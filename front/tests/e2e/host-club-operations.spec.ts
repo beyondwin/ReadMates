@@ -376,7 +376,13 @@ test("host current-session card keeps balanced metrics at 320px", async ({ page 
   await expect(head).toHaveCSS("padding-bottom", "16px");
   await expect(metrics.locator(":scope > div")).toHaveCount(3);
   expect(await metrics.evaluate((element) => getComputedStyle(element).gridTemplateColumns.split(" ").length)).toBe(3);
-  await expect(cta).toHaveCSS("height", "48px");
+  await expect(cta).toHaveCSS("width", "44px");
+  await expect(cta).toHaveCSS("height", "44px");
+  await expect(cta).toHaveAttribute("aria-label", "세션 문서 열기");
+  await expect(cta).not.toContainText("세션 문서 열기");
+  const priorityState = mobile.locator(".rm-host-mobile-priority__state");
+  expect(Number.parseFloat(await priorityState.evaluate((element) => getComputedStyle(element).rowGap)))
+    .toBeGreaterThanOrEqual(8);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 

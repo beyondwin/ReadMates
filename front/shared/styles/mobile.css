@@ -2164,3 +2164,9 @@ body[data-home="stack"] .home-carousel { display: none; }
     width: 100%;
   }
 }
+
+@media (max-width: 540px) {
+  .rm-host-session-editor__overview {
+    padding-inline: 14px !important;
+  }
+}

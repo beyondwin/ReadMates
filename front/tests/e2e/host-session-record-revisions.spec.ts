@@ -451,6 +451,12 @@ test("7. restoring an immutable version creates a draft without changing the app
 
 test("8. 320px host record navigation and confirmation sheet remain accessible", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 320, height: 720 });
+  runMysql(`
+update sessions
+set visibility = 'HOST_ONLY',
+    access_scope = 'HOST_ONLY'
+where id = '${recordSessionId}';
+`);
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions`);
   await expect(page.getByRole("heading", { name: "세션 기록 장부" })).toBeVisible();
@@ -465,10 +471,33 @@ test("8. 320px host record navigation and confirmation sheet remain accessible",
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
   }));
-  expect(sectionNavMetrics.scrollWidth).toBeGreaterThan(sectionNavMetrics.clientWidth);
+  expect(sectionNavMetrics.scrollWidth).toBeLessThanOrEqual(sectionNavMetrics.clientWidth);
+  const tabBoxes = await sectionTabs.evaluateAll((tabs) => tabs.map((tab) => {
+    const box = tab.getBoundingClientRect();
+    const style = getComputedStyle(tab);
+    return { width: box.width, height: box.height, justifyContent: style.justifyContent };
+  }));
+  expect(Math.max(...tabBoxes.map((box) => box.width)) - Math.min(...tabBoxes.map((box) => box.width)))
+    .toBeLessThanOrEqual(1);
+  expect(tabBoxes.every((box) => box.height >= 44 && box.justifyContent === "center")).toBe(true);
+  const mobileMetadata = page.getByRole("group", { name: "모바일 세션 상태" });
+  await expect(mobileMetadata).toBeVisible();
+  await expect(mobileMetadata.getByText("호스트 전용")).toHaveCount(1);
+  const metadataLines = await mobileMetadata.locator(":scope > *").evaluateAll((items) =>
+    new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+  );
+  expect(metadataLines).toBe(1);
+
+  const overviewPanel = page.locator(".rm-host-session-editor__overview");
+  await expect(overviewPanel).toHaveCSS("padding-left", "14px");
+  await expect(overviewPanel).toHaveCSS("padding-right", "14px");
   await openEditorSection(page, "기록 작업대");
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
   await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
+  const refreshDraft = page.getByRole("button", { name: "최신 정보 확인 완료" });
+  await expect(refreshDraft).toBeVisible();
+  await refreshDraft.click();
+  await waitForDraftSaved(page);
 
   const longMobileSummary =
     "모바일 확인용 미적용 초안 EnglishVeryLongWordWithoutNaturalBreaks "
@@ -504,6 +533,24 @@ test("8. 320px host record navigation and confirmation sheet remain accessible",
   await expect(dialog).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 844 });
+  await openRecordEditor(page);
+  const wideMobileMetadata = page.getByRole("group", { name: "모바일 세션 상태" });
+  const wideMetadataLines = await wideMobileMetadata.locator(":scope > *").evaluateAll((items) =>
+    new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
+  );
+  expect(wideMetadataLines).toBe(1);
+  const wideSectionTabs = page.getByRole("tablist", { name: "호스트 편집 섹션" }).getByRole("tab");
+  await expect(wideSectionTabs).toHaveCount(5);
+  for (const tab of await wideSectionTabs.all()) {
+    await expect(tab).toBeVisible();
+  }
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const overviewScreenshot = await page.screenshot({
+    path: testInfo.outputPath("host-editor-overview-390x844.png"),
+    fullPage: true,
+  });
+  expect(overviewScreenshot.byteLength).toBeGreaterThan(10_000);
+  await openEditorSection(page, "기록 작업대");
   await page.getByRole("button", { name: "반영 검토" }).click();
   await expect(dialog).toBeVisible();
   const wideMobileBox = await sheet.boundingBox();
