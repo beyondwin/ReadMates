@@ -48,7 +48,19 @@
 
 첫 full gate는 모바일 세션 편집기의 5개 탭이 실제로 viewport 안에 들어가는데도 overflow를 요구하던 stale E2E assertion 1건을 검출했습니다. 현행 반응형 계약과 같은 suite의 인접 검증을 기준으로 기대값을 수정했고, 해당 focused E2E 1/1과 전체 release gate를 새로 실행해 통과했습니다.
 
-Tag 후 원격 `main` CI, server image scan/promote, OCI Flyway/health, frontend deployment와 production smoke 결과는 배포 완료 뒤 workflow ID와 공개 가능한 상태만 추가합니다.
+## Production deployment evidence
+
+| Stage | Result |
+| --- | --- |
+| Release commit and CI | **PASS** — `main`과 annotated `v2.3.0` tag는 `50e0d316b8e5e64a2079e0758a222de79b666f0a`을 가리킵니다. [main CI 31266473480](https://github.com/beyondwin/ReadMates/actions/runs/31266473480)의 backend, frontend, design, scripts, public safety, integration과 E2E shard가 모두 성공했습니다. |
+| Dependency alerts | **PASS** — tag 전 발견된 HIGH `brace-expansion`과 `nanoid` advisory를 `5.0.9`, `3.3.17`로 forward-fix했고 GitHub open HIGH alert와 `pnpm audit --audit-level high`가 모두 0건입니다. |
+| Server image | **PASS** — [Deploy Server Image 31266723555](https://github.com/beyondwin/ReadMates/actions/runs/31266723555)가 ARM64 scan candidate를 Trivy HIGH/CRITICAL 기준으로 통과시킨 뒤 동일 digest `sha256:bc9bf9fb298b249c8181579f12baf80253ae21782c71b7d206c8c71893474fc4`를 `v2.3.0`에 promote했습니다. |
+| OCI backend | **PASS** — 최근 48시간 DB backup과 active backup timer를 확인한 뒤 promoted digest를 배포했습니다. Running image/tag 일치, restart 0, container health, `/internal/health`, deploy ledger SUCCESS와 Flyway latest `47:1`을 확인했습니다. Runtime config는 변경하지 않았습니다. |
+| Cloudflare frontend | **PASS** — backend 검증 뒤 [Deploy Front 31267581997](https://github.com/beyondwin/ReadMates/actions/runs/31267581997)이 exact `v2.3.0` tag checkout, lint, test, build, Zod fixture check와 Pages deployment를 성공했습니다. |
+| Production smoke | **PASS** — Pages marker와 public app, anonymous auth, anonymous admin operations 401, OAuth start redirect와 public-safe OAuth error navigation/no-store, selected-session guest note feed scope/no-store를 read-only로 확인했습니다. |
+| GitHub Release | **PUBLISHED** — [ReadMates v2.3.0](https://github.com/beyondwin/ReadMates/releases/tag/v2.3.0) |
+
+실제 Google OAuth provider 완료, AI provider 호출, 이메일 발송, OWNER/OPERATOR lifecycle mutation과 실제 member data 변경은 수행하지 않았습니다. SUPPORT/OWNER/OPERATOR의 authenticated UI 경계는 server/API/E2E evidence로 확인했고 production에서는 anonymous deny와 read-only public 경계만 smoke했습니다.
 
 ## Production boundary
 
