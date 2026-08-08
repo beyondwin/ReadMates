@@ -1773,7 +1773,8 @@
     gap: 16px;
   }
   .rm-host-session-editor__section-panel,
-  .rm-host-session-editor__section {
+  .rm-host-session-editor__section,
+  .rm-host-session-editor__overview {
     padding: 16px !important;
   }
   .rm-host-session-overview,
@@ -1823,6 +1824,7 @@
 @media (max-width: 360px) {
   .rm-host-session-editor__section-panel,
   .rm-host-session-editor__section,
+  .rm-host-session-editor__overview,
   .rm-session-record-workspace {
     padding: 14px !important;
   }
@@ -2162,11 +2164,5 @@ body[data-home="stack"] .home-carousel { display: none; }
   .host-notification-composer-dialog--side-sheet .btn-primary {
     min-height: 44px;
     width: 100%;
-  }
-}
-
-@media (max-width: 540px) {
-  .rm-host-session-editor__overview {
-    padding-inline: 14px !important;
   }
 }

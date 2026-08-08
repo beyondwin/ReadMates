@@ -496,8 +496,16 @@ where id = '${recordSessionId}';
   await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
   const refreshDraft = page.getByRole("button", { name: "최신 정보 확인 완료" });
   await expect(refreshDraft).toBeVisible();
+  const refreshResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST" &&
+      response.url().includes(`/host/sessions/${recordSessionId}/record-draft/rebase`),
+  );
   await refreshDraft.click();
-  await waitForDraftSaved(page);
+  const refreshed = await refreshResponse;
+  expect(refreshed.status(), await refreshed.text()).toBe(200);
+  await expect(refreshDraft).toHaveCount(0);
+  await expect(page.getByText(/세션 기본 정보 또는 현재 적용본이 변경되어/)).toHaveCount(0);
 
   const longMobileSummary =
     "모바일 확인용 미적용 초안 EnglishVeryLongWordWithoutNaturalBreaks "
@@ -534,6 +542,8 @@ where id = '${recordSessionId}';
 
   await page.setViewportSize({ width: 390, height: 844 });
   await openRecordEditor(page);
+  await expect(overviewPanel).toHaveCSS("padding-left", "16px");
+  await expect(overviewPanel).toHaveCSS("padding-right", "16px");
   const wideMobileMetadata = page.getByRole("group", { name: "모바일 세션 상태" });
   const wideMetadataLines = await wideMobileMetadata.locator(":scope > *").evaluateAll((items) =>
     new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
