@@ -380,6 +380,12 @@ describe("HostSessionEditor", () => {
     expect(bookAndSessionPanel).not.toBeNull();
     expect(within(bookAndSessionPanel as HTMLElement).getByText("도서 정보")).toBeVisible();
     expect(screen.queryByText("세션 문서 편집")).not.toBeInTheDocument();
+    const mobileMetadata = screen.getByRole("group", { name: "모바일 세션 상태" });
+    expect(Array.from(mobileMetadata.children, (item) => item.textContent)).toEqual([
+      "새 예정 세션",
+      "호스트 전용",
+      "초안 준비됨",
+    ]);
   });
 
   it("shows helpful hints for the new-session title and book fields", () => {
@@ -406,17 +412,30 @@ describe("HostSessionEditor", () => {
       ...openSession,
       date: "2026-05-20",
     };
+    const workflow = recordWorkflow("HOST_ONLY");
+    workflow.saveState = "idle";
 
-    render(<HostSessionEditorForTest session={currentOpenSession} />);
+    render(<HostSessionEditorForTest session={currentOpenSession} recordWorkflow={workflow} />);
 
     expect(screen.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
     expect(screen.getByText("세션 운영 문서")).toBeVisible();
     expect(screen.queryByText("세션 운영 문서 · No.7")).not.toBeInTheDocument();
-    expect(screen.getByRole("group", { name: "No.07 · 이번 세션 · 준비 중 · D-18" })).toBeVisible();
-    expect(screen.getByText("No.07")).toHaveClass("rm-session-identity__number");
-    expect(screen.getByText("준비 중")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
-    expect(screen.getByText("D-18")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
-    expect(screen.getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
+    const desktopMetadata = screen.getByRole("group", { name: "데스크톱 세션 상태" });
+    expect(within(desktopMetadata).getByRole("group", {
+      name: "No.07 · 이번 세션 · 준비 중 · D-18",
+    })).toBeVisible();
+    expect(within(desktopMetadata).getByText("No.07")).toHaveClass("rm-session-identity__number");
+    expect(within(desktopMetadata).getByText("준비 중")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    expect(within(desktopMetadata).getByText("D-18")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
+    expect(within(desktopMetadata).getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
+
+    const mobileMetadata = screen.getByRole("group", { name: "모바일 세션 상태" });
+    expect(within(mobileMetadata).getByText("No.07")).toBeInTheDocument();
+    expect(within(mobileMetadata).getByText("준비 중")).toBeInTheDocument();
+    expect(within(mobileMetadata).getAllByText("호스트 전용")).toHaveLength(1);
+    expect(within(mobileMetadata).getByText("초안 준비됨")).toBeInTheDocument();
+    expect(within(mobileMetadata).queryByText("이번 세션")).not.toBeInTheDocument();
+    expect(within(mobileMetadata).queryByText("D-18")).not.toBeInTheDocument();
     expect(screen.queryByText("문서 있음")).not.toBeInTheDocument();
     expect(screen.queryByText("No.07 · D-18")).not.toBeInTheDocument();
     expect(screen.getByText("현재 적용본")).toBeVisible();

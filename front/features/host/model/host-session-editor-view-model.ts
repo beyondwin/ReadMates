@@ -1,5 +1,6 @@
 import {
   recordVisibilityLabel,
+  type HostSessionState,
   type SessionRecordVisibility,
 } from "./host-session-editor-model";
 import type { HostSessionEditorLocation } from "./host-session-editor-navigation";
@@ -100,6 +101,13 @@ const changedFieldLabels: Record<string, string> = {
   feedbackDocument: "피드백 문서",
 };
 
+const compactSessionLifecycleLabels: Record<HostSessionState, string> = {
+  DRAFT: "예정",
+  OPEN: "준비 중",
+  CLOSED: "마감",
+  PUBLISHED: "공개",
+};
+
 const historySourceLabels: Record<NonNullable<HostSessionHistoryItem["revisionSource"]>, string> = {
   BASELINE: "기본 기록",
   ...draftSourceLabels,
@@ -137,6 +145,10 @@ export function buildHostSessionHistoryItemView(item: HostSessionHistoryItem): H
       && item.revisionVersion !== null
       && item.revisionVersion > 0,
   };
+}
+
+export function compactSessionLifecycleLabel(state: HostSessionState | null): string {
+  return state === null ? "새 예정 세션" : compactSessionLifecycleLabels[state];
 }
 
 function buildDraftOverview(input: HostSessionEditorOverviewInput): HostSessionEditorOverview["draft"] {

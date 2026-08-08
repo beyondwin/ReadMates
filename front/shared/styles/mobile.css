@@ -1607,6 +1607,15 @@
 .rm-host-session-editor__content {
   padding: 8px 0 80px;
 }
+.rm-host-session-editor__desktop-metadata {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+.rm-host-session-editor__record-status {
+  gap: 8px;
+  flex-wrap: wrap;
+}
 .rm-host-session-editor__section-nav {
   display: flex;
   width: 100%;
@@ -1687,6 +1696,23 @@
   top: 86px;
 }
 @media (max-width: 768px) {
+  .rm-host-session-editor__mobile-metadata {
+    width: 100%;
+    margin-top: 10px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    scrollbar-width: none;
+    white-space: nowrap;
+  }
+  .rm-host-session-editor__mobile-metadata::-webkit-scrollbar {
+    display: none;
+  }
+  .rm-host-session-editor__mobile-metadata > * {
+    flex: 0 0 auto;
+  }
   .rm-host-session-editor {
     overflow-x: clip;
   }

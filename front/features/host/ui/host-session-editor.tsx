@@ -30,7 +30,10 @@ import type {
   HostSessionEditorLocation,
   HostSessionEditorSection,
 } from "@/features/host/model/host-session-editor-navigation";
-import { buildHostSessionEditorOverview } from "@/features/host/model/host-session-editor-view-model";
+import {
+  buildHostSessionEditorOverview,
+  compactSessionLifecycleLabel,
+} from "@/features/host/model/host-session-editor-view-model";
 import {
   buildSessionImportCommitResult,
   buildSessionImportRequest,
@@ -934,7 +937,11 @@ export default function HostSessionEditor({
             <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
               {editorTitle}
             </h1>
-            <div style={{ marginTop: "10px" }}>
+            <div
+              className="desktop-only rm-host-session-editor__desktop-metadata"
+              role="group"
+              aria-label="데스크톱 세션 상태"
+            >
               {displaySession ? (
                 <SessionIdentity
                   sessionNumber={displaySession.sessionNumber}
@@ -945,13 +952,29 @@ export default function HostSessionEditor({
               ) : (
                 <div className="rm-session-identity">
                   <span className="rm-session-identity__chip">새 예정 세션</span>
-                  <span className="rm-session-identity__chip">호스트 전용</span>
                 </div>
               )}
+              <div className="row rm-host-session-editor__record-status">
+                <span className="badge">{overview.applied.visibilityLabel}</span>
+                <span className="badge">{overview.draft.statusLabel}</span>
+              </div>
             </div>
-            <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-              <span className="badge">{overview.applied.visibilityLabel}</span>
-              <span className="badge">{overview.draft.statusLabel}</span>
+
+            <div
+              className="mobile-only rm-host-session-editor__mobile-metadata"
+              role="group"
+              aria-label="모바일 세션 상태"
+            >
+              {displaySession?.sessionNumber ? (
+                <span className="rm-session-identity__chip">
+                  {`No.${String(displaySession.sessionNumber).padStart(2, "0")}`}
+                </span>
+              ) : null}
+              <span className="rm-session-identity__chip">
+                {compactSessionLifecycleLabel(displaySession?.state ?? null)}
+              </span>
+              <span className="rm-session-identity__chip">{overview.applied.visibilityLabel}</span>
+              <span className="rm-session-identity__chip">{overview.draft.statusLabel}</span>
             </div>
           </div>
         </div>

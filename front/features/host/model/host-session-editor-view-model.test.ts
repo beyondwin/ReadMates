@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildHostSessionEditorOverview,
   buildHostSessionHistoryItemView,
+  compactSessionLifecycleLabel,
 } from "./host-session-editor-view-model";
 
 const snapshot = {
@@ -37,6 +38,16 @@ function overviewInput() {
 }
 
 describe("host session editor view model", () => {
+  it.each([
+    [null, "새 예정 세션"],
+    ["DRAFT", "예정"],
+    ["OPEN", "준비 중"],
+    ["CLOSED", "마감"],
+    ["PUBLISHED", "공개"],
+  ] as const)("maps %s to compact mobile lifecycle copy", (state, expected) => {
+    expect(compactSessionLifecycleLabel(state)).toBe(expected);
+  });
+
   it.each([
     [
       "requires basic information before a new session is saved",
