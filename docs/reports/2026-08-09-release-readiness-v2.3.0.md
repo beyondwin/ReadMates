@@ -20,7 +20,7 @@
 
 - **CHANGELOG/운영 문서:** 사용자·운영자 변화, V47, backend-first 순서, forward-only rollback과 no-send smoke 범위를 `CHANGELOG.md`, architecture, deploy README와 runbook에 반영했습니다.
 - **CI/deploy artifact:** `.github/workflows`와 deploy script는 이 범위에서 바뀌지 않았습니다. 기존 exact annotated tag checkout, tag commit/HEAD 일치, scan-candidate와 promoted digest 동일성 계약을 repository checker로 재검증합니다.
-- **Security-code hygiene:** OAuth 오류는 allowlist kind와 safe relative `returnTo`만 사용하고 upstream body를 노출하지 않습니다. Admin operation projection은 raw provider error, email, recipient, transcript와 private member content를 제외합니다.
+- **Security-code hygiene:** OAuth 오류는 allowlist kind와 safe relative `returnTo`만 사용하고 upstream body를 노출하지 않습니다. Admin operation projection은 raw provider error, email, recipient, transcript와 private member content를 제외합니다. Tag 전 GitHub가 새로 공개한 HIGH advisory를 반영해 `brace-expansion`은 `5.0.9`, `nanoid`는 `3.3.17`로 고정합니다.
 - **Architecture baseline:** `admin.operations`를 기존 port/adapter 경계와 architecture test registry에 포함했고 baseline·exception list를 늘리지 않았습니다.
 - **Public release safety:** 실제 member data, private deployment state, local absolute path, secret/token-shaped 값을 문서와 release note에 기록하지 않습니다. 실제 AI provider 호출, 이메일 발송, OAuth 완료와 production mutation은 release smoke에서 제외합니다.
 - **Branch policy:** GitHub ruleset은 비어 있고 `main` protection에는 required status check/review와 admin enforcement가 없습니다. 이를 `POLICY_MISMATCH`로 기록하고 release commit의 로컬 full gate와 원격 `main` CI 성공을 tag 전 수동으로 강제합니다.
@@ -39,10 +39,11 @@
 | Evidence | Result |
 | --- | --- |
 | `./scripts/pre-push-check.sh --full --release` | **PASS** — pinned `pnpm@11.13.1`, frontend lint, build, Zod fixture freshness, server quality, Testcontainers integration, public release candidate, AI config와 observability config를 포함한 전체 gate |
-| Frontend unit/coverage | **PASS** — 274 files / 2,153 tests; 84.51% statements, 79.65% branches, 84.30% functions, 85.27% lines |
+| Frontend unit/coverage | **PASS** — 274 files / 2,153 tests; 84.50% statements, 79.63% branches, 84.30% functions, 85.25% lines |
 | Server unit/architecture | **PASS** — unit 1,091 tests(1 skipped), architecture 28 tests; failure/error 0 |
 | Server integration | **PASS** — MySQL/Testcontainers 872 tests; failure/error 0 |
 | Chromium E2E | **PASS** — 146/146 |
+| Dependency audit | **PASS** — `corepack pnpm audit --audit-level high`; known vulnerability 0 |
 | Public/deploy safety | **PASS** — deploy workflow contract, scanned-image promotion invariant, gitleaks/public candidate, production AI config와 Prometheus/Tempo/Grafana/Alertmanager validation |
 
 첫 full gate는 모바일 세션 편집기의 5개 탭이 실제로 viewport 안에 들어가는데도 overflow를 요구하던 stale E2E assertion 1건을 검출했습니다. 현행 반응형 계약과 같은 suite의 인접 검증을 기준으로 기대값을 수정했고, 해당 focused E2E 1/1과 전체 release gate를 새로 실행해 통과했습니다.

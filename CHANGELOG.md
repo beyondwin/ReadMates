@@ -29,6 +29,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Fixed
 
 - **OAuth/BFF navigation 오류:** 잘못된 provider route, upstream 4xx/5xx, network failure를 HTML 문서 탐색에서는 `no-store` 오류 화면으로 전환하고 non-HTML 요청은 기존 public-safe JSON 오류 contract를 유지합니다. 오류 kind와 `returnTo`는 allowlist·same-origin 상대 경로로 제한하고 recursive `/auth/error` 복귀를 거절합니다.
+- **릴리스 의존성 보안:** 전이 의존성 `brace-expansion`을 DoS 수정 버전 `5.0.9`, `nanoid`를 zero-size custom generator 무한 반복 수정 버전 `3.3.17`로 강제해 HIGH audit 경고를 제거했습니다.
 - 긴 검토 label, guest feedback 잠금 dialog, 멤버 홈 간격과 최근 기록 action 정렬을 다듬고, 선택한 guest note session이 route layout 전환 뒤에도 유지되도록 했습니다.
 
 ### Database
@@ -43,10 +44,10 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Verification
 
-- Release candidate gate: repository-pinned `pnpm@11.13.1`로 frontend lint, 274 files / 2,153 tests와 coverage(84.51% statements, 79.65% branches, 84.30% functions, 85.27% lines), production build와 Zod fixture freshness를 확인했습니다.
+- Release candidate gate: repository-pinned `pnpm@11.13.1`로 frontend lint, 274 files / 2,153 tests와 coverage(84.50% statements, 79.63% branches, 84.30% functions, 85.25% lines), production build와 Zod fixture freshness를 확인했습니다.
 - Server evidence: PR quality gate에서 unit 1,091 tests(1 skipped)와 architecture 28 tests가 통과했고, MySQL/Testcontainers integration 872 tests가 통과했습니다.
 - Browser/design evidence: Chromium E2E 146/146이 통과했습니다. 모바일 세션 편집기의 5개 탭이 의도대로 viewport 안에 들어가는 계약과 어긋난 기존 overflow 기대값을 수정한 뒤 해당 focused E2E 1/1과 전체 suite를 다시 확인했습니다.
-- Release safety: deploy workflow contract, AI production config, public release candidate/gitleaks와 Prometheus/Tempo/Grafana/Alertmanager 검증이 통과했습니다.
+- Release safety: `pnpm audit --audit-level high` 0건, deploy workflow contract, AI production config, public release candidate/gitleaks와 Prometheus/Tempo/Grafana/Alertmanager 검증이 통과했습니다.
 
 ## v2.2.0 - 2026-08-03
 
