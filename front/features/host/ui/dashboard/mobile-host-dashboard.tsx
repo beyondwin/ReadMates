@@ -140,7 +140,7 @@ export function MobileHostDashboard({
           <span className="tiny">최대 3건</span>
         </div>
         <div className="rm-host-mobile-priority__state">
-          <span className="badge badge-accent badge-dot">{_nextAction.loopLabel}</span>
+          <span className="badge badge-warn badge-dot">{_nextAction.loopLabel}</span>
           <span className="small">{_nextAction.loopBridge}</span>
         </div>
         <HostPrepPaceNote pace={prepPace} />
@@ -221,15 +221,27 @@ export function MobileHostDashboard({
                 <p className="small">새 세션을 등록하면 RSVP와 질문 작성이 열립니다.</p>
               </>
             )}
+            {session ? (
+              <LinkComponent
+                to={sessionEditHref}
+                state={sessionEditState}
+                className="rm-host-dashboard-mobile__session-cta rm-host-dashboard-mobile__session-cta--icon"
+                aria-label="세션 문서 열기"
+              >
+                <Icon name="arrow-right" size={16} />
+              </LinkComponent>
+            ) : null}
           </div>
-          <LinkComponent
-            to={sessionEditHref}
-            state={sessionEditState}
-            className="btn btn-primary rm-host-dashboard-mobile__session-cta"
-          >
-            <span>{session ? "세션 문서 열기" : "세션 문서 만들기"}</span>
-            <Icon name="arrow-right" size={14} />
-          </LinkComponent>
+          {session ? null : (
+            <LinkComponent
+              to={sessionEditHref}
+              state={sessionEditState}
+              className="btn btn-primary rm-host-dashboard-mobile__session-cta rm-host-dashboard-mobile__session-cta--create"
+            >
+              <span>세션 문서 만들기</span>
+              <Icon name="arrow-right" size={14} />
+            </LinkComponent>
+          )}
         </article>
       </section>
 

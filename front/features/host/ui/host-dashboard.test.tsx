@@ -282,10 +282,21 @@ describe("HostDashboard", () => {
     expect(within(head).getByRole("group", { name: /No\.09/ })).not.toHaveTextContent("이번 세션");
     expect(note).toHaveTextContent("미응답 1명");
     expect(head).not.toHaveTextContent("참석 1명");
-    expect(within(card).getByRole("link", { name: "세션 문서 열기" })).toHaveAttribute(
+    const openLink = within(card).getByRole("link", { name: "세션 문서 열기" });
+    expect(openLink).toHaveAttribute(
       "href",
       "/app/host/sessions/session-9/edit",
     );
+    expect(openLink).toHaveClass(
+      "rm-host-dashboard-mobile__session-cta",
+      "rm-host-dashboard-mobile__session-cta--icon",
+    );
+    expect(openLink).not.toHaveTextContent("세션 문서 열기");
+
+    const state = mobile.querySelector(".rm-host-mobile-priority__state") as HTMLElement;
+    expect(state.children).toHaveLength(2);
+    expect(within(state).getByText("호스트 준비 필요")).toBeInTheDocument();
+    expect(within(state).getByText(/세션 정보.*운영 대기 항목/)).toBeInTheDocument();
   });
 
   it("keeps the mobile current-session empty state actionable", () => {
@@ -301,7 +312,12 @@ describe("HostDashboard", () => {
     const mobile = container.querySelector(".rm-host-dashboard-mobile") as HTMLElement;
     const card = within(mobile).getByRole("article", { name: "현재 세션 요약" });
     expect(within(card).getByText("열린 세션 없음")).toBeInTheDocument();
-    expect(within(card).getByRole("link", { name: "세션 문서 만들기" })).toBeInTheDocument();
+    const createLink = within(card).getByRole("link", { name: "세션 문서 만들기" });
+    expect(createLink).toHaveClass(
+      "rm-host-dashboard-mobile__session-cta",
+      "rm-host-dashboard-mobile__session-cta--create",
+    );
+    expect(createLink).toHaveTextContent("세션 문서 만들기");
   });
 
   it("renders headings without unnamed interactive elements", () => {
