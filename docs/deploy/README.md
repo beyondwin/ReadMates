@@ -78,6 +78,8 @@ Google OAuth 로그인 성공 후 Spring은 `readmates_session` cookie를 발급
 
 프런트엔드 route guard, loader, API 401 처리는 같은 origin의 안전한 relative `returnTo`만 `/login`과 OAuth start로 전달합니다. Absolute URL, protocol-relative URL, login/reset/invite/OAuth/root path, backslash, control character가 포함된 값은 버리고, 서버는 signed return state와 허용 origin/host 정책으로 다시 검증합니다.
 
+OAuth start/callback의 HTML navigation이 invalid route, upstream 4xx/5xx 또는 network failure를 만나면 Pages Functions는 upstream 오류 body를 브라우저에 직접 노출하지 않고 `Cache-Control: no-store`인 `/auth/error?kind=...`로 전환합니다. 오류 kind는 고정 allowlist이고 `returnTo`는 안전한 relative path만 유지합니다. `fetch` 같은 non-HTML 요청은 public-safe JSON status contract를 그대로 사용하므로 운영 smoke는 document navigation과 API 응답을 구분해 확인합니다.
+
 ## 멤버십과 권한
 
 ReadMates는 제품 수준에서 invite-only 흐름을 사용합니다.
@@ -188,7 +190,7 @@ OCI helper script는 placeholder 기반이며 운영자가 값을 주입하는 �
 
 백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 여전히 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차이며, VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
 
-DB migration이 포함된 릴리즈는 같은 tag의 backend를 먼저 올리고 Spring startup Flyway와 health를 확인한 뒤에만 frontend를 배포합니다. `v2.2.0`은 V43–V46을 순서대로 적용하며 최종 schema는 guest exposure의 `access_scope`/`site_visibility`와 30-key membership avatar catalog를 사용합니다. 실패 시 migration을 되돌리지 않고 schema를 보존한 호환 image 또는 새 forward-fix tag로 복구합니다.
+DB migration이 포함된 릴리즈는 같은 tag의 backend를 먼저 올리고 Spring startup Flyway와 health를 확인한 뒤에만 frontend를 배포합니다. 현재 `v2.3.0` 릴리즈는 기존 V43–V46 schema 위에 V47의 durable admin operation case/event/source-status ledger를 additive하게 적용합니다. 실패 시 migration을 되돌리거나 이미 발행한 tag를 이동하지 않고 schema를 보존한 호환 image 또는 새 forward-fix tag로 복구합니다.
 
 Server workflow의 tag checkout, exact semver, annotated-tag/HEAD 일치, same-digest scan/promote 계약은 배포 전에 repository checker로 검증합니다.
 

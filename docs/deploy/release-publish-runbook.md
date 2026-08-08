@@ -1,6 +1,6 @@
 # 새 버전 발행과 운영 배포 Runbook
 
-검토일: 2026-08-03
+검토일: 2026-08-09
 
 이 문서는 ReadMates 새 제품 버전을 발행하고, 같은 tag로 Cloudflare Pages 프론트엔드와 OCI Compose 백엔드를 운영에 반영하는 절차입니다. 세부 설정 기준은 [Cloudflare Pages](cloudflare-pages.md), [OCI Compose Stack](compose-stack.md), [버저닝](../development/versioning.md)을 우선합니다.
 
@@ -211,7 +211,7 @@ DB migration이 있는 릴리즈는 Spring startup log 또는 Flyway schema hist
 
 알림/SMTP/Kafka가 바뀐 릴리즈는 호스트 알림 화면에서 preview/confirm, event ledger, pending/failed delivery 상태를 sanitized summary로 확인합니다. 실제 멤버 이메일, 알림 본문, club 운영 데이터는 release note에 쓰지 않습니다.
 
-서버/API/frontend contract가 함께 바뀐 platform-admin 릴리스는 OWNER 또는 OPERATOR 권한으로 `/admin/analytics`를 열어 KPI 카드와 trend table이 렌더링되는지 확인합니다. trend `series`가 충분하지 않은 환경에서는 빈 trend 상태가 렌더링되는지 확인하고, 실제 멤버 데이터나 운영 식별자는 기록하지 않습니다.
+서버/API/frontend contract가 함께 바뀐 platform-admin 릴리스는 먼저 익명 요청이 `/api/bff/api/admin/operations/cases`에서 인증 경계를 지키는지 확인합니다. 그 뒤 OWNER 또는 OPERATOR의 읽기 전용 세션으로 `/admin/today`의 queue/detail, source status와 canonical detail link가 렌더링되는지 확인하고 SUPPORT에는 lifecycle action이 노출되지 않는지 확인합니다. 실제 acknowledge·snooze·resolve mutation은 별도 운영 승인 없이 smoke로 실행하지 않으며, 실제 멤버 데이터나 운영 식별자는 기록하지 않습니다.
 
 ## Rollback 기준
 

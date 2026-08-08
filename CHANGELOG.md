@@ -8,12 +8,28 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v2.3.0 - 2026-08-09
+
+### Highlights
+
 - **플랫폼 운영 지휘대:** `/admin/today`를 클럽 readiness·domain·첫 호스트, 알림 실패·backlog, AI failed/stale job, 회차 마감 위험을 하나의 내구 운영 케이스 queue와 inspector로 처리하는 command center로 전환했습니다. Desktop은 queue와 상세를 함께 제공하고 mobile은 목록 → 상세 → 목록 흐름을 사용하며, source 일부 장애가 나도 확인 가능한 case는 계속 처리할 수 있습니다.
+- **안전한 로그인·오류 복구:** OAuth 시작·callback의 HTML navigation 실패를 public-safe한 `/auth/error` 화면으로 모으고, 상태별 안내와 검증된 상대 복귀 경로를 제공합니다. 공통 route error도 같은 editorial hierarchy와 구체적인 다음 행동을 사용합니다.
+- **멤버·호스트 모바일 완성도:** 내 공간의 최근 독서 기록과 호스트 AI 기본값 도구를 더 조밀하고 읽기 쉽게 정리했습니다. 호스트 모바일 대시보드와 세션 편집기는 핵심 행동, 현재 세션 metadata, 다섯 편집 탭을 좁은 화면에서도 겹침 없이 사용할 수 있도록 다듬었습니다.
 
 ### Changed
 
 - **운영 케이스 lifecycle과 권한:** case는 `OPEN`, `ACKNOWLEDGED`, `SNOOZED`, `RESOLVED` 상태와 optimistic version, immutable event history를 가집니다. 운영 화면의 활성 건수는 `RESOLVED`를 제외한 모든 상태를 포함합니다. OWNER와 OPERATOR만 acknowledge·최대 7일 snooze·resolve 검증을 실행하고 SUPPORT는 safe projection만 읽습니다. Resolve는 exact source identity가 authoritative하게 사라진 경우에만 성공하며 active·부분 조회·source unavailable은 fail closed합니다.
 - **운영 shell과 안전 경계:** admin 탐색을 Command·Operations·Review 업무 그룹과 compact source status로 정리했습니다. Case API는 allowlist summary, aggregate impact, freshness와 canonical detail link만 제공하며 기존 club publication, notification replay, AI recovery, support grant mutation route를 변경하지 않고 범용 execute endpoint도 추가하지 않습니다.
+- **운영 케이스 API:** `GET /api/admin/operations/cases`, case 상세와 acknowledge·snooze·resolve action을 추가했습니다. 목록은 state·severity·source·assignee filter와 opaque cursor를 사용하고 mutation은 exact expected version을 요구합니다.
+- **게스트 노트 범위:** 공개 노트 feed의 optional `sessionId` query를 backend와 frontend가 함께 사용해 선택한 회차의 질문·서평만 pagination합니다. 회차 선택과 cursor cache는 club·session별로 분리되며 선택하지 않은 기존 전체 feed contract는 유지합니다.
+- **반응형 작업 밀도:** 멤버 최근 독서 행은 날짜·회차·책 정보와 기록 action의 위계를 맞췄고, 호스트 AI 기본값은 별도 설명 card 대신 compact 운영 도구로 정리했습니다. 모바일 호스트 화면은 현재 세션 CTA, 운영 항목, 예정 세션 흐름을 중복 없이 배치하며 세션 편집 metadata와 section tab은 320px 폭까지 축약 label과 fallback wrapping을 사용합니다.
+
+### Fixed
+
+- **OAuth/BFF navigation 오류:** 잘못된 provider route, upstream 4xx/5xx, network failure를 HTML 문서 탐색에서는 `no-store` 오류 화면으로 전환하고 non-HTML 요청은 기존 public-safe JSON 오류 contract를 유지합니다. 오류 kind와 `returnTo`는 allowlist·same-origin 상대 경로로 제한하고 recursive `/auth/error` 복귀를 거절합니다.
+- 긴 검토 label, guest feedback 잠금 dialog, 멤버 홈 간격과 최근 기록 action 정렬을 다듬고, 선택한 guest note session이 route layout 전환 뒤에도 유지되도록 했습니다.
 
 ### Database
 
@@ -21,7 +37,16 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Deployment Notes
 
-- 이 변경은 저장소 구현과 로컬 검증이며 production 배포나 live provider·이메일 호출을 수행하지 않았습니다. 별도 release가 승인되면 V47과 operations API를 포함한 backend를 먼저 배포해 Flyway·health·authorization을 확인한 뒤 같은 tag의 frontend를 배포하고 desktop/mobile smoke를 수행합니다.
+- Annotated `v2.3.0` tag에서 `Deploy Server Image`가 scan한 digest를 같은 release tag로 promote한 뒤 OCI backend를 먼저 배포합니다. Spring startup Flyway가 V47까지 적용되고 `/internal/health`, anonymous BFF auth, guest note feed와 admin operations authorization이 정상인 경우에만 같은 `v2.3.0` tag의 Cloudflare Pages frontend를 배포합니다.
+- V47은 forward-only입니다. 실패 시 migration을 되돌리거나 이미 발행한 tag를 이동하지 않고 V47 schema와 호환되는 이전 image 또는 새 patch forward-fix를 사용합니다. Runtime env rendering, host-write client contract와 provider activation policy는 바뀌지 않으므로 `sync-config` mutation은 필요하지 않습니다.
+- Production smoke는 public app/auth, OAuth start/error navigation, guest selected-session note read와 OWNER/OPERATOR/SUPPORT의 admin operations read/denied 경계를 read-only 또는 no-send 방식으로 확인합니다. 실제 Google OAuth 완료, AI provider 호출, 이메일 발송, 실제 member/admin mutation은 별도 승인 없이 실행하지 않습니다.
+
+### Verification
+
+- Release candidate gate: repository-pinned `pnpm@11.13.1`로 frontend lint, 274 files / 2,153 tests와 coverage(84.51% statements, 79.65% branches, 84.30% functions, 85.27% lines), production build와 Zod fixture freshness를 확인했습니다.
+- Server evidence: PR quality gate에서 unit 1,091 tests(1 skipped)와 architecture 28 tests가 통과했고, MySQL/Testcontainers integration 872 tests가 통과했습니다.
+- Browser/design evidence: Chromium E2E 146/146이 통과했습니다. 모바일 세션 편집기의 5개 탭이 의도대로 viewport 안에 들어가는 계약과 어긋난 기존 overflow 기대값을 수정한 뒤 해당 focused E2E 1/1과 전체 suite를 다시 확인했습니다.
+- Release safety: deploy workflow contract, AI production config, public release candidate/gitleaks와 Prometheus/Tempo/Grafana/Alertmanager 검증이 통과했습니다.
 
 ## v2.2.0 - 2026-08-03
 

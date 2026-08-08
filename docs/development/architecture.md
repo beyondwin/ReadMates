@@ -90,6 +90,8 @@ Cloudflare Pages Functions BFF가 upstream Spring API에 도달하기 전에 거
 
 프런트엔드 `shared/api`는 non-OK 응답을 `ReadmatesApiError`로 변환하고 status, code, message, fallback 여부, response metadata를 보존한다. JSON body가 비어 있거나 잘못된 형태여도 HTTP status를 기준으로 안전한 fallback code/message를 만든다. React Router route boundary는 HTTP status와 public/member/host/auth context를 기준으로 404, 403, 409, 410, 5xx 화면을 보여주며, code와 message는 `ReadmatesApiError`에 보존한다.
 
+OAuth start와 callback은 browser document navigation과 API-style request를 구분합니다. Pages Functions와 로컬 Vite proxy가 HTML navigation에서 invalid provider route, upstream 4xx/5xx 또는 network failure를 만나면 원래 body를 노출하지 않고 `Cache-Control: no-store`인 `/auth/error?kind=...`로 전환합니다. `kind`는 고정 allowlist이고 `returnTo`는 same-origin의 안전한 relative path만 보존하며 `/auth/error` 자체로의 재귀 복귀는 거절합니다. Non-HTML 요청은 `ApiErrorResponse`와 같은 public-safe JSON/status contract를 유지합니다.
+
 보호 API의 401 기본값은 안전한 `returnTo`를 가진 login redirect입니다. 이미 성공한 내용을 화면에 유지하는 mounted current-session/archive/notes read만 `recover-read`, 작성 중 입력을 유지할 current-session mutation만 `recover-write`를 명시적으로 opt-in합니다. Read recovery는 현재 exact scoped URL의 guest capability와 public resource를 매 episode마다 다시 확인한 경우에만 `게스트로 계속 보기`를 제공하고, write recovery는 재로그인만 제공합니다. Host/admin/feedback/personal/profile/notification, loader-only member home과 opt-in하지 않은 호출은 기본 401 redirect를 유지합니다. Write expiry는 같은 episode의 후속 read 401로 guest 전환 상태로 낮아지지 않습니다.
 
 Feature-specific unavailable state는 feature가 계속 소유한다. 공개 세션이 없는 상태, 피드백 문서가 없거나 권한이 없는 상태, 초대 링크 검증 오류처럼 제품 맥락이 있는 화면은 generic route error page로 대체하지 않는다.

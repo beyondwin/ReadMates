@@ -281,7 +281,7 @@ async function expectMobileEditorChrome(page: Page): Promise<void> {
     clientWidth: element.clientWidth,
     scrollWidth: element.scrollWidth,
   }));
-  expect(sectionNavMetrics.scrollWidth).toBeGreaterThan(sectionNavMetrics.clientWidth);
+  expect(sectionNavMetrics.scrollWidth).toBeLessThanOrEqual(sectionNavMetrics.clientWidth);
 
   const appNav = page.getByRole("navigation", { name: "앱 탭" });
   const stickyAction = page.getByRole("region", { name: "반영 검토 작업" });

@@ -102,6 +102,8 @@ https://<primary-domain>/login/oauth2/code/google
 
 ReadMates의 기본 전략은 OAuth start는 현재 Pages 또는 registered host에서 시작할 수 있게 두고, Google에 전달하는 callback `redirect_uri`는 `READMATES_AUTH_BASE_URL`의 primary auth origin으로 모으는 방식입니다. 프런트엔드는 같은 origin의 안전한 relative `returnTo`만 OAuth start에 붙이고, 성공 후에는 signed return state로 검증된 흐름만 원래 클럽 path나 registered club host로 복귀합니다. 일반 로그인은 `/app` smart entry로 이동합니다. 따라서 club별 registered host를 Google redirect URI에 모두 추가하지 않습니다. 단, 운영자가 OAuth callback 자체를 특정 registered host에서 받도록 바꾸는 경우에는 해당 host의 `/login/oauth2/code/google`도 Google Cloud에 등록해야 합니다.
 
+Pages Functions의 OAuth proxy는 HTML document navigation 실패를 public-safe한 `/auth/error?kind=...`로 전환하고 `Cache-Control: no-store`를 설정합니다. Invalid provider route, upstream HTTP failure와 network failure는 고정된 error kind로만 전달되며 upstream body, 내부 host, secret은 노출하지 않습니다. 안전한 relative `returnTo`만 오류 화면의 다음 행동에 사용할 수 있고 `/auth/error` 재귀 복귀는 거절합니다. Non-HTML 요청은 JSON status contract를 유지합니다.
+
 ## Spring과 맞춰야 하는 값
 
 Cloudflare origin과 Spring 설정은 같은 browser-facing origin 집합을 바라봐야 합니다. Primary auth origin을 아직 쓰지 않는 배포에서는 `READMATES_AUTH_BASE_URL`을 `READMATES_APP_BASE_URL`과 같은 fallback origin으로 둡니다.
