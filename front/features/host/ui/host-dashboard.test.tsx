@@ -279,6 +279,7 @@ describe("HostDashboard", () => {
     const note = head.querySelector(".rm-host-dashboard-mobile__session-note") as HTMLElement;
 
     expect(head).toBeInTheDocument();
+    expect(head).toHaveClass("rm-host-dashboard-mobile__session-head--with-action");
     expect(within(head).getByRole("group", { name: /No\.09/ })).not.toHaveTextContent("이번 세션");
     expect(note).toHaveTextContent("미응답 1명");
     expect(head).not.toHaveTextContent("참석 1명");
@@ -311,6 +312,8 @@ describe("HostDashboard", () => {
 
     const mobile = container.querySelector(".rm-host-dashboard-mobile") as HTMLElement;
     const card = within(mobile).getByRole("article", { name: "현재 세션 요약" });
+    const head = card.querySelector(".rm-host-dashboard-mobile__session-head") as HTMLElement;
+    expect(head).not.toHaveClass("rm-host-dashboard-mobile__session-head--with-action");
     expect(within(card).getByText("열린 세션 없음")).toBeInTheDocument();
     const createLink = within(card).getByRole("link", { name: "세션 문서 만들기" });
     expect(createLink).toHaveClass(

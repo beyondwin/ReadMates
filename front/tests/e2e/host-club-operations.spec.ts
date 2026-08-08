@@ -95,6 +95,21 @@ async function routeHostDashboardPublicSafe(page: Page): Promise<void> {
   });
 }
 
+async function routeEmptyCurrentSession(page: Page): Promise<void> {
+  await page.route((url) => matchesExactBffUrl(
+    url,
+    "/api/bff/api/sessions/current",
+    [{}, { clubSlug: "reading-sai" }],
+  ), async (route) => {
+    expect(route.request().method()).toBe("GET");
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ currentSession: null }),
+    });
+  });
+}
+
 async function routeHostSessionsPublicSafe(page: Page): Promise<void> {
   await page.route((url) => matchesExactBffUrl(
     url,
@@ -384,6 +399,42 @@ test("host current-session card keeps balanced metrics at 320px", async ({ page 
   expect(Number.parseFloat(await priorityState.evaluate((element) => getComputedStyle(element).rowGap)))
     .toBeGreaterThanOrEqual(8);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+});
+
+test("host empty current-session card uses the full text measure at 320px", async ({ page }, testInfo) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await routeHostDashboardPublicSafe(page);
+  await routeHostClubOperations(page);
+  await routeHostSessionsPublicSafe(page);
+  await routeEmptyCurrentSession(page);
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto("/clubs/reading-sai/app/host");
+
+  const card = page
+    .locator("main.rm-host-dashboard-mobile")
+    .getByRole("article", { name: "현재 세션 요약" });
+  const head = card.locator(".rm-host-dashboard-mobile__session-head");
+  const heading = head.getByRole("heading", { name: "열린 세션 없음" });
+  const helper = head.getByText("새 세션을 등록하면 RSVP와 질문 작성이 열립니다.");
+
+  await expect(card.getByRole("link", { name: "세션 문서 만들기" })).toBeVisible();
+  await expect(card.getByRole("link", { name: "세션 문서 열기" })).toHaveCount(0);
+  await expect(heading).toHaveCSS("padding-right", "0px");
+  await expect(helper).toHaveCSS("padding-right", "0px");
+  const measure = await Promise.all([head.boundingBox(), heading.boundingBox(), helper.boundingBox()]);
+  expect(measure.every(Boolean)).toBe(true);
+  const [headBox, headingBox, helperBox] = measure as NonNullable<typeof measure[number]>[];
+  const headContentRight = headBox.x + headBox.width
+    - Number.parseFloat(await head.evaluate((element) => getComputedStyle(element).paddingRight));
+  expect(headingBox.x + headingBox.width).toBeGreaterThanOrEqual(headContentRight - 1);
+  expect(helperBox.x + helperBox.width).toBeGreaterThanOrEqual(headContentRight - 1);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+
+  const screenshot = await page.screenshot({
+    path: testInfo.outputPath("host-dashboard-empty-320x844.png"),
+    fullPage: true,
+  });
+  expect(screenshot.byteLength).toBeGreaterThan(10_000);
 });
 
 test("host mobile notification summary keeps active states and failures readable at 320px", async ({ page }) => {

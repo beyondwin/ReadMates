@@ -545,6 +545,10 @@ where id = '${recordSessionId}';
   await expect(overviewPanel).toHaveCSS("padding-left", "16px");
   await expect(overviewPanel).toHaveCSS("padding-right", "16px");
   const wideMobileMetadata = page.getByRole("group", { name: "모바일 세션 상태" });
+  const wideDesktopMetadata = page.locator('[aria-label="데스크톱 세션 상태"]');
+  await expect(wideMobileMetadata).toHaveCSS("display", "flex");
+  await expect(wideMobileMetadata).toHaveCSS("gap", "5px");
+  await expect(wideDesktopMetadata).toHaveCSS("display", "none");
   const wideMetadataLines = await wideMobileMetadata.locator(":scope > *").evaluateAll((items) =>
     new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
   );
@@ -575,4 +579,58 @@ where id = '${recordSessionId}';
   expect(wideMobileDialogScreenshot.byteLength).toBeGreaterThan(10_000);
   await page.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await openRecordEditor(page);
+  const desktopMetadata = page.getByRole("group", { name: "데스크톱 세션 상태" });
+  const desktopMobileMetadata = page.locator('[aria-label="모바일 세션 상태"]');
+  await expect(desktopMetadata).toHaveCSS("display", "grid");
+  await expect(desktopMetadata).toHaveCSS("gap", "10px");
+  await expect(desktopMobileMetadata).toHaveCSS("display", "none");
+  const desktopScreenshot = await page.screenshot({
+    path: testInfo.outputPath("host-editor-overview-1280x900.png"),
+    fullPage: true,
+  });
+  expect(desktopScreenshot.byteLength).toBeGreaterThan(10_000);
+
+  await page.setViewportSize({ width: 240, height: 720 });
+  await openRecordEditor(page);
+  const narrowSectionNav = page.getByRole("tablist", { name: "호스트 편집 섹션" });
+  const narrowTabs = narrowSectionNav.getByRole("tab");
+  const narrowMetrics = await narrowSectionNav.evaluate((element) => ({
+    clientWidth: element.clientWidth,
+    scrollWidth: element.scrollWidth,
+    overflowX: getComputedStyle(element).overflowX,
+  }));
+  expect(narrowMetrics.scrollWidth).toBeGreaterThan(narrowMetrics.clientWidth);
+  expect(narrowMetrics.overflowX).toBe("auto");
+  const narrowTabGeometry = await narrowTabs.evaluateAll((tabs) => tabs.map((tab) => {
+    const tabBox = tab.getBoundingClientRect();
+    const label = tab.querySelector<HTMLElement>("[data-mobile-label]");
+    if (!label) throw new Error("mobile tab label missing");
+    const labelBox = label.getBoundingClientRect();
+    return {
+      left: tabBox.left,
+      right: tabBox.right,
+      width: tabBox.width,
+      height: tabBox.height,
+      labelLeft: labelBox.left,
+      labelRight: labelBox.right,
+    };
+  }));
+  expect(narrowTabGeometry.every((tab) => tab.width >= 44 && tab.height >= 44)).toBe(true);
+  expect(narrowTabGeometry.every((tab) => (
+    tab.labelLeft >= tab.left - 0.5 && tab.labelRight <= tab.right + 0.5
+  ))).toBe(true);
+  expect(narrowTabGeometry.slice(1).every((tab, index) => (
+    tab.left >= narrowTabGeometry[index].right - 0.5
+  ))).toBe(true);
+  await narrowSectionNav.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
+  expect(await narrowSectionNav.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  const narrowScreenshot = await page.screenshot({
+    path: testInfo.outputPath("host-editor-tabs-240x720.png"),
+    fullPage: true,
+  });
+  expect(narrowScreenshot.byteLength).toBeGreaterThan(10_000);
 });

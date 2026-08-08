@@ -190,7 +190,11 @@ export function MobileHostDashboard({
           className="m-card rm-host-dashboard-mobile__session-card"
           aria-label="현재 세션 요약"
         >
-          <div className="rm-host-dashboard-mobile__session-head">
+          <div
+            className={`rm-host-dashboard-mobile__session-head${
+              session ? " rm-host-dashboard-mobile__session-head--with-action" : ""
+            }`}
+          >
             {session ? (
               <>
                 <SessionTimingIdentity
