@@ -52,11 +52,10 @@ export function SessionEditorSectionNav({
 }): JSX.Element {
   return (
     <div
-      className="m-hscroll rm-host-session-editor__section-nav"
+      className="rm-host-session-editor__section-nav"
       role="tablist"
       aria-label="호스트 편집 섹션"
       onKeyDown={(event) => handleSectionKeyDown(event, activeSection, onSectionChange)}
-      style={{ gap: 6, padding: "0 0 6px" }}
     >
       {sectionItems.map((item) => {
         const selected = item.key === activeSection;
@@ -73,14 +72,6 @@ export function SessionEditorSectionNav({
             tabIndex={selected ? 0 : -1}
             className={`m-chip rm-host-session-editor__section-tab${selected ? " is-on" : ""}`}
             onClick={() => onSectionChange(item.key)}
-            style={{
-              minHeight: 36,
-              height: 36,
-              padding: "0 15px",
-              borderColor: selected ? "var(--text)" : "var(--line)",
-              background: selected ? "var(--text)" : "transparent",
-              color: selected ? "var(--bg)" : "var(--text-2)",
-            }}
           >
             <span className="desktop-only" data-desktop-label aria-hidden="true">
               {item.desktopLabel}

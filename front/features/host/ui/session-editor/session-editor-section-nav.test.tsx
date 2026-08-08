@@ -7,7 +7,7 @@ import { Panel } from "./session-editor-panel";
 import { SessionEditorSectionNav } from "./session-editor-section-nav";
 
 describe("SessionEditorSectionNav", () => {
-  it("renders one horizontally scrollable tablist with five responsive labels", () => {
+  it("renders five equal mobile tabs with responsive labels", () => {
     const { container } = render(
       <SessionEditorSectionNav activeSection="overview" onSectionChange={() => {}} />,
     );
@@ -27,9 +27,10 @@ describe("SessionEditorSectionNav", () => {
       .toEqual(["개요", "기본 정보", "출석", "기록 작업대", "변경 기록"]);
     expect(Array.from(container.querySelectorAll("[data-mobile-label]"), (label) => label.textContent))
       .toEqual(["개요", "기본", "출석", "기록", "변경"]);
-    expect(tablist).toHaveClass("m-hscroll");
+    expect(tablist).toHaveClass("rm-host-session-editor__section-nav");
     tabs.forEach((tab) => {
       expect(tab).toHaveClass("rm-host-session-editor__section-tab");
+      expect(tab).not.toHaveAttribute("style");
     });
     expect(tabs[0]).toHaveAttribute("aria-selected", "true");
     expect(tabs[0]).toHaveAttribute("tabindex", "0");

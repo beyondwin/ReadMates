@@ -1619,17 +1619,26 @@
 .rm-host-session-editor__section-nav {
   display: flex;
   width: 100%;
+  gap: 6px;
   margin-bottom: 24px;
+  padding-bottom: 6px;
   overflow-x: auto;
   overscroll-behavior-inline: contain;
   scrollbar-width: thin;
-  scroll-snap-type: inline proximity;
 }
-.rm-host-session-editor__section-tab {
-  min-height: 44px !important;
-  height: 44px !important;
+.m-chip.rm-host-session-editor__section-tab {
+  min-height: 44px;
+  height: 44px;
   flex: 0 0 auto;
-  scroll-snap-align: start;
+  padding: 0 15px;
+  border-color: var(--line);
+  background: transparent;
+  color: var(--text-2);
+}
+.m-chip.rm-host-session-editor__section-tab.is-on {
+  border-color: var(--text);
+  background: var(--text);
+  color: var(--bg);
 }
 .rm-host-session-editor__section-tab:focus-visible,
 .rm-session-record-workspace__sticky-action .btn:focus-visible,
@@ -1740,13 +1749,19 @@
     backdrop-filter: saturate(1.4) blur(12px);
   }
   .rm-host-session-editor__section-nav {
-    gap: 6px !important;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 4px;
     margin-bottom: 16px;
-    scroll-padding-inline: var(--m-page-x);
+    overflow-x: visible;
   }
-  .rm-host-session-editor__section-tab {
-    min-width: 76px;
-    padding-inline: 15px !important;
+  .m-chip.rm-host-session-editor__section-tab {
+    width: 100%;
+    min-width: 0;
+    padding-inline: 2px;
+    justify-content: center;
+    border-radius: var(--r-2);
+    text-align: center;
     white-space: nowrap;
   }
   .rm-host-session-editor__content {
@@ -1755,18 +1770,18 @@
   .rm-host-session-editor__layout {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
+    gap: 16px;
   }
   .rm-host-session-editor__section-panel,
   .rm-host-session-editor__section {
-    padding: 18px !important;
+    padding: 16px !important;
   }
   .rm-host-session-overview,
   .rm-host-session-editor__overview {
     border-radius: var(--r-2);
   }
   .rm-session-record-workspace {
-    padding: 18px !important;
+    padding: 16px !important;
     border-radius: var(--r-2);
   }
   .rm-session-record-workspace__context {
@@ -1781,7 +1796,7 @@
       "creation"
       "editor";
     grid-template-columns: minmax(0, 1fr);
-    gap: 18px;
+    gap: 16px;
   }
   .rm-session-record-workspace__sticky-action {
     bottom: calc(var(--m-nav-h) + var(--m-safe-bottom) + 12px) !important;
@@ -1806,9 +1821,10 @@
 }
 
 @media (max-width: 360px) {
-  .rm-host-session-editor__section-tab {
-    min-width: 72px;
-    padding-inline: 13px !important;
+  .rm-host-session-editor__section-panel,
+  .rm-host-session-editor__section,
+  .rm-session-record-workspace {
+    padding: 14px !important;
   }
   .rm-session-record-workspace__sticky-action {
     gap: 8px !important;
