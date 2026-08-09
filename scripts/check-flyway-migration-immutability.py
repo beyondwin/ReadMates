@@ -22,6 +22,59 @@ VERSION_LOOKING_RE = re.compile(r"^V[0-9]+__.*\.sql$")
 MAX_PATH_DISPLAY = 240
 MAX_REPORTED_VIOLATIONS = 100
 
+VALID_WORKFLOW_FIXTURE = r'''name: CI
+on: [pull_request, push]
+permissions:
+  contents: read
+jobs:
+  scripts:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@example
+        with:
+          fetch-depth: 0
+      - name: Flyway migration checker self-tests
+        run: python3 -B scripts/check-flyway-migration-immutability.py --self-test
+      - name: Flyway migration workflow contract
+        run: python3 -B scripts/check-flyway-migration-immutability.py --check-workflow .github/workflows/ci.yml
+      - name: Flyway migration history immutability
+        env:
+          READMATES_FLYWAY_EVENT_NAME: ${{ github.event_name }}
+          READMATES_FLYWAY_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          READMATES_FLYWAY_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          base_sha=""
+          case "${READMATES_FLYWAY_EVENT_NAME}" in
+            pull_request)
+              base_sha="${READMATES_FLYWAY_PR_BASE_SHA}"
+              ;;
+            push)
+              base_sha="${READMATES_FLYWAY_PUSH_BEFORE_SHA}"
+              if [[ "$base_sha" =~ ^0+$ ]]; then
+                if ! base_sha="$(git rev-parse --verify --quiet 'HEAD^^{commit}')"; then
+                  echo "Flyway comparison base is unavailable." >&2
+                  exit 1
+                fi
+              fi
+              ;;
+            *)
+              echo "Unsupported Flyway comparison event." >&2
+              exit 1
+              ;;
+          esac
+          if [[ -z "$base_sha" ]]; then
+            echo "Flyway comparison base is empty." >&2
+            exit 1
+          fi
+          if ! base_sha="$(git rev-parse --verify --quiet "${base_sha}^{commit}")"; then
+            echo "Flyway comparison base cannot be resolved locally." >&2
+            exit 1
+          fi
+          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"
+'''
+
 
 @dataclass(frozen=True)
 class Migration:
@@ -36,6 +89,200 @@ class Violation:
     category: str
     path: str
     detail: str
+
+
+@dataclass(frozen=True, order=True)
+class WorkflowViolation:
+    category: str
+    detail: str
+
+
+def _top_level_block(source: str, name: str) -> str | None:
+    lines = source.splitlines(keepends=True)
+    marker = f"{name}:"
+    start = next((index for index, line in enumerate(lines) if line.rstrip() == marker), None)
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        line = lines[index]
+        if line.strip() and not line.startswith((" ", "\t", "#")):
+            end = index
+            break
+    return "".join(lines[start:end])
+
+
+def _scripts_job_block(source: str) -> str | None:
+    jobs = _top_level_block(source, "jobs")
+    if jobs is None:
+        return None
+    lines = jobs.splitlines(keepends=True)
+    start = next((index for index, line in enumerate(lines) if line.rstrip() == "  scripts:"), None)
+    if start is None:
+        return None
+    end = len(lines)
+    for index in range(start + 1, len(lines)):
+        if re.fullmatch(r"  [A-Za-z0-9_-]+:\s*(?:#.*)?\n?", lines[index]):
+            end = index
+            break
+    return "".join(lines[start:end])
+
+
+def _workflow_step_blocks(job: str) -> list[str]:
+    lines = job.splitlines(keepends=True)
+    starts = [index for index, line in enumerate(lines) if line.startswith("      - ")]
+    return [
+        "".join(lines[start : starts[position + 1] if position + 1 < len(starts) else len(lines)])
+        for position, start in enumerate(starts)
+    ]
+
+
+def _workflow_run_block(step: str) -> str:
+    lines = step.splitlines(keepends=True)
+    for index, line in enumerate(lines):
+        match = re.match(r"^        run:\s*(.*)$", line.rstrip("\n"))
+        if match is None:
+            continue
+        value = match.group(1)
+        if value in ("|", ">"):
+            return "".join(lines[index + 1 :])
+        return value + "\n"
+    return ""
+
+
+def _active_run_source(step: str) -> str:
+    return "".join(
+        line for line in _workflow_run_block(step).splitlines(keepends=True) if not line.lstrip().startswith("#")
+    )
+
+
+def validate_ci_workflow(source: str) -> list[WorkflowViolation]:
+    """Validate only the Flyway history contract in the CI scripts job."""
+    violations: list[WorkflowViolation] = []
+    permissions = _top_level_block(source, "permissions")
+    if permissions is None or re.search(r"(?m)^  contents:\s*read\s*$", permissions) is None:
+        violations.append(
+            WorkflowViolation("workflow-permissions-unsafe", "top-level contents permission must remain read-only")
+        )
+
+    scripts_job = _scripts_job_block(source)
+    if scripts_job is None:
+        return violations + [
+            WorkflowViolation("workflow-scripts-job-missing", "the scripts job is required for Flyway history checks")
+        ]
+
+    steps = _workflow_step_blocks(scripts_job)
+    checkout_steps = [step for step in steps if re.search(r"(?m)^        uses:\s*actions/checkout@", step)]
+    if len(checkout_steps) != 1 or re.search(
+        r"(?m)^          fetch-depth:\s*0\s*$",
+        checkout_steps[0] if checkout_steps else "",
+    ) is None:
+        violations.append(
+            WorkflowViolation(
+                "workflow-scripts-checkout-history",
+                "the scripts checkout must use fetch-depth 0",
+            )
+        )
+
+    checker_command = "python3 -B scripts/check-flyway-migration-immutability.py"
+    required_gates = (
+        (f"{checker_command} --self-test", "workflow-self-test-missing", "checker self-test step is required"),
+        (
+            f"{checker_command} --check-workflow .github/workflows/ci.yml",
+            "workflow-contract-check-missing",
+            "workflow contract step is required",
+        ),
+        (
+            f'{checker_command} --base-ref "$base_sha"',
+            "workflow-history-check-missing",
+            "real history comparison step is required",
+        ),
+    )
+    history_step = ""
+    for command, category, detail in required_gates:
+        command_pattern = re.compile(rf"(?m)^\s*{re.escape(command)}\s*$")
+        matches = [step for step in steps if command_pattern.search(_active_run_source(step))]
+        if len(matches) != 1:
+            violations.append(WorkflowViolation(category, detail))
+            continue
+        if " --base-ref " in command:
+            history_step = matches[0]
+
+    checker_steps = [step for step in steps if checker_command in _active_run_source(step)]
+    if any(re.search(r"(?m)^\s*continue-on-error\s*:", step) for step in checker_steps):
+        violations.append(
+            WorkflowViolation(
+                "workflow-gate-continue-on-error",
+                "Flyway gates must not continue after failure",
+            )
+        )
+    always_success = re.compile(
+        r"\|\|\s*(?:true|:)(?:\s|$)|;\s*true(?:\s|$)|^\s*if:\s*.*always\(\)",
+        re.MULTILINE,
+    )
+    if any(always_success.search(step) for step in checker_steps):
+        violations.append(
+            WorkflowViolation(
+                "workflow-gate-always-success",
+                "Flyway gates must not hide failure with an always-success fallback",
+            )
+        )
+
+    if history_step:
+        run_block = _active_run_source(history_step)
+        env_contract = (
+            "READMATES_FLYWAY_EVENT_NAME: ${{ github.event_name }}",
+            "READMATES_FLYWAY_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+            "READMATES_FLYWAY_PUSH_BEFORE_SHA: ${{ github.event.before }}",
+        )
+        shell_contract = (
+            'case "${READMATES_FLYWAY_EVENT_NAME}" in',
+            'pull_request)\n              base_sha="${READMATES_FLYWAY_PR_BASE_SHA}"',
+            'push)\n              base_sha="${READMATES_FLYWAY_PUSH_BEFORE_SHA}"',
+            'if [[ "$base_sha" =~ ^0+$ ]]; then',
+            'if ! base_sha="$(git rev-parse --verify --quiet \'HEAD^^{commit}\')"; then',
+            'if [[ -z "$base_sha" ]]; then',
+            'if ! base_sha="$(git rev-parse --verify --quiet "${base_sha}^{commit}")"; then',
+        )
+        if (
+            any(fragment not in history_step for fragment in env_contract)
+            or any(fragment not in run_block for fragment in shell_contract)
+            or run_block.count("HEAD^") != 1
+            or "${{" in run_block
+        ):
+            violations.append(
+                WorkflowViolation(
+                    "workflow-event-base-unsafe",
+                    "event base selection must reject empty SHAs and limit verified HEAD^ fallback to zero pushes",
+                )
+            )
+        if re.search(
+            r"(?m)^\s*(?:git\s+(?:fetch|pull|push|clone|ls-remote)|git\s+remote\s+update|gh|curl|wget|ssh|scp)\b",
+            run_block,
+        ):
+            violations.append(
+                WorkflowViolation(
+                    "workflow-network-forbidden",
+                    "the history gate must use only checkout-provided local history",
+                )
+            )
+
+    return sorted(set(violations))
+
+
+def check_workflow(path: Path) -> int:
+    try:
+        source = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeError):
+        print("[workflow-unreadable] workflow: CI workflow cannot be read safely", file=sys.stderr)
+        return 1
+    violations = validate_ci_workflow(source)
+    if violations:
+        for violation in violations:
+            print(f"[{violation.category}] workflow: {violation.detail}", file=sys.stderr)
+        return 1
+    print("Flyway CI workflow contract passed.")
+    return 0
 
 
 def _git_environment(allow_lazy_fetch: bool = False) -> dict[str, str]:
@@ -1194,8 +1441,177 @@ class FlywayMigrationImmutabilityTests(unittest.TestCase):
                 self.assertFalse(marker.exists(), "checker invoked inactive clean filter")
 
 
+class FlywayWorkflowContractTests(unittest.TestCase):
+    def _run_workflow_checker(self, source: str) -> subprocess.CompletedProcess[str]:
+        with tempfile.TemporaryDirectory() as temporary:
+            workflow = Path(temporary) / "ci.yml"
+            workflow.write_text(source, encoding="utf-8")
+            return subprocess.run(
+                [sys.executable, str(Path(__file__).resolve()), "--check-workflow", str(workflow)],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+    def _assert_workflow_failure(self, source: str, category: str) -> None:
+        result = self._run_workflow_checker(source)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn(f"[{category}]", result.stderr)
+
+    def test_valid_scripts_job_workflow_contract_passes(self) -> None:
+        unrelated_shallow_checkout = VALID_WORKFLOW_FIXTURE + r'''
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@example
+'''
+        for name, source in (
+            ("minimal", VALID_WORKFLOW_FIXTURE),
+            ("unrelated shallow checkout", unrelated_shallow_checkout),
+        ):
+            with self.subTest(name=name):
+                result = self._run_workflow_checker(source)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_workflow_keeps_read_only_contents_permission(self) -> None:
+        source = VALID_WORKFLOW_FIXTURE.replace("  contents: read", "  contents: write", 1)
+        self._assert_workflow_failure(source, "workflow-permissions-unsafe")
+
+    def test_scripts_job_checkout_requires_complete_history(self) -> None:
+        source = VALID_WORKFLOW_FIXTURE.replace("          fetch-depth: 0\n", "")
+        self._assert_workflow_failure(source, "workflow-scripts-checkout-history")
+
+    def test_scripts_job_requires_each_flyway_gate(self) -> None:
+        cases = (
+            (
+                "self-test",
+                VALID_WORKFLOW_FIXTURE.replace(" --self-test", " --base-ref HEAD", 1),
+                "workflow-self-test-missing",
+            ),
+            (
+                "workflow contract",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    " --check-workflow .github/workflows/ci.yml",
+                    " --base-ref HEAD",
+                    1,
+                ),
+                "workflow-contract-check-missing",
+            ),
+            (
+                "history check",
+                VALID_WORKFLOW_FIXTURE.replace(" --base-ref \"$base_sha\"", " --self-test", 1),
+                "workflow-history-check-missing",
+            ),
+            (
+                "commented self-test",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "        run: python3 -B scripts/check-flyway-migration-immutability.py --self-test",
+                    "        run: echo skipped\n"
+                    "        # python3 -B scripts/check-flyway-migration-immutability.py --self-test",
+                    1,
+                ),
+                "workflow-self-test-missing",
+            ),
+        )
+        for name, source, category in cases:
+            with self.subTest(name=name):
+                self._assert_workflow_failure(source, category)
+
+    def test_event_base_cannot_be_empty_or_fall_back_for_pull_requests(self) -> None:
+        cases = (
+            (
+                "empty base accepted",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    '          if [[ -z "$base_sha" ]]; then\n',
+                    '          if [[ "$base_sha" == "not-empty" ]]; then\n',
+                    1,
+                ),
+            ),
+            (
+                "empty guard commented out",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    '          if [[ -z "$base_sha" ]]; then\n',
+                    '          # if [[ -z "$base_sha" ]]; then\n',
+                    1,
+                ),
+            ),
+            (
+                "pull request fallback",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    '              base_sha="${READMATES_FLYWAY_PR_BASE_SHA}"',
+                    '              base_sha="${READMATES_FLYWAY_PR_BASE_SHA:-HEAD^}"',
+                    1,
+                ),
+            ),
+            (
+                "unverified zero push fallback",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    'if ! base_sha="$(git rev-parse --verify --quiet \'HEAD^^{commit}\')"; then',
+                    'if ! base_sha="HEAD^"; then',
+                    1,
+                ),
+            ),
+        )
+        for name, source in cases:
+            with self.subTest(name=name):
+                self._assert_workflow_failure(source, "workflow-event-base-unsafe")
+
+    def test_flyway_gates_cannot_continue_on_error_or_force_success(self) -> None:
+        cases = (
+            (
+                "continue on error",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "      - name: Flyway migration checker self-tests\n",
+                    "      - name: Flyway migration checker self-tests\n        continue-on-error: true\n",
+                    1,
+                ),
+                "workflow-gate-continue-on-error",
+            ),
+            (
+                "always-success fallback",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    " --check-workflow .github/workflows/ci.yml\n",
+                    " --check-workflow .github/workflows/ci.yml || true\n",
+                    1,
+                ),
+                "workflow-gate-always-success",
+            ),
+        )
+        for name, source, category in cases:
+            with self.subTest(name=name):
+                self._assert_workflow_failure(source, category)
+
+    def test_history_gate_cannot_fetch_or_contact_a_remote(self) -> None:
+        cases = (
+            "git fetch origin main",
+            "git ls-remote origin",
+            "gh api repos/example/project",
+        )
+        for command in cases:
+            with self.subTest(command=command):
+                source = VALID_WORKFLOW_FIXTURE.replace(
+                    '          base_sha=""\n',
+                    f'          {command}\n          base_sha=""\n',
+                    1,
+                )
+                self._assert_workflow_failure(source, "workflow-network-forbidden")
+
+    def test_history_shell_uses_environment_instead_of_expression_interpolation(self) -> None:
+        source = VALID_WORKFLOW_FIXTURE.replace(
+            '          base_sha=""\n',
+            '          base_sha="${{ github.event.before }}"\n',
+            1,
+        )
+        self._assert_workflow_failure(source, "workflow-event-base-unsafe")
+
+
 def run_self_tests() -> int:
-    suite = unittest.defaultTestLoader.loadTestsFromTestCase(FlywayMigrationImmutabilityTests)
+    suite = unittest.TestSuite(
+        (
+            unittest.defaultTestLoader.loadTestsFromTestCase(FlywayMigrationImmutabilityTests),
+            unittest.defaultTestLoader.loadTestsFromTestCase(FlywayWorkflowContractTests),
+        )
+    )
     result = unittest.TextTestRunner(verbosity=2).run(suite)
     return 0 if result.wasSuccessful() else 1
 
@@ -1203,11 +1619,17 @@ def run_self_tests() -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Check immutable production Flyway migrations")
     parser.add_argument("--base-ref")
+    parser.add_argument("--check-workflow", type=Path)
     parser.add_argument("--self-test", action="store_true")
     args = parser.parse_args(argv)
 
     if args.self_test:
         return run_self_tests()
+    if args.check_workflow is not None:
+        if args.base_ref:
+            print("[usage-conflicting-modes] choose workflow or migration history mode", file=sys.stderr)
+            return 2
+        return check_workflow(args.check_workflow)
     if not args.base_ref:
         print("[usage-missing-base-ref] --base-ref is required", file=sys.stderr)
         return 2
