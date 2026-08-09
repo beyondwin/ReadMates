@@ -129,23 +129,22 @@ class PlatformAdminHealthExecutorTest {
 
     @org.springframework.context.annotation.Configuration(proxyBeanMethods = false)
     class ExecutorCreationProbe {
+        @org.springframework.context.annotation.Bean
+        fun executorCreationProbe(): org.springframework.beans.factory.config.BeanPostProcessor =
+            object : org.springframework.beans.factory.config.BeanPostProcessor {
+                override fun postProcessAfterInitialization(
+                    bean: Any,
+                    beanName: String,
+                ): Any {
+                    if (bean is ThreadPoolTaskExecutor) {
+                        executorCreated.set(true)
+                    }
+                    return bean
+                }
+            }
+
         companion object {
             val executorCreated = AtomicReference(false)
-
-            @JvmStatic
-            @org.springframework.context.annotation.Bean
-            fun executorCreationProbe(): org.springframework.beans.factory.config.BeanPostProcessor =
-                object : org.springframework.beans.factory.config.BeanPostProcessor {
-                    override fun postProcessAfterInitialization(
-                        bean: Any,
-                        beanName: String,
-                    ): Any {
-                        if (bean is ThreadPoolTaskExecutor) {
-                            executorCreated.set(true)
-                        }
-                        return bean
-                    }
-                }
         }
     }
 }

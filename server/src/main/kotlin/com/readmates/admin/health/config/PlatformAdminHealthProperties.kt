@@ -4,12 +4,19 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import java.net.URI
 import java.time.Duration
 
-private val DEFAULT_REFRESH_INTERVAL: Duration = Duration.ofSeconds(10)
-private val DEFAULT_FRESHNESS: Duration = Duration.ofSeconds(30)
-private val DEFAULT_PROVIDER_DEADLINE: Duration = Duration.ofMillis(2_500)
-private val DEFAULT_EXECUTOR_SHUTDOWN_AWAIT: Duration = Duration.ofSeconds(5)
-private val DEFAULT_PROMETHEUS_CONNECT_TIMEOUT: Duration = Duration.ofMillis(500)
-private val DEFAULT_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT: Duration = Duration.ofMillis(500)
+private const val DEFAULT_REFRESH_INTERVAL_SECONDS = 10L
+private const val DEFAULT_FRESHNESS_SECONDS = 30L
+private const val DEFAULT_PROVIDER_DEADLINE_MILLIS = 2_500L
+private const val DEFAULT_EXECUTOR_SHUTDOWN_AWAIT_SECONDS = 5L
+private const val DEFAULT_PROMETHEUS_CONNECT_TIMEOUT_MILLIS = 500L
+private const val DEFAULT_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT_MILLIS = 500L
+private val DEFAULT_REFRESH_INTERVAL: Duration = Duration.ofSeconds(DEFAULT_REFRESH_INTERVAL_SECONDS)
+private val DEFAULT_FRESHNESS: Duration = Duration.ofSeconds(DEFAULT_FRESHNESS_SECONDS)
+private val DEFAULT_PROVIDER_DEADLINE: Duration = Duration.ofMillis(DEFAULT_PROVIDER_DEADLINE_MILLIS)
+private val DEFAULT_EXECUTOR_SHUTDOWN_AWAIT: Duration = Duration.ofSeconds(DEFAULT_EXECUTOR_SHUTDOWN_AWAIT_SECONDS)
+private val DEFAULT_PROMETHEUS_CONNECT_TIMEOUT: Duration = Duration.ofMillis(DEFAULT_PROMETHEUS_CONNECT_TIMEOUT_MILLIS)
+private val DEFAULT_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT: Duration =
+    Duration.ofMillis(DEFAULT_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT_MILLIS)
 private val DEFAULT_PROMETHEUS_READ_TIMEOUT: Duration = Duration.ofSeconds(2)
 private const val MIN_EXECUTOR_THREADS = 1
 private const val MAX_EXECUTOR_THREADS = 16
