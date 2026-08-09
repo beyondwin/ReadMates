@@ -10,20 +10,34 @@ import java.nio.file.Path
 @Tag("architecture")
 class ServerArchitectureInventoryTest {
     @Test
-    fun `boundary inventory detects forbidden directions but permits shared web errors`(@TempDir root: Path) {
-        write(root, "com/readmates/sample/adapter/in/web/SampleController.kt", """
+    fun `boundary inventory detects forbidden directions but permits shared web errors`(
+        @TempDir root: Path,
+    ) {
+        write(
+            root,
+            "com/readmates/sample/adapter/in/web/SampleController.kt",
+            """
             package com.readmates.sample.adapter.`in`.web
             import com.readmates.sample.application.service.SampleService
             import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
-        """)
-        write(root, "com/readmates/sample/application/service/SampleService.kt", """
+            """,
+        )
+        write(
+            root,
+            "com/readmates/sample/application/service/SampleService.kt",
+            """
             package com.readmates.sample.application.service
             import com.readmates.sample.adapter.out.persistence.SampleAdapter
-        """)
-        write(root, "com/readmates/sample/adapter/out/persistence/SampleAdapter.kt", """
+            """,
+        )
+        write(
+            root,
+            "com/readmates/sample/adapter/out/persistence/SampleAdapter.kt",
+            """
             package com.readmates.sample.adapter.out.persistence
             import com.readmates.sample.application.service.SampleService
-        """)
+            """,
+        )
 
         assertThat(boundaryDebtImports(root)).containsExactlyInAnyOrder(
             "com/readmates/sample/adapter/in/web/SampleController.kt|" +
@@ -59,7 +73,11 @@ class ServerArchitectureInventoryTest {
         assertThat(components).allMatch { component -> knownComponent.containsAll(component) }
     }
 
-    private fun write(root: Path, relative: String, content: String) {
+    private fun write(
+        root: Path,
+        relative: String,
+        content: String,
+    ) {
         val path = root.resolve(relative)
         Files.createDirectories(path.parent)
         Files.writeString(path, content.trimIndent())

@@ -55,7 +55,8 @@ fun applicationFeatureEdges(sourceRoot: Path): Set<String> =
 
 fun readArchitectureBaseline(path: Path): Set<String> {
     val rows =
-        path.readLines()
+        path
+            .readLines()
             .map(String::trim)
             .filter { row -> row.isNotEmpty() && !row.startsWith("#") }
     require(rows.size == rows.toSet().size) { "Duplicate architecture baseline row in $path" }
@@ -66,6 +67,7 @@ fun cyclicFeatureComponents(edges: Set<String>): Set<Set<String>> {
     val pairs = edges.map { edge -> edge.split('|').let { it[0] to it[1] } }
     val nodes = pairs.flatMap { (source, target) -> listOf(source, target) }.toSet()
     val adjacency = nodes.associateWith { node -> pairs.filter { it.first == node }.map { it.second }.toSet() }
+
     fun reachable(start: String): Set<String> {
         val seen = mutableSetOf<String>()
         val pending = ArrayDeque<String>().apply { add(start) }
@@ -77,10 +79,11 @@ fun cyclicFeatureComponents(edges: Set<String>): Set<Set<String>> {
     }
     val reachability = nodes.associateWith(::reachable)
     return nodes
-        .map { node -> nodes.filterTo(sortedSetOf()) { candidate ->
-            candidate in reachability.getValue(node) && node in reachability.getValue(candidate)
-        } }
-        .filter { component -> component.size > 1 }
+        .map { node ->
+            nodes.filterTo(sortedSetOf()) { candidate ->
+                candidate in reachability.getValue(node) && node in reachability.getValue(candidate)
+            }
+        }.filter { component -> component.size > 1 }
         .toSet()
 }
 
@@ -90,7 +93,10 @@ private fun normalizedReadmatesImport(line: String): String? {
     return trimmed.removePrefix("import ").replace("`", "")
 }
 
-private fun isBoundaryDebt(source: String, imported: String): Boolean {
+private fun isBoundaryDebt(
+    source: String,
+    imported: String,
+): Boolean {
     val rootedSource = "/$source"
     val inbound = "/adapter/in/" in rootedSource || "/infrastructure/security/" in rootedSource
     val application = "/application/" in rootedSource

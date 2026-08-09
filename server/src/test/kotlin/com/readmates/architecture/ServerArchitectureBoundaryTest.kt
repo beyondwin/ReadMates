@@ -6,8 +6,8 @@ import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
-import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -186,11 +186,11 @@ private val legacyRepositoryDependencyTarget: DescribedPredicate<JavaClass> =
     DescribedPredicate.describe("project or legacy persistence repository") { target ->
         target.simpleName.endsWith("Repository") &&
             target.name !in
-                setOf(
-                    "com.readmates.auth.infrastructure.security.OAuthFlowContextRepository",
-                    "org.springframework.security.oauth2.client.registration.ClientRegistrationRepository",
-                    "org.springframework.security.oauth2.client.web.AuthorizationRequestRepository",
-                )
+            setOf(
+                "com.readmates.auth.infrastructure.security.OAuthFlowContextRepository",
+                "org.springframework.security.oauth2.client.registration.ClientRegistrationRepository",
+                "org.springframework.security.oauth2.client.web.AuthorizationRequestRepository",
+            )
     }
 
 @Tag("architecture")

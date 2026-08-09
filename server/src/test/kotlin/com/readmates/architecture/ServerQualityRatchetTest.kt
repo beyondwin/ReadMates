@@ -11,7 +11,9 @@ import java.nio.file.Path
 @Tag("architecture")
 class ServerQualityRatchetTest {
     @Test
-    fun `baseline reader counts detekt ids and ktlint errors`(@TempDir tempDir: Path) {
+    fun `baseline reader counts detekt ids and ktlint errors`(
+        @TempDir tempDir: Path,
+    ) {
         val detekt = tempDir.resolve("detekt.xml")
         val ktlint = tempDir.resolve("ktlint.xml")
         Files.writeString(
@@ -38,7 +40,9 @@ class ServerQualityRatchetTest {
     }
 
     @Test
-    fun `baseline reader fails closed for malformed xml`(@TempDir tempDir: Path) {
+    fun `baseline reader fails closed for malformed xml`(
+        @TempDir tempDir: Path,
+    ) {
         val detekt = tempDir.resolve("detekt.xml")
         val ktlint = tempDir.resolve("ktlint.xml")
         Files.writeString(detekt, "<SmellBaseline><ID>broken")
@@ -135,13 +139,19 @@ class ServerQualityRatchetTest {
             .containsExactly("0.43")
     }
 
-    private fun blocksNamed(source: String, name: String): List<String> =
+    private fun blocksNamed(
+        source: String,
+        name: String,
+    ): List<String> =
         Regex("""\b${Regex.escape(name)}\s*\{""")
             .findAll(source)
             .mapNotNull { match -> blockAt(source, match.range.last) }
             .toList()
 
-    private fun blockAfter(source: String, anchor: String): String? {
+    private fun blockAfter(
+        source: String,
+        anchor: String,
+    ): String? {
         val anchorIndex = source.indexOf(anchor)
         if (anchorIndex < 0) {
             return null
@@ -149,7 +159,10 @@ class ServerQualityRatchetTest {
         return blockAt(source, source.indexOf('{', anchorIndex + anchor.length))
     }
 
-    private fun blockAt(source: String, openingBraceIndex: Int): String? {
+    private fun blockAt(
+        source: String,
+        openingBraceIndex: Int,
+    ): String? {
         if (openingBraceIndex < 0) {
             return null
         }

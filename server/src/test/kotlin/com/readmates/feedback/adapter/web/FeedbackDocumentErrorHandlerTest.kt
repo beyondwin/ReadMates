@@ -1,5 +1,6 @@
-package com.readmates.feedback.adapter.`in`.web
+package com.readmates.feedback.adapter.web
 
+import com.readmates.feedback.adapter.`in`.web.FeedbackDocumentErrorHandler
 import com.readmates.feedback.application.FeedbackDocumentError
 import com.readmates.feedback.application.FeedbackDocumentException
 import org.assertj.core.api.Assertions.assertThat
