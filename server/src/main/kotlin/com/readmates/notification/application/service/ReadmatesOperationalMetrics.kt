@@ -11,6 +11,17 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Duration
 
+enum class NotificationEventPublishResult(
+    val tag: String,
+) {
+    SUCCESS("success"),
+    FAILURE("failure"),
+    DEAD("dead"),
+    MISSING_PAYLOAD("missing_payload"),
+    EXPIRED("expired"),
+    STALE_LEASE("stale_lease"),
+}
+
 @Service
 class ReadmatesOperationalMetrics(
     private val meterRegistry: MeterRegistry,
@@ -152,7 +163,11 @@ class ReadmatesOperationalMetrics(
                     Duration.ofMinutes(SLO_BUCKET_5_MINUTES),
                     Duration.ofMinutes(SLO_BUCKET_15_MINUTES),
                 ).register(meterRegistry)
-        timer.record(latency)
+        timer.record(if (latency.isNegative) Duration.ZERO else latency)
+    }
+
+    fun recordOutboxPublish(result: NotificationEventPublishResult) {
+        meterRegistry.counter("readmates.outbox.publish", "result", result.tag).increment()
     }
 
     private companion object {

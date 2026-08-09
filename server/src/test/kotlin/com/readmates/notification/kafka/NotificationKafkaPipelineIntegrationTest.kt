@@ -6,6 +6,7 @@ import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfigurati
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaProperties
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapter
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapter
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSendMode
@@ -66,6 +67,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import tools.jackson.databind.ObjectMapper
 import java.nio.charset.StandardCharsets.UTF_8
+import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
 import java.time.OffsetDateTime
@@ -126,6 +128,7 @@ class NotificationKafkaPipelineIntegrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val objectMapper: ObjectMapper,
     @param:Autowired private val notificationEventOutboxAdapter: JdbcNotificationEventOutboxAdapter,
+    @param:Autowired private val notificationRuntimeProperties: NotificationRuntimeProperties,
     @param:Autowired
     @param:Qualifier("notificationEventConsumerFactory")
     private val observerConsumerFactory: ConsumerFactory<String, NotificationEventMessage>,
@@ -178,16 +181,24 @@ class NotificationKafkaPipelineIntegrationTest(
         waitForListenerAssignment()
 
         observeBrokerFromCurrentEnd().use { observer ->
-            val firstRelay = relay(RejectPublishedMarkOutboxPort(notificationEventOutboxAdapter))
+            val relayMetrics = SimpleMeterRegistry()
+            val firstRelay = relay(RejectPublishedMarkOutboxPort(notificationEventOutboxAdapter), relayMetrics)
 
             assertThat(firstRelay.publishPending(1)).isEqualTo(1)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "stale_lease").count())
+                .isEqualTo(1.0)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "success").count()).isZero()
             val firstBrokerRecord = observeNextBrokerRecord(observer)
             awaitDispatches(persistedMessage, requestId, expectedCount = 1)
             assertPublishingAfterLostMark(persistedMessage.eventId, requestId)
 
             makePublishingLeaseStale(persistedMessage.eventId)
 
-            assertThat(relay(notificationEventOutboxAdapter).publishPending(1)).isEqualTo(1)
+            assertThat(relay(notificationEventOutboxAdapter, relayMetrics).publishPending(1)).isEqualTo(1)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "success").count())
+                .isEqualTo(1.0)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "stale_lease").count())
+                .isEqualTo(1.0)
             val secondBrokerRecord = observeNextBrokerRecord(observer)
             awaitExactlyOnceRecovery(persistedMessage, requestId)
 
@@ -297,12 +308,16 @@ class NotificationKafkaPipelineIntegrationTest(
         return requireNotNull(notificationEventOutboxAdapter.loadMessage(message.eventId))
     }
 
-    private fun relay(outboxPort: NotificationEventOutboxPort): NotificationRelayService =
+    private fun relay(
+        outboxPort: NotificationEventOutboxPort,
+        registry: SimpleMeterRegistry,
+    ): NotificationRelayService =
         NotificationRelayService(
             notificationEventOutboxPort = outboxPort,
             notificationEventPublisherPort = notificationEventPublisherPort,
-            operationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-            maxAttempts = 5,
+            operationalMetrics = ReadmatesOperationalMetrics(registry),
+            runtimeProperties = notificationRuntimeProperties,
+            clock = Clock.systemUTC(),
         )
 
     private fun observeBrokerFromCurrentEnd(): Consumer<String, NotificationEventMessage> {

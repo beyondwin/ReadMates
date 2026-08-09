@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
@@ -18,6 +19,8 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import java.time.Clock
+import java.time.Duration
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.OffsetDateTime
@@ -212,7 +215,8 @@ class JdbcNotificationEventOutboxAdapterTest(
                 notificationEventOutboxPort = adapter,
                 notificationEventPublisherPort = publisher,
                 operationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                maxAttempts = 5,
+                runtimeProperties = relayRuntimeProperties(),
+                clock = Clock.systemUTC(),
             )
 
         val publishedCounts =
@@ -720,6 +724,12 @@ class JdbcNotificationEventOutboxAdapterTest(
         fun eventIds(): List<UUID> = eventIds.toList()
     }
 }
+
+private fun relayRuntimeProperties(): NotificationRuntimeProperties =
+    NotificationRuntimeProperties(
+        worker = NotificationRuntimeProperties.Worker(eventMaxAge = Duration.ofHours(24)),
+        kafka = NotificationRuntimeProperties.Kafka(maxPublishAttempts = 5),
+    )
 
 private fun JdbcTemplate.seedReminderCandidate(
     clubId: String,

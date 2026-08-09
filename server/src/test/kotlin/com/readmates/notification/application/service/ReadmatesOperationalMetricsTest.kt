@@ -16,6 +16,36 @@ import java.util.concurrent.TimeUnit
 
 class ReadmatesOperationalMetricsTest {
     @Test
+    fun `outbox publish metric exposes exactly the fixed result tags`() {
+        val registry = SimpleMeterRegistry()
+        val metrics = ReadmatesOperationalMetrics(registry)
+
+        NotificationEventPublishResult.entries.forEach(metrics::recordOutboxPublish)
+
+        assertThat(
+            registry
+                .find("readmates.outbox.publish")
+                .counters()
+                .map { counter -> counter.id.getTag("result") },
+        ).containsExactlyInAnyOrder(
+            "success",
+            "failure",
+            "dead",
+            "missing_payload",
+            "expired",
+            "stale_lease",
+        )
+        assertThat(
+            registry
+                .find("readmates.outbox.publish")
+                .meters()
+                .flatMap { meter -> meter.id.tags.map { it.key } },
+        ).containsOnly("result")
+        assertThat(registry.find("readmates.outbox.publish").counters())
+            .allSatisfy { counter -> assertThat(counter.count()).isEqualTo(1.0) }
+    }
+
+    @Test
     fun `sent metric increments with event type tag`() {
         val registry = SimpleMeterRegistry()
         val metrics = ReadmatesOperationalMetrics(registry)
