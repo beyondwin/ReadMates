@@ -159,7 +159,7 @@ ArchUnit은 test scope 의존성이다. production 빌드에 영향을 주지 �
 - ArchUnit 테스트는 빌드 타임에 빠르게 실행된다. 실제 DB나 외부 서비스 없이 바이트코드 분석만으로 동작한다.
 - SQL이 코드에 명시적이어서 schema 변경이 코드 리뷰에서 즉시 보인다.
 - 2026-08-09 Phase 0 update: `ServerArchitectureBoundaryTest`의 registry는 web뿐 아니라 messaging/Kafka, scheduler, adapter security, auth servlet-security inbound package를 모두 등록하고 `sessionimport`를 `WORKFLOW` slice로 포함한다. `aigen` 같은 workflow-side slice는 `CurrentMember` 같은 web/session carrier를 application-safe actor value로 변환해 전달한다.
-- `com.readmates.shared.adapter.in.web`은 Phase 0의 공통 web-error contract로 유지한다. `server/config/architecture/boundary-import-baseline.txt`와 `feature-dependency-baseline.txt`는 승인된 목표 architecture가 아니라 제거 가능한 기존 debt inventory이며, 새 debt를 추가할 수 없고 제거 시 같은 변경에서 대응 row도 삭제한다.
+- `com.readmates.shared.adapter.in.web`은 Phase 0의 공통 web-error contract로 유지한다. `server/config/architecture/boundary-import-baseline.txt`와 `feature-dependency-baseline.txt`는 승인된 목표 architecture가 아니라 제거 가능한 기존 debt inventory다. Debt 제거는 (1) source debt 제거, (2) 같은 변경에서 matching current baseline row 삭제, (3) 그 exact identity를 matching retired ledger에 추가하는 순서로 수행한다. Retired identity는 삭제하지 않고 approved seed는 늘리지 않는다.
 
 부정적/감수한 비용:
 - 작은 feature에도 5계층 구조가 강제된다. 보일러플레이트 파일 수가 많아진다. IDE template으로 초기 파일 생성을 자동화해 단축하고 있다.
