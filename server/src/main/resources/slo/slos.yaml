@@ -59,8 +59,8 @@ slos:
     window: 7d
     sli:
       type: prometheus
-      query_good: sum(rate(readmates_outbox_publish_total{result="success"}[5m]))
-      query_total: clamp_min(sum(rate(readmates_outbox_publish_total[5m])), 1e-9)
+      query_good: (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
+      query_total: clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
 
   - id: notification_delivery_latency_p95
     description: notification_event_outbox row create -> PUBLISHED p95 (30d rolling)

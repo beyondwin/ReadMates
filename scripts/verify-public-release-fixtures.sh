@@ -327,6 +327,10 @@ do
   fi
 done
 
+if [[ ! -f "$candidate_dir/ops/prometheus/tests/notification-rules.test.yml" ]]; then
+  fail "public release candidate is missing notification promtool rule tests"
+fi
+
 if [[ -e "$candidate_dir/.git" ]]; then
   fail "public release candidate unexpectedly contains Git metadata"
 fi

@@ -1,0 +1,90 @@
+rule_files:
+  - ../alerts/notification-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: failure-only counters
+    interval: 1m
+    input_series:
+      - series: 'readmates_outbox_publish_total{result="failure"}'
+        values: '0+1x20'
+      - series: 'readmates_notifications_failed_total{event_type="SESSION_REMINDER_DUE"}'
+        values: '0+1x20'
+    promql_expr_test:
+      - expr: |
+          (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
+          / clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: |
+          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
+          / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
+            + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9)
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: NotificationFailRateHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              component: notification
+            exp_annotations:
+              summary: "Notification 실패율 5% 초과 (10분)"
+              description: "Email delivery 실패가 지속. SMTP/provider 또는 delivery worker evidence 확인."
+
+  - name: success-only counters
+    interval: 1m
+    input_series:
+      - series: 'readmates_outbox_publish_total{result="success"}'
+        values: '0+1x20'
+      - series: 'readmates_notifications_sent_total{event_type="SESSION_REMINDER_DUE"}'
+        values: '0+1x20'
+    promql_expr_test:
+      - expr: |
+          (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
+          / clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 1
+      - expr: |
+          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
+          / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
+            + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9)
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: NotificationFailRateHigh
+        exp_alerts: []
+
+  - name: no counters
+    interval: 1m
+    promql_expr_test:
+      - expr: |
+          (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
+          / clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+      - expr: |
+          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
+          / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
+            + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9)
+        eval_time: 15m
+        exp_samples:
+          - labels: '{}'
+            value: 0
+    alert_rule_test:
+      - eval_time: 15m
+        alertname: NotificationFailRateHigh
+        exp_alerts: []

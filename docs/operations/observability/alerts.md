@@ -94,9 +94,9 @@ groups:
 
       - alert: NotificationFailRateHigh
         expr: |
-          sum(rate(readmates_notifications_failed_total[5m]))
-            / clamp_min(sum(rate(readmates_notifications_sent_total[5m]))
-                       + sum(rate(readmates_notifications_failed_total[5m])), 1e-9) > 0.05
+          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
+            / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
+                       + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9) > 0.05
         for: 10m
         labels:
           severity: warning
@@ -253,6 +253,6 @@ count > 0이면 운영자에게 알림 (이메일 또는 in-app).
 
 NotificationOutboxBacklog/RelayDead는 event relay, NotificationDeliveryBacklog/DeadLetters는 SMTP delivery 경보다. event outbox와 delivery rows를 같은 queue로 해석하지 않는다.
 
-NotificationFailRateHigh의 per-second rate 분모는 `1e-9` floor를 사용합니다. 5분에 실패 한 건뿐인 저빈도 구간도 failure ratio 1.0으로 평가하고, traffic이 전혀 없을 때만 유한한 0을 만듭니다.
+NotificationFailRateHigh는 lazy `failed`/`sent` aggregate를 각각 `or vector(0)`으로 채우고 per-second rate 분모에 `1e-9` floor를 사용합니다. 5분에 실패 한 건뿐인 저빈도 구간은 failure ratio 1.0으로 평가해 alert가 유지되고, success-only 또는 series가 전혀 없는 구간은 ratio 0으로 평가해 이 alert가 발생하지 않습니다. Prometheus query 자체가 unavailable이면 이 0-fill contract와 별도 운영 장애로 취급합니다.
 
 Backlog gauge가 첫 refresh 전 `NaN`이거나 refresh result가 `partial|failure`인 경우 0건으로 해석하지 않습니다. 마지막 성공 snapshot과 `readmates_notifications_backlog_refresh_total`을 먼저 확인합니다.

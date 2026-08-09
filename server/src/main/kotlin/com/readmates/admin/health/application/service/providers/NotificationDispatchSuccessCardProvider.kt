@@ -71,7 +71,7 @@ class NotificationDispatchSuccessCardProvider(
         private const val CRIT_THRESHOLD = 0.95
         private val DRILL = HealthCardDrill.AdminRoute("/admin/notifications?focus=notification_dispatch_success")
         private const val PROMQL =
-            "sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) / " +
-                "clamp_min(sum(rate(readmates_outbox_publish_total[5m])), 1e-9)"
+            "(sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) or vector(0)) / " +
+                "clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)"
     }
 }

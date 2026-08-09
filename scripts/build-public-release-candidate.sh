@@ -469,6 +469,7 @@ copy_manifest() {
   copy_dir "ops/grafana/dashboards"
   copy_dir "ops/observability/local"
   copy_dir "ops/prometheus/alerts"
+  copy_dir "ops/prometheus/tests"
   copy_dir "ops/tempo"
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/check-deploy-workflow-contract.py"

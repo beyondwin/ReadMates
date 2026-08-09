@@ -71,6 +71,15 @@
 
 실제 dashboard JSON은 `ops/grafana/dashboards/notification-dispatch.json`(title: "Notification Dispatch")입니다.
 
+### Panel: Relay publish success ratio
+- 목적: 모든 fixed publish result 중 `success` 비율을 5분 rate로 표시합니다.
+- PromQL:
+  ```promql
+  (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
+    / clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
+  ```
+- 해석: failure-only는 0, success-only는 1, 아직 어떤 result series도 없으면 0입니다. Prometheus datasource/query 자체가 unavailable인 상태는 이 0-fill 결과와 구분해 unavailable로 표시합니다.
+
 ### Panel: Event outbox backlog (status별)
 - 목적: `notification_event_outbox`의 relay/Kafka publication 적체를 `pending|failed|dead|publishing`으로 분리합니다.
 - 메트릭: `readmates_notifications_outbox_backlog`

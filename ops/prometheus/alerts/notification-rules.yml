@@ -27,9 +27,9 @@ groups:
 
       - alert: NotificationFailRateHigh
         expr: |
-          sum(rate(readmates_notifications_failed_total[5m]))
-            / clamp_min(sum(rate(readmates_notifications_sent_total[5m]))
-                       + sum(rate(readmates_notifications_failed_total[5m])), 1e-9) > 0.05
+          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
+            / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
+                       + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9) > 0.05
         for: 10m
         labels:
           severity: warning

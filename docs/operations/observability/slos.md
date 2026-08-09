@@ -104,9 +104,9 @@ ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 - **정의**: 7일 rolling window에서 모든 고정 relay 결과(`success`, `failure`, `dead`, `missing_payload`, `expired`, `stale_lease`) 중 `success` 비율 > 99% (objective 0.99).
 - **측정**:
   ```promql
-  sum(rate(readmates_outbox_publish_total{result="success"}[5m]))
+  (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
     /
-  clamp_min(sum(rate(readmates_outbox_publish_total[5m])), 1e-9)
+  clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
   ```
 - **에러 예산**: 7일 window 기준 1%.
 - **위반 시 행동**: `sum by (result) (rate(readmates_outbox_publish_total[5m]))`와 `readmates_notifications_outbox_backlog`의 `pending|failed|dead|publishing`을 함께 확인합니다. 이 counter에는 `event_type` tag가 없으므로 존재하지 않는 tag로 원인을 추론하지 않습니다.
@@ -141,4 +141,4 @@ ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 - External blackbox/synthetic checks for full script-load failure.
 - SLO 위반 시 자동 post-mortem trigger.
 
-Notification dispatch success ratio는 `readmates_outbox_publish_total`의 모든 고정 결과를 분모로 사용합니다. Per-second rate 분모의 `clamp_min(..., 1e-9)`은 0으로 나누기만 막으면서 5분에 한 건인 정상 저빈도 traffic의 비율을 보존합니다. Scrape 또는 backlog observation 실패를 성공 증거로 바꾸지 않으며, `stale_lease`는 uncommitted CAS outcome이고 event-outbox와 delivery backlog는 별도 운영 신호입니다.
+Notification dispatch success ratio는 `readmates_outbox_publish_total`의 모든 고정 결과를 분모로 사용합니다. Lazy counter가 아직 등록되지 않은 aggregate는 `or vector(0)`으로 0을 채우고, per-second rate 분모의 `clamp_min(..., 1e-9)`은 0으로 나누기만 막으면서 5분에 한 건인 정상 저빈도 traffic의 비율을 보존합니다. 따라서 series가 하나도 없으면 SLO/Grafana ratio는 0이며 성공 증거가 아닙니다. Admin health도 정상 Prometheus 응답의 0은 `CRIT`로 평가하고, transport 실패나 빈 query result만 `UNKNOWN(no_data)`로 평가합니다. Scrape 또는 backlog observation 실패를 성공 증거로 바꾸지 않으며, `stale_lease`는 uncommitted CAS outcome이고 event-outbox와 delivery backlog는 별도 운영 신호입니다.

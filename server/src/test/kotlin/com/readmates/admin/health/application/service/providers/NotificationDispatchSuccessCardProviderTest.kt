@@ -29,7 +29,7 @@ class NotificationDispatchSuccessCardProviderTest {
     }
 
     @Test
-    fun `rate denominator floor preserves sparse success and failure ratios and finite no-data`() {
+    fun `query zero fills lazy counters and keeps the epsilon rate floor`() {
         val prometheus =
             FakePrometheus {
                 PromQueryResult(listOf(PromInstantValue(emptyMap(), 1.0)))
@@ -37,20 +37,11 @@ class NotificationDispatchSuccessCardProviderTest {
 
         NotificationDispatchSuccessCardProvider(prometheus, clock).compute()
 
-        val query = requireNotNull(prometheus.lastQuery)
-        val floor = query.substringAfterLast(", ").removeSuffix(")").toDouble()
-        val oneEventInFiveMinutes = 1.0 / 300.0
-        val noEvents = 0.0
-        val oneSuccessRatio = oneEventInFiveMinutes / maxOf(oneEventInFiveMinutes, floor)
-        val oneFailureRatio =
-            oneEventInFiveMinutes /
-                maxOf(noEvents + oneEventInFiveMinutes, floor)
-        val noDataRatio = 0.0 / maxOf(0.0, floor)
-
-        assertThat(floor).isEqualTo(1e-9)
-        assertThat(oneSuccessRatio).isEqualTo(1.0)
-        assertThat(oneFailureRatio).isEqualTo(1.0)
-        assertThat(noDataRatio).isFinite().isZero()
+        assertThat(prometheus.lastQuery)
+            .isEqualTo(
+                "(sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) or vector(0)) / " +
+                    "clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)",
+            )
     }
 
     @Test
