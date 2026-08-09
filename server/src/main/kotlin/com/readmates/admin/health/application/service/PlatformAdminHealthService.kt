@@ -48,7 +48,8 @@ class PlatformAdminHealthService(
         val now = clock.instant()
         val staleAge = staleAgeSeconds(current.lastSuccessfulAt, now)
         val isStale =
-            current.lastSuccessfulAt == null ||
+            current.refreshState == PlatformHealthRefreshState.STALE ||
+                current.lastSuccessfulAt == null ||
                 !Duration.between(current.lastSuccessfulAt, now).isNegative &&
                 Duration.between(current.lastSuccessfulAt, now) >= properties.freshness
 

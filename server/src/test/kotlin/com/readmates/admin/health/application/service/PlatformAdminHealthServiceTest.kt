@@ -127,6 +127,51 @@ class PlatformAdminHealthServiceTest {
     }
 
     @Test
+    fun `failed wave inside freshness starts exactly one lazy recovery and returns cached health immediately`() {
+        val recoveryStarted = CountDownLatch(1)
+        val releaseRecovery = CountDownLatch(1)
+        val providerCalls = AtomicInteger()
+        val providerExecutor = Executors.newSingleThreadExecutor()
+        val service =
+            service(
+                providers =
+                    listOf(
+                        provider("redis") {
+                            when (providerCalls.incrementAndGet()) {
+                                1 -> card("redis", HealthCardStatus.OK, "last-known-good")
+                                2 -> error("failed wave")
+                                else -> {
+                                    recoveryStarted.countDown()
+                                    check(releaseRecovery.await(1, TimeUnit.SECONDS))
+                                    card("redis", HealthCardStatus.OK, "recovered")
+                                }
+                            }
+                        },
+                    ),
+                executor = providerExecutor,
+            )
+
+        try {
+            val lastKnownGood = service.currentHealth()
+            clock.advance(Duration.ofSeconds(10))
+            val stale = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED).get(1, TimeUnit.SECONDS)
+            assertThat(stale.refreshState).isEqualTo(PlatformHealthRefreshState.STALE)
+
+            val cachedRead = CompletableFuture.supplyAsync(service::currentHealth)
+
+            assertThat(recoveryStarted.await(1, TimeUnit.SECONDS)).isTrue()
+            val returned = cachedRead.get(250, TimeUnit.MILLISECONDS)
+            assertThat(returned.snapshot).isSameAs(lastKnownGood.snapshot)
+            assertThat(returned.refreshState).isEqualTo(PlatformHealthRefreshState.REFRESHING)
+            assertThat(service.currentHealth().snapshot).isSameAs(lastKnownGood.snapshot)
+            assertThat(providerCalls.get()).isEqualTo(3)
+        } finally {
+            releaseRecovery.countDown()
+            providerExecutor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `failed wave after a full success preserves the whole previous snapshot as stale`() {
         val releaseHungProvider = CountDownLatch(1)
         val fail = AtomicReference(false)
@@ -253,23 +298,31 @@ class PlatformAdminHealthServiceTest {
 
     @Test
     fun `late supplier completion after timeout cannot replace the stale last known good state`() {
-        val providerStarted = CountDownLatch(1)
-        val releaseProvider = CountDownLatch(1)
-        val providerFinished = CountDownLatch(1)
-        val block = AtomicReference(false)
+        val timedOutProviderStarted = CountDownLatch(1)
+        val releaseTimedOutProvider = CountDownLatch(1)
+        val timedOutProviderFinished = CountDownLatch(1)
+        val recoveryStarted = CountDownLatch(1)
+        val releaseRecovery = CountDownLatch(1)
+        val providerCalls = AtomicInteger()
         val providerExecutor = Executors.newSingleThreadExecutor()
         val service =
             service(
                 providers =
                     listOf(
                         provider("redis") {
-                            if (block.get()) {
-                                providerStarted.countDown()
-                                check(releaseProvider.await(1, TimeUnit.SECONDS))
-                                providerFinished.countDown()
-                                card("redis", HealthCardStatus.CRIT, "late-new")
-                            } else {
-                                card("redis", HealthCardStatus.OK, "last-known-good")
+                            when (providerCalls.incrementAndGet()) {
+                                1 -> card("redis", HealthCardStatus.OK, "last-known-good")
+                                2 -> {
+                                    timedOutProviderStarted.countDown()
+                                    check(releaseTimedOutProvider.await(1, TimeUnit.SECONDS))
+                                    timedOutProviderFinished.countDown()
+                                    card("redis", HealthCardStatus.CRIT, "late-new")
+                                }
+                                else -> {
+                                    recoveryStarted.countDown()
+                                    check(releaseRecovery.await(1, TimeUnit.SECONDS))
+                                    card("redis", HealthCardStatus.OK, "recovered")
+                                }
                             }
                         },
                     ),
@@ -279,23 +332,46 @@ class PlatformAdminHealthServiceTest {
 
         try {
             val lastKnownGood = service.currentHealth()
-            block.set(true)
             clock.advance(Duration.ofSeconds(31))
             val stale = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED).get(1, TimeUnit.SECONDS)
-            assertThat(providerStarted.await(1, TimeUnit.SECONDS)).isTrue()
+            assertThat(timedOutProviderStarted.await(1, TimeUnit.SECONDS)).isTrue()
             assertThat(stale.snapshot).isSameAs(lastKnownGood.snapshot)
 
-            releaseProvider.countDown()
-            assertThat(providerFinished.await(1, TimeUnit.SECONDS)).isTrue()
+            releaseTimedOutProvider.countDown()
+            assertThat(timedOutProviderFinished.await(1, TimeUnit.SECONDS)).isTrue()
 
             val afterLateCompletion = service.currentHealth()
+            assertThat(recoveryStarted.await(1, TimeUnit.SECONDS)).isTrue()
             assertThat(afterLateCompletion.snapshot).isSameAs(lastKnownGood.snapshot)
             val visibleCard = afterLateCompletion.snapshot.cards.single()
             assertThat(visibleCard.title).isEqualTo("last-known-good")
         } finally {
-            releaseProvider.countDown()
+            releaseTimedOutProvider.countDown()
+            releaseRecovery.countDown()
             providerExecutor.shutdownNow()
         }
+    }
+
+    @Test
+    fun `provider returned unknown is a successful invocation that advances last successful time`() {
+        val service =
+            service(
+                providers = listOf(provider("redis") { card("redis", HealthCardStatus.UNKNOWN) }),
+                executor = directExecutor,
+            )
+
+        val initial = service.currentHealth()
+        clock.advance(Duration.ofSeconds(5))
+        val refreshed = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED).get(1, TimeUnit.SECONDS)
+
+        assertThat(initial.refreshState).isEqualTo(PlatformHealthRefreshState.FRESH)
+        assertThat(refreshed.refreshState).isEqualTo(PlatformHealthRefreshState.FRESH)
+        assertThat(refreshed.lastSuccessfulAt).isEqualTo(initialNow.plusSeconds(5))
+        assertThat(
+            refreshed.snapshot.cards
+                .single()
+                .status,
+        ).isEqualTo(HealthCardStatus.UNKNOWN)
     }
 
     @Test
