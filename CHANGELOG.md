@@ -10,6 +10,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - **백엔드 품질 래칫:** 프로덕션 Kotlin 경고를 0건으로 만들고 신규 경고를 빌드 오류로 처리합니다. Detekt·ktlint baseline, JaCoCo 43%, 전체 인바운드 슬라이스 registry, 기존 경계 import와 기능 의존 edge를 단방향 gate로 고정해 새 품질·아키텍처 부채가 추가되지 않도록 했습니다. 외부 API, 권한, DB schema와 런타임 기능은 변경하지 않습니다.
 - **플랫폼 health 장애 격리:** `/api/admin/health/snapshot`은 실제 Prometheus transport timeout, bounded dedicated executor와 single-flight refresh, last-known-good fallback을 사용합니다. 기존 snapshot contract에 refresh metadata만 additive로 추가하고, `/admin/health`는 서버가 제공한 `FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE` 상태를 표시합니다. platform-admin authorization, 외부 API 제거, schema migration, live provider 호출, email 발송 동작은 바꾸지 않았습니다.
+- **Flyway migration 불변성:** CI가 pull request base 또는 `main` push before SHA의 complete history와 현재 index/worktree를 비교해 기존 production migration의 수정·삭제·rename·이동을 fail closed로 차단합니다. 운영 보정은 `repair`나 과거 SQL 변경이 아니라 더 높은 새 forward-only migration으로 수행하며, Flyway runtime checksum과 V42/V44 지원 upgrade 테스트를 함께 유지합니다. 이 gate는 production schema를 변경하지 않습니다.
 
 ## v2.3.0 - 2026-08-09
 

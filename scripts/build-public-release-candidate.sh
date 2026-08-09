@@ -466,6 +466,7 @@ copy_manifest() {
   copy_dir "ops/tempo"
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/check-deploy-workflow-contract.py"
+  copy_required_file "scripts/check-flyway-migration-immutability.py"
   copy_required_file "scripts/README.md"
   copy_optional_file "scripts/run-local-google-oauth.sh"
   copy_optional_file "scripts/check-local-google-oauth-redirect.py"

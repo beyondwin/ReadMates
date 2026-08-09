@@ -296,6 +296,33 @@ Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 �
 
 Backend `integrationTest`는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, integration lane을 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
 
+### Flyway migration 불변성
+
+Production migration은 repository history gate와 Flyway runtime checksum을 함께 검증합니다. 전자는 명시한 base의 merge base에 있던 SQL과 현재 index/worktree를 비교해 수정·삭제·rename·이동, 잘못된 catalog와 불완전한 history를 merge 전에 fail closed로 차단합니다. 후자는 이미 적용된 database의 `flyway_schema_history` checksum mismatch를 startup에 거부합니다.
+
+로컬에서는 complete Git history와 trusted base ref를 사용합니다. `--self-test`는 Git repository나 network 없이 실행할 수 있고 clean public release candidate에서도 같은 entry point를 검증합니다.
+
+```bash
+python3 -B scripts/check-flyway-migration-immutability.py --self-test
+python3 -B scripts/check-flyway-migration-immutability.py \
+  --check-workflow .github/workflows/ci.yml
+python3 -B scripts/check-flyway-migration-immutability.py \
+  --base-ref <trusted-base-ref>
+```
+
+CI의 scripts job만 `fetch-depth: 0`을 사용합니다. Pull request는 `github.event.pull_request.base.sha`, `main` push는 `github.event.before`를 immutable base로 선택합니다. Push before가 all-zero이면 local `HEAD^`가 실제로 resolve될 때만 fallback하고, 빈 값·unresolved base·missing merge base·shallow history는 검사 생략이 아니라 실패입니다. 실패 증거는 violation category, repository-relative path, exact merge-base와 다음 허용 version으로 제한하며 SQL 본문과 로컬 절대 경로는 출력하지 않습니다.
+
+Runtime evidence는 synthetic checksum fixture와 production migration suite를 같은 active `integrationTest` lane에서 실행합니다. `MySqlFlywayMigrationTest`는 clean install과 populated V42/V44 schema에서 현재 V47까지의 지원 upgrade를 보존합니다.
+
+```bash
+./server/gradlew -p server integrationTest \
+  --tests com.readmates.support.FlywayChecksumImmutabilityTest \
+  --tests com.readmates.support.MySqlFlywayMigrationTest \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+```
+
+Historical migration의 edit/delete/rename, `flyway repair`, baseline 증가, 낮거나 재사용한 version은 remediation이 아닙니다. Checker가 보고한 base 최고 version보다 큰 새 `V{N}__{lower_snake_case_description}.sql` forward-only migration으로 보정합니다. 이 불변성 gate 자체는 production schema를 변경하지 않습니다.
+
 ### Admin health 장애 격리
 
 `admin.health`의 transport, executor, single-flight, stale snapshot, scheduler, metric, additive response contract를 변경하면 아래 focused lane을 먼저 실행합니다. transport test는 응답 body를 보류하는 local HTTP server를 사용하며 live Prometheus/provider를 호출하지 않습니다. scheduler, executor, frontend browser fixture도 local 또는 fake infrastructure만 사용합니다.
