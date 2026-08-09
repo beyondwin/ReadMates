@@ -134,6 +134,33 @@ class NotificationRuntimePropertiesTest {
             }
     }
 
+    @Test
+    fun `whole millisecond runtime durations bind without precision loss`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.worker.fixed-delay=1ms",
+                "readmates.notifications.worker.backlog-refresh-interval=1ms",
+                "readmates.notifications.worker.backlog-initial-delay=1ms",
+                "readmates.notifications.kafka.send-timeout=1ms",
+                "readmates.notifications.kafka.delivery-retry-backoff=1ms",
+                "readmates.notifications.smtp.connection-timeout=1ms",
+                "readmates.notifications.smtp.read-timeout=1ms",
+                "readmates.notifications.smtp.write-timeout=1ms",
+            ).run { context ->
+                assertThat(context).hasNotFailed()
+                val properties = context.getBean(NotificationRuntimeProperties::class.java)
+
+                assertThat(properties.worker.fixedDelay).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.worker.backlogRefreshInterval).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.worker.backlogInitialDelay).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.kafka.sendTimeout).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.kafka.deliveryRetryBackoff).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.smtp.connectionTimeout).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.smtp.readTimeout).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.smtp.writeTimeout).isEqualTo(Duration.ofMillis(1))
+            }
+    }
+
     companion object {
         @JvmStatic
         fun invalidProperties(): Stream<Arguments> =
@@ -142,6 +169,7 @@ class NotificationRuntimePropertiesTest {
                 workerInvalidProperties(),
                 claimLeaseInvalidProperties(),
                 transportInvalidProperties(),
+                millisecondPrecisionInvalidProperties(),
             ).flatten().stream()
 
         @JvmStatic
@@ -300,6 +328,25 @@ class NotificationRuntimePropertiesTest {
                     "readmates.notifications.smtp.write-timeout=5s",
                 ),
             )
+
+        private fun millisecondPrecisionInvalidProperties(): List<Arguments> {
+            val toMillisProperties =
+                listOf(
+                    "readmates.notifications.worker.fixed-delay",
+                    "readmates.notifications.worker.backlog-refresh-interval",
+                    "readmates.notifications.worker.backlog-initial-delay",
+                    "readmates.notifications.kafka.send-timeout",
+                    "readmates.notifications.kafka.delivery-retry-backoff",
+                    "readmates.notifications.smtp.connection-timeout",
+                    "readmates.notifications.smtp.read-timeout",
+                    "readmates.notifications.smtp.write-timeout",
+                )
+            val subMillisecondValues = listOf("500us", "PT0.0005S")
+
+            return toMillisProperties.flatMap { property ->
+                subMillisecondValues.map { value -> invalidValue(property, value) }
+            } + invalidValue("readmates.notifications.worker.fixed-delay", "1500us")
+        }
 
         private fun invalid(
             expectedPath: String,

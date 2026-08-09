@@ -221,6 +221,40 @@ class KafkaNotificationEventPublisherAdapterTest {
     }
 
     @Test
+    fun `one millisecond Kafka timings reach the publisher and retry handler exactly`() {
+        contextRunner
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+                "readmates.notifications.kafka.send-timeout=1ms",
+                "readmates.notifications.kafka.delivery-retry-backoff=1ms",
+            ).run { context ->
+                assertThat(context).hasNotFailed()
+                val properties = context.getBean(NotificationKafkaProperties::class.java)
+                val errorHandler = context.getBean("notificationKafkaErrorHandler", DefaultErrorHandler::class.java)
+
+                assertThat(properties.sendTimeout).isEqualTo(Duration.ofMillis(1))
+                assertThat(properties.deliveryRetryBackoff).isEqualTo(Duration.ofMillis(1))
+                assertThat(errorHandler.configuredBackOff().interval).isEqualTo(1)
+            }
+
+        val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, NotificationEventMessage>
+        val sendFuture = RecordingKafkaSendFuture()
+        Mockito.`when`(kafkaTemplate.send(Mockito.any<Message<NotificationEventMessage>>())).thenReturn(sendFuture)
+
+        KafkaNotificationEventPublisherAdapter(kafkaTemplate, Duration.ofMillis(1)).publish(
+            notificationEventMessage(),
+            topic = "readmates.notification.events.v1",
+            key = "club-key",
+            requestId = "req-abc-123",
+        )
+
+        assertThat(sendFuture.timeout).isEqualTo(1)
+        assertThat(sendFuture.unit).isEqualTo(TimeUnit.MILLISECONDS)
+    }
+
+    @Test
     fun `error handler treats generic consumer processing failures as retryable`() {
         contextRunner
             .withPropertyValues(
@@ -605,6 +639,17 @@ private fun DefaultErrorHandler.exceptionMatcher(): ExceptionMatcher {
     val method = ExceptionClassifier::class.java.getDeclaredMethod("getExceptionMatcher")
     method.isAccessible = true
     return method.invoke(this) as ExceptionMatcher
+}
+
+private fun DefaultErrorHandler.configuredBackOff(): org.springframework.util.backoff.FixedBackOff {
+    val trackerField =
+        org.springframework.kafka.listener.FailedRecordProcessor::class.java
+            .getDeclaredField("failureTracker")
+    trackerField.isAccessible = true
+    val tracker = trackerField.get(this)
+    val backOffField = tracker.javaClass.getDeclaredField("backOff")
+    backOffField.isAccessible = true
+    return backOffField.get(tracker) as org.springframework.util.backoff.FixedBackOff
 }
 
 private fun notificationEventMessage(

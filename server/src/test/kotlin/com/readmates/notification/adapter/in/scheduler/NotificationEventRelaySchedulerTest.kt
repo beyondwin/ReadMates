@@ -50,6 +50,31 @@ class NotificationEventRelaySchedulerTest {
     }
 
     @Test
+    fun `one millisecond fixed delay reaches the actual scheduler exactly`() {
+        ApplicationContextRunner()
+            .withUserConfiguration(
+                NotificationWorkerConfiguration::class.java,
+                NotificationEventRelayScheduler::class.java,
+                NotificationEventRelaySchedulingConfig::class.java,
+                SchedulerTestConfiguration::class.java,
+            ).withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.sender-email=no-reply@example.test",
+                "readmates.notifications.sender-name=ReadMates",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+                "readmates.notifications.worker.fixed-delay=1ms",
+            ).run { context ->
+                assertThat(context).hasNotFailed()
+                Mockito.verify(context.getBean(TaskScheduler::class.java)).scheduleWithFixedDelay(
+                    Mockito.any(Runnable::class.java),
+                    Mockito.any(Instant::class.java),
+                    Mockito.eq(Duration.ofMillis(1)),
+                )
+            }
+    }
+
+    @Test
     fun `worker disabled keeps relay scheduling inactive`() {
         ApplicationContextRunner()
             .withUserConfiguration(

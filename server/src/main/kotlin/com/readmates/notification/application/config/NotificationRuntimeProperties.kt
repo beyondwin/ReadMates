@@ -10,6 +10,7 @@ private const val MAX_RUNTIME_COUNT = 1_000
 private const val SECONDS_PER_MINUTE = 60L
 private const val MICROSECONDS_PER_SECOND = 1_000_000L
 private const val NANOSECONDS_PER_MICROSECOND = 1_000
+private const val NANOSECONDS_PER_MILLISECOND = 1_000_000
 private const val FIXED_DELAY_SECONDS = 30L
 private const val CLAIM_LEASE_MINUTES = 15L
 private const val MAX_AGE_HOURS = 24L
@@ -96,7 +97,7 @@ data class NotificationRuntimeProperties(
         val claimLeaseMicroseconds: Long
 
         init {
-            requirePositive("worker.fixed-delay", fixedDelay)
+            requireExactMilliseconds("worker.fixed-delay", fixedDelay)
             requireCount("worker.relay-batch-size", relayBatchSize)
             requirePositive("worker.claim-lease", claimLease)
             claimLeaseMicroseconds = requireExactMicroseconds("worker.claim-lease", claimLease)
@@ -121,8 +122,8 @@ data class NotificationRuntimeProperties(
             require(retryDelays.zipWithNext().all { (previous, next) -> previous <= next }) {
                 "readmates.notifications.worker.retry-delays must be nondecreasing"
             }
-            requirePositive("worker.backlog-refresh-interval", backlogRefreshInterval)
-            requirePositive("worker.backlog-initial-delay", backlogInitialDelay)
+            requireExactMilliseconds("worker.backlog-refresh-interval", backlogRefreshInterval)
+            requireExactMilliseconds("worker.backlog-initial-delay", backlogInitialDelay)
         }
     }
 
@@ -139,10 +140,10 @@ data class NotificationRuntimeProperties(
         val deliveryRetryMaxAttempts: Long = 72,
     ) {
         init {
-            requirePositive("kafka.send-timeout", sendTimeout)
+            requireExactMilliseconds("kafka.send-timeout", sendTimeout)
             requireCount("kafka.max-publish-attempts", maxPublishAttempts)
             requireCount("kafka.max-delivery-attempts", maxDeliveryAttempts)
-            requirePositive("kafka.delivery-retry-backoff", deliveryRetryBackoff)
+            requireExactMilliseconds("kafka.delivery-retry-backoff", deliveryRetryBackoff)
             requireCount("kafka.delivery-retry-max-attempts", deliveryRetryMaxAttempts)
         }
     }
@@ -153,9 +154,9 @@ data class NotificationRuntimeProperties(
         val writeTimeout: Duration = DEFAULT_SMTP_TIMEOUT,
     ) {
         init {
-            requirePositive("smtp.connection-timeout", connectionTimeout)
-            requirePositive("smtp.read-timeout", readTimeout)
-            requirePositive("smtp.write-timeout", writeTimeout)
+            requireExactMilliseconds("smtp.connection-timeout", connectionTimeout)
+            requireExactMilliseconds("smtp.read-timeout", readTimeout)
+            requireExactMilliseconds("smtp.write-timeout", writeTimeout)
         }
 
         fun totalTimeout(): Duration = connectionTimeout.plus(readTimeout).plus(writeTimeout)
@@ -188,6 +189,19 @@ data class NotificationRuntimeProperties(
                     value.seconds % SECONDS_PER_MINUTE == 0L,
             ) {
                 "readmates.notifications.$property must be at least one minute and use whole-minute increments"
+            }
+        }
+
+        fun requireExactMilliseconds(
+            property: String,
+            value: Duration,
+        ) {
+            require(
+                value >= Duration.ofMillis(1) &&
+                    value.nano % NANOSECONDS_PER_MILLISECOND == 0,
+            ) {
+                "readmates.notifications.$property must be at least one millisecond " +
+                    "and use whole-millisecond increments"
             }
         }
 

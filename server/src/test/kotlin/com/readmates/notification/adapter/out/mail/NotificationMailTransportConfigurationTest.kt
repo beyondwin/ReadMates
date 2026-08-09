@@ -66,4 +66,29 @@ class NotificationMailTransportConfigurationTest {
                     .containsEntry("mail.smtp.writetimeout", "333")
             }
     }
+
+    @Test
+    fun `one millisecond timeouts reach the actual Boot mail sender exactly`() {
+        ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(MailSenderAutoConfiguration::class.java))
+            .withUserConfiguration(
+                NotificationWorkerConfiguration::class.java,
+                NotificationMailTransportConfiguration::class.java,
+            ).withPropertyValues(
+                "spring.mail.host=smtp.example.test",
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.sender-email=no-reply@example.test",
+                "readmates.notifications.sender-name=ReadMates",
+                "readmates.notifications.smtp.connection-timeout=1ms",
+                "readmates.notifications.smtp.read-timeout=1ms",
+                "readmates.notifications.smtp.write-timeout=1ms",
+            ).run { context ->
+                assertThat(context).hasNotFailed()
+
+                assertThat(context.getBean(JavaMailSenderImpl::class.java).javaMailProperties)
+                    .containsEntry("mail.smtp.connectiontimeout", "1")
+                    .containsEntry("mail.smtp.timeout", "1")
+                    .containsEntry("mail.smtp.writetimeout", "1")
+            }
+    }
 }

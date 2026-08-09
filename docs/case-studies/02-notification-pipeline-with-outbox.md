@@ -147,7 +147,7 @@ enum class NotificationEventOutboxStatus { PENDING, PUBLISHING, PUBLISHED, FAILE
 enum class NotificationDeliveryStatus { PENDING, SENDING, SENT, FAILED, DEAD, SKIPPED }
 ```
 
-두 state machine은 독립적으로 동작합니다. outbox가 PUBLISHED가 되어야 Kafka consumer가 delivery를 생성할 수 있고, delivery가 SENT가 되어야 최종 발송이 완료됩니다.
+두 state machine은 독립적으로 동작합니다. Kafka publish가 `markPublished`보다 먼저이므로 mark 유실 뒤 outbox가 `PUBLISHING`인 동안에도 consumer는 dedupe 계약에 따라 delivery를 멱등하게 생성·처리할 수 있습니다. `PUBLISHED`는 producer-side mark 완료를 확인하는 상태이지 consumer 처리의 선행 조건이 아니며, 전체 전달 계약은 at-least-once입니다. Delivery가 `SENT`가 되어야 애플리케이션의 최종 발송 상태가 완료됩니다.
 
 **이메일 본문 — `NotificationEmailTemplates.eventCopy`**
 

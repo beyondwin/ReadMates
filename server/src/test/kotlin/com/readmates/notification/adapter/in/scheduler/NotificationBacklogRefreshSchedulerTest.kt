@@ -54,6 +54,29 @@ class NotificationBacklogRefreshSchedulerTest {
     }
 
     @Test
+    fun `one millisecond backlog timings reach the actual scheduler exactly`() {
+        val earliestStart = Instant.now().plusMillis(1)
+        ApplicationContextRunner()
+            .withUserConfiguration(
+                NotificationWorkerConfiguration::class.java,
+                NotificationBacklogRefreshScheduler::class.java,
+                BacklogSchedulerTestConfiguration::class.java,
+            ).withPropertyValues(
+                "readmates.notifications.worker.backlog-refresh-interval=1ms",
+                "readmates.notifications.worker.backlog-initial-delay=1ms",
+            ).run { context ->
+                assertThat(context).hasNotFailed()
+                val start = ArgumentCaptor.forClass(Instant::class.java)
+                Mockito.verify(context.getBean(TaskScheduler::class.java)).scheduleWithFixedDelay(
+                    Mockito.any(Runnable::class.java),
+                    start.capture(),
+                    Mockito.eq(Duration.ofMillis(1)),
+                )
+                assertThat(start.value).isBetween(earliestStart, Instant.now().plusMillis(1))
+            }
+    }
+
+    @Test
     fun `observation failure does not escape the scheduler or repeat refresh`() {
         val refreshUseCase = Mockito.mock(RefreshNotificationBacklogUseCase::class.java)
         val observationPort = Mockito.mock(NotificationBacklogObservationPort::class.java)
