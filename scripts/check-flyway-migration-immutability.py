@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import shlex
 import stat
 import subprocess
 import sys
@@ -540,6 +541,43 @@ def _normalized_worktree_object_id(repo: Path, path: str) -> str | None:
     return object_id
 
 
+def _filter_attribute_violation(repo: Path, path: str) -> Violation | None:
+    result = _run_git_bytes(
+        repo,
+        "check-attr",
+        "-z",
+        "filter",
+        "--",
+        path,
+    )
+    if result.returncode != 0:
+        return Violation(
+            "catalog-attribute-unreadable",
+            _public_path(path),
+            "Git filter attribute cannot be inspected safely",
+        )
+    fields = result.stdout.split(b"\0")
+    if fields and fields[-1] == b"":
+        fields.pop()
+    try:
+        reported_path = fields[0].decode("utf-8")
+    except (IndexError, UnicodeDecodeError):
+        reported_path = ""
+    if len(fields) != 3 or reported_path != path or fields[1] != b"filter":
+        return Violation(
+            "catalog-attribute-unreadable",
+            _public_path(path),
+            "Git filter attribute response is malformed",
+        )
+    if fields[2] in (b"unspecified", b"unset"):
+        return None
+    return Violation(
+        "catalog-external-filter",
+        _public_path(path),
+        "production migrations must not use a clean filter driver",
+    )
+
+
 def _print_history_failure(category: str, detail: str) -> int:
     print(f"[{category}] history: {detail}", file=sys.stderr)
     print(
@@ -634,6 +672,10 @@ def check_migrations(base_ref: str) -> int:
                 )
             )
         else:
+            filter_violation = _filter_attribute_violation(repo, path)
+            if filter_violation is not None:
+                violations.append(filter_violation)
+                continue
             normalized_object_id = _normalized_worktree_object_id(repo, path)
             if normalized_object_id is None:
                 violations.append(
@@ -752,6 +794,30 @@ class FlywayMigrationImmutabilityTests(unittest.TestCase):
         self.assertNotIn(b"\n", content.replace(b"\r\n", b""))
         self.assertEqual(self._git(clone, "status", "--porcelain=v1", "--untracked-files=all"), "")
         return clone, base, migration
+
+    def _configure_mask_filter(
+        self,
+        repo: Path,
+        attribute_rule: str,
+    ) -> Path:
+        marker = repo / "filter-invoked.marker"
+        filter_script = self._write(
+            repo,
+            "mask_filter.py",
+            "from pathlib import Path\n"
+            "import sys\n"
+            "data = sys.stdin.buffer.read()\n"
+            "Path(sys.argv[1]).write_text('invoked', encoding='utf-8')\n"
+            "sys.stdout.buffer.write(data.replace(b'edited_label', b'label'))\n",
+        )
+        self._write(repo, ".gitattributes", attribute_rule + "\n")
+        command = f"{shlex.quote(sys.executable)} {shlex.quote(str(filter_script))} {shlex.quote(str(marker))}"
+        self._git(repo, "config", "filter.mask.clean", command)
+        self._git(repo, "add", ".gitattributes", "mask_filter.py")
+        self._git(repo, "commit", "--quiet", "-m", "configure fixture attributes")
+        if marker.exists():
+            marker.unlink()
+        return marker
 
     def _run_checker(
         self,
@@ -1101,6 +1167,31 @@ class FlywayMigrationImmutabilityTests(unittest.TestCase):
             content = migration.read_bytes()
             migration.write_bytes(content.replace(b"label", b"edited_label", 1))
             self._assert_failure(clone, base, "historical-modified")
+
+    def test_external_clean_filter_is_rejected_without_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo, base = self._new_repo(Path(temporary))
+            marker = self._configure_mask_filter(repo, "*.sql filter=mask")
+            relative = MIGRATION_DIRECTORY / "V9__current.sql"
+            migration = repo / relative
+            migration.write_bytes(migration.read_bytes().replace(b"label", b"edited_label", 1))
+
+            result = self._run_checker(repo, base)
+            with self.subTest(contract="fails closed"):
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            with self.subTest(contract="bounded category"):
+                self.assertIn("[catalog-external-filter]", result.stderr)
+            with self.subTest(contract="filter not invoked"):
+                self.assertFalse(marker.exists(), "checker invoked configured clean filter")
+
+    def test_unset_and_unspecified_filter_attributes_do_not_invoke_driver(self) -> None:
+        for attribute_rule in ("*.sql -filter", "*.sql !filter"):
+            with self.subTest(attribute_rule=attribute_rule), tempfile.TemporaryDirectory() as temporary:
+                repo, base = self._new_repo(Path(temporary))
+                marker = self._configure_mask_filter(repo, attribute_rule)
+                result = self._run_checker(repo, base)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertFalse(marker.exists(), "checker invoked inactive clean filter")
 
 
 def run_self_tests() -> int:
