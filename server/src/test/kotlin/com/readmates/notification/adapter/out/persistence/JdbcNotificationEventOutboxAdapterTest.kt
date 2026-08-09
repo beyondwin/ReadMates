@@ -21,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import tools.jackson.databind.ObjectMapper
 import java.time.Clock
 import java.time.Duration
 import java.time.LocalDate
@@ -104,6 +105,7 @@ class JdbcNotificationEventOutboxAdapterTest(
     @param:Autowired private val deliveryBacklogPort: NotificationDeliveryBacklogPort,
     @param:Autowired private val eventOutboxBacklogPort: NotificationEventOutboxBacklogPort,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val objectMapper: ObjectMapper,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000101")
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000201")
@@ -333,6 +335,17 @@ class JdbcNotificationEventOutboxAdapterTest(
         assertThat(freshRow["locked_at"]).isEqualTo(freshLeaseBefore)
         assertThat(freshRow["published_at"]).isNull()
     }
+
+    @Test
+    fun `claim publishable uses the typed non-default lease for stale publishing boundaries`() =
+        assertTypedEventClaimLeaseBoundaries(
+            jdbcTemplate = jdbcTemplate,
+            objectMapper = objectMapper,
+            adapter = adapter,
+            clubId = clubId,
+            sessionId = sessionId,
+            insertClub = ::insertClub,
+        )
 
     @Test
     fun `claim publishable moves due failed rows to publishing but leaves future failed rows alone`() {
@@ -883,6 +896,97 @@ private fun relayRuntimeProperties(): NotificationRuntimeProperties =
     NotificationRuntimeProperties(
         worker = NotificationRuntimeProperties.Worker(eventMaxAge = Duration.ofHours(24)),
         kafka = NotificationRuntimeProperties.Kafka(maxPublishAttempts = 5),
+    )
+
+private fun notificationRuntimeProperties(claimLease: Duration): NotificationRuntimeProperties =
+    NotificationRuntimeProperties(
+        worker = NotificationRuntimeProperties.Worker(claimLease = claimLease),
+    )
+
+private fun assertTypedEventClaimLeaseBoundaries(
+    jdbcTemplate: JdbcTemplate,
+    objectMapper: ObjectMapper,
+    adapter: JdbcNotificationEventOutboxAdapter,
+    clubId: UUID,
+    sessionId: UUID,
+    insertClub: () -> Unit,
+) {
+    insertClub()
+    val lease = Duration.ofMinutes(7).plusSeconds(30).plusMillis(500)
+    val leaseMicros = 450_500_000L
+    val leaseAdapter =
+        JdbcNotificationEventOutboxAdapter(
+            jdbcTemplate = jdbcTemplate,
+            objectMapper = objectMapper,
+            eventsTopic = TEST_NOTIFICATION_EVENTS_TOPIC,
+            runtimeProperties = notificationRuntimeProperties(lease),
+        )
+    val expiredId =
+        enqueueConfiguredLeaseEvent(adapter, jdbcTemplate, clubId, sessionId, "expired", "Expired Configured Lease")
+    val insideId =
+        enqueueConfiguredLeaseEvent(adapter, jdbcTemplate, clubId, sessionId, "inside", "Inside Configured Lease")
+    jdbcTemplate.setPublishingLease(expiredId, -leaseMicros)
+    jdbcTemplate.setPublishingLease(insideId, -(leaseMicros - 5_000_000L))
+    val insideLeaseBefore = jdbcTemplate.configuredLeaseEventRow(insideId)["locked_at"]
+
+    val claimed = leaseAdapter.claimPublishable(10)
+
+    assertThat(claimed.map { it.id.toString() }).contains(expiredId)
+    assertThat(claimed.map { it.id.toString() }).doesNotContain(insideId)
+    assertThat(jdbcTemplate.configuredLeaseEventRow(insideId)["status"]).isEqualTo("PUBLISHING")
+    assertThat(jdbcTemplate.configuredLeaseEventRow(insideId)["locked_at"]).isEqualTo(insideLeaseBefore)
+}
+
+private fun enqueueConfiguredLeaseEvent(
+    adapter: JdbcNotificationEventOutboxAdapter,
+    jdbcTemplate: JdbcTemplate,
+    clubId: UUID,
+    sessionId: UUID,
+    suffix: String,
+    bookTitle: String,
+): String {
+    val dedupeKey = "event-outbox-adapter-test-configured-$suffix-lease"
+    check(
+        adapter.enqueueEvent(
+            clubId = clubId,
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+            aggregateType = "SESSION",
+            aggregateId = sessionId,
+            payload = NotificationEventPayload(sessionId = sessionId, bookTitle = bookTitle),
+            dedupeKey = dedupeKey,
+        ),
+    )
+    return requireNotNull(
+        jdbcTemplate.queryForObject(
+            "select id from notification_event_outbox where dedupe_key = ?",
+            String::class.java,
+            dedupeKey,
+        ),
+    )
+}
+
+private fun JdbcTemplate.setPublishingLease(
+    eventId: String,
+    offsetMicros: Long,
+) {
+    update(
+        """
+        update notification_event_outbox
+        set status = 'PUBLISHING',
+            locked_at = timestampadd(MICROSECOND, ?, utc_timestamp(6)),
+            next_attempt_at = timestampadd(MICROSECOND, ?, utc_timestamp(6))
+        where id = ?
+        """.trimIndent(),
+        offsetMicros,
+        offsetMicros,
+        eventId,
+    )
+}
+
+private fun JdbcTemplate.configuredLeaseEventRow(eventId: String): Map<String, Any?> =
+    queryForMap(
+        "select status, locked_at from notification_event_outbox where id = ?",
+        eventId,
     )
 
 private fun JdbcTemplate.seedReminderCandidate(

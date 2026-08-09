@@ -8,6 +8,8 @@ import java.time.temporal.ChronoUnit
 private const val MIN_RUNTIME_COUNT = 1
 private const val MAX_RUNTIME_COUNT = 1_000
 private const val SECONDS_PER_MINUTE = 60L
+private const val MICROSECONDS_PER_SECOND = 1_000_000L
+private const val NANOSECONDS_PER_MICROSECOND = 1_000
 private const val FIXED_DELAY_SECONDS = 30L
 private const val CLAIM_LEASE_MINUTES = 15L
 private const val MAX_AGE_HOURS = 24L
@@ -89,10 +91,13 @@ data class NotificationRuntimeProperties(
         val backlogRefreshInterval: Duration = DEFAULT_BACKLOG_REFRESH_INTERVAL,
         val backlogInitialDelay: Duration = DEFAULT_BACKLOG_INITIAL_DELAY,
     ) {
+        val claimLeaseMicroseconds: Long
+
         init {
             requirePositive("worker.fixed-delay", fixedDelay)
             requireCount("worker.relay-batch-size", relayBatchSize)
             requirePositive("worker.claim-lease", claimLease)
+            claimLeaseMicroseconds = requireExactMicroseconds("worker.claim-lease", claimLease)
             requirePositive("worker.event-max-age", eventMaxAge)
             requirePositive("worker.delivery-max-age", deliveryMaxAge)
             require(retryDelays.isNotEmpty()) {
@@ -173,6 +178,20 @@ data class NotificationRuntimeProperties(
             ) {
                 "readmates.notifications.$property must be at least one minute and use whole-minute increments"
             }
+        }
+
+        fun requireExactMicroseconds(
+            property: String,
+            value: Duration,
+        ): Long {
+            val fractionalMicroseconds = value.nano / NANOSECONDS_PER_MICROSECOND
+            require(value.nano % NANOSECONDS_PER_MICROSECOND == 0) {
+                "readmates.notifications.$property must use exact microsecond increments"
+            }
+            require(value.seconds <= (Long.MAX_VALUE - fractionalMicroseconds) / MICROSECONDS_PER_SECOND) {
+                "readmates.notifications.$property exceeds the supported microsecond interval"
+            }
+            return value.seconds * MICROSECONDS_PER_SECOND + fractionalMicroseconds
         }
 
         fun requireCount(

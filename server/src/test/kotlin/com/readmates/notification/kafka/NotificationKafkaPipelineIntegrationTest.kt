@@ -539,9 +539,10 @@ class NotificationKafkaPipelineIntegrationTest(
         fun jdbcNotificationDeliveryAdapter(
             jdbcTemplate: JdbcTemplate,
             objectMapper: ObjectMapper,
+            runtimeProperties: NotificationRuntimeProperties,
         ): JdbcNotificationDeliveryAdapter {
             val appBaseUrl = PIPELINE_APP_BASE_URL
-            return JdbcNotificationDeliveryAdapter(jdbcTemplate, objectMapper, appBaseUrl)
+            return JdbcNotificationDeliveryAdapter(jdbcTemplate, objectMapper, appBaseUrl, runtimeProperties)
         }
 
         @Bean
@@ -549,9 +550,10 @@ class NotificationKafkaPipelineIntegrationTest(
             jdbcTemplate: JdbcTemplate,
             objectMapper: ObjectMapper,
             @Value("\${readmates.notifications.kafka.events-topic}") eventsTopic: String,
+            runtimeProperties: NotificationRuntimeProperties,
         ): JdbcNotificationEventOutboxAdapter {
             val topic = eventsTopic
-            return JdbcNotificationEventOutboxAdapter(jdbcTemplate, objectMapper, topic)
+            return JdbcNotificationEventOutboxAdapter(jdbcTemplate, objectMapper, topic, runtimeProperties)
         }
 
         @Bean

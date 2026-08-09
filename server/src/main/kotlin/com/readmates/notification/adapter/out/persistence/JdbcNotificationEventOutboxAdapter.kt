@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.HostNotificationManualDispatchMetadata
 import com.readmates.notification.application.model.ManualNotificationAudience
@@ -33,15 +34,16 @@ import java.util.UUID
 import kotlin.math.max
 
 private const val MAX_EVENT_LAST_ERROR_LENGTH = 500
-private const val PUBLISHING_LEASE_TIMEOUT_MINUTES = 15
 
 @Repository
 class JdbcNotificationEventOutboxAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val objectMapper: ObjectMapper,
     @param:Value("\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}") private val eventsTopic: String,
+    runtimeProperties: NotificationRuntimeProperties,
 ) : NotificationEventOutboxPort {
     private val payloadType = objectMapper.typeFactory.constructType(NotificationEventPayload::class.java)
+    private val claimLeaseMicroseconds = runtimeProperties.worker.claimLeaseMicroseconds
 
     override fun enqueueEvent(
         clubId: UUID,
@@ -443,9 +445,9 @@ class JdbcNotificationEventOutboxAdapter(
                 next_attempt_at = utc_timestamp(6),
                 updated_at = utc_timestamp(6)
             where status = 'PUBLISHING'
-              and locked_at < timestampadd(MINUTE, ?, utc_timestamp(6))
+              and locked_at <= timestampadd(MICROSECOND, ?, utc_timestamp(6))
             """.trimIndent(),
-            -PUBLISHING_LEASE_TIMEOUT_MINUTES,
+            -claimLeaseMicroseconds,
         )
     }
 

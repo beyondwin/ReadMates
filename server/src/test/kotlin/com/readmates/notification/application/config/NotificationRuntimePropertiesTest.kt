@@ -64,6 +64,7 @@ class NotificationRuntimePropertiesTest {
             assertThat(properties.worker.fixedDelay).isEqualTo(Duration.ofSeconds(30))
             assertThat(properties.worker.relayBatchSize).isEqualTo(50)
             assertThat(properties.worker.claimLease).isEqualTo(Duration.ofMinutes(15))
+            assertThat(properties.worker.claimLeaseMicroseconds).isEqualTo(900_000_000L)
             assertThat(properties.worker.eventMaxAge).isEqualTo(Duration.ofHours(24))
             assertThat(properties.worker.deliveryMaxAge).isEqualTo(Duration.ofHours(24))
             assertThat(properties.worker.retryDelays)
@@ -84,6 +85,21 @@ class NotificationRuntimePropertiesTest {
             assertThat(properties.smtp.readTimeout).isEqualTo(Duration.ofSeconds(5))
             assertThat(properties.smtp.writeTimeout).isEqualTo(Duration.ofSeconds(5))
         }
+    }
+
+    @Test
+    fun `claim lease preserves exact database microsecond precision`() {
+        val worker =
+            NotificationRuntimeProperties.Worker(
+                claimLease =
+                    Duration
+                        .ofMinutes(7)
+                        .plusSeconds(30)
+                        .plusMillis(500)
+                        .plusNanos(123_000),
+            )
+
+        assertThat(worker.claimLeaseMicroseconds).isEqualTo(450_500_123L)
     }
 
     @Test
@@ -168,6 +184,7 @@ class NotificationRuntimePropertiesTest {
                 invalidValue("readmates.notifications.worker.relay-batch-size", "1001"),
                 invalidValue("readmates.notifications.worker.claim-lease", "0s"),
                 invalidValue("readmates.notifications.worker.claim-lease", "-1s"),
+                invalidValue("readmates.notifications.worker.claim-lease", "450.500000001s"),
                 invalidValue("readmates.notifications.worker.event-max-age", "0s"),
                 invalidValue("readmates.notifications.worker.event-max-age", "-1s"),
                 invalidValue("readmates.notifications.worker.delivery-max-age", "0s"),

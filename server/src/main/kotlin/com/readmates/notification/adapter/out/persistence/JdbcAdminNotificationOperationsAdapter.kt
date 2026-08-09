@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.AdminNotificationClubHealth
 import com.readmates.notification.application.model.AdminNotificationClubRef
 import com.readmates.notification.application.model.AdminNotificationDelivery
@@ -42,10 +43,15 @@ import java.util.UUID
 @Repository
 class JdbcAdminNotificationOperationsAdapter(
     private val jdbcTemplate: JdbcTemplate,
+    runtimeProperties: NotificationRuntimeProperties,
 ) : AdminNotificationOperationsReadPort,
     AdminNotificationReplayPort,
     AdminNotificationAuditPort {
-    private val snapshotQueries = AdminNotificationSnapshotQueries(jdbcTemplate)
+    private val snapshotQueries =
+        AdminNotificationSnapshotQueries(
+            jdbcTemplate = jdbcTemplate,
+            claimLeaseMicroseconds = runtimeProperties.worker.claimLeaseMicroseconds,
+        )
 
     override fun snapshot(): AdminNotificationOperationsSnapshot = snapshotQueries.snapshot()
 
@@ -282,6 +288,7 @@ class JdbcAdminNotificationOperationsAdapter(
 
 private class AdminNotificationSnapshotQueries(
     private val jdbcTemplate: JdbcTemplate,
+    private val claimLeaseMicroseconds: Long,
 ) {
     fun snapshot(): AdminNotificationOperationsSnapshot =
         AdminNotificationOperationsSnapshot(
@@ -344,9 +351,10 @@ private class AdminNotificationSnapshotQueries(
                     select count(*)
                     from notification_event_outbox
                     where status = 'PUBLISHING'
-                      and locked_at < timestampadd(MINUTE, -15, utc_timestamp(6))
+                      and locked_at <= timestampadd(MICROSECOND, ?, utc_timestamp(6))
                     """.trimIndent(),
                     Int::class.java,
+                    -claimLeaseMicroseconds,
                 ) ?: 0,
             staleSending =
                 jdbcTemplate.queryForObject(
@@ -354,9 +362,10 @@ private class AdminNotificationSnapshotQueries(
                     select count(*)
                     from notification_deliveries
                     where status = 'SENDING'
-                      and locked_at < timestampadd(MINUTE, -15, utc_timestamp(6))
+                      and locked_at <= timestampadd(MICROSECOND, ?, utc_timestamp(6))
                     """.trimIndent(),
                     Int::class.java,
+                    -claimLeaseMicroseconds,
                 ) ?: 0,
         )
 

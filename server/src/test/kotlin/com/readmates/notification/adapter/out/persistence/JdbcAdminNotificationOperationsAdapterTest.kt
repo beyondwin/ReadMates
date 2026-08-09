@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.AdminNotificationFilter
 import com.readmates.notification.application.model.NotificationDispatchSource
 import com.readmates.notification.domain.NotificationDeliveryStatus
@@ -12,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import java.time.Duration
 import java.util.UUID
 
 private const val CLEANUP_ADMIN_NOTIFICATION_OPERATIONS_SQL = """
@@ -54,8 +56,9 @@ private const val CLEANUP_ADMIN_NOTIFICATION_OPERATIONS_SQL = """
 class JdbcAdminNotificationOperationsAdapterTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val hostLedgerAdapter: JdbcNotificationEventOutboxAdapter,
+    @param:Autowired private val runtimeProperties: NotificationRuntimeProperties,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-    private val adapter by lazy { JdbcAdminNotificationOperationsAdapter(jdbcTemplate) }
+    private val adapter by lazy { JdbcAdminNotificationOperationsAdapter(jdbcTemplate, runtimeProperties) }
 
     @Test
     fun `snapshot and ledgers expose safe admin notification operations`() {
@@ -114,6 +117,61 @@ class JdbcAdminNotificationOperationsAdapterTest(
             .containsEntry(MANUAL_EVENT_ID, NotificationDispatchSource.MANUAL)
             .containsEntry(HOST_CONFIRMED_EVENT_ID, NotificationDispatchSource.HOST_CONFIRMED)
         assertThat(hostEvents.items.single { it.id == MANUAL_EVENT_ID }.manualDispatch).isNotNull()
+    }
+
+    @Test
+    fun `relay summary uses one typed non-default lease for publishing and sending staleness`() {
+        seedOperationsRows()
+        val lease = Duration.ofMinutes(7).plusSeconds(30).plusMillis(500)
+        val leaseMicros = 450_500_000L
+        val leaseAdapter =
+            JdbcAdminNotificationOperationsAdapter(
+                jdbcTemplate = jdbcTemplate,
+                runtimeProperties = notificationRuntimeProperties(lease),
+            )
+        setOutboxLease(FAILED_EVENT_ID, -leaseMicros)
+        setOutboxLease(SECOND_CLUB_EVENT_ID, -(leaseMicros - 5_000_000L))
+        setDeliveryLease(DEAD_DELIVERY_ID, -leaseMicros)
+        setDeliveryLease(SECOND_DELIVERY_ID, -(leaseMicros - 5_000_000L))
+
+        val relaySummary = leaseAdapter.snapshot().relaySummary
+
+        assertThat(relaySummary.publishing).isEqualTo(2)
+        assertThat(relaySummary.stalePublishing).isEqualTo(1)
+        assertThat(relaySummary.sending).isEqualTo(2)
+        assertThat(relaySummary.staleSending).isEqualTo(1)
+    }
+
+    private fun setOutboxLease(
+        eventId: UUID,
+        offsetMicros: Long,
+    ) {
+        jdbcTemplate.update(
+            """
+            update notification_event_outbox
+            set status = 'PUBLISHING',
+                locked_at = timestampadd(MICROSECOND, ?, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
+            offsetMicros,
+            eventId.toString(),
+        )
+    }
+
+    private fun setDeliveryLease(
+        deliveryId: UUID,
+        offsetMicros: Long,
+    ) {
+        jdbcTemplate.update(
+            """
+            update notification_deliveries
+            set status = 'SENDING',
+                locked_at = timestampadd(MICROSECOND, ?, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
+            offsetMicros,
+            deliveryId.toString(),
+        )
     }
 
     private fun seedOperationsRows() {
@@ -292,6 +350,11 @@ private data class DeliverySeed(
     val status: String,
     val lastError: String?,
 )
+
+private fun notificationRuntimeProperties(claimLease: Duration): NotificationRuntimeProperties =
+    NotificationRuntimeProperties(
+        worker = NotificationRuntimeProperties.Worker(claimLease = claimLease),
+    )
 
 private val BASELINE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
 private val SECOND_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")

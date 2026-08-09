@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDetail
@@ -30,6 +31,7 @@ class JdbcNotificationDeliveryAdapter(
     private val jdbcTemplate: JdbcTemplate,
     objectMapper: ObjectMapper,
     @Value("\${readmates.app-base-url:http://localhost:3000}") appBaseUrl: String,
+    runtimeProperties: NotificationRuntimeProperties,
 ) : NotificationDeliveryPlanningPort,
     NotificationDeliveryClaimPort,
     NotificationDeliveryStatusPort,
@@ -39,7 +41,11 @@ class JdbcNotificationDeliveryAdapter(
     private val backlogQueries = NotificationDeliveryBacklogQueries()
     private val ledgerQueries = HostNotificationLedgerQueries(rowMappers, backlogQueries)
     private val planningOperations = NotificationDeliveryPlanningOperations(rowMappers)
-    private val claimOperations = NotificationDeliveryClaimOperations(rowMappers)
+    private val claimOperations =
+        NotificationDeliveryClaimOperations(
+            rowMappers = rowMappers,
+            claimLeaseMicroseconds = runtimeProperties.worker.claimLeaseMicroseconds,
+        )
     private val statusOperations = NotificationDeliveryStatusOperations()
 
     override fun persistPlannedDeliveries(message: NotificationEventMessage): List<NotificationDeliveryItem> =

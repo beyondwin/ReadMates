@@ -24,8 +24,10 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import tools.jackson.databind.ObjectMapper
 import java.sql.Timestamp
 import java.time.Clock
+import java.time.Duration
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -95,6 +97,7 @@ class JdbcNotificationDeliveryAdapterTest(
     @param:Autowired private val memberNotificationAdapter: JdbcMemberNotificationAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val transactionalOps: NotificationDeliveryTransactionalOperations,
+    @param:Autowired private val objectMapper: ObjectMapper,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val eventId = UUID.fromString("00000000-0000-0000-0000-000000009701")
@@ -403,6 +406,34 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(reclaimed).isNotNull
         assertThat(reclaimed!!.status).isEqualTo(NotificationDeliveryStatus.SENDING)
         assertThat(statusFor(emailDeliveryId)).isEqualTo("SENDING")
+    }
+
+    @Test
+    fun `claimEmailDelivery uses the typed non-default lease for sending boundaries`() {
+        insertEventOutboxRow()
+        deliveryAdapter.persistPlannedDeliveries(message())
+        val lease = Duration.ofMinutes(7).plusSeconds(30).plusMillis(500)
+        val leaseMicros = 450_500_000L
+        val leaseAdapter =
+            JdbcNotificationDeliveryAdapter(
+                jdbcTemplate = jdbcTemplate,
+                objectMapper = objectMapper,
+                appBaseUrl = "http://localhost:3000",
+                runtimeProperties = notificationRuntimeProperties(lease),
+            )
+        val expiredId = pendingEmailDeliveryIdFor("member1@example.com")
+        val insideId = pendingEmailDeliveryIdFor("member5@example.com")
+        setSendingLease(expiredId, -leaseMicros)
+        setSendingLease(insideId, -(leaseMicros - 5_000_000L))
+        val insideLeaseBefore = deliveryLockedAt(insideId)
+
+        val reclaimed = leaseAdapter.claimEmailDelivery(expiredId)
+        val inside = leaseAdapter.claimEmailDelivery(insideId)
+
+        assertThat(reclaimed).isNotNull
+        assertThat(inside).isNull()
+        assertThat(statusFor(insideId)).isEqualTo("SENDING")
+        assertThat(deliveryLockedAt(insideId)).isEqualTo(insideLeaseBefore)
     }
 
     @Test
@@ -877,6 +908,29 @@ class JdbcNotificationDeliveryAdapterTest(
             id.toString(),
         )!!
 
+    private fun deliveryLockedAt(id: UUID): Timestamp? =
+        jdbcTemplate.queryForObject(
+            "select locked_at from notification_deliveries where id = ?",
+            Timestamp::class.java,
+            id.toString(),
+        )
+
+    private fun setSendingLease(
+        id: UUID,
+        offsetMicros: Long,
+    ) {
+        jdbcTemplate.update(
+            """
+            update notification_deliveries
+            set status = 'SENDING',
+                locked_at = timestampadd(MICROSECOND, ?, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
+            offsetMicros,
+            id.toString(),
+        )
+    }
+
     private fun lastErrorFor(id: UUID): String? =
         jdbcTemplate.queryForObject(
             "select last_error from notification_deliveries where id = ?",
@@ -945,3 +999,8 @@ class JdbcNotificationDeliveryAdapterTest(
         private fun failDelivery(): Nothing = throw MailDeliveryFailure(MailDeliveryFailureKind.RETRYABLE)
     }
 }
+
+private fun notificationRuntimeProperties(claimLease: Duration): NotificationRuntimeProperties =
+    NotificationRuntimeProperties(
+        worker = NotificationRuntimeProperties.Worker(claimLease = claimLease),
+    )
