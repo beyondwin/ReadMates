@@ -56,6 +56,9 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
 const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   schema: "platform.health_snapshot.v1",
   generatedAt: "2026-05-26T00:00:00Z",
+  lastSuccessfulAt: "2026-05-26T00:00:00Z",
+  refreshState: "FRESH",
+  staleAgeSeconds: 0,
   cards: [
     {
       id: "outbox_backlog",
@@ -210,3 +213,41 @@ test("operator views /admin/health grid", async ({ page }) => {
   ).toHaveAttribute("href", "/admin/ai-ops");
   await expect(page.getByText(/NaN/)).toHaveCount(0);
 });
+
+const HEALTH_REFRESH_FIXTURES = [
+  {
+    name: "stale with server age",
+    snapshot: { ...HEALTH_SNAPSHOT, refreshState: "STALE" as const, staleAgeSeconds: 125 },
+    expected: "마지막 정상 갱신 2분 5초 전",
+  },
+  {
+    name: "refreshing with last known good cards",
+    snapshot: { ...HEALTH_SNAPSHOT, refreshState: "REFRESHING" as const, staleAgeSeconds: 12 },
+    expected: "서버에서 갱신 중",
+  },
+  {
+    name: "unavailable before first success",
+    snapshot: {
+      ...HEALTH_SNAPSHOT,
+      lastSuccessfulAt: null,
+      refreshState: "UNAVAILABLE" as const,
+      staleAgeSeconds: 0,
+    },
+    expected: "정상 갱신 이력 없음",
+  },
+] as const;
+
+for (const fixture of HEALTH_REFRESH_FIXTURES) {
+  test(`operator sees ${fixture.name} metadata without losing cards`, async ({ page }) => {
+    await routePlatformAdminShell(page, "OWNER");
+    await page.route("**/api/bff/api/admin/health/snapshot", async (route) => {
+      await json(route, 200, fixture.snapshot);
+    });
+
+    await page.goto("/admin/health");
+
+    await expect(page.getByText(fixture.expected)).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Outbox backlog" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "최근 deploy" })).toBeVisible();
+  });
+}

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import * as api from "@/features/platform-admin/api/platform-admin-health-api";
 import { AdminHealthRoute } from "@/features/platform-admin/route/admin-health-route";
@@ -10,6 +11,9 @@ import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-c
 const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   schema: "platform.health_snapshot.v1",
   generatedAt: "2026-05-26T00:00:00Z",
+  lastSuccessfulAt: "2026-05-26T00:00:00Z",
+  refreshState: "FRESH",
+  staleAgeSeconds: 0,
   cards: [
     {
       id: "outbox_backlog",
@@ -108,6 +112,10 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
 };
 
 describe("AdminHealthRoute", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("renders the full health snapshot and deploy strip", async () => {
     const fetchSpy = vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockResolvedValueOnce(HEALTH_SNAPSHOT);
     const client = new QueryClient();
@@ -131,5 +139,34 @@ describe("AdminHealthRoute", () => {
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).toBeNull();
     expect(fetchSpy).toHaveBeenCalled();
+  });
+
+  it("keeps the server stale state after a successful manual refetch", async () => {
+    const user = userEvent.setup();
+    const staleSnapshot: PlatformHealthSnapshotResponse = {
+      ...HEALTH_SNAPSHOT,
+      refreshState: "STALE",
+      staleAgeSeconds: 125,
+    };
+    const fetchSpy = vi
+      .spyOn(api, "fetchPlatformAdminHealthSnapshot")
+      .mockResolvedValueOnce(HEALTH_SNAPSHOT)
+      .mockResolvedValueOnce(staleSnapshot);
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, refetchInterval: false } },
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter>
+          <AdminHealthRoute />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("정상 갱신 완료")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "새로고침" }));
+
+    expect(await screen.findByText("마지막 정상 갱신 2분 5초 전")).toBeInTheDocument();
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 });

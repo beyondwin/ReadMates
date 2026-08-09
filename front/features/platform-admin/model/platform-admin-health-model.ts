@@ -1,6 +1,7 @@
 export type HealthCardStatus = "OK" | "WARN" | "CRIT" | "UNKNOWN";
 export type HealthCardSource = "IN_PROCESS" | "PROMETHEUS" | "FILE";
 export type DeployAttemptFinalStatus = "SUCCEEDED" | "FAILED" | "RUNNING";
+export type PlatformHealthRefreshState = "FRESH" | "REFRESHING" | "STALE" | "UNAVAILABLE";
 
 export type HealthCardMetric = {
   value: number | null;
@@ -43,5 +44,8 @@ export type HealthCard = {
 export type PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1";
   generatedAt: string;
+  lastSuccessfulAt: string | null;
+  refreshState: PlatformHealthRefreshState;
+  staleAgeSeconds: number;
   cards: HealthCard[];
 };

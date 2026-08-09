@@ -9,6 +9,9 @@ import { AdminHealthGrid } from "@/features/platform-admin/ui/admin-health-grid"
 const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1",
   generatedAt: "2026-05-26T00:00:00Z",
+  lastSuccessfulAt: "2026-05-26T00:00:00Z",
+  refreshState: "FRESH",
+  staleAgeSeconds: 0,
   cards: [
     {
       id: "outbox_backlog",
@@ -114,7 +117,6 @@ function renderGrid(
     loading: false,
     error: false,
     fetching: false,
-    stale: false,
     onRefresh: vi.fn(),
   };
   render(
@@ -154,9 +156,28 @@ describe("AdminHealthGrid", () => {
     expect(onRefresh).toHaveBeenCalledTimes(1);
   });
 
-  it("marks the snapshot stale when the route says it is stale", () => {
-    renderGrid({ stale: true });
+  it.each([
+    ["FRESH", 0, "정상 갱신 완료"],
+    ["REFRESHING", 12, "서버에서 갱신 중"],
+    ["STALE", 125, "마지막 정상 갱신 2분 5초 전"],
+    ["UNAVAILABLE", 0, "정상 갱신 이력 없음"],
+  ] as const)("renders the %s state from server metadata", (refreshState, staleAgeSeconds, copy) => {
+    renderGrid({
+      snapshot: {
+        ...HEALTH_SNAPSHOT,
+        lastSuccessfulAt: refreshState === "UNAVAILABLE" ? null : HEALTH_SNAPSHOT.lastSuccessfulAt,
+        refreshState,
+        staleAgeSeconds,
+      },
+    });
 
-    expect(screen.getByText("30초 이상 경과")).toBeInTheDocument();
+    expect(screen.getByText(copy)).toBeInTheDocument();
+  });
+
+  it("shows transport activity without replacing the fresh server state", () => {
+    renderGrid({ fetching: true });
+
+    expect(screen.getByText("정상 갱신 완료")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "요청 중" })).toBeDisabled();
   });
 });

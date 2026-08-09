@@ -16,6 +16,7 @@ import com.readmates.admin.health.application.model.PlatformHealthView
 import com.readmates.admin.health.application.port.`in`.ReadPlatformAdminHealthUseCase
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
+import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Test
 import org.springframework.core.MethodParameter
 import org.springframework.http.HttpStatus
@@ -40,7 +41,7 @@ class PlatformAdminHealthControllerTest {
         )
 
     @Test
-    fun `snapshot returns schema generatedAt and all provider cards`() {
+    fun `snapshot returns additive refresh metadata with schema generatedAt and all provider cards`() {
         val readUseCase = stubReadUseCase(deployAttemptsCard(), aiProviderCard())
         val mockMvc = buildMockMvc(readUseCase, StubCurrentPlatformAdminResolver(ownerAdmin))
 
@@ -63,26 +64,77 @@ class PlatformAdminHealthControllerTest {
                 jsonPath("$.cards[1].status") { value("WARN") }
                 jsonPath("$.cards[1].drill.kind") { value("ADMIN_ROUTE") }
                 jsonPath("$.cards[1].drill.target") { value("/admin/ai-ops") }
-                jsonPath("$.lastSuccessfulAt") { doesNotExist() }
-                jsonPath("$.refreshState") { doesNotExist() }
-                jsonPath("$.staleAgeSeconds") { doesNotExist() }
+                jsonPath("$.lastSuccessfulAt") { value("2026-05-26T00:00:00Z") }
+                jsonPath("$.refreshState") { value("FRESH") }
+                jsonPath("$.staleAgeSeconds") { value(0) }
+            }
+    }
+
+    @Test
+    fun `stale response preserves deterministic age and last successful time`() {
+        val view =
+            healthView(
+                cards = listOf(deployAttemptsCard(), aiProviderCard()),
+                lastSuccessfulAt = now.minusSeconds(125),
+                refreshState = PlatformHealthRefreshState.STALE,
+                staleAgeSeconds = 125,
+            )
+        val mockMvc = buildMockMvc(ReadPlatformAdminHealthUseCase { view }, StubCurrentPlatformAdminResolver(ownerAdmin))
+
+        mockMvc
+            .get("/api/admin/health/snapshot")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.schema") { value(PlatformHealthSnapshot.SCHEMA) }
+                jsonPath("$.generatedAt") { value("2026-05-26T00:00:00Z") }
+                jsonPath("$.cards.length()") { value(2) }
+                jsonPath("$.lastSuccessfulAt") { value("2026-05-25T23:57:55Z") }
+                jsonPath("$.refreshState") { value("STALE") }
+                jsonPath("$.staleAgeSeconds") { value(125) }
+            }
+    }
+
+    @Test
+    fun `unavailable response serializes null last success and deterministic age`() {
+        val view =
+            healthView(
+                cards = listOf(aiProviderCard().copy(status = HealthCardStatus.UNKNOWN, reason = "provider_timeout")),
+                lastSuccessfulAt = null,
+                refreshState = PlatformHealthRefreshState.UNAVAILABLE,
+                staleAgeSeconds = 0,
+            )
+        val mockMvc = buildMockMvc(ReadPlatformAdminHealthUseCase { view }, StubCurrentPlatformAdminResolver(ownerAdmin))
+
+        mockMvc
+            .get("/api/admin/health/snapshot")
+            .andExpect {
+                status { isOk() }
+                content { string(containsString("\"lastSuccessfulAt\":null")) }
+                jsonPath("$.refreshState") { value("UNAVAILABLE") }
+                jsonPath("$.staleAgeSeconds") { value(0) }
             }
     }
 
     private fun stubReadUseCase(vararg cards: HealthCard): ReadPlatformAdminHealthUseCase =
-        ReadPlatformAdminHealthUseCase {
-            PlatformHealthView(
-                snapshot =
-                    PlatformHealthSnapshot(
-                        schema = PlatformHealthSnapshot.SCHEMA,
-                        generatedAt = now,
-                        cards = cards.toList(),
-                    ),
-                lastSuccessfulAt = now,
-                refreshState = PlatformHealthRefreshState.FRESH,
-                staleAgeSeconds = 0,
-            )
-        }
+        ReadPlatformAdminHealthUseCase { healthView(cards.toList()) }
+
+    private fun healthView(
+        cards: List<HealthCard>,
+        lastSuccessfulAt: Instant? = now,
+        refreshState: PlatformHealthRefreshState = PlatformHealthRefreshState.FRESH,
+        staleAgeSeconds: Long = 0,
+    ): PlatformHealthView =
+        PlatformHealthView(
+            snapshot =
+                PlatformHealthSnapshot(
+                    schema = PlatformHealthSnapshot.SCHEMA,
+                    generatedAt = now,
+                    cards = cards,
+                ),
+            lastSuccessfulAt = lastSuccessfulAt,
+            refreshState = refreshState,
+            staleAgeSeconds = staleAgeSeconds,
+        )
 
     private fun deployAttemptsCard(): HealthCard =
         HealthCard(
