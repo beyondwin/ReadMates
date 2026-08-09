@@ -7,6 +7,7 @@ import java.time.temporal.ChronoUnit
 
 private const val MIN_RUNTIME_COUNT = 1
 private const val MAX_RUNTIME_COUNT = 1_000
+private const val SECONDS_PER_MINUTE = 60L
 private const val FIXED_DELAY_SECONDS = 30L
 private const val CLAIM_LEASE_MINUTES = 15L
 private const val MAX_AGE_HOURS = 24L
@@ -71,6 +72,9 @@ data class NotificationRuntimeProperties(
         require(worker.backlogInitialDelay <= worker.backlogRefreshInterval) {
             "readmates.notifications.worker.backlog-initial-delay must not exceed backlog-refresh-interval"
         }
+        require(worker.retryDelays.size >= kafka.maxPublishAttempts - 1) {
+            "readmates.notifications.worker.retry-delays must cover every nonterminal publish attempt"
+        }
     }
 
     data class Worker(
@@ -94,7 +98,10 @@ data class NotificationRuntimeProperties(
             require(retryDelays.isNotEmpty()) {
                 "readmates.notifications.worker.retry-delays must not be empty"
             }
-            retryDelays.forEach { retryDelay -> requirePositive("worker.retry-delays", retryDelay) }
+            retryDelays.forEach { retryDelay ->
+                requirePositive("worker.retry-delays", retryDelay)
+                requireWholeMinutes("worker.retry-delays", retryDelay)
+            }
             require(retryDelays.zipWithNext().all { (previous, next) -> previous <= next }) {
                 "readmates.notifications.worker.retry-delays must be nondecreasing"
             }
@@ -152,6 +159,19 @@ data class NotificationRuntimeProperties(
         ) {
             require(!value.isZero && !value.isNegative) {
                 "readmates.notifications.$property must be positive"
+            }
+        }
+
+        fun requireWholeMinutes(
+            property: String,
+            value: Duration,
+        ) {
+            require(
+                value >= Duration.ofMinutes(1) &&
+                    value.nano == 0 &&
+                    value.seconds % SECONDS_PER_MINUTE == 0L,
+            ) {
+                "readmates.notifications.$property must be at least one minute and use whole-minute increments"
             }
         }
 

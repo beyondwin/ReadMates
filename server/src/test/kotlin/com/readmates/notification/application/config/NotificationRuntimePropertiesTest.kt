@@ -174,7 +174,14 @@ class NotificationRuntimePropertiesTest {
                 invalidValue("readmates.notifications.worker.delivery-max-age", "-1s"),
                 invalidValue("readmates.notifications.worker.retry-delays", ""),
                 invalidValue("readmates.notifications.worker.retry-delays", "5m,0s"),
+                invalidValue("readmates.notifications.worker.retry-delays", "30s,5m,15m,60m"),
+                invalidValue("readmates.notifications.worker.retry-delays", "90s,5m,15m,60m"),
                 invalidValue("readmates.notifications.worker.retry-delays", "15m,5m"),
+                invalid(
+                    "readmates.notifications.worker.retry-delays",
+                    "readmates.notifications.worker.retry-delays=5m,15m,60m",
+                    "readmates.notifications.kafka.max-publish-attempts=5",
+                ),
                 invalid(
                     "readmates.notifications.worker.event-max-age",
                     "readmates.notifications.worker.retry-delays=5m,4h",

@@ -31,6 +31,11 @@ import java.util.concurrent.TimeUnit
 
 class NotificationRelayServiceTest {
     @Test
+    fun `relay has only the injected runtime constructor`() {
+        assertThat(NotificationRelayService::class.java.declaredConstructors).hasSize(1)
+    }
+
+    @Test
     fun `publish pending events marks them published`() {
         val item = publishingItem()
         val message = messageFor(item)

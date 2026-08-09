@@ -31,21 +31,6 @@ class NotificationRelayService
         private val runtimeProperties: NotificationRuntimeProperties,
         private val clock: Clock,
     ) : PublishNotificationEventsUseCase {
-        internal constructor(
-            notificationEventOutboxPort: NotificationEventOutboxPort,
-            notificationEventPublisherPort: NotificationEventPublisherPort,
-            operationalMetrics: ReadmatesOperationalMetrics,
-            maxAttempts: Int,
-        ) : this(
-            notificationEventOutboxPort,
-            notificationEventPublisherPort,
-            operationalMetrics,
-            NotificationRuntimeProperties(
-                kafka = NotificationRuntimeProperties.Kafka(maxPublishAttempts = maxAttempts),
-            ),
-            Clock.systemUTC(),
-        )
-
         override fun publishPending(limit: Int): Int {
             if (limit <= 0) {
                 return 0
@@ -113,11 +98,6 @@ class NotificationRelayService
             logTransition(result, item.attemptCount + 1)
         }
 
-        private fun retryDelayMinutes(attemptCount: Int): Long =
-            runtimeProperties.worker.retryDelays
-                .getOrElse(attemptCount) { runtimeProperties.worker.retryDelays.last() }
-                .toMinutes()
-
         private fun recordPublishFailure(
             item: NotificationEventOutboxItem,
             error: String,
@@ -134,7 +114,7 @@ class NotificationRelayService
                         id = item.id,
                         lockedAt = item.lockedAt,
                         error = error,
-                        nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
+                        nextAttemptDelayMinutes = runtimeProperties.worker.retryDelays[item.attemptCount].toMinutes(),
                     )
             }
             val result = committed.resultOrStale(attemptedResult)
