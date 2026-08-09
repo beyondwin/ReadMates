@@ -1,73 +1,65 @@
 package com.readmates.admin.health.application.service.providers
 
-import com.readmates.admin.health.application.model.DeployAttemptStripEntry
 import com.readmates.admin.health.application.port.out.DeployLedgerPort
+import com.readmates.admin.health.application.port.out.PlatformAdminHealthLocalReadingsPort
 import com.readmates.admin.health.application.port.out.PlatformHealthProvider
-import com.readmates.admin.health.application.port.out.PromQueryResult
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import com.readmates.admin.health.application.service.HealthCardProvider
 import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
-import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.ObjectProvider
+import org.mockito.Mockito.mock
+import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.annotation.ComponentScan
+import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.FilterType
+import org.springframework.stereotype.Component
+import java.lang.reflect.Modifier
 import java.time.Clock
-import java.time.Duration
+
+private const val PROVIDER_PACKAGE = "com.readmates.admin.health.application.service.providers"
 
 class PlatformHealthProviderIdentityTest {
+    private val contextRunner =
+        ApplicationContextRunner()
+            .withUserConfiguration(ProviderInventoryTestConfiguration::class.java)
+            .withBean(PrometheusQueryPort::class.java, { mock(PrometheusQueryPort::class.java) })
+            .withBean(DeployLedgerPort::class.java, { mock(DeployLedgerPort::class.java) })
+            .withBean(
+                PlatformAdminHealthLocalReadingsPort::class.java,
+                { mock(PlatformAdminHealthLocalReadingsPort::class.java) },
+            ).withBean(OutboundCircuitBreakers::class.java, { mock(OutboundCircuitBreakers::class.java) })
+            .withBean(Clock::class.java, { Clock.systemUTC() })
+
     @Test
-    fun `production provider inventory is a bijection with typed provider identities`() {
-        val providers = productionProviders()
+    fun `component scanned production provider inventory is a bijection with typed identities`() {
+        contextRunner.run { context ->
+            assertThat(context).hasNotFailed()
+            val providers = context.getBeansOfType(HealthCardProvider::class.java).values
 
-        assertThat(providers.map(HealthCardProvider::identity))
-            .containsExactlyInAnyOrderElementsOf(PlatformHealthProvider.entries)
-        assertThat(providers.map(HealthCardProvider::cardId)).doesNotHaveDuplicates()
-    }
-
-    private fun productionProviders(): List<HealthCardProvider> {
-        val clock = Clock.systemUTC()
-        val prometheus =
-            object : PrometheusQueryPort {
-                override fun query(promql: String): PromQueryResult = PromQueryResult(emptyList())
+            assertThat(providers).hasSize(PlatformHealthProvider.entries.size)
+            assertThat(providers.map(HealthCardProvider::identity)).doesNotHaveDuplicates()
+            assertThat(providers.map(HealthCardProvider::identity))
+                .containsExactlyInAnyOrderElementsOf(PlatformHealthProvider.entries)
+            assertThat(providers).allSatisfy { provider ->
+                assertThat(provider.javaClass.packageName).isEqualTo(PROVIDER_PACKAGE)
+                assertThat(provider.javaClass.isAnnotationPresent(Component::class.java)).isTrue()
+                assertThat(provider.javaClass.isInterface).isFalse()
+                assertThat(Modifier.isAbstract(provider.javaClass.modifiers)).isFalse()
             }
-        val deployLedger =
-            object : DeployLedgerPort {
-                override fun tailLatestAttempts(limit: Int): List<DeployAttemptStripEntry> = emptyList()
-            }
-        val readings = localReadings()
-        return listOf(
-            AiProviderAvailabilityCardProvider(prometheus, clock),
-            DbPoolHealthCardProvider(readings, clock),
-            DeployAttemptsStripCardProvider(deployLedger, clock),
-            KafkaLagHealthCardProvider(prometheus, clock),
-            NotificationDispatchSuccessCardProvider(prometheus, clock),
-            OutboundResilienceHealthCardProvider(outboundCircuitBreakers(), clock),
-            OutboxBacklogHealthCardProvider(readings, clock),
-            RedisHealthCardProvider(readings, clock),
-        )
+        }
     }
-
-    private fun outboundCircuitBreakers(): OutboundCircuitBreakers =
-        OutboundCircuitBreakers(
-            properties =
-                OutboundResilienceProperties(
-                    slidingWindowSize = 2,
-                    minimumNumberOfCalls = 2,
-                    waitDurationInOpenState = Duration.ofSeconds(60),
-                ),
-            meterRegistryProvider =
-                object : ObjectProvider<MeterRegistry> {
-                    private val registry = SimpleMeterRegistry()
-
-                    override fun getObject(): MeterRegistry = registry
-
-                    override fun getObject(vararg args: Any?): MeterRegistry = registry
-
-                    override fun getIfAvailable(): MeterRegistry = registry
-
-                    override fun getIfUnique(): MeterRegistry = registry
-                },
-        )
 }
+
+@Configuration(proxyBeanMethods = false)
+@ComponentScan(
+    basePackages = [PROVIDER_PACKAGE],
+    excludeFilters =
+        [
+            ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = [ProviderInventoryTestConfiguration::class],
+            ),
+        ],
+)
+private class ProviderInventoryTestConfiguration
