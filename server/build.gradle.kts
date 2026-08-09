@@ -28,6 +28,12 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 repositories {
     mavenCentral()
 }

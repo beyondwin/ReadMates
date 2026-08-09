@@ -229,7 +229,7 @@ internal class HostSessionQueries {
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toHostDashboardOpenMetrics() },
                 member.clubId.dbString(),
-            ) ?: HostDashboardOpenMetrics(rsvpPending = 0, checkinMissing = 0)
+            )
 
         val publishPending =
             jdbcTemplate.queryForObject(

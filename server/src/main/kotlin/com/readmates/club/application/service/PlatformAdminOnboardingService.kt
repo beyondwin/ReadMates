@@ -105,7 +105,7 @@ class PlatformAdminOnboardingService(
         val persisted =
             transactionTemplate.execute {
                 persistOnboarding(admin, normalized)
-            } ?: error("Platform admin onboarding transaction returned no result")
+            }
 
         val deliveryStatus = sendInvitationAfterCommit(persisted.pendingEmail)
         return persisted.toResult(deliveryStatus)

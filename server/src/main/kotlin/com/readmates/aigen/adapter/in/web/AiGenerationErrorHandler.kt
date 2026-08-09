@@ -38,7 +38,7 @@ class AiGenerationErrorHandler {
     @Suppress("MaxLineLength")
     fun handleInvalidTranscriptSpeakers(error: AiGenerationException.InvalidTranscriptSpeakers): ResponseEntity<ProblemDetail> =
         problem(
-            status = HttpStatus.UNPROCESSABLE_ENTITY,
+            status = HttpStatus.UNPROCESSABLE_CONTENT,
             code = error.code.name,
             detail = "대본의 화자명을 활성 회원 이름과 맞춘 뒤 다시 업로드하세요.",
             invalidSpeakerLabels = error.invalidSpeakerLabels,
@@ -105,7 +105,7 @@ class AiGenerationErrorHandler {
     fun handleUnreadableRequest(
         @Suppress("UNUSED_PARAMETER") error: HttpMessageNotReadableException,
     ): ResponseEntity<ProblemDetail> =
-        problem(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.SCHEMA_INVALID.name, ErrorCode.SCHEMA_INVALID.safeDetail())
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, ErrorCode.SCHEMA_INVALID.name, ErrorCode.SCHEMA_INVALID.safeDetail())
 
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDenied(
@@ -188,7 +188,7 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS,
         ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL,
         ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED,
-        -> HttpStatus.UNPROCESSABLE_ENTITY
+        -> HttpStatus.UNPROCESSABLE_CONTENT
         ErrorCode.STALE_GENERATION_REVISION,
         ErrorCode.MEMBERSHIP_CHANGED,
         -> HttpStatus.CONFLICT

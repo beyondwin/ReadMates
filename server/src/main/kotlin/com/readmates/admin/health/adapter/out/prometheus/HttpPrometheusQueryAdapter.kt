@@ -27,7 +27,7 @@ class HttpPrometheusQueryAdapter(
                     .retrieve()
                     .body(JsonNode::class.java)
                     ?: throw PrometheusQueryException("empty body")
-            val status = body.path("status").asText()
+            val status = body.path("status").asString()
             if (status != "success") {
                 throw PrometheusQueryException("prometheus status=$status")
             }
@@ -38,9 +38,9 @@ class HttpPrometheusQueryAdapter(
                         entry
                             .path("metric")
                             .properties()
-                            .associate { it.key to it.value.asText() }
+                            .associate { it.key to it.value.asString() }
                     val valueArray = entry.path("value")
-                    val raw = valueArray.path(1).asText()
+                    val raw = valueArray.path(1).asString()
                     PromInstantValue(labels = labels, value = raw.toDouble())
                 }
             PromQueryResult(values = values)

@@ -25,26 +25,26 @@ class JsonlDeployLedgerAdapter(
                     if (line.isBlank()) return@mapNotNull null
                     runCatching { objectMapper.readTree(line) }.getOrNull()
                 }.forEach { event ->
-                    val attemptId = event.path("attemptId").asText().ifBlank { return@forEach }
+                    val attemptId = event.path("attemptId").asString().ifBlank { return@forEach }
                     grouped.getOrPut(attemptId) { mutableListOf() }.add(event)
                 }
         }
 
         val entries =
             grouped.map { (attemptId, events) ->
-                val sorted = events.sortedBy { it.path("ts").asText() }
-                val firstStarted = sorted.firstOrNull { it.path("event").asText() == "STARTED" } ?: sorted.first()
-                val terminal = sorted.lastOrNull { it.path("status").asText() in TERMINAL_STATUSES }
+                val sorted = events.sortedBy { it.path("ts").asString() }
+                val firstStarted = sorted.firstOrNull { it.path("event").asString() == "STARTED" } ?: sorted.first()
+                val terminal = sorted.lastOrNull { it.path("status").asString() in TERMINAL_STATUSES }
                 val finalStatus =
-                    when (terminal?.path("status")?.asText()) {
+                    when (terminal?.path("status")?.asString()) {
                         "SUCCEEDED" -> DeployAttemptFinalStatus.SUCCEEDED
                         "FAILED" -> DeployAttemptFinalStatus.FAILED
                         else -> DeployAttemptFinalStatus.RUNNING
                     }
-                val startedAt = Instant.parse(firstStarted.path("ts").asText())
-                val endedAt = terminal?.path("ts")?.asText()?.let(Instant::parse)
+                val startedAt = Instant.parse(firstStarted.path("ts").asString())
+                val endedAt = terminal?.path("ts")?.asString()?.let(Instant::parse)
                 val duration = terminal?.path("durationSeconds")?.takeIf { it.isNumber }?.asLong()
-                val imageTag = extractImageTag(firstStarted.path("detail").asText())
+                val imageTag = extractImageTag(firstStarted.path("detail").asString())
                 DeployAttemptStripEntry(
                     attemptId = attemptId,
                     startedAt = startedAt,

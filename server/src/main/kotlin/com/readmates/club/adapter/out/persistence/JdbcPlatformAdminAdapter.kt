@@ -49,7 +49,7 @@ class JdbcPlatformAdminAdapter(
             """.trimIndent(),
             ::mapDomain,
             limit.coerceIn(1, 100),
-        ) ?: emptyList()
+        )
 
     override fun listDomainsRequiringAction(limit: Int): List<PlatformAdminClubDomain> =
         jdbcTemplate.query(
@@ -62,7 +62,7 @@ class JdbcPlatformAdminAdapter(
             """.trimIndent(),
             ::mapDomain,
             limit.coerceIn(1, 100),
-        ) ?: emptyList()
+        )
 
     @Transactional
     override fun createClubDomain(
@@ -126,7 +126,7 @@ class JdbcPlatformAdminAdapter(
                 """.trimIndent(),
                 ::mapDomain,
                 domainId.dbString(),
-            )?.firstOrNull()
+            ).firstOrNull()
 
     @Transactional
     override fun updateClubDomainProvisioning(

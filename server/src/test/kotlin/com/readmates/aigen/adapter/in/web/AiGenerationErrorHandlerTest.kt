@@ -29,7 +29,8 @@ class AiGenerationErrorHandlerTest {
                 ),
             )
 
-        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT)
+        assertThat(response.statusCode.value()).isEqualTo(422)
         assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         assertThat(response.body!!.code).isEqualTo("TRANSCRIPT_SPEAKER_NOT_MEMBER")
         assertThat(response.body!!.invalidSpeakerLabels).containsExactly("없는이름", "화자 1")
@@ -125,7 +126,8 @@ class AiGenerationErrorHandlerTest {
             handler.handleLlmGeneration(
                 ProviderCallException(GenerationError(ErrorCode.SCHEMA_INVALID, "bad schema")),
             )
-        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT)
+        assertThat(response.statusCode.value()).isEqualTo(422)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.SCHEMA_INVALID.name)
     }
 
@@ -203,19 +205,19 @@ class AiGenerationErrorHandlerTest {
                 arrayOf(ErrorCode.QUEUE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE),
                 arrayOf(ErrorCode.PROVIDER_UNAVAILABLE, HttpStatus.BAD_GATEWAY),
                 arrayOf(ErrorCode.PROVIDER_RATE_LIMITED, HttpStatus.BAD_GATEWAY),
-                arrayOf(ErrorCode.SCHEMA_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.AUTHOR_NAME_MISMATCH, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.HIGHLIGHTS_OUT_OF_RANGE, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.ONE_LINE_REVIEWS_DUPLICATE, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.FEEDBACK_TEMPLATE_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_FORMAT_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_EMPTY, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_DURATION_EXCEEDED, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.SCHEMA_INVALID, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.AUTHOR_NAME_MISMATCH, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.HIGHLIGHTS_OUT_OF_RANGE, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.ONE_LINE_REVIEWS_DUPLICATE, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.FEEDBACK_TEMPLATE_INVALID, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_FORMAT_INVALID, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_EMPTY, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_DURATION_EXCEEDED, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS, HttpStatus.UNPROCESSABLE_CONTENT),
                 arrayOf(ErrorCode.MODEL_CAPABILITY_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE),
-                arrayOf(ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED, HttpStatus.UNPROCESSABLE_CONTENT),
                 arrayOf(ErrorCode.STALE_GENERATION_REVISION, HttpStatus.CONFLICT),
                 arrayOf(ErrorCode.MEMBERSHIP_CHANGED, HttpStatus.CONFLICT),
                 arrayOf(ErrorCode.UNKNOWN, HttpStatus.INTERNAL_SERVER_ERROR),

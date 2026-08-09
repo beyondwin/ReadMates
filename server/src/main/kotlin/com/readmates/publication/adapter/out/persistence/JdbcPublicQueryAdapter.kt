@@ -126,7 +126,7 @@ class JdbcPublicQueryAdapter(
             clubId.dbString(),
             clubId.dbString(),
             clubId.dbString(),
-        ) ?: PublicClubStatsResult(sessions = 0, books = 0, members = 0)
+        )
 
     private fun publicSessions(
         jdbcTemplate: JdbcTemplate,

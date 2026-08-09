@@ -289,7 +289,7 @@ private class AdminNotificationSnapshotQueries(
                 jdbcTemplate.queryForObject(
                     "select utc_timestamp(6)",
                     OffsetDateTimeRowMapper,
-                ) ?: OffsetDateTime.now(),
+                ),
             outboxSummary = outboxSummary(),
             deliverySummary = deliverySummary(),
             relaySummary = relaySummary(),

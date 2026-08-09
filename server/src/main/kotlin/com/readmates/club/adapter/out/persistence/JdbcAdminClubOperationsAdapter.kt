@@ -144,7 +144,7 @@ class JdbcAdminClubOperationsAdapter(
                 )
             },
             clubId.dbString(),
-        ) ?: AdminClubMemberActivity(0, 0, 0, 0)
+        )
 
     private fun sessionProgress(clubId: UUID): AdminClubSessionProgress =
         jdbcTemplate.queryForObject(
@@ -170,7 +170,7 @@ class JdbcAdminClubOperationsAdapter(
                 )
             },
             clubId.dbString(),
-        ) ?: AdminClubSessionProgress(0, 0, 0, 0, 0)
+        )
 
     private fun closingRisks(
         clubId: UUID,
@@ -329,7 +329,7 @@ class JdbcAdminClubOperationsAdapter(
                 )
             },
             clubId.dbString(),
-        ) ?: emptyList()
+        )
 
     private fun aiUsage(clubId: UUID): AdminClubAiUsage =
         jdbcTemplate.queryForObject(
@@ -363,7 +363,7 @@ class JdbcAdminClubOperationsAdapter(
                 )
             },
             clubId.dbString(),
-        ) ?: AdminClubAiUsage(0, 0, 0, "0.0000", "NO_RECENT_USAGE", 0)
+        )
 
     private fun scalarInt(
         sql: String,
