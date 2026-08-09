@@ -62,6 +62,8 @@ class NotificationEventKafkaListenerTest {
             .withUserConfiguration(NotificationKafkaConfiguration::class.java)
             .withPropertyValues(
                 "readmates.notifications.enabled=true",
+                "readmates.notifications.sender-email=no-reply@example.test",
+                "readmates.notifications.sender-name=ReadMates",
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
                 "readmates.notifications.kafka.consumer-group=notification-workers",

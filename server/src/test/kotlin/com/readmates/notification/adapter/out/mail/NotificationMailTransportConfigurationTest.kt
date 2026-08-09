@@ -11,6 +11,21 @@ import org.springframework.mail.javamail.JavaMailSenderImpl
 
 class NotificationMailTransportConfigurationTest {
     @Test
+    fun `mail-only properties registration rejects enabled notifications without sender`() {
+        ApplicationContextRunner()
+            .withConfiguration(AutoConfigurations.of(MailSenderAutoConfiguration::class.java))
+            .withUserConfiguration(NotificationMailTransportConfiguration::class.java)
+            .withPropertyValues(
+                "spring.mail.host=smtp.example.test",
+                "readmates.notifications.enabled=true",
+            ).run { context ->
+                assertThat(context).hasFailed()
+                assertThat(context.startupFailure)
+                    .hasRootCauseMessage("readmates.notifications.sender-email must not be blank")
+            }
+    }
+
+    @Test
     fun `validated timeouts customize the actual Boot mail sender without replacing mail settings`() {
         ApplicationContextRunner()
             .withConfiguration(AutoConfigurations.of(MailSenderAutoConfiguration::class.java))

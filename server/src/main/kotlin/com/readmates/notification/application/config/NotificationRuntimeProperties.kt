@@ -44,6 +44,10 @@ data class NotificationRuntimeProperties(
     val smtp: Smtp = Smtp(),
 ) {
     init {
+        if (enabled) {
+            requireNotBlank("sender-email", senderEmail)
+            requireNotBlank("sender-name", senderName)
+        }
         if (enabled && kafka.enabled) {
             require(kafka.bootstrapServers.any(String::isNotBlank)) {
                 "readmates.notifications.kafka.bootstrap-servers must be set when notification Kafka is enabled"
@@ -66,13 +70,6 @@ data class NotificationRuntimeProperties(
         }
         require(worker.backlogInitialDelay <= worker.backlogRefreshInterval) {
             "readmates.notifications.worker.backlog-initial-delay must not exceed backlog-refresh-interval"
-        }
-    }
-
-    internal fun validateEnabledSender() {
-        if (enabled) {
-            requireNotBlank("sender-email", senderEmail)
-            requireNotBlank("sender-name", senderName)
         }
     }
 

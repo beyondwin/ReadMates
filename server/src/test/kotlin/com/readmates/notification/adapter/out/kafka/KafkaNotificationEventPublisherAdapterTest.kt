@@ -57,11 +57,29 @@ class KafkaNotificationEventPublisherAdapterTest {
             .withUserConfiguration(
                 NotificationKafkaConfiguration::class.java,
                 KafkaPublisherAdapterTestConfiguration::class.java,
+            ).withPropertyValues(
+                "readmates.notifications.sender-email=no-reply@example.test",
+                "readmates.notifications.sender-name=ReadMates",
             )
 
     @AfterEach
     fun clearInterrupt() {
         Thread.interrupted()
+    }
+
+    @Test
+    fun `kafka-only properties registration rejects enabled notifications without sender`() {
+        ApplicationContextRunner()
+            .withUserConfiguration(NotificationKafkaConfiguration::class.java)
+            .withPropertyValues(
+                "readmates.notifications.enabled=true",
+                "readmates.notifications.kafka.enabled=true",
+                "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
+            ).run { context ->
+                assertThat(context).hasFailed()
+                assertThat(context.startupFailure)
+                    .hasRootCauseMessage("readmates.notifications.sender-email must not be blank")
+            }
     }
 
     @Test
@@ -101,6 +119,8 @@ class KafkaNotificationEventPublisherAdapterTest {
                 KafkaNotificationEventPublisherAdapter::class.java,
             ).withPropertyValues(
                 "readmates.notifications.enabled=true",
+                "readmates.notifications.sender-email=no-reply@example.test",
+                "readmates.notifications.sender-name=ReadMates",
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
