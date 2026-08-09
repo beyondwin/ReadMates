@@ -6,11 +6,13 @@ import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.io.TempDir
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
 import java.nio.file.Files
@@ -258,6 +260,42 @@ class ServerArchitectureBoundaryTest {
         assertTrue(inboundPackages.contains("com.readmates.notification.adapter.in.scheduler.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.adapter.in.security.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.infrastructure.security.."))
+    }
+
+    @Test
+    fun `production inbound package discovery exactly matches registry`() {
+        val discovered =
+            discoverProductionInboundPackageRoots(architectureProjectRoot().resolve("server/src/main/kotlin"))
+        val registered = normalizeInboundRegistryRoots(serverSlices.flatMap(ServerSlice::inboundAdapterPackages))
+
+        assertEquals(discovered, registered)
+        assertTrue(discovered.contains("com.readmates.auth.infrastructure.security"))
+    }
+
+    @Test
+    fun `new production inbound package must be registered`(
+        @TempDir sourceRoot: Path,
+    ) {
+        val sourceFile = sourceRoot.resolve("com/readmates/sample/adapter/in/cli/SampleCommand.kt")
+        Files.createDirectories(sourceFile.parent)
+        Files.writeString(
+            sourceFile,
+            """
+            package com.readmates.sample.adapter.`in`.cli
+
+            class SampleCommand
+            """.trimIndent(),
+        )
+
+        assertThatThrownBy {
+            requireInboundRegistryMatchesSource(sourceRoot, emptyList())
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("com.readmates.sample.adapter.in.cli")
+
+        requireInboundRegistryMatchesSource(
+            sourceRoot,
+            listOf("com.readmates.sample.adapter.in.cli.."),
+        )
     }
 
     @Test
