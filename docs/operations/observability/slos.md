@@ -141,3 +141,5 @@ ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 
 - External blackbox/synthetic checks for full script-load failure.
 - SLO 위반 시 자동 post-mortem trigger.
+
+Notification dispatch success ratio는 실제 committed publish transition인 `readmates_outbox_publish_total`만 사용한다. scrape 또는 backlog observation 실패를 성공으로 간주하지 않으며, event-outbox와 delivery backlog는 별도 운영 신호다.

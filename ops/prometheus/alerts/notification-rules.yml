@@ -47,3 +47,23 @@ groups:
         annotations:
           summary: "Notification dead-letter 발생 (1시간 내)"
           description: "발송이 최종 포기된 알림. notification_deliveries.status='DEAD' 로우 조사."
+
+      - alert: NotificationOutboxRelayDead
+        expr: max(readmates_notifications_outbox_backlog{status="dead"}) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification event outbox DEAD row detected"
+          description: "Delivery row 생성 전 relay가 retry exhaustion 또는 deadline으로 종료됐다. outbox 상태와 publish result를 확인."
+
+      - alert: NotificationDeliveryBacklogHigh
+        expr: max(readmates_notifications_delivery_backlog{status=~"pending|failed|sending"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification delivery backlog over 100 for 10 minutes"
+          description: "이 값은 event outbox가 아니라 delivery rows다. SMTP/provider 상태와 delivery worker를 확인."

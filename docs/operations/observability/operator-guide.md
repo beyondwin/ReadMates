@@ -179,3 +179,7 @@ ReadMates의 현재 결정:
 - production, preview, local 환경 분리
 
 초보자가 자주 헷갈리는 점: Kibana는 로그를 "보는 화면"이고, Logback은 로그를 "쓰는 라이브러리"입니다. 둘 사이에는 수집기와 저장소가 필요합니다.
+
+## Notification recovery
+
+Outbox `DEAD`는 relay retry exhaustion, missing payload 또는 event deadline이다. Published 뒤 delivery `DEAD`는 SMTP permanent failure 또는 retry exhaustion이다. timeout/connection loss와 SMTP accepted-before-commit은 ambiguous라 at-least-once retry가 중복 메일을 만들 수 있다. host/admin recovery에서 correlation ID, fixed result, attempt count, safe timestamp만 대조하고 raw address, payload, provider response는 ticket에 넣지 않는다. Exactly-once는 provider idempotency key/receipt API가 필요하며 이 slice 밖이다.

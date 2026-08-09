@@ -296,3 +296,5 @@ Latency histogram exemplar는 Grafana의 `readmates-tempo` datasource로 이동�
 - PromQL은 *복사-붙여넣기 가능*하게 단일 쿼리.
 - 도구 종속 (Grafana variables 등)은 일반화된 PromQL 위주로.
 - Micrometer 네이밍 규칙: `.`은 `_`으로 변환, counter는 `_total` suffix 자동 부착. 예: `readmates.notifications.sent` → `readmates_notifications_sent_total`.
+
+Notification Dispatch dashboard는 `readmates_outbox_publish_total` success ratio, event outbox backlog(`pending|failed|dead|publishing`), delivery backlog(`pending|failed|dead|sending`)를 분리한다. delivery가 0이어도 relay가 정상이라는 뜻이 아니므로 outbox `dead`/`publishing`과 publish result를 먼저 본다.

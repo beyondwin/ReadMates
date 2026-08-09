@@ -231,3 +231,5 @@ count > 0이면 운영자에게 알림 (이메일 또는 in-app).
 - Alertmanager receiver를 운영 SMTP 또는 팀 알림 채널에 연결한다.
 - 한 달치 production data가 쌓이면 false positive와 threshold를 조정한다.
 - `node-exporter`, `cadvisor`, `blackbox-exporter`는 production v1 이후 별도 계획으로 추가한다.
+
+NotificationOutboxBacklog/RelayDead는 event relay, NotificationDeliveryBacklog/DeadLetters는 SMTP delivery 경보다. event outbox와 delivery rows를 같은 queue로 해석하지 않는다.

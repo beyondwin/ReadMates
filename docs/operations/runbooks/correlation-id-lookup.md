@@ -122,3 +122,5 @@ In the incident note or release evidence, explicitly record:
 - [Metrics catalog](../observability/metrics-catalog.md)
 - [Alerts](../observability/alerts.md)
 - [SLO](../observability/slos.md)
+
+알림 조사에는 correlation ID, fixed publish result, outbox/delivery status, attempt count, transition timestamp만 사용한다. raw SMTP response, email address, payload, stack trace는 조회 키나 incident 증거로 복사하지 않는다.

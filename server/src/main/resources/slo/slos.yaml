@@ -54,7 +54,7 @@ slos:
       query_total: sum(rate(readmates_login_total[5m]))
 
   - id: notification_dispatch_success_ratio
-    description: Outbox publish success ratio (DEAD excluded)
+    description: Committed outbox publish success ratio (fixed result enum; no absent-data success)
     objective: 0.99
     window: 7d
     sli:

@@ -120,3 +120,7 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | scp/ssh 연결 실패 | VM 네트워크/방화벽 확인. known_hosts 변경됐다면 `READMATES_VM_KNOWN_HOSTS` 갱신 |
 | `docker compose up` 실패 | workflow가 `.bak` 자동 복원 + 재시작. 실패 메시지 + 컨테이너 로그 확인 |
 | `.bak` 복원도 실패 | admin SSH로 직접 개입: `sudo cp /etc/readmates/readmates.env.bak /etc/readmates/readmates.env && sudo docker compose -f /opt/readmates/compose.yml up -d --force-recreate readmates-api` |
+
+## Notification SMTP boundary
+
+SMTP username/password만 secret이다. Host와 connection/read/write timeout(각 `5s`)은 공개 운영 설정이며 sync-config가 렌더링한다. 세 timeout 합계는 notification claim lease보다 짧아야 하며 startup validation 실패 시 credential을 출력하지 말고 property path만 확인한다.
