@@ -93,7 +93,7 @@ class PlatformAdminNotificationControllerTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.items[0].maskedRecipient") { value("m***@example.com") }
-                jsonPath("$.items[0].safeErrorCode") { value("mailbox_unavailable") }
+                jsonPath("$.items[0].safeErrorCode") { value("delivery_failure") }
             }.andReturn()
             .response
             .contentAsString
@@ -213,7 +213,7 @@ class PlatformAdminNotificationControllerTest(
               id, event_id, club_id, recipient_membership_id, channel, status, dedupe_key,
               attempt_count, last_error, created_at, updated_at
             )
-            values (?, ?, ?, ?, 'EMAIL', 'DEAD', ?, 2, 'SMTP 550 member1@example.com', utc_timestamp(6), utc_timestamp(6))
+            values (?, ?, ?, ?, 'EMAIL', 'DEAD', ?, 2, 'MAIL_PERMANENT', utc_timestamp(6), utc_timestamp(6))
             """.trimIndent(),
             DELIVERY_ID,
             EVENT_ID,

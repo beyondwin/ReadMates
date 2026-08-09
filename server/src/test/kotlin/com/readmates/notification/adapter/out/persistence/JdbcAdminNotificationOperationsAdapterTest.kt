@@ -193,6 +193,20 @@ class JdbcAdminNotificationOperationsAdapterTest(
     }
 
     @Test
+    fun `replay estimate requires byte exact channel status and failure code independently`() {
+        seedOperationsRows()
+        seedReplayFilterRows()
+
+        val baselineClub =
+            withNonEnforcedReplayValueChecks {
+                paddedReplayFilterRows().forEach(::insertDelivery)
+                replayCount(AdminNotificationFilter(clubId = BASELINE_CLUB_ID))
+            }
+
+        assertThat(baselineClub).isEqualTo(2)
+    }
+
+    @Test
     fun `replay persistence uses only explicit microsecond application timestamps`() {
         seedOperationsRows()
         seedReplayFilterRows()
@@ -378,6 +392,12 @@ class JdbcAdminNotificationOperationsAdapterTest(
         )
 
     private fun ineligibleReplayFilterRows(): List<DeliverySeed> =
+        ineligibleStatusRows() +
+            nonExactChannelRows() +
+            nonExactStatusRows() +
+            nonExactFailureCodeRows()
+
+    private fun ineligibleStatusRows(): List<DeliverySeed> =
         listOf(
             DeliverySeed(
                 id = REPLAY_PENDING_DELIVERY_ID,
@@ -404,14 +424,120 @@ class JdbcAdminNotificationOperationsAdapterTest(
                 status = "FAILED",
                 lastError = "MAIL_RETRYABLE",
             ),
+        )
+
+    private fun nonExactChannelRows(): List<DeliverySeed> =
+        listOf(
             DeliverySeed(
-                id = REPLAY_LOWERCASE_DELIVERY_ID,
+                id = REPLAY_LOWERCASE_CHANNEL_DELIVERY_ID,
                 eventId = FAILED_EVENT_ID,
                 clubId = BASELINE_CLUB_ID,
                 membershipId = BASELINE_MEMBER_ID,
                 channel = "email",
+                status = "FAILED",
+                lastError = "MAIL_RETRYABLE",
+            ),
+            DeliverySeed(
+                id = REPLAY_MIXED_CHANNEL_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                channel = "Email",
+                status = "FAILED",
+                lastError = "MAIL_RETRYABLE",
+            ),
+        )
+
+    private fun nonExactStatusRows(): List<DeliverySeed> =
+        listOf(
+            DeliverySeed(
+                id = REPLAY_LOWERCASE_STATUS_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
                 status = "failed",
+                lastError = "MAIL_RETRYABLE",
+            ),
+            DeliverySeed(
+                id = REPLAY_MIXED_STATUS_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "Failed",
+                lastError = "MAIL_RETRYABLE",
+            ),
+        )
+
+    private fun paddedReplayFilterRows(): List<DeliverySeed> =
+        listOf(
+            DeliverySeed(
+                id = REPLAY_PADDED_CHANNEL_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                channel = "EMAIL ",
+                status = "FAILED",
+                lastError = "MAIL_RETRYABLE",
+            ),
+            DeliverySeed(
+                id = REPLAY_PADDED_STATUS_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "FAILED ",
+                lastError = "MAIL_RETRYABLE",
+            ),
+        )
+
+    private fun nonExactFailureCodeRows(): List<DeliverySeed> =
+        listOf(
+            DeliverySeed(
+                id = REPLAY_LOWERCASE_FAILURE_CODE_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "FAILED",
                 lastError = "mail_retryable",
+            ),
+            DeliverySeed(
+                id = REPLAY_MIXED_FAILURE_CODE_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "FAILED",
+                lastError = "Mail_Retryable",
+            ),
+            DeliverySeed(
+                id = REPLAY_PADDED_FAILURE_CODE_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "FAILED",
+                lastError = "MAIL_RETRYABLE ",
+            ),
+            DeliverySeed(
+                id = REPLAY_NULL_FAILURE_CODE_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "FAILED",
+                lastError = null,
+            ),
+            DeliverySeed(
+                id = REPLAY_BLANK_FAILURE_CODE_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "FAILED",
+                lastError = "",
+            ),
+            DeliverySeed(
+                id = REPLAY_UNKNOWN_FAILURE_CODE_DELIVERY_ID,
+                eventId = FAILED_EVENT_ID,
+                clubId = BASELINE_CLUB_ID,
+                membershipId = BASELINE_MEMBER_ID,
+                status = "FAILED",
+                lastError = "MAIL_UNKNOWN",
             ),
         )
 
@@ -520,6 +646,30 @@ class JdbcAdminNotificationOperationsAdapterTest(
         )
     }
 
+    private fun <T> withNonEnforcedReplayValueChecks(block: () -> T): T {
+        jdbcTemplate.execute(
+            "alter table notification_deliveries alter check notification_deliveries_channel_check not enforced",
+        )
+        jdbcTemplate.execute(
+            "alter table notification_deliveries alter check notification_deliveries_status_check not enforced",
+        )
+        return try {
+            block()
+        } finally {
+            jdbcTemplate.update(
+                "delete from notification_deliveries where id in (?, ?)",
+                REPLAY_PADDED_CHANNEL_DELIVERY_ID.toString(),
+                REPLAY_PADDED_STATUS_DELIVERY_ID.toString(),
+            )
+            jdbcTemplate.execute(
+                "alter table notification_deliveries alter check notification_deliveries_channel_check enforced",
+            )
+            jdbcTemplate.execute(
+                "alter table notification_deliveries alter check notification_deliveries_status_check enforced",
+            )
+        }
+    }
+
     private fun deliveryTimestamp(
         deliveryId: UUID,
         column: String,
@@ -569,7 +719,18 @@ private val REPLAY_PENDING_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-00
 private val REPLAY_SENT_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007606")
 private val REPLAY_IN_APP_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007607")
 private val REPLAY_SECOND_CLUB_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007608")
-private val REPLAY_LOWERCASE_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007609")
+private val REPLAY_LOWERCASE_CHANNEL_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007609")
+private val REPLAY_MIXED_CHANNEL_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007610")
+private val REPLAY_PADDED_CHANNEL_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007611")
+private val REPLAY_LOWERCASE_STATUS_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007612")
+private val REPLAY_MIXED_STATUS_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007613")
+private val REPLAY_PADDED_STATUS_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007614")
+private val REPLAY_LOWERCASE_FAILURE_CODE_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007615")
+private val REPLAY_MIXED_FAILURE_CODE_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007616")
+private val REPLAY_PADDED_FAILURE_CODE_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007617")
+private val REPLAY_NULL_FAILURE_CODE_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007618")
+private val REPLAY_BLANK_FAILURE_CODE_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007619")
+private val REPLAY_UNKNOWN_FAILURE_CODE_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007620")
 private val MANUAL_DISPATCH_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007701")
 private val HOST_PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007801")
 private val HOST_DECISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000007901")
