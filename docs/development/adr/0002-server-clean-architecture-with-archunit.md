@@ -172,7 +172,7 @@ ArchUnit은 test scope 의존성이다. production 빌드에 영향을 주지 �
 
 ArchUnit 경계 테스트:
 ```bash
-./server/gradlew -p server test --tests "com.readmates.architecture.ServerArchitectureBoundaryTest"
+./server/gradlew -p server architectureTest --tests "com.readmates.architecture.ServerArchitectureBoundaryTest"
 ```
 
 기대: 모든 경계 규칙 통과. 위반 시 "cannot depend on", "must inject" 메시지와 함께 위반 파일/라인 출력.
@@ -188,7 +188,7 @@ feature 추가 후 구조 검증:
 3. domain model에서 `org.springframework` 패키지를 import하면 ArchUnit 테스트 실패 확인.
 
 legacy surface 확인:
-- `ServerArchitectureBoundaryTest.kt:22-29`에 명시된 패키지 목록이 전환된 surface를 정확히 반영하는지 PR마다 확인.
+- `ServerArchitectureBoundaryTest.kt`의 `serverSlices` registry가 전환된 surface를 정확히 반영하는지 PR마다 확인.
 
 ## 후속 작업
 
