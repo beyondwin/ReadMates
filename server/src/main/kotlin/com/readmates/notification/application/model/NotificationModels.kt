@@ -262,6 +262,7 @@ data class ClaimedNotificationDeliveryItem(
     val status: NotificationDeliveryStatus,
     val attemptCount: Int,
     val lockedAt: OffsetDateTime,
+    val createdAt: OffsetDateTime,
     val recipientEmail: String?,
     val subject: String?,
     val bodyText: String?,

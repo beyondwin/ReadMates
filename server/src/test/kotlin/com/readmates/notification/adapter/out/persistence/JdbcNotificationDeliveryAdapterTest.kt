@@ -1,8 +1,11 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.MailDeliveryCommand
+import com.readmates.notification.application.port.out.MailDeliveryFailure
+import com.readmates.notification.application.port.out.MailDeliveryFailureKind
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.service.NotificationDeliveryEngine
 import com.readmates.notification.application.service.NotificationDeliveryProcessingService
@@ -21,6 +24,9 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import java.sql.Timestamp
+import java.time.Clock
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.Collections
@@ -323,6 +329,12 @@ class JdbcNotificationDeliveryAdapterTest(
         insertEventOutboxRow()
         deliveryAdapter.persistPlannedDeliveries(message())
         val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
+        val createdAt = OffsetDateTime.of(2026, 4, 28, 1, 2, 3, 456_000_000, ZoneOffset.UTC)
+        jdbcTemplate.update(
+            "update notification_deliveries set created_at = ? where id = ?",
+            Timestamp.from(createdAt.toInstant()),
+            emailDeliveryId.toString(),
+        )
 
         val claimed = deliveryAdapter.claimEmailDelivery(emailDeliveryId)
         val secondClaim = deliveryAdapter.claimEmailDelivery(emailDeliveryId)
@@ -333,6 +345,7 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(claimed.subject).isEqualTo("1회차 피드백 문서가 올라왔습니다")
         assertThat(claimed.bodyText).contains("팩트풀니스")
         assertThat(claimed.bodyHtml).contains("/clubs/reading-sai/app/feedback/$sessionId")
+        assertThat(claimed.createdAt).isEqualTo(createdAt)
         assertThat(secondClaim).isNull()
         assertThat(staleMarked).isFalse()
         assertThat(activeMarked).isTrue()
@@ -352,8 +365,8 @@ class JdbcNotificationDeliveryAdapterTest(
                         deliveryStatusPort = deliveryAdapter,
                         mailDeliveryPort = mailPort,
                         metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                        maxAttempts = 5,
-                        retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+                        runtimeProperties = NotificationRuntimeProperties(),
+                        clock = Clock.fixed(Instant.parse("2026-04-29T02:00:00Z"), ZoneOffset.UTC),
                     ),
                 transactionalOps = transactionalOps,
                 deliveryEnabled = true,
@@ -368,6 +381,66 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(processedCounts.sum() + remainingProcessedCount).isEqualTo(3)
         assertThat(mailPort.recipients()).hasSize(3).doesNotHaveDuplicates()
         assertThat(emailDeliveryRowsByStatus(NotificationDeliveryStatus.SENT)).isEqualTo(3)
+    }
+
+    @Test
+    fun `claimEmailDelivery reclaims only an expired sending lease`() {
+        insertEventOutboxRow()
+        deliveryAdapter.persistPlannedDeliveries(message())
+        val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
+        jdbcTemplate.update(
+            """
+            update notification_deliveries
+            set status = 'SENDING',
+                locked_at = timestampadd(MINUTE, -16, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
+            emailDeliveryId.toString(),
+        )
+
+        val reclaimed = deliveryAdapter.claimEmailDelivery(emailDeliveryId)
+
+        assertThat(reclaimed).isNotNull
+        assertThat(reclaimed!!.status).isEqualTo(NotificationDeliveryStatus.SENDING)
+        assertThat(statusFor(emailDeliveryId)).isEqualTo("SENDING")
+    }
+
+    @Test
+    fun `retryable delivery reaches dead through exact claimed leases at attempt ceiling`() {
+        insertEventOutboxRow()
+        deliveryAdapter.persistPlannedDeliveries(message())
+        val emailDeliveryId = pendingEmailDeliveryIdFor("member1@example.com")
+        val createdAt = OffsetDateTime.of(2026, 4, 29, 1, 0, 0, 0, ZoneOffset.UTC)
+        jdbcTemplate.update(
+            "update notification_deliveries set created_at = ? where id = ?",
+            Timestamp.from(createdAt.toInstant()),
+            emailDeliveryId.toString(),
+        )
+        val engine =
+            NotificationDeliveryEngine(
+                deliveryStatusPort = deliveryAdapter,
+                mailDeliveryPort = IntegrationFailingMailPort,
+                metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
+                runtimeProperties =
+                    NotificationRuntimeProperties(
+                        kafka = NotificationRuntimeProperties.Kafka(maxDeliveryAttempts = 2),
+                    ),
+                clock = Clock.fixed(Instant.parse("2026-04-29T02:00:00Z"), ZoneOffset.UTC),
+            )
+
+        val first = deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
+        engine.sendClaimed(first)
+        jdbcTemplate.update(
+            "update notification_deliveries set next_attempt_at = utc_timestamp(6) where id = ?",
+            emailDeliveryId.toString(),
+        )
+        val second = deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
+        engine.sendClaimed(second)
+
+        assertThat(first.attemptCount).isZero()
+        assertThat(second.attemptCount).isEqualTo(1)
+        assertThat(statusFor(emailDeliveryId)).isEqualTo("DEAD")
+        assertThat(lastErrorFor(emailDeliveryId)).isEqualTo("MAIL_RETRYABLE")
     }
 
     @Test
@@ -804,6 +877,13 @@ class JdbcNotificationDeliveryAdapterTest(
             id.toString(),
         )!!
 
+    private fun lastErrorFor(id: UUID): String? =
+        jdbcTemplate.queryForObject(
+            "select last_error from notification_deliveries where id = ?",
+            String::class.java,
+            id.toString(),
+        )
+
     private fun emailDeliveryRowsByStatus(status: NotificationDeliveryStatus): Int =
         jdbcTemplate.queryForObject(
             """
@@ -857,5 +937,11 @@ class JdbcNotificationDeliveryAdapterTest(
         }
 
         fun recipients(): List<String> = recipients.toList()
+    }
+
+    private object IntegrationFailingMailPort : MailDeliveryPort {
+        override fun send(command: MailDeliveryCommand): Unit = failDelivery()
+
+        private fun failDelivery(): Nothing = throw MailDeliveryFailure(MailDeliveryFailureKind.RETRYABLE)
     }
 }

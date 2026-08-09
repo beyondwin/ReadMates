@@ -214,6 +214,7 @@ internal class NotificationDeliveryClaimOperations(
               notification_deliveries.status,
               notification_deliveries.attempt_count,
               notification_deliveries.locked_at,
+              notification_deliveries.created_at,
               notification_event_outbox.event_type,
               notification_event_outbox.aggregate_id,
               notification_event_outbox.payload_json,

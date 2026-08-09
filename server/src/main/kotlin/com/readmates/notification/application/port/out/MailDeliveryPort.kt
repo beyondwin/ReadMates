@@ -7,6 +7,18 @@ data class MailDeliveryCommand(
     val html: String? = null,
 )
 
+enum class MailDeliveryFailureKind(
+    val storageCode: String,
+) {
+    PERMANENT("MAIL_PERMANENT"),
+    RETRYABLE("MAIL_RETRYABLE"),
+    AMBIGUOUS("MAIL_AMBIGUOUS"),
+}
+
+class MailDeliveryFailure(
+    val kind: MailDeliveryFailureKind,
+) : RuntimeException(kind.storageCode)
+
 interface MailDeliveryPort {
     fun send(command: MailDeliveryCommand)
 }

@@ -69,6 +69,7 @@ import tools.jackson.databind.ObjectMapper
 import java.nio.charset.StandardCharsets.UTF_8
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -565,13 +566,14 @@ class NotificationKafkaPipelineIntegrationTest(
         fun notificationDeliveryEngine(
             adapter: JdbcNotificationDeliveryAdapter,
             mailDeliveryPort: RecordingMailDeliveryPort,
+            runtimeProperties: NotificationRuntimeProperties,
         ): NotificationDeliveryEngine =
             NotificationDeliveryEngine(
                 deliveryStatusPort = adapter,
                 mailDeliveryPort = mailDeliveryPort,
                 metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                maxAttempts = 5,
-                retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+                runtimeProperties = runtimeProperties,
+                clock = Clock.fixed(Instant.parse("2026-04-29T00:00:00Z"), ZoneOffset.UTC),
             )
 
         @Bean

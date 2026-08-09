@@ -4,9 +4,12 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.out.MailDeliveryCommand
+import com.readmates.notification.application.port.out.MailDeliveryFailure
+import com.readmates.notification.application.port.out.MailDeliveryFailureKind
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryClaimPort
 import com.readmates.notification.application.port.out.NotificationDeliveryPlanningPort
@@ -19,6 +22,9 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.ResourceLock
 import org.slf4j.LoggerFactory
+import java.time.Clock
+import java.time.Duration
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -63,7 +69,7 @@ class NotificationDeliveryProcessingServiceTest {
         val service =
             notificationDeliveryProcessingService(
                 deliveryStatusPort = deliveryPort,
-                mailPort = FailingMailPort("smtp rejected"),
+                mailPort = FailingMailPort(MailDeliveryFailureKind.RETRYABLE),
                 metrics = ReadmatesOperationalMetrics(registry),
             )
 
@@ -77,7 +83,7 @@ class NotificationDeliveryProcessingServiceTest {
                 UUID.fromString("00000000-0000-0000-0000-000000000401"),
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
                 2,
-                "smtp rejected",
+                "MAIL_RETRYABLE",
             )
             assertThat(event.formattedMessage).doesNotContain("member@example.com")
         }
@@ -92,8 +98,8 @@ class NotificationDeliveryProcessingServiceTest {
         val service =
             notificationDeliveryProcessingService(
                 deliveryStatusPort = deliveryPort,
-                mailPort = FailingMailPort("smtp rejected"),
-                retryDelayMinutesConfig = listOf(2L, 4L, 8L),
+                mailPort = FailingMailPort(MailDeliveryFailureKind.RETRYABLE),
+                retryDelayMinutesConfig = listOf(2L, 4L, 8L, 16L),
             )
 
         service.processClaimed(processingClaimedDelivery(attemptCount = 1))
@@ -102,13 +108,12 @@ class NotificationDeliveryProcessingServiceTest {
     }
 
     @Test
-    fun `processClaimed records bounded sanitized retry and dead transitions`() {
+    fun `processClaimed records only fixed safe retry and dead transition codes`() {
         val deliveryPort = ProcessingRecordingDeliveryPort()
-        val unsafeError = "Authorization: synthetic-secret synthetic@example.test " + "x".repeat(600)
         val service =
             notificationDeliveryProcessingService(
                 deliveryStatusPort = deliveryPort,
-                mailPort = FailingMailPort(unsafeError),
+                mailPort = FailingMailPort(MailDeliveryFailureKind.AMBIGUOUS),
             )
         val retryable = processingClaimedDelivery(attemptCount = 1)
         val exhausted = processingClaimedDelivery(attemptCount = 4)
@@ -120,16 +125,12 @@ class NotificationDeliveryProcessingServiceTest {
         assertThat(retryMark.id).isEqualTo(retryable.id)
         assertThat(retryMark.lockedAt).isEqualTo(retryable.lockedAt)
         assertThat(retryMark.delayMinutes).isEqualTo(15L)
-        assertThat(retryMark.error).hasSize(500)
-        assertThat(retryMark.error).contains("[redacted-secret]", "[redacted-email]")
-        assertThat(retryMark.error).doesNotContain("synthetic-secret", "synthetic@example.test")
+        assertThat(retryMark.error).isEqualTo("MAIL_AMBIGUOUS")
 
         val deadMark = deliveryPort.dead.single()
         assertThat(deadMark.id).isEqualTo(exhausted.id)
         assertThat(deadMark.lockedAt).isEqualTo(exhausted.lockedAt)
-        assertThat(deadMark.error).hasSize(500)
-        assertThat(deadMark.error).contains("[redacted-secret]", "[redacted-email]")
-        assertThat(deadMark.error).doesNotContain("synthetic-secret", "synthetic@example.test")
+        assertThat(deadMark.error).isEqualTo("MAIL_AMBIGUOUS")
     }
 
     @Test
@@ -139,7 +140,7 @@ class NotificationDeliveryProcessingServiceTest {
         val service =
             notificationDeliveryProcessingService(
                 deliveryStatusPort = deliveryPort,
-                mailPort = FailingMailPort("smtp rejected"),
+                mailPort = FailingMailPort(MailDeliveryFailureKind.AMBIGUOUS),
                 metrics = ReadmatesOperationalMetrics(registry),
             )
 
@@ -153,7 +154,7 @@ class NotificationDeliveryProcessingServiceTest {
                 UUID.fromString("00000000-0000-0000-0000-000000000401"),
                 NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
                 5,
-                "smtp rejected",
+                "MAIL_AMBIGUOUS",
             )
             assertThat(event.formattedMessage).doesNotContain("member@example.com")
         }
@@ -186,8 +187,15 @@ class NotificationDeliveryProcessingServiceTest {
                     deliveryStatusPort = deliveryStatusPort,
                     mailDeliveryPort = mailPort,
                     metrics = metrics,
-                    maxAttempts = maxAttempts,
-                    retryDelayMinutesConfig = retryDelayMinutesConfig,
+                    runtimeProperties =
+                        NotificationRuntimeProperties(
+                            worker =
+                                NotificationRuntimeProperties.Worker(
+                                    retryDelays = retryDelayMinutesConfig.map(Duration::ofMinutes),
+                                ),
+                            kafka = NotificationRuntimeProperties.Kafka(maxDeliveryAttempts = maxAttempts),
+                        ),
+                    clock = Clock.fixed(Instant.parse("2026-04-29T02:00:00Z"), ZoneOffset.UTC),
                 ),
             transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryTransactionPort, NoopDeliveryTransactionPort),
             deliveryEnabled = true,
@@ -213,11 +221,9 @@ private object NoopDeliveryTransactionPort : NotificationDeliveryPlanningPort, N
 }
 
 private class FailingMailPort(
-    private val message: String,
+    private val kind: MailDeliveryFailureKind,
 ) : MailDeliveryPort {
-    override fun send(command: MailDeliveryCommand) {
-        error(message)
-    }
+    override fun send(command: MailDeliveryCommand): Unit = throw MailDeliveryFailure(kind)
 }
 
 private class ProcessingRecordingMailPort : MailDeliveryPort {
@@ -291,6 +297,7 @@ private fun processingClaimedDelivery(
         status = NotificationDeliveryStatus.SENDING,
         attemptCount = attemptCount,
         lockedAt = OffsetDateTime.of(2026, 4, 29, 1, 2, 3, 0, ZoneOffset.UTC),
+        createdAt = OffsetDateTime.of(2026, 4, 29, 1, 0, 0, 0, ZoneOffset.UTC),
         recipientEmail = "member@example.com",
         subject = "Feedback document is ready",
         bodyText = "ReadMates에서 확인해 주세요.",

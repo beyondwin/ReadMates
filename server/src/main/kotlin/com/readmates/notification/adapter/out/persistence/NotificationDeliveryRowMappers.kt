@@ -115,6 +115,7 @@ internal class NotificationDeliveryRowMappers(
             status = NotificationDeliveryStatus.valueOf(getString("status")),
             attemptCount = getInt("attempt_count"),
             lockedAt = utcOffsetDateTime("locked_at"),
+            createdAt = utcOffsetDateTime("created_at"),
             recipientEmail = getString("recipient_email"),
             subject = copy.emailSubject,
             bodyText = copy.emailBodyText,
