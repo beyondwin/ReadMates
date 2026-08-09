@@ -10,6 +10,8 @@ import com.readmates.admin.health.application.port.out.PlatformAdminHealthMetric
 import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.port.out.PlatformHealthProviderOutcome
 import com.readmates.admin.health.application.port.out.PlatformHealthRefreshResult
+import com.readmates.admin.health.application.port.out.PrometheusQueryException
+import com.readmates.admin.health.application.port.out.PrometheusQueryFailureKind
 import com.readmates.admin.health.config.PlatformAdminHealthProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
@@ -22,6 +24,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.Collections
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.CompletionException
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executor
@@ -658,6 +661,67 @@ class PlatformAdminHealthServiceMetricsTest {
             releaseTimedOutProvider.countDown()
             delegatedExecutor.shutdownNow()
         }
+    }
+
+    @Test
+    fun `nested typed prometheus timeout is classified as timeout instead of error`() {
+        val metrics = RecordingHealthMetrics()
+        val service =
+            service(
+                providers =
+                    listOf(
+                        provider(PlatformHealthProvider.KAFKA_CONSUMER_LAG) {
+                            throw CompletionException(
+                                IllegalStateException(
+                                    "async boundary",
+                                    PrometheusQueryException(PrometheusQueryFailureKind.TIMEOUT),
+                                ),
+                            )
+                        },
+                    ),
+                executor = directExecutor,
+                metrics = metrics,
+            )
+
+        val unavailable = service.currentHealth()
+
+        assertThat(unavailable.refreshState).isEqualTo(PlatformHealthRefreshState.UNAVAILABLE)
+        assertThat(
+            unavailable.snapshot.cards
+                .single()
+                .reason,
+        ).isEqualTo("provider_timeout")
+        assertThat(metrics.providerOutcomes)
+            .containsExactly(PlatformHealthProvider.KAFKA_CONSUMER_LAG to PlatformHealthProviderOutcome.TIMEOUT)
+    }
+
+    @Test
+    fun `non-timeout typed prometheus failures remain provider errors`() {
+        val metrics = RecordingHealthMetrics()
+        val service =
+            service(
+                providers =
+                    listOf(
+                        provider(PlatformHealthProvider.KAFKA_CONSUMER_LAG) {
+                            throw CompletionException(
+                                PrometheusQueryException(PrometheusQueryFailureKind.HTTP_ERROR),
+                            )
+                        },
+                    ),
+                executor = directExecutor,
+                metrics = metrics,
+            )
+
+        val unavailable = service.currentHealth()
+
+        assertThat(unavailable.refreshState).isEqualTo(PlatformHealthRefreshState.UNAVAILABLE)
+        assertThat(
+            unavailable.snapshot.cards
+                .single()
+                .reason,
+        ).isEqualTo("provider_error")
+        assertThat(metrics.providerOutcomes)
+            .containsExactly(PlatformHealthProvider.KAFKA_CONSUMER_LAG to PlatformHealthProviderOutcome.ERROR)
     }
 
     @Test

@@ -13,6 +13,8 @@ import com.readmates.admin.health.application.port.out.PlatformAdminHealthMetric
 import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.port.out.PlatformHealthProviderOutcome
 import com.readmates.admin.health.application.port.out.PlatformHealthRefreshResult
+import com.readmates.admin.health.application.port.out.PrometheusQueryException
+import com.readmates.admin.health.application.port.out.PrometheusQueryFailureKind
 import com.readmates.admin.health.config.PlatformAdminHealthProperties
 import com.readmates.shared.architecture.ReadOnlyApplicationService
 import org.springframework.beans.factory.annotation.Qualifier
@@ -20,6 +22,8 @@ import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
+import java.util.Collections
+import java.util.IdentityHashMap
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.Executor
 import java.util.concurrent.RejectedExecutionException
@@ -165,8 +169,8 @@ class PlatformAdminHealthService(
                     ProviderResult.Failure(provider, ProviderFailureKind.TIMEOUT, waveStartedAt),
                     properties.providerDeadline.toMillis(),
                     TimeUnit.MILLISECONDS,
-                ).exceptionally {
-                    ProviderResult.Failure(provider, ProviderFailureKind.ERROR, waveStartedAt)
+                ).exceptionally { failure ->
+                    ProviderResult.Failure(provider, failure.providerFailureKind(), waveStartedAt)
                 }
         } catch (_: RejectedExecutionException) {
             CompletableFuture.completedFuture(
@@ -311,13 +315,29 @@ class PlatformAdminHealthService(
             override fun outcome(): PlatformHealthProviderOutcome = kind.metricOutcome
         }
     }
+}
 
-    private enum class ProviderFailureKind(
-        val reason: String,
-        val metricOutcome: PlatformHealthProviderOutcome,
-    ) {
-        ERROR("provider_error", PlatformHealthProviderOutcome.ERROR),
-        TIMEOUT("provider_timeout", PlatformHealthProviderOutcome.TIMEOUT),
-        REJECTED("provider_rejected", PlatformHealthProviderOutcome.REJECTED),
+private fun Throwable.providerFailureKind(): ProviderFailureKind {
+    val visited = Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
+    var current: Throwable? = this
+    while (current != null && visited.add(current)) {
+        if (current is PrometheusQueryException) {
+            return if (current.kind == PrometheusQueryFailureKind.TIMEOUT) {
+                ProviderFailureKind.TIMEOUT
+            } else {
+                ProviderFailureKind.ERROR
+            }
+        }
+        current = current.cause
     }
+    return ProviderFailureKind.ERROR
+}
+
+private enum class ProviderFailureKind(
+    val reason: String,
+    val metricOutcome: PlatformHealthProviderOutcome,
+) {
+    ERROR("provider_error", PlatformHealthProviderOutcome.ERROR),
+    TIMEOUT("provider_timeout", PlatformHealthProviderOutcome.TIMEOUT),
+    REJECTED("provider_rejected", PlatformHealthProviderOutcome.REJECTED),
 }

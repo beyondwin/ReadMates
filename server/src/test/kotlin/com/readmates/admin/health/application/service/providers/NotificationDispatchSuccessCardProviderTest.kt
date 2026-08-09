@@ -8,6 +8,7 @@ import com.readmates.admin.health.application.port.out.PrometheusQueryException
 import com.readmates.admin.health.application.port.out.PrometheusQueryFailureKind
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
@@ -56,20 +57,22 @@ class NotificationDispatchSuccessCardProviderTest {
     }
 
     @Test
-    fun `status UNKNOWN on empty result or prometheus error`() {
-        val empty =
+    fun `status UNKNOWN on empty result`() {
+        val card =
             NotificationDispatchSuccessCardProvider(
                 FakePrometheus { PromQueryResult(emptyList()) },
                 clock,
             ).compute()
-        val error =
-            NotificationDispatchSuccessCardProvider(
-                FakePrometheus { throw PrometheusQueryException(PrometheusQueryFailureKind.CONNECTION) },
-                clock,
-            ).compute()
-        assertThat(empty.status).isEqualTo(HealthCardStatus.UNKNOWN)
-        assertThat(empty.reason).isEqualTo("no_data")
-        assertThat(error.status).isEqualTo(HealthCardStatus.UNKNOWN)
-        assertThat(error.reason).isEqualTo("prometheus_unreachable")
+
+        assertThat(card.status).isEqualTo(HealthCardStatus.UNKNOWN)
+        assertThat(card.reason).isEqualTo("no_data")
+    }
+
+    @Test
+    fun `typed prometheus failure reaches refresh orchestration`() {
+        val failure = PrometheusQueryException(PrometheusQueryFailureKind.CONNECTION)
+        val provider = NotificationDispatchSuccessCardProvider(FakePrometheus { throw failure }, clock)
+
+        assertThatThrownBy(provider::compute).isSameAs(failure)
     }
 }

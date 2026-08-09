@@ -8,6 +8,7 @@ import com.readmates.admin.health.application.port.out.PrometheusQueryException
 import com.readmates.admin.health.application.port.out.PrometheusQueryFailureKind
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
@@ -69,13 +70,10 @@ class AiProviderAvailabilityCardProviderTest {
     }
 
     @Test
-    fun `status UNKNOWN when prometheus throws`() {
-        val card =
-            AiProviderAvailabilityCardProvider(
-                FakePrometheus { throw PrometheusQueryException(PrometheusQueryFailureKind.CONNECTION) },
-                clock,
-            ).compute()
-        assertThat(card.status).isEqualTo(HealthCardStatus.UNKNOWN)
-        assertThat(card.reason).isEqualTo("prometheus_unreachable")
+    fun `typed prometheus failure reaches refresh orchestration`() {
+        val failure = PrometheusQueryException(PrometheusQueryFailureKind.CONNECTION)
+        val provider = AiProviderAvailabilityCardProvider(FakePrometheus { throw failure }, clock)
+
+        assertThatThrownBy(provider::compute).isSameAs(failure)
     }
 }

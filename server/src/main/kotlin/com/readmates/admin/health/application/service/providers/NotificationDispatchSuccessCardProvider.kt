@@ -7,7 +7,6 @@ import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
 import com.readmates.admin.health.application.port.out.PlatformHealthProvider
-import com.readmates.admin.health.application.port.out.PrometheusQueryException
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import com.readmates.admin.health.application.service.HealthCardProvider
 import org.springframework.stereotype.Component
@@ -21,21 +20,15 @@ class NotificationDispatchSuccessCardProvider(
 ) : HealthCardProvider {
     override val identity: PlatformHealthProvider = PlatformHealthProvider.NOTIFICATION_DISPATCH_SUCCESS
 
-    @Suppress("ReturnCount", "SwallowedException")
+    @Suppress("ReturnCount")
     override fun compute(): HealthCard {
         val now = clock.instant()
         val ratio =
-            try {
-                prometheusQueryPort
-                    .query(PROMQL)
-                    .values
-                    .firstOrNull()
-                    ?.value
-            } catch (ignored: PrometheusQueryException) {
-                // Health probes must never throw — a degraded metric source surfaces as
-                // an UNKNOWN card so one unreachable backend can't fail the dashboard.
-                return failure(now, "prometheus_unreachable")
-            }
+            prometheusQueryPort
+                .query(PROMQL)
+                .values
+                .firstOrNull()
+                ?.value
         if (ratio == null) {
             return failure(now, "no_data")
         }
