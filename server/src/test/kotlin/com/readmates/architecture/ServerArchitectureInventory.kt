@@ -67,6 +67,20 @@ fun readFeatureDependencyBaseline(path: Path): Set<String> =
         fields.size == ARCHITECTURE_IDENTITY_FIELD_COUNT && fields.all(FEATURE_NAME::matches)
     }
 
+fun readRetiredBoundaryImports(path: Path): Set<String> =
+    readArchitectureBaseline(path, "retired boundary import") { row ->
+        val fields = row.split('|')
+        fields.size == ARCHITECTURE_IDENTITY_FIELD_COUNT &&
+            BOUNDARY_SOURCE.matches(fields[0]) &&
+            IMPORTED_SYMBOL.matches(fields[1])
+    }
+
+fun readRetiredFeatureDependencies(path: Path): Set<String> =
+    readArchitectureBaseline(path, "retired feature dependency") { row ->
+        val fields = row.split('|')
+        fields.size == ARCHITECTURE_IDENTITY_FIELD_COUNT && fields.all(FEATURE_NAME::matches)
+    }
+
 fun cyclicFeatureComponents(edges: Set<String>): Set<Set<String>> {
     val pairs = edges.map { edge -> edge.split('|').let { it[0] to it[1] } }
     val nodes = pairs.flatMap { (source, target) -> listOf(source, target) }.toSet()

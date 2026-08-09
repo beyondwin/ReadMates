@@ -98,6 +98,20 @@ fun readKtlintIdentitySeed(path: Path): Set<String> =
         )
     }
 
+fun readDetektRetiredIdentities(path: Path) = readIdentitySeed(path, "retired Detekt", ::normalizeDetektIdentity)
+
+fun readKtlintRetiredIdentities(path: Path): Set<String> =
+    readIdentitySeed(path, "ktlint retired ledger") { row ->
+        val fields = row.split('|')
+        require(fields.size == KTLINT_IDENTITY_FIELD_COUNT) { "Malformed ktlint retired row in $path: $row" }
+        ktlintIdentity(
+            fileName = fields[0],
+            source = fields[1],
+            line = fields[2],
+            column = fields[3],
+        )
+    }
+
 private fun readIdentitySeed(
     path: Path,
     label: String,

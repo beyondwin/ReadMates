@@ -104,19 +104,81 @@ class ServerQualityRatchetTest {
             readDetektIdentitySeed(root.resolve("server/config/detekt/phase-0-approved-identities.txt"))
         val approvedKtlintSeed =
             readKtlintIdentitySeed(root.resolve("server/config/ktlint/phase-0-approved-identities.txt"))
+        val retiredDetektIdentities =
+            readDetektRetiredIdentities(root.resolve("server/config/detekt/phase-0-retired-identities.txt"))
+        val retiredKtlintIdentities =
+            readKtlintRetiredIdentities(root.resolve("server/config/ktlint/phase-0-retired-identities.txt"))
 
-        requireApprovedIdentitySubset(
+        requireApprovedIdentityPartition(
             current = identities.detektIssues,
+            retired = retiredDetektIdentities,
             approvedSeed = approvedDetektSeed,
             ceiling = MAX_DETEKT_BASELINE_ISSUES,
             label = "Detekt baseline",
         )
-        requireApprovedIdentitySubset(
+        requireApprovedIdentityPartition(
             current = identities.ktlintErrors,
+            retired = retiredKtlintIdentities,
             approvedSeed = approvedKtlintSeed,
             ceiling = MAX_KTLINT_BASELINE_ERRORS,
             label = "ktlint baseline",
         )
+    }
+
+    @Test
+    fun `detekt ratchet accepts unchanged seed`() {
+        val approvedSeed = setOf("Rule:A.kt:first", "Rule:B.kt:second")
+
+        requireApprovedIdentityPartition(
+            current = approvedSeed,
+            retired = emptySet(),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "Detekt fixture",
+        )
+    }
+
+    @Test
+    fun `detekt ratchet accepts a tombstoned removal`() {
+        val approvedSeed = setOf("Rule:A.kt:first", "Rule:B.kt:second")
+
+        requireApprovedIdentityPartition(
+            current = setOf("Rule:A.kt:first"),
+            retired = setOf("Rule:B.kt:second"),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "Detekt fixture",
+        )
+    }
+
+    @Test
+    fun `detekt ratchet rejects reintroduction of a retired identity`() {
+        val approvedSeed = setOf("Rule:A.kt:first", "Rule:B.kt:second")
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = approvedSeed,
+                retired = setOf("Rule:B.kt:second"),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "Detekt fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `detekt ratchet rejects removal without a tombstone`() {
+        val approvedSeed = setOf("Rule:A.kt:first", "Rule:B.kt:second")
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = setOf("Rule:A.kt:first"),
+                retired = emptySet(),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "Detekt fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -125,9 +187,71 @@ class ServerQualityRatchetTest {
         val substituted = setOf("Rule:A.kt:first", "Rule:C.kt:replacement")
 
         assertThatThrownBy {
-            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "Detekt fixture")
+            requireApprovedIdentityPartition(
+                current = substituted,
+                retired = setOf("Rule:B.kt:second"),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "Detekt fixture",
+            )
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("Rule:C.kt:replacement")
+    }
+
+    @Test
+    fun `ktlint ratchet accepts unchanged seed`() {
+        val approvedSeed = setOf("A.kt|standard:first|1|2", "B.kt|standard:second|3|4")
+
+        requireApprovedIdentityPartition(
+            current = approvedSeed,
+            retired = emptySet(),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "ktlint fixture",
+        )
+    }
+
+    @Test
+    fun `ktlint ratchet accepts a tombstoned removal`() {
+        val approvedSeed = setOf("A.kt|standard:first|1|2", "B.kt|standard:second|3|4")
+
+        requireApprovedIdentityPartition(
+            current = setOf("A.kt|standard:first|1|2"),
+            retired = setOf("B.kt|standard:second|3|4"),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "ktlint fixture",
+        )
+    }
+
+    @Test
+    fun `ktlint ratchet rejects reintroduction of a retired identity`() {
+        val approvedSeed = setOf("A.kt|standard:first|1|2", "B.kt|standard:second|3|4")
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = approvedSeed,
+                retired = setOf("B.kt|standard:second|3|4"),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "ktlint fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `ktlint ratchet rejects removal without a tombstone`() {
+        val approvedSeed = setOf("A.kt|standard:first|1|2", "B.kt|standard:second|3|4")
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = setOf("A.kt|standard:first|1|2"),
+                retired = emptySet(),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "ktlint fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -136,7 +260,13 @@ class ServerQualityRatchetTest {
         val substituted = setOf("A.kt|standard:first|1|2", "C.kt|standard:replacement|5|6")
 
         assertThatThrownBy {
-            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "ktlint fixture")
+            requireApprovedIdentityPartition(
+                current = substituted,
+                retired = setOf("B.kt|standard:second|3|4"),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "ktlint fixture",
+            )
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("C.kt|standard:replacement|5|6")
     }
@@ -156,6 +286,33 @@ class ServerQualityRatchetTest {
         assertThatThrownBy { readKtlintIdentitySeed(malformedKtlintSeed) }
             .isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("Malformed")
+    }
+
+    @Test
+    fun `quality retired ledgers fail closed for duplicate malformed or outside seed rows`(
+        @TempDir tempDir: Path,
+    ) {
+        val duplicateDetektRetired = tempDir.resolve("detekt-retired.txt")
+        val malformedKtlintRetired = tempDir.resolve("ktlint-retired.txt")
+        Files.writeString(duplicateDetektRetired, "Rule:B.kt:second\nRule:B.kt:second\n")
+        Files.writeString(malformedKtlintRetired, "B.kt|standard:second|not-a-line|4\n")
+
+        assertThatThrownBy { readDetektRetiredIdentities(duplicateDetektRetired) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Duplicate")
+        assertThatThrownBy { readKtlintRetiredIdentities(malformedKtlintRetired) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Malformed")
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = setOf("Rule:A.kt:first"),
+                retired = setOf("Rule:C.kt:outside-seed"),
+                approvedSeed = setOf("Rule:A.kt:first", "Rule:B.kt:second"),
+                ceiling = 2,
+                label = "Detekt fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Rule:C.kt:outside-seed")
     }
 
     @Test

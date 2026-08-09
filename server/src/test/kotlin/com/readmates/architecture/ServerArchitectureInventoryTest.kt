@@ -60,9 +60,19 @@ class ServerArchitectureInventoryTest {
             readBoundaryImportBaseline(
                 root.resolve("server/config/architecture/phase-0-approved-boundary-imports.txt"),
             )
+        val retired =
+            readRetiredBoundaryImports(
+                root.resolve("server/config/architecture/phase-0-retired-boundary-imports.txt"),
+            )
 
         assertThat(actual).isEqualTo(baseline)
-        requireApprovedIdentitySubset(baseline, approvedSeed, ceiling = 39, label = "boundary import baseline")
+        requireApprovedIdentityPartition(
+            current = baseline,
+            retired = retired,
+            approvedSeed = approvedSeed,
+            ceiling = 39,
+            label = "boundary import baseline",
+        )
     }
 
     @Test
@@ -75,31 +85,155 @@ class ServerArchitectureInventoryTest {
             readFeatureDependencyBaseline(
                 root.resolve("server/config/architecture/phase-0-approved-feature-dependencies.txt"),
             )
+        val retired =
+            readRetiredFeatureDependencies(
+                root.resolve("server/config/architecture/phase-0-retired-feature-dependencies.txt"),
+            )
         val components = cyclicFeatureComponents(actual)
         val knownComponent = setOf("auth", "club", "notification", "session", "sessionimport", "sessionrecord")
 
         assertThat(actual).isEqualTo(baseline)
-        requireApprovedIdentitySubset(baseline, approvedSeed, ceiling = 41, label = "feature dependency baseline")
+        requireApprovedIdentityPartition(
+            current = baseline,
+            retired = retired,
+            approvedSeed = approvedSeed,
+            ceiling = 41,
+            label = "feature dependency baseline",
+        )
         assertThat(components).allMatch { component -> knownComponent.containsAll(component) }
     }
 
     @Test
-    fun `boundary ratchet rejects a same size identity substitution`() {
-        val approvedSeed =
-            setOf(
-                "com/readmates/a/adapter/in/web/A.kt|com.readmates.a.application.service.AService",
-                "com/readmates/b/adapter/in/web/B.kt|com.readmates.b.application.service.BService",
+    fun `boundary ratchet accepts unchanged seed`() {
+        val approvedSeed = boundaryFixtureSeed()
+
+        requireApprovedIdentityPartition(
+            current = approvedSeed,
+            retired = emptySet(),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "boundary fixture",
+        )
+    }
+
+    @Test
+    fun `boundary ratchet accepts a tombstoned removal`() {
+        val approvedSeed = boundaryFixtureSeed()
+
+        requireApprovedIdentityPartition(
+            current = setOf(approvedSeed.first()),
+            retired = setOf(approvedSeed.last()),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "boundary fixture",
+        )
+    }
+
+    @Test
+    fun `boundary ratchet rejects reintroduction of a retired identity`() {
+        val approvedSeed = boundaryFixtureSeed()
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = approvedSeed,
+                retired = setOf(approvedSeed.last()),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "boundary fixture",
             )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `boundary ratchet rejects removal without a tombstone`() {
+        val approvedSeed = boundaryFixtureSeed()
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = setOf(approvedSeed.first()),
+                retired = emptySet(),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "boundary fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `boundary ratchet rejects a same size identity substitution`() {
+        val approvedSeed = boundaryFixtureSeed()
         val substituted =
             setOf(
-                "com/readmates/a/adapter/in/web/A.kt|com.readmates.a.application.service.AService",
+                approvedSeed.first(),
                 "com/readmates/c/adapter/in/web/C.kt|com.readmates.c.application.service.CService",
             )
 
         assertThatThrownBy {
-            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "boundary fixture")
+            requireApprovedIdentityPartition(
+                current = substituted,
+                retired = setOf(approvedSeed.last()),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "boundary fixture",
+            )
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("com/readmates/c/adapter/in/web/C.kt")
+    }
+
+    @Test
+    fun `feature ratchet accepts unchanged seed`() {
+        val approvedSeed = setOf("auth|club", "club|shared")
+
+        requireApprovedIdentityPartition(
+            current = approvedSeed,
+            retired = emptySet(),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "feature fixture",
+        )
+    }
+
+    @Test
+    fun `feature ratchet accepts a tombstoned removal`() {
+        val approvedSeed = setOf("auth|club", "club|shared")
+
+        requireApprovedIdentityPartition(
+            current = setOf("auth|club"),
+            retired = setOf("club|shared"),
+            approvedSeed = approvedSeed,
+            ceiling = 2,
+            label = "feature fixture",
+        )
+    }
+
+    @Test
+    fun `feature ratchet rejects reintroduction of a retired identity`() {
+        val approvedSeed = setOf("auth|club", "club|shared")
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = approvedSeed,
+                retired = setOf("club|shared"),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "feature fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+    }
+
+    @Test
+    fun `feature ratchet rejects removal without a tombstone`() {
+        val approvedSeed = setOf("auth|club", "club|shared")
+
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = setOf("auth|club"),
+                retired = emptySet(),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "feature fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -108,7 +242,13 @@ class ServerArchitectureInventoryTest {
         val substituted = setOf("auth|club", "example|shared")
 
         assertThatThrownBy {
-            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "feature fixture")
+            requireApprovedIdentityPartition(
+                current = substituted,
+                retired = setOf("club|shared"),
+                approvedSeed = approvedSeed,
+                ceiling = 2,
+                label = "feature fixture",
+            )
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("example|shared")
     }
@@ -132,6 +272,40 @@ class ServerArchitectureInventoryTest {
             .isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("Malformed")
     }
+
+    @Test
+    fun `architecture retired ledgers fail closed for duplicate malformed or outside seed rows`(
+        @TempDir root: Path,
+    ) {
+        val duplicateBoundaryRetired = root.resolve("boundary-retired.txt")
+        val malformedFeatureRetired = root.resolve("feature-retired.txt")
+        val duplicate = "com/readmates/a/A.kt|com.readmates.a.B"
+        Files.writeString(duplicateBoundaryRetired, "$duplicate\n$duplicate\n")
+        Files.writeString(malformedFeatureRetired, "auth|club|shared\n")
+
+        assertThatThrownBy { readRetiredBoundaryImports(duplicateBoundaryRetired) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Duplicate")
+        assertThatThrownBy { readRetiredFeatureDependencies(malformedFeatureRetired) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Malformed")
+        assertThatThrownBy {
+            requireApprovedIdentityPartition(
+                current = setOf("auth|club"),
+                retired = setOf("example|shared"),
+                approvedSeed = setOf("auth|club", "club|shared"),
+                ceiling = 2,
+                label = "feature fixture",
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("example|shared")
+    }
+
+    private fun boundaryFixtureSeed(): Set<String> =
+        sortedSetOf(
+            "com/readmates/a/adapter/in/web/A.kt|com.readmates.a.application.service.AService",
+            "com/readmates/b/adapter/in/web/B.kt|com.readmates.b.application.service.BService",
+        )
 
     private fun write(
         root: Path,

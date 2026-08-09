@@ -1,0 +1,1 @@
+# Append an exact approved Detekt identity here when its current baseline debt is removed.
