@@ -16,11 +16,20 @@ class ServerQualityRatchetTest {
         val ktlint = tempDir.resolve("ktlint.xml")
         Files.writeString(
             detekt,
-            """<?xml version="1.0"?><SmellBaseline><CurrentIssues><ID>one</ID><ID>two</ID></CurrentIssues></SmellBaseline>""",
+            """
+            <?xml version="1.0"?>
+            <SmellBaseline><CurrentIssues><ID>one</ID><ID>two</ID></CurrentIssues></SmellBaseline>
+            """.trimIndent(),
         )
         Files.writeString(
             ktlint,
-            """<?xml version="1.0"?><baseline><file name="A.kt"><error line="1"/><error line="2"/></file><file name="B.kt"><error line="3"/></file></baseline>""",
+            """
+            <?xml version="1.0"?>
+            <baseline>
+                <file name="A.kt"><error line="1"/><error line="2"/></file>
+                <file name="B.kt"><error line="3"/></file>
+            </baseline>
+            """.trimIndent(),
         )
 
         val counts = ServerQualityBaselineReader.read(detekt, ktlint)
@@ -146,18 +155,20 @@ class ServerQualityRatchetTest {
         }
 
         var depth = 0
+        var closingBraceIndex: Int? = null
         for (index in openingBraceIndex until source.length) {
             when (source[index]) {
                 '{' -> depth++
                 '}' -> {
                     depth--
                     if (depth == 0) {
-                        return source.substring(openingBraceIndex + 1, index)
+                        closingBraceIndex = index
+                        break
                     }
                 }
             }
         }
-        return null
+        return closingBraceIndex?.let { index -> source.substring(openingBraceIndex + 1, index) }
     }
 
     private fun projectRoot(): Path =
