@@ -28,6 +28,7 @@ permissions:
   contents: read
 jobs:
   scripts:
+    name: Scripts
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -253,11 +254,17 @@ def validate_ci_workflow(source: str) -> list[WorkflowViolation]:
         ]
 
     job_active = _active_yaml_lines(scripts_job)
-    if any(re.match(r"^    (?:continue-on-error|if|permissions):", line) for line in job_active):
+    job_metadata = tuple(line for line in job_active if re.match(r"^ {4}\S", line))
+    expected_job_metadata = (
+        "    name: Scripts",
+        "    runs-on: ubuntu-latest",
+        "    steps:",
+    )
+    if job_metadata != expected_job_metadata:
         violations.append(
             WorkflowViolation(
                 "workflow-scripts-job-unsafe",
-                "the scripts job must not override permissions, guard execution, or tolerate failure",
+                "the scripts job must use only the canonical active job metadata",
             )
         )
 
@@ -1594,8 +1601,14 @@ class FlywayWorkflowContractTests(unittest.TestCase):
     steps:
       - uses: actions/checkout@example
 '''
+        metadata_comments_and_blanks = VALID_WORKFLOW_FIXTURE.replace(
+            "    name: Scripts\n",
+            "\n    # The exact active metadata ignores comments and blank lines.\n    name: Scripts\n\n",
+            1,
+        )
         for name, source in (
             ("minimal", VALID_WORKFLOW_FIXTURE),
+            ("metadata comments and blanks", metadata_comments_and_blanks),
             ("unrelated shallow checkout", unrelated_shallow_checkout),
         ):
             with self.subTest(name=name):
@@ -1841,6 +1854,62 @@ class FlywayWorkflowContractTests(unittest.TestCase):
                     "    runs-on: ubuntu-latest\n",
                     "    runs-on: ubuntu-latest\n"
                     "    continue-on-error: ${{ github.event_name == 'push' }}\n",
+                    1,
+                ),
+            ),
+            (
+                "job continue on error spaced key",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n    continue-on-error : true\n",
+                    1,
+                ),
+            ),
+            (
+                "job continue on error quoted key",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    '    runs-on: ubuntu-latest\n    "continue-on-error": true\n',
+                    1,
+                ),
+            ),
+            (
+                "job continue on error typed key",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n    !!str continue-on-error: true\n",
+                    1,
+                ),
+            ),
+            (
+                "job if quoted key",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    '    runs-on: ubuntu-latest\n    "if": ${{ success() }}\n',
+                    1,
+                ),
+            ),
+            (
+                "job if typed key",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n    !!str if: ${{ success() }}\n",
+                    1,
+                ),
+            ),
+            (
+                "job permissions quoted key",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    '    runs-on: ubuntu-latest\n    "permissions":\n      contents: write\n',
+                    1,
+                ),
+            ),
+            (
+                "job permissions typed key",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n    !!str permissions:\n      contents: write\n",
                     1,
                 ),
             ),
