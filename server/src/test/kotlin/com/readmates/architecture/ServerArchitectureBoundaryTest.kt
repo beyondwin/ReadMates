@@ -1,10 +1,12 @@
 package com.readmates.architecture
 
 import com.tngtech.archunit.base.DescribedPredicate
+import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ClassFileImporter
 import com.tngtech.archunit.core.importer.ImportOption
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes
 import com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
@@ -33,7 +35,7 @@ private enum class ServerSliceType {
 private data class ServerSlice(
     val name: String,
     val type: ServerSliceType,
-    val webAdapterPackages: List<String> = emptyList(),
+    val inboundAdapterPackages: List<String> = emptyList(),
     val applicationPackages: List<String> = emptyList(),
 )
 
@@ -42,109 +44,130 @@ private val serverSlices =
         ServerSlice(
             name = "session",
             type = ServerSliceType.WRITE,
-            webAdapterPackages = listOf("com.readmates.session.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.session.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.session.application.."),
         ),
         ServerSlice(
             name = "note",
             type = ServerSliceType.READ,
-            webAdapterPackages = listOf("com.readmates.note.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.note.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.note.application.."),
         ),
         ServerSlice(
             name = "publication",
             type = ServerSliceType.READ,
-            webAdapterPackages = listOf("com.readmates.publication.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.publication.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.publication.application.."),
         ),
         ServerSlice(
             name = "archive",
             type = ServerSliceType.READ,
-            webAdapterPackages = listOf("com.readmates.archive.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.archive.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.archive.application.."),
         ),
         ServerSlice(
             name = "browse",
             type = ServerSliceType.READ,
-            webAdapterPackages = listOf("com.readmates.browse.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.browse.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.browse.application.."),
         ),
         ServerSlice(
             name = "sessionclosing",
             type = ServerSliceType.READ,
-            webAdapterPackages = listOf("com.readmates.sessionclosing.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.sessionclosing.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.sessionclosing.application.."),
         ),
         ServerSlice(
             name = "feedback",
             type = ServerSliceType.WORKFLOW,
-            webAdapterPackages = listOf("com.readmates.feedback.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.feedback.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.feedback.application.."),
         ),
         ServerSlice(
             name = "auth",
             type = ServerSliceType.WRITE,
-            webAdapterPackages = listOf("com.readmates.auth.adapter.in.web.."),
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.auth.adapter.in.web..",
+                    "com.readmates.auth.adapter.in.security..",
+                    "com.readmates.auth.infrastructure.security..",
+                ),
             applicationPackages = listOf("com.readmates.auth.application.."),
         ),
         ServerSlice(
             name = "notification",
             type = ServerSliceType.WRITE,
-            webAdapterPackages = listOf("com.readmates.notification.adapter.in.web.."),
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.notification.adapter.in.web..",
+                    "com.readmates.notification.adapter.in.kafka..",
+                    "com.readmates.notification.adapter.in.scheduler..",
+                ),
             applicationPackages = listOf("com.readmates.notification.application.."),
         ),
         ServerSlice(
             name = "club",
             type = ServerSliceType.WRITE,
-            webAdapterPackages = listOf("com.readmates.club.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.club.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.club.application.."),
         ),
         ServerSlice(
             name = "admin.audit",
             type = ServerSliceType.READ,
-            webAdapterPackages = listOf("com.readmates.admin.audit.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.admin.audit.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.admin.audit.application.."),
         ),
         ServerSlice(
             name = "admin.health",
             type = ServerSliceType.OPS_READ,
-            webAdapterPackages = listOf("com.readmates.admin.health.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.admin.health.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.admin.health.application.."),
         ),
         ServerSlice(
             name = "admin.operations",
             type = ServerSliceType.WORKFLOW,
-            webAdapterPackages = listOf("com.readmates.admin.operations.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.admin.operations.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.admin.operations.application.."),
         ),
         ServerSlice(
             name = "observability",
             type = ServerSliceType.OPS_READ,
-            webAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.observability.application.."),
         ),
         ServerSlice(
             name = "admin.analytics",
             type = ServerSliceType.READ,
-            webAdapterPackages = listOf("com.readmates.admin.analytics.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.admin.analytics.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.admin.analytics.application.."),
         ),
         ServerSlice(
             name = "aigen",
             type = ServerSliceType.WORKFLOW,
-            webAdapterPackages = listOf("com.readmates.aigen.adapter.in.web.."),
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.aigen.adapter.in.web..",
+                    "com.readmates.aigen.adapter.in.messaging..",
+                    "com.readmates.aigen.adapter.in.scheduling..",
+                ),
             applicationPackages = listOf("com.readmates.aigen.application.."),
+        ),
+        ServerSlice(
+            name = "sessionimport",
+            type = ServerSliceType.WORKFLOW,
+            inboundAdapterPackages = listOf("com.readmates.sessionimport.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.sessionimport.application.."),
         ),
         ServerSlice(
             name = "sessionrecord",
             type = ServerSliceType.WORKFLOW,
-            webAdapterPackages = listOf("com.readmates.sessionrecord.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.sessionrecord.adapter.in.web.."),
             applicationPackages = listOf("com.readmates.sessionrecord.application.."),
         ),
         ServerSlice(
             name = "shared",
             type = ServerSliceType.SHARED,
-            webAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
+            inboundAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
         ),
     )
 
@@ -153,10 +176,17 @@ private val migratedApplicationPackages =
         .flatMap(ServerSlice::applicationPackages)
         .toTypedArray()
 
-private val migratedWebAdapterPackages =
+private val migratedInboundAdapterPackages =
     serverSlices
-        .flatMap(ServerSlice::webAdapterPackages)
+        .flatMap(ServerSlice::inboundAdapterPackages)
         .toTypedArray()
+
+private val legacyRepositoryDependencyTarget: DescribedPredicate<JavaClass> =
+    DescribedPredicate.describe("project or legacy persistence repository") { target ->
+        target.simpleName.endsWith("Repository") &&
+            target.name != "com.readmates.auth.infrastructure.security.OAuthFlowContextRepository" &&
+            !target.packageName.startsWith("org.springframework.security.")
+    }
 
 @Tag("architecture")
 class ServerArchitectureBoundaryTest {
@@ -167,7 +197,7 @@ class ServerArchitectureBoundaryTest {
         assertEquals(ServerSliceType.WORKFLOW, adminOperations.type)
         assertEquals(
             listOf("com.readmates.admin.operations.adapter.in.web.."),
-            adminOperations.webAdapterPackages,
+            adminOperations.inboundAdapterPackages,
         )
         assertEquals(
             listOf("com.readmates.admin.operations.application.."),
@@ -204,6 +234,7 @@ class ServerArchitectureBoundaryTest {
                     "aigen",
                     "browse",
                     "sessionclosing",
+                    "sessionimport",
                     "sessionrecord",
                     "observability",
                 ),
@@ -213,10 +244,49 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
-    fun `migrated web adapters do not depend on persistence or legacy repositories`() {
+    fun `non web inbound adapters are registered`() {
+        val inboundPackages = serverSlices.flatMap(ServerSlice::inboundAdapterPackages).toSet()
+
+        assertTrue(inboundPackages.contains("com.readmates.aigen.adapter.in.messaging.."))
+        assertTrue(inboundPackages.contains("com.readmates.aigen.adapter.in.scheduling.."))
+        assertTrue(inboundPackages.contains("com.readmates.notification.adapter.in.kafka.."))
+        assertTrue(inboundPackages.contains("com.readmates.notification.adapter.in.scheduler.."))
+        assertTrue(inboundPackages.contains("com.readmates.auth.adapter.in.security.."))
+        assertTrue(inboundPackages.contains("com.readmates.auth.infrastructure.security.."))
+    }
+
+    @Test
+    fun `repository dependency predicate excludes OAuth security contracts but retains project repositories`() {
+        val projectRepository =
+            importedClasses.get("com.readmates.aigen.adapter.out.persistence.JdbcAiGenerationClubDefaultRepository")
+        val oauthFlowContextRepository =
+            importedClasses.get("com.readmates.auth.infrastructure.security.OAuthFlowContextRepository")
+        val oauthSecurityRepositoryContracts =
+            listOf(
+                oauthFlowContextRepository,
+                importedClasses.get("com.readmates.auth.infrastructure.security.SecurityConfig"),
+            ).flatMap { javaClass -> javaClass.directDependenciesFromSelf }
+                .map { dependency -> dependency.targetClass }
+                .filter { javaClass -> javaClass.name.startsWith("org.springframework.security.") }
+                .filter { javaClass -> javaClass.simpleName.endsWith("Repository") }
+
+        assertTrue(legacyRepositoryDependencyTarget.test(projectRepository))
+        assertFalse(legacyRepositoryDependencyTarget.test(oauthFlowContextRepository))
+        assertEquals(
+            setOf(
+                "org.springframework.security.oauth2.client.registration.ClientRegistrationRepository",
+                "org.springframework.security.oauth2.client.web.AuthorizationRequestRepository",
+            ),
+            oauthSecurityRepositoryContracts.map { javaClass -> javaClass.name }.toSet(),
+        )
+        assertTrue(oauthSecurityRepositoryContracts.none(legacyRepositoryDependencyTarget::test))
+    }
+
+    @Test
+    fun `registered inbound adapters do not depend on persistence or legacy repositories`() {
         noClasses()
             .that()
-            .resideInAnyPackage(*migratedWebAdapterPackages)
+            .resideInAnyPackage(*migratedInboundAdapterPackages)
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage(
@@ -228,10 +298,9 @@ class ServerArchitectureBoundaryTest {
 
         noClasses()
             .that()
-            .resideInAnyPackage(*migratedWebAdapterPackages)
+            .resideInAnyPackage(*migratedInboundAdapterPackages)
             .should()
-            .dependOnClassesThat()
-            .haveSimpleNameEndingWith("Repository")
+            .dependOnClassesThat(legacyRepositoryDependencyTarget)
             .check(importedClasses)
     }
 
