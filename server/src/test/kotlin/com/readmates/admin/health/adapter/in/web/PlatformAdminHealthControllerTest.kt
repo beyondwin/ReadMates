@@ -10,9 +10,10 @@ import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.model.PlatformHealthRefreshState
 import com.readmates.admin.health.application.model.PlatformHealthSnapshot
-import com.readmates.admin.health.application.service.HealthCardProvider
-import com.readmates.admin.health.application.service.PlatformAdminHealthService
+import com.readmates.admin.health.application.model.PlatformHealthView
+import com.readmates.admin.health.application.port.`in`.ReadPlatformAdminHealthUseCase
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.junit.jupiter.api.Test
@@ -26,17 +27,11 @@ import org.springframework.web.context.request.NativeWebRequest
 import org.springframework.web.method.support.HandlerMethodArgumentResolver
 import org.springframework.web.method.support.ModelAndViewContainer
 import org.springframework.web.server.ResponseStatusException
-import java.time.Clock
 import java.time.Instant
-import java.time.ZoneOffset
 import java.util.UUID
-import java.util.concurrent.Executor
 
 class PlatformAdminHealthControllerTest {
     private val now: Instant = Instant.parse("2026-05-26T00:00:00Z")
-    private val clock: Clock = Clock.fixed(now, ZoneOffset.UTC)
-    private val directExecutor = Executor { command -> command.run() }
-
     private val ownerAdmin =
         CurrentPlatformAdmin(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
@@ -46,8 +41,8 @@ class PlatformAdminHealthControllerTest {
 
     @Test
     fun `snapshot returns schema generatedAt and all provider cards`() {
-        val service = buildService(deployAttemptsCard(), aiProviderCard())
-        val mockMvc = buildMockMvc(service, StubCurrentPlatformAdminResolver(ownerAdmin))
+        val readUseCase = stubReadUseCase(deployAttemptsCard(), aiProviderCard())
+        val mockMvc = buildMockMvc(readUseCase, StubCurrentPlatformAdminResolver(ownerAdmin))
 
         mockMvc
             .get("/api/admin/health/snapshot")
@@ -68,15 +63,26 @@ class PlatformAdminHealthControllerTest {
                 jsonPath("$.cards[1].status") { value("WARN") }
                 jsonPath("$.cards[1].drill.kind") { value("ADMIN_ROUTE") }
                 jsonPath("$.cards[1].drill.target") { value("/admin/ai-ops") }
+                jsonPath("$.lastSuccessfulAt") { doesNotExist() }
+                jsonPath("$.refreshState") { doesNotExist() }
+                jsonPath("$.staleAgeSeconds") { doesNotExist() }
             }
     }
 
-    private fun buildService(vararg cards: HealthCard): PlatformAdminHealthService =
-        PlatformAdminHealthService(
-            providers = cards.map(::StaticCardProvider),
-            clock = clock,
-            executor = directExecutor,
-        )
+    private fun stubReadUseCase(vararg cards: HealthCard): ReadPlatformAdminHealthUseCase =
+        ReadPlatformAdminHealthUseCase {
+            PlatformHealthView(
+                snapshot =
+                    PlatformHealthSnapshot(
+                        schema = PlatformHealthSnapshot.SCHEMA,
+                        generatedAt = now,
+                        cards = cards.toList(),
+                    ),
+                lastSuccessfulAt = now,
+                refreshState = PlatformHealthRefreshState.FRESH,
+                staleAgeSeconds = 0,
+            )
+        }
 
     private fun deployAttemptsCard(): HealthCard =
         HealthCard(
@@ -117,29 +123,32 @@ class PlatformAdminHealthControllerTest {
 
     @Test
     fun `provider throwing produces unknown card with provider_error reason in response`() {
-        val service =
-            PlatformAdminHealthService(
-                providers =
-                    listOf(
-                        ThrowingCardProvider("kafka_lag"),
-                        StaticCardProvider(
-                            HealthCard(
-                                id = "redis",
-                                title = "Redis",
-                                status = HealthCardStatus.OK,
-                                metric = null,
-                                thresholds = null,
-                                lastCheckedAt = now,
-                                source = HealthCardSource.IN_PROCESS,
-                                drill = null,
-                                reason = null,
-                            ),
-                        ),
-                    ),
-                clock = clock,
-                executor = directExecutor,
+        val readUseCase =
+            stubReadUseCase(
+                HealthCard(
+                    id = "kafka_lag",
+                    title = "kafka_lag",
+                    status = HealthCardStatus.UNKNOWN,
+                    metric = null,
+                    thresholds = null,
+                    lastCheckedAt = now,
+                    source = HealthCardSource.IN_PROCESS,
+                    drill = null,
+                    reason = "provider_error",
+                ),
+                HealthCard(
+                    id = "redis",
+                    title = "Redis",
+                    status = HealthCardStatus.OK,
+                    metric = null,
+                    thresholds = null,
+                    lastCheckedAt = now,
+                    source = HealthCardSource.IN_PROCESS,
+                    drill = null,
+                    reason = null,
+                ),
             )
-        val mockMvc = buildMockMvc(service, StubCurrentPlatformAdminResolver(ownerAdmin))
+        val mockMvc = buildMockMvc(readUseCase, StubCurrentPlatformAdminResolver(ownerAdmin))
 
         mockMvc
             .get("/api/admin/health/snapshot")
@@ -156,8 +165,7 @@ class PlatformAdminHealthControllerTest {
 
     @Test
     fun `non-platform-admin caller receives 403 from the permission gate`() {
-        val service = PlatformAdminHealthService(providers = emptyList(), clock = clock, executor = directExecutor)
-        val mockMvc = buildMockMvc(service, ForbiddenCurrentPlatformAdminResolver())
+        val mockMvc = buildMockMvc(stubReadUseCase(), ForbiddenCurrentPlatformAdminResolver())
 
         mockMvc
             .get("/api/admin/health/snapshot")
@@ -167,27 +175,13 @@ class PlatformAdminHealthControllerTest {
     }
 
     private fun buildMockMvc(
-        service: PlatformAdminHealthService,
+        readUseCase: ReadPlatformAdminHealthUseCase,
         adminResolver: HandlerMethodArgumentResolver,
     ): MockMvc =
         MockMvcBuilders
-            .standaloneSetup(PlatformAdminHealthController(service))
+            .standaloneSetup(PlatformAdminHealthController(readUseCase))
             .setCustomArgumentResolvers(adminResolver)
             .build()
-}
-
-private class StaticCardProvider(
-    private val card: HealthCard,
-) : HealthCardProvider {
-    override val cardId: String = card.id
-
-    override fun compute(): HealthCard = card
-}
-
-private class ThrowingCardProvider(
-    override val cardId: String,
-) : HealthCardProvider {
-    override fun compute(): HealthCard = error("provider $cardId exploded")
 }
 
 private class StubCurrentPlatformAdminResolver(

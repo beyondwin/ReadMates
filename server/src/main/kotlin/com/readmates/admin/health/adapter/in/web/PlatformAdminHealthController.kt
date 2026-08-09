@@ -8,7 +8,7 @@ import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
 import com.readmates.admin.health.application.model.PlatformHealthSnapshot
-import com.readmates.admin.health.application.service.PlatformAdminHealthService
+import com.readmates.admin.health.application.port.`in`.ReadPlatformAdminHealthUseCase
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestMapping
@@ -18,12 +18,12 @@ import java.time.Instant
 @RestController
 @RequestMapping("/api/admin/health")
 class PlatformAdminHealthController(
-    private val service: PlatformAdminHealthService,
+    private val readUseCase: ReadPlatformAdminHealthUseCase,
 ) {
     @GetMapping("/snapshot")
     fun snapshot(
         @Suppress("UNUSED_PARAMETER") admin: CurrentPlatformAdmin,
-    ): PlatformHealthSnapshotResponse = PlatformHealthSnapshotResponse.from(service.currentSnapshot())
+    ): PlatformHealthSnapshotResponse = PlatformHealthSnapshotResponse.from(readUseCase.currentHealth().snapshot)
 }
 
 data class PlatformHealthSnapshotResponse(
