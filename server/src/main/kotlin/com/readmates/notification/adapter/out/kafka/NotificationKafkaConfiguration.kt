@@ -1,6 +1,7 @@
 package com.readmates.notification.adapter.out.kafka
 
 import com.readmates.notification.adapter.`in`.kafka.NotificationUnsupportedSchemaVersionException
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.service.NotificationDeliveryRetryableException
 import org.apache.kafka.clients.consumer.ConsumerConfig
@@ -12,7 +13,6 @@ import org.apache.kafka.common.serialization.StringDeserializer
 import org.apache.kafka.common.serialization.StringSerializer
 import org.springframework.beans.factory.annotation.Qualifier
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
-import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
@@ -37,8 +37,11 @@ import java.time.Duration
 @Configuration(proxyBeanMethods = false)
 @ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.notifications.kafka", name = ["enabled"], havingValue = "true")
-@EnableConfigurationProperties(NotificationKafkaProperties::class)
+@EnableConfigurationProperties(NotificationRuntimeProperties::class)
 class NotificationKafkaConfiguration {
+    @Bean
+    fun notificationKafkaProperties(properties: NotificationRuntimeProperties): NotificationKafkaProperties = properties.kafka
+
     @Bean
     fun notificationEventProducerFactory(properties: NotificationKafkaProperties): ProducerFactory<String, NotificationEventMessage> =
         DefaultKafkaProducerFactory(
@@ -146,12 +149,4 @@ class NotificationKafkaConfiguration {
     private fun notificationEventJsonMapper(): JsonMapper = JacksonMapperUtils.enhancedJsonMapper()
 }
 
-@ConfigurationProperties(prefix = "readmates.notifications.kafka")
-data class NotificationKafkaProperties(
-    val bootstrapServers: List<String> = emptyList(),
-    val sendTimeout: Duration = Duration.ofSeconds(10),
-    val dlqTopic: String = "readmates.notification.events.dlq.v1",
-    val consumerGroup: String = "readmates-notification-dispatcher",
-    val deliveryRetryBackoff: Duration = Duration.ofMinutes(5),
-    val deliveryRetryMaxAttempts: Long = 72,
-)
+typealias NotificationKafkaProperties = NotificationRuntimeProperties.Kafka

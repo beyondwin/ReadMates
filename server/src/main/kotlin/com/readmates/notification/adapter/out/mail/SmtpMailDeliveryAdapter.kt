@@ -1,9 +1,9 @@
 package com.readmates.notification.adapter.out.mail
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import jakarta.mail.internet.InternetAddress
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.mail.javamail.JavaMailSender
 import org.springframework.mail.javamail.MimeMessageHelper
@@ -13,9 +13,11 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 class SmtpMailDeliveryAdapter(
     private val javaMailSender: JavaMailSender,
-    @param:Value("\${readmates.notifications.sender-email}") private val senderEmail: String,
-    @param:Value("\${readmates.notifications.sender-name}") private val senderName: String,
+    properties: NotificationRuntimeProperties,
 ) : MailDeliveryPort {
+    private val senderEmail = properties.senderEmail
+    private val senderName = properties.senderName
+
     override fun send(command: MailDeliveryCommand) {
         val message = javaMailSender.createMimeMessage()
         val helper = MimeMessageHelper(message, command.html?.isNotBlank() == true, Charsets.UTF_8.name())

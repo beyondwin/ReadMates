@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.mail
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.port.out.MailDeliveryCommand
 import jakarta.mail.Message
 import jakarta.mail.Session
@@ -17,7 +18,7 @@ class SmtpMailDeliveryAdapterTest {
     @Test
     fun `sends multipart alternative email when html is present`() {
         val sender = CapturingJavaMailSender()
-        val adapter = SmtpMailDeliveryAdapter(sender, "no-reply@example.com", "ReadMates")
+        val adapter = SmtpMailDeliveryAdapter(sender, notificationProperties())
 
         adapter.send(
             MailDeliveryCommand(
@@ -44,7 +45,7 @@ class SmtpMailDeliveryAdapterTest {
     @Test
     fun `sends plain text email when html is absent`() {
         val sender = CapturingJavaMailSender()
-        val adapter = SmtpMailDeliveryAdapter(sender, "no-reply@example.com", "ReadMates")
+        val adapter = SmtpMailDeliveryAdapter(sender, notificationProperties())
 
         adapter.send(
             MailDeliveryCommand(
@@ -59,6 +60,13 @@ class SmtpMailDeliveryAdapterTest {
         assertThat(message.content.toString()).contains("plain only")
     }
 }
+
+private fun notificationProperties(): NotificationRuntimeProperties =
+    NotificationRuntimeProperties(
+        enabled = true,
+        senderEmail = "no-reply@example.com",
+        senderName = "ReadMates",
+    )
 
 private class CapturingJavaMailSender : JavaMailSender {
     private val messages = mutableListOf<MimeMessage>()
