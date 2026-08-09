@@ -172,6 +172,68 @@ class PlatformAdminHealthServiceTest {
     }
 
     @Test
+    fun `failed future is cleared before completion is observable so immediate refresh starts recovery`() {
+        val failedProviderStarted = CountDownLatch(1)
+        val releaseFailedProvider = CountDownLatch(1)
+        val failedCompletionObserved = CountDownLatch(1)
+        val releaseFailedCompletion = CountDownLatch(1)
+        val recoveryStarted = CountDownLatch(1)
+        val releaseRecovery = CountDownLatch(1)
+        val providerCalls = AtomicInteger()
+        val providerExecutor = Executors.newFixedThreadPool(2)
+        val service =
+            service(
+                providers =
+                    listOf(
+                        provider("redis") {
+                            when (providerCalls.incrementAndGet()) {
+                                1 -> card("redis", HealthCardStatus.OK, "last-known-good")
+                                2 -> {
+                                    failedProviderStarted.countDown()
+                                    check(releaseFailedProvider.await(1, TimeUnit.SECONDS))
+                                    error("failed wave")
+                                }
+                                else -> {
+                                    recoveryStarted.countDown()
+                                    check(releaseRecovery.await(1, TimeUnit.SECONDS))
+                                    card("redis", HealthCardStatus.OK, "recovered")
+                                }
+                            }
+                        },
+                    ),
+                executor = providerExecutor,
+            )
+
+        try {
+            service.currentHealth()
+            clock.advance(Duration.ofSeconds(10))
+            val failedRefresh = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED)
+            assertThat(failedProviderStarted.await(1, TimeUnit.SECONDS)).isTrue()
+            failedRefresh.whenComplete { _, _ ->
+                failedCompletionObserved.countDown()
+                check(releaseFailedCompletion.await(1, TimeUnit.SECONDS))
+            }
+
+            releaseFailedProvider.countDown()
+            assertThat(failedCompletionObserved.await(1, TimeUnit.SECONDS)).isTrue()
+            assertThat(failedRefresh.get(250, TimeUnit.MILLISECONDS).refreshState)
+                .isEqualTo(PlatformHealthRefreshState.STALE)
+
+            val recovery = service.refresh(PlatformHealthRefreshTrigger.LAZY)
+
+            assertThat(recovery).isNotSameAs(failedRefresh)
+            assertThat(recoveryStarted.await(1, TimeUnit.SECONDS)).isTrue()
+            assertThat(recovery.isDone).isFalse()
+            assertThat(providerCalls.get()).isEqualTo(3)
+        } finally {
+            releaseFailedProvider.countDown()
+            releaseFailedCompletion.countDown()
+            releaseRecovery.countDown()
+            providerExecutor.shutdownNow()
+        }
+    }
+
+    @Test
     fun `failed wave after a full success preserves the whole previous snapshot as stale`() {
         val releaseHungProvider = CountDownLatch(1)
         val fail = AtomicReference(false)

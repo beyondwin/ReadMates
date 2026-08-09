@@ -108,9 +108,9 @@ class PlatformAdminHealthService(
                 continue
             }
 
-            exactFuture.whenComplete { _, _ -> inFlight.compareAndSet(exactFuture, null) }
             try {
                 startProviderWave().whenComplete { view, failure ->
+                    inFlight.compareAndSet(exactFuture, null)
                     if (failure == null) {
                         exactFuture.complete(view)
                     } else {
@@ -118,6 +118,7 @@ class PlatformAdminHealthService(
                     }
                 }
             } catch (failure: Exception) {
+                inFlight.compareAndSet(exactFuture, null)
                 exactFuture.completeExceptionally(failure)
             }
             return exactFuture
