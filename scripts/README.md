@@ -29,8 +29,9 @@ python3 -B scripts/check-deploy-workflow-contract.py
 
 기준 commit에 존재하는 production Flyway migration을 현재 worktree와 비교해 과거 SQL의 수정, 삭제,
 rename, 이동을 차단합니다. 비교 대상은
-`server/src/main/resources/db/mysql/migration/`이며 staged, unstaged, 삭제, untracked 파일을 모두 현재
-상태로 검사합니다. 기준 ref는 신뢰할 수 있는 로컬 commit 또는 ref를 명시해야 합니다.
+`server/src/main/resources/db/mysql/migration/`이며 기준 migration은 Git index와 filesystem 상태를
+독립적으로 비교합니다. 따라서 staged, unstaged, index/worktree가 다른 상태, 삭제, untracked 파일을
+모두 검사합니다. 기준 ref는 신뢰할 수 있는 로컬 commit 또는 ref를 명시해야 합니다.
 
 ```bash
 python3 -B scripts/check-flyway-migration-immutability.py --self-test
@@ -39,8 +40,9 @@ python3 -B scripts/check-flyway-migration-immutability.py --base-ref <trusted-ba
 
 검사기는 완전한 로컬 Git history에서 merge base를 해석하고 exact object ID, migration 수, 다음 허용
 version을 출력합니다. shallow/incomplete history, 해석할 수 없는 base, 공통 조상이 없는 history,
-잘못된 파일명이나 위치, 숫자로 같은 중복 version, symlink와 읽을 수 없는 파일은 fail closed로
-거부합니다. SQL 본문과 로컬 절대 경로는 출력하지 않습니다.
+잘못된 파일명이나 위치, 숫자로 같은 중복 version, migration 또는 상위 디렉터리 symlink와 읽을 수
+없는 파일은 fail closed로 거부합니다. Git object 조회는 lazy fetch를 비활성화하므로 promisor remote에
+누락 object를 요청하지 않습니다. SQL 본문, Git 오류 전문, 로컬 절대 경로는 출력하지 않습니다.
 
 실패 시 과거 migration을 수정하거나 삭제하거나 `flyway repair`로 우회하지 않습니다. 검사기가 안내한
 base maximum보다 큰 `V{N}__lower_snake_case_description.sql` 파일을 새 forward-only migration으로
