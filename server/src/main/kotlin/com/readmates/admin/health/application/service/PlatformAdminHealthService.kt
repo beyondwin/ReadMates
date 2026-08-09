@@ -9,6 +9,10 @@ import com.readmates.admin.health.application.model.PlatformHealthSnapshot
 import com.readmates.admin.health.application.model.PlatformHealthView
 import com.readmates.admin.health.application.port.`in`.ReadPlatformAdminHealthUseCase
 import com.readmates.admin.health.application.port.`in`.RefreshPlatformAdminHealthUseCase
+import com.readmates.admin.health.application.port.out.PlatformAdminHealthMetricsPort
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
+import com.readmates.admin.health.application.port.out.PlatformHealthProviderOutcome
+import com.readmates.admin.health.application.port.out.PlatformHealthRefreshResult
 import com.readmates.admin.health.config.PlatformAdminHealthProperties
 import com.readmates.shared.architecture.ReadOnlyApplicationService
 import org.springframework.beans.factory.annotation.Qualifier
@@ -30,16 +34,21 @@ class PlatformAdminHealthService(
     @param:Qualifier("platformAdminHealthExecutor")
     private val executor: Executor,
     private val properties: PlatformAdminHealthProperties,
+    private val metrics: PlatformAdminHealthMetricsPort,
 ) : ReadPlatformAdminHealthUseCase,
     RefreshPlatformAdminHealthUseCase {
     private val state = AtomicReference(HealthState())
     private val inFlight = AtomicReference<CompletableFuture<PlatformHealthView>?>()
 
-    override fun currentHealth(): PlatformHealthView =
-        state.get().let { current ->
-            current.snapshot?.let { snapshot -> currentHealth(current, snapshot) }
-                ?: refresh(PlatformHealthRefreshTrigger.LAZY).join()
-        }
+    override fun currentHealth(): PlatformHealthView {
+        val view =
+            state.get().let { current ->
+                current.snapshot?.let { snapshot -> currentHealth(current, snapshot) }
+                    ?: refresh(PlatformHealthRefreshTrigger.LAZY).join()
+            }
+        recordMetric { updateStaleAge(view.staleAgeSeconds) }
+        return view
+    }
 
     private fun currentHealth(
         current: HealthState,
@@ -102,7 +111,10 @@ class PlatformAdminHealthService(
     @Suppress("TooGenericExceptionCaught")
     override fun refresh(trigger: PlatformHealthRefreshTrigger): CompletableFuture<PlatformHealthView> {
         while (true) {
-            inFlight.get()?.let { return it }
+            inFlight.get()?.let { existing ->
+                recordMetric { recordRefreshOverlap(trigger) }
+                return existing
+            }
             val exactFuture = CompletableFuture<PlatformHealthView>()
             if (!inFlight.compareAndSet(null, exactFuture)) {
                 continue
@@ -145,7 +157,7 @@ class PlatformAdminHealthService(
         try {
             val result =
                 CompletableFuture.supplyAsync<ProviderResult>(
-                    { ProviderResult.Success(provider.compute()) },
+                    { ProviderResult.Success(provider, provider.compute()) },
                     executor,
                 )
             result
@@ -175,7 +187,7 @@ class PlatformAdminHealthService(
                         PlatformHealthSnapshot(
                             schema = PlatformHealthSnapshot.SCHEMA,
                             generatedAt = waveStartedAt,
-                            cards = results.map { result -> (result as ProviderResult.Success).card },
+                            cards = results.map(ProviderResult::card),
                         ),
                     lastSuccessfulAt = completedAt,
                     refreshState = PlatformHealthRefreshState.FRESH,
@@ -184,7 +196,29 @@ class PlatformAdminHealthService(
                 failedState(waveStartedAt, results)
             }
         state.set(nextState)
-        return nextState.toView(completedAt)
+        results.forEach { result ->
+            PlatformHealthProvider.fromCardId(result.cardId())?.let { provider ->
+                recordMetric { recordProviderOutcome(provider, result.outcome()) }
+            }
+        }
+        recordMetric {
+            recordRefreshDuration(
+                result =
+                    when (nextState.refreshState) {
+                        PlatformHealthRefreshState.FRESH -> PlatformHealthRefreshResult.FRESH
+                        PlatformHealthRefreshState.STALE -> PlatformHealthRefreshResult.STALE
+                        PlatformHealthRefreshState.UNAVAILABLE -> PlatformHealthRefreshResult.UNAVAILABLE
+                        PlatformHealthRefreshState.REFRESHING -> error("Refresh wave cannot complete as REFRESHING")
+                    },
+                duration =
+                    Duration.between(waveStartedAt, completedAt).let { duration ->
+                        if (duration.isNegative) Duration.ZERO else duration
+                    },
+            )
+        }
+        val view = nextState.toView(completedAt)
+        recordMetric { updateStaleAge(view.staleAgeSeconds) }
+        return view
     }
 
     private fun failedState(
@@ -223,6 +257,15 @@ class PlatformAdminHealthService(
             ?.let { successfulAt -> Duration.between(successfulAt, now).seconds.coerceAtLeast(0) }
             ?: 0
 
+    @Suppress("SwallowedException")
+    private inline fun recordMetric(record: PlatformAdminHealthMetricsPort.() -> Unit) {
+        try {
+            metrics.record()
+        } catch (_: RuntimeException) {
+            // Observability is fail-open: metric backend failures must not change health behavior.
+        }
+    }
+
     private data class HealthState(
         val snapshot: PlatformHealthSnapshot? = null,
         val lastSuccessfulAt: Instant? = null,
@@ -232,10 +275,19 @@ class PlatformAdminHealthService(
     private sealed interface ProviderResult {
         fun card(): HealthCard
 
+        fun cardId(): String
+
+        fun outcome(): PlatformHealthProviderOutcome
+
         data class Success(
-            val card: HealthCard,
+            val provider: HealthCardProvider,
+            val healthCard: HealthCard,
         ) : ProviderResult {
-            override fun card(): HealthCard = card
+            override fun card(): HealthCard = healthCard
+
+            override fun cardId(): String = provider.cardId
+
+            override fun outcome(): PlatformHealthProviderOutcome = PlatformHealthProviderOutcome.SUCCESS
         }
 
         data class Failure(
@@ -255,14 +307,19 @@ class PlatformAdminHealthService(
                     drill = null,
                     reason = kind.reason,
                 )
+
+            override fun cardId(): String = provider.cardId
+
+            override fun outcome(): PlatformHealthProviderOutcome = kind.metricOutcome
         }
     }
 
     private enum class ProviderFailureKind(
         val reason: String,
+        val metricOutcome: PlatformHealthProviderOutcome,
     ) {
-        ERROR("provider_error"),
-        TIMEOUT("provider_timeout"),
-        REJECTED("provider_rejected"),
+        ERROR("provider_error", PlatformHealthProviderOutcome.ERROR),
+        TIMEOUT("provider_timeout", PlatformHealthProviderOutcome.TIMEOUT),
+        REJECTED("provider_rejected", PlatformHealthProviderOutcome.REJECTED),
     }
 }

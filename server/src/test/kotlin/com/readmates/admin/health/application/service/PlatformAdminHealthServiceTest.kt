@@ -6,6 +6,10 @@ import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.PlatformHealthRefreshState
 import com.readmates.admin.health.application.model.PlatformHealthRefreshTrigger
 import com.readmates.admin.health.application.model.PlatformHealthView
+import com.readmates.admin.health.application.port.out.PlatformAdminHealthMetricsPort
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
+import com.readmates.admin.health.application.port.out.PlatformHealthProviderOutcome
+import com.readmates.admin.health.application.port.out.PlatformHealthRefreshResult
 import com.readmates.admin.health.config.PlatformAdminHealthProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
@@ -520,11 +524,13 @@ class PlatformAdminHealthServiceTest {
         providers: List<HealthCardProvider>,
         executor: Executor,
         providerDeadline: Duration = Duration.ofMillis(100),
+        metrics: PlatformAdminHealthMetricsPort = RecordingHealthMetrics(),
     ): PlatformAdminHealthService =
         PlatformAdminHealthService(
             providers = providers,
             clock = clock,
             executor = executor,
+            metrics = metrics,
             properties =
                 PlatformAdminHealthProperties(
                     refreshInterval = Duration.ofSeconds(10),
@@ -565,6 +571,240 @@ class PlatformAdminHealthServiceTest {
             drill = null,
             reason = null,
         )
+}
+
+class PlatformAdminHealthServiceMetricsTest {
+    private val initialNow: Instant = Instant.parse("2026-08-09T00:00:00Z")
+    private val clock = MutableClock(initialNow)
+    private val directExecutor = Executor { command -> command.run() }
+
+    @Test
+    fun `one actual wave records every provider outcome once and one duration only`() {
+        val timedOutProviderStarted = CountDownLatch(1)
+        val releaseTimedOutProvider = CountDownLatch(1)
+        val delegatedExecutor = Executors.newSingleThreadExecutor()
+        val submissions = AtomicInteger()
+        val executor =
+            Executor { command ->
+                when (submissions.incrementAndGet()) {
+                    1, 2 -> command.run()
+                    3 -> delegatedExecutor.execute(command)
+                    else -> throw RejectedExecutionException("queue full")
+                }
+            }
+        val metrics = RecordingHealthMetrics()
+        val service =
+            service(
+                providers =
+                    listOf(
+                        provider("redis") { card("redis") },
+                        provider("kafka_consumer_lag") { error("provider failed") },
+                        provider("notification_dispatch_success") {
+                            timedOutProviderStarted.countDown()
+                            check(releaseTimedOutProvider.await(1, TimeUnit.SECONDS))
+                            card("notification_dispatch_success")
+                        },
+                        provider("db_pool") { card("db_pool") },
+                    ),
+                executor = executor,
+                providerDeadline = Duration.ofMillis(75),
+                metrics = metrics,
+            )
+
+        try {
+            val unavailable = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED).get(1, TimeUnit.SECONDS)
+
+            assertThat(timedOutProviderStarted.await(1, TimeUnit.SECONDS)).isTrue()
+            assertThat(unavailable.refreshState).isEqualTo(PlatformHealthRefreshState.UNAVAILABLE)
+            assertThat(metrics.providerOutcomes)
+                .containsExactly(
+                    PlatformHealthProvider.REDIS to PlatformHealthProviderOutcome.SUCCESS,
+                    PlatformHealthProvider.KAFKA_CONSUMER_LAG to PlatformHealthProviderOutcome.ERROR,
+                    PlatformHealthProvider.NOTIFICATION_DISPATCH_SUCCESS to PlatformHealthProviderOutcome.TIMEOUT,
+                    PlatformHealthProvider.DB_POOL to PlatformHealthProviderOutcome.REJECTED,
+                )
+            assertThat(metrics.durations).containsExactly(PlatformHealthRefreshResult.UNAVAILABLE to Duration.ZERO)
+        } finally {
+            releaseTimedOutProvider.countDown()
+            delegatedExecutor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `provider outcome attribution uses the invoked fixed provider identity`() {
+        val metrics = RecordingHealthMetrics()
+        val provider =
+            object : HealthCardProvider {
+                override val cardId: String = "redis"
+
+                override fun compute(): HealthCard = card("db_pool")
+            }
+        val service = service(listOf(provider), directExecutor, metrics = metrics)
+
+        service.refresh(PlatformHealthRefreshTrigger.SCHEDULED).get(1, TimeUnit.SECONDS)
+
+        assertThat(metrics.providerOutcomes)
+            .containsExactly(PlatformHealthProvider.REDIS to PlatformHealthProviderOutcome.SUCCESS)
+    }
+
+    @Test
+    fun `each trigger joining an in flight wave records overlap while duration belongs only to the actual wave`() {
+        val providerStarted = CountDownLatch(1)
+        val releaseProvider = CountDownLatch(1)
+        val providerExecutor = Executors.newSingleThreadExecutor()
+        val metrics = RecordingHealthMetrics()
+        val service =
+            service(
+                providers =
+                    listOf(
+                        provider("redis") {
+                            providerStarted.countDown()
+                            check(releaseProvider.await(1, TimeUnit.SECONDS))
+                            card("redis")
+                        },
+                    ),
+                executor = providerExecutor,
+                metrics = metrics,
+            )
+
+        try {
+            val actualWave = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED)
+            assertThat(providerStarted.await(1, TimeUnit.SECONDS)).isTrue()
+
+            val lazyJoin = service.refresh(PlatformHealthRefreshTrigger.LAZY)
+            val scheduledJoin = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED)
+            clock.advance(Duration.ofSeconds(7))
+            releaseProvider.countDown()
+
+            assertThat(lazyJoin).isSameAs(actualWave)
+            assertThat(scheduledJoin).isSameAs(actualWave)
+            assertThat(actualWave.get(1, TimeUnit.SECONDS).refreshState).isEqualTo(PlatformHealthRefreshState.FRESH)
+            assertThat(metrics.overlaps)
+                .containsExactly(PlatformHealthRefreshTrigger.LAZY, PlatformHealthRefreshTrigger.SCHEDULED)
+            assertThat(metrics.providerOutcomes)
+                .containsExactly(PlatformHealthProvider.REDIS to PlatformHealthProviderOutcome.SUCCESS)
+            assertThat(metrics.durations).containsExactly(PlatformHealthRefreshResult.FRESH to Duration.ofSeconds(7))
+        } finally {
+            releaseProvider.countDown()
+            providerExecutor.shutdownNow()
+        }
+    }
+
+    @Test
+    fun `stale age metric tracks the current derived value and metric failures never change health behavior`() {
+        val metrics = RecordingHealthMetrics()
+        val service = service(listOf(provider("redis") { card("redis") }), directExecutor, metrics = metrics)
+
+        val fresh = service.currentHealth()
+        clock.advance(Duration.ofSeconds(12))
+        val aged = service.currentHealth()
+
+        assertThat(fresh.refreshState).isEqualTo(PlatformHealthRefreshState.FRESH)
+        assertThat(aged.staleAgeSeconds).isEqualTo(12)
+        assertThat(metrics.staleAges.last()).isEqualTo(12)
+
+        val healthWithBrokenMetrics =
+            service(
+                providers = listOf(provider("redis") { card("redis") }),
+                executor = directExecutor,
+                metrics = ThrowingHealthMetrics,
+            )
+        assertThatCode { healthWithBrokenMetrics.currentHealth() }.doesNotThrowAnyException()
+        assertThat(healthWithBrokenMetrics.currentHealth().refreshState).isEqualTo(PlatformHealthRefreshState.FRESH)
+    }
+
+    private fun service(
+        providers: List<HealthCardProvider>,
+        executor: Executor,
+        providerDeadline: Duration = Duration.ofMillis(100),
+        metrics: PlatformAdminHealthMetricsPort,
+    ): PlatformAdminHealthService =
+        PlatformAdminHealthService(
+            providers = providers,
+            clock = clock,
+            executor = executor,
+            metrics = metrics,
+            properties =
+                PlatformAdminHealthProperties(
+                    refreshInterval = Duration.ofSeconds(10),
+                    freshness = Duration.ofSeconds(30),
+                    providerDeadline = providerDeadline,
+                    prometheus =
+                        PlatformAdminHealthProperties.Prometheus(
+                            connectTimeout = Duration.ofMillis(50).coerceAtMost(providerDeadline),
+                            connectionRequestTimeout = Duration.ofMillis(50).coerceAtMost(providerDeadline),
+                            readTimeout = Duration.ofMillis(50).coerceAtMost(providerDeadline),
+                        ),
+                ),
+        )
+
+    private fun provider(
+        id: String,
+        compute: () -> HealthCard,
+    ): HealthCardProvider =
+        object : HealthCardProvider {
+            override val cardId: String = id
+
+            override fun compute(): HealthCard = compute()
+        }
+
+    private fun card(id: String): HealthCard =
+        HealthCard(
+            id = id,
+            title = id,
+            status = HealthCardStatus.OK,
+            metric = null,
+            thresholds = null,
+            lastCheckedAt = clock.instant(),
+            source = HealthCardSource.IN_PROCESS,
+            drill = null,
+            reason = null,
+        )
+}
+
+private class RecordingHealthMetrics : PlatformAdminHealthMetricsPort {
+    val providerOutcomes = mutableListOf<Pair<PlatformHealthProvider, PlatformHealthProviderOutcome>>()
+    val overlaps = mutableListOf<PlatformHealthRefreshTrigger>()
+    val durations = mutableListOf<Pair<PlatformHealthRefreshResult, Duration>>()
+    val staleAges = mutableListOf<Long>()
+
+    override fun recordProviderOutcome(
+        provider: PlatformHealthProvider,
+        result: PlatformHealthProviderOutcome,
+    ) {
+        providerOutcomes += provider to result
+    }
+
+    override fun recordRefreshOverlap(trigger: PlatformHealthRefreshTrigger) {
+        overlaps += trigger
+    }
+
+    override fun recordRefreshDuration(
+        result: PlatformHealthRefreshResult,
+        duration: Duration,
+    ) {
+        durations += result to duration
+    }
+
+    override fun updateStaleAge(seconds: Long) {
+        staleAges += seconds
+    }
+}
+
+private object ThrowingHealthMetrics : PlatformAdminHealthMetricsPort {
+    override fun recordProviderOutcome(
+        provider: PlatformHealthProvider,
+        result: PlatformHealthProviderOutcome,
+    ) = error("metrics unavailable")
+
+    override fun recordRefreshOverlap(trigger: PlatformHealthRefreshTrigger) = error("metrics unavailable")
+
+    override fun recordRefreshDuration(
+        result: PlatformHealthRefreshResult,
+        duration: Duration,
+    ) = error("metrics unavailable")
+
+    override fun updateStaleAge(seconds: Long) = error("metrics unavailable")
 }
 
 private class MutableClock(
