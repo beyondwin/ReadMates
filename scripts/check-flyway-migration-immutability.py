@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@example
+        uses: actions/checkout@0000000000000000000000000000000000000000
         with:
           fetch-depth: 0
       - name: Flyway migration checker self-tests
@@ -73,6 +73,36 @@ jobs:
             exit 1
           fi
           python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"
+'''
+
+CANONICAL_HISTORY_RUN = r'''base_sha=""
+case "${READMATES_FLYWAY_EVENT_NAME}" in
+  pull_request)
+    base_sha="${READMATES_FLYWAY_PR_BASE_SHA}"
+    ;;
+  push)
+    base_sha="${READMATES_FLYWAY_PUSH_BEFORE_SHA}"
+    if [[ "$base_sha" =~ ^0+$ ]]; then
+      if ! base_sha="$(git rev-parse --verify --quiet 'HEAD^^{commit}')"; then
+        echo "Flyway comparison base is unavailable." >&2
+        exit 1
+      fi
+    fi
+    ;;
+  *)
+    echo "Unsupported Flyway comparison event." >&2
+    exit 1
+    ;;
+esac
+if [[ -z "$base_sha" ]]; then
+  echo "Flyway comparison base is empty." >&2
+  exit 1
+fi
+if ! base_sha="$(git rev-parse --verify --quiet "${base_sha}^{commit}")"; then
+  echo "Flyway comparison base cannot be resolved locally." >&2
+  exit 1
+fi
+python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"
 '''
 
 
@@ -137,6 +167,26 @@ def _workflow_step_blocks(job: str) -> list[str]:
     ]
 
 
+def _active_yaml_lines(source: str) -> tuple[str, ...]:
+    active: list[str] = []
+    for line in source.splitlines():
+        stripped = line.rstrip()
+        if not stripped.strip() or stripped.lstrip().startswith("#"):
+            continue
+        if " #" in stripped:
+            stripped = stripped.split(" #", 1)[0].rstrip()
+        active.append(stripped)
+    return tuple(active)
+
+
+def _workflow_step_name(step: str) -> str | None:
+    active = _active_yaml_lines(step)
+    if not active:
+        return None
+    match = re.fullmatch(r"      - name:\s*(.+)", active[0])
+    return match.group(1) if match else None
+
+
 def _workflow_run_block(step: str) -> str:
     lines = step.splitlines(keepends=True)
     for index, line in enumerate(lines):
@@ -156,11 +206,42 @@ def _active_run_source(step: str) -> str:
     )
 
 
+def _canonical_history_body(step: str) -> str | None:
+    body: list[str] = []
+    for line in _workflow_run_block(step).splitlines(keepends=True):
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        if not line.startswith("          "):
+            return None
+        body.append(line[10:])
+    return "".join(body)
+
+
+def _step_metadata(step: str) -> tuple[str, ...]:
+    active = _active_yaml_lines(step)
+    for index, line in enumerate(active):
+        if line.startswith("        run:"):
+            return active[: index + 1]
+    return active
+
+
+def _normalized_checkout_step(step: str) -> tuple[str, ...] | None:
+    normalized: list[str] = []
+    for line in _active_yaml_lines(step):
+        if line.startswith("        uses:"):
+            if re.fullmatch(r"        uses:\s*actions/checkout@[0-9a-f]{40}", line) is None:
+                return None
+            normalized.append("        uses: actions/checkout@<commit>")
+        else:
+            normalized.append(line)
+    return tuple(normalized)
+
+
 def validate_ci_workflow(source: str) -> list[WorkflowViolation]:
     """Validate only the Flyway history contract in the CI scripts job."""
     violations: list[WorkflowViolation] = []
     permissions = _top_level_block(source, "permissions")
-    if permissions is None or re.search(r"(?m)^  contents:\s*read\s*$", permissions) is None:
+    if permissions is None or _active_yaml_lines(permissions) != ("permissions:", "  contents: read"):
         violations.append(
             WorkflowViolation("workflow-permissions-unsafe", "top-level contents permission must remain read-only")
         )
@@ -171,45 +252,119 @@ def validate_ci_workflow(source: str) -> list[WorkflowViolation]:
             WorkflowViolation("workflow-scripts-job-missing", "the scripts job is required for Flyway history checks")
         ]
 
+    job_active = _active_yaml_lines(scripts_job)
+    if any(re.match(r"^    (?:if|permissions):", line) for line in job_active):
+        violations.append(
+            WorkflowViolation(
+                "workflow-scripts-job-unsafe",
+                "the scripts job must not override permissions or guard execution",
+            )
+        )
+
     steps = _workflow_step_blocks(scripts_job)
-    checkout_steps = [step for step in steps if re.search(r"(?m)^        uses:\s*actions/checkout@", step)]
-    if len(checkout_steps) != 1 or re.search(
-        r"(?m)^          fetch-depth:\s*0\s*$",
-        checkout_steps[0] if checkout_steps else "",
-    ) is None:
+    named_steps: dict[str, list[str]] = {}
+    for step in steps:
+        name = _workflow_step_name(step)
+        if name is not None:
+            named_steps.setdefault(name, []).append(step)
+
+    checkout_name = "Check out repository"
+    checkout_steps = named_steps.get(checkout_name, [])
+    checkout_uses = [
+        step
+        for step in steps
+        if any(re.match(r"^        uses:\s*actions/checkout@", line) for line in _active_yaml_lines(step))
+    ]
+    expected_checkout = (
+        "      - name: Check out repository",
+        "        uses: actions/checkout@<commit>",
+        "        with:",
+        "          fetch-depth: 0",
+    )
+    if (
+        len(checkout_steps) != 1
+        or len(checkout_uses) != 1
+        or _normalized_checkout_step(checkout_steps[0]) != expected_checkout
+    ):
         violations.append(
             WorkflowViolation(
                 "workflow-scripts-checkout-history",
-                "the scripts checkout must use fetch-depth 0",
+                "the scripts checkout must be one exact pinned action step with fetch-depth 0",
             )
         )
 
     checker_command = "python3 -B scripts/check-flyway-migration-immutability.py"
-    required_gates = (
-        (f"{checker_command} --self-test", "workflow-self-test-missing", "checker self-test step is required"),
+    exact_gates = (
         (
-            f"{checker_command} --check-workflow .github/workflows/ci.yml",
-            "workflow-contract-check-missing",
-            "workflow contract step is required",
+            "Flyway migration checker self-tests",
+            (
+                "      - name: Flyway migration checker self-tests",
+                f"        run: {checker_command} --self-test",
+            ),
+            "workflow-self-test-missing",
+            "checker self-test step is required in its exact active shape",
         ),
         (
-            f'{checker_command} --base-ref "$base_sha"',
-            "workflow-history-check-missing",
-            "real history comparison step is required",
+            "Flyway migration workflow contract",
+            (
+                "      - name: Flyway migration workflow contract",
+                f"        run: {checker_command} --check-workflow .github/workflows/ci.yml",
+            ),
+            "workflow-contract-check-missing",
+            "workflow contract step is required in its exact active shape",
         ),
     )
-    history_step = ""
-    for command, category, detail in required_gates:
-        command_pattern = re.compile(rf"(?m)^\s*{re.escape(command)}\s*$")
-        matches = [step for step in steps if command_pattern.search(_active_run_source(step))]
-        if len(matches) != 1:
+    for name, expected, category, detail in exact_gates:
+        matches = named_steps.get(name, [])
+        if len(matches) != 1 or _active_yaml_lines(matches[0]) != expected:
             violations.append(WorkflowViolation(category, detail))
+            if matches:
+                violations.append(
+                    WorkflowViolation(
+                        "workflow-gate-shape-unsafe",
+                        "Flyway gate steps must match the canonical active shape exactly",
+                    )
+                )
             continue
-        if " --base-ref " in command:
-            history_step = matches[0]
 
-    checker_steps = [step for step in steps if checker_command in _active_run_source(step)]
-    if any(re.search(r"(?m)^\s*continue-on-error\s*:", step) for step in checker_steps):
+    history_name = "Flyway migration history immutability"
+    history_matches = named_steps.get(history_name, [])
+    history_step = history_matches[0] if len(history_matches) == 1 else ""
+    expected_history_metadata = (
+        "      - name: Flyway migration history immutability",
+        "        env:",
+        "          READMATES_FLYWAY_EVENT_NAME: ${{ github.event_name }}",
+        "          READMATES_FLYWAY_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
+        "          READMATES_FLYWAY_PUSH_BEFORE_SHA: ${{ github.event.before }}",
+        "        shell: bash",
+        "        run: |",
+    )
+    history_shape_valid = (
+        bool(history_step)
+        and _step_metadata(history_step) == expected_history_metadata
+        and _canonical_history_body(history_step) == CANONICAL_HISTORY_RUN
+    )
+    if not history_shape_valid:
+        violations.extend(
+            (
+                WorkflowViolation(
+                    "workflow-history-check-missing",
+                    "real history comparison step is required in its exact active shape",
+                ),
+                WorkflowViolation(
+                    "workflow-gate-shape-unsafe",
+                    "Flyway gate steps must match the canonical active shape exactly",
+                ),
+                WorkflowViolation(
+                    "workflow-event-base-unsafe",
+                    "event base environment and history script must match the canonical active contract",
+                ),
+            )
+        )
+
+    gate_names = {name for name, *_ in exact_gates} | {history_name}
+    gate_steps = [step for name in gate_names for step in named_steps.get(name, [])]
+    if any(re.search(r"(?m)^\s*continue-on-error\s*:", step) for step in gate_steps):
         violations.append(
             WorkflowViolation(
                 "workflow-gate-continue-on-error",
@@ -220,7 +375,7 @@ def validate_ci_workflow(source: str) -> list[WorkflowViolation]:
         r"\|\|\s*(?:true|:)(?:\s|$)|;\s*true(?:\s|$)|^\s*if:\s*.*always\(\)",
         re.MULTILINE,
     )
-    if any(always_success.search(step) for step in checker_steps):
+    if any(always_success.search(step) for step in gate_steps):
         violations.append(
             WorkflowViolation(
                 "workflow-gate-always-success",
@@ -230,32 +385,6 @@ def validate_ci_workflow(source: str) -> list[WorkflowViolation]:
 
     if history_step:
         run_block = _active_run_source(history_step)
-        env_contract = (
-            "READMATES_FLYWAY_EVENT_NAME: ${{ github.event_name }}",
-            "READMATES_FLYWAY_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}",
-            "READMATES_FLYWAY_PUSH_BEFORE_SHA: ${{ github.event.before }}",
-        )
-        shell_contract = (
-            'case "${READMATES_FLYWAY_EVENT_NAME}" in',
-            'pull_request)\n              base_sha="${READMATES_FLYWAY_PR_BASE_SHA}"',
-            'push)\n              base_sha="${READMATES_FLYWAY_PUSH_BEFORE_SHA}"',
-            'if [[ "$base_sha" =~ ^0+$ ]]; then',
-            'if ! base_sha="$(git rev-parse --verify --quiet \'HEAD^^{commit}\')"; then',
-            'if [[ -z "$base_sha" ]]; then',
-            'if ! base_sha="$(git rev-parse --verify --quiet "${base_sha}^{commit}")"; then',
-        )
-        if (
-            any(fragment not in history_step for fragment in env_contract)
-            or any(fragment not in run_block for fragment in shell_contract)
-            or run_block.count("HEAD^") != 1
-            or "${{" in run_block
-        ):
-            violations.append(
-                WorkflowViolation(
-                    "workflow-event-base-unsafe",
-                    "event base selection must reject empty SHAs and limit verified HEAD^ fallback to zero pushes",
-                )
-            )
         if re.search(
             r"(?m)^\s*(?:git\s+(?:fetch|pull|push|clone|ls-remote)|git\s+remote\s+update|gh|curl|wget|ssh|scp)\b",
             run_block,
@@ -1603,6 +1732,139 @@ class FlywayWorkflowContractTests(unittest.TestCase):
             1,
         )
         self._assert_workflow_failure(source, "workflow-event-base-unsafe")
+
+    def test_exact_history_step_rejects_execution_wrappers(self) -> None:
+        wrapped_if_false = VALID_WORKFLOW_FIXTURE.replace(
+            '        run: |\n          base_sha=""',
+            '        run: |\n          if false; then\n            base_sha=""',
+            1,
+        ).replace(
+            '          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"\n',
+            '          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"\n'
+            '          fi\n',
+            1,
+        )
+        cases = (
+            (
+                "step if",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "      - name: Flyway migration history immutability\n",
+                    "      - name: Flyway migration history immutability\n        if: ${{ success() }}\n",
+                    1,
+                ),
+            ),
+            (
+                "continue on error",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "      - name: Flyway migration history immutability\n",
+                    "      - name: Flyway migration history immutability\n        continue-on-error: true\n",
+                    1,
+                ),
+            ),
+            ("if false wrapper", wrapped_if_false),
+            (
+                "set plus e",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    '          base_sha=""\n',
+                    '          set +e\n          base_sha=""\n',
+                    1,
+                ),
+            ),
+            (
+                "always success prelude",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    '          base_sha=""\n',
+                    '          false || true\n          base_sha=""\n',
+                    1,
+                ),
+            ),
+            (
+                "later exit zero",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    '          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"\n',
+                    '          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"\n'
+                    '          exit 0\n',
+                    1,
+                ),
+            ),
+            (
+                "custom shell",
+                VALID_WORKFLOW_FIXTURE.replace("        shell: bash\n", "        shell: bash -e {0}\n", 1),
+            ),
+            (
+                "heredoc wrapper",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    '          base_sha=""\n',
+                    "          bash <<'WRAPPED_GATE'\n          base_sha=\"\"\n",
+                    1,
+                ).replace(
+                    '          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"\n',
+                    '          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"\n'
+                    '          WRAPPED_GATE\n',
+                    1,
+                ),
+            ),
+        )
+        for name, source in cases:
+            with self.subTest(name=name):
+                self._assert_workflow_failure(source, "workflow-gate-shape-unsafe")
+
+    def test_scripts_job_rejects_guards_and_permission_overrides(self) -> None:
+        cases = (
+            (
+                "job if",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n    if: ${{ success() }}\n",
+                    1,
+                ),
+            ),
+            (
+                "job contents write",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n",
+                    1,
+                ),
+            ),
+        )
+        for name, source in cases:
+            with self.subTest(name=name):
+                self._assert_workflow_failure(source, "workflow-scripts-job-unsafe")
+
+    def test_event_env_requires_active_exact_mappings(self) -> None:
+        source = VALID_WORKFLOW_FIXTURE.replace(
+            "          READMATES_FLYWAY_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}\n",
+            "          READMATES_FLYWAY_PR_BASE_SHA: ${{ github.sha }}\n"
+            "          # READMATES_FLYWAY_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}\n",
+            1,
+        )
+        self._assert_workflow_failure(source, "workflow-event-base-unsafe")
+
+    def test_exact_history_step_rejects_disguised_remote_commands(self) -> None:
+        run_commands = (
+            "/usr/bin/git fetch origin main",
+            "command git fetch origin main",
+            "env git ls-remote origin",
+            "/usr/bin/curl example.invalid",
+        )
+        for command in run_commands:
+            with self.subTest(location="run", command=command):
+                source = VALID_WORKFLOW_FIXTURE.replace(
+                    '          base_sha=""\n',
+                    f'          {command}\n          base_sha=""\n',
+                    1,
+                )
+                self._assert_workflow_failure(source, "workflow-gate-shape-unsafe")
+
+        with self.subTest(location="env"):
+            source = VALID_WORKFLOW_FIXTURE.replace(
+                "          READMATES_FLYWAY_EVENT_NAME: ${{ github.event_name }}\n",
+                "          READMATES_FLYWAY_EVENT_NAME: ${{ github.event_name }}\n"
+                "          READMATES_FLYWAY_REMOTE_COMMAND: git fetch origin main\n",
+                1,
+            )
+            self._assert_workflow_failure(source, "workflow-gate-shape-unsafe")
 
 
 def run_self_tests() -> int:
