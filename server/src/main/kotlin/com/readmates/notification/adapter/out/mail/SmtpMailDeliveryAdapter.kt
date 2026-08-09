@@ -22,6 +22,11 @@ import java.net.SocketTimeoutException
 import java.util.Collections
 import java.util.IdentityHashMap
 
+private data class BoundedFailureChain(
+    val failures: List<Throwable>,
+    val truncated: Boolean,
+)
+
 @Component
 @ConditionalOnProperty(prefix = "readmates.notifications", name = ["enabled"], havingValue = "true")
 class SmtpMailDeliveryAdapter(
@@ -32,27 +37,35 @@ class SmtpMailDeliveryAdapter(
     private val senderName = properties.senderName
 
     override fun send(command: MailDeliveryCommand) {
+        val message = prepareMessage(command)
         val result =
             runCatching {
-                val message = javaMailSender.createMimeMessage()
-                val helper = MimeMessageHelper(message, command.html?.isNotBlank() == true, Charsets.UTF_8.name())
-                helper.setFrom(InternetAddress(senderEmail, senderName, Charsets.UTF_8.name()))
-                helper.setTo(command.to)
-                helper.setSubject(command.subject)
-                val html = command.html?.takeIf { it.isNotBlank() }
-                if (html == null) {
-                    helper.setText(command.text, false)
-                } else {
-                    helper.setText(command.text, html)
-                }
                 javaMailSender.send(message)
             }
         result.exceptionOrNull()?.let { failure ->
-            throw failure.toMailDeliveryFailure() ?: failure
+            throw failure.toSendStageMailDeliveryFailure() ?: failure
         }
     }
 
-    private fun Throwable.toMailDeliveryFailure(): MailDeliveryFailure? =
+    private fun prepareMessage(command: MailDeliveryCommand) =
+        runCatching {
+            val message = javaMailSender.createMimeMessage()
+            val helper = MimeMessageHelper(message, command.html?.isNotBlank() == true, Charsets.UTF_8.name())
+            helper.setFrom(InternetAddress(senderEmail, senderName, Charsets.UTF_8.name()))
+            helper.setTo(command.to)
+            helper.setSubject(command.subject)
+            val html = command.html?.takeIf { it.isNotBlank() }
+            if (html == null) {
+                helper.setText(command.text, false)
+            } else {
+                helper.setText(command.text, html)
+            }
+            message
+        }.getOrElse { failure ->
+            throw failure.toPreparationMailDeliveryFailure() ?: failure
+        }
+
+    private fun Throwable.toPreparationMailDeliveryFailure(): MailDeliveryFailure? =
         when (this) {
             is MailAuthenticationException,
             is MailPreparationException,
@@ -60,24 +73,31 @@ class SmtpMailDeliveryAdapter(
             is MessagingException,
             -> MailDeliveryFailure(MailDeliveryFailureKind.PERMANENT)
 
-            is MailSendException -> MailDeliveryFailure(failureKind())
             else -> null
         }
 
-    private fun MailSendException.failureKind(): MailDeliveryFailureKind {
-        val failures = failureChain()
+    private fun Throwable.toSendStageMailDeliveryFailure(): MailDeliveryFailure? =
+        takeIf { failure -> failure.isBoundedMailFailure() }
+            ?.let { failure -> MailDeliveryFailure(failure.sendStageFailureKind()) }
+
+    private fun Throwable.isBoundedMailFailure(): Boolean =
+        this is MailSendException ||
+            this is MailAuthenticationException ||
+            this is MailPreparationException ||
+            this is MailParseException ||
+            this is MessagingException ||
+            this is SocketException
+
+    private fun Throwable.sendStageFailureKind(): MailDeliveryFailureKind {
+        val chain = failureChain()
+        val failures = chain.failures
         val responseCodes = failures.mapNotNull { it.smtpResponseCode() }
         return when {
-            failures.any {
-                it is AuthenticationFailedException ||
-                    it is MailAuthenticationException ||
-                    it is MailPreparationException ||
-                    it is MailParseException
-            } ->
-                MailDeliveryFailureKind.PERMANENT
             failures.filterIsInstance<SendFailedException>().any { it.hasAcceptedRecipient() } ->
                 MailDeliveryFailureKind.AMBIGUOUS
             failures.any { it is SocketTimeoutException || it is SocketException } ->
+                MailDeliveryFailureKind.AMBIGUOUS
+            chain.truncated ->
                 MailDeliveryFailureKind.AMBIGUOUS
             responseCodes.any { it in TRANSIENT_SMTP_RESPONSE_RANGE } ->
                 MailDeliveryFailureKind.RETRYABLE
@@ -85,29 +105,64 @@ class SmtpMailDeliveryAdapter(
                 MailDeliveryFailureKind.PERMANENT
             failures.filterIsInstance<SendFailedException>().any { it.hasInvalidRecipientOnly() } ->
                 MailDeliveryFailureKind.PERMANENT
+            failures.any {
+                it is AuthenticationFailedException ||
+                    it is MailAuthenticationException ||
+                    it is MailPreparationException ||
+                    it is MailParseException
+            } ->
+                MailDeliveryFailureKind.PERMANENT
             else -> MailDeliveryFailureKind.AMBIGUOUS
         }
     }
 
-    private fun MailSendException.failureChain(): List<Throwable> {
+    private fun Throwable.failureChain(): BoundedFailureChain {
         val seen = Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
+        val queued = Collections.newSetFromMap(IdentityHashMap<Throwable, Boolean>())
         val pending = ArrayDeque<Throwable>()
-        pending += this
-        messageExceptions.forEach(pending::addLast)
-        failedMessages.values.forEach(pending::addLast)
         val failures = mutableListOf<Throwable>()
+        var truncated = false
+
+        fun enqueue(failure: Throwable?) {
+            if (failure != null && failure !in seen && failure !in queued) {
+                if (seen.size + pending.size < MAX_FAILURE_CHAIN_NODES) {
+                    pending += failure
+                    queued += failure
+                } else {
+                    truncated = true
+                }
+            }
+        }
+
+        enqueue(this)
         while (pending.isNotEmpty()) {
             val current = pending.removeFirst()
+            queued -= current
             if (!seen.add(current)) {
                 continue
             }
             failures += current
-            current.cause?.let(pending::addLast)
+            enqueue(current.cause)
             if (current is MessagingException) {
-                current.nextException?.let(pending::addLast)
+                enqueue(current.nextException)
+            }
+            if (current is MailSendException) {
+                val messageExceptions = current.messageExceptions
+                val failedMessages = current.failedMessages.values
+                if (messageExceptions.size > MAX_FAILURE_CHAIN_NODES || failedMessages.size > MAX_FAILURE_CHAIN_NODES) {
+                    truncated = true
+                }
+                messageExceptions
+                    .asSequence()
+                    .take(MAX_FAILURE_CHAIN_NODES)
+                    .forEach(::enqueue)
+                failedMessages
+                    .asSequence()
+                    .take(MAX_FAILURE_CHAIN_NODES)
+                    .forEach(::enqueue)
             }
         }
-        return failures
+        return BoundedFailureChain(failures, truncated)
     }
 
     private fun SendFailedException.hasAcceptedRecipient(): Boolean = !validSentAddresses.isNullOrEmpty()
@@ -116,15 +171,19 @@ class SmtpMailDeliveryAdapter(
         !invalidAddresses.isNullOrEmpty() && validSentAddresses.isNullOrEmpty()
 
     private fun Throwable.smtpResponseCode(): Int? =
-        runCatching {
-            javaClass
-                .methods
-                .firstOrNull { method -> method.name == "getReturnCode" && method.parameterCount == 0 }
-                ?.invoke(this) as? Int
-        }.getOrNull()
+        (this as? MessagingException)
+            ?.message
+            ?.take(MAX_SMTP_RESPONSE_TEXT_LENGTH)
+            ?.let(SMTP_RESPONSE_CODE_PATTERN::find)
+            ?.groupValues
+            ?.get(1)
+            ?.toIntOrNull()
 
     private companion object {
+        private const val MAX_FAILURE_CHAIN_NODES = 64
+        private const val MAX_SMTP_RESPONSE_TEXT_LENGTH = 256
         private val TRANSIENT_SMTP_RESPONSE_RANGE = 400..499
         private val PERMANENT_SMTP_RESPONSE_RANGE = 500..599
+        private val SMTP_RESPONSE_CODE_PATTERN = Regex("(?:^|\\s)([45]\\d{2})(?:[ -]|$)")
     }
 }

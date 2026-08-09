@@ -5,7 +5,9 @@ import com.readmates.notification.application.port.out.MailDeliveryCommand
 import com.readmates.notification.application.port.out.MailDeliveryFailure
 import com.readmates.notification.application.port.out.MailDeliveryFailureKind
 import jakarta.mail.Address
+import jakarta.mail.AuthenticationFailedException
 import jakarta.mail.Message
+import jakarta.mail.MessagingException
 import jakarta.mail.SendFailedException
 import jakarta.mail.Session
 import jakarta.mail.internet.MimeMessage
@@ -90,6 +92,21 @@ class SmtpMailDeliveryAdapterTest {
     }
 
     @Test
+    fun `classifies bare messaging failure during preparation as permanent before send`() {
+        val sender =
+            PreparationThrowingJavaMailSender(
+                MessagingException("raw preparation recipient@example.test"),
+            )
+        val adapter = SmtpMailDeliveryAdapter(sender, notificationProperties())
+
+        assertSafeFailure(
+            adapter = adapter,
+            expectedKind = MailDeliveryFailureKind.PERMANENT,
+        )
+        assertThat(sender.sendCalls).isZero()
+    }
+
+    @Test
     fun `classifies explicit SMTP rejection by response family when no recipient was accepted`() {
         assertSafeFailure(
             thrown = smtpFailure(returnCode = 550),
@@ -99,6 +116,13 @@ class SmtpMailDeliveryAdapterTest {
             thrown = smtpFailure(returnCode = 450),
             expectedKind = MailDeliveryFailureKind.RETRYABLE,
         )
+
+        val sideEffectFailure = SideEffectSmtpResponseException()
+        assertSafeFailure(
+            thrown = MailSendException("raw outer provider response recipient@example.test", sideEffectFailure),
+            expectedKind = MailDeliveryFailureKind.PERMANENT,
+        )
+        assertThat(sideEffectFailure.returnCodeCalls).isZero()
     }
 
     @Test
@@ -113,6 +137,84 @@ class SmtpMailDeliveryAdapterTest {
                     "raw connection loss recipient@example.test",
                     SocketException("raw connection reset recipient@example.test"),
                 ),
+            expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
+        )
+    }
+
+    @Test
+    fun `accepted recipient dominates nested permanent send signals`() {
+        listOf(
+            AuthenticationFailedException("raw authentication password=synthetic-secret"),
+            MailPreparationException("raw preparation recipient@example.test"),
+            SmtpResponseException(responseCode = 550, acceptedRecipients = null),
+        ).forEach { nestedFailure ->
+            assertSafeFailure(
+                thrown = acceptedFailureWithNested(nestedFailure),
+                expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
+            )
+        }
+    }
+
+    @Test
+    fun `classifies bare and wrapped messaging transport failures as ambiguous`() {
+        val nextExceptionFailure = MessagingException("raw transport state recipient@example.test")
+        nextExceptionFailure.setNextException(SocketException("raw connection loss recipient@example.test"))
+
+        listOf(
+            MessagingException(
+                "raw timeout recipient@example.test",
+                SocketTimeoutException("raw timeout recipient@example.test"),
+            ),
+            nextExceptionFailure,
+            MailSendException(
+                "raw wrapped transport recipient@example.test",
+                MessagingException(
+                    "raw connection recipient@example.test",
+                    SocketException("raw connection loss recipient@example.test"),
+                ),
+            ),
+        ).forEach { failure ->
+            assertSafeFailure(
+                thrown = failure,
+                expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
+            )
+        }
+    }
+
+    @Test
+    fun `classifies unknown send stage messaging state as ambiguous with a cycle safe chain`() {
+        val first = MessagingException("raw unknown provider response recipient@example.test")
+        val second = MessagingException("raw nested provider response recipient@example.test")
+        first.setNextException(second)
+        second.setNextException(first)
+
+        assertSafeFailure(
+            thrown = first,
+            expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
+        )
+    }
+
+    @Test
+    fun `classifies a truncated send failure chain as ambiguous when acceptance cannot be disproved`() {
+        val root = AuthenticationFailedException("raw authentication password=synthetic-secret")
+        var tail: MessagingException = root
+        repeat(64) { index ->
+            val next = MessagingException("raw nested provider response $index recipient@example.test")
+            tail.setNextException(next)
+            tail = next
+        }
+        tail.setNextException(
+            SendFailedException(
+                "raw accepted recipient@example.test",
+                null,
+                arrayOf(InternetAddressStub),
+                null,
+                null,
+            ),
+        )
+
+        assertSafeFailure(
+            thrown = root,
             expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
         )
     }
@@ -161,11 +263,18 @@ class SmtpMailDeliveryAdapterTest {
     }
 
     private fun assertSafeFailure(
-        thrown: RuntimeException,
+        thrown: Throwable,
         expectedKind: MailDeliveryFailureKind,
     ) {
         val adapter = SmtpMailDeliveryAdapter(ThrowingJavaMailSender(thrown), notificationProperties())
 
+        assertSafeFailure(adapter, expectedKind)
+    }
+
+    private fun assertSafeFailure(
+        adapter: SmtpMailDeliveryAdapter,
+        expectedKind: MailDeliveryFailureKind,
+    ) {
         assertThatThrownBy { adapter.send(mailCommand()) }
             .isInstanceOfSatisfying(MailDeliveryFailure::class.java) { failure ->
                 assertThat(failure.kind).isEqualTo(expectedKind)
@@ -187,6 +296,19 @@ class SmtpMailDeliveryAdapterTest {
             SmtpResponseException(returnCode, acceptedRecipients),
         )
 
+    private fun acceptedFailureWithNested(nestedFailure: Exception): MailSendException {
+        val acceptedFailure =
+            SendFailedException(
+                "raw accepted recipient@example.test",
+                null,
+                arrayOf(InternetAddressStub),
+                null,
+                null,
+            )
+        acceptedFailure.setNextException(nestedFailure)
+        return MailSendException("raw outer provider response recipient@example.test", acceptedFailure)
+    }
+
     private fun mailCommand(): MailDeliveryCommand =
         MailDeliveryCommand(
             to = "member@example.com",
@@ -206,16 +328,27 @@ private object InternetAddressStub : Address() {
 }
 
 private class SmtpResponseException(
-    private val responseCode: Int,
+    responseCode: Int,
     acceptedRecipients: Array<Address>?,
 ) : SendFailedException(
-        "raw SMTP response recipient@example.test",
+        "$responseCode raw SMTP response recipient@example.test",
         null,
         acceptedRecipients,
         null,
         null,
+    )
+
+private class SideEffectSmtpResponseException :
+    SendFailedException(
+        "550 raw SMTP response recipient@example.test",
     ) {
-    fun getReturnCode(): Int = responseCode
+    var returnCodeCalls: Int = 0
+        private set
+
+    fun getReturnCode(): Int {
+        returnCodeCalls += 1
+        return 550
+    }
 }
 
 private fun notificationProperties(): NotificationRuntimeProperties =
@@ -262,9 +395,22 @@ private open class CapturingJavaMailSender : JavaMailSender {
 }
 
 private class ThrowingJavaMailSender(
-    private val failure: RuntimeException,
+    private val failure: Throwable,
 ) : CapturingJavaMailSender() {
     override fun send(mimeMessage: MimeMessage): Unit = throw failure
+}
+
+private class PreparationThrowingJavaMailSender(
+    private val failure: Throwable,
+) : CapturingJavaMailSender() {
+    var sendCalls: Int = 0
+        private set
+
+    override fun createMimeMessage(): MimeMessage = throw failure
+
+    override fun send(mimeMessage: MimeMessage) {
+        sendCalls += 1
+    }
 }
 
 private fun MimeMessage.allTextParts(): List<String> = collectTextParts(content)
