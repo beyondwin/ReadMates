@@ -9,6 +9,8 @@ import jakarta.mail.AuthenticationFailedException
 import jakarta.mail.MessagingException
 import jakarta.mail.SendFailedException
 import jakarta.mail.internet.InternetAddress
+import org.eclipse.angus.mail.smtp.SMTPAddressFailedException
+import org.eclipse.angus.mail.smtp.SMTPSendFailedException
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.mail.MailAuthenticationException
 import org.springframework.mail.MailParseException
@@ -171,19 +173,15 @@ class SmtpMailDeliveryAdapter(
         !invalidAddresses.isNullOrEmpty() && validSentAddresses.isNullOrEmpty()
 
     private fun Throwable.smtpResponseCode(): Int? =
-        (this as? MessagingException)
-            ?.message
-            ?.take(MAX_SMTP_RESPONSE_TEXT_LENGTH)
-            ?.let(SMTP_RESPONSE_CODE_PATTERN::find)
-            ?.groupValues
-            ?.get(1)
-            ?.toIntOrNull()
+        when (this) {
+            is SMTPAddressFailedException -> returnCode
+            is SMTPSendFailedException -> returnCode
+            else -> null
+        }
 
     private companion object {
         private const val MAX_FAILURE_CHAIN_NODES = 64
-        private const val MAX_SMTP_RESPONSE_TEXT_LENGTH = 256
         private val TRANSIENT_SMTP_RESPONSE_RANGE = 400..499
         private val PERMANENT_SMTP_RESPONSE_RANGE = 500..599
-        private val SMTP_RESPONSE_CODE_PATTERN = Regex("(?:^|\\s)([45]\\d{2})(?:[ -]|$)")
     }
 }

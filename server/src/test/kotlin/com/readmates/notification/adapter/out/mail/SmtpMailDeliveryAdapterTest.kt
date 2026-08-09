@@ -10,6 +10,7 @@ import jakarta.mail.Message
 import jakarta.mail.MessagingException
 import jakarta.mail.SendFailedException
 import jakarta.mail.Session
+import jakarta.mail.internet.InternetAddress
 import jakarta.mail.internet.MimeMessage
 import jakarta.mail.internet.MimeMultipart
 import org.assertj.core.api.Assertions.assertThat
@@ -116,11 +117,30 @@ class SmtpMailDeliveryAdapterTest {
             thrown = smtpFailure(returnCode = 450),
             expectedKind = MailDeliveryFailureKind.RETRYABLE,
         )
+    }
 
+    @Test
+    fun `classifies typed SMTP address rejection by structured response family`() {
+        assertSafeFailure(
+            thrown = typedSmtpAddressFailure(returnCode = 550),
+            expectedKind = MailDeliveryFailureKind.PERMANENT,
+        )
+        assertSafeFailure(
+            thrown = typedSmtpAddressFailure(returnCode = 450),
+            expectedKind = MailDeliveryFailureKind.RETRYABLE,
+        )
+    }
+
+    @Test
+    fun `ignores incidental SMTP-like number in an unstructured diagnostic`() {
+        assertSafeFailure(
+            thrown = MessagingException("local diagnostic: processed 550 records before unknown failure"),
+            expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
+        )
         val sideEffectFailure = SideEffectSmtpResponseException()
         assertSafeFailure(
             thrown = MailSendException("raw outer provider response recipient@example.test", sideEffectFailure),
-            expectedKind = MailDeliveryFailureKind.PERMANENT,
+            expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
         )
         assertThat(sideEffectFailure.returnCodeCalls).isZero()
     }
@@ -129,6 +149,14 @@ class SmtpMailDeliveryAdapterTest {
     fun `classifies accepted recipient and transport timeout as ambiguous`() {
         assertSafeFailure(
             thrown = smtpFailure(returnCode = 550, acceptedRecipients = arrayOf(InternetAddressStub)),
+            expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
+        )
+        assertSafeFailure(
+            thrown =
+                smtpFailure(
+                    returnCode = 550,
+                    nestedFailure = SocketException("raw connection reset recipient@example.test"),
+                ),
             expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
         )
         assertSafeFailure(
@@ -146,7 +174,7 @@ class SmtpMailDeliveryAdapterTest {
         listOf(
             AuthenticationFailedException("raw authentication password=synthetic-secret"),
             MailPreparationException("raw preparation recipient@example.test"),
-            SmtpResponseException(responseCode = 550, acceptedRecipients = null),
+            typedSmtpAddressException(returnCode = 550),
         ).forEach { nestedFailure ->
             assertSafeFailure(
                 thrown = acceptedFailureWithNested(nestedFailure),
@@ -215,6 +243,18 @@ class SmtpMailDeliveryAdapterTest {
 
         assertSafeFailure(
             thrown = root,
+            expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
+        )
+
+        val typedStatusRoot = typedSmtpAddressException(returnCode = 550) as MessagingException
+        tail = typedStatusRoot
+        repeat(64) { index ->
+            val next = MessagingException("raw typed status chain $index recipient@example.test")
+            tail.setNextException(next)
+            tail = next
+        }
+        assertSafeFailure(
+            thrown = typedStatusRoot,
             expectedKind = MailDeliveryFailureKind.AMBIGUOUS,
         )
     }
@@ -290,11 +330,62 @@ class SmtpMailDeliveryAdapterTest {
     private fun smtpFailure(
         returnCode: Int,
         acceptedRecipients: Array<Address>? = null,
+        nestedFailure: Exception? = null,
     ): MailSendException =
         MailSendException(
             "raw outer provider response recipient@example.test",
-            SmtpResponseException(returnCode, acceptedRecipients),
+            typedSmtpSendException(returnCode, acceptedRecipients, nestedFailure),
         )
+
+    private fun typedSmtpAddressFailure(returnCode: Int): MailSendException =
+        MailSendException(
+            "raw outer provider response recipient@example.test",
+            typedSmtpAddressException(returnCode),
+        )
+
+    private fun typedSmtpSendException(
+        returnCode: Int,
+        acceptedRecipients: Array<Address>? = null,
+        nestedFailure: Exception? = null,
+    ): Exception {
+        val type = Class.forName("org.eclipse.angus.mail.smtp.SMTPSendFailedException")
+        val constructor =
+            type.getConstructor(
+                String::class.java,
+                Int::class.javaPrimitiveType,
+                String::class.java,
+                Exception::class.java,
+                Array<Address>::class.java,
+                Array<Address>::class.java,
+                Array<Address>::class.java,
+            )
+        return constructor.newInstance(
+            "DATA",
+            returnCode,
+            "raw structured provider response recipient@example.test",
+            nestedFailure,
+            acceptedRecipients,
+            null,
+            null,
+        ) as Exception
+    }
+
+    private fun typedSmtpAddressException(returnCode: Int): Exception {
+        val type = Class.forName("org.eclipse.angus.mail.smtp.SMTPAddressFailedException")
+        val constructor =
+            type.getConstructor(
+                InternetAddress::class.java,
+                String::class.java,
+                Int::class.javaPrimitiveType,
+                String::class.java,
+            )
+        return constructor.newInstance(
+            InternetAddress("recipient@example.test"),
+            "RCPT TO",
+            returnCode,
+            "raw structured provider response recipient@example.test",
+        ) as Exception
+    }
 
     private fun acceptedFailureWithNested(nestedFailure: Exception): MailSendException {
         val acceptedFailure =
@@ -326,17 +417,6 @@ private object InternetAddressStub : Address() {
 
     override fun hashCode(): Int = 1
 }
-
-private class SmtpResponseException(
-    responseCode: Int,
-    acceptedRecipients: Array<Address>?,
-) : SendFailedException(
-        "$responseCode raw SMTP response recipient@example.test",
-        null,
-        acceptedRecipients,
-        null,
-        null,
-    )
 
 private class SideEffectSmtpResponseException :
     SendFailedException(
