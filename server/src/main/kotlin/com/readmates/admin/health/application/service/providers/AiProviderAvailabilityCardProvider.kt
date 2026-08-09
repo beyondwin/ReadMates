@@ -6,6 +6,7 @@ import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.port.out.PrometheusQueryException
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import com.readmates.admin.health.application.service.HealthCardProvider
@@ -18,7 +19,7 @@ class AiProviderAvailabilityCardProvider(
     private val prometheusQueryPort: PrometheusQueryPort,
     private val clock: Clock,
 ) : HealthCardProvider {
-    override val cardId: String = "ai_provider_availability"
+    override val identity: PlatformHealthProvider = PlatformHealthProvider.AI_PROVIDER_AVAILABILITY
 
     @Suppress("ReturnCount", "SwallowedException")
     override fun compute(): HealthCard {

@@ -381,6 +381,19 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `admin health application does not depend on micrometer or spring scheduling`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.admin.health.application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "io.micrometer..",
+                "org.springframework.scheduling..",
+            ).check(importedClasses)
+    }
+
+    @Test
     fun `aigen provider gate port does not expose resilience4j types`() {
         noClasses()
             .that()
@@ -461,6 +474,28 @@ class ServerArchitectureBoundaryTest {
 
 @Tag("architecture")
 class ServerArchitectureSourceBoundaryTest {
+    @Test
+    fun `admin health application does not declare scheduled methods`() {
+        val violations =
+            adminHealthApplicationSourceFiles()
+                .flatMap { sourceFile ->
+                    sourceFile
+                        .readLines()
+                        .mapIndexedNotNull { index, line ->
+                            if ("@Scheduled" in line) {
+                                "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: ${line.trim()}"
+                            } else {
+                                null
+                            }
+                        }
+                }.sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Application packages must not declare @Scheduled methods:\n${violations.joinToString("\n")}",
+        )
+    }
+
     @Test
     fun `test membership inserts declare avatar keys`() {
         val membershipInsert =
@@ -790,6 +825,11 @@ class ServerArchitectureSourceBoundaryTest {
                     .walk(packageRoot)
                     .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
             }
+
+    private fun adminHealthApplicationSourceFiles(): List<Path> =
+        Files
+            .walk(sourceRoot().resolve("com/readmates/admin/health/application"))
+            .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
 
     private fun authProductionSourceFiles(): List<Path> {
         val authRoot = sourceRoot().resolve("com/readmates/auth")

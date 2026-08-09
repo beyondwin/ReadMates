@@ -5,22 +5,23 @@ import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.PlatformAdminHealthLocalReadingsPort
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.service.HealthCardProvider
-import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.stereotype.Component
 import java.time.Clock
 
 @Component
 class DbPoolHealthCardProvider(
-    private val meterRegistry: MeterRegistry,
+    private val localReadings: PlatformAdminHealthLocalReadingsPort,
     private val clock: Clock,
 ) : HealthCardProvider {
-    override val cardId: String = "db_pool"
+    override val identity: PlatformHealthProvider = PlatformHealthProvider.DB_POOL
 
     override fun compute(): HealthCard {
         val now = clock.instant()
-        val gauge = meterRegistry.find("hikaricp.connections.pending").gauge()
-        if (gauge == null) {
+        val pending = localReadings.dbPoolPendingConnections()
+        if (pending == null) {
             return HealthCard(
                 id = cardId,
                 title = "DB pool",
@@ -33,7 +34,6 @@ class DbPoolHealthCardProvider(
                 reason = "hikari_gauge_unavailable",
             )
         }
-        val pending = gauge.value()
         val status =
             when {
                 pending >= CRIT_THRESHOLD -> HealthCardStatus.CRIT

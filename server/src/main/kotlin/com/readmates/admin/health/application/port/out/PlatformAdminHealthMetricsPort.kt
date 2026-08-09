@@ -14,11 +14,6 @@ enum class PlatformHealthProvider(
     OUTBOUND_RESILIENCE("outbound-resilience"),
     OUTBOX_BACKLOG("outbox_backlog"),
     REDIS("redis"),
-    ;
-
-    companion object {
-        fun fromCardId(cardId: String): PlatformHealthProvider? = entries.firstOrNull { it.cardId == cardId }
-    }
 }
 
 enum class PlatformHealthProviderOutcome {

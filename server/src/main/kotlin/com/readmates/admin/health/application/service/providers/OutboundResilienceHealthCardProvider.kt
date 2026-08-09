@@ -5,6 +5,7 @@ import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.service.HealthCardProvider
 import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import org.springframework.stereotype.Component
@@ -21,7 +22,7 @@ class OutboundResilienceHealthCardProvider(
     private val circuitBreakers: OutboundCircuitBreakers,
     private val clock: Clock,
 ) : HealthCardProvider {
-    override val cardId: String = "outbound-resilience"
+    override val identity: PlatformHealthProvider = PlatformHealthProvider.OUTBOUND_RESILIENCE
 
     override fun compute(): HealthCard {
         val openCount = circuitBreakers.openCircuitCount()

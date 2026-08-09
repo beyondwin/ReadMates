@@ -197,9 +197,7 @@ class PlatformAdminHealthService(
             }
         state.set(nextState)
         results.forEach { result ->
-            PlatformHealthProvider.fromCardId(result.cardId())?.let { provider ->
-                recordMetric { recordProviderOutcome(provider, result.outcome()) }
-            }
+            recordMetric { recordProviderOutcome(result.providerIdentity(), result.outcome()) }
         }
         recordMetric {
             recordRefreshDuration(
@@ -275,7 +273,7 @@ class PlatformAdminHealthService(
     private sealed interface ProviderResult {
         fun card(): HealthCard
 
-        fun cardId(): String
+        fun providerIdentity(): PlatformHealthProvider
 
         fun outcome(): PlatformHealthProviderOutcome
 
@@ -285,7 +283,7 @@ class PlatformAdminHealthService(
         ) : ProviderResult {
             override fun card(): HealthCard = healthCard
 
-            override fun cardId(): String = provider.cardId
+            override fun providerIdentity(): PlatformHealthProvider = provider.identity
 
             override fun outcome(): PlatformHealthProviderOutcome = PlatformHealthProviderOutcome.SUCCESS
         }
@@ -308,7 +306,7 @@ class PlatformAdminHealthService(
                     reason = kind.reason,
                 )
 
-            override fun cardId(): String = provider.cardId
+            override fun providerIdentity(): PlatformHealthProvider = provider.identity
 
             override fun outcome(): PlatformHealthProviderOutcome = kind.metricOutcome
         }

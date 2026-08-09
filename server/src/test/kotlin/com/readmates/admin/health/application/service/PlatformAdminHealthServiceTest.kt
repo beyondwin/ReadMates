@@ -50,7 +50,7 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             providerCalls.incrementAndGet()
                             providerStarted.countDown()
                             check(releaseProvider.await(1, TimeUnit.SECONDS))
@@ -101,7 +101,7 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             if (block.get()) {
                                 providerStarted.countDown()
                                 check(releaseProvider.await(1, TimeUnit.SECONDS))
@@ -140,7 +140,7 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             when (providerCalls.incrementAndGet()) {
                                 1 -> card("redis", HealthCardStatus.OK, "last-known-good")
                                 2 -> error("failed wave")
@@ -189,7 +189,7 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             when (providerCalls.incrementAndGet()) {
                                 1 -> card("redis", HealthCardStatus.OK, "last-known-good")
                                 2 -> {
@@ -246,7 +246,7 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("stuck") {
+                        provider(PlatformHealthProvider.KAFKA_CONSUMER_LAG) {
                             if (fail.get()) {
                                 check(releaseHungProvider.await(1, TimeUnit.SECONDS))
                                 card("stuck", HealthCardStatus.CRIT, "late")
@@ -254,7 +254,7 @@ class PlatformAdminHealthServiceTest {
                                 card("stuck", HealthCardStatus.OK, "old-stuck")
                             }
                         },
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             if (fail.get()) {
                                 card("redis", HealthCardStatus.CRIT, "new-redis")
                             } else {
@@ -291,11 +291,11 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("stuck") {
+                        provider(PlatformHealthProvider.KAFKA_CONSUMER_LAG) {
                             check(releaseHungProvider.await(1, TimeUnit.SECONDS))
                             card("stuck", HealthCardStatus.OK, "too-late")
                         },
-                        provider("redis") { card("redis", HealthCardStatus.OK, "Redis") },
+                        provider(PlatformHealthProvider.REDIS) { card("redis", HealthCardStatus.OK, "Redis") },
                     ),
                 executor = providerExecutor,
                 providerDeadline = Duration.ofMillis(75),
@@ -306,13 +306,13 @@ class PlatformAdminHealthServiceTest {
 
             assertThat(unavailable.refreshState).isEqualTo(PlatformHealthRefreshState.UNAVAILABLE)
             assertThat(unavailable.lastSuccessfulAt).isNull()
-            assertThat(unavailable.snapshot.cards.map(HealthCard::id)).containsExactly("stuck", "redis")
+            assertThat(unavailable.snapshot.cards.map(HealthCard::id)).containsExactly("kafka_consumer_lag", "redis")
             assertThat(unavailable.snapshot.cards[0])
                 .usingRecursiveComparison()
                 .isEqualTo(
                     HealthCard(
-                        id = "stuck",
-                        title = "stuck",
+                        id = "kafka_consumer_lag",
+                        title = "kafka_consumer_lag",
                         status = HealthCardStatus.UNKNOWN,
                         metric = null,
                         thresholds = null,
@@ -335,7 +335,11 @@ class PlatformAdminHealthServiceTest {
         val rejectingExecutor = Executor { throw RejectedExecutionException("queue full") }
         val unavailableService =
             service(
-                providers = listOf(provider("redis") { card("redis") }, provider("db_pool") { card("db_pool") }),
+                providers =
+                    listOf(
+                        provider(PlatformHealthProvider.REDIS) { card("redis") },
+                        provider(PlatformHealthProvider.DB_POOL) { card("db_pool") },
+                    ),
                 executor = rejectingExecutor,
             )
 
@@ -351,7 +355,8 @@ class PlatformAdminHealthServiceTest {
 
         val executorDelegate = AtomicReference(directExecutor)
         val switchingExecutor = Executor { command -> executorDelegate.get().execute(command) }
-        val staleService = service(listOf(provider("redis") { card("redis") }), switchingExecutor)
+        val staleService =
+            service(listOf(provider(PlatformHealthProvider.REDIS) { card("redis") }), switchingExecutor)
         val lastKnownGood = staleService.currentHealth()
         clock.advance(Duration.ofSeconds(30))
         executorDelegate.set(rejectingExecutor)
@@ -375,7 +380,7 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             when (providerCalls.incrementAndGet()) {
                                 1 -> card("redis", HealthCardStatus.OK, "last-known-good")
                                 2 -> {
@@ -422,7 +427,7 @@ class PlatformAdminHealthServiceTest {
     fun `provider returned unknown is a successful invocation that advances last successful time`() {
         val service =
             service(
-                providers = listOf(provider("redis") { card("redis", HealthCardStatus.UNKNOWN) }),
+                providers = listOf(provider(PlatformHealthProvider.REDIS) { card("redis", HealthCardStatus.UNKNOWN) }),
                 executor = directExecutor,
             )
 
@@ -444,7 +449,7 @@ class PlatformAdminHealthServiceTest {
     fun `exceptional in-flight future is cleared by exact CAS and next refresh recovers`() {
         val executorDelegate = AtomicReference<Executor>(Executor { throw IllegalStateException("broken executor") })
         val switchingExecutor = Executor { command -> executorDelegate.get().execute(command) }
-        val service = service(listOf(provider("redis") { card("redis") }), switchingExecutor)
+        val service = service(listOf(provider(PlatformHealthProvider.REDIS) { card("redis") }), switchingExecutor)
 
         val failed = service.refresh(PlatformHealthRefreshTrigger.LAZY)
         assertThatThrownBy { failed.get(1, TimeUnit.SECONDS) }
@@ -470,7 +475,7 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             if (block.get()) {
                                 providerStarted.countDown()
                                 check(releaseProvider.await(1, TimeUnit.SECONDS))
@@ -508,8 +513,8 @@ class PlatformAdminHealthServiceTest {
             service(
                 providers =
                     listOf(
-                        provider("kafka_lag") { error("boom") },
-                        provider("redis") { card("redis") },
+                        provider(PlatformHealthProvider.KAFKA_CONSUMER_LAG) { error("boom") },
+                        provider(PlatformHealthProvider.REDIS) { card("redis") },
                     ),
                 executor = directExecutor,
             )
@@ -546,11 +551,11 @@ class PlatformAdminHealthServiceTest {
         )
 
     private fun provider(
-        id: String,
+        providerIdentity: PlatformHealthProvider,
         compute: () -> HealthCard,
     ): HealthCardProvider =
         object : HealthCardProvider {
-            override val cardId: String = id
+            override val identity: PlatformHealthProvider = providerIdentity
 
             override fun compute(): HealthCard = compute()
         }
@@ -579,6 +584,31 @@ class PlatformAdminHealthServiceMetricsTest {
     private val directExecutor = Executor { command -> command.run() }
 
     @Test
+    fun `actual wave records exactly one outcome for every typed provider invocation`() {
+        val invocations = AtomicInteger()
+        val metrics = RecordingHealthMetrics()
+        val providers =
+            PlatformHealthProvider.entries.map { providerIdentity ->
+                object : HealthCardProvider {
+                    override val identity: PlatformHealthProvider = providerIdentity
+
+                    override fun compute(): HealthCard {
+                        invocations.incrementAndGet()
+                        return card("returned-${providerIdentity.cardId}")
+                    }
+                }
+            }
+        val service = service(providers, directExecutor, metrics = metrics)
+
+        service.refresh(PlatformHealthRefreshTrigger.SCHEDULED).get(1, TimeUnit.SECONDS)
+
+        assertThat(invocations.get()).isEqualTo(8)
+        assertThat(metrics.providerOutcomes).hasSize(8)
+        assertThat(metrics.providerOutcomes.map { (provider, _) -> provider })
+            .containsExactlyElementsOf(PlatformHealthProvider.entries)
+    }
+
+    @Test
     fun `one actual wave records every provider outcome once and one duration only`() {
         val timedOutProviderStarted = CountDownLatch(1)
         val releaseTimedOutProvider = CountDownLatch(1)
@@ -597,14 +627,14 @@ class PlatformAdminHealthServiceMetricsTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") { card("redis") },
-                        provider("kafka_consumer_lag") { error("provider failed") },
-                        provider("notification_dispatch_success") {
+                        provider(PlatformHealthProvider.REDIS) { card("redis") },
+                        provider(PlatformHealthProvider.KAFKA_CONSUMER_LAG) { error("provider failed") },
+                        provider(PlatformHealthProvider.NOTIFICATION_DISPATCH_SUCCESS) {
                             timedOutProviderStarted.countDown()
                             check(releaseTimedOutProvider.await(1, TimeUnit.SECONDS))
                             card("notification_dispatch_success")
                         },
-                        provider("db_pool") { card("db_pool") },
+                        provider(PlatformHealthProvider.DB_POOL) { card("db_pool") },
                     ),
                 executor = executor,
                 providerDeadline = Duration.ofMillis(75),
@@ -635,7 +665,7 @@ class PlatformAdminHealthServiceMetricsTest {
         val metrics = RecordingHealthMetrics()
         val provider =
             object : HealthCardProvider {
-                override val cardId: String = "redis"
+                override val identity: PlatformHealthProvider = PlatformHealthProvider.REDIS
 
                 override fun compute(): HealthCard = card("db_pool")
             }
@@ -657,7 +687,7 @@ class PlatformAdminHealthServiceMetricsTest {
             service(
                 providers =
                     listOf(
-                        provider("redis") {
+                        provider(PlatformHealthProvider.REDIS) {
                             providerStarted.countDown()
                             check(releaseProvider.await(1, TimeUnit.SECONDS))
                             card("redis")
@@ -693,7 +723,12 @@ class PlatformAdminHealthServiceMetricsTest {
     @Test
     fun `stale age metric tracks the current derived value and metric failures never change health behavior`() {
         val metrics = RecordingHealthMetrics()
-        val service = service(listOf(provider("redis") { card("redis") }), directExecutor, metrics = metrics)
+        val service =
+            service(
+                listOf(provider(PlatformHealthProvider.REDIS) { card("redis") }),
+                directExecutor,
+                metrics = metrics,
+            )
 
         val fresh = service.currentHealth()
         clock.advance(Duration.ofSeconds(12))
@@ -705,7 +740,7 @@ class PlatformAdminHealthServiceMetricsTest {
 
         val healthWithBrokenMetrics =
             service(
-                providers = listOf(provider("redis") { card("redis") }),
+                providers = listOf(provider(PlatformHealthProvider.REDIS) { card("redis") }),
                 executor = directExecutor,
                 metrics = ThrowingHealthMetrics,
             )
@@ -739,11 +774,11 @@ class PlatformAdminHealthServiceMetricsTest {
         )
 
     private fun provider(
-        id: String,
+        providerIdentity: PlatformHealthProvider,
         compute: () -> HealthCard,
     ): HealthCardProvider =
         object : HealthCardProvider {
-            override val cardId: String = id
+            override val identity: PlatformHealthProvider = providerIdentity
 
             override fun compute(): HealthCard = compute()
         }
