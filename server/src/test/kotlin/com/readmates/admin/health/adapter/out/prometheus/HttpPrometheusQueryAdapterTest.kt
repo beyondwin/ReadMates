@@ -1,6 +1,8 @@
 package com.readmates.admin.health.adapter.out.prometheus
 
+import com.readmates.admin.health.application.port.out.PrometheusQueryFailureKind
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpMethod
 import org.springframework.http.HttpStatus
@@ -12,7 +14,7 @@ import org.springframework.test.web.client.response.MockRestResponseCreators.wit
 import org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess
 import org.springframework.web.client.RestClient
 import java.io.IOException
-import java.time.Duration
+import com.readmates.admin.health.application.port.out.PrometheusQueryException as ApplicationPrometheusQueryException
 
 class HttpPrometheusQueryAdapterTest {
     @Test
@@ -77,41 +79,107 @@ class HttpPrometheusQueryAdapterTest {
     }
 
     @Test
-    fun `throws when prometheus returns non-200`() {
+    fun `maps HTTP errors without exposing response bodies`() {
         val (adapter, server) = newAdapter()
         server
             .expect(method(HttpMethod.GET))
-            .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).body("boom"))
+            .andRespond(withStatus(HttpStatus.INTERNAL_SERVER_ERROR).body("private-response-body"))
 
-        try {
-            adapter.query("up")
-            throw AssertionError("expected exception")
-        } catch (ex: PrometheusQueryException) {
-            assertThat(ex.message).contains("500")
-        }
+        val thrown = catchThrowable { adapter.query("up") }
+
+        assertFailure(thrown, PrometheusQueryFailureKind.HTTP_ERROR)
+        assertThat(thrown.message).doesNotContain("private-response-body")
         server.verify()
     }
 
     @Test
-    fun `wraps network failures`() {
+    fun `maps connection failures without exposing transport messages`() {
         val (adapter, server) = newAdapter()
         server
             .expect(method(HttpMethod.GET))
-            .andRespond { throw IOException("network down") }
+            .andRespond { throw IOException("private-network-detail") }
 
-        try {
-            adapter.query("up")
-            throw AssertionError("expected exception")
-        } catch (ex: PrometheusQueryException) {
-            assertThat(ex.message).contains("prometheus unavailable")
-        }
+        val thrown = catchThrowable { adapter.query("up") }
+
+        assertFailure(thrown, PrometheusQueryFailureKind.CONNECTION)
+        assertThat(thrown.message).doesNotContain("private-network-detail")
+        server.verify()
+    }
+
+    @Test
+    fun `maps unsuccessful prometheus status to invalid response`() {
+        val (adapter, server) = newAdapter()
+        server
+            .expect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(
+                    """{"status":"error","error":"private-provider-detail"}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val thrown = catchThrowable { adapter.query("up") }
+
+        assertFailure(thrown, PrometheusQueryFailureKind.INVALID_RESPONSE)
+        assertThat(thrown.message).doesNotContain("private-provider-detail")
+        server.verify()
+    }
+
+    @Test
+    fun `maps malformed prometheus value to invalid response`() {
+        val (adapter, server) = newAdapter()
+        server
+            .expect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(
+                    """
+                    {"status":"success","data":{"resultType":"vector","result":[
+                       {"metric":{},"value":[1717000000,"private-invalid-number"]}
+                    ]}}
+                    """.trimIndent(),
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val thrown = catchThrowable { adapter.query("up") }
+
+        assertFailure(thrown, PrometheusQueryFailureKind.INVALID_RESPONSE)
+        assertThat(thrown.message).doesNotContain("private-invalid-number")
+        server.verify()
+    }
+
+    @Test
+    fun `maps success body without an instant vector to invalid response`() {
+        val (adapter, server) = newAdapter()
+        server
+            .expect(method(HttpMethod.GET))
+            .andRespond(
+                withSuccess(
+                    """{"status":"success","data":{}}""",
+                    MediaType.APPLICATION_JSON,
+                ),
+            )
+
+        val thrown = catchThrowable { adapter.query("up") }
+
+        assertFailure(thrown, PrometheusQueryFailureKind.INVALID_RESPONSE)
         server.verify()
     }
 
     private fun newAdapter(): Pair<HttpPrometheusQueryAdapter, MockRestServiceServer> {
         val builder = RestClient.builder().baseUrl("http://prometheus.test/")
         val server = MockRestServiceServer.bindTo(builder).build()
-        val adapter = HttpPrometheusQueryAdapter(builder.build(), Duration.ofSeconds(5))
+        val adapter = HttpPrometheusQueryAdapter(builder.build())
         return adapter to server
+    }
+
+    private fun assertFailure(
+        thrown: Throwable?,
+        expectedKind: PrometheusQueryFailureKind,
+    ) {
+        assertThat(thrown)
+            .isInstanceOf(ApplicationPrometheusQueryException::class.java)
+            .extracting("kind")
+            .isEqualTo(expectedKind)
     }
 }

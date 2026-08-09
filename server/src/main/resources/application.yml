@@ -79,6 +79,20 @@ management:
 
 readmates:
   app-base-url: ${READMATES_APP_BASE_URL:http://localhost:3000}
+  admin:
+    health:
+      refresh-interval: ${READMATES_ADMIN_HEALTH_REFRESH_INTERVAL:10s}
+      freshness: ${READMATES_ADMIN_HEALTH_FRESHNESS:30s}
+      provider-deadline: ${READMATES_ADMIN_HEALTH_PROVIDER_DEADLINE:2500ms}
+      executor:
+        threads: ${READMATES_ADMIN_HEALTH_EXECUTOR_THREADS:4}
+        queue-capacity: ${READMATES_ADMIN_HEALTH_EXECUTOR_QUEUE_CAPACITY:16}
+        shutdown-await: ${READMATES_ADMIN_HEALTH_EXECUTOR_SHUTDOWN_AWAIT:5s}
+      prometheus:
+        base-url: ${READMATES_ADMIN_HEALTH_PROMETHEUS_BASE_URL:http://prometheus:9090}
+        connect-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_CONNECT_TIMEOUT:500ms}
+        connection-request-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT:500ms}
+        read-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_READ_TIMEOUT:2000ms}
   host-action-confirmation:
     required: false
   auth:

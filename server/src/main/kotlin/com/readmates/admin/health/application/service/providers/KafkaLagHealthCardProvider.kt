@@ -1,11 +1,11 @@
 package com.readmates.admin.health.application.service.providers
 
-import com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 import com.readmates.admin.health.application.model.HealthCard
 import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.PrometheusQueryException
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import com.readmates.admin.health.application.service.HealthCardProvider
 import org.springframework.stereotype.Component

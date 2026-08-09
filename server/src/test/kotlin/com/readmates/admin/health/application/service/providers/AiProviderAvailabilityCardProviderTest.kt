@@ -1,10 +1,11 @@
 package com.readmates.admin.health.application.service.providers
 
-import com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 import com.readmates.admin.health.application.model.HealthCardDrill
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.port.out.PromInstantValue
 import com.readmates.admin.health.application.port.out.PromQueryResult
+import com.readmates.admin.health.application.port.out.PrometheusQueryException
+import com.readmates.admin.health.application.port.out.PrometheusQueryFailureKind
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -71,7 +72,7 @@ class AiProviderAvailabilityCardProviderTest {
     fun `status UNKNOWN when prometheus throws`() {
         val card =
             AiProviderAvailabilityCardProvider(
-                FakePrometheus { throw PrometheusQueryException("boom") },
+                FakePrometheus { throw PrometheusQueryException(PrometheusQueryFailureKind.CONNECTION) },
                 clock,
             ).compute()
         assertThat(card.status).isEqualTo(HealthCardStatus.UNKNOWN)

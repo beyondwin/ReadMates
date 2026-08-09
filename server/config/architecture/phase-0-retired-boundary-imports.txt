@@ -1,1 +1,4 @@
 # Append an exact approved boundary import here when its current baseline debt is removed.
+com/readmates/admin/health/application/service/providers/AiProviderAvailabilityCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
+com/readmates/admin/health/application/service/providers/KafkaLagHealthCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
+com/readmates/admin/health/application/service/providers/NotificationDispatchSuccessCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
