@@ -16,15 +16,12 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.http.client.HttpComponentsClientHttpRequestFactory
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor
 import org.springframework.web.client.RestClient
 import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
 import java.time.Clock
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
-import java.util.concurrent.ThreadFactory
-
-private const val HEALTH_EXECUTOR_THREADS = 4
+import java.util.concurrent.ThreadPoolExecutor
 
 @Configuration
 @EnableConfigurationProperties(PlatformAdminHealthProperties::class)
@@ -32,14 +29,21 @@ class PlatformAdminHealthConfig {
     @Bean
     fun platformAdminHealthClock(): Clock = Clock.systemUTC()
 
-    @Bean(destroyMethod = "shutdown")
-    fun platformAdminHealthExecutor(): ExecutorService =
-        Executors.newFixedThreadPool(
-            HEALTH_EXECUTOR_THREADS,
-            ThreadFactory { runnable ->
-                Thread(runnable, "platform-admin-health").apply { isDaemon = true }
-            },
-        )
+    @Bean
+    fun platformAdminHealthExecutor(properties: PlatformAdminHealthProperties): ThreadPoolTaskExecutor {
+        val executor = properties.executor
+        return ThreadPoolTaskExecutor().apply {
+            corePoolSize = executor.threads
+            maxPoolSize = executor.threads
+            queueCapacity = executor.queueCapacity
+            setThreadNamePrefix("platform-admin-health-")
+            setDaemon(true)
+            setWaitForTasksToCompleteOnShutdown(true)
+            setAwaitTerminationMillis(executor.shutdownAwait.toMillis())
+            setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
+            initialize()
+        }
+    }
 
     @Bean(destroyMethod = "close")
     @Qualifier("platformAdminHealthHttpClient")
