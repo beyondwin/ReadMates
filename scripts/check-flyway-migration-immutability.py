@@ -253,11 +253,11 @@ def validate_ci_workflow(source: str) -> list[WorkflowViolation]:
         ]
 
     job_active = _active_yaml_lines(scripts_job)
-    if any(re.match(r"^    (?:if|permissions):", line) for line in job_active):
+    if any(re.match(r"^    (?:continue-on-error|if|permissions):", line) for line in job_active):
         violations.append(
             WorkflowViolation(
                 "workflow-scripts-job-unsafe",
-                "the scripts job must not override permissions or guard execution",
+                "the scripts job must not override permissions, guard execution, or tolerate failure",
             )
         )
 
@@ -1824,6 +1824,23 @@ class FlywayWorkflowContractTests(unittest.TestCase):
                 VALID_WORKFLOW_FIXTURE.replace(
                     "    runs-on: ubuntu-latest\n",
                     "    runs-on: ubuntu-latest\n    permissions:\n      contents: write\n",
+                    1,
+                ),
+            ),
+            (
+                "job continue on error",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n    continue-on-error: true\n",
+                    1,
+                ),
+            ),
+            (
+                "job continue on error expression",
+                VALID_WORKFLOW_FIXTURE.replace(
+                    "    runs-on: ubuntu-latest\n",
+                    "    runs-on: ubuntu-latest\n"
+                    "    continue-on-error: ${{ github.event_name == 'push' }}\n",
                     1,
                 ),
             ),
