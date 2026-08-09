@@ -41,7 +41,6 @@ class PlatformAdminHealthConfig {
             setWaitForTasksToCompleteOnShutdown(true)
             setAwaitTerminationMillis(executor.shutdownAwait.toMillis())
             setRejectedExecutionHandler(ThreadPoolExecutor.AbortPolicy())
-            initialize()
         }
     }
 
