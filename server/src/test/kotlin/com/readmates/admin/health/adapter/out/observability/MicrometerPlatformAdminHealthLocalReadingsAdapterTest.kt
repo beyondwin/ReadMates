@@ -34,4 +34,20 @@ class MicrometerPlatformAdminHealthLocalReadingsAdapterTest {
         assertThat(adapter.dbPoolPendingConnections()).isNull()
         assertThat(adapter.outboxPendingBacklog()).isNull()
     }
+
+    @Test
+    fun `treats nonfinite event outbox backlog as unavailable instead of healthy zero`() {
+        val registry = SimpleMeterRegistry()
+        val backlog = doubleArrayOf(Double.NaN)
+        Gauge
+            .builder("readmates.notifications.outbox.backlog", backlog) { values -> values.single() }
+            .tag("status", "pending")
+            .register(registry)
+        val adapter = MicrometerPlatformAdminHealthLocalReadingsAdapter(registry)
+
+        assertThat(adapter.outboxPendingBacklog()).isNull()
+
+        backlog[0] = Double.POSITIVE_INFINITY
+        assertThat(adapter.outboxPendingBacklog()).isNull()
+    }
 }

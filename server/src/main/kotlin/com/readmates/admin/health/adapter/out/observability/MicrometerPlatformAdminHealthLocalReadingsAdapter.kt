@@ -18,6 +18,7 @@ class MicrometerPlatformAdminHealthLocalReadingsAdapter(
             .tag(STATUS_TAG, PENDING_STATUS)
             .gauge()
             ?.value()
+            ?.takeIf(Double::isFinite)
 
     private companion object {
         const val REDIS_ERRORS_METRIC = "readmates.redis.operation.errors"

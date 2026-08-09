@@ -4,6 +4,8 @@ import com.readmates.notification.application.config.NotificationRuntimeProperti
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.NotificationDeliveryBacklogPort
+import com.readmates.notification.application.port.out.NotificationEventOutboxBacklogPort
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
 import com.readmates.notification.application.service.NotificationRelayService
 import com.readmates.notification.application.service.ReadmatesOperationalMetrics
@@ -32,6 +34,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
+    delete from notification_deliveries
+    where club_id = '00000000-0000-0000-0000-000000000101';
     delete from notification_event_outbox
     where club_id = '00000000-0000-0000-0000-000000000101';
     delete from notification_event_outbox
@@ -54,11 +58,15 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
       '00000000-0000-0000-0000-000000009512'
     );
     delete from memberships
+    where id = '00000000-0000-0000-0000-000000000801';
+    delete from memberships
     where id in (
       '00000000-0000-0000-0000-000000000810',
       '00000000-0000-0000-0000-000000000811',
       '00000000-0000-0000-0000-000000000812'
     );
+    delete from users
+    where id = '00000000-0000-0000-0000-000000000701';
     delete from users
     where id in (
       '00000000-0000-0000-0000-000000000710',
@@ -93,10 +101,23 @@ private const val TEST_NOTIFICATION_EVENTS_TOPIC = "readmates.notification.event
 @Tag("integration")
 class JdbcNotificationEventOutboxAdapterTest(
     @param:Autowired private val adapter: JdbcNotificationEventOutboxAdapter,
+    @param:Autowired private val deliveryBacklogPort: NotificationDeliveryBacklogPort,
+    @param:Autowired private val eventOutboxBacklogPort: NotificationEventOutboxBacklogPort,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000101")
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000201")
+
+    @Test
+    fun `event outbox and delivery backlog queries keep exact statuses and tables separate`() {
+        insertClub()
+        assertTruthfulBacklogs(
+            jdbcTemplate = jdbcTemplate,
+            clubId = clubId,
+            eventOutboxBacklogPort = eventOutboxBacklogPort,
+            deliveryBacklogPort = deliveryBacklogPort,
+        )
+    }
 
     @Test
     fun `enqueue event is idempotent by dedupe key`() {
@@ -722,6 +743,139 @@ class JdbcNotificationEventOutboxAdapterTest(
         }
 
         fun eventIds(): List<UUID> = eventIds.toList()
+    }
+}
+
+private fun assertTruthfulBacklogs(
+    jdbcTemplate: JdbcTemplate,
+    clubId: UUID,
+    eventOutboxBacklogPort: NotificationEventOutboxBacklogPort,
+    deliveryBacklogPort: NotificationDeliveryBacklogPort,
+) {
+    val eventIds =
+        jdbcTemplate.seedEventBacklog(
+            clubId = clubId,
+            statusCounts =
+                mapOf(
+                    NotificationEventOutboxStatus.PENDING to 1,
+                    NotificationEventOutboxStatus.FAILED to 2,
+                    NotificationEventOutboxStatus.DEAD to 3,
+                    NotificationEventOutboxStatus.PUBLISHING to 4,
+                    NotificationEventOutboxStatus.PUBLISHED to 5,
+                ),
+        )
+
+    val eventBacklog = eventOutboxBacklogPort.eventOutboxBacklog()
+    val deliveryBeforePlanning = deliveryBacklogPort.deliveryBacklog()
+
+    assertThat(eventBacklog.pending).isEqualTo(1)
+    assertThat(eventBacklog.failed).isEqualTo(2)
+    assertThat(eventBacklog.dead).isEqualTo(3)
+    assertThat(eventBacklog.publishing).isEqualTo(4)
+    assertThat(deliveryBeforePlanning.pending).isZero()
+    assertThat(deliveryBeforePlanning.failed).isZero()
+    assertThat(deliveryBeforePlanning.dead).isZero()
+    assertThat(deliveryBeforePlanning.sending).isZero()
+
+    jdbcTemplate.insertBacklogRecipient(clubId)
+    jdbcTemplate.seedDeliveryBacklog(
+        eventId = eventIds.first(),
+        clubId = clubId,
+        channel = "EMAIL",
+        statusCounts =
+            mapOf(
+                "PENDING" to 6,
+                "FAILED" to 7,
+                "DEAD" to 8,
+                "SENDING" to 9,
+                "SENT" to 10,
+            ),
+    )
+    jdbcTemplate.seedDeliveryBacklog(
+        eventId = eventIds.first(),
+        clubId = clubId,
+        channel = "IN_APP",
+        statusCounts = mapOf("PENDING" to 11),
+    )
+
+    val deliveryBacklog = deliveryBacklogPort.deliveryBacklog()
+
+    assertThat(deliveryBacklog.pending).isEqualTo(6)
+    assertThat(deliveryBacklog.failed).isEqualTo(7)
+    assertThat(deliveryBacklog.dead).isEqualTo(8)
+    assertThat(deliveryBacklog.sending).isEqualTo(9)
+}
+
+private fun JdbcTemplate.insertBacklogRecipient(clubId: UUID) {
+    update(
+        """
+        insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+        values (?, ?, 'backlog-recipient@example.test', 'Backlog Recipient', 'Recipient', 'GOOGLE')
+        """.trimIndent(),
+        "00000000-0000-0000-0000-000000000701",
+        "backlog-recipient-subject",
+    )
+    update(
+        """
+        insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+        values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'Recipient', 'globe-notebook')
+        """.trimIndent(),
+        "00000000-0000-0000-0000-000000000801",
+        clubId.toString(),
+        "00000000-0000-0000-0000-000000000701",
+    )
+}
+
+private fun JdbcTemplate.seedEventBacklog(
+    clubId: UUID,
+    statusCounts: Map<NotificationEventOutboxStatus, Int>,
+): List<UUID> =
+    statusCounts.flatMap { (status, count) ->
+        (1..count).map { ordinal ->
+            UUID.randomUUID().also { eventId ->
+                update(
+                    """
+                    insert into notification_event_outbox (
+                      id, club_id, event_type, aggregate_type, aggregate_id, payload_json,
+                      status, kafka_topic, kafka_key, dedupe_key
+                    ) values (?, ?, 'SESSION_REMINDER_DUE', 'SESSION', ?, '{}', ?, ?, ?, ?)
+                    """.trimIndent(),
+                    eventId.toString(),
+                    clubId.toString(),
+                    UUID.randomUUID().toString(),
+                    status.name,
+                    TEST_NOTIFICATION_EVENTS_TOPIC,
+                    clubId.toString(),
+                    "backlog-event-${status.name.lowercase()}-$ordinal-$eventId",
+                )
+            }
+        }
+    }
+
+private fun JdbcTemplate.seedDeliveryBacklog(
+    eventId: UUID,
+    clubId: UUID,
+    channel: String,
+    statusCounts: Map<String, Int>,
+) {
+    statusCounts.forEach { (status, count) ->
+        repeat(count) { index ->
+            val deliveryId = UUID.randomUUID()
+            update(
+                """
+                insert into notification_deliveries (
+                  id, event_id, club_id, recipient_membership_id, channel, status, dedupe_key
+                ) values (?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                deliveryId.toString(),
+                eventId.toString(),
+                clubId.toString(),
+                "00000000-0000-0000-0000-000000000801",
+                channel,
+                status,
+                "backlog-delivery-${channel.lowercase()}-${status.lowercase()}-$index-$deliveryId",
+            )
+        }
     }
 }
 

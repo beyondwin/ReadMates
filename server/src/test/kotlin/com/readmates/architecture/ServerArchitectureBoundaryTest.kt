@@ -470,6 +470,31 @@ class ServerArchitectureBoundaryTest {
             .haveSimpleName("NotificationOutboxPort")
             .check(importedClasses)
     }
+
+    @Test
+    fun `notification backlog policy ports do not depend on metrics or scheduling frameworks`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage(
+                "com.readmates.notification.application.port.in..",
+                "com.readmates.notification.application.port.out..",
+            ).should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "io.micrometer..",
+                "org.springframework.scheduling..",
+            ).check(importedClasses)
+
+        noClasses()
+            .that()
+            .haveSimpleName("CachedNotificationBacklogProvider")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "io.micrometer..",
+                "org.springframework.scheduling..",
+            ).check(importedClasses)
+    }
 }
 
 @Tag("architecture")
@@ -493,6 +518,28 @@ class ServerArchitectureSourceBoundaryTest {
         assertTrue(
             violations.isEmpty(),
             "Application packages must not declare @Scheduled methods:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    @Test
+    fun `notification application does not declare scheduled methods`() {
+        val violations =
+            notificationApplicationSourceFiles()
+                .flatMap { sourceFile ->
+                    sourceFile
+                        .readLines()
+                        .mapIndexedNotNull { index, line ->
+                            if ("@Scheduled" in line) {
+                                "${sourceFile.relativeTo(sourceRoot())}:${index + 1}: ${line.trim()}"
+                            } else {
+                                null
+                            }
+                        }
+                }.sorted()
+
+        assertTrue(
+            violations.isEmpty(),
+            "Notification application packages must not declare @Scheduled methods:\n${violations.joinToString("\n")}",
         )
     }
 
@@ -829,6 +876,11 @@ class ServerArchitectureSourceBoundaryTest {
     private fun adminHealthApplicationSourceFiles(): List<Path> =
         Files
             .walk(sourceRoot().resolve("com/readmates/admin/health/application"))
+            .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
+
+    private fun notificationApplicationSourceFiles(): List<Path> =
+        Files
+            .walk(sourceRoot().resolve("com/readmates/notification/application"))
             .use { paths -> paths.filter { it.name.endsWith(".kt") }.toList() }
 
     private fun authProductionSourceFiles(): List<Path> {

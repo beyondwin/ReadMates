@@ -558,6 +558,21 @@ data class NotificationDeliveryBacklog(
     val sending: Int,
 )
 
+data class NotificationEventOutboxBacklog(
+    val pending: Int,
+    val failed: Int,
+    val dead: Int,
+    val publishing: Int,
+)
+
+enum class NotificationBacklogRefreshResult(
+    val tag: String,
+) {
+    SUCCESS("success"),
+    PARTIAL("partial"),
+    FAILURE("failure"),
+}
+
 data class NotificationPreferences(
     val emailEnabled: Boolean,
     val events: Map<NotificationEventType, Boolean>,

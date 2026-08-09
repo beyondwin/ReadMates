@@ -1,7 +1,10 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.NotificationBacklogRefreshResult
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
+import com.readmates.notification.application.model.NotificationEventOutboxBacklog
 import com.readmates.notification.application.port.out.NotificationDeliveryBacklogPort
+import com.readmates.notification.application.port.out.NotificationEventOutboxBacklogPort
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -150,57 +153,93 @@ class ReadmatesOperationalMetricsTest {
     }
 
     @Test
-    fun `notification delivery backlog gauges expose only status counts`() {
+    fun `backlog gauges are unavailable before their sources first succeed`() {
         val registry = SimpleMeterRegistry()
-        val deliveryPort =
-            FixedDeliveryBacklogPort(
-                NotificationDeliveryBacklog(
-                    pending = 2,
-                    failed = 3,
-                    dead = 5,
-                    sending = 7,
-                ),
+        val provider =
+            CachedNotificationBacklogProvider(
+                FixedEventBacklogPort(NotificationEventOutboxBacklog(2, 3, 5, 7)),
+                FixedDeliveryBacklogPort(NotificationDeliveryBacklog(11, 13, 17, 19)),
             )
-        val provider = CachedNotificationBacklogProvider(deliveryPort)
-        provider.refresh()
 
         ReadmatesOperationalMetrics(registry, provider)
 
-        assertThat(
-            registry
-                .find("readmates.notifications.outbox.backlog")
-                .tag("status", "pending")
-                .gauge()
-                ?.value(),
-        ).isEqualTo(2.0)
-        assertThat(
-            registry
-                .find("readmates.notifications.outbox.backlog")
-                .tag("status", "failed")
-                .gauge()
-                ?.value(),
-        ).isEqualTo(3.0)
-        assertThat(
-            registry
-                .find("readmates.notifications.outbox.backlog")
-                .tag("status", "dead")
-                .gauge()
-                ?.value(),
-        ).isEqualTo(5.0)
-        assertThat(
-            registry
-                .find("readmates.notifications.outbox.backlog")
-                .tag("status", "sending")
-                .gauge()
-                ?.value(),
-        ).isEqualTo(7.0)
+        assertThat(backlogGaugeValues(registry, "readmates.notifications.outbox.backlog").values)
+            .allMatch(Double::isNaN)
+        assertThat(backlogGaugeValues(registry, "readmates.notifications.delivery.backlog").values)
+            .allMatch(Double::isNaN)
+    }
+
+    @Test
+    fun `event outbox and delivery gauges expose separate exact statuses`() {
+        val registry = SimpleMeterRegistry()
+        val provider =
+            CachedNotificationBacklogProvider(
+                FixedEventBacklogPort(NotificationEventOutboxBacklog(2, 3, 5, 7)),
+                FixedDeliveryBacklogPort(NotificationDeliveryBacklog(11, 13, 17, 19)),
+            )
+        assertThat(provider.refresh()).isEqualTo(NotificationBacklogRefreshResult.SUCCESS)
+
+        ReadmatesOperationalMetrics(registry, provider)
+
+        assertThat(backlogGaugeValues(registry, "readmates.notifications.outbox.backlog"))
+            .containsExactlyInAnyOrderEntriesOf(
+                mapOf("pending" to 2.0, "failed" to 3.0, "dead" to 5.0, "publishing" to 7.0),
+            )
+        assertThat(backlogGaugeValues(registry, "readmates.notifications.delivery.backlog"))
+            .containsExactlyInAnyOrderEntriesOf(
+                mapOf("pending" to 11.0, "failed" to 13.0, "dead" to 17.0, "sending" to 19.0),
+            )
         assertThat(
             registry
                 .find("readmates.notifications.outbox.backlog")
                 .meters()
                 .flatMap { meter -> meter.id.tags.map { it.key } },
         ).containsOnly("status")
+        assertThat(
+            registry
+                .find("readmates.notifications.delivery.backlog")
+                .meters()
+                .flatMap { meter -> meter.id.tags.map { it.key } },
+        ).containsOnly("status")
     }
+
+    @Test
+    fun `backlog refresh metric exposes exactly the fixed results`() {
+        val registry = SimpleMeterRegistry()
+        val metrics = ReadmatesOperationalMetrics(registry)
+
+        NotificationBacklogRefreshResult.entries.forEach(metrics::recordBacklogRefresh)
+
+        assertThat(
+            registry
+                .find("readmates.notifications.backlog.refresh")
+                .counters()
+                .associate { counter -> counter.id.getTag("result") to counter.count() },
+        ).containsExactlyInAnyOrderEntriesOf(
+            mapOf("success" to 1.0, "partial" to 1.0, "failure" to 1.0),
+        )
+        assertThat(
+            registry
+                .find("readmates.notifications.backlog.refresh")
+                .meters()
+                .flatMap { meter -> meter.id.tags.map { tag -> tag.key } },
+        ).containsOnly("result")
+    }
+}
+
+private fun backlogGaugeValues(
+    registry: SimpleMeterRegistry,
+    name: String,
+): Map<String, Double> =
+    registry
+        .find(name)
+        .gauges()
+        .associate { gauge -> requireNotNull(gauge.id.getTag("status")) to gauge.value() }
+
+private class FixedEventBacklogPort(
+    private val backlog: NotificationEventOutboxBacklog,
+) : NotificationEventOutboxBacklogPort {
+    override fun eventOutboxBacklog(): NotificationEventOutboxBacklog = backlog
 }
 
 private class FixedDeliveryBacklogPort(
