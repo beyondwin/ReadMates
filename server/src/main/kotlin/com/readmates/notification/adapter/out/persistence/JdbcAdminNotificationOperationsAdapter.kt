@@ -351,7 +351,7 @@ private class AdminNotificationSnapshotQueries(
                     select count(*)
                     from notification_event_outbox
                     where status = 'PUBLISHING'
-                      and locked_at <= timestampadd(MICROSECOND, ?, utc_timestamp(6))
+                      and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
                     """.trimIndent(),
                     Int::class.java,
                     -claimLeaseMicroseconds,
@@ -362,7 +362,7 @@ private class AdminNotificationSnapshotQueries(
                     select count(*)
                     from notification_deliveries
                     where status = 'SENDING'
-                      and locked_at <= timestampadd(MICROSECOND, ?, utc_timestamp(6))
+                      and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
                     """.trimIndent(),
                     Int::class.java,
                     -claimLeaseMicroseconds,

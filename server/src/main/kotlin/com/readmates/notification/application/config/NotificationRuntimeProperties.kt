@@ -13,6 +13,7 @@ private const val NANOSECONDS_PER_MICROSECOND = 1_000
 private const val FIXED_DELAY_SECONDS = 30L
 private const val CLAIM_LEASE_MINUTES = 15L
 private const val MAX_AGE_HOURS = 24L
+private const val MAX_CLAIM_LEASE_HOURS = 24L
 private const val FIRST_RETRY_MINUTES = 5L
 private const val SECOND_RETRY_MINUTES = 15L
 private const val THIRD_RETRY_HOURS = 1L
@@ -24,6 +25,7 @@ private const val SMTP_TIMEOUT_SECONDS = 5L
 private val DEFAULT_FIXED_DELAY: Duration = Duration.ofSeconds(FIXED_DELAY_SECONDS)
 private val DEFAULT_CLAIM_LEASE: Duration = Duration.ofMinutes(CLAIM_LEASE_MINUTES)
 private val DEFAULT_MAX_AGE: Duration = Duration.ofHours(MAX_AGE_HOURS)
+private val MAX_CLAIM_LEASE: Duration = Duration.ofHours(MAX_CLAIM_LEASE_HOURS)
 private val DEFAULT_RETRY_DELAYS: List<Duration> =
     listOf(
         Duration.ofMinutes(FIRST_RETRY_MINUTES),
@@ -100,6 +102,15 @@ data class NotificationRuntimeProperties(
             claimLeaseMicroseconds = requireExactMicroseconds("worker.claim-lease", claimLease)
             requirePositive("worker.event-max-age", eventMaxAge)
             requirePositive("worker.delivery-max-age", deliveryMaxAge)
+            require(claimLease <= MAX_CLAIM_LEASE) {
+                "readmates.notifications.worker.claim-lease must not exceed 24 hours"
+            }
+            require(claimLease < eventMaxAge) {
+                "readmates.notifications.worker.event-max-age must be greater than worker.claim-lease"
+            }
+            require(claimLease < deliveryMaxAge) {
+                "readmates.notifications.worker.delivery-max-age must be greater than worker.claim-lease"
+            }
             require(retryDelays.isNotEmpty()) {
                 "readmates.notifications.worker.retry-delays must not be empty"
             }

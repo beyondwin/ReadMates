@@ -456,4 +456,4 @@ where used_at < utc_timestamp() - interval 30 day;
 
 ## Notification runtime contract
 
-알림 환경은 Kafka send timeout `10s`, claim lease `15m`, event/delivery max age `24h`, SMTP connection/read/write timeout 각 `5s`를 함께 렌더링한다. 시작 시 모든 값·retry schedule을 검증하고, Kafka timeout 및 SMTP timeout 합계가 claim lease보다 짧지 않으면 fail-fast한다.
+알림 환경은 Kafka send timeout `10s`, claim lease `15m`, event/delivery max age `24h`, SMTP connection/read/write timeout 각 `5s`를 함께 렌더링한다. 시작 시 모든 값·retry schedule을 검증하고, claim lease가 `24h`를 초과하거나 event/delivery max age보다 짧지 않거나 Kafka timeout 및 SMTP timeout 합계보다 길지 않으면 fail-fast한다.

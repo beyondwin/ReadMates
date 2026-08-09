@@ -104,7 +104,7 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | `READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE` / `MAX_PUBLISH_ATTEMPTS` | `50` / `5` | relay 처리량과 attempt ceiling |
 | `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES` | `5,15,60,240` | relay와 delivery가 공유하는 retry schedule |
 | `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS` | `5` | delivery attempt ceiling |
-| `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS` / `CLAIM_LEASE` | `30s` / `15m` | scheduler delay와 exact claim lease |
+| `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS` / `CLAIM_LEASE` | `30s` / `15m` | scheduler delay와 exact claim lease. Lease는 최대 `24h`이고 두 max age보다 짧아야 함 |
 | `READMATES_NOTIFICATION_EVENT_MAX_AGE` / `DELIVERY_MAX_AGE` | `24h` / `24h` | relay와 delivery deadline |
 | `READMATES_NOTIFICATION_BACKLOG_REFRESH_INTERVAL` / `BACKLOG_INITIAL_DELAY` | `60s` / `5s` | backlog snapshot refresh |
 | `SERVER_FORWARD_HEADERS_STRATEGY` | `framework` | Caddy reverse-proxy 뒤 fixed |
@@ -130,4 +130,4 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 
 ## Notification SMTP boundary
 
-SMTP username/password만 secret이다. Host와 connection/read/write timeout(각 `5s`)은 공개 운영 설정이며 sync-config가 렌더링한다. 세 timeout 합계는 notification claim lease보다 짧아야 하며 startup validation 실패 시 credential을 출력하지 말고 property path만 확인한다.
+SMTP username/password만 secret이다. Host와 connection/read/write timeout(각 `5s`)은 공개 운영 설정이며 sync-config가 렌더링한다. 세 timeout 합계는 notification claim lease보다 짧아야 한다. Claim lease는 최대 `24h`이고 event/delivery max age보다 각각 엄격히 짧아야 하며, startup validation 실패 시 credential을 출력하지 말고 property path만 확인한다.

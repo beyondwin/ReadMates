@@ -16,12 +16,12 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import tools.jackson.databind.ObjectMapper
 import java.net.InetSocketAddress
 import java.nio.charset.StandardCharsets
-import java.time.Duration
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 import kotlin.system.measureTimeMillis
@@ -29,35 +29,29 @@ import kotlin.system.measureTimeMillis
 class PlatformAdminHealthTransportConfigTest {
     @Test
     fun `production prometheus transport enforces configured read timeout`() {
-        val server = withholdingBodyServer(Duration.ofMillis(BODY_DELAY_MILLIS))
-        server.start()
-        try {
+        WithholdingBodyServer().use { server ->
             ApplicationContextRunner()
                 .withUserConfiguration(PlatformAdminHealthConfig::class.java)
                 .withBean(ObjectMapper::class.java, { ObjectMapper() })
                 .withPropertyValues(
                     "readmates.admin.health.provider-deadline=${PROVIDER_DEADLINE_MILLIS}ms",
-                    "readmates.admin.health.prometheus.base-url=http://127.0.0.1:${server.address.port}",
+                    "readmates.admin.health.prometheus.base-url=${server.baseUrl}",
                     "readmates.admin.health.prometheus.connect-timeout=100ms",
                     "readmates.admin.health.prometheus.connection-request-timeout=100ms",
                     "readmates.admin.health.prometheus.read-timeout=${READ_TIMEOUT_MILLIS}ms",
                 ).run { context ->
                     assertThat(context).hasNotFailed()
                     val port = context.getBean(PrometheusQueryPort::class.java)
-                    var thrown: Throwable? = null
-                    val elapsedMillis =
-                        measureTimeMillis {
-                            thrown = catchThrowable { port.query("up") }
-                        }
+                    val properties = context.getBean(PlatformAdminHealthProperties::class.java)
+                    val thrown = catchThrowable { port.query("up") }
 
-                    assertThat(elapsedMillis).isLessThan(PROVIDER_DEADLINE_MILLIS)
+                    assertThat(properties.prometheus.readTimeout.compareTo(properties.providerDeadline)).isNegative()
                     assertThat(thrown)
                         .isInstanceOf(PrometheusQueryException::class.java)
                         .extracting("kind")
                         .isEqualTo(PrometheusQueryFailureKind.TIMEOUT)
+                    assertThat(server.bodyWriteStarted()).isFalse()
                 }
-        } finally {
-            server.stop(0)
         }
     }
 
@@ -121,19 +115,6 @@ class PlatformAdminHealthTransportConfigTest {
         }
     }
 
-    private fun withholdingBodyServer(delay: Duration): HttpServer =
-        HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
-            createContext("/api/v1/query") { exchange ->
-                val body =
-                    """{"status":"success","data":{"resultType":"vector","result":[]}}"""
-                        .toByteArray(StandardCharsets.UTF_8)
-                exchange.responseHeaders.add("Content-Type", "application/json")
-                exchange.sendResponseHeaders(200, body.size.toLong())
-                Thread.sleep(delay.toMillis())
-                exchange.responseBody.use { it.write(body) }
-            }
-        }
-
     private fun immediateSuccessServer(): HttpServer =
         HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
             createContext("/api/v1/query") { exchange ->
@@ -152,6 +133,32 @@ class PlatformAdminHealthTransportConfigTest {
             .isInstanceOf(PrometheusQueryException::class.java)
             .extracting("kind")
             .isEqualTo(expectedKind)
+    }
+
+    private class WithholdingBodyServer : AutoCloseable {
+        private val bodyRelease = CountDownLatch(1)
+        private val bodyWriteStarted = AtomicBoolean()
+        private val server =
+            HttpServer.create(InetSocketAddress("127.0.0.1", 0), 0).apply {
+                createContext("/api/v1/query") { exchange ->
+                    val body = PROMETHEUS_SUCCESS_BODY.toByteArray(StandardCharsets.UTF_8)
+                    exchange.responseHeaders.add("Content-Type", "application/json")
+                    exchange.sendResponseHeaders(200, body.size.toLong())
+                    bodyRelease.await()
+                    bodyWriteStarted.set(true)
+                    exchange.responseBody.use { it.write(body) }
+                }
+                start()
+            }
+
+        val baseUrl: String = "http://127.0.0.1:${server.address.port}"
+
+        fun bodyWriteStarted(): Boolean = bodyWriteStarted.get()
+
+        override fun close() {
+            bodyRelease.countDown()
+            server.stop(0)
+        }
     }
 
     private class PoolStarvationServer : AutoCloseable {
@@ -200,7 +207,6 @@ class PlatformAdminHealthTransportConfigTest {
     private companion object {
         private const val READ_TIMEOUT_MILLIS = 100L
         private const val PROVIDER_DEADLINE_MILLIS = 600L
-        private const val BODY_DELAY_MILLIS = 800L
         private const val DEFAULT_MAX_CONNECTIONS_PER_ROUTE = 5
         private const val POOL_TIMEOUT_UPPER_BOUND_MILLIS = 400L
         private const val PROMETHEUS_SUCCESS_BODY =

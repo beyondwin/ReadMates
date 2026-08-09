@@ -445,7 +445,7 @@ class JdbcNotificationEventOutboxAdapter(
                 next_attempt_at = utc_timestamp(6),
                 updated_at = utc_timestamp(6)
             where status = 'PUBLISHING'
-              and locked_at <= timestampadd(MICROSECOND, ?, utc_timestamp(6))
+              and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
             """.trimIndent(),
             -claimLeaseMicroseconds,
         )

@@ -251,7 +251,7 @@ internal class NotificationDeliveryClaimOperations(
                 updated_at = utc_timestamp(6)
             where channel = 'EMAIL'
               and status = 'SENDING'
-              and locked_at <= timestampadd(MICROSECOND, ?, utc_timestamp(6))
+              and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
               $clubPredicate
             """.trimIndent(),
             -claimLeaseMicroseconds,

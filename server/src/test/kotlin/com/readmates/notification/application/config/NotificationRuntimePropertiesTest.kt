@@ -103,6 +103,18 @@ class NotificationRuntimePropertiesTest {
     }
 
     @Test
+    fun `largest database safe claim lease remains accepted before longer deadlines`() {
+        val worker =
+            NotificationRuntimeProperties.Worker(
+                claimLease = Duration.ofHours(24),
+                eventMaxAge = Duration.ofHours(25),
+                deliveryMaxAge = Duration.ofHours(25),
+            )
+
+        assertThat(worker.claimLeaseMicroseconds).isEqualTo(86_400_000_000L)
+    }
+
+    @Test
     fun `legacy numeric duration values retain their documented units`() {
         contextRunner
             .withPropertyValues(
@@ -128,6 +140,7 @@ class NotificationRuntimePropertiesTest {
             listOf(
                 senderAndKafkaIdentityInvalidProperties(),
                 workerInvalidProperties(),
+                claimLeaseInvalidProperties(),
                 transportInvalidProperties(),
             ).flatten().stream()
 
@@ -217,6 +230,42 @@ class NotificationRuntimePropertiesTest {
                     "readmates.notifications.worker.backlog-initial-delay",
                     "readmates.notifications.worker.backlog-refresh-interval=10s",
                     "readmates.notifications.worker.backlog-initial-delay=11s",
+                ),
+            )
+
+        private fun claimLeaseInvalidProperties(): List<Arguments> =
+            listOf(
+                invalid(
+                    "readmates.notifications.worker.claim-lease",
+                    "readmates.notifications.worker.claim-lease=PT24H0.000001S",
+                    "readmates.notifications.worker.event-max-age=25h",
+                    "readmates.notifications.worker.delivery-max-age=25h",
+                ),
+                invalid(
+                    "readmates.notifications.worker.claim-lease",
+                    "readmates.notifications.worker.claim-lease=25h",
+                    "readmates.notifications.worker.event-max-age=26h",
+                    "readmates.notifications.worker.delivery-max-age=26h",
+                ),
+                invalid(
+                    "readmates.notifications.worker.event-max-age",
+                    "readmates.notifications.worker.claim-lease=5h",
+                    "readmates.notifications.worker.event-max-age=5h",
+                ),
+                invalid(
+                    "readmates.notifications.worker.event-max-age",
+                    "readmates.notifications.worker.claim-lease=5h",
+                    "readmates.notifications.worker.event-max-age=4h",
+                ),
+                invalid(
+                    "readmates.notifications.worker.delivery-max-age",
+                    "readmates.notifications.worker.claim-lease=5h",
+                    "readmates.notifications.worker.delivery-max-age=5h",
+                ),
+                invalid(
+                    "readmates.notifications.worker.delivery-max-age",
+                    "readmates.notifications.worker.claim-lease=5h",
+                    "readmates.notifications.worker.delivery-max-age=4h",
                 ),
             )
 
