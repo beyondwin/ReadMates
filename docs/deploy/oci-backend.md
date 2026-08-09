@@ -339,12 +339,13 @@ Relay/consumer 처리 기준:
 
 수동 처리:
 
-- Relay 장애는 `readmates_outbox_publish_total` result와 event-outbox `pending|failed|dead|publishing`, backlog refresh result, attempt/deadline/lease evidence로 먼저 확인합니다. Relay 원인이 제거되기 전에는 delivery replay나 새 event 생성을 복구로 사용하지 않으며 DB row를 직접 수정하지 않습니다.
-- SMTP 장애는 delivery `pending|failed|dead|sending`, failure kind, attempt/deadline/lease와 provider/recipient acceptance evidence를 확인합니다. `AMBIGUOUS`는 수락 여부를 모르는 상태이므로 blind resend하지 않습니다.
+- Relay 장애는 `readmates_outbox_publish_total` result와 event-outbox `pending|failed|dead|publishing`, backlog refresh result, `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`을 먼저 확인합니다. Event deadline은 `created_at + READMATES_NOTIFICATION_EVENT_MAX_AGE`의 현재 배포값으로 계산하며 equality부터 만료입니다. Relay 원인이 제거되기 전에는 delivery replay나 새 event 생성을 복구로 사용하지 않으며 DB row를 직접 수정하지 않습니다.
+- SMTP 장애는 delivery `pending|failed|dead|sending`, `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`과 provider/recipient acceptance evidence를 확인합니다. Delivery deadline은 `created_at + READMATES_NOTIFICATION_DELIVERY_MAX_AGE`, stale lease는 `locked_at + READMATES_NOTIFICATION_CLAIM_LEASE`의 현재 배포값으로 평가합니다. `next_attempt_at`은 deadline이 아닙니다.
 - Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인하되, 이 host count가 relay와 delivery 어느 단계를 나타내는지 event/delivery ledger로 확정합니다.
 - 호스트 알림 운영 페이지는 `/app/host/notifications`입니다.
-- 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인합니다. `DEAD` email delivery 복구는 원인이 교정되고 exact 대상·failure kind·lease가 확인된 경우에만 preview/confirm하며, `AMBIGUOUS`를 자동 복구하지 않습니다.
+- 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인합니다. 원인이 교정되고 exact 대상·failure kind·deadline·lease가 확인된 한 건의 `DEAD` EMAIL delivery만 host가 `POST /api/host/notifications/items/{id}/restore`로 명시적으로 복구합니다. 이 endpoint는 해당 delivery를 `PENDING`으로 되돌리고 `next_attempt_at`을 현재 시각으로 설정하며 새 event를 만들지 않습니다. `AMBIGUOUS`는 provider/recipient evidence로 미수락이 확인되지 않으면 restore하지 않습니다.
 - 같은 페이지와 콘텐츠 변경 직후 열린 composer에서 세션, 템플릿, 대상 그룹, 채널을 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 현재 클럽의 중복 없는 활성 membership을 한 명 이상 요구합니다. Preview는 현재 `contentRevision`과 함께 10분 TTL로 저장되며, stale revision이나 같은 세션/템플릿/revision의 최근 수동 발송은 재-preview 또는 명시적 재발송 확인을 요구합니다.
+- Composer의 manual preview/confirm은 새 notification event를 만드는 발송 절차이며 기존 delivery restore나 event relay replay가 아닙니다. 기존 admin replay preview/confirm도 이 복구 절차에 사용하지 않으며 atomicity hardening은 다음 계획 범위입니다.
 - 같은 페이지의 리마인더 정책은 기본 꺼짐입니다. Host `GET/PUT /api/host/notifications/policy`가 `sessionReminderEnabled=true`를 저장한 클럽만 scheduler 자동 outbox 생성 대상입니다.
 - 호스트 알림 운영 페이지에서 redesigned template helper를 쓰는 테스트 메일을 보낼 수 있습니다. 테스트 메일 copy는 별도 문구를 사용하고 CTA/deep link는 포함하지 않습니다. 테스트 메일 audit은 masked recipient email과 hash만 저장하고 raw recipient email은 저장하지 않습니다.
 - Host dashboard의 수동 처리 action은 현재 host club의 pending/failed delivery만 처리합니다. Event relay DEAD 복구와 혼동하지 않습니다.

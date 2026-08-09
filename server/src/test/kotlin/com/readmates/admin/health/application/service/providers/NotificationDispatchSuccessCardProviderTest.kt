@@ -20,7 +20,37 @@ class NotificationDispatchSuccessCardProviderTest {
     private class FakePrometheus(
         private val behaviour: () -> PromQueryResult,
     ) : PrometheusQueryPort {
-        override fun query(promql: String): PromQueryResult = behaviour()
+        var lastQuery: String? = null
+
+        override fun query(promql: String): PromQueryResult {
+            lastQuery = promql
+            return behaviour()
+        }
+    }
+
+    @Test
+    fun `rate denominator floor preserves sparse success and failure ratios and finite no-data`() {
+        val prometheus =
+            FakePrometheus {
+                PromQueryResult(listOf(PromInstantValue(emptyMap(), 1.0)))
+            }
+
+        NotificationDispatchSuccessCardProvider(prometheus, clock).compute()
+
+        val query = requireNotNull(prometheus.lastQuery)
+        val floor = query.substringAfterLast(", ").removeSuffix(")").toDouble()
+        val oneEventInFiveMinutes = 1.0 / 300.0
+        val noEvents = 0.0
+        val oneSuccessRatio = oneEventInFiveMinutes / maxOf(oneEventInFiveMinutes, floor)
+        val oneFailureRatio =
+            oneEventInFiveMinutes /
+                maxOf(noEvents + oneEventInFiveMinutes, floor)
+        val noDataRatio = 0.0 / maxOf(0.0, floor)
+
+        assertThat(floor).isEqualTo(1e-9)
+        assertThat(oneSuccessRatio).isEqualTo(1.0)
+        assertThat(oneFailureRatio).isEqualTo(1.0)
+        assertThat(noDataRatio).isFinite().isZero()
     }
 
     @Test

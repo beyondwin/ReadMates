@@ -15,6 +15,8 @@
 ## 알림 목록 (anchors)
 
 <a id="notificationoutboxbackloghigh"></a>
+<a id="notificationoutboxrelaydead"></a>
+<a id="notificationdeliverybackloghigh"></a>
 <a id="notificationdeadletters"></a>
 <a id="notificationfailratehigh"></a>
 <a id="httperrorratehigh"></a>
@@ -74,7 +76,7 @@ groups:
         for: 10m
         labels:
           severity: warning
-          team: backend
+          component: notification
         annotations:
           summary: "Notification pending backlog over 100 for 10 minutes"
           description: "Event relay가 Kafka publish 속도를 따라가지 못했거나 멈췄을 가능성. publish result와 relay/Kafka evidence 확인."
@@ -85,36 +87,53 @@ groups:
         for: 5m
         labels:
           severity: critical
-          team: backend
+          component: notification
         annotations:
           summary: "Notification pending backlog over 1000"
           description: "Event relay 또는 Kafka publication이 중단됐을 가능성. delivery worker가 아니라 event outbox evidence를 즉시 조사."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationFailRateHigh
         expr: |
           sum(rate(readmates_notifications_failed_total[5m]))
             / clamp_min(sum(rate(readmates_notifications_sent_total[5m]))
-                       + sum(rate(readmates_notifications_failed_total[5m])), 1) > 0.05
+                       + sum(rate(readmates_notifications_failed_total[5m])), 1e-9) > 0.05
         for: 10m
         labels:
           severity: warning
-          team: backend
+          component: notification
         annotations:
           summary: "Notification 실패율 5% 초과 (10분)"
           description: "Email delivery 실패가 지속. SMTP/provider 또는 delivery worker evidence 확인."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationDeadLetters
         expr: increase(readmates_notifications_dead_total[1h]) > 0
         for: 0m
         labels:
           severity: warning
-          team: backend
+          component: notification
         annotations:
           summary: "Notification dead-letter 발생 (1시간 내)"
-          description: "발송이 최종 포기된 알림이 있습니다. notification_deliveries.status='DEAD' 로우 조사."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
+          description: "발송이 최종 포기된 알림. notification_deliveries.status='DEAD' 로우 조사."
+
+      - alert: NotificationOutboxRelayDead
+        expr: max(readmates_notifications_outbox_backlog{status="dead"}) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification event outbox DEAD row detected"
+          description: "Delivery row 생성 전 relay가 missing payload, retry exhaustion 또는 deadline으로 종료됐다. outbox 상태와 publish result를 확인."
+
+      - alert: NotificationDeliveryBacklogHigh
+        expr: max(readmates_notifications_delivery_backlog{status=~"pending|failed|sending"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification delivery backlog over 100 for 10 minutes"
+          description: "이 값은 event outbox가 아니라 delivery rows다. SMTP/provider 상태와 delivery worker를 확인."
 
   - name: readmates.http
     interval: 30s
@@ -233,5 +252,7 @@ count > 0이면 운영자에게 알림 (이메일 또는 in-app).
 - `node-exporter`, `cadvisor`, `blackbox-exporter`는 production v1 이후 별도 계획으로 추가한다.
 
 NotificationOutboxBacklog/RelayDead는 event relay, NotificationDeliveryBacklog/DeadLetters는 SMTP delivery 경보다. event outbox와 delivery rows를 같은 queue로 해석하지 않는다.
+
+NotificationFailRateHigh의 per-second rate 분모는 `1e-9` floor를 사용합니다. 5분에 실패 한 건뿐인 저빈도 구간도 failure ratio 1.0으로 평가하고, traffic이 전혀 없을 때만 유한한 0을 만듭니다.
 
 Backlog gauge가 첫 refresh 전 `NaN`이거나 refresh result가 `partial|failure`인 경우 0건으로 해석하지 않습니다. 마지막 성공 snapshot과 `readmates_notifications_backlog_refresh_total`을 먼저 확인합니다.
