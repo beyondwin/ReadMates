@@ -8,7 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
-- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+- **백엔드 품질 래칫:** 프로덕션 Kotlin 경고를 0건으로 만들고 신규 경고를 빌드 오류로 처리합니다. Detekt·ktlint baseline, JaCoCo 43%, 전체 인바운드 슬라이스 registry, 기존 경계 import와 기능 의존 edge를 단방향 gate로 고정해 새 품질·아키텍처 부채가 추가되지 않도록 했습니다. 외부 API, 권한, DB schema와 런타임 기능은 변경하지 않습니다.
 
 ## v2.3.0 - 2026-08-09
 
