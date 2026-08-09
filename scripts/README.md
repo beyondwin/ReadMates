@@ -31,7 +31,9 @@ python3 -B scripts/check-deploy-workflow-contract.py
 rename, 이동을 차단합니다. 비교 대상은
 `server/src/main/resources/db/mysql/migration/`이며 기준 migration은 Git index와 filesystem 상태를
 독립적으로 비교합니다. 따라서 staged, unstaged, index/worktree가 다른 상태, 삭제, untracked 파일을
-모두 검사합니다. 기준 ref는 신뢰할 수 있는 로컬 commit 또는 ref를 명시해야 합니다.
+모두 검사합니다. Filesystem 내용은 `core.autocrlf` 같은 Git clean-filter 정규화를 적용한 object
+identity로 비교하므로 clean checkout의 플랫폼별 줄바꿈은 변경으로 오인하지 않지만, 실제 SQL 내용
+변경은 계속 차단합니다. 기준 ref는 신뢰할 수 있는 로컬 commit 또는 ref를 명시해야 합니다.
 
 ```bash
 python3 -B scripts/check-flyway-migration-immutability.py --self-test

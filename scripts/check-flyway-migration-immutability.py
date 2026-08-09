@@ -27,6 +27,7 @@ class Migration:
     path: str
     version: int
     content: bytes
+    object_id: str | None = None
 
 
 @dataclass(frozen=True, order=True)
@@ -217,7 +218,7 @@ def _base_catalog(repo: Path, merge_base: str) -> tuple[list[Migration], list[Vi
                     Violation("history-incomplete", _public_path(path), "base migration blob is unavailable")
                 )
                 continue
-            migrations.append(Migration(path, version, blob.stdout))
+            migrations.append(Migration(path, version, blob.stdout, object_id))
         elif VERSION_LOOKING_RE.fullmatch(Path(path).name):
             violations.append(
                 Violation(
@@ -382,7 +383,7 @@ def _index_catalog(repo: Path) -> tuple[list[Migration], list[Violation]]:
                     )
                 )
                 continue
-            migrations.append(Migration(path, version, blob.stdout))
+            migrations.append(Migration(path, version, blob.stdout, object_id))
         elif VERSION_LOOKING_RE.fullmatch(Path(path).name):
             violations.append(
                 Violation(
@@ -523,6 +524,22 @@ def _duplicate_violations(
     return violations
 
 
+def _normalized_worktree_object_id(repo: Path, path: str) -> str | None:
+    result = _run_git(
+        repo,
+        "hash-object",
+        f"--path={path}",
+        "--",
+        path,
+    )
+    if result.returncode != 0:
+        return None
+    object_id = _git_line(result.stdout)
+    if re.fullmatch(r"[0-9a-f]{40,64}", object_id) is None:
+        return None
+    return object_id
+
+
 def _print_history_failure(category: str, detail: str) -> int:
     print(f"[{category}] history: {detail}", file=sys.stderr)
     print(
@@ -616,8 +633,24 @@ def check_migrations(base_ref: str) -> int:
                     "base migration was deleted, renamed, moved, or made invalid",
                 )
             )
-        elif current.content != base_migration.content:
-            violations.append(Violation("historical-modified", _public_path(path), "base migration bytes changed"))
+        else:
+            normalized_object_id = _normalized_worktree_object_id(repo, path)
+            if normalized_object_id is None:
+                violations.append(
+                    Violation(
+                        "catalog-unreadable",
+                        _public_path(path),
+                        "worktree migration cannot be normalized safely",
+                    )
+                )
+            elif normalized_object_id != base_migration.object_id:
+                violations.append(
+                    Violation(
+                        "historical-modified",
+                        _public_path(path),
+                        "base migration content changed after Git normalization",
+                    )
+                )
     if base_max is not None:
         for path, indexed in sorted(index_by_path.items()):
             if path not in base_by_path and indexed.version <= base_max:
@@ -700,6 +733,25 @@ class FlywayMigrationImmutabilityTests(unittest.TestCase):
         self._git(repo, "add", ".")
         self._git(repo, "commit", "--quiet", "-m", "fixture base")
         return repo, self._git(repo, "rev-parse", "HEAD")
+
+    def _new_autocrlf_clone(self, root: Path) -> tuple[Path, str, Path]:
+        source, base = self._new_repo(root, "source")
+        clone = root / "autocrlf-clone"
+        clone_result = subprocess.run(
+            ["git", "clone", "--quiet", "--no-checkout", str(source), str(clone)],
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(clone_result.returncode, 0, "autocrlf clone fixture setup failed")
+        self._git(clone, "config", "core.autocrlf", "true")
+        self._git(clone, "checkout", "--quiet", "HEAD")
+        migration = clone / MIGRATION_DIRECTORY / "V9__current.sql"
+        content = migration.read_bytes()
+        self.assertIn(b"\r\n", content)
+        self.assertNotIn(b"\n", content.replace(b"\r\n", b""))
+        self.assertEqual(self._git(clone, "status", "--porcelain=v1", "--untracked-files=all"), "")
+        return clone, base, migration
 
     def _run_checker(
         self,
@@ -1032,6 +1084,23 @@ class FlywayMigrationImmutabilityTests(unittest.TestCase):
             result = self._run_checker(repo, base)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn(f"merge-base: {base}", result.stdout)
+
+    def test_clean_autocrlf_checkout_matches_base_after_git_normalization(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            clone, base, _ = self._new_autocrlf_clone(Path(temporary))
+            result = self._run_checker(
+                clone,
+                base,
+                {"GIT_EXTERNAL_DIFF": "external-diff-must-not-run"},
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_actual_edit_in_autocrlf_checkout_still_fails(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            clone, base, migration = self._new_autocrlf_clone(Path(temporary))
+            content = migration.read_bytes()
+            migration.write_bytes(content.replace(b"label", b"edited_label", 1))
+            self._assert_failure(clone, base, "historical-modified")
 
 
 def run_self_tests() -> int:
