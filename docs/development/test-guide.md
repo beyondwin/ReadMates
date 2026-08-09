@@ -283,10 +283,10 @@ PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 `check`는 다음 게이트를 한 번에 검증합니다.
 
 - **production compiler warning gate**: production `compileKotlin`은 `allWarningsAsErrors`를 사용해 신규 Kotlin warning을 build error로 처리합니다. Test source warning은 별도 inventory이며 Phase 0 hard gate는 아닙니다.
-- **ktlint baseline gate**: `org.jlleitschuh.gradle.ktlint` 12.1.1 + ktlint tool 1.7.1. `server/config/ktlint/baseline.xml`은 최대 171건이며 더 늘릴 수 없습니다. Auto-format은 `./server/gradlew -p server ktlintFormat`로 적용합니다.
-- **detekt baseline gate**: detekt 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. `server/config/detekt/baseline.xml`은 최대 461건이며 더 늘릴 수 없습니다. detekt 1.23.x는 Java 25 daemon에서 동작하지 않아 Java 25/Kotlin 2.4/Gradle 9.x 검증 범위에 있는 detekt 2.x line으로 올렸고, baseline은 detekt 2 rule id 기준으로 재생성했습니다.
+- **ktlint baseline gate**: `org.jlleitschuh.gradle.ktlint` 12.1.1 + ktlint tool 1.7.1. `server/config/ktlint/baseline.xml`은 최대 171건이며 현재 identity가 승인된 Phase 0 seed의 부분집합이어야 합니다. Auto-format은 `./server/gradlew -p server ktlintFormat`로 적용합니다.
+- **detekt baseline gate**: detekt 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. `server/config/detekt/baseline.xml`은 최대 461건이며 현재 identity가 승인된 Phase 0 seed의 부분집합이어야 합니다. detekt 1.23.x는 Java 25 daemon에서 동작하지 않아 Java 25/Kotlin 2.4/Gradle 9.x 검증 범위에 있는 detekt 2.x line으로 올렸고, baseline은 detekt 2 rule id 기준으로 재생성했습니다.
 - **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.43을 강제합니다. 현재 rule은 안정 측정치에서 약 2 percentage points를 뺀 floor입니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때도 이 baseline rule을 유지합니다.
-- **architecture no-growth gate**: `server/config/architecture/boundary-import-baseline.txt`는 최대 39개 import, `server/config/architecture/feature-dependency-baseline.txt`는 최대 41개 application feature edge를 허용하며 두 파일 모두 현재 source inventory와 정확히 일치해야 합니다. 기존 debt를 제거한 변경은 같은 변경에서 대응하는 baseline row도 삭제해야 합니다.
+- **architecture no-growth gate**: `server/config/architecture/boundary-import-baseline.txt`는 최대 39개 import, `server/config/architecture/feature-dependency-baseline.txt`는 최대 41개 application feature edge를 허용하며 두 파일 모두 현재 source inventory와 정확히 일치하고 승인된 Phase 0 seed의 부분집합이어야 합니다. 네 seed 파일은 늘리지 않는 control data이며 목표 아키텍처가 아닙니다. 기존 debt와 seed가 고정한 아키텍처 부채는 Phase 2에서 제거하고, 현재 source debt를 제거한 변경은 같은 변경에서 대응하는 baseline row도 삭제해야 합니다.
 
 CI backend job은 `./scripts/server-ci-check.sh` 단일 호출로 구성되어 있습니다 — wrapper가 실행하는 `check`는 `:unitTest + :architectureTest + :detekt + :jacoco*`를 모두 의존하므로 별도 architectureTest step은 불필요합니다. ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
 
@@ -351,10 +351,12 @@ Targeted Redis adapter test는 Testcontainers Redis를 직접 띄우므로 수�
 Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`의 slice registry는 web, messaging/Kafka, scheduler, adapter security, auth servlet-security inbound package를 등록하고, 등록된 inbound adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인합니다. `ServerArchitectureInventoryTest`는 39개 boundary import와 41개 application feature edge의 no-growth baseline을 현재 source와 대조합니다. 전환된 application package가 adapter, Spring JDBC, Spring DAO, Spring Web/HTTP 세부사항에 의존하지 않는지도 확인합니다. Application service에서 `ResponseStatusException`, `HttpStatus`, Spring Web type을 쓰지 말고 feature application error를 `adapter.in.web`에서 HTTP response로 매핑합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
 
 ```bash
-./server/gradlew -p server test \
+./server/gradlew -p server architectureTest \
+  --tests com.readmates.architecture.ServerArchitectureBoundaryTest
+./server/gradlew -p server unitTest \
   --tests com.readmates.auth.adapter.in.security.CurrentMemberArgumentResolverTest \
-  --tests com.readmates.architecture.ServerArchitectureBoundaryTest \
-  --tests com.readmates.session.application.service.SessionMemberWriteServiceTest \
+  --tests com.readmates.session.application.service.SessionMemberWriteServiceTest
+./server/gradlew -p server integrationTest \
   --tests com.readmates.session.api.CurrentSessionControllerDbTest \
   --tests com.readmates.session.api.HostSessionControllerDbTest \
   --tests com.readmates.session.api.HostDashboardControllerTest \
