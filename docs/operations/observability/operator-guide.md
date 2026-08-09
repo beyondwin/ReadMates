@@ -130,7 +130,22 @@ bash scripts/observability-local-smoke.sh
 
 AI span의 허용 dimension은 provider, allowlisted model, call mode, outcome, safe error code, job/attempt correlation뿐입니다. Prompt/completion/transcript/evidence/raw error와 user/session/club identity를 검색 편의를 위해 추가하지 않습니다. Tempo가 down이어도 server health와 product 요청이 유지되어야 하며 exporter failure/queue-drop meter로 손실을 별도로 확인합니다.
 
-## 6. Alerts And SLOs
+## 6. Admin health refresh 장애 격리
+
+`/admin/health`는 platform-admin 전용 운영 진단입니다. Actuator liveness/readiness endpoint가 아니며 live AI provider를 호출하거나 email을 보내지 않습니다. 개별 card를 해석하기 전에 server response metadata를 확인합니다.
+
+| `refreshState` | 운영 의미와 다음 조치 |
+| --- | --- |
+| `FRESH` | complete provider wave가 성공했습니다. card-local signal을 정상적으로 해석합니다. |
+| `REFRESHING` | scheduled 또는 lazy wave가 진행 중이며 last-known-good card가 현재 진단입니다. outcome이 보이기 전 새 incident로 단정하지 않습니다. |
+| `STALE` | failed wave 뒤 이전 complete snapshot을 보존한 상태입니다. card에 조치하기 전 `lastSuccessfulAt`, `staleAgeSeconds`, provider outcome counter, transport availability, executor saturation을 확인합니다. |
+| `UNAVAILABLE` | complete success wave가 아직 없습니다. card에 provider-local `UNKNOWN`이 있어도 fresh로 가정하지 말고 initial wave가 끝나지 못한 이유를 찾습니다. |
+
+다음 bounded metric을 함께 봅니다. `readmates.admin.health.provider.outcomes`는 `TIMEOUT`, `REJECTED` 등 provider outcome을 구분하고, `readmates.admin.health.refresh.overlap`은 existing wave에 join한 demand를 보이며, `readmates.admin.health.refresh.duration`은 완료된 `FRESH`/`STALE`/`UNAVAILABLE` wave를 분리하고, `readmates.admin.health.snapshot.stale.age.seconds`는 current age를 표시합니다. label은 fixed enum이므로 endpoint, URL, exception, club, user, deployment 값을 time series에서 찾지 않습니다.
+
+`REJECTED`가 증가하면 dedicated bounded executor가 포화되어 request thread에서 provider work를 실행하는 대신 의도적으로 거절한 것입니다. workload와 configured executor capacity를 확인하되 caller-runs로 바꾸지 않습니다. timeout outcome이 늘면 Prometheus transport path와 configured connect, connection-request, read timeout의 provider deadline 관계를 점검합니다. invalid configuration은 fallback을 적용하지 않고 startup에서 application을 실패시키므로 restart 전 typed `readmates.admin.health` 값을 검증합니다. scheduler는 refresh input port를 비동기로 호출하고 failure에는 fixed safe warning만 남기므로 provider payload를 log에서 찾기보다 metric과 response metadata를 사용합니다.
+
+## 7. Alerts And SLOs
 
 Prometheus alert rule source는 `ops/prometheus/alerts/*.yml`입니다. SLO 사람 읽기용 문서는 `docs/operations/observability/slos.md`이고, 서버 resource source는 `server/src/main/resources/slo/slos.yaml`입니다.
 
@@ -145,7 +160,7 @@ sed -n '1,160p' docs/operations/observability/slos.md
 
 초보자가 자주 헷갈리는 점: 알림이 울리지 않았다고 장애가 없는 것은 아닙니다. 반대로 알림 하나만으로 root cause가 확정되는 것도 아닙니다.
 
-## 7. ELK/Kibana
+## 8. ELK/Kibana
 
 ELK는 로그를 중앙 수집, 저장, 검색, 시각화하는 스택입니다.
 

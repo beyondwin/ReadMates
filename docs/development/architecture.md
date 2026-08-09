@@ -204,7 +204,15 @@ ReadMates 서버는 도메인 패키지를 다음 두 형태로 운영합니다.
 
 ### Ops Read-side
 - `admin.health` — 운영 상태 snapshot과 deploy ledger를 provider/adapter에서 읽어 aggregate card model로 반환합니다.
-- Mutation surface가 아니며, application service는 provider 결과를 card-local failure로 격리합니다.
+- Mutation surface가 아니며, `@ReadOnlyApplicationService`인 application service는 provider 결과를 card-local failure로 격리합니다. `PlatformAdminHealthRefreshScheduler`는 `admin.health.adapter.in.scheduling`의 인바운드 어댑터이며 `RefreshPlatformAdminHealthUseCase`만 호출합니다. scheduler와 HTTP controller는 concrete service나 provider에 직접 의존하지 않습니다.
+
+`readmates.admin.health`는 typed startup configuration입니다. 기본값은 `refresh-interval=10s`, `freshness=30s`, `provider-deadline=2500ms`, executor `threads=4`, `queue-capacity=16`, `shutdown-await=5s`, Prometheus `base-url=http://prometheus:9090`, `connect-timeout=500ms`, `connection-request-timeout=500ms`, `read-timeout=2000ms`입니다. 모든 duration은 양수여야 하고 `refresh-interval < freshness`, 각 Prometheus timeout은 `provider-deadline` 이하여야 합니다. executor thread는 1–16, queue capacity는 1–1024 범위이며 base URL은 host를 가진 absolute HTTP(S) URL이어야 합니다. 이 조건 중 하나라도 어기면 Spring context가 health executor를 만들기 전에 startup을 실패시킵니다.
+
+Prometheus transport의 connect/socket timeout은 전용 Apache HttpClient connection configuration이 소유하고, connection-request와 response/read timeout은 Apache request configuration 및 Spring request factory에 명시적으로 설정합니다. 이는 `provider-deadline`의 논리 fallback과 별개로 blocking HTTP 작업을 실제로 제한합니다. health executor는 `platform-admin-health-` daemon thread를 쓰는 fixed-size `ThreadPoolTaskExecutor`이며, bounded queue와 `AbortPolicy`를 사용합니다. 따라서 포화 때 caller-runs로 요청 thread를 점유하지 않고 즉시 rejection을 provider-local `UNKNOWN` 결과로 바꿉니다. 종료 시에는 진행 task 완료를 기다리되 `shutdown-await`까지만 기다립니다.
+
+lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight future를 공유합니다. 전체 provider wave가 성공하면 snapshot과 `lastSuccessfulAt`을 갱신해 `FRESH`가 되고, 하나라도 실패하면 이전의 완전한 last-known-good snapshot은 `STALE`로 보존합니다. 첫 성공 전 실패는 성공한 card와 provider-local `UNKNOWN` card를 포함한 `UNAVAILABLE` snapshot을 반환합니다. stale read는 하나의 lazy refresh를 시작하되 last-known-good을 즉시 반환하며, 늦은 supplier completion은 이미 결정된 결과를 덮어쓰지 못합니다.
+
+`GET /api/admin/health/snapshot`의 기존 `schema`, `generatedAt`, `cards`는 유지되고 `lastSuccessfulAt`(첫 성공 전 `null`), `refreshState`(`FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE`), `staleAgeSeconds`가 additive metadata로 제공됩니다. platform-admin authorization, database schema, migration, provider 호출과 email 동작은 변경하지 않습니다. frontend는 server-supplied state와 age를 표시하며 TanStack Query의 fetching 상태는 새로고침 버튼의 transport hint일 뿐 server freshness를 대체하지 않습니다.
 
 ### Mixed / Workflow-side
 - `admin.operations` — 네 운영 source의 allowlist signal을 case/event/source-freshness ledger로 조정하고, 낙관적 version을 가진 lifecycle mutation과 exact-source resolve 검증을 수행합니다. Application layer는 source adapter, JDBC, Micrometer, Spring Web detail이 아니라 outbound port에 의존합니다.

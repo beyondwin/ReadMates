@@ -296,6 +296,26 @@ Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 �
 
 Backend `integrationTest`는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, integration lane을 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
 
+### Admin health 장애 격리
+
+`admin.health`의 transport, executor, single-flight, stale snapshot, scheduler, metric, additive response contract를 변경하면 아래 focused lane을 먼저 실행합니다. transport test는 응답 body를 보류하는 local HTTP server를 사용하며 live Prometheus/provider를 호출하지 않습니다. scheduler, executor, frontend browser fixture도 local 또는 fake infrastructure만 사용합니다.
+
+```bash
+./server/gradlew -p server unitTest \
+  --tests 'com.readmates.admin.health.*' \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+./server/gradlew -p server architectureTest \
+  --tests com.readmates.architecture.ServerArchitectureInventoryTest \
+  --tests com.readmates.architecture.ServerArchitectureBoundaryTest \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+corepack pnpm --dir front exec vitest run \
+  features/platform-admin/ui/admin-health-grid.test.tsx \
+  features/platform-admin/route/admin-health-route.test.tsx
+corepack pnpm --dir front exec playwright test tests/e2e/admin-health.spec.ts
+```
+
+회귀 matrix는 executor 생성 전 invalid typed property의 startup failure, 실제 read timeout, caller-runs 없는 bounded-queue rejection, lazy/scheduled single-flight, timeout/error/rejection, stale last-known-good, initial unavailable와 recovery, bounded metric label, scheduler-to-input-port 방향, additive metadata/UI state를 포함해야 합니다. ship 전에는 `./scripts/server-ci-check.sh`, `./server/gradlew -p server integrationTest`, full frontend lint/test/build/E2E lane, 변경 scope에 맞는 public-release candidate check를 실행합니다.
+
 로컬 image 재현성 검증은 `./server/gradlew -p server bootJar` 후 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다. Java 25 test JVM은 Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access를 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access를 거절하며, `ProtobufJava25CompatibilityTest`가 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화하는 fallback을 고정합니다.
 
 ### Testcontainers 재사용 (로컬 전용)
