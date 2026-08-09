@@ -284,7 +284,7 @@ PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 
 - **ktlint baseline gate**: `org.jlleitschuh.gradle.ktlint` 12.1.1 + ktlint tool 1.7.1. 기존 위반은 `server/config/ktlint/baseline.xml`로 grandfather, 신규 위반만 차단합니다. Auto-format은 `./server/gradlew -p server ktlintFormat`로 적용합니다.
 - **detekt baseline gate**: detekt 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. 기존 위반은 `server/config/detekt/baseline.xml`로 grandfather. detekt 1.23.x는 Java 25 daemon에서 동작하지 않아 Java 25/Kotlin 2.4/Gradle 9.x 검증 범위에 있는 detekt 2.x line으로 올렸고, baseline은 detekt 2 rule id 기준으로 재생성했습니다.
-- **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.23(측정치 -2pp)을 강제합니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때는 측정치 -2pp baseline rule을 유지합니다.
+- **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.43을 강제합니다. 현재 rule은 안정 측정치에서 약 2 percentage points를 뺀 floor입니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때도 이 baseline rule을 유지합니다.
 
 CI backend job은 `./scripts/server-ci-check.sh` 단일 호출로 구성되어 있습니다 — wrapper가 실행하는 `check`는 `:unitTest + :architectureTest + :detekt + :jacoco*`를 모두 의존하므로 별도 architectureTest step은 불필요합니다. ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
 

@@ -352,8 +352,8 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                // baseline 0.2504 (measured 2026-05-14) -2pp; raised in Task 4 if needed.
-                minimum = "0.23".toBigDecimal()
+                // Phase 0 baseline 0.4577 (measured 2026-08-09) -2pp safety margin.
+                minimum = "0.43".toBigDecimal()
             }
         }
     }

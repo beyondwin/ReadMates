@@ -52,6 +52,15 @@ class ServerQualityRatchetTest {
         assertThat(counts.ktlintErrors).isLessThanOrEqualTo(MAX_KTLINT_BASELINE_ERRORS)
     }
 
+    @Test
+    fun `jacoco line floor stays at approved phase zero minimum`() {
+        val buildScript = projectRoot().resolve("server/build.gradle.kts").toFile().readText()
+
+        assertThat(buildScript).contains(
+            """minimum = "0.43".toBigDecimal()""",
+        )
+    }
+
     private fun projectRoot(): Path =
         listOf(Path.of("."), Path.of(".."))
             .map { candidate -> candidate.toAbsolutePath().normalize() }
