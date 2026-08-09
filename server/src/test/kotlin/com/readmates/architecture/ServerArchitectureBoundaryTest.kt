@@ -11,6 +11,7 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
 import java.nio.file.Files
 import java.nio.file.Path
@@ -184,8 +185,12 @@ private val migratedInboundAdapterPackages =
 private val legacyRepositoryDependencyTarget: DescribedPredicate<JavaClass> =
     DescribedPredicate.describe("project or legacy persistence repository") { target ->
         target.simpleName.endsWith("Repository") &&
-            target.name != "com.readmates.auth.infrastructure.security.OAuthFlowContextRepository" &&
-            !target.packageName.startsWith("org.springframework.security.")
+            target.name !in
+                setOf(
+                    "com.readmates.auth.infrastructure.security.OAuthFlowContextRepository",
+                    "org.springframework.security.oauth2.client.registration.ClientRegistrationRepository",
+                    "org.springframework.security.oauth2.client.web.AuthorizationRequestRepository",
+                )
     }
 
 @Tag("architecture")
@@ -256,7 +261,7 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
-    fun `repository dependency predicate excludes OAuth security contracts but retains project repositories`() {
+    fun `repository dependency predicate allows exact OAuth contracts and rejects other repositories`() {
         val projectRepository =
             importedClasses.get("com.readmates.aigen.adapter.out.persistence.JdbcAiGenerationClubDefaultRepository")
         val oauthFlowContextRepository =
@@ -269,6 +274,8 @@ class ServerArchitectureBoundaryTest {
                 .map { dependency -> dependency.targetClass }
                 .filter { javaClass -> javaClass.name.startsWith("org.springframework.security.") }
                 .filter { javaClass -> javaClass.simpleName.endsWith("Repository") }
+        val otherSpringSecurityRepository =
+            ClassFileImporter().importClass(HttpSessionSecurityContextRepository::class.java)
 
         assertTrue(legacyRepositoryDependencyTarget.test(projectRepository))
         assertFalse(legacyRepositoryDependencyTarget.test(oauthFlowContextRepository))
@@ -280,6 +287,7 @@ class ServerArchitectureBoundaryTest {
             oauthSecurityRepositoryContracts.map { javaClass -> javaClass.name }.toSet(),
         )
         assertTrue(oauthSecurityRepositoryContracts.none(legacyRepositoryDependencyTarget::test))
+        assertTrue(legacyRepositoryDependencyTarget.test(otherSpringSecurityRepository))
     }
 
     @Test
