@@ -924,20 +924,27 @@ def _normalized_worktree_object_id(repo: Path, path: str) -> str | None:
     return object_id
 
 
-def _filter_attribute_violation(repo: Path, path: str) -> Violation | None:
+def _filter_attribute_violation(
+    repo: Path,
+    path: str,
+    *,
+    cached: bool,
+) -> Violation | None:
+    view = "cached/index" if cached else "worktree"
+    category_prefix = "index-" if cached else ""
+    arguments = ["check-attr"]
+    if cached:
+        arguments.append("--cached")
+    arguments.extend(("-z", "filter", "--", path))
     result = _run_git_bytes(
         repo,
-        "check-attr",
-        "-z",
-        "filter",
-        "--",
-        path,
+        *arguments,
     )
     if result.returncode != 0:
         return Violation(
-            "catalog-attribute-unreadable",
+            f"{category_prefix}catalog-attribute-unreadable",
             _public_path(path),
-            "Git filter attribute cannot be inspected safely",
+            f"Git {view} filter attribute cannot be inspected safely",
         )
     fields = result.stdout.split(b"\0")
     if fields and fields[-1] == b"":
@@ -948,16 +955,16 @@ def _filter_attribute_violation(repo: Path, path: str) -> Violation | None:
         reported_path = ""
     if len(fields) != 3 or reported_path != path or fields[1] != b"filter":
         return Violation(
-            "catalog-attribute-unreadable",
+            f"{category_prefix}catalog-attribute-unreadable",
             _public_path(path),
-            "Git filter attribute response is malformed",
+            f"Git {view} filter attribute response is malformed",
         )
     if fields[2] in (b"unspecified", b"unset"):
         return None
     return Violation(
-        "catalog-external-filter",
+        f"{category_prefix}catalog-external-filter",
         _public_path(path),
-        "production migrations must not use a clean filter driver",
+        f"production migrations must not use a clean filter driver in {view} attributes",
     )
 
 
@@ -1018,6 +1025,17 @@ def check_migrations(base_ref: str) -> int:
     base_by_path = {migration.path: migration for migration in base_migrations}
     index_by_path = {migration.path: migration for migration in index_migrations}
     current_by_path = {migration.path: migration for migration in current_migrations}
+    worktree_attribute_blocked: set[str] = set()
+    for path in sorted(index_by_path):
+        filter_violation = _filter_attribute_violation(repo, path, cached=True)
+        if filter_violation is not None:
+            violations.append(filter_violation)
+    for path in sorted(current_by_path):
+        filter_violation = _filter_attribute_violation(repo, path, cached=False)
+        if filter_violation is not None:
+            violations.append(filter_violation)
+            worktree_attribute_blocked.add(path)
+
     base_max = max((migration.version for migration in base_migrations), default=None)
     if base_max is None:
         violations.append(
@@ -1054,11 +1072,7 @@ def check_migrations(base_ref: str) -> int:
                     "base migration was deleted, renamed, moved, or made invalid",
                 )
             )
-        else:
-            filter_violation = _filter_attribute_violation(repo, path)
-            if filter_violation is not None:
-                violations.append(filter_violation)
-                continue
+        elif path not in worktree_attribute_blocked:
             normalized_object_id = _normalized_worktree_object_id(repo, path)
             if normalized_object_id is None:
                 violations.append(
@@ -1565,6 +1579,111 @@ class FlywayMigrationImmutabilityTests(unittest.TestCase):
             with self.subTest(contract="bounded category"):
                 self.assertIn("[catalog-external-filter]", result.stderr)
             with self.subTest(contract="filter not invoked"):
+                self.assertFalse(marker.exists(), "checker invoked configured clean filter")
+
+    def test_untracked_forward_migration_rejects_active_worktree_filter_without_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo, base = self._new_repo(Path(temporary))
+            relative = MIGRATION_DIRECTORY / "V10__untracked_filtered_change.sql"
+            marker = self._configure_mask_filter(repo, f"{relative.as_posix()} filter=mask")
+            self._write(
+                repo,
+                str(relative),
+                "ALTER TABLE fixture_one ADD COLUMN untracked_filtered_at TIMESTAMP;\n",
+            )
+
+            result = self._run_checker(repo, base)
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("[catalog-external-filter]", result.stderr)
+            self.assertFalse(marker.exists(), "checker invoked configured clean filter")
+
+    def test_staged_forward_migration_rejects_active_cached_filter_without_invocation(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            repo, base = self._new_repo(Path(temporary))
+            relative = MIGRATION_DIRECTORY / "V10__staged_filtered_change.sql"
+            marker = self._configure_mask_filter(repo, f"{relative.as_posix()} filter=mask")
+            self._write(
+                repo,
+                str(relative),
+                "ALTER TABLE fixture_one ADD COLUMN staged_filtered_at TIMESTAMP;\n",
+            )
+            self._git(repo, "add", str(relative))
+            if marker.exists():
+                marker.unlink()
+
+            result = self._run_checker(repo, base)
+
+            self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertIn("[index-catalog-external-filter]", result.stderr)
+            self.assertFalse(marker.exists(), "checker invoked configured clean filter")
+
+    def test_index_and_worktree_filter_attributes_are_inspected_independently_for_additions(self) -> None:
+        relative = MIGRATION_DIRECTORY / "V10__split_attribute_change.sql"
+        cases = (
+            (
+                "cached active",
+                f"{relative.as_posix()} !filter",
+                f"{relative.as_posix()} filter=mask",
+                f"{relative.as_posix()} !filter",
+                "index-catalog-external-filter",
+            ),
+            (
+                "worktree active",
+                f"{relative.as_posix()} !filter",
+                None,
+                f"{relative.as_posix()} filter=mask",
+                "catalog-external-filter",
+            ),
+        )
+        for name, committed_rule, staged_rule, worktree_rule, category in cases:
+            with self.subTest(name=name), tempfile.TemporaryDirectory() as temporary:
+                repo, base = self._new_repo(Path(temporary))
+                marker = self._configure_mask_filter(repo, committed_rule)
+                self._write(
+                    repo,
+                    str(relative),
+                    "ALTER TABLE fixture_one ADD COLUMN split_attribute_at TIMESTAMP;\n",
+                )
+                if staged_rule is not None:
+                    self._write(repo, ".gitattributes", staged_rule + "\n")
+                    self._git(repo, "add", ".gitattributes")
+                self._git(repo, "add", str(relative))
+                self._write(repo, ".gitattributes", worktree_rule + "\n")
+                if marker.exists():
+                    marker.unlink()
+
+                result = self._run_checker(repo, base)
+
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn(f"[{category}]", result.stderr)
+                self.assertFalse(marker.exists(), "checker invoked configured clean filter")
+
+    def test_inactive_filters_allow_new_index_and_worktree_migrations_without_invocation(self) -> None:
+        for attribute_rule in ("*.sql -filter", "*.sql !filter"):
+            with self.subTest(attribute_rule=attribute_rule), tempfile.TemporaryDirectory() as temporary:
+                repo, base = self._new_repo(Path(temporary))
+                marker = self._configure_mask_filter(repo, attribute_rule)
+                staged = MIGRATION_DIRECTORY / "V10__staged_inactive_filter.sql"
+                self._write(
+                    repo,
+                    str(staged),
+                    "ALTER TABLE fixture_one ADD COLUMN staged_inactive_at TIMESTAMP;\n",
+                )
+                self._git(repo, "add", str(staged))
+                self._write(
+                    repo,
+                    str(MIGRATION_DIRECTORY / "V11__untracked_inactive_filter.sql"),
+                    "ALTER TABLE fixture_one ADD COLUMN untracked_inactive_at TIMESTAMP;\n",
+                )
+                if marker.exists():
+                    marker.unlink()
+
+                result = self._run_checker(repo, base)
+
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn("index-count: 3", result.stdout)
+                self.assertIn("current-count: 4", result.stdout)
                 self.assertFalse(marker.exists(), "checker invoked configured clean filter")
 
     def test_unset_and_unspecified_filter_attributes_do_not_invoke_driver(self) -> None:
