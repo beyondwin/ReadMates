@@ -12,7 +12,9 @@ import org.springframework.stereotype.Component
 class PlatformAdminHealthRefreshScheduler(
     private val refreshHealth: RefreshPlatformAdminHealthUseCase,
 ) {
-    @Scheduled(fixedDelayString = "\${readmates.admin.health.refresh-interval}")
+    // Annotation placeholders resolve before typed property bean defaults. The context test keeps this
+    // fallback aligned with PlatformAdminHealthProperties' approved 10-second default.
+    @Scheduled(fixedDelayString = "\${readmates.admin.health.refresh-interval:10s}")
     fun refresh() {
         try {
             refreshHealth.refresh(PlatformHealthRefreshTrigger.SCHEDULED).whenComplete { _, failure ->
