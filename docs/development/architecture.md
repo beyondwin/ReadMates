@@ -212,7 +212,7 @@ Prometheus transport의 connect/socket timeout은 전용 Apache HttpClient conne
 
 lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight future를 공유합니다. 전체 provider wave가 성공하면 snapshot과 `lastSuccessfulAt`을 갱신해 `FRESH`가 되고, 하나라도 실패하면 이전의 완전한 last-known-good snapshot은 `STALE`로 보존합니다. 첫 성공 전 실패는 성공한 card와 provider-local `UNKNOWN` card를 포함한 `UNAVAILABLE` snapshot을 반환합니다. stale read는 하나의 lazy refresh를 시작하되 last-known-good을 즉시 반환하며, 늦은 supplier completion은 이미 결정된 결과를 덮어쓰지 못합니다.
 
-`GET /api/admin/health/snapshot`의 기존 `schema`, `generatedAt`, `cards`는 유지되고 `lastSuccessfulAt`(첫 성공 전 `null`), `refreshState`(`FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE`), `staleAgeSeconds`가 additive metadata로 제공됩니다. platform-admin authorization, database schema, migration, provider 호출과 email 동작은 변경하지 않습니다. frontend는 server-supplied state와 age를 표시하며 TanStack Query의 fetching 상태는 새로고침 버튼의 transport hint일 뿐 server freshness를 대체하지 않습니다.
+`GET /api/admin/health/snapshot`의 기존 `schema`, `generatedAt`, `cards`는 유지되고 `lastSuccessfulAt`(첫 성공 전 `null`), `refreshState`(`FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE`), `staleAgeSeconds`가 additive metadata로 제공됩니다. platform-admin authorization, database schema, migration, live AI-provider invocation과 email-send behavior는 변경하지 않습니다. frontend는 server-supplied state와 age를 표시하며 TanStack Query의 fetching 상태는 새로고침 버튼의 transport hint일 뿐 server freshness를 대체하지 않습니다.
 
 ### Mixed / Workflow-side
 - `admin.operations` — 네 운영 source의 allowlist signal을 case/event/source-freshness ledger로 조정하고, 낙관적 version을 가진 lifecycle mutation과 exact-source resolve 검증을 수행합니다. Application layer는 source adapter, JDBC, Micrometer, Spring Web detail이 아니라 outbound port에 의존합니다.

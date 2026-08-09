@@ -137,7 +137,7 @@ AI span의 허용 dimension은 provider, allowlisted model, call mode, outcome, 
 | `refreshState` | 운영 의미와 다음 조치 |
 | --- | --- |
 | `FRESH` | complete provider wave가 성공했습니다. card-local signal을 정상적으로 해석합니다. |
-| `REFRESHING` | scheduled 또는 lazy wave가 진행 중이며 last-known-good card가 현재 진단입니다. outcome이 보이기 전 새 incident로 단정하지 않습니다. |
+| `REFRESHING` | scheduled 또는 lazy wave가 진행 중이며 현재 화면에는 마지막으로 보였던 snapshot이 남습니다. `lastSuccessfulAt`이 있으면 그것이 last-known-good snapshot이지만, `null`이면 첫 complete success 전 partial/`UNKNOWN` snapshot일 수 있으므로 `lastSuccessfulAt`과 `refreshState`를 함께 구분합니다. outcome이 보이기 전 새 incident로 단정하지 않습니다. |
 | `STALE` | failed wave 뒤 이전 complete snapshot을 보존한 상태입니다. card에 조치하기 전 `lastSuccessfulAt`, `staleAgeSeconds`, provider outcome counter, transport availability, executor saturation을 확인합니다. |
 | `UNAVAILABLE` | complete success wave가 아직 없습니다. card에 provider-local `UNKNOWN`이 있어도 fresh로 가정하지 말고 initial wave가 끝나지 못한 이유를 찾습니다. |
 
