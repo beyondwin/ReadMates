@@ -107,6 +107,7 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS` / `CLAIM_LEASE` | `30s` / `15m` | scheduler delay와 exact claim lease. Lease는 최대 `24h`이고 두 max age보다 짧아야 함 |
 | `READMATES_NOTIFICATION_EVENT_MAX_AGE` / `DELIVERY_MAX_AGE` | `24h` / `24h` | relay와 delivery deadline |
 | `READMATES_NOTIFICATION_BACKLOG_REFRESH_INTERVAL` / `BACKLOG_INITIAL_DELAY` | `60s` / `5s` | backlog snapshot refresh |
+| `READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL` / `MAX_TARGETS` | `10m` / `1000` | 관리자 delivery replay preview 만료 시간과 한 번에 허용할 최대 대상 수 |
 | `SERVER_FORWARD_HEADERS_STRATEGY` | `framework` | Caddy reverse-proxy 뒤 fixed |
 | `READMATES_REDIS_ENABLED` / `RATE_LIMIT_ENABLED` / `AUTH_SESSION_CACHE_ENABLED` / `PUBLIC_CACHE_ENABLED` / `NOTES_CACHE_ENABLED` / `NOTIFICATIONS_ENABLED` / `KAFKA_ENABLED` | `true` | prod 표준 (전부 활성) |
 
@@ -131,3 +132,5 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 ## Notification SMTP boundary
 
 SMTP username/password만 secret이다. Host와 connection/read/write timeout(각 `5s`)은 공개 운영 설정이며 sync-config가 렌더링한다. 세 timeout 합계는 notification claim lease보다 짧아야 한다. Claim lease는 최대 `24h`이고 event/delivery max age보다 각각 엄격히 짧아야 하며, startup validation 실패 시 credential을 출력하지 말고 property path만 확인한다.
+
+관리자 delivery replay 설정도 비민감 고정 운영값으로 렌더링한다. `READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL=10m`은 `1m..1h` 범위의 whole-millisecond duration이어야 하고, `READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS=1000`은 `1..5000` 범위여야 한다. 범위를 벗어나면 서버는 해당 property path를 포함해 시작에 실패한다.

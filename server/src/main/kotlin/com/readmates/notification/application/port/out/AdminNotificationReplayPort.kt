@@ -13,14 +13,21 @@ interface AdminNotificationReplayPort {
         filterJson: String,
         selectionHash: String,
         matchedCount: Int,
+        createdAt: OffsetDateTime,
         expiresAt: OffsetDateTime,
     ): UUID
 
     fun loadOpenPreview(previewId: UUID): AdminNotificationReplayPreviewRecord?
 
-    fun markPreviewConsumed(previewId: UUID): Boolean
+    fun markPreviewConsumed(
+        previewId: UUID,
+        consumedAt: OffsetDateTime,
+    ): Boolean
 
-    fun replayDeadOrFailedDeliveries(filter: AdminNotificationFilter): Int
+    fun replayDeadOrFailedDeliveries(
+        filter: AdminNotificationFilter,
+        replayedAt: OffsetDateTime,
+    ): Int
 }
 
 interface AdminNotificationAuditPort {
@@ -28,6 +35,7 @@ interface AdminNotificationAuditPort {
         actorUserId: UUID,
         actorPlatformRole: String,
         metadataJson: String,
+        createdAt: OffsetDateTime,
     )
 }
 

@@ -197,14 +197,15 @@ class JdbcAdminNotificationOperationsAdapter(
         filterJson: String,
         selectionHash: String,
         matchedCount: Int,
+        createdAt: OffsetDateTime,
         expiresAt: OffsetDateTime,
     ): UUID {
         val id = UUID.randomUUID()
         jdbcTemplate.update(
             """
             insert into admin_notification_replay_previews
-              (id, actor_user_id, filter_json, selection_hash, matched_count, expires_at)
-            values (?, ?, cast(? as json), ?, ?, ?)
+              (id, actor_user_id, filter_json, selection_hash, matched_count, expires_at, created_at)
+            values (?, ?, cast(? as json), ?, ?, ?, ?)
             """.trimIndent(),
             id.dbString(),
             actorUserId.dbString(),
@@ -212,6 +213,7 @@ class JdbcAdminNotificationOperationsAdapter(
             selectionHash,
             matchedCount,
             expiresAt.toUtcLocalDateTime(),
+            createdAt.toUtcLocalDateTime(),
         )
         return id
     }
@@ -238,18 +240,25 @@ class JdbcAdminNotificationOperationsAdapter(
                 previewId.dbString(),
             ).firstOrNull()
 
-    override fun markPreviewConsumed(previewId: UUID): Boolean =
+    override fun markPreviewConsumed(
+        previewId: UUID,
+        consumedAt: OffsetDateTime,
+    ): Boolean =
         jdbcTemplate.update(
             """
             update admin_notification_replay_previews
-            set consumed_at = utc_timestamp(6)
+            set consumed_at = ?
             where id = ?
               and consumed_at is null
             """.trimIndent(),
+            consumedAt.toUtcLocalDateTime(),
             previewId.dbString(),
         ) == 1
 
-    override fun replayDeadOrFailedDeliveries(filter: AdminNotificationFilter): Int {
+    override fun replayDeadOrFailedDeliveries(
+        filter: AdminNotificationFilter,
+        replayedAt: OffsetDateTime,
+    ): Int {
         val predicates = replayableDeliveryPredicates(filter)
         return JdbcArguments.update(
             jdbcTemplate,
@@ -257,13 +266,13 @@ class JdbcAdminNotificationOperationsAdapter(
             update notification_deliveries
             set status = 'PENDING',
                 attempt_count = 0,
-                next_attempt_at = utc_timestamp(6),
+                next_attempt_at = ?,
                 locked_at = null,
                 last_error = null,
-                updated_at = utc_timestamp(6)
+                updated_at = ?
             ${predicates.sql}
             """.trimIndent(),
-            predicates.args,
+            listOf(replayedAt.toUtcLocalDateTime(), replayedAt.toUtcLocalDateTime()) + predicates.args,
         )
     }
 
@@ -271,17 +280,19 @@ class JdbcAdminNotificationOperationsAdapter(
         actorUserId: UUID,
         actorPlatformRole: String,
         metadataJson: String,
+        createdAt: OffsetDateTime,
     ) {
         jdbcTemplate.update(
             """
             insert into platform_audit_events
               (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
-            values (?, ?, ?, null, 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED', cast(? as json), utc_timestamp(6))
+            values (?, ?, ?, null, 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED', cast(? as json), ?)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
             actorUserId.dbString(),
             actorPlatformRole,
             metadataJson,
+            createdAt.toUtcLocalDateTime(),
         )
     }
 }
@@ -526,22 +537,30 @@ private object JdbcArguments {
 }
 
 private fun replayableDeliveryPredicates(filter: AdminNotificationFilter): SqlPredicates {
+    val hasIneligibleFilter =
+        (filter.channel != null && filter.channel != NotificationChannel.EMAIL) ||
+            (
+                filter.deliveryStatus != null &&
+                    filter.deliveryStatus !in setOf(NotificationDeliveryStatus.FAILED, NotificationDeliveryStatus.DEAD)
+            )
+    if (hasIneligibleFilter) {
+        return SqlPredicates("where 1 = 0", emptyList())
+    }
     val predicates =
         mutableListOf(
-            "channel = 'EMAIL'",
-            "status in ('FAILED', 'DEAD')",
+            "binary channel = binary 'EMAIL'",
+            "binary status in (binary 'FAILED', binary 'DEAD')",
+            "binary last_error in (binary 'MAIL_RETRYABLE', binary 'MAIL_PERMANENT')",
         )
     val args = mutableListOf<Any>()
     filter.clubId?.let {
         predicates += "club_id = ?"
         args += it.dbString()
     }
-    filter.deliveryStatus
-        ?.takeIf { it in setOf(NotificationDeliveryStatus.FAILED, NotificationDeliveryStatus.DEAD) }
-        ?.let {
-            predicates += "status = ?"
-            args += it.name
-        }
+    filter.deliveryStatus?.let {
+        predicates += "binary status = binary ?"
+        args += it.name
+    }
     return SqlPredicates("where ${predicates.joinToString(" and ")}", args)
 }
 

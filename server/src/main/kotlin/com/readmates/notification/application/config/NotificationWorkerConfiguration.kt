@@ -6,7 +6,10 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(NotificationRuntimeProperties::class)
+@EnableConfigurationProperties(
+    NotificationRuntimeProperties::class,
+    AdminNotificationReplayProperties::class,
+)
 class NotificationWorkerConfiguration {
     @Bean("notificationWorkerRuntime")
     @ConditionalOnProperty(

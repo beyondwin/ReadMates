@@ -3,6 +3,7 @@ package com.readmates.notification.application.service
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
+import com.readmates.notification.application.config.AdminNotificationReplayProperties
 import com.readmates.notification.application.model.AdminNotificationClubHealth
 import com.readmates.notification.application.model.AdminNotificationDelivery
 import com.readmates.notification.application.model.AdminNotificationFilter
@@ -24,18 +25,33 @@ import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import java.time.Clock
+import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.ZoneId
 import java.time.ZoneOffset
 import java.util.UUID
 
 class AdminNotificationOperationsServiceTest {
     @Test
     fun `support can read snapshot but cannot replay`() {
-        val service = serviceWith(readPort = fakeReadPort())
+        val replayPort = RecordingAdminNotificationReplayPort()
+        val service = serviceWith(readPort = fakeReadPort(), replayPort = replayPort)
 
         val snapshot = service.snapshot(platformAdmin(PlatformAdminRole.SUPPORT))
 
         assertThat(snapshot.outboxSummary.pending).isEqualTo(2)
+
+        assertThatThrownBy {
+            service.previewReplay(
+                platformAdmin(PlatformAdminRole.SUPPORT),
+                com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest(
+                    AdminNotificationFilter(),
+                ),
+            )
+        }.isInstanceOf(AccessDeniedException::class.java)
+        assertThat(replayPort.estimateCalls).isZero()
+        assertThat(replayPort.createdPreviews).isEmpty()
     }
 
     @Test
@@ -55,7 +71,8 @@ class AdminNotificationOperationsServiceTest {
 
     @Test
     fun `support cannot confirm replay`() {
-        val service = serviceWith(replayPort = replayPortWithOpenPreview())
+        val replayPort = replayPortWithOpenPreview()
+        val service = serviceWith(replayPort = replayPort)
 
         assertThatThrownBy {
             service.confirmReplay(
@@ -63,6 +80,9 @@ class AdminNotificationOperationsServiceTest {
                 AdminNotificationReplayConfirmCommand(PREVIEW_ID, SELECTION_HASH, "Retry failed deliveries"),
             )
         }.isInstanceOf(AccessDeniedException::class.java)
+        assertThat(replayPort.loadCalls).isZero()
+        assertThat(replayPort.consumedPreviews).isEmpty()
+        assertThat(replayPort.replayedTransitions).isEmpty()
     }
 
     @Test
@@ -77,6 +97,146 @@ class AdminNotificationOperationsServiceTest {
         }.isInstanceOfSatisfying(NotificationApplicationException::class.java) { error ->
             assertThat(error.error)
                 .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED)
+        }
+    }
+
+    @Test
+    fun `preview normalizes one clock instant and stores the identical microsecond expiry`() {
+        val replayPort = RecordingAdminNotificationReplayPort()
+        val clock = AdminReplayCountingClock(Instant.parse("2026-05-27T01:02:03.123456789Z"))
+        val service = serviceWith(replayPort = replayPort, clock = clock)
+
+        val preview =
+            service.previewReplay(
+                platformAdmin(PlatformAdminRole.OWNER),
+                com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest(
+                    AdminNotificationFilter(),
+                ),
+            )
+
+        assertThat(clock.readCount).isEqualTo(1)
+        assertThat(replayPort.createdPreviews.single().createdAt)
+            .isEqualTo(OffsetDateTime.parse("2026-05-27T01:02:03.123456Z"))
+        assertThat(replayPort.createdPreviews.single().expiresAt)
+            .isEqualTo(OffsetDateTime.parse("2026-05-27T01:12:03.123456Z"))
+        assertThat(preview.expiresAt).isEqualTo(replayPort.createdPreviews.single().expiresAt)
+        assertThat(preview.expiresAt.nano % 1_000).isZero()
+    }
+
+    @Test
+    fun `preview rejects estimates above the configured target cap before persistence`() {
+        val replayPort = RecordingAdminNotificationReplayPort(matchedCount = 3)
+        val service =
+            serviceWith(
+                replayPort = replayPort,
+                replayProperties = AdminNotificationReplayProperties(maxTargets = 2),
+            )
+
+        assertThatThrownBy {
+            service.previewReplay(
+                platformAdmin(PlatformAdminRole.OWNER),
+                com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest(
+                    AdminNotificationFilter(),
+                ),
+            )
+        }.isInstanceOfSatisfying(NotificationApplicationException::class.java) { error ->
+            assertThat(error.error)
+                .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_TOO_MANY_TARGETS)
+        }
+        assertThat(replayPort.createdPreviews).isEmpty()
+    }
+
+    @Test
+    fun `another actor cannot confirm before any replay mutation`() {
+        val replayPort = replayPortWithOpenPreview()
+        val auditPort = RecordingAdminNotificationAuditPort()
+        val clock = AdminReplayCountingClock(TIMESTAMP.toInstant())
+        val service = serviceWith(replayPort = replayPort, auditPort = auditPort, clock = clock)
+
+        assertThatThrownBy {
+            service.confirmReplay(
+                platformAdmin(PlatformAdminRole.OWNER, OTHER_ADMIN_USER_ID),
+                AdminNotificationReplayConfirmCommand(PREVIEW_ID, SELECTION_HASH, "Retry failed deliveries"),
+            )
+        }.isInstanceOf(AccessDeniedException::class.java)
+
+        assertThat(clock.readCount).isZero()
+        assertThat(replayPort.consumedPreviews).isEmpty()
+        assertThat(replayPort.replayedTransitions).isEmpty()
+        assertThat(auditPort.events).isEmpty()
+    }
+
+    @Test
+    fun `confirm succeeds one microsecond before expiry and observes one normalized instant`() {
+        val expiresAt = TIMESTAMP.plusMinutes(10)
+        val now = expiresAt.minusNanos(1_000)
+        val replayPort = replayPortWithOpenPreview(expiresAt = expiresAt, matchedCount = 3, replayedCount = 2)
+        val auditPort = RecordingAdminNotificationAuditPort()
+        val clock = AdminReplayCountingClock(now.toInstant().plusNanos(999))
+        val service = serviceWith(replayPort = replayPort, auditPort = auditPort, clock = clock)
+
+        val result =
+            service.confirmReplay(
+                platformAdmin(PlatformAdminRole.OPERATOR),
+                AdminNotificationReplayConfirmCommand(PREVIEW_ID, SELECTION_HASH, "Retry failed deliveries"),
+            )
+
+        assertThat(result.replayedCount).isEqualTo(2)
+        assertThat(clock.readCount).isEqualTo(1)
+        assertThat(replayPort.consumedPreviews.single().at).isEqualTo(now)
+        assertThat(replayPort.replayedTransitions.single().at).isEqualTo(now)
+        assertThat(auditPort.events.single().createdAt).isEqualTo(now)
+    }
+
+    @Test
+    fun `confirm treats expiry equality as terminal before mutation`() {
+        val expiresAt = TIMESTAMP.plusMinutes(10)
+        val replayPort = replayPortWithOpenPreview(expiresAt = expiresAt)
+        val auditPort = RecordingAdminNotificationAuditPort()
+        val service =
+            serviceWith(
+                replayPort = replayPort,
+                auditPort = auditPort,
+                clock = Clock.fixed(expiresAt.toInstant(), ZoneOffset.UTC),
+            )
+
+        assertThatThrownBy {
+            service.confirmReplay(
+                platformAdmin(PlatformAdminRole.OWNER),
+                AdminNotificationReplayConfirmCommand(PREVIEW_ID, SELECTION_HASH, "Retry failed deliveries"),
+            )
+        }.isInstanceOfSatisfying(NotificationApplicationException::class.java) { error ->
+            assertThat(error.error)
+                .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED)
+        }
+        assertThat(replayPort.consumedPreviews).isEmpty()
+        assertThat(replayPort.replayedTransitions).isEmpty()
+        assertThat(auditPort.events).isEmpty()
+    }
+
+    @Test
+    fun `confirm rejects a reason above the code point bound before persistence`() {
+        assertReasonRejectedBeforePersistence("a".repeat(501))
+    }
+
+    @Test
+    fun `confirm rejects a reason above the UTF-8 byte bound before persistence`() {
+        assertReasonRejectedBeforePersistence("🙂".repeat(251))
+    }
+
+    @Test
+    fun `confirm accepts exact reason code point and UTF-8 byte boundaries`() {
+        listOf("a".repeat(500), "🙂".repeat(250)).forEach { reason ->
+            val replayPort = replayPortWithOpenPreview()
+            val service = serviceWith(replayPort = replayPort)
+
+            service.confirmReplay(
+                platformAdmin(PlatformAdminRole.OWNER),
+                AdminNotificationReplayConfirmCommand(PREVIEW_ID, SELECTION_HASH, reason),
+            )
+
+            assertThat(replayPort.consumedPreviews).hasSize(1)
+            assertThat(replayPort.replayedTransitions).hasSize(1)
         }
     }
 
@@ -124,7 +284,7 @@ class AdminNotificationOperationsServiceTest {
 
         assertThat(result.replayedCount).isEqualTo(2)
         assertThat(result.skippedCount).isEqualTo(1)
-        assertThat(replayPort.consumedPreviewIds).containsExactly(PREVIEW_ID)
+        assertThat(replayPort.consumedPreviews.map { it.previewId }).containsExactly(PREVIEW_ID)
         val event = auditPort.events.single()
         assertThat(event.actorPlatformRole).isEqualTo("OPERATOR")
         assertThat(event.metadataJson).contains("\"previewId\":\"$PREVIEW_ID\"")
@@ -136,20 +296,47 @@ class AdminNotificationOperationsServiceTest {
         readPort: AdminNotificationOperationsReadPort = fakeReadPort(),
         replayPort: RecordingAdminNotificationReplayPort = RecordingAdminNotificationReplayPort(),
         auditPort: AdminNotificationAuditPort = RecordingAdminNotificationAuditPort(),
+        replayProperties: AdminNotificationReplayProperties = AdminNotificationReplayProperties(),
+        clock: Clock = Clock.fixed(TIMESTAMP.toInstant(), ZoneOffset.UTC),
     ): AdminNotificationOperationsService =
         AdminNotificationOperationsService(
             readPort,
             replayPort,
             auditPort,
             FixedAdminNotificationJson,
+            replayProperties,
+            clock,
         )
 
-    private fun platformAdmin(role: PlatformAdminRole): CurrentPlatformAdmin =
+    private fun platformAdmin(
+        role: PlatformAdminRole,
+        userId: UUID = ADMIN_USER_ID,
+    ): CurrentPlatformAdmin =
         CurrentPlatformAdmin(
-            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            userId = userId,
             email = "admin@example.com",
             role = role,
         )
+
+    private fun assertReasonRejectedBeforePersistence(reason: String) {
+        val replayPort = replayPortWithOpenPreview()
+        val auditPort = RecordingAdminNotificationAuditPort()
+        val service = serviceWith(replayPort = replayPort, auditPort = auditPort)
+
+        assertThatThrownBy {
+            service.confirmReplay(
+                platformAdmin(PlatformAdminRole.OWNER),
+                AdminNotificationReplayConfirmCommand(PREVIEW_ID, SELECTION_HASH, reason),
+            )
+        }.isInstanceOfSatisfying(NotificationApplicationException::class.java) { error ->
+            assertThat(error.error)
+                .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_TOO_LONG)
+        }
+        assertThat(replayPort.loadCalls).isZero()
+        assertThat(replayPort.consumedPreviews).isEmpty()
+        assertThat(replayPort.replayedTransitions).isEmpty()
+        assertThat(auditPort.events).isEmpty()
+    }
 
     private fun fakeReadPort(): AdminNotificationOperationsReadPort =
         object : AdminNotificationOperationsReadPort {
@@ -168,7 +355,7 @@ class AdminNotificationOperationsServiceTest {
 }
 
 private fun replayPortWithOpenPreview(
-    expiresAt: OffsetDateTime = OffsetDateTime.now(ZoneOffset.UTC).plusMinutes(10),
+    expiresAt: OffsetDateTime = TIMESTAMP.plusMinutes(10),
     matchedCount: Int = 3,
     replayedCount: Int = 3,
 ): RecordingAdminNotificationReplayPort =
@@ -209,35 +396,76 @@ private class RecordingAdminNotificationReadPort : AdminNotificationOperationsRe
 private class RecordingAdminNotificationReplayPort(
     private val previewRecord: AdminNotificationReplayPreviewRecord? = null,
     private val replayedCount: Int = 0,
+    private val matchedCount: Int = 3,
 ) : AdminNotificationReplayPort {
-    val consumedPreviewIds = mutableListOf<UUID>()
+    var estimateCalls = 0
+    var loadCalls = 0
+    val createdPreviews = mutableListOf<CreatedPreview>()
+    val consumedPreviews = mutableListOf<TimestampedPreview>()
+    val replayedTransitions = mutableListOf<TimestampedReplay>()
 
-    override fun estimateReplayableDeliveries(filter: AdminNotificationFilter): AdminNotificationReplayEstimate =
-        AdminNotificationReplayEstimate(matchedCount = 3, estimatedByStatus = mapOf("FAILED" to 2, "DEAD" to 1))
+    override fun estimateReplayableDeliveries(filter: AdminNotificationFilter): AdminNotificationReplayEstimate {
+        estimateCalls += 1
+        return AdminNotificationReplayEstimate(
+            matchedCount = matchedCount,
+            estimatedByStatus = mapOf("FAILED" to matchedCount),
+        )
+    }
 
     override fun createPreview(
         actorUserId: UUID,
         filterJson: String,
         selectionHash: String,
         matchedCount: Int,
+        createdAt: OffsetDateTime,
         expiresAt: OffsetDateTime,
-    ): UUID = PREVIEW_ID
+    ): UUID {
+        createdPreviews += CreatedPreview(createdAt, expiresAt)
+        return PREVIEW_ID
+    }
 
-    override fun loadOpenPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? =
-        previewRecord?.takeIf { it.previewId == previewId }
+    override fun loadOpenPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? {
+        loadCalls += 1
+        return previewRecord?.takeIf { it.previewId == previewId }
+    }
 
-    override fun markPreviewConsumed(previewId: UUID): Boolean {
-        consumedPreviewIds += previewId
+    override fun markPreviewConsumed(
+        previewId: UUID,
+        consumedAt: OffsetDateTime,
+    ): Boolean {
+        consumedPreviews += TimestampedPreview(previewId, consumedAt)
         return true
     }
 
-    override fun replayDeadOrFailedDeliveries(filter: AdminNotificationFilter): Int = replayedCount
+    override fun replayDeadOrFailedDeliveries(
+        filter: AdminNotificationFilter,
+        replayedAt: OffsetDateTime,
+    ): Int {
+        replayedTransitions += TimestampedReplay(filter, replayedAt)
+        return replayedCount
+    }
 }
+
+private data class CreatedPreview(
+    val createdAt: OffsetDateTime,
+    val expiresAt: OffsetDateTime,
+)
+
+private data class TimestampedPreview(
+    val previewId: UUID,
+    val at: OffsetDateTime,
+)
+
+private data class TimestampedReplay(
+    val filter: AdminNotificationFilter,
+    val at: OffsetDateTime,
+)
 
 private data class AuditEvent(
     val actorUserId: UUID,
     val actorPlatformRole: String,
     val metadataJson: String,
+    val createdAt: OffsetDateTime,
 )
 
 private class RecordingAdminNotificationAuditPort : AdminNotificationAuditPort {
@@ -247,8 +475,25 @@ private class RecordingAdminNotificationAuditPort : AdminNotificationAuditPort {
         actorUserId: UUID,
         actorPlatformRole: String,
         metadataJson: String,
+        createdAt: OffsetDateTime,
     ) {
-        events += AuditEvent(actorUserId, actorPlatformRole, metadataJson)
+        events += AuditEvent(actorUserId, actorPlatformRole, metadataJson, createdAt)
+    }
+}
+
+private class AdminReplayCountingClock(
+    private val fixedInstant: Instant,
+    private val zone: ZoneId = ZoneOffset.UTC,
+) : Clock() {
+    var readCount: Int = 0
+
+    override fun getZone(): ZoneId = zone
+
+    override fun withZone(zone: ZoneId): Clock = AdminReplayCountingClock(fixedInstant, zone)
+
+    override fun instant(): Instant {
+        readCount += 1
+        return fixedInstant
     }
 }
 
@@ -317,6 +562,7 @@ private fun adminSnapshot(): AdminNotificationOperationsSnapshot =
 
 private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
 private val ADMIN_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000101")
+private val OTHER_ADMIN_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000102")
 private val PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000901")
 private const val SELECTION_HASH: String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 private val TIMESTAMP: OffsetDateTime = OffsetDateTime.of(2026, 5, 27, 1, 2, 3, 0, ZoneOffset.UTC)

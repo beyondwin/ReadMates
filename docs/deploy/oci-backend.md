@@ -94,6 +94,8 @@ READMATES_NOTIFICATION_EVENT_MAX_AGE=24h
 READMATES_NOTIFICATION_DELIVERY_MAX_AGE=24h
 READMATES_NOTIFICATION_BACKLOG_REFRESH_INTERVAL=60s
 READMATES_NOTIFICATION_BACKLOG_INITIAL_DELAY=5s
+READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL=10m
+READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS=1000
 SPRING_MAIL_HOST=smtp.email.<oci-region>.oci.oraclecloud.com
 SPRING_MAIL_PORT=587
 SPRING_MAIL_USERNAME=<oci-smtp-username>
@@ -457,3 +459,5 @@ where used_at < utc_timestamp() - interval 30 day;
 ## Notification runtime contract
 
 알림 환경은 Kafka send timeout `10s`, claim lease `15m`, event/delivery max age `24h`, SMTP connection/read/write timeout 각 `5s`를 함께 렌더링한다. 시작 시 모든 값·retry schedule을 검증하고, claim lease가 `24h`를 초과하거나 event/delivery max age보다 짧지 않거나 Kafka timeout 및 SMTP timeout 합계보다 길지 않으면 fail-fast한다.
+
+관리자 delivery replay preview는 `READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL=10m`, `READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS=1000`을 기본으로 사용한다. TTL은 `1m..1h`의 whole-millisecond duration, 대상 상한은 `1..5000`만 허용하며 잘못된 값은 첫 요청이 아니라 서버 시작을 실패시킨다. 한도를 넘는 preview는 저장하지 않고 클럽 또는 delivery 상태로 범위를 좁혀 다시 요청해야 한다.

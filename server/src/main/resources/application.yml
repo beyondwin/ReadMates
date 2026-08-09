@@ -142,6 +142,9 @@ readmates:
       connection-timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT:5s}
       read-timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT:5s}
       write-timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT:5s}
+    admin-replay:
+      preview-ttl: ${READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL:10m}
+      max-targets: ${READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS:1000}
   redis:
     enabled: ${READMATES_REDIS_ENABLED:false}
   rate-limit:
