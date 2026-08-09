@@ -76,9 +76,21 @@ WHERE request_id = '<request-id>';
 
 Interpretation:
 
-- `PENDING` or `FAILED` rows point to relay/publisher/channel investigation.
-- `DEAD` rows require delivery failure review and operator action.
+- Event-outbox `PENDING`, `FAILED`, `PUBLISHING`, `DEAD`는 relay/Kafka publication 조사 대상입니다. 이 row만으로 SMTP delivery 실패라고 판단하지 않습니다.
+- Event-outbox `DEAD`는 missing payload, event deadline 또는 retry exhaustion의 bounded reason을 확인하고, 원인 제거 전 blind replay/new event를 금지합니다.
 - No rows can be normal if the request did not enqueue notification work.
+
+Matching event ID가 있으면 delivery를 별도로 조회합니다.
+
+```sql
+SELECT id, event_id, channel, status, attempt_count, created_at, updated_at
+FROM notification_deliveries
+WHERE event_id IN (
+  SELECT id FROM notification_event_outbox WHERE request_id = '<request-id>'
+);
+```
+
+Delivery `DEAD`는 failure kind·attempt/deadline·lease와 허용된 provider/recipient evidence를 확인한 뒤 exact 대상만 recovery합니다. `AMBIGUOUS`는 acceptance 여부를 모르는 상태이므로 blind resend하지 않습니다.
 
 ## Step 4: Check Consumer Logs
 
@@ -99,7 +111,8 @@ Use the symptom metric that matches the incident:
 | API failures | `http_server_requests_seconds_count{status=~"5.."}` |
 | API latency | `http_server_requests_seconds_bucket` p95 |
 | DB pool pressure | `hikaricp_connections_pending` |
-| Notification backlog | `readmates_notifications_outbox_backlog` |
+| Event relay backlog | `readmates_notifications_outbox_backlog` |
+| Email delivery backlog | `readmates_notifications_delivery_backlog` |
 | Redis instability | `readmates_redis_fallbacks_total`, `readmates_redis_operation_errors_total` |
 | Log error volume | `logback_events_total{level="error"}` |
 
@@ -123,4 +136,4 @@ In the incident note or release evidence, explicitly record:
 - [Alerts](../observability/alerts.md)
 - [SLO](../observability/slos.md)
 
-알림 조사에는 correlation ID, fixed publish result, outbox/delivery status, attempt count, transition timestamp만 사용한다. raw SMTP response, email address, payload, stack trace는 조회 키나 incident 증거로 복사하지 않는다.
+알림 조사에는 correlation ID, fixed publish result, outbox/delivery status, attempt count, deadline/lease와 transition timestamp만 사용합니다. Raw SMTP response, email address, payload, stack trace는 조회 키나 incident 증거로 복사하지 않습니다. Relay와 SMTP recovery는 위 evidence gate를 각각 통과해야 하며 서로의 replay action으로 대체하지 않습니다.

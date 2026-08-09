@@ -100,6 +100,13 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | `SPRING_MAIL_PORT` | `587` | Gmail/STARTTLS 표준 |
 | `SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH` / `STARTTLS_ENABLE` | `true` | Gmail/STARTTLS 표준 |
 | `SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT` / `TIMEOUT` / `WRITETIMEOUT` | `5000` | 5s 표준 |
+| `READMATES_KAFKA_NOTIFICATION_SEND_TIMEOUT` | `10s` | claim lease보다 짧은 Kafka publish timeout |
+| `READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE` / `MAX_PUBLISH_ATTEMPTS` | `50` / `5` | relay 처리량과 attempt ceiling |
+| `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES` | `5,15,60,240` | relay와 delivery가 공유하는 retry schedule |
+| `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS` | `5` | delivery attempt ceiling |
+| `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS` / `CLAIM_LEASE` | `30s` / `15m` | scheduler delay와 exact claim lease |
+| `READMATES_NOTIFICATION_EVENT_MAX_AGE` / `DELIVERY_MAX_AGE` | `24h` / `24h` | relay와 delivery deadline |
+| `READMATES_NOTIFICATION_BACKLOG_REFRESH_INTERVAL` / `BACKLOG_INITIAL_DELAY` | `60s` / `5s` | backlog snapshot refresh |
 | `SERVER_FORWARD_HEADERS_STRATEGY` | `framework` | Caddy reverse-proxy 뒤 fixed |
 | `READMATES_REDIS_ENABLED` / `RATE_LIMIT_ENABLED` / `AUTH_SESSION_CACHE_ENABLED` / `PUBLIC_CACHE_ENABLED` / `NOTES_CACHE_ENABLED` / `NOTIFICATIONS_ENABLED` / `KAFKA_ENABLED` | `true` | prod 표준 (전부 활성) |
 

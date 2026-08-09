@@ -29,6 +29,32 @@
         }
       ],
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Event outbox backlog by status",
+      "targets": [
+        {
+          "expr": "sum by (status) (readmates_notifications_outbox_backlog)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Email delivery backlog by status",
+      "targets": [
+        {
+          "expr": "sum by (status) (readmates_notifications_delivery_backlog)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
     }
   ]
 }

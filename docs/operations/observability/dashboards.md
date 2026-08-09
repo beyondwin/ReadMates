@@ -71,8 +71,8 @@
 
 실제 dashboard JSON은 `ops/grafana/dashboards/notification-dispatch.json`(title: "Notification Dispatch")입니다.
 
-### Panel: Outbox backlog (status별)
-- 목적: notification_deliveries 테이블의 status별 적체 행 수. 증가 지속 시 발송 장애.
+### Panel: Event outbox backlog (status별)
+- 목적: `notification_event_outbox`의 relay/Kafka publication 적체를 `pending|failed|dead|publishing`으로 분리합니다.
 - 메트릭: `readmates_notifications_outbox_backlog`
 - PromQL:
   ```promql
@@ -88,10 +88,16 @@
   ```promql
   readmates_notifications_outbox_backlog{status="dead"}
   ```
-  ```promql
-  readmates_notifications_outbox_backlog{status="sending"}
-  ```
 - 임계 (참고): `pending` > 100이 5분 이상 지속, 또는 `dead` > 0 지속 시 조사.
+
+### Panel: Email delivery backlog (status별)
+- 목적: `notification_deliveries`의 worker/SMTP 적체를 `pending|failed|dead|sending`으로 분리합니다.
+- 메트릭: `readmates_notifications_delivery_backlog`
+- PromQL:
+  ```promql
+  sum by (status) (readmates_notifications_delivery_backlog)
+  ```
+- 해석: 첫 refresh 전 `NaN`은 0건이 아니며, `readmates_notifications_backlog_refresh_total{result=~"partial|failure"}` 증가 시 마지막 성공 snapshot일 수 있습니다.
 
 ### Panel: Notification send rate (event_type별)
 - 목적: 알림 발송 성공 처리량 추적. 기대 발송 수에 비해 급감 시 이상.
@@ -297,4 +303,4 @@ Latency histogram exemplar는 Grafana의 `readmates-tempo` datasource로 이동�
 - 도구 종속 (Grafana variables 등)은 일반화된 PromQL 위주로.
 - Micrometer 네이밍 규칙: `.`은 `_`으로 변환, counter는 `_total` suffix 자동 부착. 예: `readmates.notifications.sent` → `readmates_notifications_sent_total`.
 
-Notification Dispatch dashboard는 `readmates_outbox_publish_total` success ratio, event outbox backlog(`pending|failed|dead|publishing`), delivery backlog(`pending|failed|dead|sending`)를 분리한다. delivery가 0이어도 relay가 정상이라는 뜻이 아니므로 outbox `dead`/`publishing`과 publish result를 먼저 본다.
+Notification Dispatch dashboard는 `readmates_outbox_publish_total` success ratio, event outbox backlog(`pending|failed|dead|publishing`), delivery backlog(`pending|failed|dead|sending`)를 분리합니다. delivery가 0이어도 relay가 정상이라는 뜻이 아니므로 outbox와 publish result를 먼저 보고, backlog refresh `partial|failure`이면 last-success snapshot의 시각을 확인합니다.

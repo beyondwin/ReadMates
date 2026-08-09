@@ -314,6 +314,19 @@ do
   fi
 done
 
+for required_operating_evidence in \
+  "CHANGELOG.md" \
+  "docs/operations/observability/metrics-catalog.md" \
+  "docs/operations/observability/dashboards.md" \
+  "docs/operations/observability/alerts.md" \
+  "docs/operations/observability/slos.md" \
+  "docs/operations/observability/operator-guide.md"
+do
+  if [[ ! -f "$candidate_dir/$required_operating_evidence" ]]; then
+    fail "public release candidate is missing required operating evidence: $required_operating_evidence"
+  fi
+done
+
 if [[ -e "$candidate_dir/.git" ]]; then
   fail "public release candidate unexpectedly contains Git metadata"
 fi

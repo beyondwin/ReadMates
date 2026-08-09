@@ -182,4 +182,12 @@ ReadMates의 현재 결정:
 
 ## Notification recovery
 
-Outbox `DEAD`는 relay retry exhaustion, missing payload 또는 event deadline이다. Published 뒤 delivery `DEAD`는 SMTP permanent failure 또는 retry exhaustion이다. timeout/connection loss와 SMTP accepted-before-commit은 ambiguous라 at-least-once retry가 중복 메일을 만들 수 있다. host/admin recovery에서 correlation ID, fixed result, attempt count, safe timestamp만 대조하고 raw address, payload, provider response는 ticket에 넣지 않는다. Exactly-once는 provider idempotency key/receipt API가 필요하며 이 slice 밖이다.
+### Relay/Kafka publication
+
+`readmates_outbox_publish_total`의 `failure|dead|missing_payload|expired|stale_lease` 분포, event-outbox `pending|failed|dead|publishing`, backlog refresh result, outbox의 event type·attempt count·safe bounded error code·transition time·request ID를 함께 확인합니다. `DEAD` 원인이 missing payload/deadline/config/Kafka 장애 중 무엇인지 확인하고 원인이 제거되기 전에는 같은 business event를 다시 만들거나 delivery replay를 대신 실행하지 않습니다. 현재 slice에는 relay DEAD를 안전하게 되돌리는 범용 action이 없으므로 DB row를 직접 수정하지 않고 incident와 forward recovery를 분리합니다.
+
+### Email worker/SMTP
+
+Delivery `pending|failed|dead|sending`, sent/failed/dead counter, attempt count, failure kind(`PERMANENT|RETRYABLE|AMBIGUOUS`), deadline과 exact lease를 확인합니다. `PERMANENT`는 주소/구성 근거가 교정된 exact delivery만 preview/confirm recovery 대상으로 삼고, `RETRYABLE`은 provider 회복과 lease 상태를 확인합니다. `AMBIGUOUS`는 provider acceptance 또는 recipient-side evidence 없이 즉시 resend하지 않습니다. 불확실한 경우 중복 위험을 incident에 남기고 operator가 명시적으로 승인한 exact 대상만 처리합니다.
+
+Raw address, payload, provider response, stack trace는 ticket에 넣지 않습니다. SMTP accepted-before-`SENT` CAS는 lease reclaim 뒤 중복될 수 있는 at-least-once 경계입니다. Exactly-once에는 provider idempotency key/receipt API가 필요하며 현재 범위 밖입니다.

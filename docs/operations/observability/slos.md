@@ -101,16 +101,15 @@ ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 
 ## `notification_dispatch_success_ratio`
 
-- **정의**: 7일 rolling window에서 outbox publish 성공률 > 99% (DEAD 제외, objective 0.99).
+- **정의**: 7일 rolling window에서 모든 고정 relay 결과(`success`, `failure`, `dead`, `missing_payload`, `expired`, `stale_lease`) 중 `success` 비율 > 99% (objective 0.99).
 - **측정**:
   ```promql
   sum(rate(readmates_outbox_publish_total{result="success"}[5m]))
     /
-  sum(rate(readmates_outbox_publish_total[5m]))
+  clamp_min(sum(rate(readmates_outbox_publish_total[5m])), 1)
   ```
 - **에러 예산**: 7일 window 기준 1%.
-- **위반 시 행동**: `readmates_notifications_outbox_backlog{status="pending"}` gauge 추이 + Kafka publisher 로그 확인.
-  실패가 특정 event_type에 몰리면 payload schema 회귀, 분산되면 인프라 장애.
+- **위반 시 행동**: `sum by (result) (rate(readmates_outbox_publish_total[5m]))`와 `readmates_notifications_outbox_backlog`의 `pending|failed|dead|publishing`을 함께 확인합니다. 이 counter에는 `event_type` tag가 없으므로 존재하지 않는 tag로 원인을 추론하지 않습니다.
 - **근거**: 알림 발송 실패는 사용자 흐름과 비동기이지만 누락 시 신뢰가 무너지므로 99% 유지.
 - **현재**: 측정 중 (Prometheus 스크래퍼 배포 완료, 첫 측정은 `docs/operations/slo-reports/2026-06.md` 참조).
 
@@ -142,4 +141,4 @@ ID/PromQL 일관성은 `SloCatalogDocsConsistencyTest`가 강제합니다.
 - External blackbox/synthetic checks for full script-load failure.
 - SLO 위반 시 자동 post-mortem trigger.
 
-Notification dispatch success ratio는 실제 committed publish transition인 `readmates_outbox_publish_total`만 사용한다. scrape 또는 backlog observation 실패를 성공으로 간주하지 않으며, event-outbox와 delivery backlog는 별도 운영 신호다.
+Notification dispatch success ratio는 `readmates_outbox_publish_total`의 모든 고정 결과를 분모로 사용합니다. `clamp_min(..., 1)`은 0으로 나누기만 막으며, scrape 또는 backlog observation 실패를 성공 증거로 바꾸지 않습니다. `stale_lease`는 uncommitted CAS outcome이고 event-outbox와 delivery backlog는 별도 운영 신호입니다.

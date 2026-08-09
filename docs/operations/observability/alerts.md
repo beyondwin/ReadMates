@@ -77,7 +77,7 @@ groups:
           team: backend
         annotations:
           summary: "Notification pending backlog over 100 for 10 minutes"
-          description: "Consumer가 처리 속도를 따라가지 못하거나 죽었을 가능성. consumer 로그 확인."
+          description: "Event relay가 Kafka publish 속도를 따라가지 못했거나 멈췄을 가능성. publish result와 relay/Kafka evidence 확인."
           runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationOutboxBacklogCritical
@@ -88,7 +88,7 @@ groups:
           team: backend
         annotations:
           summary: "Notification pending backlog over 1000"
-          description: "Consumer가 죽었거나 의존 인프라가 unreachable. 즉시 조사."
+          description: "Event relay 또는 Kafka publication이 중단됐을 가능성. delivery worker가 아니라 event outbox evidence를 즉시 조사."
           runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationFailRateHigh
@@ -102,7 +102,7 @@ groups:
           team: backend
         annotations:
           summary: "Notification 실패율 5% 초과 (10분)"
-          description: "발송 실패가 지속. 외부 채널(예: FCM) 장애 또는 payload 변경 의심."
+          description: "Email delivery 실패가 지속. SMTP/provider 또는 delivery worker evidence 확인."
           runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationDeadLetters
@@ -233,3 +233,5 @@ count > 0이면 운영자에게 알림 (이메일 또는 in-app).
 - `node-exporter`, `cadvisor`, `blackbox-exporter`는 production v1 이후 별도 계획으로 추가한다.
 
 NotificationOutboxBacklog/RelayDead는 event relay, NotificationDeliveryBacklog/DeadLetters는 SMTP delivery 경보다. event outbox와 delivery rows를 같은 queue로 해석하지 않는다.
+
+Backlog gauge가 첫 refresh 전 `NaN`이거나 refresh result가 `partial|failure`인 경우 0건으로 해석하지 않습니다. 마지막 성공 snapshot과 `readmates_notifications_backlog_refresh_total`을 먼저 확인합니다.
