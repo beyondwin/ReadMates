@@ -112,8 +112,8 @@ readmates:
       allow-empty-secret: false
   notifications:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
-    sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:ReadMates}
-    sender-email: ${READMATES_NOTIFICATION_SENDER_EMAIL:no-reply@example.com}
+    sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:}
+    sender-email: ${READMATES_NOTIFICATION_SENDER_EMAIL:}
     reminder-cron: ${READMATES_NOTIFICATION_REMINDER_CRON:0 0 0 * * *}
     reminder-zone: ${READMATES_NOTIFICATION_REMINDER_ZONE:Asia/Seoul}
     retry-delay-minutes: ${READMATES_NOTIFICATION_RETRY_DELAY_MINUTES:5,15,60,240}
@@ -121,7 +121,6 @@ readmates:
       enabled: ${READMATES_NOTIFICATIONS_WORKER_ENABLED:true}
       fixed-delay: ${READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS:30s}
       relay-batch-size: ${READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE:50}
-      delivery-batch-size: ${READMATES_NOTIFICATION_WORKER_BATCH_SIZE:20}
       claim-lease: ${READMATES_NOTIFICATION_CLAIM_LEASE:15m}
       event-max-age: ${READMATES_NOTIFICATION_EVENT_MAX_AGE:24h}
       delivery-max-age: ${READMATES_NOTIFICATION_DELIVERY_MAX_AGE:24h}

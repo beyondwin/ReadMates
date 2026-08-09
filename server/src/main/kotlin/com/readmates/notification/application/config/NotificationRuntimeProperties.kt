@@ -37,17 +37,13 @@ private val DEFAULT_SMTP_TIMEOUT: Duration = Duration.ofSeconds(SMTP_TIMEOUT_SEC
 @ConfigurationProperties(prefix = "readmates.notifications")
 data class NotificationRuntimeProperties(
     val enabled: Boolean = false,
-    val senderEmail: String = "no-reply@example.com",
-    val senderName: String = "ReadMates",
+    val senderEmail: String = "",
+    val senderName: String = "",
     val worker: Worker = Worker(),
     val kafka: Kafka = Kafka(),
     val smtp: Smtp = Smtp(),
 ) {
     init {
-        if (enabled) {
-            requireNotBlank("sender-email", senderEmail)
-            requireNotBlank("sender-name", senderName)
-        }
         if (enabled && kafka.enabled) {
             require(kafka.bootstrapServers.any(String::isNotBlank)) {
                 "readmates.notifications.kafka.bootstrap-servers must be set when notification Kafka is enabled"
@@ -73,11 +69,17 @@ data class NotificationRuntimeProperties(
         }
     }
 
+    internal fun validateEnabledSender() {
+        if (enabled) {
+            requireNotBlank("sender-email", senderEmail)
+            requireNotBlank("sender-name", senderName)
+        }
+    }
+
     data class Worker(
         val enabled: Boolean = true,
         val fixedDelay: Duration = DEFAULT_FIXED_DELAY,
         val relayBatchSize: Int = 50,
-        val deliveryBatchSize: Int = 20,
         val claimLease: Duration = DEFAULT_CLAIM_LEASE,
         val eventMaxAge: Duration = DEFAULT_MAX_AGE,
         val deliveryMaxAge: Duration = DEFAULT_MAX_AGE,
@@ -89,7 +91,6 @@ data class NotificationRuntimeProperties(
         init {
             requirePositive("worker.fixed-delay", fixedDelay)
             requireCount("worker.relay-batch-size", relayBatchSize)
-            requireCount("worker.delivery-batch-size", deliveryBatchSize)
             requirePositive("worker.claim-lease", claimLease)
             requirePositive("worker.event-max-age", eventMaxAge)
             requirePositive("worker.delivery-max-age", deliveryMaxAge)

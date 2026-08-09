@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.Arguments
 import org.junit.jupiter.params.provider.MethodSource
+import org.springframework.boot.test.context.ConfigDataApplicationContextInitializer
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import java.time.Duration
 import java.util.stream.Stream
@@ -12,6 +13,11 @@ import java.util.stream.Stream
 class NotificationRuntimePropertiesTest {
     private val contextRunner =
         ApplicationContextRunner()
+            .withUserConfiguration(NotificationWorkerConfiguration::class.java)
+
+    private val productionConfigRunner =
+        ApplicationContextRunner()
+            .withInitializer(ConfigDataApplicationContextInitializer())
             .withUserConfiguration(NotificationWorkerConfiguration::class.java)
 
     @ParameterizedTest(name = "rejects {0}")
@@ -26,6 +32,25 @@ class NotificationRuntimePropertiesTest {
         }
     }
 
+    @ParameterizedTest(name = "omitted {0}")
+    @MethodSource("omittedEnabledSenderProperties")
+    fun `enabled notifications require sender values absent from production configuration`(
+        expectedPath: String,
+        propertyValues: Array<String>,
+    ) {
+        productionConfigRunner.withPropertyValues(*propertyValues).run { context ->
+            assertThat(context).hasFailed()
+            assertThat(context.startupFailure.allMessages()).contains(expectedPath)
+        }
+    }
+
+    @Test
+    fun `removed delivery batch setting does not bind a second runtime owner`() {
+        contextRunner
+            .withPropertyValues("readmates.notifications.worker.delivery-batch-size=0")
+            .run { context -> assertThat(context).hasNotFailed() }
+    }
+
     @Test
     fun `approved defaults bind to one immutable runtime contract`() {
         contextRunner.run { context ->
@@ -33,10 +58,11 @@ class NotificationRuntimePropertiesTest {
 
             val properties = context.getBean(NotificationRuntimeProperties::class.java)
             assertThat(properties.enabled).isFalse()
+            assertThat(properties.senderEmail).isEmpty()
+            assertThat(properties.senderName).isEmpty()
             assertThat(properties.worker.enabled).isTrue()
             assertThat(properties.worker.fixedDelay).isEqualTo(Duration.ofSeconds(30))
             assertThat(properties.worker.relayBatchSize).isEqualTo(50)
-            assertThat(properties.worker.deliveryBatchSize).isEqualTo(20)
             assertThat(properties.worker.claimLease).isEqualTo(Duration.ofMinutes(15))
             assertThat(properties.worker.eventMaxAge).isEqualTo(Duration.ofHours(24))
             assertThat(properties.worker.deliveryMaxAge).isEqualTo(Duration.ofHours(24))
@@ -89,6 +115,20 @@ class NotificationRuntimePropertiesTest {
                 transportInvalidProperties(),
             ).flatten().stream()
 
+        @JvmStatic
+        fun omittedEnabledSenderProperties(): Stream<Arguments> =
+            Stream.of(
+                invalid(
+                    "readmates.notifications.sender-email",
+                    "readmates.notifications.enabled=true",
+                ),
+                invalid(
+                    "readmates.notifications.sender-name",
+                    "readmates.notifications.enabled=true",
+                    "readmates.notifications.sender-email=no-reply@example.test",
+                ),
+            )
+
         private fun senderAndKafkaIdentityInvalidProperties(): List<Arguments> =
             listOf(
                 invalid(
@@ -126,8 +166,6 @@ class NotificationRuntimePropertiesTest {
                 invalidValue("readmates.notifications.worker.fixed-delay", "-1s"),
                 invalidValue("readmates.notifications.worker.relay-batch-size", "0"),
                 invalidValue("readmates.notifications.worker.relay-batch-size", "1001"),
-                invalidValue("readmates.notifications.worker.delivery-batch-size", "0"),
-                invalidValue("readmates.notifications.worker.delivery-batch-size", "1001"),
                 invalidValue("readmates.notifications.worker.claim-lease", "0s"),
                 invalidValue("readmates.notifications.worker.claim-lease", "-1s"),
                 invalidValue("readmates.notifications.worker.event-max-age", "0s"),

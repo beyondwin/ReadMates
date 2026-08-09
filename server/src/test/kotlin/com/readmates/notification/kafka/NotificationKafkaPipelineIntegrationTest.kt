@@ -99,9 +99,11 @@ private const val CLEANUP_NOTIFICATION_KAFKA_PIPELINE_SQL = """
     ],
     properties = [
         "readmates.notifications.enabled=true",
+        "readmates.notifications.sender-email=no-reply@example.test",
+        "readmates.notifications.sender-name=ReadMates",
         "readmates.notifications.kafka.enabled=true",
         "readmates.notifications.kafka.delivery-retry-backoff=10ms",
-        "readmates.notifications.kafka.delivery-retry-max-attempts=0",
+        "readmates.notifications.kafka.delivery-retry-max-attempts=1",
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
     ],
 )
