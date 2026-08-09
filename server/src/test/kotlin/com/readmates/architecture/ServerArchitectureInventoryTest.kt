@@ -1,6 +1,7 @@
 package com.readmates.architecture
 
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -53,10 +54,15 @@ class ServerArchitectureInventoryTest {
     fun `repository boundary import baseline exactly matches source`() {
         val root = projectRoot()
         val actual = boundaryDebtImports(root.resolve("server/src/main/kotlin"))
-        val baseline = readArchitectureBaseline(root.resolve("server/config/architecture/boundary-import-baseline.txt"))
+        val baseline =
+            readBoundaryImportBaseline(root.resolve("server/config/architecture/boundary-import-baseline.txt"))
+        val approvedSeed =
+            readBoundaryImportBaseline(
+                root.resolve("server/config/architecture/phase-0-approved-boundary-imports.txt"),
+            )
 
-        assertThat(baseline).hasSizeLessThanOrEqualTo(39)
         assertThat(actual).isEqualTo(baseline)
+        requireApprovedIdentitySubset(baseline, approvedSeed, ceiling = 39, label = "boundary import baseline")
     }
 
     @Test
@@ -64,13 +70,67 @@ class ServerArchitectureInventoryTest {
         val root = projectRoot()
         val actual = applicationFeatureEdges(root.resolve("server/src/main/kotlin"))
         val baseline =
-            readArchitectureBaseline(root.resolve("server/config/architecture/feature-dependency-baseline.txt"))
+            readFeatureDependencyBaseline(root.resolve("server/config/architecture/feature-dependency-baseline.txt"))
+        val approvedSeed =
+            readFeatureDependencyBaseline(
+                root.resolve("server/config/architecture/phase-0-approved-feature-dependencies.txt"),
+            )
         val components = cyclicFeatureComponents(actual)
         val knownComponent = setOf("auth", "club", "notification", "session", "sessionimport", "sessionrecord")
 
-        assertThat(baseline).hasSizeLessThanOrEqualTo(41)
         assertThat(actual).isEqualTo(baseline)
+        requireApprovedIdentitySubset(baseline, approvedSeed, ceiling = 41, label = "feature dependency baseline")
         assertThat(components).allMatch { component -> knownComponent.containsAll(component) }
+    }
+
+    @Test
+    fun `boundary ratchet rejects a same size identity substitution`() {
+        val approvedSeed =
+            setOf(
+                "com/readmates/a/adapter/in/web/A.kt|com.readmates.a.application.service.AService",
+                "com/readmates/b/adapter/in/web/B.kt|com.readmates.b.application.service.BService",
+            )
+        val substituted =
+            setOf(
+                "com/readmates/a/adapter/in/web/A.kt|com.readmates.a.application.service.AService",
+                "com/readmates/c/adapter/in/web/C.kt|com.readmates.c.application.service.CService",
+            )
+
+        assertThatThrownBy {
+            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "boundary fixture")
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("com/readmates/c/adapter/in/web/C.kt")
+    }
+
+    @Test
+    fun `feature ratchet rejects a same size identity substitution`() {
+        val approvedSeed = setOf("auth|club", "club|shared")
+        val substituted = setOf("auth|club", "example|shared")
+
+        assertThatThrownBy {
+            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "feature fixture")
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("example|shared")
+    }
+
+    @Test
+    fun `architecture baselines fail closed for duplicate and malformed rows`(
+        @TempDir root: Path,
+    ) {
+        val duplicateBoundary = root.resolve("boundary.txt")
+        val malformedFeature = root.resolve("feature.txt")
+        Files.writeString(
+            duplicateBoundary,
+            "com/readmates/a/A.kt|com.readmates.a.B\ncom/readmates/a/A.kt|com.readmates.a.B\n",
+        )
+        Files.writeString(malformedFeature, "auth|club|shared\n")
+
+        assertThatThrownBy { readBoundaryImportBaseline(duplicateBoundary) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Duplicate")
+        assertThatThrownBy { readFeatureDependencyBaseline(malformedFeature) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Malformed")
     }
 
     private fun write(

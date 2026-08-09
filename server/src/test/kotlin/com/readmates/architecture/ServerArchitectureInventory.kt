@@ -53,15 +53,19 @@ fun applicationFeatureEdges(sourceRoot: Path): Set<String> =
             }
         }.toSortedSet()
 
-fun readArchitectureBaseline(path: Path): Set<String> {
-    val rows =
-        path
-            .readLines()
-            .map(String::trim)
-            .filter { row -> row.isNotEmpty() && !row.startsWith("#") }
-    require(rows.size == rows.toSet().size) { "Duplicate architecture baseline row in $path" }
-    return rows.toSortedSet()
-}
+fun readBoundaryImportBaseline(path: Path): Set<String> =
+    readArchitectureBaseline(path, "boundary import") { row ->
+        val fields = row.split('|')
+        fields.size == ARCHITECTURE_IDENTITY_FIELD_COUNT &&
+            BOUNDARY_SOURCE.matches(fields[0]) &&
+            IMPORTED_SYMBOL.matches(fields[1])
+    }
+
+fun readFeatureDependencyBaseline(path: Path): Set<String> =
+    readArchitectureBaseline(path, "feature dependency") { row ->
+        val fields = row.split('|')
+        fields.size == ARCHITECTURE_IDENTITY_FIELD_COUNT && fields.all(FEATURE_NAME::matches)
+    }
 
 fun cyclicFeatureComponents(edges: Set<String>): Set<Set<String>> {
     val pairs = edges.map { edge -> edge.split('|').let { it[0] to it[1] } }
@@ -120,3 +124,31 @@ private fun kotlinFiles(root: Path): List<Path> =
     Files.walk(root).use { paths ->
         paths.filter { path -> Files.isRegularFile(path) && path.name.endsWith(".kt") }.toList()
     }
+
+private fun readArchitectureBaseline(
+    path: Path,
+    label: String,
+    isValid: (String) -> Boolean,
+): Set<String> {
+    val rows =
+        path
+            .readLines()
+            .filterNot { row -> row.isBlank() || row.trimStart().startsWith("#") }
+            .map { row ->
+                require(row == row.trim() && isValid(row)) { "Malformed $label baseline row in $path: $row" }
+                row
+            }
+    val duplicates =
+        rows
+            .groupingBy { row -> row }
+            .eachCount()
+            .filterValues { count -> count > 1 }
+            .keys
+    require(duplicates.isEmpty()) { "Duplicate $label baseline rows in $path: ${duplicates.sorted().joinToString()}" }
+    return rows.toSortedSet()
+}
+
+private val BOUNDARY_SOURCE = Regex("""com/readmates/[A-Za-z0-9_/]+\.kt""")
+private val IMPORTED_SYMBOL = Regex("""com\.readmates\.[A-Za-z0-9_.]+""")
+private val FEATURE_NAME = Regex("""[a-z][a-z0-9]*(?:\.[a-z][a-z0-9]*)?""")
+private const val ARCHITECTURE_IDENTITY_FIELD_COUNT = 2

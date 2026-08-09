@@ -11,7 +11,7 @@ import java.nio.file.Path
 @Tag("architecture")
 class ServerQualityRatchetTest {
     @Test
-    fun `baseline reader counts detekt ids and ktlint errors`(
+    fun `baseline reader retains normalized detekt and ktlint identities`(
         @TempDir tempDir: Path,
     ) {
         val detekt = tempDir.resolve("detekt.xml")
@@ -20,7 +20,9 @@ class ServerQualityRatchetTest {
             detekt,
             """
             <?xml version="1.0"?>
-            <SmellBaseline><CurrentIssues><ID>one</ID><ID>two</ID></CurrentIssues></SmellBaseline>
+            <SmellBaseline>
+                <CurrentIssues><ID>Rule:A.kt:one</ID><ID>Rule:B.kt:two</ID></CurrentIssues>
+            </SmellBaseline>
             """.trimIndent(),
         )
         Files.writeString(
@@ -28,15 +30,23 @@ class ServerQualityRatchetTest {
             """
             <?xml version="1.0"?>
             <baseline>
-                <file name="A.kt"><error line="1"/><error line="2"/></file>
-                <file name="B.kt"><error line="3"/></file>
+                <file name="./A.kt">
+                    <error line="1" column="2" source="standard:first-rule"/>
+                    <error line="2" column="3" source="standard:second-rule"/>
+                </file>
+                <file name="B.kt"><error line="3" column="4" source="standard:third-rule"/></file>
             </baseline>
             """.trimIndent(),
         )
 
-        val counts = ServerQualityBaselineReader.read(detekt, ktlint)
+        val identities = ServerQualityBaselineReader.read(detekt, ktlint)
 
-        assertThat(counts).isEqualTo(ServerQualityBaselineCounts(detektIssues = 2, ktlintErrors = 3))
+        assertThat(identities.detektIssues).containsExactlyInAnyOrder("Rule:A.kt:one", "Rule:B.kt:two")
+        assertThat(identities.ktlintErrors).containsExactlyInAnyOrder(
+            "A.kt|standard:first-rule|1|2",
+            "A.kt|standard:second-rule|2|3",
+            "B.kt|standard:third-rule|3|4",
+        )
     }
 
     @Test
@@ -53,16 +63,99 @@ class ServerQualityRatchetTest {
     }
 
     @Test
+    fun `baseline reader fails closed for duplicate identities`(
+        @TempDir tempDir: Path,
+    ) {
+        val detekt = tempDir.resolve("detekt.xml")
+        val ktlint = tempDir.resolve("ktlint.xml")
+        Files.writeString(
+            detekt,
+            """
+            <?xml version="1.0"?>
+            <SmellBaseline><CurrentIssues><ID>Rule:A.kt:item</ID><ID>Rule:A.kt:item</ID></CurrentIssues></SmellBaseline>
+            """.trimIndent(),
+        )
+        Files.writeString(
+            ktlint,
+            """
+            <?xml version="1.0"?>
+            <baseline>
+                <file name="A.kt">
+                    <error line="1" column="2" source="standard:rule"/>
+                </file>
+            </baseline>
+            """.trimIndent(),
+        )
+
+        assertThatThrownBy { ServerQualityBaselineReader.read(detekt, ktlint) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Duplicate")
+    }
+
+    @Test
     fun `static analysis baselines never grow`() {
         val root = projectRoot()
-        val counts =
+        val identities =
             ServerQualityBaselineReader.read(
                 root.resolve("server/config/detekt/baseline.xml"),
                 root.resolve("server/config/ktlint/baseline.xml"),
             )
+        val approvedDetektSeed =
+            readDetektIdentitySeed(root.resolve("server/config/detekt/phase-0-approved-identities.txt"))
+        val approvedKtlintSeed =
+            readKtlintIdentitySeed(root.resolve("server/config/ktlint/phase-0-approved-identities.txt"))
 
-        assertThat(counts.detektIssues).isLessThanOrEqualTo(MAX_DETEKT_BASELINE_ISSUES)
-        assertThat(counts.ktlintErrors).isLessThanOrEqualTo(MAX_KTLINT_BASELINE_ERRORS)
+        requireApprovedIdentitySubset(
+            current = identities.detektIssues,
+            approvedSeed = approvedDetektSeed,
+            ceiling = MAX_DETEKT_BASELINE_ISSUES,
+            label = "Detekt baseline",
+        )
+        requireApprovedIdentitySubset(
+            current = identities.ktlintErrors,
+            approvedSeed = approvedKtlintSeed,
+            ceiling = MAX_KTLINT_BASELINE_ERRORS,
+            label = "ktlint baseline",
+        )
+    }
+
+    @Test
+    fun `detekt ratchet rejects a same size identity substitution`() {
+        val approvedSeed = setOf("Rule:A.kt:first", "Rule:B.kt:second")
+        val substituted = setOf("Rule:A.kt:first", "Rule:C.kt:replacement")
+
+        assertThatThrownBy {
+            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "Detekt fixture")
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Rule:C.kt:replacement")
+    }
+
+    @Test
+    fun `ktlint ratchet rejects a same size identity substitution`() {
+        val approvedSeed = setOf("A.kt|standard:first|1|2", "B.kt|standard:second|3|4")
+        val substituted = setOf("A.kt|standard:first|1|2", "C.kt|standard:replacement|5|6")
+
+        assertThatThrownBy {
+            requireApprovedIdentitySubset(substituted, approvedSeed, ceiling = 2, label = "ktlint fixture")
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("C.kt|standard:replacement|5|6")
+    }
+
+    @Test
+    fun `quality identity seeds fail closed for duplicate or malformed rows`(
+        @TempDir tempDir: Path,
+    ) {
+        val duplicateDetektSeed = tempDir.resolve("detekt-seed.txt")
+        val malformedKtlintSeed = tempDir.resolve("ktlint-seed.txt")
+        Files.writeString(duplicateDetektSeed, "Rule:A.kt:item\nRule:A.kt:item\n")
+        Files.writeString(malformedKtlintSeed, "A.kt|standard:rule|not-a-line|2\n")
+
+        assertThatThrownBy { readDetektIdentitySeed(duplicateDetektSeed) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Duplicate")
+        assertThatThrownBy { readKtlintIdentitySeed(malformedKtlintSeed) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("Malformed")
     }
 
     @Test
