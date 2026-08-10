@@ -40,6 +40,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.TestFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.data.redis.connection.DataType
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
@@ -79,14 +80,15 @@ import kotlin.io.path.readText
 @Tag("integration")
 @Tag("container")
 class RedisAiGenerationFailureRecoveryTest(
-    @param:Autowired private val recovery: AiGenerationFailureRecoveryPort,
-    @param:Autowired private val store: AiGenerationJobStore,
-    @param:Autowired private val guard: GenerationCostGuard,
-    @param:Autowired private val reservations: ProviderCallReservationPort,
-    @param:Autowired private val redis: StringRedisTemplate,
-    @param:Autowired private val properties: AiGenerationProperties,
+    @param:Autowired override val recovery: AiGenerationFailureRecoveryPort,
+    @param:Autowired override val store: AiGenerationJobStore,
+    @param:Autowired override val guard: GenerationCostGuard,
+    @param:Autowired override val reservations: ProviderCallReservationPort,
+    @param:Autowired override val redis: StringRedisTemplate,
+    @param:Autowired override val properties: AiGenerationProperties,
     @param:Autowired private val queueProbe: ActiveAiGenerationJobProbe,
-) : ReadmatesRedisIntegrationTestSupport() {
+) : ReadmatesRedisIntegrationTestSupport(),
+    RedisRecoveryRollingCompatibilityContract {
     @Suppress("UnusedPrivateProperty")
     @MockitoBean
     private lateinit var jobQueue: AiGenerationJobQueue
@@ -1049,6 +1051,249 @@ class RedisAiGenerationFailureRecoveryTest(
         assertThat(failed && inFlight).isFalse()
     }
 }
+
+interface RedisRecoveryRollingCompatibilityContract {
+    val recovery: AiGenerationFailureRecoveryPort
+    val store: AiGenerationJobStore
+    val guard: GenerationCostGuard
+    val reservations: ProviderCallReservationPort
+    val redis: StringRedisTemplate
+    val properties: AiGenerationProperties
+
+    @Test
+    fun `legacy fourteen-field provider attempt defers while live without mutation`() {
+        val running = rollingRecord(JobStatus.RUNNING)
+        guard.checkBeforeCall(running.hostUserId, running.clubId, running.jobId)
+        store.save(running)
+        val attemptId = UUID.randomUUID()
+        reservations.reserve(reservation(running, attemptId, NOW.minusSeconds(5)))
+        makeLegacyAttempt(redis, running.jobId, attemptId)
+        val before = redis.opsForHash<String, String>().entries(providerAttemptsKey(running.jobId))
+
+        assertThat(
+            recovery.recover(
+                command(running, AiGenerationAdmissionDisposition.COMPLETE_RUNNING)
+                    .copy(providerStaleBefore = NOW.minusSeconds(10)),
+            ),
+        ).isEqualTo(AiGenerationAtomicRecoveryResult.DeferredInFlight)
+        assertThat(before).hasSize(14)
+        assertThat(redis.opsForHash<String, String>().entries(providerAttemptsKey(running.jobId))).isEqualTo(before)
+        assertThat(redis.opsForHash<String, String>().get(jobKey(running.jobId), "status"))
+            .isEqualTo(JobStatus.RUNNING.name)
+    }
+
+    @Test
+    fun `legacy fourteen-field stale attempt recovers unknown with cost evidence`() {
+        val running = rollingRecord(JobStatus.RUNNING)
+        guard.checkBeforeCall(running.hostUserId, running.clubId, running.jobId)
+        store.save(running)
+        val attemptId = UUID.randomUUID()
+        reservations.reserve(reservation(running, attemptId, NOW.minusSeconds(20)))
+        makeLegacyAttempt(redis, running.jobId, attemptId)
+
+        val result = recovery.recover(command(running, AiGenerationAdmissionDisposition.COMPLETE_RUNNING))
+
+        assertThat(result).isInstanceOf(AiGenerationAtomicRecoveryResult.RecoveredWithAttempts::class.java)
+        val evidence = (result as AiGenerationAtomicRecoveryResult.RecoveredWithAttempts).attempts.single()
+        assertThat(evidence.attemptId).isEqualTo(attemptId)
+        assertThat(evidence.reservedCostUsd).isEqualByComparingTo("0.25")
+        assertThat(evidence.costBasis.name).isEqualTo("ESTIMATED_UNKNOWN")
+        assertThat(attemptField(redis, running.jobId, attemptId, "state")).isEqualTo("UNKNOWN")
+    }
+
+    @Test
+    fun `mixed legacy and current provider ledger validates each row independently`() {
+        val running = rollingRecord(JobStatus.RUNNING)
+        guard.checkBeforeCall(running.hostUserId, running.clubId, running.jobId)
+        store.save(running)
+        val legacyStaleAttempt = UUID.randomUUID()
+        val currentLiveAttempt = UUID.randomUUID()
+        reservations.reserve(reservation(running, legacyStaleAttempt, NOW.minusSeconds(20)))
+        reservations.reserve(reservation(running, currentLiveAttempt, NOW.minusSeconds(5)))
+        makeLegacyAttempt(redis, running.jobId, legacyStaleAttempt)
+
+        val result =
+            recovery.recover(
+                command(running, AiGenerationAdmissionDisposition.COMPLETE_RUNNING)
+                    .copy(providerStaleBefore = NOW.minusSeconds(10)),
+            )
+
+        assertThat(result).isInstanceOf(AiGenerationAtomicRecoveryResult.DeferredInFlightWithAttempts::class.java)
+        val evidence = (result as AiGenerationAtomicRecoveryResult.DeferredInFlightWithAttempts).attempts
+        assertThat(evidence.map { it.attemptId }).containsExactly(legacyStaleAttempt)
+        assertThat(attemptField(redis, running.jobId, legacyStaleAttempt, "state")).isEqualTo("UNKNOWN")
+        assertThat(attemptField(redis, running.jobId, currentLiveAttempt, "state")).isEqualTo("IN_FLIGHT")
+        assertThat(redis.opsForHash<String, String>().size(providerAttemptsKey(running.jobId))).isEqualTo(30)
+    }
+
+    @Test
+    fun `provider ledger rejects partial exact tuple and unknown fields without attempt mutation`() {
+        listOf("partial-exact-tuple", "unknown-field").forEach { corruption ->
+            val running = rollingRecord(JobStatus.RUNNING)
+            guard.checkBeforeCall(running.hostUserId, running.clubId, running.jobId)
+            store.save(running)
+            val attemptId = UUID.randomUUID()
+            reservations.reserve(reservation(running, attemptId, NOW.minusSeconds(20)))
+            if (corruption == "partial-exact-tuple") {
+                redis.opsForHash<String, String>().delete(
+                    providerAttemptsKey(running.jobId),
+                    "$attemptId:startedAtEpochSecond",
+                )
+            } else {
+                redis.opsForHash<String, String>().put(
+                    providerAttemptsKey(running.jobId),
+                    "$attemptId:unexpected",
+                    "value",
+                )
+            }
+
+            assertThat(recovery.recover(command(running, AiGenerationAdmissionDisposition.COMPLETE_RUNNING)))
+                .describedAs(corruption)
+                .isEqualTo(AiGenerationAtomicRecoveryResult.Corrupt)
+            assertThat(attemptField(redis, running.jobId, attemptId, "state")).isEqualTo("IN_FLIGHT")
+            assertThat(redis.opsForHash<String, String>().get(jobKey(running.jobId), "status"))
+                .isEqualTo(JobStatus.RUNNING.name)
+        }
+    }
+
+    @Test
+    fun `pending recovery validates all accounting state before any mutation across retries`() {
+        listOf(
+            "daily-counter",
+            "minute-counter",
+            "daily-window-token",
+            "minute-window-token",
+            "receipt-token",
+            "receipt-shape",
+        ).forEach { corruption ->
+            val pending = rollingRecord(JobStatus.PENDING)
+            guard.checkBeforeCall(pending.hostUserId, pending.clubId, pending.jobId)
+            store.save(pending)
+            when (corruption) {
+                "daily-counter" -> redis.opsForValue().set(dailyKey(pending.hostUserId), "01")
+                "minute-counter" -> redis.opsForValue().set(minuteKey(pending.hostUserId), "01")
+                "daily-window-token" -> redis.opsForValue().set(dailyTokenKey(pending.hostUserId), "malformed")
+                "minute-window-token" -> redis.opsForValue().set(minuteTokenKey(pending.hostUserId), "malformed")
+                "receipt-token" ->
+                    redis.opsForHash<String, String>().put(receiptKey(pending.jobId), "minuteToken", "malformed")
+                "receipt-shape" ->
+                    redis.opsForHash<String, String>().put(receiptKey(pending.jobId), "unexpected", "value")
+            }
+            val before = recoverySnapshot(redis, pending)
+
+            repeat(2) {
+                assertThatThrownBy {
+                    recovery.recover(command(pending, AiGenerationAdmissionDisposition.RELEASE_PENDING))
+                }.describedAs(corruption).isInstanceOf(RuntimeException::class.java)
+                assertThat(recoverySnapshot(redis, pending)).describedAs(corruption).isEqualTo(before)
+            }
+        }
+    }
+
+    @Test
+    fun `pending recovery validates index types before refund or job mutation`() {
+        val pending = rollingRecord(JobStatus.PENDING)
+        guard.checkBeforeCall(pending.hostUserId, pending.clubId, pending.jobId)
+        store.save(pending)
+        redis.delete(ACTIVE_KEY)
+        redis.opsForValue().set(ACTIVE_KEY, "wrong-type")
+        val before = wrongTypeRecoverySnapshot(redis, pending)
+
+        repeat(2) {
+            assertThatThrownBy {
+                recovery.recover(command(pending, AiGenerationAdmissionDisposition.RELEASE_PENDING))
+            }.isInstanceOf(RuntimeException::class.java)
+            assertThat(wrongTypeRecoverySnapshot(redis, pending)).isEqualTo(before)
+        }
+    }
+
+    private fun rollingRecord(status: JobStatus): JobRecord = recoveryRecord(properties, status, NOW.minusSeconds(60))
+}
+
+private fun attemptField(
+    redis: StringRedisTemplate,
+    jobId: UUID,
+    attemptId: UUID,
+    field: String,
+) = redis.opsForHash<String, String>().get(providerAttemptsKey(jobId), "$attemptId:$field")
+
+private fun makeLegacyAttempt(
+    redis: StringRedisTemplate,
+    jobId: UUID,
+    attemptId: UUID,
+) {
+    redis.opsForHash<String, String>().delete(
+        providerAttemptsKey(jobId),
+        "$attemptId:startedAtEpochSecond",
+        "$attemptId:startedAtNano",
+    )
+}
+
+private fun recoverySnapshot(
+    redis: StringRedisTemplate,
+    record: JobRecord,
+) = RecoveryMutationSnapshot(
+    job = redis.opsForHash<String, String>().entries(jobKey(record.jobId)),
+    receipt = redis.opsForHash<String, String>().entries(receiptKey(record.jobId)),
+    daily = redis.opsForValue().get(dailyKey(record.hostUserId)),
+    dailyToken = redis.opsForValue().get(dailyTokenKey(record.hostUserId)),
+    minute = redis.opsForValue().get(minuteKey(record.hostUserId)),
+    minuteToken = redis.opsForValue().get(minuteTokenKey(record.hostUserId)),
+    lease = redis.opsForValue().get(admissionKey(record.clubId)),
+    activeScore = redis.opsForZSet().score(ACTIVE_KEY, record.jobId.toString()),
+    clubActiveScore = redis.opsForZSet().score("aigen:club:${record.clubId}:jobs:active", record.jobId.toString()),
+    processingScore = redis.opsForZSet().score(PROCESSING_KEY, record.jobId.toString()),
+    quarantineScore = redis.opsForZSet().score(QUARANTINE_KEY, record.jobId.toString()),
+    recentScore = redis.opsForZSet().score("aigen:session:${record.sessionId}:jobs", record.jobId.toString()),
+)
+
+private data class RecoveryMutationSnapshot(
+    val job: Map<String, String>,
+    val receipt: Map<String, String>,
+    val daily: String?,
+    val dailyToken: String?,
+    val minute: String?,
+    val minuteToken: String?,
+    val lease: String?,
+    val activeScore: Double?,
+    val clubActiveScore: Double?,
+    val processingScore: Double?,
+    val quarantineScore: Double?,
+    val recentScore: Double?,
+)
+
+private fun wrongTypeRecoverySnapshot(
+    redis: StringRedisTemplate,
+    record: JobRecord,
+) = WrongTypeRecoverySnapshot(
+    job = redis.opsForHash<String, String>().entries(jobKey(record.jobId)),
+    receipt = redis.opsForHash<String, String>().entries(receiptKey(record.jobId)),
+    daily = redis.opsForValue().get(dailyKey(record.hostUserId)),
+    dailyToken = redis.opsForValue().get(dailyTokenKey(record.hostUserId)),
+    minute = redis.opsForValue().get(minuteKey(record.hostUserId)),
+    minuteToken = redis.opsForValue().get(minuteTokenKey(record.hostUserId)),
+    lease = redis.opsForValue().get(admissionKey(record.clubId)),
+    activeType = redis.type(ACTIVE_KEY),
+    activeValue = if (redis.type(ACTIVE_KEY) == DataType.STRING) redis.opsForValue().get(ACTIVE_KEY) else null,
+    clubActiveScore = redis.opsForZSet().score("aigen:club:${record.clubId}:jobs:active", record.jobId.toString()),
+    processingScore = redis.opsForZSet().score(PROCESSING_KEY, record.jobId.toString()),
+    recentScore = redis.opsForZSet().score("aigen:session:${record.sessionId}:jobs", record.jobId.toString()),
+)
+
+private data class WrongTypeRecoverySnapshot(
+    val job: Map<String, String>,
+    val receipt: Map<String, String>,
+    val daily: String?,
+    val dailyToken: String?,
+    val minute: String?,
+    val minuteToken: String?,
+    val lease: String?,
+    val activeType: DataType?,
+    val activeValue: String?,
+    val clubActiveScore: Double?,
+    val processingScore: Double?,
+    val recentScore: Double?,
+)
 
 private fun sourceWriterWindow(
     storeSource: String,

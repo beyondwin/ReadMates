@@ -155,6 +155,17 @@ internal object AiGenerationRecoveryRedisScripts {
                 '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$'
               ) ~= nil
             end
+            local function validCounter(value)
+              if value == false or value == '0' then return true end
+              if string.match(value, '^[1-9]%d*$') == nil then return false end
+              if string.len(value) > 19 then return false end
+              return string.len(value) < 19 or value <= '9223372036854775807'
+            end
+            local function validKeyType(key, expected)
+              local reply = redis.call('TYPE', key)
+              local actual = type(reply) == 'table' and reply.ok or reply
+              return actual == 'none' or actual == expected
+            end
             local validSafeErrors = {
               PROVIDER_UNAVAILABLE = true, PROVIDER_RATE_LIMITED = true, SCHEMA_INVALID = true,
               AUTHOR_NAME_MISMATCH = true, HIGHLIGHTS_OUT_OF_RANGE = true, ONE_LINE_REVIEWS_DUPLICATE = true,
@@ -165,6 +176,12 @@ internal object AiGenerationRecoveryRedisScripts {
               MODEL_CAPABILITY_UNAVAILABLE = true, TRANSCRIPT_TOO_LONG_FOR_MODEL = true,
               TRANSCRIPT_ALIAS_MODE_UNSUPPORTED = true, STALE_GENERATION_REVISION = true, MEMBERSHIP_CHANGED = true,
               ASYNC_PROCESSING_EXHAUSTED = true, MAX_CALLS_EXCEEDED = true, UNKNOWN = true
+            }
+            local validAttemptFields = {
+              attemptId = true, ordinal = true, jobId = true, provider = true, model = true, mode = true,
+              state = true, slotReleased = true, reservedCostUsd = true, costBasis = true, safeErrorCode = true,
+              startedAt = true, startedAtEpochMs = true, startedAtEpochSecond = true, startedAtNano = true,
+              completedAt = true
             }
             local function corrupt()
               redis.call('HSET', KEYS[1],
@@ -199,6 +216,38 @@ internal object AiGenerationRecoveryRedisScripts {
                 return 'NOT_STALE'
               end
             end
+            if not validKeyType(KEYS[8], 'string') or
+              not validKeyType(KEYS[9], 'zset') or not validKeyType(KEYS[10], 'zset') or
+              not validKeyType(KEYS[11], 'zset') or not validKeyType(KEYS[12], 'zset') or
+              not validKeyType(KEYS[13], 'zset') or not validKeyType(KEYS[14], 'zset') then
+              return redis.error_reply('corrupt recovery key type')
+            end
+
+            local receiptExists = redis.call('EXISTS', KEYS[3]) == 1
+            local refundDaily = false
+            local refundMinute = false
+            if status == 'PENDING' and receiptExists then
+              if redis.call('HLEN', KEYS[3]) ~= 4 then
+                return redis.error_reply('corrupt admission accounting')
+              end
+              local dailyReceiptToken = redis.call('HGET', KEYS[3], 'dailyToken')
+              local minuteReceiptToken = redis.call('HGET', KEYS[3], 'minuteToken')
+              local dailyCharged = redis.call('HGET', KEYS[3], 'dailyCharged')
+              local minuteCharged = redis.call('HGET', KEYS[3], 'minuteCharged')
+              local daily = redis.call('GET', KEYS[4])
+              local minute = redis.call('GET', KEYS[6])
+              local currentDailyToken = redis.call('GET', KEYS[5])
+              local currentMinuteToken = redis.call('GET', KEYS[7])
+              if not isUuid(dailyReceiptToken) or not isUuid(minuteReceiptToken) or
+                dailyCharged ~= '1' or minuteCharged ~= '1' or
+                not validCounter(daily) or not validCounter(minute) or
+                (currentDailyToken ~= false and not isUuid(currentDailyToken)) or
+                (currentMinuteToken ~= false and not isUuid(currentMinuteToken)) then
+                return redis.error_reply('corrupt admission accounting')
+              end
+              refundDaily = daily ~= false and daily ~= '0' and currentDailyToken == dailyReceiptToken
+              refundMinute = minute ~= false and minute ~= '0' and currentMinuteToken == minuteReceiptToken
+            end
 
             local reconciled = {}
             if status == 'RUNNING' then
@@ -208,12 +257,24 @@ internal object AiGenerationRecoveryRedisScripts {
               local entries = redis.call('HGETALL', KEYS[2])
               local live = false
               local attemptCount = 0
+              local attemptIds = {}
+              local attemptFieldCounts = {}
               for i = 1, #entries, 2 do
                 local field = entries[i]
-                local value = entries[i + 1]
-                if string.sub(field, -6) == ':state' then
-                  local attemptId = string.sub(field, 1, -7)
+                local attemptId, fieldName = string.match(field, '^([^:]+):([^:]+)$')
+                if attemptId == nil or not isUuid(attemptId) or validAttemptFields[fieldName] ~= true then
+                  return corrupt()
+                end
+                if attemptFieldCounts[attemptId] == nil then
                   attemptCount = attemptCount + 1
+                  table.insert(attemptIds, attemptId)
+                  attemptFieldCounts[attemptId] = 0
+                end
+                attemptFieldCounts[attemptId] = attemptFieldCounts[attemptId] + 1
+              end
+              if attemptCount > 3 then return corrupt() end
+              for _, attemptId in ipairs(attemptIds) do
+                  local value = redis.call('HGET', KEYS[2], attemptId .. ':state')
                   local startedRaw = redis.call('HGET', KEYS[2], attemptId .. ':startedAtEpochMs')
                   local started = tonumber(startedRaw)
                   local provider = redis.call('HGET', KEYS[2], attemptId .. ':provider')
@@ -236,6 +297,7 @@ internal object AiGenerationRecoveryRedisScripts {
                   local completedSecond = nil
                   if completedAt ~= false and completedAt ~= '' then completedSecond = parseInstant(completedAt) end
                   local exactStartAbsent = startedSecondRaw == false and startedNanoRaw == false
+                  local expectedFieldCount = exactStartAbsent and 14 or 16
                   local exactStartValid = exactStartAbsent or
                     (startedSecond ~= nil and startedNano ~= nil and startedNano >= 0 and startedNano < 1000000000 and
                       startedSecond == parsedSecond and startedNano == parsedNano)
@@ -257,8 +319,9 @@ internal object AiGenerationRecoveryRedisScripts {
                     completedAt ~= false and
                     ((value == 'IN_FLIGHT' and completedAt == '') or (value ~= 'IN_FLIGHT' and completedSecond ~= nil)) and
                     parsedSecond ~= nil and parsedNano ~= nil and
-                    started == parsedSecond * 1000 + math.floor(parsedNano / 1000000) and exactStartValid
-                  if started == nil or not attemptValid or attemptCount > 3 then
+                    started == parsedSecond * 1000 + math.floor(parsedNano / 1000000) and exactStartValid and
+                    attemptFieldCounts[attemptId] == expectedFieldCount
+                  if started == nil or not attemptValid then
                     return corrupt()
                   elseif value == 'IN_FLIGHT' and
                     (parsedSecond < tonumber(ARGV[17]) or
@@ -267,9 +330,7 @@ internal object AiGenerationRecoveryRedisScripts {
                   elseif value == 'IN_FLIGHT' then
                     live = true
                   end
-                end
               end
-              if #entries ~= attemptCount * 32 then return corrupt() end
               for _, attemptId in ipairs(reconciled) do
                 redis.call('HSET', KEYS[2],
                   attemptId .. ':state', 'UNKNOWN',
@@ -288,21 +349,13 @@ internal object AiGenerationRecoveryRedisScripts {
                 'lastUpdatedAtNano', observedNano)
             end
 
-            local unaccounted = status == 'PENDING' and redis.call('EXISTS', KEYS[3]) == 0
-            if redis.call('EXISTS', KEYS[3]) == 1 then
+            local unaccounted = status == 'PENDING' and not receiptExists
+            if receiptExists then
               if status == 'PENDING' then
-                local dailyToken = redis.call('HGET', KEYS[3], 'dailyToken')
-                local minuteToken = redis.call('HGET', KEYS[3], 'minuteToken')
-                local daily = tonumber(redis.call('GET', KEYS[4]) or '0')
-                if redis.call('HGET', KEYS[3], 'dailyCharged') == '1' and
-                  dailyToken ~= false and dailyToken ~= '' and
-                  redis.call('GET', KEYS[5]) == dailyToken and daily > 0 then
+                if refundDaily then
                   redis.call('DECR', KEYS[4])
                 end
-                local minute = tonumber(redis.call('GET', KEYS[6]) or '0')
-                if redis.call('HGET', KEYS[3], 'minuteCharged') == '1' and
-                  minuteToken ~= false and minuteToken ~= '' and
-                  redis.call('GET', KEYS[7]) == minuteToken and minute > 0 then
+                if refundMinute then
                   redis.call('DECR', KEYS[6])
                 end
               end

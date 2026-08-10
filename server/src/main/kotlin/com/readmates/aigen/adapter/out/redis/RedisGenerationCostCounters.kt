@@ -141,10 +141,10 @@ class RedisGenerationCostCounters(
             DefaultRedisScript(
                 """
                 local function validToken(value)
-                  return value ~= false and string.len(value) == 36 and
-                    string.match(value, '^[0-9a-fA-F%-]+$') ~= nil and
-                    string.sub(value, 9, 9) == '-' and string.sub(value, 14, 14) == '-' and
-                    string.sub(value, 19, 19) == '-' and string.sub(value, 24, 24) == '-'
+                  return value ~= false and string.match(
+                    value,
+                    '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$'
+                  ) ~= nil
                 end
                 local function ensureWindow(counterKey, tokenKey, fullTtlSeconds, newToken)
                   if redis.call('EXISTS', counterKey) == 0 then
@@ -193,18 +193,51 @@ class RedisGenerationCostCounters(
                 """
                 local receiptExists = redis.call('EXISTS', KEYS[6]) == 1
                 if receiptExists then
+                  local function validToken(value)
+                    return value ~= false and string.match(
+                      value,
+                      '^%x%x%x%x%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%-%x%x%x%x%x%x%x%x%x%x%x%x$'
+                    ) ~= nil
+                  end
+                  local function validKeyType(key, expected)
+                    local reply = redis.call('TYPE', key)
+                    local actual = type(reply) == 'table' and reply.ok or reply
+                    return actual == 'none' or actual == expected
+                  end
+                  local function validCounter(value)
+                    if value == false or value == '0' then return true end
+                    if string.match(value, '^[1-9]%d*$') == nil then return false end
+                    if string.len(value) > 19 then return false end
+                    return string.len(value) < 19 or value <= '9223372036854775807'
+                  end
+                  if redis.call('HLEN', KEYS[6]) ~= 4 then
+                    return redis.error_reply('corrupt admission accounting')
+                  end
+                  if not validKeyType(KEYS[3], 'string') then
+                    return redis.error_reply('corrupt admission accounting')
+                  end
                   local dailyToken = redis.call('HGET', KEYS[6], 'dailyToken')
                   local minuteToken = redis.call('HGET', KEYS[6], 'minuteToken')
-                  local daily = tonumber(redis.call('GET', KEYS[1]) or '0')
-                  if redis.call('HGET', KEYS[6], 'dailyCharged') == '1' and
-                    dailyToken ~= false and dailyToken ~= '' and
-                    redis.call('GET', KEYS[4]) == dailyToken and daily > 0 then
+                  local dailyCharged = redis.call('HGET', KEYS[6], 'dailyCharged')
+                  local minuteCharged = redis.call('HGET', KEYS[6], 'minuteCharged')
+                  local daily = redis.call('GET', KEYS[1])
+                  local minute = redis.call('GET', KEYS[2])
+                  local currentDailyToken = redis.call('GET', KEYS[4])
+                  local currentMinuteToken = redis.call('GET', KEYS[5])
+                  if not validToken(dailyToken) or not validToken(minuteToken) or
+                    dailyCharged ~= '1' or minuteCharged ~= '1' or
+                    not validCounter(daily) or not validCounter(minute) or
+                    (currentDailyToken ~= false and not validToken(currentDailyToken)) or
+                    (currentMinuteToken ~= false and not validToken(currentMinuteToken)) then
+                    return redis.error_reply('corrupt admission accounting')
+                  end
+                  local refundDaily = daily ~= false and daily ~= '0' and currentDailyToken == dailyToken
+                  local refundMinute = minute ~= false and minute ~= '0' and currentMinuteToken == minuteToken
+
+                  if refundDaily then
                     redis.call('DECR', KEYS[1])
                   end
-                  local minute = tonumber(redis.call('GET', KEYS[2]) or '0')
-                  if redis.call('HGET', KEYS[6], 'minuteCharged') == '1' and
-                    minuteToken ~= false and minuteToken ~= '' and
-                    redis.call('GET', KEYS[5]) == minuteToken and minute > 0 then
+                  if refundMinute then
                     redis.call('DECR', KEYS[2])
                   end
                   redis.call('DEL', KEYS[6])
