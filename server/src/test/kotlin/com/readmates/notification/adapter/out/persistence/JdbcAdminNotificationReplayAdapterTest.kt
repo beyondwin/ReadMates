@@ -209,6 +209,32 @@ internal class JdbcAdminNotificationReplayAdapterTest(
         assertThat(deliveryState(currentDeliveryId).first()).isNotEqualTo("PENDING")
     }
 
+    @ParameterizedTest
+    @EnumSource(ReplayByteExactCasMutation::class)
+    fun `CAS rejects byte lookalikes changed after snapshot`(mutation: ReplayByteExactCasMutation) {
+        seedEvent()
+        withNonEnforcedReplayValueChecks {
+            insertDelivery(TARGET_ID, "FAILED", "MAIL_RETRYABLE")
+            val snapshot = adapter.loadSnapshot(AdminNotificationFilter(clubId = CLUB_ID), 2)
+            val at = OffsetDateTime.parse("2026-05-27T01:03:03.123456Z")
+            val selectionHash =
+                adminNotificationReplaySelectionHash(AdminNotificationFilter(clubId = CLUB_ID), snapshot.targets)
+            val previewId = adapter.createPreview(previewInsert(snapshot.targets, selectionHash, at))
+            createdPreviewIds += previewId
+            updateDelivery(
+                "${mutation.column} = ?, updated_at = ?",
+                mutation.lookalike,
+                snapshot.targets
+                    .single()
+                    .updatedAt
+                    .toLocalDateTime(),
+            )
+
+            assertThat(adapter.replayPreviewTargets(previewId, at.plusMinutes(1))).isZero()
+            assertThat(deliveryState(TARGET_ID).first()).isNotEqualTo("PENDING")
+        }
+    }
+
     @Test
     fun `v2 preview stores exact targets and confirmation CAS skips changed rows and active leases`() {
         seedEvent()
@@ -302,7 +328,6 @@ internal class JdbcAdminNotificationReplayAdapterTest(
         actorUserId = ADMIN_USER_ID,
         actorPlatformRole = "OWNER",
         clubId = CLUB_ID,
-        filter = AdminNotificationFilter(clubId = CLUB_ID),
         filterJson = "{\"clubId\":\"$CLUB_ID\"}",
         selectionHash = selectionHash,
         targets = targets,
@@ -447,6 +472,21 @@ internal enum class ReplayCasMutation {
     LOCKED_AT,
     CLUB_ID,
     DELIVERY_ID,
+}
+
+internal enum class ReplayByteExactCasMutation(
+    val column: String,
+    val lookalike: String,
+) {
+    CHANNEL_LOWER("channel", "email"),
+    CHANNEL_MIXED("channel", "Email"),
+    CHANNEL_PADDED("channel", "EMAIL "),
+    STATUS_LOWER("status", "failed"),
+    STATUS_MIXED("status", "Failed"),
+    STATUS_PADDED("status", "FAILED "),
+    FAILURE_CODE_LOWER("last_error", "mail_retryable"),
+    FAILURE_CODE_MIXED("last_error", "Mail_Retryable"),
+    FAILURE_CODE_PADDED("last_error", "MAIL_RETRYABLE "),
 }
 
 private val AUDIT_ID = UUID.fromString("00000000-0000-0000-0000-000000009003")

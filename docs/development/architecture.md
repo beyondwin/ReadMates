@@ -231,11 +231,11 @@ lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight fut
 
 ## Flyway migration 불변성
 
-운영 schema의 source of truth는 `server/src/main/resources/db/mysql/migration/`이다. 현재 catalog는 `V1`, `V9`~`V47`의 40개 versioned SQL이며 `V2`~`V8` gap은 의도적으로 유지한다. 이 품질 보강은 production migration을 추가하거나 schema를 바꾸지 않는다.
+운영 schema의 source of truth는 `server/src/main/resources/db/mysql/migration/`이다. 현재 catalog는 `V1`, `V9`~`V48`의 41개 versioned SQL이며 `V2`~`V8` gap은 의도적으로 유지한다. `V48`은 기존 migration을 수정하지 않고 관리자 알림 재실행의 exact target과 confirmation receipt schema를 additive하게 추가한다.
 
 과거 migration은 두 개의 보완 통제로 보호한다. `scripts/check-flyway-migration-immutability.py`는 명시한 trusted base ref의 merge base에 존재하던 migration을 현재 index와 worktree까지 비교해 수정·삭제·rename·이동을 merge 전에 차단한다. CI는 pull request의 base SHA와 `main` push의 before SHA를 사용하고, 비교 job에 complete Git history를 제공한다. Flyway는 적용된 database의 `flyway_schema_history` checksum을 startup에 검증해 repository gate 이후의 runtime drift를 다시 차단한다.
 
-위반을 `flyway repair`, baseline 증가, 과거 파일 복원 없는 삭제·rename, 낮거나 재사용한 version으로 우회하지 않는다. checker가 보고한 base 최고 version보다 큰 새 `V{N}__{lower_snake_case_description}.sql` forward-only migration으로 보정한다. Testcontainers는 clean install과 populated V42/V44 schema에서 V47까지의 upgrade를 유지하고, 합성 checksum fixture는 변조 거부와 정상 successor 적용을 검증한다.
+위반을 `flyway repair`, baseline 증가, 과거 파일 복원 없는 삭제·rename, 낮거나 재사용한 version으로 우회하지 않는다. checker가 보고한 base 최고 version보다 큰 새 `V{N}__{lower_snake_case_description}.sql` forward-only migration으로 보정한다. Testcontainers는 clean install과 populated V42/V44 schema에서 V48까지의 upgrade를 유지하고, 합성 checksum fixture는 변조 거부와 정상 successor 적용을 검증한다.
 
 ## 인증과 세션
 

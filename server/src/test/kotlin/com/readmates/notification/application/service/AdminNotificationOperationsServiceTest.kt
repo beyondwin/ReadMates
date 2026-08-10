@@ -374,12 +374,15 @@ private fun replayPortWithOpenPreview(
         previewRecord =
             AdminNotificationReplayPreviewRecord(
                 previewId = PREVIEW_ID,
+                contractVersion = 2,
                 actorUserId = ADMIN_USER_ID,
                 actorPlatformRole = actorPlatformRole,
+                clubId = null,
                 filterJson = "{}",
                 selectionHash = SELECTION_HASH,
                 matchedCount = matchedCount,
                 expiresAt = expiresAt,
+                consumedAt = null,
             ),
         replayedCount = replayedCount,
     )

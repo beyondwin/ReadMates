@@ -76,7 +76,7 @@ spring:
 
 ### 현재 migration 파일 목록
 
-현재 source of truth는 canonical migration directory의 파일 자체다. 2026-08-09 기준 catalog는 `V1`, `V9`~`V47`의 40개 파일이다. 이 숫자와 최신 version을 수동 표로 복제하지 않고 아래 checker의 `base-count`, `current-count`, `next-version` 출력으로 확인한다.
+현재 source of truth는 canonical migration directory의 파일 자체다. 이 ADR의 2026-08-09 검증 기록은 `V1`, `V9`~`V47`의 40개 파일이었고, 이후 `V48`이 additive하게 추가되어 이 변경 시점에는 41개다. 이후의 정확한 개수와 최신 version은 수동 표가 아니라 아래 checker의 `base-count`, `current-count`, `next-version` 출력으로 확인한다.
 
 ```bash
 python3 -B scripts/check-flyway-migration-immutability.py --base-ref <trusted-base-ref>
@@ -107,7 +107,7 @@ Flyway는 이미 적용된 migration 파일의 checksum을 `flyway_schema_histor
 
 ### Testcontainers 동일 버전
 
-`MySqlFlywayMigrationTest`가 Testcontainers MySQL을 실행해 clean install과 populated V42/V44 schema에서 현재 V47까지의 지원 upgrade를 검증한다. `FlywayChecksumImmutabilityTest`는 합성 filesystem migration으로 checksum mismatch와 정상 forward-only successor를 검증한다:
+`MySqlFlywayMigrationTest`가 Testcontainers MySQL을 실행해 clean install과 populated V42/V44 schema에서 현재 V48까지의 지원 upgrade를 검증한다. `FlywayChecksumImmutabilityTest`는 합성 filesystem migration으로 checksum mismatch와 정상 forward-only successor를 검증한다:
 
 ```bash
 ./server/gradlew -p server integrationTest \
@@ -178,7 +178,7 @@ migration 통합 테스트:
 ./server/gradlew -p server integrationTest
 ```
 
-기대: V1/V9~V47의 40개 production migration clean install, populated V42/V44에서 V47까지의 upgrade, checksum mismatch 거부와 더 높은 forward-only successor 적용이 통과한다.
+기대: V1/V9~V48의 41개 production migration clean install, populated V42/V44에서 V48까지의 upgrade, checksum mismatch 거부와 더 높은 forward-only successor 적용이 통과한다.
 
 migration 파일 추가 규칙 검증:
 - `python3 -B scripts/check-flyway-migration-immutability.py --self-test`

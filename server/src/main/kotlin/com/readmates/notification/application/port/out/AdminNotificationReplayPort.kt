@@ -43,15 +43,15 @@ interface AdminNotificationAuditPort {
 
 data class AdminNotificationReplayPreviewRecord(
     val previewId: UUID,
-    val contractVersion: Int = 2,
+    val contractVersion: Int,
     val actorUserId: UUID,
-    val actorPlatformRole: String? = "OWNER",
-    val clubId: UUID? = null,
+    val actorPlatformRole: String?,
+    val clubId: UUID?,
     val filterJson: String,
     val selectionHash: String,
     val matchedCount: Int,
     val expiresAt: OffsetDateTime,
-    val consumedAt: OffsetDateTime? = null,
+    val consumedAt: OffsetDateTime?,
 )
 
 data class AdminNotificationReplayPreviewInsert(
@@ -59,7 +59,6 @@ data class AdminNotificationReplayPreviewInsert(
     val actorUserId: UUID,
     val actorPlatformRole: String,
     val clubId: UUID?,
-    val filter: AdminNotificationFilter,
     val filterJson: String,
     val selectionHash: String,
     val targets: List<AdminNotificationReplayTarget>,

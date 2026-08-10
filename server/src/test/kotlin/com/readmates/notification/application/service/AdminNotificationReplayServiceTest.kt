@@ -26,6 +26,8 @@ import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.EnumSource
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -63,7 +65,7 @@ class AdminNotificationReplayServiceTest {
         assertThat(inserted.clubId).isEqualTo(CLUB_ID)
         assertThat(inserted.targets).containsExactly(target)
         assertThat(inserted.selectionHash).isEqualTo(
-            adminNotificationReplaySelectionHash(inserted.filter, listOf(target)),
+            adminNotificationReplaySelectionHash(AdminNotificationFilter(clubId = CLUB_ID), listOf(target)),
         )
         assertThat(preview.excludedCount).isEqualTo(2)
         assertThat(preview.warnings).containsExactly("MAIL_AMBIGUOUS", "FAILURE_CODE_UNKNOWN")
@@ -158,6 +160,27 @@ class AdminNotificationReplayServiceTest {
                 .isInstanceOfAny(AccessDeniedException::class.java, NotificationApplicationException::class.java)
             assertThat(replayPort.calls).containsExactly("lock")
         }
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReplayReceiptIdentityMutation::class)
+    fun `receipt identity corruption is denied after lookup`(mutation: ReplayReceiptIdentityMutation) {
+        val replayPort =
+            ReplayPortFake(
+                preview = openV2Preview(consumedAt = CONFIRMED_AT.minusMinutes(2)),
+                confirmation = mutateReceipt(mutation, confirmation()),
+            )
+        val auditPort = ReplayAuditFake()
+
+        assertThatThrownBy {
+            service(replayPort, auditPort = auditPort).confirmReplay(admin(), confirmCommand())
+        }.isInstanceOf(AccessDeniedException::class.java)
+
+        assertThat(replayPort.calls).containsExactly("lock", "receipt")
+        assertThat(replayPort.replayedAt).isNull()
+        assertThat(replayPort.confirmationInsert).isNull()
+        assertThat(replayPort.consumedAt).isNull()
+        assertThat(auditPort.calls).isZero()
     }
 
     private fun service(
@@ -331,6 +354,24 @@ private fun admin(
 private fun confirmCommand(selectionHash: String = SELECTION_HASH) =
     AdminNotificationReplayConfirmCommand(PREVIEW_ID, selectionHash, "Retry failed deliveries")
 
+enum class ReplayReceiptIdentityMutation {
+    ACTOR,
+    ROLE,
+    CLUB,
+    SELECTION_HASH,
+}
+
+private fun mutateReceipt(
+    mutation: ReplayReceiptIdentityMutation,
+    receipt: AdminNotificationReplayConfirmation,
+): AdminNotificationReplayConfirmation =
+    when (mutation) {
+        ReplayReceiptIdentityMutation.ACTOR -> receipt.copy(actorUserId = OTHER_USER_ID)
+        ReplayReceiptIdentityMutation.ROLE -> receipt.copy(actorPlatformRole = "OPERATOR")
+        ReplayReceiptIdentityMutation.CLUB -> receipt.copy(clubId = OTHER_CLUB_ID)
+        ReplayReceiptIdentityMutation.SELECTION_HASH -> receipt.copy(selectionHash = "b".repeat(64))
+    }
+
 private class ReplayCountingClock(
     private val current: Instant,
 ) : Clock() {
@@ -352,5 +393,6 @@ private val AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-0000000000
 private val ADMIN_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000101")
 private val OTHER_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000102")
 private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
+private val OTHER_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
 private val CONFIRMED_AT: OffsetDateTime = OffsetDateTime.parse("2026-05-27T01:02:03.123456Z")
 private const val SELECTION_HASH = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"

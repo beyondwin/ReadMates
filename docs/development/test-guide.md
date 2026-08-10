@@ -312,7 +312,7 @@ python3 -B scripts/check-flyway-migration-immutability.py \
 
 CI의 scripts job만 `fetch-depth: 0`을 사용합니다. Pull request는 `github.event.pull_request.base.sha`, `main` push는 `github.event.before`를 immutable base로 선택합니다. Push before가 all-zero이면 local `HEAD^`가 실제로 resolve될 때만 fallback하고, 빈 값·unresolved base·missing merge base·shallow history는 검사 생략이 아니라 실패입니다. 실패 증거는 violation category, repository-relative path, exact merge-base와 다음 허용 version으로 제한하며 SQL 본문과 로컬 절대 경로는 출력하지 않습니다.
 
-Runtime evidence는 synthetic checksum fixture와 production migration suite를 같은 active `integrationTest` lane에서 실행합니다. `MySqlFlywayMigrationTest`는 clean install과 populated V42/V44 schema에서 현재 V47까지의 지원 upgrade를 보존합니다.
+Runtime evidence는 synthetic checksum fixture와 production migration suite를 같은 active `integrationTest` lane에서 실행합니다. `MySqlFlywayMigrationTest`는 41개 production migration의 clean install과 populated V42/V44 schema에서 현재 V48까지의 지원 upgrade를 보존합니다.
 
 ```bash
 ./server/gradlew -p server integrationTest \

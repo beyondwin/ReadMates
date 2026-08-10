@@ -90,7 +90,6 @@ class AdminNotificationOperationsService(
                     actorUserId = admin.userId,
                     actorPlatformRole = admin.role.name,
                     clubId = request.filter.clubId,
-                    filter = request.filter,
                     filterJson = filterJson,
                     selectionHash = selectionHash,
                     targets = snapshot.targets,
@@ -315,8 +314,6 @@ private const val ATOMIC_REPLAY_CONTRACT_VERSION = 2
 interface AdminNotificationJsonCodec {
     fun filterJson(filter: AdminNotificationFilter): String
 
-    fun parseFilter(filterJson: String): AdminNotificationFilter = AdminNotificationFilter()
-
     fun metadataJson(
         previewId: UUID,
         clubId: UUID?,
@@ -332,9 +329,6 @@ class JacksonAdminNotificationJsonCodec(
     private val objectMapper: ObjectMapper,
 ) : AdminNotificationJsonCodec {
     override fun filterJson(filter: AdminNotificationFilter): String = objectMapper.writeValueAsString(filter)
-
-    override fun parseFilter(filterJson: String): AdminNotificationFilter =
-        objectMapper.readValue(filterJson, AdminNotificationFilter::class.java)
 
     override fun metadataJson(
         previewId: UUID,

@@ -44,6 +44,12 @@ class AdminNotificationReplaySelectionTest {
                 listOf(first.copy(failureCode = "MAIL_PERMANENT"), second),
             ),
         ).isNotEqualTo(baseline)
+        assertThat(
+            adminNotificationReplaySelectionHash(
+                filter,
+                listOf(first.copy(clubId = OTHER_CLUB_ID), second),
+            ),
+        ).isNotEqualTo(baseline)
     }
 
     @Test
@@ -78,5 +84,6 @@ class AdminNotificationReplaySelectionTest {
 }
 
 private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
+private val OTHER_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
 private val DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000011")
 private val OTHER_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000099")
