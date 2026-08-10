@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.out.messaging
 
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.config.AiGenerationKafkaProperties

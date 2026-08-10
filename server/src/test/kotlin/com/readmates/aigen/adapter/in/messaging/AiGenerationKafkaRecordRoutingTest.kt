@@ -2,15 +2,15 @@
 
 package com.readmates.aigen.adapter.`in`.messaging
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
 import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.AiGenerationRecoveryResult
 import com.readmates.aigen.application.model.AiGenerationRecoverySource
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.RecordUnroutableAiGenerationRecordUseCase
 import com.readmates.aigen.application.port.`in`.RecoverExhaustedAiGenerationJobUseCase
 import com.readmates.aigen.application.port.out.JobKind
-import com.readmates.aigen.application.service.AiGenerationWorker
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.apache.kafka.common.header.internals.RecordHeader
 import org.assertj.core.api.Assertions.assertThat
@@ -23,16 +23,20 @@ import java.util.UUID
 
 class AiGenerationKafkaRecordRoutingTest {
     @Test
-    fun `listener accepts one canonical equal job header and invokes the worker`() {
-        val worker = Mockito.mock(AiGenerationWorker::class.java)
+    fun `listener accepts one canonical equal job header and invokes the input port before acknowledging`() {
+        val worker = Mockito.mock(ProcessAiGenerationJobUseCase::class.java)
         val acknowledgment = Mockito.mock(Acknowledgment::class.java)
         val message = message(JOB_ID)
         val record = record(message, JOB_ID.toString())
 
         AiGenerationJobConsumer(worker).onMessage(record, acknowledgment)
 
-        Mockito.verify(worker).process(JOB_ID)
-        Mockito.verify(acknowledgment).acknowledge()
+        Mockito
+            .inOrder(worker, acknowledgment)
+            .apply {
+                verify(worker).process(JOB_ID)
+                verify(acknowledgment).acknowledge()
+            }
     }
 
     @Test
@@ -47,7 +51,7 @@ class AiGenerationKafkaRecordRoutingTest {
             )
 
         invalidHeaders.forEach { headers ->
-            val worker = Mockito.mock(AiGenerationWorker::class.java)
+            val worker = Mockito.mock(ProcessAiGenerationJobUseCase::class.java)
             val acknowledgment = Mockito.mock(Acknowledgment::class.java)
             val record = record(message(JOB_ID), *headers.toTypedArray())
 
@@ -57,6 +61,18 @@ class AiGenerationKafkaRecordRoutingTest {
 
             Mockito.verifyNoInteractions(worker, acknowledgment)
         }
+    }
+
+    @Test
+    fun `listener rejects null payload without invoking or acknowledging`() {
+        val worker = Mockito.mock(ProcessAiGenerationJobUseCase::class.java)
+        val acknowledgment = Mockito.mock(Acknowledgment::class.java)
+
+        assertThatThrownBy { AiGenerationJobConsumer(worker).onMessage(record(null, JOB_ID.toString()), acknowledgment) }
+            .isInstanceOf(AiGenerationRoutingMismatchException::class.java)
+            .hasMessage("AI generation Kafka record has no unambiguous canonical job identity")
+
+        Mockito.verifyNoInteractions(worker, acknowledgment)
     }
 
     @Test

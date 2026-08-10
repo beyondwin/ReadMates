@@ -22,6 +22,7 @@ import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.RecordUnroutableAiGenerationRecordUseCase
 import com.readmates.aigen.application.port.`in`.RecoverExhaustedAiGenerationJobUseCase
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
@@ -251,7 +252,7 @@ internal class GroundedAiGenerationJobConsumerIntegrationTest(
         ): GroundedRuntime = GroundedRuntime(redisTemplate, properties)
 
         @Bean
-        fun aiGenerationWorker(runtime: GroundedRuntime): AiGenerationWorker = runtime.worker
+        fun processAiGenerationJobUseCase(runtime: GroundedRuntime): ProcessAiGenerationJobUseCase = runtime.worker
 
         @Bean
         fun aiGenerationMetrics(runtime: GroundedRuntime): AiGenerationMetrics = runtime.metrics

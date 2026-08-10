@@ -3,6 +3,7 @@
 package com.readmates.aigen.adapter.out.messaging
 
 import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.JobKind

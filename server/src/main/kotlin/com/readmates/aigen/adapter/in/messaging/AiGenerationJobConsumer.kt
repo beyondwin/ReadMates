@@ -1,7 +1,7 @@
 package com.readmates.aigen.adapter.`in`.messaging
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
-import com.readmates.aigen.application.service.AiGenerationWorker
+import com.readmates.aigen.application.model.AiGenerationJobMessage
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
 import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
@@ -27,7 +27,7 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.aigen.kafka", name = ["enabled"], havingValue = "true")
 class AiGenerationJobConsumer(
-    private val worker: AiGenerationWorker,
+    private val processAiGenerationJob: ProcessAiGenerationJobUseCase,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -48,7 +48,7 @@ class AiGenerationJobConsumer(
         }
         withWorkerMdc(message) {
             try {
-                worker.process(message.jobId)
+                processAiGenerationJob.process(message.jobId)
                 acknowledgment.acknowledge()
             } catch (ex: RuntimeException) {
                 // Do NOT ack — let the container redeliver. Never attach the raw

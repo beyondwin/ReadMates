@@ -3,12 +3,12 @@ package com.readmates.aigen.adapter.`in`.messaging
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobProducer
 import com.readmates.aigen.adapter.out.redis.RedisAiGenerationJobStore
 import com.readmates.aigen.adapter.out.redis.RedisGenerationCostCounters
 import com.readmates.aigen.adapter.out.redis.RedisProviderCallReservationAdapter
 import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.AiGenerationRecoveryResult
 import com.readmates.aigen.application.model.AiGenerationRecoverySource
 import com.readmates.aigen.application.model.AuthorNameMode
@@ -21,6 +21,7 @@ import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
 import com.readmates.aigen.application.port.`in`.RecoverExhaustedAiGenerationJobUseCase
 import com.readmates.aigen.application.port.out.AiGenerationAtomicRecoveryCommand
 import com.readmates.aigen.application.port.out.AiGenerationAtomicRecoveryResult
@@ -40,7 +41,6 @@ import com.readmates.aigen.application.port.out.ProviderCallReservationPort
 import com.readmates.aigen.application.port.out.ProviderCallReservationResult
 import com.readmates.aigen.application.service.AiGenerationFailureRecoveryService
 import com.readmates.aigen.application.service.AiGenerationMetrics
-import com.readmates.aigen.application.service.AiGenerationWorker
 import com.readmates.aigen.config.AiGenerationKafkaConfig
 import com.readmates.aigen.config.AiGenerationKafkaProperties
 import com.readmates.aigen.config.AiGenerationProperties
@@ -152,7 +152,7 @@ import java.util.concurrent.atomic.AtomicReference
 )
 class AiGenerationJobConsumerIntegrationTest(
     @param:Autowired private val producer: AiGenerationJobProducer,
-    @param:Autowired private val worker: AiGenerationWorker,
+    @param:Autowired private val worker: ProcessAiGenerationJobUseCase,
     @param:Autowired private val kafkaListenerEndpointRegistry: KafkaListenerEndpointRegistry,
     @param:Autowired private val observationRegistry: ObservationRegistry,
     @param:Autowired private val tracer: Tracer,
@@ -768,7 +768,7 @@ class AiGenerationJobConsumerIntegrationTest(
     @TestConfiguration(proxyBeanMethods = false)
     class TestWorkerConfiguration {
         @Bean
-        fun aiGenerationWorker(): AiGenerationWorker = Mockito.mock(AiGenerationWorker::class.java)
+        fun processAiGenerationJobUseCase(): ProcessAiGenerationJobUseCase = Mockito.mock(ProcessAiGenerationJobUseCase::class.java)
 
         @Bean
         fun meterRegistry(): SimpleMeterRegistry = SimpleMeterRegistry()

@@ -2,6 +2,7 @@ package com.readmates.aigen.adapter.out.messaging
 
 import com.readmates.aigen.application.model.AiGenerationRecoveryResult
 import com.readmates.aigen.application.model.AiGenerationRecoverySource
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.`in`.RecordUnroutableAiGenerationRecordUseCase
 import com.readmates.aigen.application.port.`in`.RecoverExhaustedAiGenerationJobUseCase
@@ -22,6 +23,7 @@ import org.springframework.kafka.listener.ContainerProperties
 import java.nio.charset.StandardCharsets
 import java.time.Duration
 import java.util.UUID
+import kotlin.reflect.full.memberProperties
 
 /**
  * Round-trip serialization test for [AiGenerationJobMessage] through the same
@@ -75,7 +77,7 @@ class AiGenerationJobMessageSerializationTest {
     }
 
     @Test
-    fun `producer value serializer writes JSON with stringified UUIDs and enum names`() {
+    fun `producer value serializer preserves the exact seven-field routing envelope`() {
         contextRunner.run { context ->
             val factory =
                 context.getBean(
@@ -90,6 +92,16 @@ class AiGenerationJobMessageSerializationTest {
                     StandardCharsets.UTF_8,
                 )
 
+            assertThat(AiGenerationJobMessage::class.memberProperties.map { it.name })
+                .containsExactlyInAnyOrder(
+                    "jobId",
+                    "sessionId",
+                    "clubId",
+                    "hostUserId",
+                    "provider",
+                    "model",
+                    "kind",
+                )
             assertThat(json).contains(
                 """"jobId":"11111111-1111-4111-8111-111111111111"""",
                 """"sessionId":"22222222-2222-4222-8222-222222222222"""",
@@ -99,7 +111,7 @@ class AiGenerationJobMessageSerializationTest {
                 """"model":"claude-sonnet-4-6"""",
                 """"kind":"FULL"""",
             )
-            assertThat(json).doesNotContain("transcript")
+            assertThat(json).doesNotContain("transcript", "result", "prompt", "evidence")
             assertThat(json).doesNotContain("traceparent", "baggage", "traceId", "spanId")
         }
     }

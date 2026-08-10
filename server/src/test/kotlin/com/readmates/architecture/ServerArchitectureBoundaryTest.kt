@@ -472,6 +472,32 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `aigen messaging inbound adapter depends on application ports and models instead of services or outbound adapters`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.aigen.adapter.in.messaging..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "com.readmates.aigen.application.service..",
+                "com.readmates.aigen.adapter.out..",
+            ).check(importedClasses)
+    }
+
+    @Test
+    fun `aigen scheduling inbound adapter depends on application ports instead of services or outbound adapters`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.aigen.adapter.in.scheduling..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "com.readmates.aigen.application.service..",
+                "com.readmates.aigen.adapter.out..",
+            ).check(importedClasses)
+    }
+
+    @Test
     fun `notification application does not depend on legacy notification outbox port`() {
         noClasses()
             .that()

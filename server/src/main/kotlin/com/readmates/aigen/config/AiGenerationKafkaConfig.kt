@@ -2,7 +2,7 @@ package com.readmates.aigen.config
 
 import com.readmates.aigen.adapter.`in`.messaging.AiGenerationConsumerRecordRecoverer
 import com.readmates.aigen.adapter.`in`.messaging.AiGenerationRoutingMismatchException
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.service.ProviderCallStillInFlightException
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -39,7 +39,7 @@ import tools.jackson.databind.json.JsonMapper
  *
  * - Producer: idempotent, acks=all, JSON value serializer (Jackson 3 via Spring Kafka).
  * - Consumer: manual ack mode, earliest offset reset, read_committed isolation;
- *   the listener acks only after [com.readmates.aigen.application.service.AiGenerationWorker.process]
+ *   the listener acks only after [com.readmates.aigen.application.port.in.ProcessAiGenerationJobUseCase.process]
  *   returns successfully.
  *
  * Wired only when both `readmates.aigen.enabled=true` and
@@ -123,7 +123,7 @@ class AiGenerationKafkaConfig {
             it.setConsumerFactory(consumerFactory)
             it.setCommonErrorHandler(errorHandler)
             // Manual ack: the listener calls Acknowledgment.acknowledge() only after
-            // AiGenerationWorker.process(jobId) returns successfully. Throwing skips
+            // ProcessAiGenerationJobUseCase.process(jobId) returns successfully. Throwing skips
             // the ack so the container redelivers. Generic exhaustion is settled by
             // the recoverer; live provider attempts retain timeout-sized unlimited backoff.
             it.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL

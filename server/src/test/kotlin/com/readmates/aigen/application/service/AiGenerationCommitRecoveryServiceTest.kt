@@ -127,7 +127,7 @@ class AiGenerationCommitRecoveryServiceTest {
             )
 
         captureCommitRecoveryLogs().use { logs ->
-            val results = service.recoverBatch()
+            val results = service.recoverBatch(50)
 
             assertThat(results.map { it.jobId }).containsExactly(healthyRecord.jobId)
             val warning = logs.events.single()

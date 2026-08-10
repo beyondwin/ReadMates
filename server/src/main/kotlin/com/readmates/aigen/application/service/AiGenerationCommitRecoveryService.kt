@@ -1,6 +1,8 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.port.`in`.AiGenerationCommitRecoveryResult
+import com.readmates.aigen.application.port.`in`.RecoverAiGenerationCommitsUseCase
 import com.readmates.aigen.application.port.out.AiGenerationCommitPersistencePort
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import org.slf4j.LoggerFactory
@@ -8,12 +10,6 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.util.UUID
-
-data class AiGenerationCommitRecoveryResult(
-    val jobId: UUID,
-    val status: JobStatus,
-    val recovered: Boolean,
-)
 
 @Service
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
@@ -23,7 +19,7 @@ class AiGenerationCommitRecoveryService(
     private val cleanupService: AiGenerationPostCommitCleanupService,
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
-) {
+) : RecoverAiGenerationCommitsUseCase {
     @Suppress("ReturnCount")
     fun recover(jobId: UUID): AiGenerationCommitRecoveryResult {
         val record =
@@ -62,7 +58,7 @@ class AiGenerationCommitRecoveryService(
             requestSha256?.length == SHA256_LENGTH,
         ).all { it }
 
-    fun recoverBatch(limit: Int = 50): List<AiGenerationCommitRecoveryResult> =
+    override fun recoverBatch(limit: Int): List<AiGenerationCommitRecoveryResult> =
         jobStore.loadCommitRecoveryJobs(limit).mapNotNull { record ->
             try {
                 recover(record.jobId)
