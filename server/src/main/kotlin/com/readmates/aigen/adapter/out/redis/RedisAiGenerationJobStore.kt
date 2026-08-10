@@ -14,6 +14,7 @@ import com.readmates.aigen.application.model.ProviderAttemptState
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.ActiveAiGenerationJobProbe
 import com.readmates.aigen.application.port.out.AiGenerationAtomicRecoveryCommand
 import com.readmates.aigen.application.port.out.AiGenerationAtomicRecoveryResult
 import com.readmates.aigen.application.port.out.AiGenerationFailureRecoveryPort
@@ -32,6 +33,7 @@ import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.shared.cache.RedisCacheMetrics
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.data.redis.core.StringRedisTemplate
+import org.springframework.data.redis.core.script.DefaultRedisScript
 import org.springframework.stereotype.Component
 import tools.jackson.core.JacksonException
 import tools.jackson.databind.ObjectMapper
@@ -62,7 +64,8 @@ class RedisAiGenerationJobStore(
     private val metrics: RedisCacheMetrics,
     private val clock: Clock,
 ) : AiGenerationJobStore,
-    AiGenerationFailureRecoveryPort {
+    AiGenerationFailureRecoveryPort,
+    ActiveAiGenerationJobProbe {
     private val objectMapper: ObjectMapper = JsonMapper.builder().findAndAddModules().build()
     private val recordCodec = AiGenerationRedisRecordCodec(objectMapper)
     private val indexes = AiGenerationRedisIndexes(redisTemplate, properties.job.redisTtl)
@@ -1000,6 +1003,46 @@ class RedisAiGenerationJobStore(
             }
         }.onFailure { recordFailure("repairProcessingRecoveryIndex") }.getOrThrow()
 
+    override fun probe(now: Instant): ActiveAiGenerationJobProbe.Result =
+        runCatching {
+            val response =
+                redisTemplate
+                    .execute(
+                        activeQueueProbeScript,
+                        listOf(
+                            ACTIVE_INDEX_EPOCH_KEY,
+                            PROCESSING_REPAIR_STATE_KEY,
+                            ACTIVE_JOBS_KEY,
+                            PROCESSING_RECOVERY_KEY,
+                            PROCESSING_QUARANTINE_KEY,
+                        ),
+                        now.toEpochMilli().toString(),
+                        properties.job.recoveryIndexRepairMaxMembers.toString(),
+                    ).orEmpty()
+            when {
+                response.startsWith("AVAILABLE|") ->
+                    ActiveAiGenerationJobProbe.Available(response.substringAfter('|').toLong())
+                response == "INDEX_NOT_READY" ->
+                    ActiveAiGenerationJobProbe.Unavailable(
+                        ActiveAiGenerationJobProbe.UnavailableReason.INDEX_NOT_READY,
+                    )
+                response == "OVER_CAP" ->
+                    ActiveAiGenerationJobProbe.Unavailable(
+                        ActiveAiGenerationJobProbe.UnavailableReason.OVER_CAP,
+                    )
+                response == "QUARANTINED" ->
+                    ActiveAiGenerationJobProbe.Unavailable(
+                        ActiveAiGenerationJobProbe.UnavailableReason.QUARANTINED,
+                    )
+                else -> error("Unexpected Redis queue probe result")
+            }
+        }.onFailure { recordFailure("probeProcessingRecoveryQueue") }
+            .getOrElse {
+                ActiveAiGenerationJobProbe.Unavailable(
+                    ActiveAiGenerationJobProbe.UnavailableReason.REDIS_UNAVAILABLE,
+                )
+            }
+
     private fun repairProcessingMember(
         rawId: String,
         epoch: String,
@@ -1138,6 +1181,22 @@ class RedisAiGenerationJobStore(
         const val MAX_ERROR_MESSAGE_LEN = 512
         const val MAX_RECLASSIFY_RETRIES = 3
         const val REPAIR_WORKLIST_PREFIX = "$PROCESSING_RECOVERY_KEY:repair-worklist:"
+
+        val activeQueueProbeScript: DefaultRedisScript<String> =
+            DefaultRedisScript(
+                """
+                redis.call('ZREMRANGEBYSCORE', KEYS[5], '-inf', ARGV[1])
+                local epoch = redis.call('GET', KEYS[1])
+                local completedEpoch = redis.call('HGET', KEYS[2], 'completedEpoch')
+                if epoch == false or epoch == '' or completedEpoch == false or completedEpoch ~= epoch then
+                  return 'INDEX_NOT_READY'
+                end
+                if redis.call('ZCARD', KEYS[3]) > tonumber(ARGV[2]) then return 'OVER_CAP' end
+                if redis.call('ZCARD', KEYS[5]) > 0 then return 'QUARANTINED' end
+                return 'AVAILABLE|' .. tostring(redis.call('ZCARD', KEYS[4]))
+                """.trimIndent(),
+                String::class.java,
+            )
 
         val GROUNDED_TRANSCRIPT_STATUSES = setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED)
 

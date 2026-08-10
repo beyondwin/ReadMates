@@ -284,6 +284,10 @@ Redis 사용 범위는 재생성 가능한 보조 데이터 또는 짧은 TTL의
 
 Redis key와 metric label에는 raw session token, 초대 token 원문, BFF secret, OAuth code, private feedback document body, 이메일, 표시 이름을 넣지 않습니다. AI generation의 transcript, parsed turns, evidence와 검토 전 result는 job-store adapter가 관리하는 `:transcript`, `:turns`, `:result`, `:evidence` 네 값에만 짧은 TTL로 저장하고 Kafka, MySQL audit/receipt, metrics, metadata hash, operator log로 복사하지 않습니다. Commit한 검토 완료 snapshot만 공통 `session_record_drafts`에 내구 저장됩니다. Cache invalidation은 command transaction commit 이후 실행해 pre-commit DB 상태가 cache로 다시 채워지는 race를 줄입니다.
 
+AI Kafka exhaustion과 restart recovery는 application input port를 호출하는 두 scheduling adapter와 단일 Redis authority로 구성합니다. Generic Kafka failure는 총 10회 뒤 content-free routing identity가 안전할 때만 hash-only recovery를 수행하고, durable terminal/no-op 결과 뒤에만 offset을 commit합니다. 살아 있는 provider attempt, 상태 변경, 아직 deadline 이전 job, corrupt/persistence failure는 commit하지 않으며 DLT를 두지 않습니다. Scheduler는 `processing-deadline`의 inclusive cutoff(`lastUpdatedAt <= cutoff`)를 쓰고 provider attempt stale 판정은 기존 strict cutoff(`startedAt < providerStaleBefore`)를 유지합니다.
+
+현재 writer는 active/processing index와 epoch를 상태 변경 Lua 안에서 함께 갱신합니다. Legacy self-healing은 global active set을 최대 `recovery-index-repair-max-members`로 제한한 persisted worklist로 snapshot하고 wave마다 `recovery-index-repair-batch-size`만 처리합니다. `completedEpoch == activeIndexEpoch`인 full pass가 있고 ceiling 이내이며 quarantine이 비어 있을 때만 queue depth가 authoritative합니다. Redis failure, epoch 미완료, over-cap, quarantine은 0이 아니라 unavailable(`NaN` depth, availability 0)이며, sampling service가 injected `Clock`과 하나의 immutable snapshot을 소유해 gauge callback에서 Redis I/O를 하지 않습니다. 이 경계는 single-node Redis 전용이고 mixed-version writer overlap과 wall-clock repair 완료 시간은 보장하지 않습니다.
+
 ## 공개 API 2계층 캐시
 
 공개 API 응답은 Spring과 Cloudflare Pages Functions BFF 두 계층에서 캐시합니다.

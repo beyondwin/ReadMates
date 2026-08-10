@@ -9,6 +9,10 @@ cd "$(git rev-parse --show-toplevel)"
 rules="ops/prometheus/alerts/aigen-rules.yml"
 for alert in \
   AiGenProviderCircuitOpen \
+  AiGenQueueProbeUnavailable \
+  AiGenQueueProbeStale \
+  AiGenRecoveryFailure \
+  AiGenRecoveryIndexRepairBlocked \
   AiGenEstimatedUnknownCostGrowth \
   AiGenPhysicalCallCapExhausted \
   AiGenOtlpExporterDrops \

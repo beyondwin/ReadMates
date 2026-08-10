@@ -30,6 +30,10 @@
 <a id="aigenschemafailurespike"></a>
 <a id="aigenbudgetexhaustion"></a>
 <a id="aigenqueuelaghigh"></a>
+<a id="aigenqueueprobeunavailable"></a>
+<a id="aigenqueueprobestale"></a>
+<a id="aigenrecoveryfailure"></a>
+<a id="aigenrecoveryindexrepairblocked"></a>
 <a id="aigenredisdown"></a>
 <a id="aigenprovidercircuitopen"></a>
 <a id="aigenestimatedunknowncostgrowth"></a>
@@ -47,7 +51,11 @@
 | `AiGenProviderErrorBurst` | warn | provider별 FAILED job ratio > 10% over 10m | `#provider-error-burst` |
 | `AiGenSchemaFailureSpike` | warn | `SCHEMA_INVALID` validation failure ratio > 20% over 1h | `#schema-failure-spike` |
 | `AiGenBudgetExhaustion` | info | aggregate 30d AI generation cost > $1000 | `#budget-exhaustion` |
-| `AiGenQueueLagHigh` | warn | Redis active AI job backlog `readmates_aigen_queue_depth > 50` for 5m | `#queue-lag-high` |
+| `AiGenQueueLagHigh` | warn | authoritative/fresh probe에서 Redis processing backlog > 50 for 5m | `#queue-lag-high` |
+| `AiGenQueueProbeUnavailable` | warn | availability가 0 또는 series absent for 2m | `#queue-probe-unavailable` |
+| `AiGenQueueProbeStale` | warn | last-success가 absent/NaN 또는 sample interval 3배 이상 stale | `#queue-probe-unavailable` |
+| `AiGenRecoveryFailure` | warn | 10m 내 job recovery `failed`/`corrupt` 증가 또는 nonzero series 최초 관측 | `#recovery-failure` |
+| `AiGenRecoveryIndexRepairBlocked` | warn | repair `quarantined`/`over_cap`/`failed` 증가 또는 nonzero series 최초 관측 | `#recovery-index-repair` |
 | `AiGenRedisDown` | critical | `redis_up == 0` and HTTP 5xx rate elevated | `#redis-down` |
 | `AiGenProviderCircuitOpen` | warn | provider circuit open for 5m | `#provider-circuit-open` |
 | `AiGenEstimatedUnknownCostGrowth` | warn | 15m unknown-estimated reserved cost growth | `#estimated-unknown-cost` |

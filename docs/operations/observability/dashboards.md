@@ -294,7 +294,9 @@
 | Cost rate by provider/model | `readmates_aigen_cost_usd_total` | 최근 비용 증가율 확인 |
 | Top-N club cost | SQL drill-down 안내 | `club_id`를 metric label로 쓰지 않는 정책을 유지하면서 과금 원인 확인 |
 | Validation failures by reason | `readmates_aigen_validation_failures_total` | schema/author/template 실패 spike 확인 |
-| Active job backlog | `readmates_aigen_queue_depth` | Redis job store 기준 `PENDING` + `RUNNING` AI job 적체 확인 |
+| Authoritative queue depth | `readmates_aigen_queue_depth` | 완료된 현재 repair epoch 기준 `PENDING` + `RUNNING`; `NaN`은 0건이 아니라 unavailable |
+| Queue probe authority and last-success age | availability, `time() - last_success_timestamp`, sample interval | stopped sampler와 Redis/index ambiguity를 실제 backlog와 분리 |
+| Failure recovery and index repair outcomes | recovery/repair counter | Kafka·scheduler 복구와 bounded worklist/quarantine/ceiling 결과 분리 |
 | Jobs by status/provider | `readmates_aigen_jobs_completed_total` | 성공/실패/취소 비율 확인 |
 | Tokens by direction | `readmates_aigen_tokens_total` | input/cache_write_input/cache_read_input/output 4채널 사용량 확인 |
 | Cap denials by reason | `readmates_aigen_cap_denials_total` | host daily, club monthly, host per-minute cap 거절 확인 |

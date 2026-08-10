@@ -8,19 +8,21 @@ import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.`in`.AiGenerationQueueProbeSnapshot
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
 import com.readmates.aigen.application.port.out.ProviderGateRejection
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
 import java.math.BigDecimal
 import java.time.Duration
-import java.util.concurrent.atomic.AtomicLong
+import java.time.Instant
 
 /**
- * Validates that AiGenerationMetrics emits the 8 spec §11.1 meters and the
- * bounded grounded-section repair counter with the correct tag keys. Tag values
+ * Validates the core AI generation, recovery, and queue-probe meters and their
+ * fixed-cardinality tag keys. Tag values
  * are intentionally NOT asserted exhaustively here;
  * the [MetricLabelsTest] covers allowlist enforcement across the full surface.
  */
@@ -285,16 +287,38 @@ class AiGenerationMetricsTest {
     }
 
     @Test
-    fun `registerQueueDepthGauge registers gauge whose value tracks supplier`() {
-        val depth = AtomicLong(7L)
-        metrics.registerQueueDepthGauge { depth.get() }
+    fun `queue probe gauges expose one snapshot and the finite configured interval`() {
+        val sampledAt = Instant.parse("2026-08-10T10:00:00Z")
+        var snapshot = AiGenerationQueueProbeSnapshot(sampledAt, 7.0, true, sampledAt)
+        metrics.registerQueueProbeGauges({ snapshot }, Duration.ofSeconds(30))
 
-        val gauge = registry.find("readmates.aigen.queue.depth").gauge()
-        assertThat(gauge).isNotNull
-        assertThat(gauge!!.value()).isEqualTo(7.0)
+        assertThat(registry.find("readmates.aigen.queue.depth").gauge()!!.value()).isEqualTo(7.0)
+        assertThat(registry.find("readmates.aigen.queue.probe.available").gauge()!!.value()).isEqualTo(1.0)
+        assertThat(registry.find("readmates.aigen.queue.probe.last.success.timestamp.seconds").gauge()!!.value())
+            .isEqualTo(sampledAt.epochSecond.toDouble())
+        assertThat(registry.find("readmates.aigen.queue.probe.sample.interval.seconds").gauge()!!.value())
+            .isEqualTo(30.0)
 
-        depth.set(42L)
-        assertThat(gauge.value()).isEqualTo(42.0)
+        snapshot = AiGenerationQueueProbeSnapshot(sampledAt.plusSeconds(30), Double.NaN, false, sampledAt)
+        assertThat(registry.find("readmates.aigen.queue.depth").gauge()!!.value()).isNaN()
+        assertThat(registry.find("readmates.aigen.queue.probe.available").gauge()!!.value()).isZero()
+        assertThat(registry.find("readmates.aigen.queue.probe.last.success.timestamp.seconds").gauge()!!.value())
+            .isEqualTo(sampledAt.epochSecond.toDouble())
+    }
+
+    @Test
+    fun `recovery metric registry failure is fail open`() {
+        val failingRegistry = SimpleMeterRegistry()
+        failingRegistry.config().onMeterAdded { throw IllegalStateException("registry detail") }
+        val failingMetrics = AiGenerationMetrics(failingRegistry)
+
+        assertThatCode {
+            failingMetrics.recordFailureRecovery(
+                AiGenerationRecoverySource.SCHEDULED,
+                AiGenerationRecoveryResult.RECOVERED_RUNNING,
+            )
+            failingMetrics.recordRecoveryIndexRepair(AiGenerationIndexRepairResultTag.QUARANTINED)
+        }.doesNotThrowAnyException()
     }
 
     @Test

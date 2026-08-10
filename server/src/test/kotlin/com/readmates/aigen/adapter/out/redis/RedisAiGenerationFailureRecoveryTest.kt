@@ -11,6 +11,7 @@ import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
+import com.readmates.aigen.application.port.out.ActiveAiGenerationJobProbe
 import com.readmates.aigen.application.port.out.AiGenerationAdmissionDisposition
 import com.readmates.aigen.application.port.out.AiGenerationAtomicRecoveryCommand
 import com.readmates.aigen.application.port.out.AiGenerationAtomicRecoveryResult
@@ -84,6 +85,7 @@ class RedisAiGenerationFailureRecoveryTest(
     @param:Autowired private val reservations: ProviderCallReservationPort,
     @param:Autowired private val redis: StringRedisTemplate,
     @param:Autowired private val properties: AiGenerationProperties,
+    @param:Autowired private val queueProbe: ActiveAiGenerationJobProbe,
 ) : ReadmatesRedisIntegrationTestSupport() {
     @Suppress("UnusedPrivateProperty")
     @MockitoBean
@@ -99,6 +101,74 @@ class RedisAiGenerationFailureRecoveryTest(
                 ACTIVE_KEY,
                 ACTIVE_EPOCH_KEY,
                 REPAIR_STATE_KEY,
+            ),
+        )
+    }
+
+    @Test
+    fun `queue probe is unavailable until the active epoch has a completed repair pass`() {
+        assertThat(queueProbe.probe(NOW)).isEqualTo(
+            ActiveAiGenerationJobProbe.Unavailable(
+                ActiveAiGenerationJobProbe.UnavailableReason.INDEX_NOT_READY,
+            ),
+        )
+
+        assertThat(recovery.repairProcessingRecoveryIndex(NOW))
+            .isEqualTo(AiGenerationIndexRepairResult.PASS_COMPLETED)
+        assertThat(queueProbe.probe(NOW)).isEqualTo(ActiveAiGenerationJobProbe.Available(0))
+
+        val pending = record(JobStatus.PENDING).also(store::save)
+        val running = record(JobStatus.RUNNING).also(store::save)
+        record(JobStatus.SUCCEEDED).also(store::save)
+
+        assertThat(queueProbe.probe(NOW)).isEqualTo(
+            ActiveAiGenerationJobProbe.Unavailable(
+                ActiveAiGenerationJobProbe.UnavailableReason.INDEX_NOT_READY,
+            ),
+        )
+        assertThat(recovery.repairProcessingRecoveryIndex(NOW))
+            .isEqualTo(AiGenerationIndexRepairResult.EPOCH_RESET)
+        assertThat(queueProbe.probe(NOW)).isEqualTo(
+            ActiveAiGenerationJobProbe.Unavailable(
+                ActiveAiGenerationJobProbe.UnavailableReason.INDEX_NOT_READY,
+            ),
+        )
+        assertThat(recovery.repairProcessingRecoveryIndex(NOW))
+            .isEqualTo(AiGenerationIndexRepairResult.PASS_COMPLETED)
+
+        assertThat(queueProbe.probe(NOW)).isEqualTo(ActiveAiGenerationJobProbe.Available(2))
+        assertThat(score(PROCESSING_KEY, pending.jobId)).isNotNull()
+        assertThat(score(PROCESSING_KEY, running.jobId)).isNotNull()
+    }
+
+    @Test
+    fun `queue probe prunes expired quarantine and refuses live quarantine or over cap`() {
+        assertThat(recovery.repairProcessingRecoveryIndex(NOW))
+            .isEqualTo(AiGenerationIndexRepairResult.PASS_COMPLETED)
+        val quarantined = UUID.randomUUID()
+        redis.opsForZSet().add(QUARANTINE_KEY, quarantined.toString(), NOW.plusSeconds(1).toEpochMilli().toDouble())
+
+        assertThat(queueProbe.probe(NOW)).isEqualTo(
+            ActiveAiGenerationJobProbe.Unavailable(
+                ActiveAiGenerationJobProbe.UnavailableReason.QUARANTINED,
+            ),
+        )
+        assertThat(queueProbe.probe(NOW.plusSeconds(1))).isEqualTo(ActiveAiGenerationJobProbe.Available(0))
+        val expiredQuarantineScore: Double? = redis.opsForZSet().score(QUARANTINE_KEY, quarantined.toString())
+        assertThat(expiredQuarantineScore).isNull()
+
+        repeat(properties.job.recoveryIndexRepairMaxMembers) {
+            redis.opsForZSet().add(ACTIVE_KEY, UUID.randomUUID().toString(), it.toDouble())
+        }
+        assertThat(queueProbe.probe(NOW.plusSeconds(1))).isEqualTo(ActiveAiGenerationJobProbe.Available(0))
+        redis.opsForZSet().add(
+            ACTIVE_KEY,
+            UUID.randomUUID().toString(),
+            properties.job.recoveryIndexRepairMaxMembers.toDouble(),
+        )
+        assertThat(queueProbe.probe(NOW.plusSeconds(1))).isEqualTo(
+            ActiveAiGenerationJobProbe.Unavailable(
+                ActiveAiGenerationJobProbe.UnavailableReason.OVER_CAP,
             ),
         )
     }

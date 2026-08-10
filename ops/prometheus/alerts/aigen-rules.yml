@@ -9,9 +9,9 @@
 #   * Provider-level error code labels (`PROVIDER_*`) are not exported as
 #     metric labels; the provider adapter records them in the audit log only.
 #     `AiGenProviderErrorBurst` uses `status="FAILED"` as the closest proxy.
-#   * `readmates_aigen_queue_depth` is the Redis-backed active job count
-#     (`PENDING` + `RUNNING`) bound by `AiGenerationQueueDepthGaugeBinder`.
-#     Kafka consumer-group lag is a separate operational signal.
+#   * `readmates_aigen_queue_depth` is a scheduled, authoritative Redis recovery-index
+#     snapshot. NaN means unavailable, never an empty queue. Kafka consumer-group lag
+#     remains a separate operational signal.
 #   * `redis_up` metric name follows the Spring Boot Actuator / Micrometer
 #     health convention; confirm exported series name with ops before
 #     enabling in production.
@@ -91,9 +91,20 @@ groups:
 
       - alert: AiGenQueueLagHigh
         # Spec: consumer lag > 50 5m.
-        # Backed by the live Redis active-job gauge (`PENDING` + `RUNNING`).
-        # This is application backlog, not Kafka consumer-group lag.
-        expr: readmates_aigen_queue_depth > 50
+        # Fire only while the sampled recovery index is authoritative and fresh.
+        # A stopped sampler must not leave a frozen high-depth series alerting as live data.
+        # Default exact-label joins keep availability/freshness target-local.
+        expr: |
+          (readmates_aigen_queue_depth > 50)
+          and (readmates_aigen_queue_probe_available == 1)
+          and (
+            readmates_aigen_queue_probe_last_success_timestamp_seconds
+              == readmates_aigen_queue_probe_last_success_timestamp_seconds
+          )
+          and (
+            time() - readmates_aigen_queue_probe_last_success_timestamp_seconds
+              < 3 * readmates_aigen_queue_probe_sample_interval_seconds
+          )
         for: 5m
         labels:
           severity: warn
@@ -105,6 +116,81 @@ groups:
             sustained for 5m. Check worker pool saturation and provider
             latency.
           runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-lag-high"
+
+      - alert: AiGenQueueProbeUnavailable
+        expr: |
+          absent(readmates_aigen_queue_probe_available)
+          or readmates_aigen_queue_probe_available == 0
+        for: 2m
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI generation queue probe is unavailable"
+          description: >-
+            The latest queue sample is unavailable or the availability series is absent.
+            Do not interpret queue depth as zero.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-probe-unavailable"
+
+      - alert: AiGenQueueProbeStale
+        expr: |
+          absent(readmates_aigen_queue_probe_last_success_timestamp_seconds)
+          or (
+            readmates_aigen_queue_probe_last_success_timestamp_seconds
+              != readmates_aigen_queue_probe_last_success_timestamp_seconds
+          )
+          or (
+            time() - readmates_aigen_queue_probe_last_success_timestamp_seconds
+              >= 3 * readmates_aigen_queue_probe_sample_interval_seconds
+          )
+        for: 2m
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI generation queue probe has no fresh success"
+          description: >-
+            The last-success timestamp is absent, NaN, or older than three configured
+            sample intervals. Queue-lag alerts are suppressed until sampling recovers.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-probe-unavailable"
+
+      - alert: AiGenRecoveryFailure
+        expr: |
+          sum(increase(readmates_aigen_failure_recovery_total{result=~"failed|corrupt"}[10m])) > 0
+          or
+          sum(
+            readmates_aigen_failure_recovery_total{result=~"failed|corrupt"}
+            unless readmates_aigen_failure_recovery_total{result=~"failed|corrupt"} offset 10m
+          ) > 0
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI generation failure recovery needs operator review"
+          description: >-
+            A Kafka or scheduled recovery failed, or encountered corrupt recovery metadata.
+            Inspect fixed recovery outcomes before any replay.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#recovery-failure"
+
+      - alert: AiGenRecoveryIndexRepairBlocked
+        expr: |
+          sum by (result) (
+            increase(readmates_aigen_recovery_index_repair_total{result=~"quarantined|over_cap|failed"}[10m])
+          ) > 0
+          or
+          sum by (result) (
+            readmates_aigen_recovery_index_repair_total{result=~"quarantined|over_cap|failed"}
+            unless readmates_aigen_recovery_index_repair_total{result=~"quarantined|over_cap|failed"} offset 10m
+          ) > 0
+        labels:
+          severity: warn
+          component: aigen
+        annotations:
+          summary: "AI generation recovery-index repair is blocked"
+          description: >-
+            Recovery-index repair reported {{ $labels.result }}. Queue depth remains
+            unavailable until the current epoch has a completed unambiguous pass.
+          runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#recovery-index-repair"
 
       - alert: AiGenRedisDown
         # Spec: Redis ping 실패 + 503 비율 상승.

@@ -98,12 +98,12 @@
     {
       "id": 5,
       "type": "timeseries",
-      "title": "Queue lag (readmates_aigen_queue_depth)",
+      "title": "Authoritative queue depth",
       "datasource": { "type": "prometheus", "uid": "prometheus" },
       "targets": [
         {
           "expr": "readmates_aigen_queue_depth",
-          "legendFormat": "queue_depth",
+          "legendFormat": "queue_depth (NaN = unavailable)",
           "refId": "A"
         }
       ],
@@ -259,6 +259,51 @@
       ],
       "fieldConfig": { "defaults": { "unit": "short" } },
       "gridPos": { "h": 8, "w": 12, "x": 12, "y": 48 }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Queue probe authority and last-success age",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "readmates_aigen_queue_probe_available",
+          "legendFormat": "available (1/0)",
+          "refId": "A"
+        },
+        {
+          "expr": "time() - readmates_aigen_queue_probe_last_success_timestamp_seconds",
+          "legendFormat": "last success age (s)",
+          "refId": "B"
+        },
+        {
+          "expr": "3 * readmates_aigen_queue_probe_sample_interval_seconds",
+          "legendFormat": "freshness ceiling (s)",
+          "refId": "C"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "short" } },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 56 }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Failure recovery and index repair outcomes",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "targets": [
+        {
+          "expr": "sum(rate(readmates_aigen_failure_recovery_total[5m])) by (source, result)",
+          "legendFormat": "recovery {{source}} / {{result}}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(readmates_aigen_recovery_index_repair_total[5m])) by (result)",
+          "legendFormat": "repair / {{result}}",
+          "refId": "B"
+        }
+      ],
+      "fieldConfig": { "defaults": { "unit": "ops" } },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 56 }
     }
   ]
 }

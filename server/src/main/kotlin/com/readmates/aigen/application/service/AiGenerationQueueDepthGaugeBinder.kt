@@ -1,38 +1,23 @@
 package com.readmates.aigen.application.service
 
-import com.readmates.aigen.application.model.JobStatus
-import com.readmates.aigen.application.port.out.AiGenerationJobStore
+import com.readmates.aigen.application.port.`in`.ReadAiGenerationQueueProbeSnapshotUseCase
+import com.readmates.aigen.config.AiGenerationProperties
 import jakarta.annotation.PostConstruct
-import org.springframework.boot.autoconfigure.condition.ConditionalOnBean
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.stereotype.Component
 
 /**
- * Binds the `readmates.aigen.queue.depth` gauge to a live supplier backed by
- * `AiGenerationJobStore.loadActiveJobs()`. The gauge reports the count of jobs
- * whose status is PENDING or RUNNING — i.e. the AI generation pipeline backlog
- * the operator cares about for `AiGenQueueLagHigh`.
- *
- * The supplier is invoked each time Prometheus scrapes (~30s). `loadActiveJobs`
- * caps at 200 to keep the call O(1) on cardinality; if the real backlog ever
- * exceeds 200 the gauge under-reports — the alert threshold (50) fires far
- * earlier so this is safe in practice.
+ * Binds I/O-free gauges to the application-owned immutable queue-probe snapshot.
  */
 @Component
-@ConditionalOnBean(AiGenerationJobStore::class)
+@ConditionalOnProperty(prefix = "readmates", name = ["redis.enabled", "aigen.enabled"], havingValue = "true")
 class AiGenerationQueueDepthGaugeBinder(
     private val metrics: AiGenerationMetrics,
-    private val jobStore: AiGenerationJobStore,
+    private val snapshots: ReadAiGenerationQueueProbeSnapshotUseCase,
+    private val properties: AiGenerationProperties,
 ) {
     @PostConstruct
     fun bind() {
-        metrics.registerQueueDepthGauge {
-            jobStore
-                .loadActiveJobs(QUEUE_DEPTH_PROBE_LIMIT)
-                .count { it.status == JobStatus.PENDING || it.status == JobStatus.RUNNING }
-        }
-    }
-
-    companion object {
-        private const val QUEUE_DEPTH_PROBE_LIMIT = 200
+        metrics.registerQueueProbeGauges(snapshots::readSnapshot, properties.job.queueProbeFixedDelay)
     }
 }
