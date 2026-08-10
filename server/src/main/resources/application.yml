@@ -196,6 +196,12 @@ readmates:
       redis-ttl: ${READMATES_AIGEN_REDIS_TTL:6h}
       notification-latency-threshold: ${READMATES_AIGEN_NOTIFICATION_LATENCY_THRESHOLD:60s}
       max-llm-calls-per-job: ${READMATES_AIGEN_MAX_LLM_CALLS_PER_JOB:3}
+      processing-deadline: ${READMATES_AIGEN_PROCESSING_DEADLINE:20m}
+      recovery-fixed-delay: ${READMATES_AIGEN_RECOVERY_FIXED_DELAY:1m}
+      recovery-batch-size: ${READMATES_AIGEN_RECOVERY_BATCH_SIZE:50}
+      recovery-index-repair-batch-size: ${READMATES_AIGEN_RECOVERY_INDEX_REPAIR_BATCH_SIZE:500}
+      recovery-index-repair-max-members: ${READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS:5000}
+      queue-probe-fixed-delay: ${READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY:30s}
     provider-calls:
       request-timeout: ${READMATES_AIGEN_PROVIDER_REQUEST_TIMEOUT:4m}
       max-concurrent-per-provider: ${READMATES_AIGEN_MAX_CONCURRENT_PER_PROVIDER:2}
@@ -240,3 +246,5 @@ readmates:
       topic-jobs: ${READMATES_AIGEN_KAFKA_TOPIC_JOBS:readmates.aigen.jobs.v1}
       consumer-group: ${READMATES_AIGEN_KAFKA_CONSUMER_GROUP:readmates-aigen-worker}
       max-poll-interval: ${READMATES_AIGEN_KAFKA_MAX_POLL_INTERVAL:16m}
+      consumer-retry-delay: ${READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY:5s}
+      consumer-max-attempts: ${READMATES_AIGEN_KAFKA_CONSUMER_MAX_ATTEMPTS:10}

@@ -22,6 +22,19 @@ class AiGenerationConfigValidatorTest {
     }
 
     @Test
+    fun `cross-property recovery budget fails startup while the AI kill switch is disabled`() {
+        assertThatThrownBy {
+            AiGenerationConfigValidator(
+                aigenEnabled = false,
+                beanFactory = emptyBeanFactory(),
+                properties = validProperties(),
+                kafkaProperties = AiGenerationKafkaProperties(maxPollInterval = Duration.ofMinutes(20)),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("readmates.aigen.job.processing-deadline")
+    }
+
+    @Test
     fun `passes when aigen is enabled and a queue bean is wired`() {
         val factory = DefaultListableBeanFactory()
         factory.registerBeanDefinition(
@@ -91,6 +104,71 @@ class AiGenerationConfigValidatorTest {
             ).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("7m10s")
+    }
+
+    @Test
+    fun `accepts processing deadline equal to poll interval plus generic retry window`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                job = base.job.copy(processingDeadline = Duration.ofMinutes(16).plusSeconds(45)),
+            )
+
+        assertThatCode {
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = properties,
+                kafkaProperties = AiGenerationKafkaProperties(),
+            ).validate()
+        }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `rejects processing deadline below poll interval plus generic retry window without truncation`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                job =
+                    base.job.copy(
+                        processingDeadline = Duration.ofMinutes(16).plusSeconds(45).minusNanos(1),
+                    ),
+            )
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = properties,
+                kafkaProperties = AiGenerationKafkaProperties(),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("readmates.aigen.job.processing-deadline")
+            .hasMessageContaining("readmates.aigen.kafka.max-poll-interval")
+    }
+
+    @Test
+    fun `rejects processing deadline equal to Redis ttl`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                job =
+                    base.job.copy(
+                        redisTtl = Duration.ofHours(1),
+                        processingDeadline = Duration.ofHours(1),
+                    ),
+            )
+
+        assertThatThrownBy {
+            AiGenerationConfigValidator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = properties,
+                kafkaProperties = AiGenerationKafkaProperties(),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("readmates.aigen.job.processing-deadline")
+            .hasMessageContaining("readmates.aigen.job.redis-ttl")
     }
 
     @Test
