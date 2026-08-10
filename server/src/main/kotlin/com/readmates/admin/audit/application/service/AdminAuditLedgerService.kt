@@ -234,7 +234,7 @@ class AdminAuditLedgerService(
             outcome = row.outcomeHint.toOutcome(default = AdminAuditOutcome.PREPARED),
             actor = actor(row.actorUserId, row.actorRole),
             target = AdminAuditTarget(row.clubId, null, null, row.sourceId, "Replay preview"),
-            summary = "알림 재처리 대상이 미리 확인되었습니다.",
+            summary = replayPreviewSummary(row.actionType),
             safeMetadata = replayPreviewMetadata(metadata),
             metadataState = metadataState(metadata, unavailable),
         )
@@ -277,15 +277,9 @@ class AdminAuditLedgerService(
                 listOfNotNull(metadata.string("grantId")?.let { AdminAuditMetadata("grantId", it, "id") })
             "ADMIN_NOTIFICATION_REPLAY_CONFIRMED" ->
                 listOfNotNull(
-                    metadata.string("previewId")?.let { AdminAuditMetadata("previewId", it, "id") },
                     metadata.selectionHashPrefix(),
                     metadata.number("replayedCount")?.let { AdminAuditMetadata("replayedCount", it, "count") },
                     metadata.number("skippedCount")?.let { AdminAuditMetadata("skippedCount", it, "count") },
-                    AdminAuditMetadata(
-                        "reasonPresent",
-                        metadata.string("reason")?.isNotBlank().toString(),
-                        "boolean",
-                    ),
                 )
             else -> listOf(AdminAuditMetadata("eventType", actionType, "code"))
         }
@@ -396,6 +390,14 @@ private fun platformSummary(actionType: String): String =
         "SUPPORT_ACCESS_GRANT_REVOKED" -> "support grant가 회수되었습니다."
         "ADMIN_NOTIFICATION_REPLAY_CONFIRMED" -> "알림 재처리가 확정되었습니다."
         else -> "platform admin 이벤트가 기록되었습니다."
+    }
+
+private fun replayPreviewSummary(actionType: String): String =
+    when (actionType) {
+        "ADMIN_NOTIFICATION_REPLAY_PREVIEW_PREPARED" -> "알림 재처리 대상이 미리 확인되었습니다."
+        "ADMIN_NOTIFICATION_REPLAY_PREVIEW_CONSUMED" -> "알림 재처리 preview가 소비되었습니다."
+        "ADMIN_NOTIFICATION_REPLAY_PREVIEW_LEGACY" -> "레거시 알림 재처리 preview 증거가 기록되었습니다."
+        else -> "알림 재처리 preview 증거가 기록되었습니다."
     }
 
 private fun clubSummary(actionType: String): String =

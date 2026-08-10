@@ -81,6 +81,7 @@
 - `V20__kafka_notification_pipeline.sql` — `notification_event_outbox` (이벤트 payload JSON) + `notification_deliveries` (채널별 delivery 상태). Kafka 도입으로 outbox와 delivery를 분리.
 - `V27__manual_notification_dispatch.sql`, `V28__manual_notification_dispatch_hardening.sql` — 10분 TTL preview와 수동 dispatch 감사 원장, preview 소비 및 dispatch 1:1 제약.
 - `V42__host_notification_composer.sql` — current content revision, `SELECTED_MEMBERS`, opt-in 클럽 리마인더 정책을 추가하고 명시적 composer 발송을 강화.
+- `V48__make_admin_notification_replay_atomic.sql` — platform admin의 exact delivery target snapshot, v2 confirmation receipt, actor/club scope, legacy v1 호환 evidence를 additive하게 추가.
 
 **outbox 삽입 — `JdbcNotificationEventOutboxAdapter.enqueueEvent`**
 
@@ -161,6 +162,12 @@ plain text와 HTML body를 `NotificationEmailTemplates.eventCopy()` 단일 호�
 
 `/app/host/notifications`는 서버 확인 정책과 backlog 지표를 상태 레일로 먼저 보여주고, `회차 → 알림 종류 → 대상과 채널` 세 결정을 한 작업대에서 받습니다. Preview는 current `contentRevision`, selection hash, 10분 TTL을 고정하고 최종 수신 인원과 채널별 예상 건수를 side sheet에서 보여줍니다. 확정 CTA만 `notification_manual_dispatches`와 outbox row를 만들며 닫기, Escape, backdrop, route navigation은 아무 발송도 만들지 않습니다. 최근 수동 발송 3건은 기본 원장에, 전체 event/delivery와 retry/recovery 도구는 조건부 운영 상세에 둡니다.
 
+**Platform admin exact delivery replay**
+
+`/api/admin/notifications/replay-preview`는 최대 1,000개(설정 범위 `1..5000`)의 byte-exact `EMAIL` + `FAILED|DEAD` + `MAIL_RETRYABLE|MAIL_PERMANENT` delivery tuple을 고정 순서 canonical hash와 v2 target row로 저장합니다. `MAIL_AMBIGUOUS`, 만료·content-invalid, 빈 값, unknown, 대소문자·padding lookalike는 warning count에만 포함됩니다. Confirm은 stored filter로 새 대상을 찾지 않고 snapshot과 status, attempt count, failure code, `updated_at`, null lease가 그대로인 row만 직접 `PENDING`으로 reset하며 달라진 row는 skip합니다.
+
+이 복구는 수동 발송과 달리 `notification_event_outbox`를 INSERT하거나 source event를 재발행하지 않습니다. Delivery reset, 단일 protected platform audit, immutable receipt, preview consume가 하나의 transaction에 들어가고 같은 actor/hash 명령의 응답 유실 재시도는 기존 receipt를 반환합니다. Legacy v1 preview는 정확한 receipt가 없으므로 성공 count를 지어내지 않고 다시 preview해야 합니다. DB 단계의 원자성과 멱등성은 SMTP side effect를 exactly-once로 바꾸지 않습니다.
+
 ## 검증
 
 **통합 테스트**
@@ -212,7 +219,7 @@ SMTP provider가 메시지를 수락한 뒤 `markDeliverySent` CAS/DB commit 전
 
 - **Kafka 운영 부담**: Redpanda(Kafka 호환)를 단일 노드로 운영하더라도 lifecycle 관리, 마이그레이션, 재시작 시 lag 확인이 필요합니다.
 - **backlog 모니터링 필수**: event outbox backlog 증가는 relay/Kafka, delivery backlog 증가는 worker/SMTP 신호입니다. 첫 refresh 전 `NaN`과 last-success snapshot을 0으로 해석하지 않습니다. 실제 Alertmanager routing은 운영 환경의 별도 확인 대상입니다.
-- **DEAD recovery 분리**: event-outbox `DEAD`에는 이 slice의 범용 replay action이 없으므로 원인 제거와 forward recovery를 분리하고 DB를 직접 수정하지 않습니다. Manual preview/confirm은 새 event를 만드는 forward action입니다. Delivery `DEAD`는 exact 대상과 failure/deadline/lease evidence를 확인한 뒤 host가 한 건씩 `POST /api/host/notifications/items/{id}/restore`로 `PENDING` 복구합니다. Admin replay preview/confirm atomicity는 다음 계획이고, `AMBIGUOUS`는 미수락 evidence 없이 restore/blind resend하지 않습니다.
+- **DEAD recovery 분리**: event-outbox `DEAD`에는 이 slice의 범용 replay action이 없으므로 원인 제거와 forward recovery를 분리하고 DB를 직접 수정하지 않습니다. Manual preview/confirm은 새 event를 만드는 forward action입니다. Delivery `DEAD`는 exact 대상과 failure/deadline/lease evidence를 확인한 뒤 host가 한 건씩 복구하거나, OWNER/OPERATOR가 bounded admin preview/confirm으로 allowlisted exact delivery 묶음만 원자적으로 `PENDING` 복구합니다. Admin replay는 새 outbox/event를 만들지 않고 changed/leased target을 skip하며, `AMBIGUOUS`는 미수락 evidence 없이 restore/blind resend하지 않습니다.
 - **consumer single instance**: `NotificationEventKafkaListener`는 단일 인스턴스로 실행됩니다. 처리량이 늘면 Kafka partition 수와 consumer 인스턴스를 맞춰 scale-out해야 하지만 현재 구성에서는 single consumer입니다.
 - **relay polling 지연**: `NotificationEventRelayScheduler`는 30초 고정 지연으로 실행되므로, commit → relay → Kafka publish 사이에 최대 30초 지연이 발생할 수 있습니다.
 
