@@ -197,6 +197,12 @@ internal object AiGenerationRecoveryRedisScripts {
             if currentHostUserId ~= ARGV[19] or currentClubId ~= ARGV[20] or currentSessionId ~= ARGV[21] then
               return 'STATE_CHANGED'
             end
+            if not validKeyType(KEYS[8], 'string') or
+              not validKeyType(KEYS[9], 'zset') or not validKeyType(KEYS[10], 'zset') or
+              not validKeyType(KEYS[11], 'zset') or not validKeyType(KEYS[12], 'zset') or
+              not validKeyType(KEYS[13], 'zset') or not validKeyType(KEYS[14], 'zset') then
+              return redis.error_reply('corrupt recovery key type')
+            end
             if (status == 'PENDING' and ARGV[11] ~= 'RELEASE_PENDING') or
               (status == 'RUNNING' and ARGV[11] ~= 'COMPLETE_RUNNING') then return corrupt() end
             if observedSecond == false and observedNano == false then
@@ -216,13 +222,6 @@ internal object AiGenerationRecoveryRedisScripts {
                 return 'NOT_STALE'
               end
             end
-            if not validKeyType(KEYS[8], 'string') or
-              not validKeyType(KEYS[9], 'zset') or not validKeyType(KEYS[10], 'zset') or
-              not validKeyType(KEYS[11], 'zset') or not validKeyType(KEYS[12], 'zset') or
-              not validKeyType(KEYS[13], 'zset') or not validKeyType(KEYS[14], 'zset') then
-              return redis.error_reply('corrupt recovery key type')
-            end
-
             local receiptExists = redis.call('EXISTS', KEYS[3]) == 1
             local refundDaily = false
             local refundMinute = false

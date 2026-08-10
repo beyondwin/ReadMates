@@ -1207,6 +1207,39 @@ interface RedisRecoveryRollingCompatibilityContract {
         }
     }
 
+    @Test
+    fun `corrupt recovery validates quarantine type before any mutation across retries`() {
+        val pending = rollingRecord(JobStatus.PENDING)
+        guard.checkBeforeCall(pending.hostUserId, pending.clubId, pending.jobId)
+        store.save(pending)
+        redis.opsForHash<String, String>().delete(jobKey(pending.jobId), "lastUpdatedAtNano")
+        redis.delete(QUARANTINE_KEY)
+        redis.opsForValue().set(QUARANTINE_KEY, "wrong-type")
+        val before = corruptWrongTypeRecoverySnapshot(redis, pending)
+
+        repeat(2) {
+            assertThatThrownBy {
+                recovery.recover(command(pending, AiGenerationAdmissionDisposition.RELEASE_PENDING))
+            }.isInstanceOf(RuntimeException::class.java)
+            assertThat(corruptWrongTypeRecoverySnapshot(redis, pending)).isEqualTo(before)
+        }
+    }
+
+    @Test
+    fun `state change remains authoritative before recovery index type validation`() {
+        val pending = rollingRecord(JobStatus.PENDING)
+        guard.checkBeforeCall(pending.hostUserId, pending.clubId, pending.jobId)
+        store.save(pending)
+        redis.opsForHash<String, String>().put(jobKey(pending.jobId), "status", JobStatus.RUNNING.name)
+        redis.delete(QUARANTINE_KEY)
+        redis.opsForValue().set(QUARANTINE_KEY, "wrong-type")
+        val before = corruptWrongTypeRecoverySnapshot(redis, pending)
+
+        assertThat(recovery.recover(command(pending, AiGenerationAdmissionDisposition.RELEASE_PENDING)))
+            .isEqualTo(AiGenerationAtomicRecoveryResult.StateChanged)
+        assertThat(corruptWrongTypeRecoverySnapshot(redis, pending)).isEqualTo(before)
+    }
+
     private fun rollingRecord(status: JobStatus): JobRecord = recoveryRecord(properties, status, NOW.minusSeconds(60))
 }
 
@@ -1293,6 +1326,50 @@ private data class WrongTypeRecoverySnapshot(
     val clubActiveScore: Double?,
     val processingScore: Double?,
     val recentScore: Double?,
+)
+
+private fun corruptWrongTypeRecoverySnapshot(
+    redis: StringRedisTemplate,
+    record: JobRecord,
+) = CorruptWrongTypeRecoverySnapshot(
+    job = redis.opsForHash<String, String>().entries(jobKey(record.jobId)),
+    providerAttempts = redis.opsForHash<String, String>().entries(providerAttemptsKey(record.jobId)),
+    receipt = redis.opsForHash<String, String>().entries(receiptKey(record.jobId)),
+    daily = redis.opsForValue().get(dailyKey(record.hostUserId)),
+    dailyToken = redis.opsForValue().get(dailyTokenKey(record.hostUserId)),
+    minute = redis.opsForValue().get(minuteKey(record.hostUserId)),
+    minuteToken = redis.opsForValue().get(minuteTokenKey(record.hostUserId)),
+    lease = redis.opsForValue().get(admissionKey(record.clubId)),
+    activeScore = redis.opsForZSet().score(ACTIVE_KEY, record.jobId.toString()),
+    clubActiveScore = redis.opsForZSet().score("aigen:club:${record.clubId}:jobs:active", record.jobId.toString()),
+    processingScore = redis.opsForZSet().score(PROCESSING_KEY, record.jobId.toString()),
+    quarantineType = redis.type(QUARANTINE_KEY),
+    quarantineValue =
+        if (redis.type(QUARANTINE_KEY) == DataType.STRING) {
+            redis.opsForValue().get(QUARANTINE_KEY)
+        } else {
+            null
+        },
+    recentScore = redis.opsForZSet().score("aigen:session:${record.sessionId}:jobs", record.jobId.toString()),
+    commitScore = redis.opsForZSet().score(COMMIT_RECOVERY_KEY, record.jobId.toString()),
+)
+
+private data class CorruptWrongTypeRecoverySnapshot(
+    val job: Map<String, String>,
+    val providerAttempts: Map<String, String>,
+    val receipt: Map<String, String>,
+    val daily: String?,
+    val dailyToken: String?,
+    val minute: String?,
+    val minuteToken: String?,
+    val lease: String?,
+    val activeScore: Double?,
+    val clubActiveScore: Double?,
+    val processingScore: Double?,
+    val quarantineType: DataType?,
+    val quarantineValue: String?,
+    val recentScore: Double?,
+    val commitScore: Double?,
 )
 
 private fun sourceWriterWindow(
