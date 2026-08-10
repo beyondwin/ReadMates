@@ -14,6 +14,9 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.data.redis.core.StringRedisTemplate
+import java.time.Clock
+import java.time.Instant
+import java.time.ZoneOffset
 
 /**
  * Verifies that the Redis-backed aigen adapters are only loaded when both
@@ -76,5 +79,8 @@ class RedisAiGenerationConditionalLoadingTest {
 
         @Bean
         fun meterRegistry(): MeterRegistry = SimpleMeterRegistry()
+
+        @Bean
+        fun clock(): Clock = Clock.fixed(Instant.parse("2026-08-10T00:00:00Z"), ZoneOffset.UTC)
     }
 }

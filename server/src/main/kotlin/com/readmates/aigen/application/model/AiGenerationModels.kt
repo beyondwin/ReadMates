@@ -239,6 +239,7 @@ enum class ErrorCode {
     TRANSCRIPT_ALIAS_MODE_UNSUPPORTED,
     STALE_GENERATION_REVISION,
     MEMBERSHIP_CHANGED,
+    ASYNC_PROCESSING_EXHAUSTED,
 
     /**
      * The per-job hard cap on LLM calls (start + validation retry + regenerations) has
@@ -249,6 +250,22 @@ enum class ErrorCode {
 
     UNKNOWN,
 }
+
+enum class AiGenerationRecoveryResult {
+    RECOVERED_PENDING,
+    RECOVERED_PENDING_UNACCOUNTED,
+    RECOVERED_RUNNING,
+    ALREADY_TERMINAL,
+    MISSING,
+    DEFERRED_IN_FLIGHT,
+    DEFERRED_STATE_CHANGED,
+    DEFERRED_NOT_STALE,
+    CORRUPT,
+    UNROUTABLE_RECORD,
+    FAILED,
+}
+
+enum class AiGenerationRecoverySource { KAFKA, SCHEDULED }
 
 data class GenerationError(
     val code: ErrorCode,

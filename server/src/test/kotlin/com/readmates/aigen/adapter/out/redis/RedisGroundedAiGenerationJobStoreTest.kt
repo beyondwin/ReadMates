@@ -23,6 +23,7 @@ import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -107,6 +108,19 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(loaded.result).isEqualTo(snapshot())
         assertThat(loaded.evidence).isEqualTo(evidence(1))
         assertThat(loaded.tokens.cacheWriteInputTokens).isEqualTo(3L)
+    }
+
+    @Test
+    fun `corrupt identity rejects grounded result before any hash or payload mutation`() {
+        val record = groundedRecord(JobStatus.RUNNING, JobStage.GENERATING_SUMMARY)
+        store.save(record)
+        redisTemplate.opsForHash<String, String>().delete(hashKey(record.jobId), "clubId")
+        val before = redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId))
+
+        assertThatThrownBy { store.saveGroundedResult(resultCommand(record, expectedRevision = 0)) }
+        assertThat(redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId))).isEqualTo(before)
+        assertThat(redisTemplate.hasKey("${hashKey(record.jobId)}:result")).isFalse()
+        assertThat(redisTemplate.hasKey("${hashKey(record.jobId)}:evidence")).isFalse()
     }
 
     @Test

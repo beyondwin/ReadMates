@@ -8,6 +8,7 @@ import org.mockito.Mockito
 import org.springframework.data.redis.RedisConnectionFailureException
 import org.springframework.data.redis.core.HashOperations
 import org.springframework.data.redis.core.StringRedisTemplate
+import java.time.Clock
 import java.util.UUID
 
 class RedisAiGenerationJobStoreFailureTest {
@@ -25,6 +26,7 @@ class RedisAiGenerationJobStoreFailureTest {
                 redisTemplate,
                 AiGenerationProperties(),
                 Mockito.mock(RedisCacheMetrics::class.java),
+                Clock.systemUTC(),
             )
 
         assertThatThrownBy { store.load(UUID.randomUUID()) }.isSameAs(failure)

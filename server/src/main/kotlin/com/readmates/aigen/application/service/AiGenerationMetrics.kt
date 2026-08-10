@@ -1,5 +1,7 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.AiGenerationRecoveryResult
+import com.readmates.aigen.application.model.AiGenerationRecoverySource
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingFailureReason
@@ -68,6 +70,31 @@ class AiGenerationMetrics(
             .builder(NAME_COMMIT_RECOVERY_FAILURES)
             .description("AI generation commit recovery attempts that failed")
             .tags(aigenMeter())
+            .register(meterRegistry)
+            .increment()
+    }
+
+    fun recordFailureRecovery(
+        source: AiGenerationRecoverySource,
+        result: AiGenerationRecoveryResult,
+    ) {
+        Counter
+            .builder(NAME_FAILURE_RECOVERY)
+            .description("AI generation failure recovery outcomes")
+            .tags(
+                aigenMeter(
+                    MetricLabel.SOURCE to source.name.lowercase(),
+                    MetricLabel.RESULT to result.name.lowercase(),
+                ),
+            ).register(meterRegistry)
+            .increment()
+    }
+
+    fun recordRecoveryIndexRepair(result: AiGenerationIndexRepairResultTag) {
+        Counter
+            .builder(NAME_RECOVERY_INDEX_REPAIR)
+            .description("AI generation processing-index repair outcomes")
+            .tags(aigenMeter(MetricLabel.RESULT to result.name.lowercase()))
             .register(meterRegistry)
             .increment()
     }
@@ -327,6 +354,8 @@ class AiGenerationMetrics(
     private companion object {
         const val NAME_JOBS = "readmates.aigen.jobs"
         const val NAME_COMMIT_RECOVERY_FAILURES = "readmates.aigen.commit.recovery.failures"
+        const val NAME_FAILURE_RECOVERY = "readmates.aigen.failure.recovery"
+        const val NAME_RECOVERY_INDEX_REPAIR = "readmates.aigen.recovery.index.repair"
         const val NAME_JOBS_COMPLETED = "readmates.aigen.jobs.completed"
         const val NAME_LATENCY = "readmates.aigen.latency"
         const val NAME_TOKENS = "readmates.aigen.tokens"
@@ -372,6 +401,17 @@ enum class MetricLabel(
     REASON("reason"),
     DIRECTION("direction"),
     BASIS("basis"),
+    SOURCE("source"),
+    RESULT("result"),
+}
+
+enum class AiGenerationIndexRepairResultTag {
+    PAGE_COMPLETED,
+    PASS_COMPLETED,
+    EPOCH_RESET,
+    QUARANTINED,
+    OVER_CAP,
+    FAILED,
 }
 
 /**

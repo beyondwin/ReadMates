@@ -25,6 +25,7 @@ internal object ProviderCallReservationRedisScripts {
 
             local requestedMode = ARGV[12]
             if requestedMode == 'FALLBACK' or requestedMode == 'RETRY' or requestedMode == 'SCHEMA_CORRECTION' or requestedMode == 'SECTION_REPAIR' then
+              if redis.call('HLEN', KEYS[4]) > 48 then return -4 end
               local attempts = redis.call('HGETALL', KEYS[4])
               for i = 1, #attempts, 2 do
                 if string.sub(attempts[i], -5) == ':mode' then
@@ -56,6 +57,8 @@ internal object ProviderCallReservationRedisScripts {
               prefix .. 'safeErrorCode', '',
               prefix .. 'startedAt', ARGV[13],
               prefix .. 'startedAtEpochMs', ARGV[16],
+              prefix .. 'startedAtEpochSecond', ARGV[17],
+              prefix .. 'startedAtNano', ARGV[18],
               prefix .. 'completedAt', '')
 
             redis.call('EXPIRE', KEYS[1], ARGV[6])

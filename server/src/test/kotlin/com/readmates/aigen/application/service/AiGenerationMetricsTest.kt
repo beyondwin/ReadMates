@@ -1,5 +1,7 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.AiGenerationRecoveryResult
+import com.readmates.aigen.application.model.AiGenerationRecoverySource
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingFailureReason
@@ -46,6 +48,51 @@ class AiGenerationMetricsTest {
         assertThat(counter).isNotNull
         assertThat(counter!!.count()).isEqualTo(2.0)
         assertThat(counter.id.tags).isEmpty()
+    }
+
+    @Test
+    fun `failure recovery and index repair use only fixed source and result labels`() {
+        metrics.recordFailureRecovery(AiGenerationRecoverySource.KAFKA, AiGenerationRecoveryResult.RECOVERED_PENDING)
+        metrics.recordFailureRecovery(
+            AiGenerationRecoverySource.SCHEDULED,
+            AiGenerationRecoveryResult.DEFERRED_NOT_STALE,
+        )
+        metrics.recordRecoveryIndexRepair(AiGenerationIndexRepairResultTag.EPOCH_RESET)
+
+        assertThat(
+            registry
+                .find("readmates.aigen.failure.recovery")
+                .tag("source", "kafka")
+                .tag("result", "recovered_pending")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+        assertThat(
+            registry
+                .find("readmates.aigen.failure.recovery")
+                .tag("source", "scheduled")
+                .tag("result", "deferred_not_stale")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+        assertThat(
+            registry
+                .find("readmates.aigen.recovery.index.repair")
+                .tag("result", "epoch_reset")
+                .counter()
+                ?.count(),
+        ).isEqualTo(1.0)
+        assertThat(AiGenerationRecoverySource.entries.map { it.name.lowercase() })
+            .containsExactlyInAnyOrder("kafka", "scheduled")
+        assertThat(AiGenerationIndexRepairResultTag.entries.map { it.name.lowercase() })
+            .containsExactlyInAnyOrder(
+                "page_completed",
+                "pass_completed",
+                "epoch_reset",
+                "quarantined",
+                "over_cap",
+                "failed",
+            )
     }
 
     @Test
@@ -319,7 +366,6 @@ class AiGenerationMetricsTest {
                 "turn",
                 "speaker",
                 "name",
-                "result",
                 "evidence",
                 "excerpt",
                 "prompt",

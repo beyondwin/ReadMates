@@ -8,6 +8,17 @@ import java.util.UUID
 
 internal fun providerAttemptsKey(jobId: UUID) = "aigen:job:$jobId:provider-attempts"
 
+internal const val ACTIVE_JOBS_KEY = "aigen:jobs:active"
+internal const val ACTIVE_INDEX_EPOCH_KEY = "aigen:jobs:active:epoch"
+internal const val PROCESSING_RECOVERY_KEY = "aigen:jobs:processing-recovery"
+internal const val PROCESSING_QUARANTINE_KEY = "aigen:jobs:processing-recovery:quarantine"
+internal const val PROCESSING_REPAIR_STATE_KEY = "aigen:jobs:processing-recovery:repair-state"
+internal const val COMMIT_RECOVERY_JOBS_KEY = "aigen:jobs:commit-recovery"
+
+internal fun activeClubJobsKey(clubId: UUID) = "aigen:club:$clubId:jobs:active"
+
+internal fun sessionRecentKey(sessionId: UUID) = "aigen:session:$sessionId:jobs"
+
 @Suppress("TooManyFunctions")
 internal class AiGenerationRedisIndexes(
     private val redisTemplate: StringRedisTemplate,
@@ -33,35 +44,6 @@ internal class AiGenerationRedisIndexes(
 
     fun isActive(job: JobRecord): Boolean = job.status in ACTIVE_INDEX_STATUSES
 
-    fun index(job: JobRecord) {
-        val id = job.jobId.toString()
-        val score = job.lastUpdatedAt.toEpochMilli().toDouble()
-        val zSet = redisTemplate.opsForZSet()
-
-        val sessionKey = sessionRecentKey(job.sessionId)
-        zSet.add(sessionKey, id, score)
-        redisTemplate.expire(sessionKey, ttl)
-        redisTemplate.expire(providerAttemptsKey(job.jobId), ttl)
-
-        if (isActive(job)) {
-            val clubKey = activeClubJobsKey(job.clubId)
-            zSet.add(ACTIVE_JOBS_KEY, id, score)
-            zSet.add(clubKey, id, score)
-            redisTemplate.expire(ACTIVE_JOBS_KEY, ttl)
-            redisTemplate.expire(clubKey, ttl)
-        } else {
-            removeActive(job)
-        }
-        if (job.status == JobStatus.COMMITTING || job.status == JobStatus.COMMIT_RETRY ||
-            (job.status == JobStatus.COMMITTED && job.cleanupPending)
-        ) {
-            zSet.add(COMMIT_RECOVERY_JOBS_KEY, id, commitRecoveryScore(job))
-            redisTemplate.expire(COMMIT_RECOVERY_JOBS_KEY, ttl)
-        } else {
-            zSet.remove(COMMIT_RECOVERY_JOBS_KEY, id)
-        }
-    }
-
     fun removeActive(job: JobRecord) {
         remove(job.jobId, sessionId = null, clubId = job.clubId)
     }
@@ -75,6 +57,8 @@ internal class AiGenerationRedisIndexes(
         val zSet = redisTemplate.opsForZSet()
         zSet.remove(ACTIVE_JOBS_KEY, id)
         zSet.remove(COMMIT_RECOVERY_JOBS_KEY, id)
+        zSet.remove(PROCESSING_RECOVERY_KEY, id)
+        zSet.remove(PROCESSING_QUARANTINE_KEY, id)
         sessionId?.let { zSet.remove(sessionRecentKey(it), id) }
         clubId?.let { zSet.remove(activeClubJobsKey(it), id) }
     }
@@ -94,26 +78,7 @@ internal class AiGenerationRedisIndexes(
         redisTemplate.opsForZSet().remove(COMMIT_RECOVERY_JOBS_KEY, id)
     }
 
-    private fun sessionRecentKey(sessionId: UUID) = "aigen:session:$sessionId:jobs"
-
-    private fun activeClubJobsKey(clubId: UUID) = "aigen:club:$clubId:jobs:active"
-
-    private fun commitRecoveryScore(job: JobRecord): Double {
-        val priority =
-            when (job.status) {
-                JobStatus.COMMITTED -> 0.0
-                JobStatus.COMMITTING -> COMMITTING_PRIORITY
-                else -> COMMIT_RETRY_PRIORITY
-            }
-        return priority + job.lastUpdatedAt.toEpochMilli().toDouble()
-    }
-
     private companion object {
-        const val ACTIVE_JOBS_KEY = "aigen:jobs:active"
-        const val COMMIT_RECOVERY_JOBS_KEY = "aigen:jobs:commit-recovery"
-        const val COMMITTING_PRIORITY = 1_000_000_000_000_000.0
-        const val COMMIT_RETRY_PRIORITY = 2_000_000_000_000_000.0
-
         val ACTIVE_INDEX_STATUSES =
             setOf(
                 JobStatus.PENDING,

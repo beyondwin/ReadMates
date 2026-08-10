@@ -192,7 +192,9 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.STALE_GENERATION_REVISION,
         ErrorCode.MEMBERSHIP_CHANGED,
         -> HttpStatus.CONFLICT
-        ErrorCode.UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR
+        ErrorCode.ASYNC_PROCESSING_EXHAUSTED,
+        ErrorCode.UNKNOWN,
+        -> HttpStatus.INTERNAL_SERVER_ERROR
     }
 
 internal fun ErrorCode.safeDetail(): String =

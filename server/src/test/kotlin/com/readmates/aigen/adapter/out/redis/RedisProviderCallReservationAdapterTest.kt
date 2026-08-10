@@ -93,6 +93,9 @@ class RedisProviderCallReservationAdapterTest(
             .isBetween(30 * 24 * 3600L, 31 * 24 * 3600L + 30)
 
         val ledger = redisTemplate.opsForHash<String, String>().entries(fixture.ledgerKey)
+        assertThat(ledger["${attempt.attemptId}:startedAtEpochSecond"])
+            .isEqualTo(attempt.startedAt.epochSecond.toString())
+        assertThat(ledger["${attempt.attemptId}:startedAtNano"]).isEqualTo(attempt.startedAt.nano.toString())
         val serialized = ledger.entries.joinToString("|") { "${it.key}=${it.value}" }.lowercase()
         assertThat(serialized).doesNotContain(fixture.clubId.toString(), fixture.admissionId.toString())
         FORBIDDEN_LEDGER_TERMS.forEach { assertThat(serialized).doesNotContain(it) }
@@ -761,6 +764,7 @@ class RedisProviderCallReservationAdapterTest(
                 "status" to status.name,
                 "llmCallCount" to llmCallCount.toString(),
                 "clubId" to fixture.clubId.toString(),
+                "sessionId" to fixture.sessionId.toString(),
             ),
         )
         redisTemplate.expire(fixture.jobKey, Duration.ofSeconds(2))
@@ -773,21 +777,35 @@ class RedisProviderCallReservationAdapterTest(
         }
     }
 
-    private fun cancelJob(fixture: Fixture): Boolean =
-        redisTemplate.execute(
-            AiGenerationRedisScripts.transitionStatus,
-            listOf(fixture.jobKey),
+    private fun cancelJob(fixture: Fixture): Boolean {
+        val now = fixture.now.plusSeconds(1)
+        return redisTemplate.execute(
+            AiGenerationJobMutationRedisScripts.transitionStatus,
+            listOf(
+                fixture.jobKey,
+                ACTIVE_JOBS_KEY,
+                PROCESSING_RECOVERY_KEY,
+                PROCESSING_QUARANTINE_KEY,
+                ACTIVE_INDEX_EPOCH_KEY,
+                COMMIT_RECOVERY_JOBS_KEY,
+            ),
             JobStatus.RUNNING.name,
             JobStatus.CANCELLED.name,
             "",
             "0",
             "",
             "",
-            fixture.now.plusSeconds(1).toString(),
+            now.toString(),
             properties.job.redisTtl.seconds
                 .toString(),
             "",
+            now.epochSecond.toString(),
+            now.nano.toString(),
+            fixture.jobId.toString(),
+            now.toEpochMilli().toString(),
+            UUID.randomUUID().toString(),
         ) == 1L
+    }
 
     private fun assertNoReservationWrites(fixture: Fixture) {
         assertThat(jobCallCount(fixture.jobId)).isZero()
@@ -838,6 +856,7 @@ class RedisProviderCallReservationAdapterTest(
     private data class Fixture(
         val jobId: UUID = UUID.randomUUID(),
         val clubId: UUID = UUID.randomUUID(),
+        val sessionId: UUID = UUID.randomUUID(),
         val admissionId: UUID = UUID.randomUUID(),
         val attemptId: UUID = UUID.randomUUID(),
         val now: Instant = Instant.parse("2026-07-16T00:00:00Z"),
