@@ -1,6 +1,6 @@
 # ReadMates Backend Quality Phase 2 — Application Port Boundaries Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use `subagent-driven-development` to implement this plan task-by-task. Keep the ledger, briefs, task reports, review packages, and final execution report in the ignored workspace returned by that skill's `scripts/sdd-workspace`; none of those SDD artifacts is a tracked deliverable. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Remove the approved non-auth, non-session-record concrete-service, cross-adapter, and adapter-owned-contract debt while making the three Redis AI job-list reads distinguish unavailability from an authoritative empty result.
 
@@ -57,13 +57,13 @@
 - `server/src/main/kotlin/com/readmates/notification/application/model/NotificationDeliveryFailures.kt` — application-owned retryable dispatch failure.
 - `server/src/main/kotlin/com/readmates/notification/adapter/in/kafka/NotificationKafkaConsumerConfiguration.kt` — consumer factory, error handler, DLT recoverer, and listener container.
 
-### New tests and report
+### New tests and ignored execution artifact
 
 - `server/src/test/kotlin/com/readmates/admin/health/adapter/out/resilience/Resilience4jOutboundResilienceHealthAdapterTest.kt`
 - `server/src/test/kotlin/com/readmates/aigen/adapter/in/scheduling/AiGenerationCommitRecoverySchedulerTest.kt`
 - `server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCountersFailureTest.kt`
 - `server/src/test/kotlin/com/readmates/notification/adapter/in/kafka/NotificationKafkaConsumerConfigurationTest.kt`
-- `docs/superpowers/reports/2026-08-10-readmates-backend-quality-phase-2-application-port-boundaries-report.md`
+- `${SDD_WORKSPACE}/final-report.md` — ignored execution evidence, where `SDD_WORKSPACE` is resolved in Task 7; never stage or commit it.
 
 Existing classes are modified in place only where named by a task. The plan does not authorize opportunistic file splitting.
 
@@ -176,7 +176,6 @@ com/readmates/admin/health/application/service/providers/OutboundResilienceHealt
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/in/scheduling/AiGenerationCommitRecoveryScheduler.kt:5-18`
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobProducer.kt`
 - Modify: `server/src/main/kotlin/com/readmates/aigen/config/AiGenerationKafkaConfig.kt`
-- Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationConsumerRecordRecoverer.kt` only for the moved envelope import.
 - Create: `server/src/test/kotlin/com/readmates/aigen/adapter/in/scheduling/AiGenerationCommitRecoverySchedulerTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumerIntegrationTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/adapter/in/messaging/AiGenerationKafkaRecordRoutingTest.kt`
@@ -250,7 +249,7 @@ com/readmates/aigen/adapter/in/scheduling/AiGenerationCommitRecoveryScheduler.kt
 
 - [ ] **Step 4: Move the model and implement ports.**
 
-  Update Kafka producer/consumer factories, serializers, deserializers, producer, recoverer, and tests to the application model package. Do not rename JSON properties or enable type headers. The scheduler retains its current fixed-delay property and batch `50`; all policy stays in the service.
+  Update Kafka producer/consumer factories, serializers, deserializers, producer, and the exact tests listed above to the application model package. Do not rename JSON properties or enable type headers. The scheduler retains its current fixed-delay property and batch `50`; all policy stays in the service.
 
 - [ ] **Step 5: Run focused GREEN and Kafka regression.**
 
@@ -289,7 +288,7 @@ com/readmates/aigen/adapter/in/scheduling/AiGenerationCommitRecoveryScheduler.kt
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationErrorHandler.kt:3,92-96`
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/out/llm/springai/SpringAiErrorMapper.kt:12,25-133`
 - Modify: `server/src/main/kotlin/com/readmates/aigen/application/service/GroundedProviderCallCoordinator.kt:47-63`
-- Modify imports in `GroundedGenerationExecutor.kt` and all tests that consume `ProviderFailureClass`.
+- Modify: `server/src/main/kotlin/com/readmates/aigen/application/service/GroundedGenerationExecutor.kt:522-526`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobProducerTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationErrorHandlerTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/adapter/out/llm/springai/SpringAiErrorMapperTest.kt`
@@ -315,6 +314,8 @@ enum class ProviderFailureClass {
 ```
 
 The Kafka adapter maps `InterruptedException`, `TimeoutException`, `ExecutionException`, and other runtime publication failures to `AiGenerationQueueUnavailableException`; interruption restores the thread flag. The web adapter handles only the application-owned exception. Provider SDK/Spring exceptions remain confined to the LLM adapter and map to `ProviderFailureClass` plus safe `GenerationError`.
+
+The exhaustive current `ProviderFailureClass` caller allowlist is the three production paths and two test paths named above: `SpringAiErrorMapper.kt`, `GroundedGenerationExecutor.kt`, `GroundedProviderCallCoordinator.kt`, `SpringAiErrorMapperTest.kt`, and `GroundedProviderCallCoordinatorTest.kt`. The queue-failure move is limited to the producer/error-handler production and test paths named above. Re-run `rg -l '\bProviderFailureClass\b|\bAiGenerationJobPublishException\b' server/src/main/kotlin server/src/test/kotlin | sort` before editing; stop and amend the plan if it returns any additional path.
 
 **Exact retired identities:**
 
@@ -365,9 +366,9 @@ com/readmates/aigen/adapter/out/llm/springai/SpringAiErrorMapper.kt|com.readmate
 - Modify: `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationMetrics.kt:48,259-323,409-416,465-469`
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCounters.kt:3-115`
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt:3-116`
-- Modify service/test imports of `CapDenialReason` and `ProviderCircuitState` mechanically.
 - Create: `server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCountersFailureTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGenerationCostCountersTest.kt`
+- Test unchanged: `server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationConditionalLoadingTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGateTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationMetricsTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/aigen/application/service/MetricLabelsTest.kt`
@@ -391,6 +392,8 @@ enum class CapDenialReason { HOST_DAILY, CLUB_MONTHLY, HOST_PER_MINUTE }
 
 `AiGenerationMetrics` implements this port. Existing application services may continue injecting `AiGenerationMetrics`; this task changes only outbound adapter dependencies and does not split the large metrics class.
 
+The exhaustive current moved-enum caller allowlist is exactly `RedisGenerationCostCounters.kt`, `ResilientProviderCallGate.kt`, `AiGenerationMetrics.kt`, `AiGenerationMetricsTest.kt`, and `MetricLabelsTest.kt`. The only outbound concrete-metrics callers are `RedisGenerationCostCounters.kt` and `ResilientProviderCallGate.kt`; `ResilientProviderCallGateTest.kt` changes to a fake port, while `RedisGenerationCostCountersTest.kt` remains the real-Redis regression and `RedisAiGenerationConditionalLoadingTest.kt` remains an unchanged unit-lane context regression. Re-run `rg -l '\b(CapDenialReason|ProviderCircuitState)\b' server/src/main/kotlin server/src/test/kotlin | sort` and `rg -l 'import com\.readmates\.aigen\.application\.service\.AiGenerationMetrics' server/src/main/kotlin/com/readmates/aigen/adapter/out server/src/test/kotlin/com/readmates/aigen/adapter/out | sort` before editing; stop and amend the plan if either command returns an additional path.
+
 **Exact retired identities:**
 
 ```text
@@ -409,6 +412,7 @@ com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.read
   ```bash
   ./server/gradlew -p server unitTest \
     --tests com.readmates.aigen.adapter.out.redis.RedisGenerationCostCountersFailureTest \
+    --tests com.readmates.aigen.adapter.out.redis.RedisAiGenerationConditionalLoadingTest \
     --tests com.readmates.aigen.adapter.out.resilience.ResilientProviderCallGateTest \
     --tests com.readmates.aigen.application.service.AiGenerationMetricsTest \
     --tests com.readmates.aigen.application.service.MetricLabelsTest \
@@ -426,7 +430,6 @@ com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.read
   ```bash
   ./server/gradlew -p server integrationTest \
     --tests com.readmates.aigen.adapter.out.redis.RedisGenerationCostCountersTest \
-    --tests com.readmates.aigen.adapter.out.redis.RedisAiGenerationConditionalLoadingTest \
     --rerun-tasks --no-build-cache --no-configuration-cache
   ```
 
@@ -453,6 +456,7 @@ com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.read
 - Create: `server/src/test/kotlin/com/readmates/notification/adapter/in/kafka/NotificationKafkaConsumerConfigurationTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/notification/adapter/in/kafka/NotificationEventKafkaListenerTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/notification/adapter/out/kafka/KafkaNotificationEventPublisherAdapterTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/notification/application/service/NotificationDispatchServiceTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/notification/kafka/NotificationKafkaPipelineIntegrationTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Modify: `server/config/architecture/boundary-import-baseline.txt`
@@ -486,12 +490,13 @@ com/readmates/notification/adapter/out/kafka/NotificationKafkaConfiguration.kt|c
     --tests com.readmates.notification.adapter.in.kafka.NotificationKafkaConsumerConfigurationTest \
     --tests com.readmates.notification.adapter.in.kafka.NotificationEventKafkaListenerTest \
     --tests com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapterTest \
+    --tests com.readmates.notification.application.service.NotificationDispatchServiceTest \
     --rerun-tasks --no-build-cache --no-configuration-cache
   ```
 
 - [ ] **Step 3: Split configuration and move the failure model.**
 
-  Duplicate only the small Jackson mapper construction needed by each transport direction; do not create a cross-adapter serialization helper. Keep bean names unchanged so listener/publisher wiring and tests remain compatible.
+  Duplicate only the small Jackson mapper construction needed by each transport direction; do not create a cross-adapter serialization helper. Move `NotificationDeliveryRetryableException` to the application model file and update its imports in `NotificationDispatchService.kt`, `NotificationKafkaConsumerConfiguration.kt`, `KafkaNotificationEventPublisherAdapterTest.kt`, and `NotificationDispatchServiceTest.kt`. Keep bean names unchanged so listener/publisher wiring and tests remain compatible.
 
 - [ ] **Step 4: Run GREEN and real Kafka regression.**
 
@@ -500,6 +505,7 @@ com/readmates/notification/adapter/out/kafka/NotificationKafkaConfiguration.kt|c
     --tests com.readmates.notification.adapter.in.kafka.NotificationKafkaConsumerConfigurationTest \
     --tests com.readmates.notification.adapter.in.kafka.NotificationEventKafkaListenerTest \
     --tests com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapterTest \
+    --tests com.readmates.notification.application.service.NotificationDispatchServiceTest \
     --rerun-tasks --no-build-cache --no-configuration-cache
   ./server/gradlew -p server integrationTest \
     --tests com.readmates.notification.kafka.NotificationKafkaPipelineIntegrationTest \
@@ -621,7 +627,7 @@ Application policy is explicit and externally compatible:
 
 **Files:**
 
-- Create: `docs/superpowers/reports/2026-08-10-readmates-backend-quality-phase-2-application-port-boundaries-report.md`
+- Create ignored execution artifact: `${SDD_WORKSPACE}/final-report.md`
 - Modify: `docs/development/architecture.md:168-189`
 - Modify: `docs/development/adr/0002-server-clean-architecture-with-archunit.md:161-167,193-201`
 - Modify: `CHANGELOG.md:7-17`
@@ -629,13 +635,32 @@ Application policy is explicit and externally compatible:
 
 **Report contract:**
 
-The report records exact plan commit/base, Task 1–6 commit SHAs and subjects, changed-file inventory, the 12 exact retired identities grouped by task, final `23 current / 16 retired / 39 approved` arithmetic, focused commands and test counts, final gate commands/exit codes/durations/XML totals, public-candidate and gitleaks result, task-review verdicts/correction waves, whole-plan verdicts, skipped evidence, and residual risks. It must distinguish repository/local-Testcontainers evidence from live production evidence.
+The ignored report records the exact plan commit/base, full 40-character Task 1–6 and correction commit SHAs plus subjects, changed-file inventory, the 12 exact retired identities grouped by task, final `23 current / 16 retired / 39 approved` arithmetic, focused commands and test counts, final gate commands/exit codes/durations/XML totals, public-candidate and gitleaks result, every task-review and correction-wave verdict, the final whole-plan verdicts, skipped evidence, residual risks, and the final clean `git status --short --branch --untracked-files=all` output. It must distinguish repository/local-Testcontainers evidence from live production evidence. It remains under `.superpowers/sdd/`, is ignored by Git, and is never staged or committed.
 
-- [ ] **Step 1: Update active architecture truth.**
+- [ ] **Step 1: Resolve the ignored SDD report path.**
+
+  From the repository root, invoke the `subagent-driven-development` skill's workspace resolver:
+
+  ```bash
+  PLAN_FILE=docs/superpowers/plans/2026-08-10-readmates-backend-quality-phase-2-application-port-boundaries.md
+  SDD_WORKSPACE="$(scripts/sdd-workspace "$PLAN_FILE")"
+  REPORT_FILE="$SDD_WORKSPACE/final-report.md"
+  PLAN_COMMIT="$(git log -n 1 --format=%H -- "$PLAN_FILE")"
+  test -d "$SDD_WORKSPACE"
+  test "${#PLAN_COMMIT}" -eq 40
+  git check-ignore -q "$REPORT_FILE"
+  ! git ls-files --error-unmatch "$REPORT_FILE" >/dev/null 2>&1
+  ```
+
+  Keep these three shell variables for every remaining Task 7 command. The report is an execution artifact only; do not add a tracked `docs/superpowers/reports` file.
+
+- [ ] **Step 2: Update active architecture truth and draft the ignored report.**
 
   Document that inbound messaging/scheduling adapters use input ports, application owns safe failure models, outbound adapters use output ports/models rather than services, notification consumer configuration is inbound-owned, and Redis job-list availability is explicit internally. State that actor/auth/session*/feature-cycle debt remains for later Phase 2 plans; do not claim Phase 2 complete or boundary baseline zero.
 
-- [ ] **Step 2: Audit ledger and source mechanically.**
+  Create `$REPORT_FILE` with the report-contract sections and populate every fact already available from Tasks 1–6. Mark final gates and whole-plan verdicts as pending evidence in the ignored draft only; these are execution-state fields, not implementation placeholders.
+
+- [ ] **Step 3: Audit ledger and source with exact commands.**
 
   ```bash
   ./server/gradlew -p server architectureTest \
@@ -648,7 +673,29 @@ The report records exact plan commit/base, Task 1–6 commit SHAs and subjects, 
 
   Expected: architecture tests PASS; both scans return no match. Count non-comment ledger lines and record `23`, `16`, and `39`.
 
-- [ ] **Step 3: Run canonical server gates sequentially at final HEAD.**
+- [ ] **Step 4: Review and commit tracked active documentation only when changed.**
+
+  A fresh Task 7 reviewer must reconcile the three tracked docs and ignored draft report against Git history, source, focused command logs, the current/retired/approved ledgers, the exclusions, and the `23 + 16 = 39` arithmetic. A material source/test finding returns to the originating Task 1–6 correction loop; a documentation finding is corrected in the three-file allowlist below. Rerun Step 3 and the targeted docs checks from Step 7 after any correction.
+
+  If at least one tracked doc changed, stage only this exact allowlist, verify the index, and commit it. If none changed, create no documentation commit. Never stage `$REPORT_FILE`:
+
+  ```bash
+  if ! git diff --quiet -- \
+    docs/development/architecture.md \
+    docs/development/adr/0002-server-clean-architecture-with-archunit.md \
+    CHANGELOG.md; then
+    git add -- \
+      docs/development/architecture.md \
+      docs/development/adr/0002-server-clean-architecture-with-archunit.md \
+      CHANGELOG.md
+    test -z "$(git diff --cached --name-only | grep -Ev '^(docs/development/architecture\.md|docs/development/adr/0002-server-clean-architecture-with-archunit\.md|CHANGELOG\.md)$')"
+    git commit -m "docs: document Phase 2 application boundaries"
+  fi
+  git check-ignore -q "$REPORT_FILE"
+  ! git ls-files --error-unmatch "$REPORT_FILE" >/dev/null 2>&1
+  ```
+
+- [ ] **Step 5: Run canonical server gates sequentially at the tracked candidate HEAD.**
 
   ```bash
   ./server/gradlew -p server compileKotlin --rerun-tasks --no-build-cache --no-configuration-cache
@@ -660,7 +707,7 @@ The report records exact plan commit/base, Task 1–6 commit SHAs and subjects, 
 
   Record fresh XML suite/test/failure/error/skip totals and name the Kafka, Redis, admin-health, metrics, and notification suites. Frontend E2E is excluded because this plan preserves API/auth/BFF/frontend contracts and must contain no frontend/auth diff; if the final diff contains one, stop and remove it rather than widening scope.
 
-- [ ] **Step 4: Run public-release safety gates.**
+- [ ] **Step 6: Run public-release safety gates at the same HEAD.**
 
   ```bash
   ./scripts/build-public-release-candidate.sh
@@ -669,34 +716,56 @@ The report records exact plan commit/base, Task 1–6 commit SHAs and subjects, 
 
   Record candidate success, no `.git`/symlink result, changed-file inclusion, and gitleaks result. Do not commit `.tmp/public-release-candidate`.
 
-- [ ] **Step 5: Run documentation and targeted safety checks.**
+- [ ] **Step 7: Run documentation and targeted safety checks.**
 
   ```bash
-  git diff --check -- \
+  git diff --check "$PLAN_COMMIT^"..HEAD -- \
     docs/development/architecture.md \
     docs/development/adr/0002-server-clean-architecture-with-archunit.md \
-    docs/superpowers/reports/2026-08-10-readmates-backend-quality-phase-2-application-port-boundaries-report.md \
     CHANGELOG.md
+  ! rg -n '[[:blank:]]+$' "$REPORT_FILE"
   rg -n "(^|[^A-Za-z0-9_])([o]cid1\\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)" \
     docs/development/architecture.md \
     docs/development/adr/0002-server-clean-architecture-with-archunit.md \
-    docs/superpowers/reports/2026-08-10-readmates-backend-quality-phase-2-application-port-boundaries-report.md \
-    CHANGELOG.md
+    CHANGELOG.md \
+    "$REPORT_FILE"
   ```
 
-  Expected: diff check passes and the safety scan returns no match introduced by this plan.
+  Expected: the tracked-doc diff check passes, and both report-whitespace and safety scans return no match introduced by this plan.
 
-- [ ] **Step 6: Task review, report commit, and clean status.**
+- [ ] **Step 8: Run whole-plan review before finalizing the ignored report.**
 
-  Require a fresh reviewer to reconcile the report against command logs, Git history, source, current/retired/approved ledgers, and exclusions. Resolve material findings and rerun affected focused plus canonical evidence. Commit only the active docs/report files:
+  Resolve the corrected plan commit and generate one review package from that commit through the current tracked HEAD:
 
   ```bash
-  git commit -m "docs: report Phase 2 application boundaries"
+  test "${#PLAN_COMMIT}" -eq 40
+  REVIEW_PACKAGE="$(scripts/review-package "$PLAN_FILE" "$PLAN_COMMIT" HEAD)"
+  test -s "$REVIEW_PACKAGE"
   ```
 
-- [ ] **Step 7: Whole-plan review.**
+  A fresh strongest reviewer must issue separate verdicts for plan compliance and exact scope; architecture/type ownership; behavior/failure-model preservation; test/mutation adequacy; release/public safety; and readiness for the later actor/auth/session*/feature-cycle Phase 2 plans. The final report is not yet final and no report commit exists.
 
-  Build one review package covering the plan commit through final HEAD. A fresh strongest reviewer must issue separate verdicts for: plan compliance and exact scope; architecture/type ownership; behavior/failure-model preservation; test/mutation adequacy; release/public safety; and readiness for the later actor/auth/session*/feature-cycle Phase 2 plans. Bundle material findings into one correction wave, rerun the smallest affected tests followed by the canonical gates, update the report, and repeat whole-plan review until all verdicts are clean.
+  Handle each material finding in an explicit correction wave:
+
+  1. Re-dispatch the originating Task 1–6 implementer (or a fresh implementer if required by the SDD fix-loop breaker). A code/test/config/ledger wave may touch only that task's exact file allowlist and uses the corresponding exact subject: Task 1 `fix(server): correct admin health boundary review`; Task 2 `fix(server): correct AI ingress boundary review`; Task 3 `fix(server): correct AI failure boundary review`; Task 4 `fix(server): correct AI metrics boundary review`; Task 5 `fix(server): correct notification Kafka boundary review`; Task 6 `fix(server): correct Redis availability boundary review`. A docs-only wave may touch only `docs/development/architecture.md`, `docs/development/adr/0002-server-clean-architecture-with-archunit.md`, and `CHANGELOG.md`, and commits with `docs: correct Phase 2 boundary documentation`. Do not add a new path or combine server and docs changes in one commit.
+  2. Before each correction commit, rerun every affected task's exact focused GREEN selectors and architecture inventory selectors, verify the staged paths against that task's allowlist, and request scoped re-review.
+  3. After each correction commit, rerun all of Steps 3, 5, 6, and 7 at the new HEAD: affected focused evidence is necessary but does not replace the canonical server, full integration, public-candidate, or public-safety gates.
+  4. Regenerate `$REVIEW_PACKAGE`, obtain all six fresh whole-plan verdicts, and repeat the correction wave until every verdict is clean. A failed canonical/public gate is itself a material finding and starts another correction wave; do not finalize the report around it.
+
+- [ ] **Step 9: Finalize the ignored report and prove clean tracked state.**
+
+  Only after Step 8 has six clean final verdicts, replace every pending field in `$REPORT_FILE`. Include the verdicts verbatim, the full 40-character SHA and subject of the corrected plan commit, each Task 1–6 commit, the conditional tracked-doc commit, and every correction commit; the final successful focused/canonical/public command evidence; and the exact final clean-status output. Then run:
+
+  ```bash
+  test -s "$REPORT_FILE"
+  rg -n '^## (Final whole-plan verdicts|Full commit SHAs|Final clean status)$' "$REPORT_FILE"
+  git check-ignore -q "$REPORT_FILE"
+  ! git ls-files --error-unmatch "$REPORT_FILE" >/dev/null 2>&1
+  test -z "$(git status --porcelain=v1 --untracked-files=all)"
+  git status --short --branch --untracked-files=all
+  ```
+
+  Copy the last command's exact output into `## Final clean status` and rerun the clean-state assertion. Do not commit the ignored report. If finalization exposes a factual tracked-doc error, return to a docs correction wave, rerun affected focused plus Steps 3, 5, 6, and 7, obtain six fresh whole-plan verdicts, and only then rewrite the final report. There is no tracked commit after the final clean verdict unless those active docs actually changed through that reviewed correction wave.
 
 ---
 
