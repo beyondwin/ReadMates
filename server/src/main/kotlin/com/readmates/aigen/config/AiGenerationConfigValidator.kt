@@ -26,8 +26,8 @@ import java.time.Duration
 class AiGenerationConfigValidator(
     @param:Value("\${readmates.aigen.enabled:false}") private val aigenEnabled: Boolean,
     private val beanFactory: ListableBeanFactory,
-    private val properties: AiGenerationProperties = AiGenerationProperties(),
-    private val kafkaProperties: AiGenerationKafkaProperties = AiGenerationKafkaProperties(),
+    private val properties: AiGenerationProperties,
+    private val kafkaProperties: AiGenerationKafkaProperties,
 ) {
     @PostConstruct
     fun validate() {

@@ -28,6 +28,9 @@ class AiGenerationPropertiesTest {
     private val contextRunner =
         ApplicationContextRunner()
             .withUserConfiguration(AiGenerationRuntimePropertiesConfiguration::class.java)
+    private val productionCompositionRunner =
+        ApplicationContextRunner()
+            .withUserConfiguration(AiGenerationConfig::class.java, AiGenerationConfigValidator::class.java)
 
     private fun loadProperties(): AiGenerationProperties {
         val resource =
@@ -105,6 +108,41 @@ class AiGenerationPropertiesTest {
         assertEquals(500, job.recoveryIndexRepairBatchSize)
         assertEquals(5_000, job.recoveryIndexRepairMaxMembers)
         assertEquals(Duration.ofSeconds(30), job.queueProbeFixedDelay)
+    }
+
+    @Test
+    fun `disabled production composition rejects invalid local Kafka configuration`() {
+        productionCompositionRunner
+            .withPropertyValues(
+                "readmates.aigen.enabled=false",
+                "readmates.aigen.kafka.enabled=false",
+                "readmates.aigen.kafka.send-timeout=0ms",
+            ).run { context ->
+                org.assertj.core.api.Assertions
+                    .assertThat(context)
+                    .hasFailed()
+                org.assertj.core.api.Assertions
+                    .assertThat(context.startupFailure.allMessages())
+                    .contains("readmates.aigen.kafka.send-timeout")
+            }
+    }
+
+    @Test
+    fun `disabled production composition rejects invalid Kafka recovery budget`() {
+        productionCompositionRunner
+            .withPropertyValues(
+                "readmates.aigen.enabled=false",
+                "readmates.aigen.kafka.enabled=false",
+                "readmates.aigen.kafka.max-poll-interval=30m",
+            ).run { context ->
+                org.assertj.core.api.Assertions
+                    .assertThat(context)
+                    .hasFailed()
+                org.assertj.core.api.Assertions
+                    .assertThat(context.startupFailure.allMessages())
+                    .contains("readmates.aigen.job.processing-deadline")
+                    .contains("readmates.aigen.kafka.max-poll-interval")
+            }
     }
 
     @Test
