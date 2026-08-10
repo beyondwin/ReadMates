@@ -725,20 +725,59 @@ The ignored report records the exact plan commit/base, full 40-character Task 1â
 - [ ] **Step 7: Run documentation and targeted safety checks.**
 
   ```bash
+  set -euo pipefail
   git diff --check "$IMPLEMENTATION_BASE"..HEAD -- \
     docs/development/architecture.md \
     docs/development/adr/0002-server-clean-architecture-with-archunit.md \
     CHANGELOG.md
-  ! rg -n '[[:blank:]]+$' "$REPORT_FILE"
-  ! git diff --unified=0 "$IMPLEMENTATION_BASE"..HEAD -- \
-      docs/development/architecture.md \
-      docs/development/adr/0002-server-clean-architecture-with-archunit.md \
-      CHANGELOG.md | \
-    rg -n '^\+[^+].*((^|[^A-Za-z0-9_])([o]cid1\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY))'
-  ! rg -n "(^|[^A-Za-z0-9_])([o]cid1\\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)" "$REPORT_FILE"
+
+  SENSITIVE_PATTERN='(^|[^A-Za-z0-9_])([o]cid1\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)'
+  SAFETY_SELFTEST_DIFF="$SDD_WORKSPACE/safety-scan-self-test.diff"
+  SAFETY_SELFTEST_ADDITIONS="$SDD_WORKSPACE/safety-scan-self-test-added-lines.txt"
+  {
+    printf '%s\n' '+++ b/self-test.md'
+    printf '+%s\n' "o""cid1.test"
+    printf '+%s\n' "s""k-exampletoken"
+    printf '+%s\n' "github""_pat_example"
+    printf '+prefix %s\n' "o""cid1.test"
+    printf '+prefix %s\n' "s""k-exampletoken"
+    printf '+prefix %s\n' "github""_pat_example"
+    printf '%s\n' '+ordinary public text'
+  } > "$SAFETY_SELFTEST_DIFF"
+  sed -n '/^+++ /d; s/^+//p' \
+    "$SAFETY_SELFTEST_DIFF" > "$SAFETY_SELFTEST_ADDITIONS"
+  test "$(wc -l < "$SAFETY_SELFTEST_ADDITIONS" | tr -d ' ')" -eq 7
+  test "$(sed -n '1p' "$SAFETY_SELFTEST_ADDITIONS")" = "o""cid1.test"
+  test "$(rg -c "$SENSITIVE_PATTERN" "$SAFETY_SELFTEST_ADDITIONS")" -eq 6
+  test "$(tail -n 1 "$SAFETY_SELFTEST_ADDITIONS")" = 'ordinary public text'
+
+  assert_no_matches() {
+    local pattern=$1
+    local target=$2
+    local description=$3
+    local scan_status=0
+    rg -n "$pattern" "$target" || scan_status=$?
+    case "$scan_status" in
+      0) echo "$description found in $target" >&2; return 1 ;;
+      1) return 0 ;;
+      *) return "$scan_status" ;;
+    esac
+  }
+
+  assert_no_matches '[[:blank:]]+$' "$REPORT_FILE" 'trailing whitespace'
+  TRACKED_DOC_DIFF="$SDD_WORKSPACE/tracked-docs.diff"
+  TRACKED_DOC_ADDITIONS="$SDD_WORKSPACE/tracked-docs-added-lines.txt"
+  git diff --unified=0 "$IMPLEMENTATION_BASE"..HEAD -- \
+    docs/development/architecture.md \
+    docs/development/adr/0002-server-clean-architecture-with-archunit.md \
+    CHANGELOG.md > "$TRACKED_DOC_DIFF" || exit $?
+  sed -n '/^+++ /d; s/^+//p' \
+    "$TRACKED_DOC_DIFF" > "$TRACKED_DOC_ADDITIONS" || exit $?
+  assert_no_matches "$SENSITIVE_PATTERN" "$TRACKED_DOC_ADDITIONS" 'sensitive value'
+  assert_no_matches "$SENSITIVE_PATTERN" "$REPORT_FILE" 'sensitive value'
   ```
 
-  Expected: the tracked-doc diff check passes, and both report-whitespace and safety scans return no match introduced by this plan.
+  Expected: the mutation input produces exactly six sensitive matches covering content-start and later-position cases, the `+++` header is excluded, the ordinary-text control is not matched, the tracked-doc diff check passes, and both real safety scans return no match introduced by this plan. Any `git diff`, extraction, or `rg` execution error fails the step instead of being treated as a clean scan.
 
 - [ ] **Step 8: Run whole-plan review before finalizing the ignored report.**
 
