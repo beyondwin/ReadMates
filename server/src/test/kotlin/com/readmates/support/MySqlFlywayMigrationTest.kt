@@ -734,6 +734,8 @@ class MySqlFlywayMigrationTest(
         val clubId = UUID.randomUUID().toString()
         val actorUserId = UUID.randomUUID().toString()
         val previewId = UUID.randomUUID().toString()
+        val operatorPreviewId = UUID.randomUUID().toString()
+        val nullRolePreviewId = UUID.randomUUID().toString()
         val deliveryId = UUID.randomUUID().toString()
         val auditId = UUID.randomUUID().toString()
         val confirmationId = UUID.randomUUID().toString()
@@ -756,6 +758,15 @@ class MySqlFlywayMigrationTest(
                 )
             }
             insertV2ReplayPreview(jdbcTemplate, previewId, actorUserId, clubId, "OWNER")
+            insertV2ReplayPreview(jdbcTemplate, operatorPreviewId, actorUserId, clubId, "OPERATOR")
+            insertReplayTarget(
+                jdbcTemplate,
+                operatorPreviewId,
+                UUID.randomUUID().toString(),
+                clubId,
+                "DEAD",
+                "MAIL_PERMANENT",
+            )
 
             listOf("failed", "FaIlEd", "FAILED ").forEach { invalidStatus ->
                 assertConstraintRejected {
@@ -829,6 +840,30 @@ class MySqlFlywayMigrationTest(
                     replayedCount = -1,
                 )
             }
+            assertConstraintRejected {
+                insertReplayConfirmation(
+                    jdbcTemplate,
+                    UUID.randomUUID().toString(),
+                    previewId,
+                    actorUserId,
+                    "OWNER",
+                    clubId,
+                    auditId,
+                    selectionHash = "A".repeat(64),
+                )
+            }
+            assertConstraintRejected {
+                insertReplayConfirmation(
+                    jdbcTemplate,
+                    UUID.randomUUID().toString(),
+                    previewId,
+                    actorUserId,
+                    "OWNER",
+                    clubId,
+                    auditId,
+                    skippedCount = -1,
+                )
+            }
             insertReplayConfirmation(
                 jdbcTemplate,
                 confirmationId,
@@ -838,6 +873,17 @@ class MySqlFlywayMigrationTest(
                 clubId,
                 auditId,
             )
+            assertUniqueConstraintRejected("admin_notification_replay_confirmations_preview_uk") {
+                insertReplayConfirmation(
+                    jdbcTemplate,
+                    UUID.randomUUID().toString(),
+                    previewId,
+                    actorUserId,
+                    "OWNER",
+                    clubId,
+                    auditId,
+                )
+            }
             assertConstraintRejected {
                 jdbcTemplate.update(
                     """
@@ -867,6 +913,9 @@ class MySqlFlywayMigrationTest(
             assertConstraintRejected {
                 jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", previewId)
             }
+            assertConstraintRejected {
+                insertV2ReplayPreview(jdbcTemplate, nullRolePreviewId, actorUserId, clubId, null)
+            }
         } finally {
             jdbcTemplate.update(
                 """
@@ -879,6 +928,11 @@ class MySqlFlywayMigrationTest(
             jdbcTemplate.update("delete from admin_notification_replay_confirmations where preview_id = ?", previewId)
             jdbcTemplate.update("delete from platform_audit_events where id = ?", auditId)
             jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", previewId)
+            jdbcTemplate.update(
+                "delete from admin_notification_replay_previews where id in (?, ?)",
+                operatorPreviewId,
+                nullRolePreviewId,
+            )
             assertThat(
                 jdbcTemplate.queryForObject(
                     "select count(*) from admin_notification_replay_preview_targets where preview_id = ?",
@@ -951,6 +1005,20 @@ class MySqlFlywayMigrationTest(
             assertThat(metadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
             assertThat(metadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
         }
+        assertThat(
+            columnMetadata(
+                jdbcTemplate,
+                "admin_notification_replay_preview_targets",
+                "expected_updated_at",
+            )["DATETIME_PRECISION"],
+        ).isEqualTo(6L)
+        assertThat(
+            columnMetadata(
+                jdbcTemplate,
+                "admin_notification_replay_confirmations",
+                "confirmed_at",
+            )["DATETIME_PRECISION"],
+        ).isEqualTo(6L)
     }
 
     private fun assertAtomicAdminReplayIndexesAndChecks(jdbcTemplate: JdbcTemplate) {
@@ -974,6 +1042,13 @@ class MySqlFlywayMigrationTest(
                 "admin_notification_replay_confirmations_preview_uk",
             ),
         )
+        assertThat(
+            indexNonUnique(
+                jdbcTemplate,
+                "admin_notification_replay_confirmations",
+                "admin_notification_replay_confirmations_preview_uk",
+            ),
+        ).isZero()
         assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_replay_previews_versioned_check"))
             .contains("contract_version", "actor_platform_role", "selection_hash", "consumed_confirmation_id")
         assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_replay_preview_targets_status_check"))
@@ -1039,7 +1114,7 @@ class MySqlFlywayMigrationTest(
         previewId: String,
         actorUserId: String,
         clubId: String,
-        actorRole: String,
+        actorRole: String?,
         selectionHash: String = "a".repeat(64),
     ) {
         jdbcTemplate.update(
@@ -1092,21 +1167,24 @@ class MySqlFlywayMigrationTest(
         clubId: String,
         auditId: String,
         replayedCount: Int = 1,
+        skippedCount: Int = 0,
+        selectionHash: String = "a".repeat(64),
     ) {
         jdbcTemplate.update(
             """
             insert into admin_notification_replay_confirmations (
               id, preview_id, actor_user_id, actor_platform_role, club_id, selection_hash,
               replayed_count, skipped_count, platform_audit_event_id, confirmed_at
-            ) values (?, ?, ?, ?, ?, ?, ?, 0, ?, '2026-08-10 00:01:00.000000')
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, '2026-08-10 00:01:00.000000')
             """.trimIndent(),
             confirmationId,
             previewId,
             actorUserId,
             actorRole,
             clubId,
-            "a".repeat(64),
+            selectionHash,
             replayedCount,
+            skippedCount,
             auditId,
         )
     }
@@ -1122,6 +1200,18 @@ class MySqlFlywayMigrationTest(
                 .mapNotNull { it.message }
                 .joinToString("\n")
         assertThat(causalMessages).containsIgnoringCase("constraint")
+    }
+
+    private fun assertUniqueConstraintRejected(
+        constraintName: String,
+        block: () -> Unit,
+    ) {
+        val error = assertThrows(DataIntegrityViolationException::class.java, block)
+        val causalMessages =
+            generateSequence<Throwable>(error) { it.cause }
+                .mapNotNull { it.message }
+                .joinToString("\n")
+        assertThat(causalMessages).contains(constraintName)
     }
 
     private data class LegacyReplayFixtures(
@@ -2441,13 +2531,29 @@ class MySqlFlywayMigrationTest(
     ): Map<String, Any?> =
         jdbcTemplate.queryForMap(
             """
-            select data_type, is_nullable, column_default, character_set_name, collation_name
+            select data_type, is_nullable, column_default, character_set_name, collation_name, datetime_precision
             from information_schema.columns
             where table_schema = database() and table_name = ? and column_name = ?
             """.trimIndent(),
             tableName,
             columnName,
         )
+
+    private fun indexNonUnique(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+        indexName: String,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select max(non_unique)
+            from information_schema.statistics
+            where table_schema = database() and table_name = ? and index_name = ?
+            """.trimIndent(),
+            Int::class.java,
+            tableName,
+            indexName,
+        ) ?: error("Index $tableName.$indexName does not exist")
 
     private fun foreignKeyReference(
         jdbcTemplate: JdbcTemplate,

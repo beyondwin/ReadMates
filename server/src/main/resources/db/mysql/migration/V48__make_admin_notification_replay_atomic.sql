@@ -78,6 +78,7 @@ alter table admin_notification_replay_previews
     or
     (
       contract_version = 2
+      and actor_platform_role is not null
       and binary actor_platform_role in (binary 'OWNER', binary 'OPERATOR')
       and octet_length(selection_hash) = 64
       and unhex(selection_hash) is not null
