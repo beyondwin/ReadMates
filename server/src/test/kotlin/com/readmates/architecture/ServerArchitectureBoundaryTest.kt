@@ -394,6 +394,17 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `admin health application does not depend on shared adapters`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.admin.health.application..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.shared.adapter..")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `aigen provider gate port does not expose resilience4j types`() {
         noClasses()
             .that()

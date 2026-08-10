@@ -1,11 +1,11 @@
 package com.readmates.admin.health.application.service.providers
 
 import com.readmates.admin.health.application.port.out.DeployLedgerPort
+import com.readmates.admin.health.application.port.out.OutboundResilienceHealthPort
 import com.readmates.admin.health.application.port.out.PlatformAdminHealthLocalReadingsPort
 import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import com.readmates.admin.health.application.service.HealthCardProvider
-import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.mock
@@ -28,7 +28,7 @@ class PlatformHealthProviderIdentityTest {
             .withBean(
                 PlatformAdminHealthLocalReadingsPort::class.java,
                 { mock(PlatformAdminHealthLocalReadingsPort::class.java) },
-            ).withBean(OutboundCircuitBreakers::class.java, { mock(OutboundCircuitBreakers::class.java) })
+            ).withBean(OutboundResilienceHealthPort::class.java, { mock(OutboundResilienceHealthPort::class.java) })
             .withBean(Clock::class.java, { Clock.systemUTC() })
 
     @Test
