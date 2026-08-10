@@ -2,12 +2,14 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.AiGenerationRecoveryResult
 import com.readmates.aigen.application.model.AiGenerationRecoverySource
+import com.readmates.aigen.application.model.CapDenialReason
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCircuitState
 import com.readmates.aigen.application.port.`in`.AiGenerationQueueProbeSnapshot
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.ProviderCircuitOutcome

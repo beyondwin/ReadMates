@@ -2,6 +2,7 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.AiGenerationRecoveryResult
 import com.readmates.aigen.application.model.AiGenerationRecoverySource
+import com.readmates.aigen.application.model.CapDenialReason
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.JobStatus

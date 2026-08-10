@@ -9,3 +9,7 @@ com/readmates/admin/health/adapter/in/web/PlatformAdminHealthController.kt|com.r
 com/readmates/admin/health/application/service/providers/AiProviderAvailabilityCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 com/readmates/admin/health/application/service/providers/KafkaLagHealthCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 com/readmates/admin/health/application/service/providers/NotificationDispatchSuccessCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
+com/readmates/aigen/adapter/out/redis/RedisGenerationCostCounters.kt|com.readmates.aigen.application.service.AiGenerationMetrics
+com/readmates/aigen/adapter/out/redis/RedisGenerationCostCounters.kt|com.readmates.aigen.application.service.CapDenialReason
+com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.readmates.aigen.application.service.AiGenerationMetrics
+com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.readmates.aigen.application.service.ProviderCircuitState

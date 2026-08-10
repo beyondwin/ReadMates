@@ -520,6 +520,25 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `aigen outbound metrics adapters do not depend on service owned metric contracts`() {
+        noClasses()
+            .that()
+            .haveFullyQualifiedName("com.readmates.aigen.adapter.out.redis.RedisGenerationCostCounters")
+            .or()
+            .haveFullyQualifiedName("com.readmates.aigen.adapter.out.resilience.ResilientProviderCallGate")
+            .should()
+            .dependOnClassesThat()
+            .haveFullyQualifiedName("com.readmates.aigen.application.service.AiGenerationMetrics")
+            .orShould()
+            .dependOnClassesThat()
+            .haveFullyQualifiedName("com.readmates.aigen.application.service.CapDenialReason")
+            .orShould()
+            .dependOnClassesThat()
+            .haveFullyQualifiedName("com.readmates.aigen.application.service.ProviderCircuitState")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `notification application does not depend on legacy notification outbox port`() {
         noClasses()
             .that()

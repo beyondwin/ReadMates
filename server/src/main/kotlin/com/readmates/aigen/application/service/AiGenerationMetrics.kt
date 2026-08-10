@@ -2,13 +2,16 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.AiGenerationRecoveryResult
 import com.readmates.aigen.application.model.AiGenerationRecoverySource
+import com.readmates.aigen.application.model.CapDenialReason
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCircuitState
 import com.readmates.aigen.application.port.`in`.AiGenerationQueueProbeSnapshot
+import com.readmates.aigen.application.port.out.AiGenerationAdapterMetricsPort
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
 import com.readmates.aigen.application.port.out.ProviderGateRejection
@@ -47,7 +50,7 @@ import java.util.concurrent.atomic.AtomicReference
 @Suppress("TooManyFunctions")
 class AiGenerationMetrics(
     private val meterRegistry: MeterRegistry,
-) {
+) : AiGenerationAdapterMetricsPort {
     private val queueProbeSnapshotSupplier =
         AtomicReference<() -> AiGenerationQueueProbeSnapshot>({
             AiGenerationQueueProbeSnapshot.unavailableBeforeFirstSample()
@@ -256,7 +259,7 @@ class AiGenerationMetrics(
             .increment()
     }
 
-    fun recordProviderCall(
+    override fun recordProviderCall(
         provider: Provider,
         outcome: ProviderCircuitOutcome,
         duration: Duration,
@@ -281,7 +284,7 @@ class AiGenerationMetrics(
             .record(duration)
     }
 
-    fun recordProviderGateRejection(
+    override fun recordProviderGateRejection(
         provider: Provider,
         reason: ProviderGateRejection,
     ) {
@@ -297,7 +300,7 @@ class AiGenerationMetrics(
             .increment()
     }
 
-    fun recordProviderCircuitTransition(
+    override fun recordProviderCircuitTransition(
         provider: Provider,
         state: ProviderCircuitState,
     ) {
@@ -314,7 +317,7 @@ class AiGenerationMetrics(
     }
 
     /** `readmates_aigen_cap_denials_total{reason}` — counter. */
-    fun recordCapDenial(reason: CapDenialReason) {
+    override fun recordCapDenial(reason: CapDenialReason) {
         Counter
             .builder(NAME_CAP_DENIALS)
             .description("Cap-guard denials before invoking an AI provider")
@@ -406,15 +409,6 @@ class AiGenerationMetrics(
 
 enum class GroundingRepairOutcome { SUCCEEDED, FAILED }
 
-enum class ProviderCircuitState {
-    CLOSED,
-    OPEN,
-    HALF_OPEN,
-    DISABLED,
-    FORCED_OPEN,
-    METRICS_ONLY,
-}
-
 /**
  * The nine fixed enum-valued Prometheus tag keys permitted on any
  * `readmates.aigen.*` meter. High-cardinality identifiers (transcript, hostId,
@@ -455,15 +449,4 @@ enum class TokenDirection(
     CACHE_WRITE_INPUT("cache_write_input"),
     CACHE_READ_INPUT("cache_read_input"),
     OUTPUT("output"),
-}
-
-/**
- * Reason tag values for `readmates_aigen_cap_denials_total`. Maps to the three
- * cap surfaces in the spec: host daily call count, club monthly cost, and
- * host per-minute call rate (the last enforced by the shared rate-limit port).
- */
-enum class CapDenialReason {
-    HOST_DAILY,
-    CLUB_MONTHLY,
-    HOST_PER_MINUTE,
 }
