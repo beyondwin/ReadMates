@@ -11,11 +11,15 @@ import com.readmates.notification.application.model.AdminNotificationOperationsS
 import com.readmates.notification.application.model.AdminNotificationOutboxEvent
 import com.readmates.notification.application.model.AdminNotificationRelaySummary
 import com.readmates.notification.application.model.AdminNotificationReplayConfirmCommand
-import com.readmates.notification.application.model.AdminNotificationReplayEstimate
+import com.readmates.notification.application.model.AdminNotificationReplaySnapshot
+import com.readmates.notification.application.model.AdminNotificationReplayTarget
 import com.readmates.notification.application.model.AdminNotificationStatusSummary
 import com.readmates.notification.application.port.out.AdminNotificationAuditPort
 import com.readmates.notification.application.port.out.AdminNotificationOperationsReadPort
+import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmation
+import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmationInsert
 import com.readmates.notification.application.port.out.AdminNotificationReplayPort
+import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewInsert
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewRecord
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.shared.paging.CursorPage
@@ -160,7 +164,7 @@ class AdminNotificationOperationsServiceTest {
             )
         }.isInstanceOf(AccessDeniedException::class.java)
 
-        assertThat(clock.readCount).isZero()
+        assertThat(clock.readCount).isEqualTo(1)
         assertThat(replayPort.consumedPreviews).isEmpty()
         assertThat(replayPort.replayedTransitions).isEmpty()
         assertThat(auditPort.events).isEmpty()
@@ -170,7 +174,13 @@ class AdminNotificationOperationsServiceTest {
     fun `confirm succeeds one microsecond before expiry and observes one normalized instant`() {
         val expiresAt = TIMESTAMP.plusMinutes(10)
         val now = expiresAt.minusNanos(1_000)
-        val replayPort = replayPortWithOpenPreview(expiresAt = expiresAt, matchedCount = 3, replayedCount = 2)
+        val replayPort =
+            replayPortWithOpenPreview(
+                expiresAt = expiresAt,
+                matchedCount = 3,
+                replayedCount = 2,
+                actorPlatformRole = "OPERATOR",
+            )
         val auditPort = RecordingAdminNotificationAuditPort()
         val clock = AdminReplayCountingClock(now.toInstant().plusNanos(999))
         val service = serviceWith(replayPort = replayPort, auditPort = auditPort, clock = clock)
@@ -272,7 +282,7 @@ class AdminNotificationOperationsServiceTest {
 
     @Test
     fun `confirm replay replays matching preview and writes audit metadata`() {
-        val replayPort = replayPortWithOpenPreview(matchedCount = 3, replayedCount = 2)
+        val replayPort = replayPortWithOpenPreview(matchedCount = 3, replayedCount = 2, actorPlatformRole = "OPERATOR")
         val auditPort = RecordingAdminNotificationAuditPort()
         val service = serviceWith(replayPort = replayPort, auditPort = auditPort)
 
@@ -358,12 +368,14 @@ private fun replayPortWithOpenPreview(
     expiresAt: OffsetDateTime = TIMESTAMP.plusMinutes(10),
     matchedCount: Int = 3,
     replayedCount: Int = 3,
+    actorPlatformRole: String = "OWNER",
 ): RecordingAdminNotificationReplayPort =
     RecordingAdminNotificationReplayPort(
         previewRecord =
             AdminNotificationReplayPreviewRecord(
                 previewId = PREVIEW_ID,
                 actorUserId = ADMIN_USER_ID,
+                actorPlatformRole = actorPlatformRole,
                 filterJson = "{}",
                 selectionHash = SELECTION_HASH,
                 matchedCount = matchedCount,
@@ -404,45 +416,57 @@ private class RecordingAdminNotificationReplayPort(
     val consumedPreviews = mutableListOf<TimestampedPreview>()
     val replayedTransitions = mutableListOf<TimestampedReplay>()
 
-    override fun estimateReplayableDeliveries(filter: AdminNotificationFilter): AdminNotificationReplayEstimate {
+    override fun loadSnapshot(
+        filter: AdminNotificationFilter,
+        targetLimit: Int,
+    ): AdminNotificationReplaySnapshot {
         estimateCalls += 1
-        return AdminNotificationReplayEstimate(
-            matchedCount = matchedCount,
-            estimatedByStatus = mapOf("FAILED" to matchedCount),
+        return AdminNotificationReplaySnapshot(
+            targets =
+                List(matchedCount.coerceAtMost(targetLimit)) { index ->
+                    AdminNotificationReplayTarget(
+                        deliveryId = UUID(0, index.toLong() + 1),
+                        clubId = CLUB_ID,
+                        status = "FAILED",
+                        attemptCount = 2,
+                        failureCode = "MAIL_RETRYABLE",
+                        updatedAt = TIMESTAMP,
+                    )
+                },
+            excludedCount = 0,
+            warnings = emptyList(),
         )
     }
 
-    override fun createPreview(
-        actorUserId: UUID,
-        filterJson: String,
-        selectionHash: String,
-        matchedCount: Int,
-        createdAt: OffsetDateTime,
-        expiresAt: OffsetDateTime,
-    ): UUID {
-        createdPreviews += CreatedPreview(createdAt, expiresAt)
+    override fun createPreview(input: AdminNotificationReplayPreviewInsert): UUID {
+        createdPreviews += CreatedPreview(input.createdAt, input.expiresAt)
         return PREVIEW_ID
     }
 
-    override fun loadOpenPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? {
+    override fun lockPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? {
         loadCalls += 1
         return previewRecord?.takeIf { it.previewId == previewId }
     }
 
-    override fun markPreviewConsumed(
+    override fun findConfirmation(previewId: UUID): AdminNotificationReplayConfirmation? = null
+
+    override fun replayPreviewTargets(
         previewId: UUID,
+        replayedAt: OffsetDateTime,
+    ): Int {
+        replayedTransitions += TimestampedReplay(AdminNotificationFilter(), replayedAt)
+        return replayedCount
+    }
+
+    override fun createConfirmation(input: AdminNotificationReplayConfirmationInsert): UUID = CONFIRMATION_ID
+
+    override fun consumePreview(
+        previewId: UUID,
+        confirmationId: UUID,
         consumedAt: OffsetDateTime,
     ): Boolean {
         consumedPreviews += TimestampedPreview(previewId, consumedAt)
         return true
-    }
-
-    override fun replayDeadOrFailedDeliveries(
-        filter: AdminNotificationFilter,
-        replayedAt: OffsetDateTime,
-    ): Int {
-        replayedTransitions += TimestampedReplay(filter, replayedAt)
-        return replayedCount
     }
 }
 
@@ -476,8 +500,9 @@ private class RecordingAdminNotificationAuditPort : AdminNotificationAuditPort {
         actorPlatformRole: String,
         metadataJson: String,
         createdAt: OffsetDateTime,
-    ) {
+    ): UUID {
         events += AuditEvent(actorUserId, actorPlatformRole, metadataJson, createdAt)
+        return AUDIT_ID
     }
 }
 
@@ -502,6 +527,7 @@ private object FixedAdminNotificationJson : AdminNotificationJsonCodec {
 
     override fun metadataJson(
         previewId: UUID,
+        clubId: UUID?,
         selectionHash: String,
         reason: String,
         replayedCount: Int,
@@ -564,5 +590,7 @@ private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-00000000000
 private val ADMIN_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000101")
 private val OTHER_ADMIN_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000102")
 private val PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000901")
+private val CONFIRMATION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000902")
+private val AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000903")
 private const val SELECTION_HASH: String = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 private val TIMESTAMP: OffsetDateTime = OffsetDateTime.of(2026, 5, 27, 1, 2, 3, 0, ZoneOffset.UTC)

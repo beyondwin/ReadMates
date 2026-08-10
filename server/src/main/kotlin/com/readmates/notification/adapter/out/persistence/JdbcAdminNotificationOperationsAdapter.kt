@@ -11,13 +11,9 @@ import com.readmates.notification.application.model.AdminNotificationManualDispa
 import com.readmates.notification.application.model.AdminNotificationOperationsSnapshot
 import com.readmates.notification.application.model.AdminNotificationOutboxEvent
 import com.readmates.notification.application.model.AdminNotificationRelaySummary
-import com.readmates.notification.application.model.AdminNotificationReplayEstimate
 import com.readmates.notification.application.model.AdminNotificationStatusSummary
 import com.readmates.notification.application.model.NotificationDispatchSource
-import com.readmates.notification.application.port.out.AdminNotificationAuditPort
 import com.readmates.notification.application.port.out.AdminNotificationOperationsReadPort
-import com.readmates.notification.application.port.out.AdminNotificationReplayPort
-import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewRecord
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
@@ -44,9 +40,7 @@ import java.util.UUID
 class JdbcAdminNotificationOperationsAdapter(
     private val jdbcTemplate: JdbcTemplate,
     runtimeProperties: NotificationRuntimeProperties,
-) : AdminNotificationOperationsReadPort,
-    AdminNotificationReplayPort,
-    AdminNotificationAuditPort {
+) : AdminNotificationOperationsReadPort {
     private val snapshotQueries =
         AdminNotificationSnapshotQueries(
             jdbcTemplate = jdbcTemplate,
@@ -169,131 +163,6 @@ class JdbcAdminNotificationOperationsAdapter(
         return pageFromRows(rows, pageRequest.limit) { row ->
             updatedAtDescCursor(row.updatedAt, row.createdAt, row.deliveryId.toString())
         }
-    }
-
-    override fun estimateReplayableDeliveries(filter: AdminNotificationFilter): AdminNotificationReplayEstimate {
-        val predicates = replayableDeliveryPredicates(filter)
-        val rows =
-            JdbcArguments.query(
-                jdbcTemplate,
-                """
-                select status, count(*) as count
-                from notification_deliveries
-                ${predicates.sql}
-                group by status
-                """.trimIndent(),
-                predicates.args,
-                { resultSet, _ -> resultSet.getString("status") to resultSet.getInt("count") },
-            )
-        val byStatus = rows.associate { it.first to it.second }
-        return AdminNotificationReplayEstimate(
-            matchedCount = byStatus.values.sum(),
-            estimatedByStatus = byStatus,
-        )
-    }
-
-    override fun createPreview(
-        actorUserId: UUID,
-        filterJson: String,
-        selectionHash: String,
-        matchedCount: Int,
-        createdAt: OffsetDateTime,
-        expiresAt: OffsetDateTime,
-    ): UUID {
-        val id = UUID.randomUUID()
-        jdbcTemplate.update(
-            """
-            insert into admin_notification_replay_previews
-              (id, actor_user_id, filter_json, selection_hash, matched_count, expires_at, created_at)
-            values (?, ?, cast(? as json), ?, ?, ?, ?)
-            """.trimIndent(),
-            id.dbString(),
-            actorUserId.dbString(),
-            filterJson,
-            selectionHash,
-            matchedCount,
-            expiresAt.toUtcLocalDateTime(),
-            createdAt.toUtcLocalDateTime(),
-        )
-        return id
-    }
-
-    override fun loadOpenPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? =
-        jdbcTemplate
-            .query(
-                """
-                select id, actor_user_id, filter_json, selection_hash, matched_count, expires_at
-                from admin_notification_replay_previews
-                where id = ?
-                  and consumed_at is null
-                """.trimIndent(),
-                { resultSet, _ ->
-                    AdminNotificationReplayPreviewRecord(
-                        previewId = resultSet.uuid("id"),
-                        actorUserId = resultSet.uuid("actor_user_id"),
-                        filterJson = resultSet.getString("filter_json"),
-                        selectionHash = resultSet.getString("selection_hash"),
-                        matchedCount = resultSet.getInt("matched_count"),
-                        expiresAt = resultSet.utcOffsetDateTime("expires_at"),
-                    )
-                },
-                previewId.dbString(),
-            ).firstOrNull()
-
-    override fun markPreviewConsumed(
-        previewId: UUID,
-        consumedAt: OffsetDateTime,
-    ): Boolean =
-        jdbcTemplate.update(
-            """
-            update admin_notification_replay_previews
-            set consumed_at = ?
-            where id = ?
-              and consumed_at is null
-            """.trimIndent(),
-            consumedAt.toUtcLocalDateTime(),
-            previewId.dbString(),
-        ) == 1
-
-    override fun replayDeadOrFailedDeliveries(
-        filter: AdminNotificationFilter,
-        replayedAt: OffsetDateTime,
-    ): Int {
-        val predicates = replayableDeliveryPredicates(filter)
-        return JdbcArguments.update(
-            jdbcTemplate,
-            """
-            update notification_deliveries
-            set status = 'PENDING',
-                attempt_count = 0,
-                next_attempt_at = ?,
-                locked_at = null,
-                last_error = null,
-                updated_at = ?
-            ${predicates.sql}
-            """.trimIndent(),
-            listOf(replayedAt.toUtcLocalDateTime(), replayedAt.toUtcLocalDateTime()) + predicates.args,
-        )
-    }
-
-    override fun writeReplayConfirmed(
-        actorUserId: UUID,
-        actorPlatformRole: String,
-        metadataJson: String,
-        createdAt: OffsetDateTime,
-    ) {
-        jdbcTemplate.update(
-            """
-            insert into platform_audit_events
-              (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
-            values (?, ?, ?, null, 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED', cast(? as json), ?)
-            """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            actorUserId.dbString(),
-            actorPlatformRole,
-            metadataJson,
-            createdAt.toUtcLocalDateTime(),
-        )
     }
 }
 
@@ -498,12 +367,7 @@ private object OffsetDateTimeRowMapper : RowMapper<OffsetDateTime> {
     ): OffsetDateTime = rs.getObject(1, LocalDateTime::class.java).atOffset(ZoneOffset.UTC)
 }
 
-private data class SqlPredicates(
-    val sql: String,
-    val args: List<Any>,
-)
-
-private object JdbcArguments {
+internal object JdbcArguments {
     fun <T> query(
         jdbcTemplate: JdbcTemplate,
         sql: String,
@@ -534,34 +398,6 @@ private object JdbcArguments {
             statement.setObject(index + 1, arg)
         }
     }
-}
-
-private fun replayableDeliveryPredicates(filter: AdminNotificationFilter): SqlPredicates {
-    val hasIneligibleFilter =
-        (filter.channel != null && filter.channel != NotificationChannel.EMAIL) ||
-            (
-                filter.deliveryStatus != null &&
-                    filter.deliveryStatus !in setOf(NotificationDeliveryStatus.FAILED, NotificationDeliveryStatus.DEAD)
-            )
-    if (hasIneligibleFilter) {
-        return SqlPredicates("where 1 = 0", emptyList())
-    }
-    val predicates =
-        mutableListOf(
-            "binary channel = binary 'EMAIL'",
-            "binary status in (binary 'FAILED', binary 'DEAD')",
-            "binary last_error in (binary 'MAIL_RETRYABLE', binary 'MAIL_PERMANENT')",
-        )
-    val args = mutableListOf<Any>()
-    filter.clubId?.let {
-        predicates += "club_id = ?"
-        args += it.dbString()
-    }
-    filter.deliveryStatus?.let {
-        predicates += "binary status = binary ?"
-        args += it.name
-    }
-    return SqlPredicates("where ${predicates.joinToString(" and ")}", args)
 }
 
 private data class FailureClusterSeed(

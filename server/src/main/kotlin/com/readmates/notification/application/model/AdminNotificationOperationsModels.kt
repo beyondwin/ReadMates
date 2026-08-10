@@ -4,7 +4,11 @@ import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.security.Sha256
+import java.nio.charset.StandardCharsets
 import java.time.OffsetDateTime
+import java.time.format.DateTimeFormatterBuilder
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 
 data class AdminNotificationOperationsSnapshot(
@@ -132,7 +136,51 @@ data class AdminNotificationReplayConfirmResult(
     val selectionHash: String,
 )
 
-data class AdminNotificationReplayEstimate(
-    val matchedCount: Int,
-    val estimatedByStatus: Map<String, Int>,
+data class AdminNotificationReplayTarget(
+    val deliveryId: UUID,
+    val clubId: UUID,
+    val status: String,
+    val attemptCount: Int,
+    val failureCode: String,
+    val updatedAt: OffsetDateTime,
 )
+
+data class AdminNotificationReplaySnapshot(
+    val targets: List<AdminNotificationReplayTarget>,
+    val excludedCount: Int,
+    val warnings: List<String>,
+)
+
+fun adminNotificationReplaySelectionHash(
+    filter: AdminNotificationFilter,
+    targets: List<AdminNotificationReplayTarget>,
+): String = Sha256.hex(adminNotificationReplayCanonicalBytes(filter, targets))
+
+fun adminNotificationReplayCanonicalBytes(
+    filter: AdminNotificationFilter,
+    targets: List<AdminNotificationReplayTarget>,
+): ByteArray =
+    buildString {
+        append("clubId=").append(filter.clubId?.toString() ?: "-").append('\n')
+        append("channel=").append(filter.channel?.name ?: "-").append('\n')
+        append("deliveryStatus=").append(filter.deliveryStatus?.name ?: "-").append('\n')
+        append("targets\n")
+        targets.sortedBy { it.deliveryId.toString() }.forEachIndexed { index, target ->
+            if (index > 0) append('\n')
+            append(target.deliveryId.toString())
+                .append('|')
+                .append(target.clubId.toString())
+                .append('|')
+                .append(target.status)
+                .append('|')
+                .append(target.attemptCount)
+                .append('|')
+                .append(target.failureCode)
+                .append('|')
+                .append(REPLAY_TIMESTAMP_FORMATTER.format(target.updatedAt.toInstant().truncatedTo(ChronoUnit.MICROS)))
+        }
+    }.toByteArray(StandardCharsets.UTF_8)
+
+private const val CANONICAL_TIMESTAMP_FRACTION_DIGITS = 6
+private val REPLAY_TIMESTAMP_FORMATTER =
+    DateTimeFormatterBuilder().appendInstant(CANONICAL_TIMESTAMP_FRACTION_DIGITS).toFormatter()

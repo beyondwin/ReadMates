@@ -12,16 +12,21 @@ import com.readmates.notification.application.model.AdminNotificationReplayConfi
 import com.readmates.notification.application.model.AdminNotificationReplayConfirmResult
 import com.readmates.notification.application.model.AdminNotificationReplayPreview
 import com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest
+import com.readmates.notification.application.model.adminNotificationReplaySelectionHash
 import com.readmates.notification.application.port.`in`.ManageAdminNotificationOperationsUseCase
 import com.readmates.notification.application.port.out.AdminNotificationAuditPort
 import com.readmates.notification.application.port.out.AdminNotificationOperationsReadPort
+import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmation
+import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmationInsert
 import com.readmates.notification.application.port.out.AdminNotificationReplayPort
+import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewInsert
+import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewRecord
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
-import com.readmates.shared.security.Sha256
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.ObjectMapper
 import java.nio.charset.StandardCharsets
 import java.time.Clock
@@ -61,87 +66,119 @@ class AdminNotificationOperationsService(
             pageRequest = pageRequest.adminLedgerPage(),
         )
 
+    @Transactional
     override fun previewReplay(
         admin: CurrentPlatformAdmin,
         request: AdminNotificationReplayPreviewRequest,
     ): AdminNotificationReplayPreview {
         requireReplayRole(admin)
+        val createdAt = normalizedNow()
         val filterJson = jsonCodec.filterJson(request.filter)
-        val estimate = replayPort.estimateReplayableDeliveries(request.filter)
-        if (estimate.matchedCount > replayProperties.maxTargets) {
+        val snapshot = replayPort.loadSnapshot(request.filter, replayProperties.maxTargets + 1)
+        if (snapshot.targets.size > replayProperties.maxTargets) {
             throw NotificationApplicationException(
                 NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_TOO_MANY_TARGETS,
                 "Replay target count exceeds the configured maximum",
             )
         }
-        val selectionHash = selectionHash(filterJson, estimate.matchedCount, estimate.estimatedByStatus)
-        val createdAt = normalizedNow()
+        val selectionHash = adminNotificationReplaySelectionHash(request.filter, snapshot.targets)
         val expiresAt = createdAt.plus(replayProperties.previewTtl)
         val previewId =
             replayPort.createPreview(
-                actorUserId = admin.userId,
-                filterJson = filterJson,
-                selectionHash = selectionHash,
-                matchedCount = estimate.matchedCount,
-                createdAt = createdAt,
-                expiresAt = expiresAt,
+                AdminNotificationReplayPreviewInsert(
+                    contractVersion = ATOMIC_REPLAY_CONTRACT_VERSION,
+                    actorUserId = admin.userId,
+                    actorPlatformRole = admin.role.name,
+                    clubId = request.filter.clubId,
+                    filter = request.filter,
+                    filterJson = filterJson,
+                    selectionHash = selectionHash,
+                    targets = snapshot.targets,
+                    createdAt = createdAt,
+                    expiresAt = expiresAt,
+                ),
             )
+        val estimatedByStatus =
+            snapshot.targets
+                .groupingBy { it.status }
+                .eachCount()
+                .toSortedMap()
         return AdminNotificationReplayPreview(
             previewId = previewId,
             selectionHash = selectionHash,
-            matchedCount = estimate.matchedCount,
-            excludedCount = 0,
-            estimatedByStatus = estimate.estimatedByStatus,
-            warnings = emptyList(),
+            matchedCount = snapshot.targets.size,
+            excludedCount = snapshot.excludedCount,
+            estimatedByStatus = estimatedByStatus,
+            warnings = snapshot.warnings,
             expiresAt = expiresAt,
         )
     }
 
+    @Transactional
     override fun confirmReplay(
         admin: CurrentPlatformAdmin,
         command: AdminNotificationReplayConfirmCommand,
     ): AdminNotificationReplayConfirmResult {
         requireReplayRole(admin)
         val reason = validateReplayReason(command.reason)
-        val preview =
-            replayPort.loadOpenPreview(command.previewId)
-                ?: throw NotificationApplicationException(
-                    NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_NOT_FOUND,
-                    "Replay preview not found",
-                )
-        if (preview.actorUserId != admin.userId) {
-            throw AccessDeniedException("Replay preview belongs to another actor")
-        }
+        val preview = lockReplayPreview(command.previewId)
         val confirmedAt = normalizedNow()
-        if (!preview.expiresAt.isAfter(confirmedAt)) {
-            throw NotificationApplicationException(
-                NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED,
-                "Replay preview expired",
-            )
+        validateReplayPreview(preview, admin, command.selectionHash)
+        replayPort.findConfirmation(preview.previewId)?.let { receipt ->
+            validateReplayReceipt(receipt, preview, admin, command.selectionHash)
+            return receipt.toConfirmResult()
         }
-        if (preview.selectionHash != command.selectionHash) {
-            throw NotificationApplicationException(
-                NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_SELECTION_MISMATCH,
-                "Replay selection changed",
+        requireOpenReplayPreview(preview, confirmedAt)
+        return persistReplayConfirmation(admin, preview, reason, confirmedAt)
+    }
+
+    private fun lockReplayPreview(previewId: UUID): AdminNotificationReplayPreviewRecord =
+        replayPort.lockPreview(previewId)
+            ?: throw NotificationApplicationException(
+                NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_NOT_FOUND,
+                "Replay preview not found",
             )
-        }
-        replayPort.markPreviewConsumed(preview.previewId, confirmedAt)
-        val filter = jsonCodec.parseFilter(preview.filterJson)
-        val replayed = replayPort.replayDeadOrFailedDeliveries(filter, confirmedAt)
+
+    private fun persistReplayConfirmation(
+        admin: CurrentPlatformAdmin,
+        preview: AdminNotificationReplayPreviewRecord,
+        reason: String,
+        confirmedAt: OffsetDateTime,
+    ): AdminNotificationReplayConfirmResult {
+        val replayed = replayPort.replayPreviewTargets(preview.previewId, confirmedAt)
         val skipped = (preview.matchedCount - replayed).coerceAtLeast(0)
-        auditPort.writeReplayConfirmed(
-            actorUserId = admin.userId,
-            actorPlatformRole = admin.role.name,
-            metadataJson =
-                jsonCodec.metadataJson(
+        val auditEventId =
+            auditPort.writeReplayConfirmed(
+                actorUserId = admin.userId,
+                actorPlatformRole = admin.role.name,
+                metadataJson =
+                    jsonCodec.metadataJson(
+                        previewId = preview.previewId,
+                        clubId = preview.clubId,
+                        selectionHash = preview.selectionHash,
+                        reason = reason,
+                        replayedCount = replayed,
+                        skippedCount = skipped,
+                    ),
+                createdAt = confirmedAt,
+            )
+        val confirmationId =
+            replayPort.createConfirmation(
+                AdminNotificationReplayConfirmationInsert(
                     previewId = preview.previewId,
+                    actorUserId = admin.userId,
+                    actorPlatformRole = admin.role.name,
+                    clubId = preview.clubId,
                     selectionHash = preview.selectionHash,
-                    reason = reason,
                     replayedCount = replayed,
                     skippedCount = skipped,
+                    platformAuditEventId = auditEventId,
+                    confirmedAt = confirmedAt,
                 ),
-            createdAt = confirmedAt,
-        )
+            )
+        if (!replayPort.consumePreview(preview.previewId, confirmationId, confirmedAt)) {
+            throw replayConfirmationConflict()
+        }
         return AdminNotificationReplayConfirmResult(
             replayedCount = replayed,
             skippedCount = skipped,
@@ -180,22 +217,100 @@ class AdminNotificationOperationsService(
             .instant()
             .truncatedTo(ChronoUnit.MICROS)
             .atOffset(ZoneOffset.UTC)
+}
 
-    private fun selectionHash(
-        filterJson: String,
-        matchedCount: Int,
-        estimatedByStatus: Map<String, Int>,
-    ): String {
-        val basis = "$filterJson|$matchedCount|${estimatedByStatus.toSortedMap()}"
-        return Sha256.hex(basis)
+private fun validateReplayPreview(
+    preview: AdminNotificationReplayPreviewRecord,
+    admin: CurrentPlatformAdmin,
+    selectionHash: String,
+) {
+    requireReplayActorAndHash(preview, admin, selectionHash)
+    requireAtomicReplayContract(preview)
+    requireReplayPreviewRole(preview, admin)
+}
+
+private fun requireReplayActorAndHash(
+    preview: AdminNotificationReplayPreviewRecord,
+    admin: CurrentPlatformAdmin,
+    selectionHash: String,
+) {
+    if (preview.actorUserId != admin.userId) {
+        throw AccessDeniedException("Replay preview belongs to another actor")
+    }
+    if (preview.selectionHash != selectionHash) {
+        throw NotificationApplicationException(
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_SELECTION_MISMATCH,
+            "Replay selection changed",
+        )
     }
 }
+
+private fun requireAtomicReplayContract(preview: AdminNotificationReplayPreviewRecord) {
+    if (preview.contractVersion != ATOMIC_REPLAY_CONTRACT_VERSION) {
+        throw NotificationApplicationException(
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REPREVIEW_REQUIRED,
+            "Legacy replay preview requires a new preview",
+        )
+    }
+}
+
+private fun requireReplayPreviewRole(
+    preview: AdminNotificationReplayPreviewRecord,
+    admin: CurrentPlatformAdmin,
+) {
+    if (preview.actorPlatformRole != admin.role.name) {
+        throw AccessDeniedException("Replay preview role changed")
+    }
+}
+
+private fun validateReplayReceipt(
+    receipt: AdminNotificationReplayConfirmation,
+    preview: AdminNotificationReplayPreviewRecord,
+    admin: CurrentPlatformAdmin,
+    selectionHash: String,
+) {
+    if (
+        receipt.actorUserId != admin.userId ||
+        receipt.actorPlatformRole != admin.role.name ||
+        receipt.clubId != preview.clubId ||
+        receipt.selectionHash != selectionHash
+    ) {
+        throw AccessDeniedException("Replay confirmation identity changed")
+    }
+}
+
+private fun requireOpenReplayPreview(
+    preview: AdminNotificationReplayPreviewRecord,
+    confirmedAt: OffsetDateTime,
+) {
+    if (preview.consumedAt != null) throw replayConfirmationConflict()
+    if (!preview.expiresAt.isAfter(confirmedAt)) {
+        throw NotificationApplicationException(
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED,
+            "Replay preview expired",
+        )
+    }
+}
+
+private fun AdminNotificationReplayConfirmation.toConfirmResult(): AdminNotificationReplayConfirmResult =
+    AdminNotificationReplayConfirmResult(
+        replayedCount = replayedCount,
+        skippedCount = skippedCount,
+        selectionHash = selectionHash,
+    )
+
+private fun replayConfirmationConflict(): NotificationApplicationException =
+    NotificationApplicationException(
+        NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_CONFIRMATION_CONFLICT,
+        "Replay confirmation state is incomplete",
+    )
 
 private fun PageRequest.adminLedgerPage(): PageRequest = copy(limit = limit.coerceIn(1, MAX_ADMIN_LEDGER_LIMIT))
 
 private const val MAX_ADMIN_LEDGER_LIMIT = 100
 private const val MAX_REPLAY_REASON_CODE_POINTS = 500
 private const val MAX_REPLAY_REASON_UTF8_BYTES = 1_000
+private const val ATOMIC_REPLAY_CONTRACT_VERSION = 2
 
 interface AdminNotificationJsonCodec {
     fun filterJson(filter: AdminNotificationFilter): String
@@ -204,6 +319,7 @@ interface AdminNotificationJsonCodec {
 
     fun metadataJson(
         previewId: UUID,
+        clubId: UUID?,
         selectionHash: String,
         reason: String,
         replayedCount: Int,
@@ -222,6 +338,7 @@ class JacksonAdminNotificationJsonCodec(
 
     override fun metadataJson(
         previewId: UUID,
+        clubId: UUID?,
         selectionHash: String,
         reason: String,
         replayedCount: Int,
@@ -230,6 +347,7 @@ class JacksonAdminNotificationJsonCodec(
         objectMapper.writeValueAsString(
             mapOf(
                 "previewId" to previewId.toString(),
+                "clubId" to clubId?.toString(),
                 "selectionHash" to selectionHash,
                 "reason" to reason,
                 "replayedCount" to replayedCount,

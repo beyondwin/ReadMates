@@ -38,6 +38,18 @@ class PlatformAdminNotificationControllerTest(
             val placeholders = createdReplayPreviewIds.joinToString(",") { "?" }
             jdbcTemplate.update(
                 """
+                update admin_notification_replay_previews
+                set consumed_at = null, consumed_confirmation_id = null
+                where id in ($placeholders)
+                """.trimIndent(),
+                *createdReplayPreviewIds.toTypedArray(),
+            )
+            jdbcTemplate.update(
+                "delete from admin_notification_replay_confirmations where preview_id in ($placeholders)",
+                *createdReplayPreviewIds.toTypedArray(),
+            )
+            jdbcTemplate.update(
+                """
                 delete from platform_audit_events
                 where actor_user_id = ?
                   and event_type = 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED'
