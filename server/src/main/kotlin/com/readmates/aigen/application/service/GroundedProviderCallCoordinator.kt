@@ -12,6 +12,7 @@ import com.readmates.aigen.application.model.ProviderAttempt
 import com.readmates.aigen.application.model.ProviderAttemptState
 import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.ProviderCallMode
+import com.readmates.aigen.application.model.ProviderFailureClass
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiProviderObservationContext
@@ -53,14 +54,6 @@ data class GroundedProviderCallCommand(
     val request: RenderedGroundedRequest,
     val section: GenerationItem? = null,
 )
-
-enum class ProviderFailureClass {
-    PRE_TRANSPORT,
-    TRANSIENT,
-    RATE_LIMITED,
-    SCHEMA_OR_PARSE,
-    TERMINAL,
-}
 
 sealed interface GroundedProviderCallResult {
     data class Generated(

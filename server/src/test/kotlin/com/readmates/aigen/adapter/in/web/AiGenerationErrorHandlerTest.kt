@@ -1,7 +1,7 @@
 package com.readmates.aigen.adapter.`in`.web
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.ProviderCallException
@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import java.util.UUID
+import java.util.concurrent.TimeoutException
 
 class AiGenerationErrorHandlerTest {
     private val handler = AiGenerationErrorHandler()
@@ -99,14 +100,15 @@ class AiGenerationErrorHandlerTest {
     }
 
     @Test
-    fun `maps AiGenerationJobPublishException to 503 QUEUE_UNAVAILABLE`() {
-        val response =
-            handler.handleQueueFailure(
-                AiGenerationJobPublishException("boom", RuntimeException("inner")),
-            )
+    fun `maps queue failures to the fixed safe 503 problem`() {
+        val cause = TimeoutException("raw provider payload for 11111111-2222-4333-8444-555555555555")
+        val response = handler.handleQueueFailure(AiGenerationQueueUnavailableException(cause))
+
         assertThat(response.statusCode).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
         assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.QUEUE_UNAVAILABLE.name)
+        assertThat(response.body!!.detail).isEqualTo("Generation queue unavailable")
+        assertThat(response.body!!.detail).doesNotContain(cause.message)
     }
 
     @Test

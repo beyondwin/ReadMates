@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.out.messaging
 
 import com.readmates.aigen.application.model.AiGenerationJobMessage
+import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.config.AiGenerationKafkaProperties
@@ -58,28 +59,15 @@ class AiGenerationJobProducer(
 
         try {
             kafkaTemplate.send(kafkaMessage).get(properties.sendTimeout.toMillis(), TimeUnit.MILLISECONDS)
-        } catch (ex: AiGenerationJobPublishException) {
-            throw ex
         } catch (ex: InterruptedException) {
             Thread.currentThread().interrupt()
-            throw AiGenerationJobPublishException("Interrupted publishing AI generation job $jobId", ex)
+            throw AiGenerationQueueUnavailableException(ex)
         } catch (ex: TimeoutException) {
-            throw AiGenerationJobPublishException(
-                "Timed out publishing AI generation job $jobId after ${properties.sendTimeout}",
-                ex,
-            )
+            throw AiGenerationQueueUnavailableException(ex)
         } catch (ex: ExecutionException) {
-            throw AiGenerationJobPublishException(
-                "Failed publishing AI generation job $jobId",
-                ex.cause ?: ex,
-            )
+            throw AiGenerationQueueUnavailableException(ex.cause ?: ex)
         } catch (ex: RuntimeException) {
-            throw AiGenerationJobPublishException("Failed publishing AI generation job $jobId", ex)
+            throw AiGenerationQueueUnavailableException(ex)
         }
     }
 }
-
-class AiGenerationJobPublishException(
-    message: String,
-    cause: Throwable,
-) : RuntimeException(message, cause)

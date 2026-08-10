@@ -498,6 +498,28 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `aigen web adapters do not depend on messaging adapter queue failures`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.aigen.adapter.in.web..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.aigen.adapter.out.messaging..")
+            .check(importedClasses)
+    }
+
+    @Test
+    fun `aigen LLM adapters do not depend on service-owned provider failure models`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.aigen.adapter.out.llm..")
+            .should()
+            .dependOnClassesThat()
+            .haveFullyQualifiedName("com.readmates.aigen.application.service.ProviderFailureClass")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `notification application does not depend on legacy notification outbox port`() {
         noClasses()
             .that()

@@ -14,6 +14,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.ProviderAttempt
+import com.readmates.aigen.application.model.ProviderFailureClass
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationJobStore

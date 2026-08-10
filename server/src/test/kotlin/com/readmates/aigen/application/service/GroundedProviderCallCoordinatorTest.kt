@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.ProviderFailureClass
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationItem

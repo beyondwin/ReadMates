@@ -3,6 +3,8 @@ com/readmates/admin/health/application/service/providers/OutboundResilienceHealt
 com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumer.kt|com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
 com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumer.kt|com.readmates.aigen.application.service.AiGenerationWorker
 com/readmates/aigen/adapter/in/scheduling/AiGenerationCommitRecoveryScheduler.kt|com.readmates.aigen.application.service.AiGenerationCommitRecoveryService
+com/readmates/aigen/adapter/in/web/AiGenerationErrorHandler.kt|com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
+com/readmates/aigen/adapter/out/llm/springai/SpringAiErrorMapper.kt|com.readmates.aigen.application.service.ProviderFailureClass
 com/readmates/admin/health/adapter/in/web/PlatformAdminHealthController.kt|com.readmates.admin.health.application.service.PlatformAdminHealthService
 com/readmates/admin/health/application/service/providers/AiProviderAvailabilityCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 com/readmates/admin/health/application/service/providers/KafkaLagHealthCardProvider.kt|com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException

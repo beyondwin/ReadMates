@@ -3,6 +3,7 @@
 package com.readmates.aigen.adapter.out.messaging
 
 import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
+import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
@@ -21,6 +22,7 @@ import org.springframework.messaging.Message
 import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.CompletableFuture
+import java.util.concurrent.ExecutionException
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.TimeoutException
 import kotlin.reflect.full.memberProperties
@@ -101,98 +103,98 @@ class AiGenerationJobProducerTest {
     }
 
     @Test
-    fun `publish wraps timeout failure in meaningful exception`() {
+    fun `publish maps timeout failure to a safe application queue exception`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, AiGenerationJobMessage>
+        val failure = TimeoutException("timed out")
         Mockito
             .`when`(kafkaTemplate.send(Mockito.any<Message<AiGenerationJobMessage>>()))
-            .thenReturn(RecordingKafkaSendFuture(timeoutFailure = TimeoutException("timed out")))
+            .thenReturn(RecordingKafkaSendFuture(timeoutFailure = failure))
         val producer =
             AiGenerationJobProducer(
                 kafkaTemplate,
                 AiGenerationKafkaProperties(sendTimeout = Duration.ofMillis(10)),
             )
 
-        assertThatThrownBy {
-            producer.publish(
-                AiGenerationJobPublishCommand(
-                    jobId = UUID.randomUUID(),
-                    sessionId = UUID.randomUUID(),
-                    clubId = UUID.randomUUID(),
-                    hostUserId = UUID.randomUUID(),
-                    provider = Provider.CLAUDE,
-                    model = "claude-sonnet-4-6",
-                    kind = JobKind.FULL,
-                ),
-            )
-        }.isInstanceOf(AiGenerationJobPublishException::class.java)
-            .hasMessageContaining("Timed out publishing AI generation job")
-            .hasCauseInstanceOf(TimeoutException::class.java)
+        assertQueueUnavailable(producer, failure)
     }
 
     @Test
-    fun `publish wraps synchronous send failure in meaningful exception`() {
+    fun `publish maps synchronous runtime failure to a safe application queue exception`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, AiGenerationJobMessage>
+        val failure = IllegalStateException("producer closed")
         Mockito
             .`when`(kafkaTemplate.send(Mockito.any<Message<AiGenerationJobMessage>>()))
-            .thenThrow(IllegalStateException("producer closed"))
+            .thenThrow(failure)
         val producer =
             AiGenerationJobProducer(
                 kafkaTemplate,
                 AiGenerationKafkaProperties(sendTimeout = Duration.ofMillis(10)),
             )
 
-        assertThatThrownBy {
-            producer.publish(
-                AiGenerationJobPublishCommand(
-                    jobId = UUID.randomUUID(),
-                    sessionId = UUID.randomUUID(),
-                    clubId = UUID.randomUUID(),
-                    hostUserId = UUID.randomUUID(),
-                    provider = Provider.CLAUDE,
-                    model = "claude-sonnet-4-6",
-                    kind = JobKind.FULL,
-                ),
-            )
-        }.isInstanceOf(AiGenerationJobPublishException::class.java)
-            .hasMessageContaining("Failed publishing AI generation job")
-            .hasCauseInstanceOf(IllegalStateException::class.java)
+        assertQueueUnavailable(producer, failure)
     }
 
     @Test
     fun `publish preserves interrupt status when interrupted`() {
         val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, AiGenerationJobMessage>
+        val failure = InterruptedException("interrupted")
         Mockito
             .`when`(kafkaTemplate.send(Mockito.any<Message<AiGenerationJobMessage>>()))
-            .thenReturn(RecordingKafkaSendFuture(interruptFailure = InterruptedException("interrupted")))
+            .thenReturn(RecordingKafkaSendFuture(interruptFailure = failure))
         val producer =
             AiGenerationJobProducer(
                 kafkaTemplate,
                 AiGenerationKafkaProperties(sendTimeout = Duration.ofMillis(10)),
             )
 
-        assertThatThrownBy {
-            producer.publish(
-                AiGenerationJobPublishCommand(
-                    jobId = UUID.randomUUID(),
-                    sessionId = UUID.randomUUID(),
-                    clubId = UUID.randomUUID(),
-                    hostUserId = UUID.randomUUID(),
-                    provider = Provider.CLAUDE,
-                    model = "claude-sonnet-4-6",
-                    kind = JobKind.FULL,
-                ),
-            )
-        }.isInstanceOf(AiGenerationJobPublishException::class.java)
-            .hasMessageContaining("Interrupted publishing AI generation job")
-            .hasCauseInstanceOf(InterruptedException::class.java)
+        assertQueueUnavailable(producer, failure)
 
         assertThat(Thread.currentThread().isInterrupted).isTrue()
     }
+
+    @Test
+    fun `publish maps execution failure cause to a safe application queue exception`() {
+        val kafkaTemplate = Mockito.mock(KafkaTemplate::class.java) as KafkaTemplate<String, AiGenerationJobMessage>
+        val failure = IllegalArgumentException("broker completion failure")
+        Mockito
+            .`when`(kafkaTemplate.send(Mockito.any<Message<AiGenerationJobMessage>>()))
+            .thenReturn(RecordingKafkaSendFuture(executionFailure = ExecutionException(failure)))
+        val producer = AiGenerationJobProducer(kafkaTemplate, AiGenerationKafkaProperties(sendTimeout = Duration.ofMillis(10)))
+
+        assertQueueUnavailable(producer, failure)
+    }
+
+    private fun assertQueueUnavailable(
+        producer: AiGenerationJobProducer,
+        expectedCause: Throwable,
+    ) {
+        val command = command()
+
+        val error = org.assertj.core.api.Assertions.catchThrowable { producer.publish(command) }
+
+        assertThat(error)
+            .isInstanceOf(AiGenerationQueueUnavailableException::class.java)
+            .hasMessage("AI generation queue unavailable")
+            .hasCause(expectedCause)
+        assertThat(error!!.message).doesNotContain(command.jobId.toString())
+    }
+
+    private fun command() =
+        AiGenerationJobPublishCommand(
+            jobId = UUID.fromString("11111111-2222-4333-8444-555555555555"),
+            sessionId = UUID.fromString("aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee"),
+            clubId = UUID.fromString("aaaaaaaa-bbbb-4ccc-8ddd-ffffffffffff"),
+            hostUserId = UUID.fromString("aaaaaaaa-bbbb-4ccc-8ddd-111111111111"),
+            provider = Provider.CLAUDE,
+            model = "claude-sonnet-4-6",
+            kind = JobKind.FULL,
+        )
 }
 
 private class RecordingKafkaSendFuture(
     private val timeoutFailure: TimeoutException? = null,
     private val interruptFailure: InterruptedException? = null,
+    private val executionFailure: ExecutionException? = null,
 ) : CompletableFuture<SendResult<String, AiGenerationJobMessage>>() {
     override fun get(
         timeout: Long,
@@ -200,6 +202,7 @@ private class RecordingKafkaSendFuture(
     ): SendResult<String, AiGenerationJobMessage> {
         timeoutFailure?.let { throw it }
         interruptFailure?.let { throw it }
+        executionFailure?.let { throw it }
         @Suppress("UNCHECKED_CAST")
         return Mockito.mock(SendResult::class.java) as SendResult<String, AiGenerationJobMessage>
     }

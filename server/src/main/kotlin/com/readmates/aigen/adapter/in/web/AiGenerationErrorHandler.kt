@@ -1,7 +1,7 @@
 package com.readmates.aigen.adapter.`in`.web
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.shared.security.AccessDeniedException
@@ -89,9 +89,9 @@ class AiGenerationErrorHandler {
             type = PROBLEM_AI_OPS_ACTION,
         )
 
-    @ExceptionHandler(AiGenerationJobPublishException::class)
+    @ExceptionHandler(AiGenerationQueueUnavailableException::class)
     fun handleQueueFailure(
-        @Suppress("UNUSED_PARAMETER") error: AiGenerationJobPublishException,
+        @Suppress("UNUSED_PARAMETER") error: AiGenerationQueueUnavailableException,
     ): ResponseEntity<ProblemDetail> =
         problem(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.QUEUE_UNAVAILABLE.name, "Generation queue unavailable")
 

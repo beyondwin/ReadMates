@@ -1,6 +1,4 @@
 # Phase 2 removes these concrete-service, cross-adapter, and adapter-owned-contract dependencies.
-com/readmates/aigen/adapter/in/web/AiGenerationErrorHandler.kt|com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
-com/readmates/aigen/adapter/out/llm/springai/SpringAiErrorMapper.kt|com.readmates.aigen.application.service.ProviderFailureClass
 com/readmates/aigen/adapter/out/redis/RedisGenerationCostCounters.kt|com.readmates.aigen.application.service.AiGenerationMetrics
 com/readmates/aigen/adapter/out/redis/RedisGenerationCostCounters.kt|com.readmates.aigen.application.service.CapDenialReason
 com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.readmates.aigen.application.service.AiGenerationMetrics
