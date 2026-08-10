@@ -6,9 +6,12 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.aigen.adapter.`in`.messaging.AiGenerationJobConsumer
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
+import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.service.AiGenerationWorker
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.header.internals.RecordHeader
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -18,6 +21,7 @@ import org.mockito.Mockito.mock
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.kafka.support.Acknowledgment
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 class AiGenerationJobConsumerLoggingTest {
@@ -37,7 +41,7 @@ class AiGenerationJobConsumerLoggingTest {
         val appender = ListAppender<ILoggingEvent>().apply { start() }
         logger.addAppender(appender)
         try {
-            assertThatThrownBy { AiGenerationJobConsumer(worker).onMessage(message, acknowledgment) }
+            assertThatThrownBy { AiGenerationJobConsumer(worker).onMessage(record(message), acknowledgment) }
                 .isSameAs(failure)
         } finally {
             logger.detachAppender(appender)
@@ -81,6 +85,16 @@ class AiGenerationJobConsumerLoggingTest {
             model = "gpt-5.4-mini",
             kind = JobKind.FULL,
         )
+
+    private fun record(message: AiGenerationJobMessage) =
+        ConsumerRecord("jobs", 0, 0L, "club", message).also {
+            it.headers().add(
+                RecordHeader(
+                    AI_GENERATION_JOB_ID_HEADER,
+                    message.jobId.toString().toByteArray(StandardCharsets.US_ASCII),
+                ),
+            )
+        }
 
     private companion object {
         const val RAW_FAILURE = "raw provider response contains synthetic prompt and secret@example.test"

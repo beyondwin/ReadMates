@@ -1,13 +1,19 @@
 package com.readmates.aigen.adapter.out.messaging
 
+import com.readmates.aigen.application.model.AiGenerationRecoveryResult
+import com.readmates.aigen.application.model.AiGenerationRecoverySource
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.`in`.RecordUnroutableAiGenerationRecordUseCase
+import com.readmates.aigen.application.port.`in`.RecoverExhaustedAiGenerationJobUseCase
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.config.AiGenerationKafkaConfig
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.beans.DirectFieldAccessor
+import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.test.context.runner.ApplicationContextRunner
+import org.springframework.context.annotation.Bean
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.DefaultKafkaConsumerFactory
 import org.springframework.kafka.core.DefaultKafkaProducerFactory
@@ -29,8 +35,10 @@ import java.util.UUID
 class AiGenerationJobMessageSerializationTest {
     private val contextRunner =
         ApplicationContextRunner()
-            .withUserConfiguration(AiGenerationKafkaConfig::class.java)
-            .withPropertyValues(
+            .withUserConfiguration(
+                AiGenerationKafkaConfig::class.java,
+                RecoveryTestConfiguration::class.java,
+            ).withPropertyValues(
                 "readmates.aigen.enabled=true",
                 "readmates.aigen.kafka.enabled=true",
                 "readmates.aigen.kafka.bootstrap-servers=kafka-a:9092",
@@ -133,4 +141,22 @@ class AiGenerationJobMessageSerializationTest {
             model = "claude-sonnet-4-6",
             kind = JobKind.FULL,
         )
+
+    @TestConfiguration(proxyBeanMethods = false)
+    class RecoveryTestConfiguration {
+        @Bean
+        fun recoverExhaustedAiGenerationJobUseCase(): RecoverExhaustedAiGenerationJobUseCase =
+            object : RecoverExhaustedAiGenerationJobUseCase {
+                override fun recoverExhausted(
+                    jobId: UUID,
+                    source: AiGenerationRecoverySource,
+                ): AiGenerationRecoveryResult = AiGenerationRecoveryResult.MISSING
+            }
+
+        @Bean
+        fun recordUnroutableAiGenerationRecordUseCase(): RecordUnroutableAiGenerationRecordUseCase =
+            object : RecordUnroutableAiGenerationRecordUseCase {
+                override fun recordUnroutableKafkaRecord() = Unit
+            }
+    }
 }

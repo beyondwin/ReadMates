@@ -8,6 +8,11 @@ import java.util.UUID
 enum class Provider { CLAUDE, OPENAI, GEMINI }
 
 const val GROUNDED_PIPELINE_VERSION = "grounded-session-generation-v2"
+const val AI_GENERATION_JOB_ID_HEADER = "readmates-aigen-job-id"
+
+interface AiGenerationKafkaRoutingValue {
+    val jobId: UUID
+}
 
 data class ModelId(
     val provider: Provider,

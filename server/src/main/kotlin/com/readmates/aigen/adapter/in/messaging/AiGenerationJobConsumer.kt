@@ -2,6 +2,7 @@ package com.readmates.aigen.adapter.`in`.messaging
 
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
 import com.readmates.aigen.application.service.AiGenerationWorker
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -13,11 +14,11 @@ import org.springframework.stereotype.Component
  * Kafka consumer for AI-generation job-routing messages (spec §8.1).
  *
  * Behavior:
- *  - On each message: invoke [AiGenerationWorker.process] with the [AiGenerationJobMessage.jobId].
+ *  - On each message: require one canonical header matching [AiGenerationJobMessage.jobId], then invoke the worker.
  *  - On success: acknowledge the offset (manual ack mode — see [com.readmates.aigen.config.AiGenerationKafkaConfig]).
  *  - On exception: log and rethrow — the container's default error handler then triggers
  *    redelivery. We do NOT call [Acknowledgment.acknowledge] on the failure path; the
- *    worker is responsible for marking the job FAILED in Redis if redelivery exhausts.
+ *    explicit Kafka recoverer owns durable terminalization when generic redelivery exhausts.
  *
  * Wired only when both `readmates.aigen.enabled=true` and
  * `readmates.aigen.kafka.enabled=true`.
@@ -37,9 +38,14 @@ class AiGenerationJobConsumer(
     )
     @Suppress("TooGenericExceptionCaught")
     fun onMessage(
-        message: AiGenerationJobMessage,
+        record: ConsumerRecord<String, AiGenerationJobMessage?>,
         acknowledgment: Acknowledgment,
     ) {
+        val route = record.aiGenerationRoute()
+        val message = record.value()
+        if (route !is AiGenerationKafkaRoute.Routable || message == null) {
+            throw AiGenerationRoutingMismatchException()
+        }
         withWorkerMdc(message) {
             try {
                 worker.process(message.jobId)

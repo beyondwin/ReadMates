@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.out.messaging
 
+import com.readmates.aigen.application.model.AiGenerationKafkaRoutingValue
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.JobKind
 import java.util.UUID
@@ -14,11 +15,11 @@ import java.util.UUID
  * through Kafka. A reflection-based test pins this invariant.
  */
 data class AiGenerationJobMessage(
-    val jobId: UUID,
+    override val jobId: UUID,
     val sessionId: UUID,
     val clubId: UUID,
     val hostUserId: UUID,
     val provider: Provider,
     val model: String,
     val kind: JobKind,
-)
+) : AiGenerationKafkaRoutingValue

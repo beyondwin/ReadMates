@@ -2,6 +2,7 @@
 
 package com.readmates.aigen.adapter.out.messaging
 
+import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.JobKind
@@ -84,6 +85,7 @@ class AiGenerationJobProducerTest {
         val sent = captor.value
         assertThat(sent.headers[KafkaHeaders.TOPIC]).isEqualTo("readmates.aigen.jobs.v1")
         assertThat(sent.headers[KafkaHeaders.KEY]).isEqualTo(clubId.toString())
+        assertThat(sent.headers[AI_GENERATION_JOB_ID_HEADER]).isEqualTo(jobId.toString())
         assertThat(sent.payload).isEqualTo(
             AiGenerationJobMessage(
                 jobId = jobId,
