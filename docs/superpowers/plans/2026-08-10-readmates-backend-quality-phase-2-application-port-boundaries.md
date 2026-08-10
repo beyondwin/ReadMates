@@ -643,16 +643,21 @@ The ignored report records the exact plan commit/base, full 40-character Task 1â
 
   ```bash
   PLAN_FILE=docs/superpowers/plans/2026-08-10-readmates-backend-quality-phase-2-application-port-boundaries.md
-  SDD_WORKSPACE="$(scripts/sdd-workspace "$PLAN_FILE")"
+  IMPLEMENTATION_BASE=519eb62deec4cbdcc5c8a4f81933faccabee1257
+  SDD_SKILL_DIR="${CODEX_HOME:-$HOME/.codex}/skills/subagent-driven-development"
+  test -x "$SDD_SKILL_DIR/scripts/sdd-workspace"
+  test -x "$SDD_SKILL_DIR/scripts/review-package"
+  SDD_WORKSPACE="$("$SDD_SKILL_DIR/scripts/sdd-workspace" "$PLAN_FILE")"
   REPORT_FILE="$SDD_WORKSPACE/final-report.md"
   PLAN_COMMIT="$(git log -n 1 --format=%H -- "$PLAN_FILE")"
   test -d "$SDD_WORKSPACE"
+  git rev-parse --verify "$IMPLEMENTATION_BASE^{commit}" >/dev/null
   test "${#PLAN_COMMIT}" -eq 40
   git check-ignore -q "$REPORT_FILE"
   ! git ls-files --error-unmatch "$REPORT_FILE" >/dev/null 2>&1
   ```
 
-  Keep these three shell variables for every remaining Task 7 command. The report is an execution artifact only; do not add a tracked `docs/superpowers/reports` file.
+  Keep these six shell variables for every remaining Task 7 command. The report is an execution artifact only; do not add a tracked `docs/superpowers/reports` file.
 
 - [ ] **Step 2: Update active architecture truth and draft the ignored report.**
 
@@ -667,8 +672,9 @@ The ignored report records the exact plan commit/base, full 40-character Task 1â
     --tests com.readmates.architecture.ServerArchitectureInventoryTest \
     --tests com.readmates.architecture.ServerArchitectureBoundaryTest \
     --rerun-tasks --no-build-cache --no-configuration-cache
-  rg -n 'AiGenerationJobPublishException|application\.service\.(AiGenerationWorker|AiGenerationCommitRecoveryService|AiGenerationMetrics|ProviderFailureClass|CapDenialReason|ProviderCircuitState)|adapter\.out\.messaging\.AiGenerationJobMessage' server/src/main/kotlin
-  rg -n 'getOrDefault\(emptyList\(\)\)' server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt
+  ! rg -n 'AiGenerationJobPublishException|application\.service\.(AiGenerationWorker|AiGenerationCommitRecoveryService|AiGenerationMetrics|ProviderFailureClass|CapDenialReason|ProviderCircuitState)|adapter\.out\.messaging\.AiGenerationJobMessage' server/src/main/kotlin
+  ! rg -n 'getOrDefault\(emptyList\(\)\)' server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt
+  git diff --name-only "$IMPLEMENTATION_BASE"..HEAD
   ```
 
   Expected: architecture tests PASS; both scans return no match. Count non-comment ledger lines and record `23`, `16`, and `39`.
@@ -702,7 +708,7 @@ The ignored report records the exact plan commit/base, full 40-character Task 1â
   ./server/gradlew -p server architectureTest --rerun-tasks --no-build-cache --no-configuration-cache
   ./scripts/server-ci-check.sh
   ./server/gradlew -p server integrationTest --rerun-tasks --no-build-cache --no-configuration-cache
-  git diff --check
+  git diff --check 519eb62deec4cbdcc5c8a4f81933faccabee1257..HEAD
   ```
 
   Record fresh XML suite/test/failure/error/skip totals and name the Kafka, Redis, admin-health, metrics, and notification suites. Frontend E2E is excluded because this plan preserves API/auth/BFF/frontend contracts and must contain no frontend/auth diff; if the final diff contains one, stop and remove it rather than widening scope.
@@ -719,27 +725,31 @@ The ignored report records the exact plan commit/base, full 40-character Task 1â
 - [ ] **Step 7: Run documentation and targeted safety checks.**
 
   ```bash
-  git diff --check "$PLAN_COMMIT^"..HEAD -- \
+  git diff --check "$IMPLEMENTATION_BASE"..HEAD -- \
     docs/development/architecture.md \
     docs/development/adr/0002-server-clean-architecture-with-archunit.md \
     CHANGELOG.md
   ! rg -n '[[:blank:]]+$' "$REPORT_FILE"
-  rg -n "(^|[^A-Za-z0-9_])([o]cid1\\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)" \
-    docs/development/architecture.md \
-    docs/development/adr/0002-server-clean-architecture-with-archunit.md \
-    CHANGELOG.md \
-    "$REPORT_FILE"
+  ! git diff --unified=0 "$IMPLEMENTATION_BASE"..HEAD -- \
+      docs/development/architecture.md \
+      docs/development/adr/0002-server-clean-architecture-with-archunit.md \
+      CHANGELOG.md | \
+    rg -n '^\+[^+].*((^|[^A-Za-z0-9_])([o]cid1\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY))'
+  ! rg -n "(^|[^A-Za-z0-9_])([o]cid1\\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)" "$REPORT_FILE"
   ```
 
   Expected: the tracked-doc diff check passes, and both report-whitespace and safety scans return no match introduced by this plan.
 
 - [ ] **Step 8: Run whole-plan review before finalizing the ignored report.**
 
-  Resolve the corrected plan commit and generate one review package from that commit through the current tracked HEAD:
+  Generate one review package from the fixed implementation base through the current tracked HEAD. Pass an explicit ignored output path because the helper prints a status sentence, not a bare filename:
 
   ```bash
   test "${#PLAN_COMMIT}" -eq 40
-  REVIEW_PACKAGE="$(scripts/review-package "$PLAN_FILE" "$PLAN_COMMIT" HEAD)"
+  REVIEW_HEAD="$(git rev-parse HEAD)"
+  REVIEW_PACKAGE="$SDD_WORKSPACE/review-${IMPLEMENTATION_BASE:0:7}..${REVIEW_HEAD:0:7}.diff"
+  "$SDD_SKILL_DIR/scripts/review-package" \
+    "$PLAN_FILE" "$IMPLEMENTATION_BASE" "$REVIEW_HEAD" "$REVIEW_PACKAGE"
   test -s "$REVIEW_PACKAGE"
   ```
 
