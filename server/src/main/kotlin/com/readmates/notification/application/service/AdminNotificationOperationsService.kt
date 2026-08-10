@@ -66,7 +66,7 @@ class AdminNotificationOperationsService(
             pageRequest = pageRequest.adminLedgerPage(),
         )
 
-    @Transactional
+    @Transactional(rollbackFor = [Exception::class])
     override fun previewReplay(
         admin: CurrentPlatformAdmin,
         request: AdminNotificationReplayPreviewRequest,
@@ -114,7 +114,7 @@ class AdminNotificationOperationsService(
         )
     }
 
-    @Transactional
+    @Transactional(rollbackFor = [Exception::class])
     override fun confirmReplay(
         admin: CurrentPlatformAdmin,
         command: AdminNotificationReplayConfirmCommand,

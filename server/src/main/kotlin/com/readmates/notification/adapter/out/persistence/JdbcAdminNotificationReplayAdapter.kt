@@ -33,7 +33,8 @@ class JdbcAdminNotificationReplayAdapter(
         targetLimit: Int,
     ): AdminNotificationReplaySnapshot {
         if (!filter.isEligibleReplayFilter()) return AdminNotificationReplaySnapshot(emptyList(), 0, emptyList())
-        val scope = replayScope(filter)
+        val targetScope = exactReplayScope(filter)
+        val exclusionScope = replayClassificationScope(filter)
         val targets =
             JdbcArguments.query(
                 jdbcTemplate,
@@ -43,11 +44,11 @@ class JdbcAdminNotificationReplayAdapter(
                 where binary channel = binary 'EMAIL'
                   and binary status in (binary 'FAILED', binary 'DEAD')
                   and binary last_error in (binary 'MAIL_RETRYABLE', binary 'MAIL_PERMANENT')
-                  ${scope.sql}
+                  ${targetScope.sql}
                 order by id
                 limit ?
                 """.trimIndent(),
-                scope.args + targetLimit,
+                targetScope.args + targetLimit,
                 { resultSet, _ ->
                     AdminNotificationReplayTarget(
                         deliveryId = resultSet.uuid("id"),
@@ -59,7 +60,7 @@ class JdbcAdminNotificationReplayAdapter(
                     )
                 },
             )
-        val exclusions = loadExclusions(scope)
+        val exclusions = loadExclusions(exclusionScope)
         return AdminNotificationReplaySnapshot(
             targets = targets,
             excludedCount = exclusions.values.sum(),
@@ -313,7 +314,7 @@ private fun AdminNotificationFilter.isEligibleReplayFilter(): Boolean =
     channel != NotificationChannel.IN_APP &&
         deliveryStatus !in NON_REPLAYABLE_DELIVERY_STATUSES
 
-private fun replayScope(filter: AdminNotificationFilter): ReplayScope {
+private fun exactReplayScope(filter: AdminNotificationFilter): ReplayScope {
     val predicates = mutableListOf<String>()
     val args = mutableListOf<Any>()
     filter.clubId?.let {
@@ -326,6 +327,27 @@ private fun replayScope(filter: AdminNotificationFilter): ReplayScope {
     }
     filter.deliveryStatus?.let {
         predicates += "binary status = binary ?"
+        args += it.name
+    }
+    return ReplayScope(
+        sql = if (predicates.isEmpty()) "" else "and ${predicates.joinToString(" and ")}",
+        args = args,
+    )
+}
+
+private fun replayClassificationScope(filter: AdminNotificationFilter): ReplayScope {
+    val predicates = mutableListOf<String>()
+    val args = mutableListOf<Any>()
+    filter.clubId?.let {
+        predicates += "club_id = ?"
+        args += it.dbString()
+    }
+    filter.channel?.let {
+        predicates += "lower(trim(channel)) = lower(?)"
+        args += it.name
+    }
+    filter.deliveryStatus?.let {
+        predicates += "lower(trim(status)) = lower(?)"
         args += it.name
     }
     return ReplayScope(

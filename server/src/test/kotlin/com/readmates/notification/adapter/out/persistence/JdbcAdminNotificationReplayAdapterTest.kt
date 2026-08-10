@@ -1,15 +1,21 @@
 package com.readmates.notification.adapter.out.persistence
 
 import com.readmates.notification.application.model.AdminNotificationFilter
+import com.readmates.notification.application.model.AdminNotificationReplaySnapshot
 import com.readmates.notification.application.model.AdminNotificationReplayTarget
 import com.readmates.notification.application.model.adminNotificationReplaySelectionHash
 import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmationInsert
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewInsert
+import com.readmates.notification.domain.NotificationChannel
+import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.CsvSource
+import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
@@ -19,7 +25,7 @@ import java.util.UUID
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Tag("integration")
-class JdbcAdminNotificationReplayAdapterTest(
+internal class JdbcAdminNotificationReplayAdapterTest(
     @param:Autowired private val adapter: JdbcAdminNotificationReplayAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
@@ -122,6 +128,85 @@ class JdbcAdminNotificationReplayAdapterTest(
             assertThat(deliveryState(LOWER_FAILURE_ID)[2]).isEqualTo("mail_retryable")
             assertThat(deliveryState(PADDED_FAILURE_ID)[2]).isEqualTo("MAIL_RETRYABLE ")
         }
+    }
+
+    @ParameterizedTest
+    @CsvSource(
+        "FAILED,failed,Failed,DEAD",
+        "DEAD,dead,Dead,FAILED",
+    )
+    fun `requested email status counts only its semantic channel and status lookalikes`(
+        requestedStatus: NotificationDeliveryStatus,
+        lowerStatus: String,
+        mixedStatus: String,
+        oppositeStatus: String,
+    ) {
+        seedEvent()
+        withNonEnforcedReplayValueChecks {
+            insertDelivery(TARGET_ID, requestedStatus.name, "MAIL_RETRYABLE")
+            insertDelivery(SECOND_TARGET_ID, oppositeStatus, "MAIL_RETRYABLE")
+            insertDelivery(LOWER_CHANNEL_ID, requestedStatus.name, "MAIL_RETRYABLE", channel = "email")
+            insertDelivery(MIXED_CHANNEL_ID, requestedStatus.name, "MAIL_RETRYABLE", channel = "Email")
+            insertDelivery(PADDED_CHANNEL_ID, requestedStatus.name, "MAIL_RETRYABLE", channel = "EMAIL ")
+            insertDelivery(LOWER_STATUS_ID, lowerStatus, "MAIL_RETRYABLE")
+            insertDelivery(MIXED_STATUS_ID, mixedStatus, "MAIL_RETRYABLE")
+            insertDelivery(PADDED_STATUS_ID, "${requestedStatus.name} ", "MAIL_RETRYABLE")
+
+            val snapshot =
+                adapter.loadSnapshot(
+                    AdminNotificationFilter(
+                        clubId = CLUB_ID,
+                        channel = NotificationChannel.EMAIL,
+                        deliveryStatus = requestedStatus,
+                    ),
+                    8,
+                )
+
+            assertThat(snapshot.targets.map { it.deliveryId }).containsExactly(TARGET_ID)
+            assertThat(snapshot.excludedCount).isEqualTo(6)
+            assertThat(snapshot.warnings).containsExactly(
+                "CHANNEL_NONCANONICAL",
+                "STATUS_NONCANONICAL",
+            )
+        }
+    }
+
+    @Test
+    fun `ineligible requested filters stay empty without broadening exclusions`() {
+        seedEvent()
+        insertDelivery(TARGET_ID, "FAILED", "MAIL_RETRYABLE")
+
+        val inApp =
+            adapter.loadSnapshot(
+                AdminNotificationFilter(clubId = CLUB_ID, channel = NotificationChannel.IN_APP),
+                2,
+            )
+        val pending =
+            adapter.loadSnapshot(
+                AdminNotificationFilter(clubId = CLUB_ID, deliveryStatus = NotificationDeliveryStatus.PENDING),
+                2,
+            )
+
+        assertThat(inApp).isEqualTo(AdminNotificationReplaySnapshot(emptyList(), 0, emptyList()))
+        assertThat(pending).isEqualTo(AdminNotificationReplaySnapshot(emptyList(), 0, emptyList()))
+    }
+
+    @ParameterizedTest
+    @EnumSource(ReplayCasMutation::class)
+    fun `confirmation CAS skips each independently changed target tuple element`(mutation: ReplayCasMutation) {
+        seedEvent()
+        insertDelivery(TARGET_ID, "FAILED", "MAIL_RETRYABLE")
+        val snapshot = adapter.loadSnapshot(AdminNotificationFilter(clubId = CLUB_ID), 2)
+        val at = OffsetDateTime.parse("2026-05-27T01:03:03.123456Z")
+        val selectionHash =
+            adminNotificationReplaySelectionHash(AdminNotificationFilter(clubId = CLUB_ID), snapshot.targets)
+        val previewId = adapter.createPreview(previewInsert(snapshot.targets, selectionHash, at))
+        createdPreviewIds += previewId
+
+        val currentDeliveryId = applyCasMutation(mutation, at)
+
+        assertThat(adapter.replayPreviewTargets(previewId, at.plusMinutes(1))).isZero()
+        assertThat(deliveryState(currentDeliveryId).first()).isNotEqualTo("PENDING")
     }
 
     @Test
@@ -300,12 +385,68 @@ class JdbcAdminNotificationReplayAdapterTest(
         )
     }
 
+    private fun applyCasMutation(
+        mutation: ReplayCasMutation,
+        at: OffsetDateTime,
+    ): UUID =
+        when (mutation) {
+            ReplayCasMutation.CHANNEL -> updateDelivery("channel = 'IN_APP'")
+            ReplayCasMutation.STATUS -> updateDelivery("status = 'DEAD'")
+            ReplayCasMutation.FAILURE_CODE -> updateDelivery("last_error = 'MAIL_PERMANENT'")
+            ReplayCasMutation.ATTEMPT_COUNT -> updateDelivery("attempt_count = attempt_count + 1")
+            ReplayCasMutation.UPDATED_AT ->
+                updateDelivery(
+                    "updated_at = ?",
+                    at.plusNanos(1_000).toLocalDateTime(),
+                )
+            ReplayCasMutation.LOCKED_AT ->
+                updateDelivery(
+                    "locked_at = ?",
+                    at.toLocalDateTime(),
+                )
+            ReplayCasMutation.CLUB_ID -> {
+                jdbcTemplate.update(
+                    "update admin_notification_replay_preview_targets set club_id = ? where preview_id = ?",
+                    SECOND_CLUB_ID.toString(),
+                    createdPreviewIds.single().toString(),
+                )
+                TARGET_ID
+            }
+            ReplayCasMutation.DELIVERY_ID -> {
+                updateDelivery("id = ?", MUTATED_DELIVERY_ID.toString())
+                MUTATED_DELIVERY_ID
+            }
+        }
+
+    private fun updateDelivery(
+        assignment: String,
+        vararg args: Any,
+    ): UUID {
+        jdbcTemplate.update(
+            "update notification_deliveries set $assignment where id = ?",
+            *args,
+            TARGET_ID.toString(),
+        )
+        return TARGET_ID
+    }
+
     private fun deliveryState(id: UUID): List<String?> =
         jdbcTemplate.queryForObject(
             "select status, attempt_count, last_error, updated_at from notification_deliveries where id = ?",
             { rs, _ -> listOf(rs.getString(1), rs.getString(2), rs.getString(3), rs.getObject(4).toString()) },
             id.toString(),
         )
+}
+
+internal enum class ReplayCasMutation {
+    CHANNEL,
+    STATUS,
+    FAILURE_CODE,
+    ATTEMPT_COUNT,
+    UPDATED_AT,
+    LOCKED_AT,
+    CLUB_ID,
+    DELIVERY_ID,
 }
 
 private val AUDIT_ID = UUID.fromString("00000000-0000-0000-0000-000000009003")
@@ -321,13 +462,17 @@ private val NULL_ERROR_ID = UUID.fromString("00000000-0000-0000-0000-00000000901
 private val NONCANONICAL_ID = UUID.fromString("00000000-0000-0000-0000-000000009018")
 private val UNKNOWN_ID = UUID.fromString("00000000-0000-0000-0000-000000009019")
 private val LOWER_CHANNEL_ID = UUID.fromString("00000000-0000-0000-0000-000000009021")
+private val MIXED_CHANNEL_ID = UUID.fromString("00000000-0000-0000-0000-000000009028")
 private val PADDED_CHANNEL_ID = UUID.fromString("00000000-0000-0000-0000-000000009022")
 private val LOWER_STATUS_ID = UUID.fromString("00000000-0000-0000-0000-000000009023")
+private val MIXED_STATUS_ID = UUID.fromString("00000000-0000-0000-0000-000000009029")
 private val PADDED_STATUS_ID = UUID.fromString("00000000-0000-0000-0000-000000009024")
 private val UNKNOWN_STATUS_ID = UUID.fromString("00000000-0000-0000-0000-000000009025")
 private val LOWER_FAILURE_ID = UUID.fromString("00000000-0000-0000-0000-000000009026")
 private val PADDED_FAILURE_ID = UUID.fromString("00000000-0000-0000-0000-000000009027")
+private val MUTATED_DELIVERY_ID = UUID.fromString("00000000-0000-0000-0000-000000009030")
 private val CLUB_ID = UUID.fromString("00000000-0000-0000-0000-000000000001")
+private val SECOND_CLUB_ID = UUID.fromString("00000000-0000-0000-0000-000000000002")
 private val SESSION_ID = UUID.fromString("00000000-0000-0000-0000-000000000301")
 private val MEMBER_ID = UUID.fromString("00000000-0000-0000-0000-000000000202")
 private val ADMIN_USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000101")

@@ -33,6 +33,7 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
 import org.springframework.context.annotation.Primary
 import org.springframework.core.env.Environment
+import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
 import java.sql.DriverManager
 import java.time.Clock
@@ -67,9 +68,11 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
     @AfterEach
     fun cleanup() {
         replayPort.failureStage = null
-        replayPort.beforeLock = {}
+        replayPort.checkedFailureStage = null
+        replayPort.failWithDuplicateTarget = false
         auditPort.failAfterInsert = false
-        previewIds.forEach { previewId ->
+        auditPort.failCheckedAfterInsert = false
+        (previewIds + replayPort.createdPreviewIds).forEach { previewId ->
             jdbcTemplate.update(
                 """
                 update admin_notification_replay_previews
@@ -93,6 +96,7 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
             jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", previewId.toString())
         }
         previewIds.clear()
+        replayPort.createdPreviewIds.clear()
         jdbcTemplate.update("delete from notification_deliveries where event_id = ?", EVENT_ID.toString())
         jdbcTemplate.update("delete from notification_event_outbox where id = ?", EVENT_ID.toString())
     }
@@ -187,6 +191,44 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
         assertThat(consumedAt(preview.previewId)).isNull()
     }
 
+    @ParameterizedTest
+    @EnumSource(CheckedFailureStage::class)
+    fun `checked persistence failure rolls back every replay companion write`(stage: CheckedFailureStage) {
+        seedFailedDelivery()
+        clock.set(BASE_TIME)
+        if (stage == CheckedFailureStage.PREVIEW_INSERT) {
+            replayPort.checkedFailureStage = stage
+
+            assertThatThrownBy { preview() }.isInstanceOf(InjectedCheckedReplayFailure::class.java)
+
+            assertThat(previewCount()).isZero()
+            assertThat(targetCount()).isZero()
+            return
+        }
+        val preview = preview()
+        replayPort.checkedFailureStage = stage.takeUnless { it == CheckedFailureStage.AUDIT_INSERT }
+        auditPort.failCheckedAfterInsert = stage == CheckedFailureStage.AUDIT_INSERT
+
+        assertThatThrownBy { confirm(preview.previewId, preview.selectionHash) }
+            .isInstanceOf(InjectedCheckedReplayFailure::class.java)
+
+        assertThat(deliveryStatus()).isEqualTo("FAILED")
+        assertReplayCardinality(preview.previewId, receipts = 0, audits = 0)
+        assertThat(consumedAt(preview.previewId)).isNull()
+    }
+
+    @Test
+    fun `real duplicate target DataAccessException rolls back preview and targets`() {
+        seedFailedDelivery()
+        clock.set(BASE_TIME)
+        replayPort.failWithDuplicateTarget = true
+
+        assertThatThrownBy { preview() }.isInstanceOf(DataAccessException::class.java)
+
+        assertThat(previewCount()).isZero()
+        assertThat(targetCount()).isZero()
+    }
+
     @Test
     fun `clock is read after preview lock so expiry while waiting rejects without mutation`() {
         seedFailedDelivery()
@@ -200,8 +242,6 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
                     statement.setString(1, preview.previewId.toString())
                     statement.executeQuery().use { check(it.next()) }
                 }
-            val lockAttempted = CountDownLatch(1)
-            replayPort.beforeLock = { lockAttempted.countDown() }
             val executor = Executors.newSingleThreadExecutor()
             try {
                 val result =
@@ -209,7 +249,7 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
                         { confirm(preview.previewId, preview.selectionHash) },
                         executor,
                     )
-                check(lockAttempted.await(10, TimeUnit.SECONDS))
+                awaitActualPreviewLockWait()
                 clock.set(BASE_TIME.plusSeconds(600))
                 blocker.commit()
 
@@ -412,6 +452,25 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
             environment.getRequiredProperty("spring.datasource.password"),
         )
 
+    private fun awaitActualPreviewLockWait() {
+        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10)
+        while (System.nanoTime() < deadline) {
+            val waiting =
+                jdbcTemplate.queryForObject(
+                    """
+                    select count(*)
+                    from information_schema.processlist
+                    where id <> connection_id()
+                      and lower(info) like '%from admin_notification_replay_previews%for update%'
+                    """.trimIndent(),
+                    Int::class.java,
+                ) ?: 0
+            if (waiting > 0) return
+            Thread.onSpinWait()
+        }
+        error("Confirmation never entered a database row-lock wait")
+    }
+
     @TestConfiguration(proxyBeanMethods = false)
     internal class TestConfig {
         @Bean
@@ -420,7 +479,10 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
 
         @Bean
         @Primary
-        fun switchableReplayPort(adapter: ReplayAdapter): SwitchableReplayPort = SwitchableReplayPort(adapter)
+        fun switchableReplayPort(
+            adapter: ReplayAdapter,
+            jdbcTemplate: JdbcTemplate,
+        ): SwitchableReplayPort = SwitchableReplayPort(adapter, jdbcTemplate)
 
         @Bean
         @Primary
@@ -430,14 +492,23 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
 
 internal enum class FailureStage { PREVIEW_INSERT, TARGET_UPDATE, AUDIT_INSERT, RECEIPT_INSERT, CONSUME }
 
+internal enum class CheckedFailureStage { PREVIEW_INSERT, TARGET_UPDATE, AUDIT_INSERT, RECEIPT_INSERT }
+
 internal class InjectedReplayFailure : RuntimeException("injected replay transaction failure")
+
+internal class InjectedCheckedReplayFailure : Exception("injected checked replay transaction failure")
 
 internal class SwitchableReplayPort(
     private val delegate: JdbcAdminNotificationReplayAdapter,
+    private val jdbcTemplate: JdbcTemplate,
 ) : AdminNotificationReplayPort {
     @Volatile var failureStage: FailureStage? = null
 
-    @Volatile var beforeLock: () -> Unit = {}
+    @Volatile var checkedFailureStage: CheckedFailureStage? = null
+
+    @Volatile var failWithDuplicateTarget = false
+
+    val createdPreviewIds = linkedSetOf<UUID>()
 
     override fun loadSnapshot(
         filter: AdminNotificationFilter,
@@ -445,14 +516,14 @@ internal class SwitchableReplayPort(
     ): AdminNotificationReplaySnapshot = delegate.loadSnapshot(filter, targetLimit)
 
     override fun createPreview(input: AdminNotificationReplayPreviewInsert): UUID =
-        delegate.createPreview(input).also {
+        delegate.createPreview(input).also { previewId ->
+            createdPreviewIds += previewId
+            if (failWithDuplicateTarget) insertDuplicateTarget(previewId)
             if (failureStage == FailureStage.PREVIEW_INSERT) throw InjectedReplayFailure()
+            if (checkedFailureStage == CheckedFailureStage.PREVIEW_INSERT) throw InjectedCheckedReplayFailure()
         }
 
-    override fun lockPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? {
-        beforeLock()
-        return delegate.lockPreview(previewId)
-    }
+    override fun lockPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? = delegate.lockPreview(previewId)
 
     override fun findConfirmation(previewId: UUID): ReplayConfirmation? = delegate.findConfirmation(previewId)
 
@@ -466,11 +537,17 @@ internal class SwitchableReplayPort(
             ) {
                 throw InjectedReplayFailure()
             }
+            if (checkedFailureStage == CheckedFailureStage.TARGET_UPDATE) {
+                throw InjectedCheckedReplayFailure()
+            }
         }
 
     override fun createConfirmation(input: AdminNotificationReplayConfirmationInsert): UUID =
         delegate.createConfirmation(input).also {
             if (failureStage == FailureStage.RECEIPT_INSERT) throw InjectedReplayFailure()
+            if (checkedFailureStage == CheckedFailureStage.RECEIPT_INSERT) {
+                throw InjectedCheckedReplayFailure()
+            }
         }
 
     override fun consumePreview(
@@ -481,12 +558,31 @@ internal class SwitchableReplayPort(
         val consumed = delegate.consumePreview(previewId, confirmationId, consumedAt)
         return if (failureStage == FailureStage.CONSUME) false else consumed
     }
+
+    private fun insertDuplicateTarget(previewId: UUID) {
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_preview_targets (
+              preview_id, delivery_id, club_id, expected_status, expected_attempt_count,
+              expected_failure_code, expected_updated_at
+            )
+            select preview_id, delivery_id, club_id, expected_status, expected_attempt_count,
+                   expected_failure_code, expected_updated_at
+            from admin_notification_replay_preview_targets
+            where preview_id = ?
+            limit 1
+            """.trimIndent(),
+            previewId.toString(),
+        )
+    }
 }
 
 internal class SwitchableAuditPort(
     private val delegate: JdbcAdminNotificationReplayAdapter,
 ) : AdminNotificationAuditPort {
     @Volatile var failAfterInsert = false
+
+    @Volatile var failCheckedAfterInsert = false
 
     override fun writeReplayConfirmed(
         actorUserId: UUID,
@@ -496,6 +592,7 @@ internal class SwitchableAuditPort(
     ): UUID =
         delegate.writeReplayConfirmed(actorUserId, actorPlatformRole, metadataJson, createdAt).also {
             if (failAfterInsert) throw InjectedReplayFailure()
+            if (failCheckedAfterInsert) throw InjectedCheckedReplayFailure()
         }
 }
 
