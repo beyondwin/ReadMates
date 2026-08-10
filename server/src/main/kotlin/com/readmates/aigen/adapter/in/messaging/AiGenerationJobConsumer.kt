@@ -66,25 +66,23 @@ class AiGenerationJobConsumer(
     private fun <T> withWorkerMdc(
         message: AiGenerationJobMessage,
         block: () -> T,
-    ): T =
-        withMdcValue("jobId", message.jobId.toString()) {
-            withMdcValue("provider", message.provider.name.lowercase()) {
-                withMdcValue("stage", "worker") { block() }
-            }
-        }
-
-    private fun <T> withMdcValue(
-        key: String,
-        value: String,
-        block: () -> T,
     ): T {
-        val previous = MDC.get(key)
-        val closeable = MDC.putCloseable(key, value)
+        val previous = MDC.getCopyOfContextMap()
+        MDC.setContextMap(
+            mapOf(
+                "jobId" to message.jobId.toString(),
+                "provider" to message.provider.name.lowercase(),
+                "stage" to "worker",
+            ),
+        )
         try {
             return block()
         } finally {
-            closeable.close()
-            previous?.let { MDC.put(key, it) }
+            if (previous.isNullOrEmpty()) {
+                MDC.clear()
+            } else {
+                MDC.setContextMap(previous)
+            }
         }
     }
 }

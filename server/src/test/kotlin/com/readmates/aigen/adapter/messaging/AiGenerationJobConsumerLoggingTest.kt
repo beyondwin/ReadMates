@@ -41,6 +41,7 @@ class AiGenerationJobConsumerLoggingTest {
         MDC.put("jobId", "previous-job")
         MDC.put("provider", "previous-provider")
         MDC.put("stage", "previous-stage")
+        MDC.put("baggage", "unrelated-listener-context")
         val logger = LoggerFactory.getLogger(AiGenerationJobConsumer::class.java) as Logger
         val appender = ListAppender<ILoggingEvent>().apply { start() }
         logger.addAppender(appender)
@@ -82,6 +83,7 @@ class AiGenerationJobConsumerLoggingTest {
                     "jobId" to "previous-job",
                     "provider" to "previous-provider",
                     "stage" to "previous-stage",
+                    "baggage" to "unrelated-listener-context",
                 ),
             )
         verifyNoInteractions(acknowledgment)
