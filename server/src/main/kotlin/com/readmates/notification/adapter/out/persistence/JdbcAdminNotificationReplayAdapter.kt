@@ -252,19 +252,19 @@ class JdbcAdminNotificationReplayAdapter(
             object : BatchPreparedStatementSetter {
                 override fun getBatchSize(): Int = targets.size
 
-                @Suppress("MagicNumber")
                 override fun setValues(
                     statement: PreparedStatement,
                     index: Int,
                 ) {
                     val target = targets[index]
-                    statement.setString(1, previewId.dbString())
-                    statement.setString(2, target.deliveryId.dbString())
-                    statement.setString(3, target.clubId.dbString())
-                    statement.setString(4, target.status)
-                    statement.setInt(5, target.attemptCount)
-                    statement.setString(6, target.failureCode)
-                    statement.setObject(7, target.updatedAt.toUtcLocalDateTime())
+                    var parameterIndex = 1
+                    statement.setString(parameterIndex++, previewId.dbString())
+                    statement.setString(parameterIndex++, target.deliveryId.dbString())
+                    statement.setString(parameterIndex++, target.clubId.dbString())
+                    statement.setString(parameterIndex++, target.status)
+                    statement.setInt(parameterIndex++, target.attemptCount)
+                    statement.setString(parameterIndex++, target.failureCode)
+                    statement.setObject(parameterIndex, target.updatedAt.toUtcLocalDateTime())
                 }
             },
         )
