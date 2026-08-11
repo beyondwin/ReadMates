@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationJobListResult
 import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
 import com.readmates.aigen.application.model.AiOpsCostTrend
@@ -51,7 +52,11 @@ class AiGenerationOpsService(
         window: AiOpsCostWindow,
     ): AiOpsSummary {
         val now = clock.instant()
-        val activeJobs = jobStore.loadActiveJobs()
+        val activeJobs =
+            when (val jobs = jobStore.loadActiveJobs()) {
+                is AiGenerationJobListResult.Available -> jobs.records
+                is AiGenerationJobListResult.Unavailable -> emptyList()
+            }
         val monthStart =
             now
                 .atZone(ZoneOffset.UTC)
@@ -112,10 +117,14 @@ class AiGenerationOpsService(
         val now = clock.instant()
         val liveItems =
             if (filters.cursor == null) {
-                jobStore
-                    .loadActiveJobs()
-                    .filter { it.matches(filters) }
-                    .map { it.toOpsItem(now) }
+                when (val jobs = jobStore.loadActiveJobs()) {
+                    is AiGenerationJobListResult.Available ->
+                        jobs.records
+                            .filter { it.matches(filters) }
+                            .map { it.toOpsItem(now) }
+
+                    is AiGenerationJobListResult.Unavailable -> emptyList()
+                }
             } else {
                 emptyList()
             }

@@ -1,5 +1,8 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableException
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.`in`.AiGenerationCommitRecoveryResult
 import com.readmates.aigen.application.port.`in`.RecoverAiGenerationCommitsUseCase
@@ -59,20 +62,28 @@ class AiGenerationCommitRecoveryService(
         ).all { it }
 
     override fun recoverBatch(limit: Int): List<AiGenerationCommitRecoveryResult> =
-        jobStore.loadCommitRecoveryJobs(limit).mapNotNull { record ->
-            try {
-                recover(record.jobId)
-            } catch (
-                @Suppress("TooGenericExceptionCaught") error: RuntimeException,
-            ) {
+        when (val jobs = jobStore.loadCommitRecoveryJobs(limit)) {
+            is AiGenerationJobListResult.Available ->
+                jobs.records.mapNotNull { record ->
+                    try {
+                        recover(record.jobId)
+                    } catch (
+                        @Suppress("TooGenericExceptionCaught") error: RuntimeException,
+                    ) {
+                        metrics.recordCommitRecoveryFailure()
+                        log.warn(
+                            "AI generation commit recovery failed jobId={} status={} errorType={}",
+                            record.jobId,
+                            record.status,
+                            error::class.simpleName ?: "RuntimeException",
+                        )
+                        null
+                    }
+                }
+
+            is AiGenerationJobListResult.Unavailable -> {
                 metrics.recordCommitRecoveryFailure()
-                log.warn(
-                    "AI generation commit recovery failed jobId={} status={} errorType={}",
-                    record.jobId,
-                    record.status,
-                    error::class.simpleName ?: "RuntimeException",
-                )
-                null
+                throw AiGenerationJobListUnavailableException(AiGenerationJobListOperation.COMMIT_RECOVERY)
             }
         }
 

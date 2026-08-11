@@ -1,6 +1,9 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableReason
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -443,6 +446,22 @@ class AiGenerationOrchestratorTest {
 
         assertThat(recent?.jobId).isEqualTo(retryable.jobId)
         assertThat(recent?.error?.code).isEqualTo(ErrorCode.PROVIDER_RATE_LIMITED)
+    }
+
+    @Test
+    fun `recent preserves null response for available empty and unavailable session lists`() {
+        val ctx = TestContext()
+        ctx.jobStore.recentJobsResult = AiGenerationJobListResult.Available(emptyList())
+
+        assertThat(ctx.orchestrator.recent(ctx.sessionId)).isNull()
+
+        ctx.jobStore.recentJobsResult =
+            AiGenerationJobListResult.Unavailable(
+                AiGenerationJobListOperation.RECENT_FOR_SESSION,
+                AiGenerationJobListUnavailableReason.STORE_READ_FAILED,
+            )
+
+        assertThat(ctx.orchestrator.recent(ctx.sessionId)).isNull()
     }
 
     @Test

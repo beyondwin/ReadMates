@@ -1,5 +1,8 @@
 package com.readmates.aigen.adapter.out.redis
 
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableReason
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -466,9 +469,9 @@ class RedisAiGenerationJobStore(
     override fun loadRecentForSession(
         sessionId: UUID,
         limit: Int,
-    ): List<JobRecord> =
-        runCatching {
-            if (limit <= 0) return@runCatching emptyList()
+    ): AiGenerationJobListResult =
+        readJobList(AiGenerationJobListOperation.RECENT_FOR_SESSION, "loadRecentForSession") {
+            if (limit <= 0) return@readJobList emptyList()
             val ids = indexes.recentIds(sessionId, limit)
             ids.mapNotNull { id ->
                 val jobId = id.toUuidOrNull() ?: return@mapNotNull null
@@ -485,11 +488,11 @@ class RedisAiGenerationJobStore(
                     else -> record
                 }
             }
-        }.onFailure { recordFailure("loadRecentForSession") }.getOrDefault(emptyList())
+        }
 
-    override fun loadActiveJobs(limit: Int): List<JobRecord> =
-        runCatching {
-            if (limit <= 0) return@runCatching emptyList()
+    override fun loadActiveJobs(limit: Int): AiGenerationJobListResult =
+        readJobList(AiGenerationJobListOperation.ACTIVE, "loadActiveJobs") {
+            if (limit <= 0) return@readJobList emptyList()
             val ids = indexes.activeIds(limit)
             ids.mapNotNull { id ->
                 val jobId = id.toUuidOrNull() ?: return@mapNotNull null
@@ -506,12 +509,12 @@ class RedisAiGenerationJobStore(
                     else -> record
                 }
             }
-        }.onFailure { recordFailure("loadActiveJobs") }.getOrDefault(emptyList())
+        }
 
     @Suppress("ComplexCondition")
-    override fun loadCommitRecoveryJobs(limit: Int): List<JobRecord> =
-        runCatching {
-            if (limit <= 0) return@runCatching emptyList()
+    override fun loadCommitRecoveryJobs(limit: Int): AiGenerationJobListResult =
+        readJobList(AiGenerationJobListOperation.COMMIT_RECOVERY, "loadCommitRecoveryJobs") {
+            if (limit <= 0) return@readJobList emptyList()
             indexes.commitRecoveryIds(limit).mapNotNull { id ->
                 val jobId = id.toUuidOrNull() ?: return@mapNotNull null
                 val record = loadIndexedMetadata(jobId)
@@ -527,7 +530,21 @@ class RedisAiGenerationJobStore(
                     record
                 }
             }
-        }.onFailure { recordFailure("loadCommitRecoveryJobs") }.getOrDefault(emptyList())
+        }
+
+    private inline fun readJobList(
+        operation: AiGenerationJobListOperation,
+        metricOperation: String,
+        read: () -> List<JobRecord>,
+    ): AiGenerationJobListResult =
+        runCatching { AiGenerationJobListResult.Available(read()) }
+            .onFailure { recordFailure(metricOperation) }
+            .getOrElse {
+                AiGenerationJobListResult.Unavailable(
+                    operation,
+                    AiGenerationJobListUnavailableReason.STORE_READ_FAILED,
+                )
+            }
 
     override fun updateStatus(
         jobId: UUID,

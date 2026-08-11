@@ -1,5 +1,8 @@
 package com.readmates.aigen.adapter.out.redis
 
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableReason
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
@@ -222,7 +225,10 @@ class RedisGroundedAiGenerationJobStoreTest(
 
         assertThat(store.releaseCommitLeaseForRetry(record.jobId, 0)).isFalse()
         assertThat(store.releaseCommitLeaseForRetry(record.jobId, 1)).isTrue()
-        val candidate = store.loadCommitRecoveryJobs().single { it.jobId == record.jobId }
+        val candidate =
+            (store.loadCommitRecoveryJobs() as AiGenerationJobListResult.Available)
+                .records
+                .single { it.jobId == record.jobId }
         assertThat(candidate.status).isEqualTo(JobStatus.COMMIT_RETRY)
         assertThat(candidate.commitLeaseExpiresAt).isNull()
         assertThat(candidate.transcript).isEmpty()
@@ -266,7 +272,8 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(store.markCommittedForCleanup(record.jobId, 1)).isTrue()
         assertThat(store.markCommittedForCleanup(record.jobId, 1)).isFalse()
         assertThat(store.load(record.jobId)?.cleanupPending).isTrue()
-        assertThat(store.loadCommitRecoveryJobs().map { it.jobId }).contains(record.jobId)
+        assertThat((store.loadCommitRecoveryJobs() as AiGenerationJobListResult.Available).records.map { it.jobId })
+            .contains(record.jobId)
         assertThat(redisTemplate.opsForHash<String, String>().hasKey(hashKey(record.jobId), "sessionMeta")).isFalse()
         assertThat(redisTemplate.opsForHash<String, String>().hasKey(hashKey(record.jobId), "instructions")).isFalse()
 
@@ -274,7 +281,8 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(store.markCleanupComplete(record.jobId, 1)).isTrue()
         assertThat(store.markCleanupComplete(record.jobId, 1)).isFalse()
         assertThat(store.load(record.jobId)?.cleanupPending).isFalse()
-        assertThat(store.loadCommitRecoveryJobs().map { it.jobId }).doesNotContain(record.jobId)
+        assertThat((store.loadCommitRecoveryJobs() as AiGenerationJobListResult.Available).records.map { it.jobId })
+            .doesNotContain(record.jobId)
     }
 
     @Test
@@ -329,7 +337,10 @@ class RedisGroundedAiGenerationJobStoreTest(
         payloadKeys(record.jobId).forEach { key -> redisTemplate.opsForValue().set(key, "not-json") }
 
         val direct = store.findJobById(record.jobId)
-        val active = store.loadActiveJobs().single { it.jobId == record.jobId }
+        val active =
+            (store.loadActiveJobs() as AiGenerationJobListResult.Available)
+                .records
+                .single { it.jobId == record.jobId }
 
         assertThat(direct?.transcript).isEmpty()
         assertThat(direct?.validatedTurns).isEmpty()
@@ -345,7 +356,12 @@ class RedisGroundedAiGenerationJobStoreTest(
         redisTemplate.delete("${hashKey(record.jobId)}:evidence")
 
         assertThat(store.findJobById(record.jobId)).isNull()
-        assertThat(store.loadActiveJobs().map { it.jobId }).doesNotContain(record.jobId)
+        assertThat(store.loadActiveJobs()).isEqualTo(
+            AiGenerationJobListResult.Unavailable(
+                AiGenerationJobListOperation.ACTIVE,
+                AiGenerationJobListUnavailableReason.STORE_READ_FAILED,
+            ),
+        )
         assertThat(redisTemplate.hasKey(hashKey(record.jobId))).isFalse()
     }
 

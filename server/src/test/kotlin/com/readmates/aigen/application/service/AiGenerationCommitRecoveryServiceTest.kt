@@ -6,6 +6,10 @@ import ch.qos.logback.classic.Level
 import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableException
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableReason
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
 import com.readmates.aigen.application.port.out.AiGenerationCommitPersistencePort
@@ -13,6 +17,7 @@ import com.readmates.aigen.application.port.out.AiGenerationCommitReceipt
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.parallel.ResourceLock
 import org.slf4j.LoggerFactory
@@ -147,6 +152,38 @@ class AiGenerationCommitRecoveryServiceTest {
         val counter = registry.find("readmates.aigen.commit.recovery.failures").counter()
         assertThat(counter?.count()).isEqualTo(1.0)
         assertThat(counter?.id?.tags).isEmpty()
+    }
+
+    @Test
+    fun `batch recovery treats available empty as success and unavailable scan as a safe failure`() {
+        val store = FakeJobStore()
+        val registry = SimpleMeterRegistry()
+        val service =
+            AiGenerationCommitRecoveryService(
+                store,
+                FakeCommitPersistence(),
+                AiGenerationPostCommitCleanupService(store, ReadCacheInvalidationPort.Noop()),
+                FakeClock(AiGenerationTestFixtures.NOW),
+                AiGenerationMetrics(registry),
+            )
+        store.commitRecoveryJobsResult = AiGenerationJobListResult.Available(emptyList())
+
+        assertThat(service.recoverBatch(50)).isEmpty()
+        assertThat(registry.find("readmates.aigen.commit.recovery.failures").counter()).isNull()
+
+        store.commitRecoveryJobsResult =
+            AiGenerationJobListResult.Unavailable(
+                AiGenerationJobListOperation.COMMIT_RECOVERY,
+                AiGenerationJobListUnavailableReason.STORE_READ_FAILED,
+            )
+
+        assertThatThrownBy { service.recoverBatch(50) }
+            .isInstanceOfSatisfying(AiGenerationJobListUnavailableException::class.java) {
+                assertThat(it.operation).isEqualTo(AiGenerationJobListOperation.COMMIT_RECOVERY)
+                assertThat(it.message).isEqualTo("AI generation job list unavailable")
+                assertThat(it.cause).isNull()
+            }
+        assertThat(registry.find("readmates.aigen.commit.recovery.failures").counter()?.count()).isEqualTo(1.0)
     }
 }
 

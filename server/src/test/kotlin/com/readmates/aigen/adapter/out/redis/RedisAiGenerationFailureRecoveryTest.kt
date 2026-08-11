@@ -1,5 +1,6 @@
 package com.readmates.aigen.adapter.out.redis
 
+import com.readmates.aigen.application.model.AiGenerationJobListResult
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -206,8 +207,13 @@ class RedisAiGenerationFailureRecoveryTest(
         redis.delete("${jobKey(pending.jobId)}:transcript")
         redis.delete("${jobKey(pending.jobId)}:turns")
 
-        assertThat(store.loadActiveJobs(10).map(JobRecord::jobId)).contains(pending.jobId)
-        assertThat(store.loadRecentForSession(pending.sessionId, 10).map(JobRecord::jobId)).contains(pending.jobId)
+        val activeRecords = (store.loadActiveJobs(10) as AiGenerationJobListResult.Available).records
+        val recentRecords =
+            (store.loadRecentForSession(pending.sessionId, 10) as AiGenerationJobListResult.Available).records
+        assertThat(activeRecords.map(JobRecord::jobId))
+            .contains(pending.jobId)
+        assertThat(recentRecords.map(JobRecord::jobId))
+            .contains(pending.jobId)
         assertThat(redis.hasKey(jobKey(pending.jobId))).isTrue()
 
         val committing = record(JobStatus.PENDING)
@@ -216,7 +222,10 @@ class RedisAiGenerationFailureRecoveryTest(
         redis.delete("${jobKey(committing.jobId)}:transcript")
         redis.delete("${jobKey(committing.jobId)}:turns")
 
-        assertThat(store.loadCommitRecoveryJobs(10).map(JobRecord::jobId)).contains(committing.jobId)
+        val commitRecoveryRecords =
+            (store.loadCommitRecoveryJobs(10) as AiGenerationJobListResult.Available).records
+        assertThat(commitRecoveryRecords.map(JobRecord::jobId))
+            .contains(committing.jobId)
         assertThat(redis.hasKey(jobKey(committing.jobId))).isTrue()
     }
 

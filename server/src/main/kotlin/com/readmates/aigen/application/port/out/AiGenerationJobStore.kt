@@ -1,5 +1,7 @@
 package com.readmates.aigen.application.port.out
 
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -37,13 +39,26 @@ interface AiGenerationJobStore {
     fun loadRecentForSession(
         sessionId: UUID,
         limit: Int = 20,
-    ): List<JobRecord>
+    ): AiGenerationJobListResult
 
-    fun loadActiveJobs(limit: Int = 100): List<JobRecord>
+    fun loadActiveJobs(limit: Int = 100): AiGenerationJobListResult
 
     /** Bounded metadata-only queue for commit lease and post-commit cleanup recovery. */
-    fun loadCommitRecoveryJobs(limit: Int = 50): List<JobRecord> =
-        loadActiveJobs(limit).filter { it.status == JobStatus.COMMITTING || it.status == JobStatus.COMMIT_RETRY }
+    fun loadCommitRecoveryJobs(limit: Int = 50): AiGenerationJobListResult =
+        when (val activeJobs = loadActiveJobs(limit)) {
+            is AiGenerationJobListResult.Available ->
+                AiGenerationJobListResult.Available(
+                    activeJobs.records.filter {
+                        it.status == JobStatus.COMMITTING || it.status == JobStatus.COMMIT_RETRY
+                    },
+                )
+
+            is AiGenerationJobListResult.Unavailable ->
+                AiGenerationJobListResult.Unavailable(
+                    AiGenerationJobListOperation.COMMIT_RECOVERY,
+                    activeJobs.reason,
+                )
+        }
 
     fun updateStatus(
         jobId: UUID,
