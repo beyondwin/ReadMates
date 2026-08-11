@@ -160,10 +160,11 @@ ArchUnit은 test scope 의존성이다. production 빌드에 영향을 주지 �
 - SQL이 코드에 명시적이어서 schema 변경이 코드 리뷰에서 즉시 보인다.
 - 2026-08-09 Phase 0 update: `ServerArchitectureBoundaryTest`의 registry는 web뿐 아니라 messaging/Kafka, scheduler, adapter security, auth servlet-security inbound package를 모두 등록하고 `sessionimport`를 `WORKFLOW` slice로 포함한다. `aigen` 같은 workflow-side slice는 `CurrentMember` 같은 web/session carrier를 application-safe actor value로 변환해 전달한다.
 - `com.readmates.shared.adapter.in.web`은 Phase 0의 공통 web-error contract로 유지한다. `server/config/architecture/boundary-import-baseline.txt`와 `feature-dependency-baseline.txt`는 승인된 목표 architecture가 아니라 제거 가능한 기존 debt inventory다. Debt 제거는 (1) source debt 제거, (2) 같은 변경에서 matching current baseline row 삭제, (3) 그 exact identity를 matching retired ledger에 추가하는 순서로 수행한다. Retired identity는 삭제하지 않고 approved seed는 늘리지 않는다.
+- 2026-08-10 application-port update: messaging/Kafka와 scheduling inbound adapter는 application input port만 호출하고, adapter-facing queue/provider/delivery failure·routing·availability 모델은 application이 소유한다. outbound Redis/resilience adapter는 concrete application service 대신 output port와 application model을 사용한다. Notification consumer factory/error handler/DLT/listener-container wiring은 inbound Kafka configuration의 책임이고 producer configuration과 분리된다.
 
 부정적/감수한 비용:
 - 작은 feature에도 5계층 구조가 강제된다. 보일러플레이트 파일 수가 많아진다. IDE template으로 초기 파일 생성을 자동화해 단축하고 있다.
-- legacy surface와 신규 clean architecture surface가 공존한다. Phase 0 registry와 두 no-growth inventory는 현재 inbound package와 기존 경계·기능 의존 debt를 빠짐없이 고정하지만, actor·cross-adapter·feature-cycle debt 자체의 제거는 Phase 2가 담당한다.
+- legacy surface와 신규 clean architecture surface가 공존한다. Phase 0 registry와 두 no-growth inventory는 현재 inbound package와 기존 경계·기능 의존 debt를 빠짐없이 고정한다. 이번 application-port 작업 뒤에도 actor/auth/club web helper, sessionclosing/sessionimport/sessionrecord, feature-cycle 및 large-class debt가 남아 있으며 current boundary ledger는 23개다. 이는 Phase 2 전체 완료나 baseline zero가 아니다.
 - cross-feature 공유 추상화의 위치(`shared/` 패키지)에 대한 규칙이 아직 명확하지 않다. 현재는 관례로 운영 중이며 별도 ADR이 필요할 수 있다.
 - ArchUnit 버전 업그레이드 시 기존 규칙과의 호환성을 확인해야 한다.
 - `JdbcTemplate` 직접 사용으로 복잡한 쿼리를 직접 작성해야 한다. 빌드 타임 타입 안전성이 없다 (jOOQ 도입은 후속 ADR 후보).
@@ -192,7 +193,7 @@ legacy surface 확인:
 
 ## 후속 작업
 
-- Phase 2에서 actor, cross-adapter, feature-cycle debt를 제거하고 같은 변경에서 두 architecture baseline의 대응 row를 삭제한다.
+- 후속 Phase 2 계획에서 actor/auth/club web helper, sessionclosing/sessionimport/sessionrecord, feature-cycle 및 large-class debt를 제거하고 같은 변경에서 두 architecture baseline의 대응 row를 삭제한다. 현재 23개 boundary debt의 제거 우선순위와 acceptance criterion을 그 계획에서 명시한다.
 - cross-feature 공유 추상화(`shared/` 패키지)의 import 방향 규칙 명문화. 현재 관례로 운영 중.
 - legacy surface의 clean architecture 전환 완료 기준 및 일정 문서화. 미전환 surface 목록 관리.
 - Gradle multi-module 전환 검토 시점 기준 정의 (feature 수, 팀 규모 임계값).
