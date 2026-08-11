@@ -61,11 +61,29 @@ class SpringAiErrorMapperTest {
         val raw = "provider-body secret@example.test"
         val cases =
             listOf(
-                HttpClientErrorException.create(HttpStatus.REQUEST_TIMEOUT, raw, HttpHeaders(), raw.toByteArray(), StandardCharsets.UTF_8) to
+                HttpClientErrorException.create(
+                    HttpStatus.REQUEST_TIMEOUT,
+                    raw,
+                    HttpHeaders(),
+                    raw.toByteArray(),
+                    StandardCharsets.UTF_8,
+                ) to
                     ProviderFailureClass.TRANSIENT,
-                HttpClientErrorException.create(HttpStatus.INTERNAL_SERVER_ERROR, raw, HttpHeaders(), raw.toByteArray(), StandardCharsets.UTF_8) to
+                HttpClientErrorException.create(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    raw,
+                    HttpHeaders(),
+                    raw.toByteArray(),
+                    StandardCharsets.UTF_8,
+                ) to
                     ProviderFailureClass.TRANSIENT,
-                HttpClientErrorException.create(HttpStatus.BAD_REQUEST, raw, HttpHeaders(), raw.toByteArray(), StandardCharsets.UTF_8) to
+                HttpClientErrorException.create(
+                    HttpStatus.BAD_REQUEST,
+                    raw,
+                    HttpHeaders(),
+                    raw.toByteArray(),
+                    StandardCharsets.UTF_8,
+                ) to
                     ProviderFailureClass.TERMINAL,
                 TimeoutException(raw) to ProviderFailureClass.TRANSIENT,
                 LlmStructuredOutputException(IllegalArgumentException(raw)) to ProviderFailureClass.SCHEMA_OR_PARSE,
