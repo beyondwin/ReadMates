@@ -18,8 +18,6 @@ com/readmates/auth/infrastructure/security/ReadmatesOAuthSuccessHandler.kt|com.r
 com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.auth.application.service.AuthSessionService
 com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.auth.application.service.AuthenticatedMemberResolver
 com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.club.adapter.in.web.resolveClubContext
-com/readmates/notification/adapter/out/kafka/NotificationKafkaConfiguration.kt|com.readmates.notification.adapter.in.kafka.NotificationUnsupportedSchemaVersionException
-com/readmates/notification/adapter/out/kafka/NotificationKafkaConfiguration.kt|com.readmates.notification.application.service.NotificationDeliveryRetryableException
 com/readmates/sessionclosing/adapter/in/web/HostSessionClosingController.kt|com.readmates.session.adapter.in.web.parseHostSessionId
 com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandler.kt|com.readmates.sessionimport.application.service.InvalidSessionImportException
 com/readmates/sessionrecord/adapter/out/persistence/JdbcHostSessionHistoryAdapter.kt|com.readmates.sessionrecord.application.service.typeSort

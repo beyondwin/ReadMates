@@ -7,6 +7,7 @@ import ch.qos.logback.core.read.ListAppender
 import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.NotificationDeliveryItem
+import com.readmates.notification.application.model.NotificationDeliveryRetryableException
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.model.clubScopedAppPath

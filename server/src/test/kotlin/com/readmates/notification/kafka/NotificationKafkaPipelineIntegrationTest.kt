@@ -1,6 +1,7 @@
 package com.readmates.notification.kafka
 
 import com.readmates.notification.adapter.`in`.kafka.NotificationEventKafkaListener
+import com.readmates.notification.adapter.`in`.kafka.NotificationKafkaConsumerConfiguration
 import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaProperties
@@ -97,6 +98,7 @@ private const val CLEANUP_NOTIFICATION_KAFKA_PIPELINE_SQL = """
     classes = [
         NotificationKafkaPipelineIntegrationTest.TestApplication::class,
         NotificationKafkaConfiguration::class,
+        NotificationKafkaConsumerConfiguration::class,
         NotificationEventKafkaListener::class,
         NotificationKafkaPipelineIntegrationTest.TestDispatchConfiguration::class,
     ],

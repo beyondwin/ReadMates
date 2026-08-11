@@ -550,6 +550,25 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `notification Kafka adapters do not cross transport directions`() {
+        noClasses()
+            .that()
+            .haveFullyQualifiedName("com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.notification.adapter.in.kafka..")
+            .check(importedClasses)
+
+        noClasses()
+            .that()
+            .haveFullyQualifiedName("com.readmates.notification.adapter.in.kafka.NotificationKafkaConsumerConfiguration")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.notification.adapter.out.kafka..")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `notification backlog policy ports do not depend on metrics or scheduling frameworks`() {
         noClasses()
             .that()
