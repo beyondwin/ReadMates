@@ -21,7 +21,8 @@ class RedisAiGenerationJobStoreFailureTest {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         val zSetOperations = zSetOperations(redisTemplate)
         val failure = RedisConnectionFailureException("test-unavailable")
-        Mockito.`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+        Mockito
+            .`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(failure)
 
         val result = store(redisTemplate).loadRecentForSession(UUID.randomUUID())
@@ -40,7 +41,8 @@ class RedisAiGenerationJobStoreFailureTest {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         val zSetOperations = zSetOperations(redisTemplate)
         val failure = RedisConnectionFailureException("test-unavailable")
-        Mockito.`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+        Mockito
+            .`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(failure)
 
         val result = store(redisTemplate).loadActiveJobs()
@@ -59,7 +61,8 @@ class RedisAiGenerationJobStoreFailureTest {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         val zSetOperations = zSetOperations(redisTemplate)
         val failure = RedisConnectionFailureException("test-unavailable")
-        Mockito.`when`(zSetOperations.range(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+        Mockito
+            .`when`(zSetOperations.range(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(failure)
 
         val result = store(redisTemplate).loadCommitRecoveryJobs()
@@ -77,9 +80,11 @@ class RedisAiGenerationJobStoreFailureTest {
     fun `empty authoritative indexes return available empty lists`() {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         val zSetOperations = zSetOperations(redisTemplate)
-        Mockito.`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+        Mockito
+            .`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenReturn(emptySet())
-        Mockito.`when`(zSetOperations.range(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
+        Mockito
+            .`when`(zSetOperations.range(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenReturn(emptySet())
         val store = store(redisTemplate)
 
