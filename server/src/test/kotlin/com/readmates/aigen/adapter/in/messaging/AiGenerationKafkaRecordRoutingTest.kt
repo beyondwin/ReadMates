@@ -68,8 +68,12 @@ class AiGenerationKafkaRecordRoutingTest {
         val worker = Mockito.mock(ProcessAiGenerationJobUseCase::class.java)
         val acknowledgment = Mockito.mock(Acknowledgment::class.java)
 
-        assertThatThrownBy { AiGenerationJobConsumer(worker).onMessage(record(null, JOB_ID.toString()), acknowledgment) }
-            .isInstanceOf(AiGenerationRoutingMismatchException::class.java)
+        assertThatThrownBy {
+            AiGenerationJobConsumer(worker).onMessage(
+                record(null, JOB_ID.toString()),
+                acknowledgment,
+            )
+        }.isInstanceOf(AiGenerationRoutingMismatchException::class.java)
             .hasMessage("AI generation Kafka record has no unambiguous canonical job identity")
 
         Mockito.verifyNoInteractions(worker, acknowledgment)

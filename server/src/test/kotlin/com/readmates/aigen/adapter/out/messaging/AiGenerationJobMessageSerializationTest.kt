@@ -1,8 +1,8 @@
 package com.readmates.aigen.adapter.out.messaging
 
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.AiGenerationRecoveryResult
 import com.readmates.aigen.application.model.AiGenerationRecoverySource
-import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.`in`.RecordUnroutableAiGenerationRecordUseCase
 import com.readmates.aigen.application.port.`in`.RecoverExhaustedAiGenerationJobUseCase

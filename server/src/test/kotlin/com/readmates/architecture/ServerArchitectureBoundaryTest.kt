@@ -472,7 +472,7 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
-    fun `aigen messaging inbound adapter depends on application ports and models instead of services or outbound adapters`() {
+    fun `aigen messaging inbound adapter avoids services and outbound adapters`() {
         noClasses()
             .that()
             .resideInAnyPackage("com.readmates.aigen.adapter.in.messaging..")

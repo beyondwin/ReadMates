@@ -768,7 +768,7 @@ class AiGenerationJobConsumerIntegrationTest(
     @TestConfiguration(proxyBeanMethods = false)
     class TestWorkerConfiguration {
         @Bean
-        fun processAiGenerationJobUseCase(): ProcessAiGenerationJobUseCase = Mockito.mock(ProcessAiGenerationJobUseCase::class.java)
+        fun processAiGenerationJobUseCase() = Mockito.mock(ProcessAiGenerationJobUseCase::class.java)
 
         @Bean
         fun meterRegistry(): SimpleMeterRegistry = SimpleMeterRegistry()

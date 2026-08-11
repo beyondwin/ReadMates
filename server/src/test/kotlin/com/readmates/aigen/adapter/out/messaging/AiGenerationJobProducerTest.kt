@@ -3,14 +3,15 @@
 package com.readmates.aigen.adapter.out.messaging
 
 import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
-import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.AiGenerationJobMessage
+import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.config.AiGenerationKafkaProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.ArgumentCaptor
@@ -108,7 +109,7 @@ class AiGenerationJobProducerTest {
         val failure = TimeoutException("timed out")
         Mockito
             .`when`(kafkaTemplate.send(Mockito.any<Message<AiGenerationJobMessage>>()))
-            .thenReturn(RecordingKafkaSendFuture(timeoutFailure = failure))
+            .thenReturn(RecordingKafkaSendFuture(failure))
         val producer =
             AiGenerationJobProducer(
                 kafkaTemplate,
@@ -140,7 +141,7 @@ class AiGenerationJobProducerTest {
         val failure = InterruptedException("interrupted")
         Mockito
             .`when`(kafkaTemplate.send(Mockito.any<Message<AiGenerationJobMessage>>()))
-            .thenReturn(RecordingKafkaSendFuture(interruptFailure = failure))
+            .thenReturn(RecordingKafkaSendFuture(failure))
         val producer =
             AiGenerationJobProducer(
                 kafkaTemplate,
@@ -158,8 +159,12 @@ class AiGenerationJobProducerTest {
         val failure = IllegalArgumentException("broker completion failure")
         Mockito
             .`when`(kafkaTemplate.send(Mockito.any<Message<AiGenerationJobMessage>>()))
-            .thenReturn(RecordingKafkaSendFuture(executionFailure = ExecutionException(failure)))
-        val producer = AiGenerationJobProducer(kafkaTemplate, AiGenerationKafkaProperties(sendTimeout = Duration.ofMillis(10)))
+            .thenReturn(RecordingKafkaSendFuture(ExecutionException(failure)))
+        val producer =
+            AiGenerationJobProducer(
+                kafkaTemplate,
+                AiGenerationKafkaProperties(sendTimeout = Duration.ofMillis(10)),
+            )
 
         assertQueueUnavailable(producer, failure)
     }
@@ -170,7 +175,7 @@ class AiGenerationJobProducerTest {
     ) {
         val command = command()
 
-        val error = org.assertj.core.api.Assertions.catchThrowable { producer.publish(command) }
+        val error = catchThrowable { producer.publish(command) }
 
         assertThat(error)
             .isInstanceOf(AiGenerationQueueUnavailableException::class.java)
@@ -192,17 +197,13 @@ class AiGenerationJobProducerTest {
 }
 
 private class RecordingKafkaSendFuture(
-    private val timeoutFailure: TimeoutException? = null,
-    private val interruptFailure: InterruptedException? = null,
-    private val executionFailure: ExecutionException? = null,
+    private val failure: Throwable? = null,
 ) : CompletableFuture<SendResult<String, AiGenerationJobMessage>>() {
     override fun get(
         timeout: Long,
         unit: TimeUnit,
     ): SendResult<String, AiGenerationJobMessage> {
-        timeoutFailure?.let { throw it }
-        interruptFailure?.let { throw it }
-        executionFailure?.let { throw it }
+        failure?.let { throw it }
         @Suppress("UNCHECKED_CAST")
         return Mockito.mock(SendResult::class.java) as SendResult<String, AiGenerationJobMessage>
     }
