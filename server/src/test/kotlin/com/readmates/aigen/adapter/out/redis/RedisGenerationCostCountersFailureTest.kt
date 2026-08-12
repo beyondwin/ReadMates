@@ -38,7 +38,13 @@ class RedisGenerationCostCountersFailureTest {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         stubAdmissionFailure(redisTemplate)
         val redisMetrics = Mockito.mock(RedisCacheMetrics::class.java)
-        val guard = RedisGenerationCostCounters(redisTemplate, AiGenerationProperties(), redisMetrics, FakeAiGenerationAdapterMetricsPort())
+        val guard =
+            RedisGenerationCostCounters(
+                redisTemplate,
+                AiGenerationProperties(),
+                redisMetrics,
+                FakeAiGenerationAdapterMetricsPort(),
+            )
 
         assertThat(guard.checkBeforeCall(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()))
             .isEqualTo(GuardDecision.Deny(ErrorCode.RATE_LIMITED))
@@ -57,7 +63,13 @@ class RedisGenerationCostCountersFailureTest {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         stubCleanupFailure(redisTemplate)
         val redisMetrics = Mockito.mock(RedisCacheMetrics::class.java)
-        val guard = RedisGenerationCostCounters(redisTemplate, AiGenerationProperties(), redisMetrics, FakeAiGenerationAdapterMetricsPort())
+        val guard =
+            RedisGenerationCostCounters(
+                redisTemplate,
+                AiGenerationProperties(),
+                redisMetrics,
+                FakeAiGenerationAdapterMetricsPort(),
+            )
 
         assertThatCode { guard.releaseAdmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()) }
             .doesNotThrowAnyException()
@@ -75,7 +87,13 @@ class RedisGenerationCostCountersFailureTest {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         stubCleanupFailure(redisTemplate)
         val redisMetrics = Mockito.mock(RedisCacheMetrics::class.java)
-        val guard = RedisGenerationCostCounters(redisTemplate, AiGenerationProperties(), redisMetrics, FakeAiGenerationAdapterMetricsPort())
+        val guard =
+            RedisGenerationCostCounters(
+                redisTemplate,
+                AiGenerationProperties(),
+                redisMetrics,
+                FakeAiGenerationAdapterMetricsPort(),
+            )
 
         assertThatCode { guard.completeAdmission(UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID()) }
             .doesNotThrowAnyException()
@@ -93,7 +111,13 @@ class RedisGenerationCostCountersFailureTest {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
         Mockito.`when`(redisTemplate.opsForValue()).thenThrow(RedisConnectionFailureException("test-unavailable"))
         val redisMetrics = Mockito.mock(RedisCacheMetrics::class.java)
-        val guard = RedisGenerationCostCounters(redisTemplate, AiGenerationProperties(), redisMetrics, FakeAiGenerationAdapterMetricsPort())
+        val guard =
+            RedisGenerationCostCounters(
+                redisTemplate,
+                AiGenerationProperties(),
+                redisMetrics,
+                FakeAiGenerationAdapterMetricsPort(),
+            )
 
         assertThat(guard.clubMonthlyCost(UUID.randomUUID())).isEqualByComparingTo(BigDecimal.ZERO)
         Mockito.verify(redisMetrics).increment(
@@ -120,33 +144,36 @@ class RedisGenerationCostCountersFailureTest {
         redisTemplate: StringRedisTemplate,
         result: Long,
     ) {
-        Mockito.`when`(
-            redisTemplate.execute(
-                Mockito.any<DefaultRedisScript<Long>>(),
-                Mockito.anyList<String>(),
-                *admissionArguments(),
-            ),
-        ).thenReturn(result)
+        Mockito
+            .`when`(
+                redisTemplate.execute(
+                    Mockito.any<DefaultRedisScript<Long>>(),
+                    Mockito.anyList<String>(),
+                    *admissionArguments(),
+                ),
+            ).thenReturn(result)
     }
 
     private fun stubAdmissionFailure(redisTemplate: StringRedisTemplate) {
-        Mockito.`when`(
-            redisTemplate.execute(
-                Mockito.any<DefaultRedisScript<Long>>(),
-                Mockito.anyList<String>(),
-                *admissionArguments(),
-            ),
-        ).thenThrow(RedisConnectionFailureException("test-unavailable"))
+        Mockito
+            .`when`(
+                redisTemplate.execute(
+                    Mockito.any<DefaultRedisScript<Long>>(),
+                    Mockito.anyList<String>(),
+                    *admissionArguments(),
+                ),
+            ).thenThrow(RedisConnectionFailureException("test-unavailable"))
     }
 
     private fun stubCleanupFailure(redisTemplate: StringRedisTemplate) {
-        Mockito.`when`(
-            redisTemplate.execute(
-                Mockito.any<DefaultRedisScript<Long>>(),
-                Mockito.anyList<String>(),
-                Mockito.anyString(),
-            ),
-        ).thenThrow(RedisConnectionFailureException("test-unavailable"))
+        Mockito
+            .`when`(
+                redisTemplate.execute(
+                    Mockito.any<DefaultRedisScript<Long>>(),
+                    Mockito.anyList<String>(),
+                    Mockito.anyString(),
+                ),
+            ).thenThrow(RedisConnectionFailureException("test-unavailable"))
     }
 
     private fun admissionArguments(): Array<String> = Array(9) { Mockito.anyString() }
