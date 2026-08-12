@@ -1,4 +1,9 @@
 # Append an exact approved boundary import here when its current baseline debt is removed.
+com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.auth.application.service.AuthenticatedMemberResolver
+com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.auth.application.service.AuthoritySynthesisRequest
+com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.auth.application.service.AuthoritySynthesisService
+com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.auth.application.service.ClubContextInput
+com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.auth.application.service.AuthenticatedMemberResolver
 com/readmates/admin/health/application/service/providers/OutboundResilienceHealthCardProvider.kt|com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumer.kt|com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
 com/readmates/aigen/adapter/in/messaging/AiGenerationJobConsumer.kt|com.readmates.aigen.application.service.AiGenerationWorker

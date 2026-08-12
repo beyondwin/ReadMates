@@ -1,5 +1,9 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.model.AuthoritySynthesisRequest
+import com.readmates.auth.application.model.AuthoritySynthesisResult
+import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
+import com.readmates.auth.domain.MembershipStatus
 import org.springframework.stereotype.Service
 
 /**
@@ -17,7 +21,7 @@ import org.springframework.stereotype.Service
  * The infrastructure layer (MemberAuthoritiesFilter) maps strings → SimpleGrantedAuthority.
  */
 @Service
-class DefaultAuthoritySynthesisService : AuthoritySynthesisService {
+class DefaultAuthoritySynthesisService : SynthesizeAuthoritiesUseCase {
     override fun synthesize(request: AuthoritySynthesisRequest): AuthoritySynthesisResult {
         val baseAuthorities =
             request.incomingAuthorities
@@ -25,7 +29,12 @@ class DefaultAuthoritySynthesisService : AuthoritySynthesisService {
                 .toMutableSet()
 
         if (request.member != null) {
-            val roleAuthority = if (request.member.isViewer) ROLE_VIEWER else "$ROLE_PREFIX${request.member.role}"
+            val roleAuthority =
+                if (request.member.membershipStatus == MembershipStatus.VIEWER) {
+                    ROLE_VIEWER
+                } else {
+                    "$ROLE_PREFIX${request.member.role}"
+                }
             baseAuthorities += roleAuthority
             return AuthoritySynthesisResult(baseAuthorities, null)
         }

@@ -370,6 +370,50 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `auth security filters consume auth ports and models instead of concrete auth resolution services`() {
+        val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
+        val memberAuthoritiesFilter =
+            sourceRoot.resolve("com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt").readText()
+        val sessionCookieAuthenticationFilter =
+            sourceRoot
+                .resolve("com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt")
+                .readText()
+
+        assertTrue(
+            memberAuthoritiesFilter.contains(
+                "import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase",
+            ),
+        )
+        assertTrue(
+            memberAuthoritiesFilter.contains(
+                "import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase",
+            ),
+        )
+        assertTrue(
+            memberAuthoritiesFilter.contains(
+                "import com.readmates.auth.application.model.AuthoritySynthesisRequest",
+            ),
+        )
+        assertTrue(
+            sessionCookieAuthenticationFilter.contains(
+                "import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase",
+            ),
+        )
+        assertFalse(memberAuthoritiesFilter.contains("auth.application.service.AuthenticatedMemberResolver"))
+        assertFalse(memberAuthoritiesFilter.contains("auth.application.service.AuthoritySynthesis"))
+        assertFalse(memberAuthoritiesFilter.contains("auth.application.service.ClubContextInput"))
+        assertFalse(sessionCookieAuthenticationFilter.contains("auth.application.service.AuthenticatedMemberResolver"))
+    }
+
+    @Test
+    fun `authority synthesis request carries the complete authenticated member snapshot`() {
+        val requestType = Class.forName("com.readmates.auth.application.model.AuthoritySynthesisRequest")
+        val memberType = requestType.getDeclaredField("member").type
+
+        assertEquals("com.readmates.auth.application.model.AuthenticatedMemberSnapshot", memberType.name)
+    }
+
+    @Test
     fun `migrated application packages do not depend on adapters`() {
         noClasses()
             .that()
