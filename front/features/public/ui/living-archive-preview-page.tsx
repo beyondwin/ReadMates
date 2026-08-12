@@ -2,7 +2,6 @@ import type { LivingArchivePreviewModel } from "@/features/public/model/living-a
 import { formatDateLabel, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
 import { Link } from "@/features/public/ui/public-link";
-import type { PublicSessionListItem } from "@/features/public/api/public-contracts";
 import { bookClubAvatarSrc } from "@/shared/ui/book-club-avatar";
 import "./living-archive-preview.css";
 
@@ -10,6 +9,8 @@ type LivingArchivePreviewPageProps = {
   model: LivingArchivePreviewModel;
   publicBasePath: string;
 };
+
+type LivingArchiveSession = LivingArchivePreviewModel["sessions"][number];
 
 function folioNumber(value: number) {
   return String(value).padStart(2, "0");
@@ -28,7 +29,7 @@ function HistoricalSpine({
 }: {
   index: number;
   publicBasePath: string;
-  session: PublicSessionListItem;
+  session: LivingArchiveSession;
 }) {
   const display = getPublicSessionListItemDisplay(session);
   const date = splitArchiveDate(session.date);
