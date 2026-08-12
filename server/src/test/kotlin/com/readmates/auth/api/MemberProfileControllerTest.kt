@@ -65,6 +65,76 @@ class MemberProfileControllerTest(
         val message: String,
     )
 
+    private val profileErrorResponseCases =
+        listOf(
+            ProfileErrorResponseCase(
+                MemberProfileError.AUTHENTICATION_REQUIRED,
+                HttpStatus.UNAUTHORIZED,
+                "AUTHENTICATION_REQUIRED",
+                "Authentication required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.HOST_ROLE_REQUIRED,
+                HttpStatus.FORBIDDEN,
+                "HOST_ROLE_REQUIRED",
+                "Host role required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.MEMBERSHIP_NOT_ALLOWED,
+                HttpStatus.FORBIDDEN,
+                "MEMBERSHIP_NOT_ALLOWED",
+                "Membership is not allowed to edit profile",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.MEMBER_NOT_FOUND,
+                HttpStatus.NOT_FOUND,
+                "MEMBER_NOT_FOUND",
+                "Member not found",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_REQUIRED,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_REQUIRED",
+                "Display name is required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_TOO_LONG,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_TOO_LONG",
+                "Display name must be 20 characters or fewer",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_INVALID,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_INVALID",
+                "Display name is invalid",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_RESERVED,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_RESERVED",
+                "Display name is reserved",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_DUPLICATE,
+                HttpStatus.CONFLICT,
+                "DISPLAY_NAME_DUPLICATE",
+                "Display name is already used in this club",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.AVATAR_KEY_REQUIRED,
+                HttpStatus.BAD_REQUEST,
+                "AVATAR_KEY_REQUIRED",
+                "Avatar key is required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.AVATAR_KEY_INVALID,
+                HttpStatus.BAD_REQUEST,
+                "AVATAR_KEY_INVALID",
+                "Avatar key is invalid",
+            ),
+        )
+
     @Test
     fun `member profile errors preserve their public response matrix`() {
         val controller =
@@ -75,77 +145,8 @@ class MemberProfileControllerTest(
                 mock(UpdateHostMemberProfileUseCase::class.java),
                 mock(ResolveClubContextUseCase::class.java),
             )
-        val cases =
-            listOf(
-                ProfileErrorResponseCase(
-                    MemberProfileError.AUTHENTICATION_REQUIRED,
-                    HttpStatus.UNAUTHORIZED,
-                    "AUTHENTICATION_REQUIRED",
-                    "Authentication required",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.HOST_ROLE_REQUIRED,
-                    HttpStatus.FORBIDDEN,
-                    "HOST_ROLE_REQUIRED",
-                    "Host role required",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.MEMBERSHIP_NOT_ALLOWED,
-                    HttpStatus.FORBIDDEN,
-                    "MEMBERSHIP_NOT_ALLOWED",
-                    "Membership is not allowed to edit profile",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.MEMBER_NOT_FOUND,
-                    HttpStatus.NOT_FOUND,
-                    "MEMBER_NOT_FOUND",
-                    "Member not found",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.DISPLAY_NAME_REQUIRED,
-                    HttpStatus.BAD_REQUEST,
-                    "DISPLAY_NAME_REQUIRED",
-                    "Display name is required",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.DISPLAY_NAME_TOO_LONG,
-                    HttpStatus.BAD_REQUEST,
-                    "DISPLAY_NAME_TOO_LONG",
-                    "Display name must be 20 characters or fewer",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.DISPLAY_NAME_INVALID,
-                    HttpStatus.BAD_REQUEST,
-                    "DISPLAY_NAME_INVALID",
-                    "Display name is invalid",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.DISPLAY_NAME_RESERVED,
-                    HttpStatus.BAD_REQUEST,
-                    "DISPLAY_NAME_RESERVED",
-                    "Display name is reserved",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.DISPLAY_NAME_DUPLICATE,
-                    HttpStatus.CONFLICT,
-                    "DISPLAY_NAME_DUPLICATE",
-                    "Display name is already used in this club",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.AVATAR_KEY_REQUIRED,
-                    HttpStatus.BAD_REQUEST,
-                    "AVATAR_KEY_REQUIRED",
-                    "Avatar key is required",
-                ),
-                ProfileErrorResponseCase(
-                    MemberProfileError.AVATAR_KEY_INVALID,
-                    HttpStatus.BAD_REQUEST,
-                    "AVATAR_KEY_INVALID",
-                    "Avatar key is invalid",
-                ),
-            )
 
-        cases.forEach { expected ->
+        profileErrorResponseCases.forEach { expected ->
             val response = controller.handleMemberProfileException(MemberProfileException(expected.error))
 
             assertEquals(expected.status, response.statusCode)
