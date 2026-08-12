@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
@@ -723,64 +724,137 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
-    fun `auth club context source shape guard detects every declaration and executable template code`() {
-        val topLevelResolver = EXACT_AUTH_CLUB_CONTEXT_EXTENSION
-        val topLevelAndSameLineNestedResolver =
-            listOf(
-                topLevelResolver,
-                "class Wrapper { $EXACT_AUTH_CLUB_CONTEXT_EXTENSION }",
-            ).joinToString("\n")
-        val nestedBlockCommentDecoy =
-            listOf(
-                "/*",
-                "  /*",
-                "  */",
-                "  $EXACT_AUTH_CLUB_CONTEXT_EXTENSION",
-                "*/",
-                topLevelResolver,
-            ).joinToString("\n")
-        val templateFqReference =
-            "val normal = \"${'$'}{run { com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG }}\""
-        val rawTemplateFqReference =
-            listOf(
-                "val raw = $TRIPLE_QUOTE",
-                "${'$'}{run { /* nested */ com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG }}",
-                TRIPLE_QUOTE,
-            ).joinToString("\n")
-        val literalDollar = '$'
-        val harmlessSimpleTemplateText =
-            "val simple = \"$literalDollar" +
-                "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG\""
-        val escapedTemplateText =
-            "val escaped = \"\\$literalDollar" +
-                "{com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG}\""
+    fun `auth club context lexer tracks template depth and code token sequences`() {
+        val assertions =
+            buildList<() -> Unit> {
+                executableTemplateFixtures().forEach { fixture ->
+                    add(
+                        {
+                            assertTrue(
+                                fullyQualifiedReadMatesReferences(listOf("fixture.kt" to fixture.source)).isNotEmpty(),
+                                "${fixture.name} must expose executable FQ code after an inner block",
+                            )
+                        },
+                    )
+                    add(
+                        {
+                            val sourceWithLaterDeclaration = "${fixture.source}\n$EXACT_AUTH_CLUB_CONTEXT_EXTENSION"
+                            assertTrue(
+                                resolverSourceShapeViolations(sourceWithLaterDeclaration).isEmpty(),
+                                "${fixture.name} must restore depth before a later top-level declaration",
+                            )
+                        },
+                    )
+                }
+                nestedResolverTokenFixtures().forEach { fixture ->
+                    add(
+                        {
+                            val sourceWithNestedDeclaration = "$EXACT_AUTH_CLUB_CONTEXT_EXTENSION\n${fixture.source}"
+                            assertTrue(
+                                resolverSourceShapeViolations(sourceWithNestedDeclaration).isNotEmpty(),
+                                "${fixture.name} must count as an extra nested resolver declaration",
+                            )
+                        },
+                    )
+                }
+                resolverLexicalDecoyFixtures().forEach { fixture ->
+                    add(
+                        {
+                            assertTrue(
+                                resolverSourceShapeViolations(fixture.source).isEmpty(),
+                                "${fixture.name} must not count as a resolver declaration",
+                            )
+                        },
+                    )
+                }
+                fqLexicalDecoyFixtures().forEach { fixture ->
+                    add(
+                        {
+                            val violations =
+                                fullyQualifiedReadMatesReferences(listOf("fixture.kt" to fixture.source))
+                            assertTrue(violations.isEmpty(), "${fixture.name} must not count as executable FQ code")
+                        },
+                    )
+                }
+            }
 
-        assertTrue(resolverSourceShapeViolations(topLevelResolver).isEmpty())
-        assertTrue(resolverSourceShapeViolations(topLevelAndSameLineNestedResolver).isNotEmpty())
-        assertTrue(resolverSourceShapeViolations(nestedBlockCommentDecoy).isEmpty())
-        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to templateFqReference)).isNotEmpty())
-        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to rawTemplateFqReference)).isNotEmpty())
-        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to harmlessSimpleTemplateText)).isEmpty())
-        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to escapedTemplateText)).isEmpty())
+        assertAll(assertions)
     }
+}
+
+private data class KotlinSourceFixture(
+    val name: String,
+    val source: String,
+)
+
+private fun executableTemplateFixtures(): List<KotlinSourceFixture> {
+    val fqReference = "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG"
+    return listOf(
+        KotlinSourceFixture("normal template", "val normal = \"${'$'}{run { 1 }; $fqReference}\""),
+        KotlinSourceFixture(
+            "raw template",
+            "val raw = $TRIPLE_QUOTE${'$'}{run { 1 }; $fqReference}$TRIPLE_QUOTE",
+        ),
+    )
+}
+
+private fun nestedResolverTokenFixtures(): List<KotlinSourceFixture> =
+    listOf(
+        KotlinSourceFixture(
+            "comment-separated declaration",
+            "class CommentWrapper { fun /*comment*/ HttpServletRequest . resolveAuthClubContext (" +
+                "resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext = TODO() }",
+        ),
+        KotlinSourceFixture(
+            "newline-separated declaration",
+            listOf(
+                "class NewlineWrapper { fun",
+                "HttpServletRequest",
+                ".",
+                "resolveAuthClubContext",
+                "(resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext = TODO() }",
+            ).joinToString("\n"),
+        ),
+        KotlinSourceFixture(
+            "alternate-whitespace declaration",
+            "class WhitespaceWrapper { fun\tHttpServletRequest  .\t resolveAuthClubContext \t(" +
+                "resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext = TODO() }",
+        ),
+    )
+
+private fun resolverLexicalDecoyFixtures(): List<KotlinSourceFixture> =
+    listOf(
+        KotlinSourceFixture("line-comment resolver decoy", "// $EXACT_AUTH_CLUB_CONTEXT_EXTENSION"),
+        KotlinSourceFixture("block-comment resolver decoy", "/* $EXACT_AUTH_CLUB_CONTEXT_EXTENSION */"),
+        KotlinSourceFixture("ordinary-string resolver decoy", "val quoted = \"$EXACT_AUTH_CLUB_CONTEXT_EXTENSION\""),
+        KotlinSourceFixture(
+            "raw-string resolver decoy",
+            "val raw = $TRIPLE_QUOTE $EXACT_AUTH_CLUB_CONTEXT_EXTENSION $TRIPLE_QUOTE",
+        ),
+    ).map { fixture -> fixture.copy(source = "${fixture.source}\n$EXACT_AUTH_CLUB_CONTEXT_EXTENSION") }
+
+private fun fqLexicalDecoyFixtures(): List<KotlinSourceFixture> {
+    val fqReference = "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG"
+    return listOf(
+        KotlinSourceFixture("line-comment FQ decoy", "// $fqReference"),
+        KotlinSourceFixture("block-comment FQ decoy", "/* $fqReference */"),
+        KotlinSourceFixture("ordinary-string FQ decoy", "val quoted = \"$fqReference\""),
+        KotlinSourceFixture("raw-string FQ decoy", "val raw = $TRIPLE_QUOTE $fqReference $TRIPLE_QUOTE"),
+    )
 }
 
 private fun resolverSourceShapeViolations(source: String): List<String> =
     buildList {
         val lexedSource = lexKotlinSource(source)
-        val declarationOffsets =
-            lexedSource.code.indices.filter { offset ->
-                lexedSource.code.startsWith(AUTH_CLUB_CONTEXT_EXTENSION_PREFIX, offset)
-            }
-        if (declarationOffsets.size != 1) {
-            add("expected one auth club-context extension declaration, found ${declarationOffsets.size}")
+        val declarationIndexes = lexedSource.matchingTokenIndexes(AUTH_CLUB_CONTEXT_EXTENSION_TOKENS)
+        if (declarationIndexes.size != 1) {
+            add("expected one auth club-context extension declaration, found ${declarationIndexes.size}")
         } else {
-            val declarationOffset = declarationOffsets.single()
-            val braceDepth = lexedSource.braceDepthAt(declarationOffset)
-            if (braceDepth != 0) {
-                add("auth club-context extension must be top-level, found at brace depth $braceDepth")
+            val declaration = lexedSource.tokens[declarationIndexes.single()]
+            if (declaration.braceDepth != 0) {
+                add("auth club-context extension must be top-level, found at brace depth ${declaration.braceDepth}")
             }
-            if (!lexedSource.code.startsWith(EXACT_AUTH_CLUB_CONTEXT_EXTENSION, declarationOffset)) {
+            if (!source.startsWith(EXACT_AUTH_CLUB_CONTEXT_EXTENSION, declaration.offset)) {
                 add("auth club-context extension declaration does not match the required signature")
             }
         }
@@ -795,16 +869,18 @@ private fun lexKotlinSource(source: String): KotlinLexedSource {
 private fun fullyQualifiedReadMatesReferences(sourceFiles: List<Pair<String, String>>): List<String> =
     sourceFiles.flatMap { (relativePath, source) ->
         val lexedSource = lexKotlinSource(source)
-        lexedSource.code
-            .lineSequence()
-            .mapIndexedNotNull { index, line ->
-                val trimmed = line.trim()
-                val isFullyQualifiedReadMatesReference =
-                    "com.readmates." in trimmed &&
-                        !trimmed.startsWith("package ") &&
-                        !trimmed.startsWith("import ")
-                if (isFullyQualifiedReadMatesReference) "$relativePath:${index + 1}: $trimmed" else null
-            }.toList()
+        lexedSource
+            .matchingTokenIndexes(READMATES_FQ_TOKENS)
+            .mapNotNull { tokenIndex ->
+                val precedingToken = lexedSource.tokens.getOrNull(tokenIndex - 1)?.text
+                if (precedingToken == "package" || precedingToken == "import") {
+                    null
+                } else {
+                    val reference = lexedSource.tokens[tokenIndex]
+                    "$relativePath:${lexedSource.lineNumberAt(reference.offset)}: " +
+                        lexedSource.sourceLineAt(reference.offset)
+                }
+            }
     }
 
 private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
@@ -829,52 +905,73 @@ private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION =
     "fun HttpServletRequest.resolveAuthClubContext(" +
         "resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {"
 
-private const val AUTH_CLUB_CONTEXT_EXTENSION_PREFIX = "fun HttpServletRequest.resolveAuthClubContext("
 private const val TRIPLE_QUOTE = "\"\"\""
+private val AUTH_CLUB_CONTEXT_EXTENSION_TOKENS =
+    listOf("fun", "HttpServletRequest", ".", "resolveAuthClubContext", "(")
+private val READMATES_FQ_TOKENS = listOf("com", ".", "readmates", ".")
 
 private data class KotlinLexedSource(
-    val code: String,
-    private val braceDepths: IntArray,
+    val source: String,
+    val tokens: List<KotlinCodeToken>,
 ) {
-    fun braceDepthAt(offset: Int): Int = braceDepths[offset]
+    fun matchingTokenIndexes(expectedTokens: List<String>): List<Int> =
+        tokens.indices.filter { tokenIndex ->
+            expectedTokens.indices.all { expectedIndex ->
+                tokens.getOrNull(tokenIndex + expectedIndex)?.text == expectedTokens[expectedIndex]
+            }
+        }
+
+    fun lineNumberAt(offset: Int): Int = source.take(offset).count { character -> character == '\n' } + 1
+
+    fun sourceLineAt(offset: Int): String {
+        val lineStart = source.lastIndexOf('\n', offset).let { index -> index + 1 }
+        val lineEnd = source.indexOf('\n', offset).let { index -> if (index == -1) source.length else index }
+        return source.substring(lineStart, lineEnd).trim()
+    }
 }
+
+private data class KotlinCodeToken(
+    val text: String,
+    val offset: Int,
+    val braceDepth: Int,
+)
 
 private class KotlinCodeScanner(
     private val source: String,
 ) {
-    private val code = CharArray(source.length) { ' ' }
-    private val braceDepths = IntArray(source.length)
+    private val tokens = mutableListOf<KotlinCodeToken>()
     private var braceDepth = 0
 
     fun scanCode(
         initialIndex: Int = 0,
-        stopAtTemplateEnd: Boolean = false,
+        templateEntryDepth: Int? = null,
     ): Int {
         var index = initialIndex
         while (index < source.length) {
-            if (stopAtTemplateEnd && source[index] == '}') {
-                writeCode(index)
-                braceDepth--
-                return index + 1
-            }
             when {
+                templateEntryDepth == braceDepth && source[index] == '}' -> {
+                    braceDepth--
+                    return index + 1
+                }
                 source.startsWith("//", index) -> index = skipLineComment(index)
                 source.startsWith("/*", index) -> index = skipBlockComment(index)
                 source.startsWith(TRIPLE_QUOTE, index) -> index = skipRawString(index + TRIPLE_QUOTE.length)
                 source[index] == '"' -> index = skipString(index + 1)
                 source[index] == '\'' -> index = skipCharacterLiteral(index + 1)
                 source[index] == '{' -> {
-                    writeCode(index)
+                    addToken("{", index)
                     braceDepth++
                     index++
                 }
                 source[index] == '}' -> {
-                    writeCode(index)
+                    addToken("}", index)
                     braceDepth--
                     index++
                 }
+                source[index].isKotlinIdentifierStart() -> index = scanIdentifier(index)
+                source[index].isWhitespace() -> index++
                 else -> {
-                    writeCode(index)
+                    addToken(source[index].toString(), index)
                     index++
                 }
             }
@@ -882,7 +979,16 @@ private class KotlinCodeScanner(
         return index
     }
 
-    fun lexedSource(): KotlinLexedSource = KotlinLexedSource(code.concatToString(), braceDepths)
+    fun lexedSource(): KotlinLexedSource = KotlinLexedSource(source, tokens.toList())
+
+    private fun scanIdentifier(initialIndex: Int): Int {
+        var index = initialIndex + 1
+        while (index < source.length && source[index].isKotlinIdentifierPart()) {
+            index++
+        }
+        addToken(source.substring(initialIndex, index), initialIndex)
+        return index
+    }
 
     private fun skipLineComment(initialIndex: Int): Int {
         var index = initialIndex
@@ -918,7 +1024,7 @@ private class KotlinCodeScanner(
                 source.startsWith(TRIPLE_QUOTE, index) -> return index + TRIPLE_QUOTE.length
                 source.startsWith("${'$'}{", index) -> {
                     braceDepth++
-                    index = scanCode(index + 2, stopAtTemplateEnd = true)
+                    index = scanCode(index + 2, templateEntryDepth = braceDepth)
                 }
                 source[index] == '$' -> index = skipSimpleTemplate(index)
                 else -> index++
@@ -935,7 +1041,7 @@ private class KotlinCodeScanner(
                 source[index] == '"' -> return index + 1
                 source.startsWith("${'$'}{", index) -> {
                     braceDepth++
-                    index = scanCode(index + 2, stopAtTemplateEnd = true)
+                    index = scanCode(index + 2, templateEntryDepth = braceDepth)
                 }
                 source[index] == '$' -> index = skipSimpleTemplate(index)
                 else -> index++
@@ -964,11 +1070,17 @@ private class KotlinCodeScanner(
         return index
     }
 
-    private fun writeCode(index: Int) {
-        code[index] = source[index]
-        braceDepths[index] = braceDepth
+    private fun addToken(
+        text: String,
+        offset: Int,
+    ) {
+        tokens += KotlinCodeToken(text, offset, braceDepth)
     }
 }
+
+private fun Char.isKotlinIdentifierStart(): Boolean = this == '_' || isLetter()
+
+private fun Char.isKotlinIdentifierPart(): Boolean = isKotlinIdentifierStart() || isDigit()
 
 @Tag("architecture")
 class ServerArchitectureSourceBoundaryTest {
