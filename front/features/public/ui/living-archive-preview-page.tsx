@@ -4,6 +4,7 @@ import { publicRecordsHref, publicSessionHref } from "@/features/public/model/pu
 import { Link } from "@/features/public/ui/public-link";
 import type { PublicSessionListItem } from "@/features/public/api/public-contracts";
 import { bookClubAvatarSrc } from "@/shared/ui/book-club-avatar";
+import "./living-archive-preview.css";
 
 type LivingArchivePreviewPageProps = {
   model: LivingArchivePreviewModel;
@@ -161,7 +162,7 @@ function EditorialStrip({
         <div className="lap-archive-index">
           <p>기록 아카이브</p>
           <strong>{model.sessions.length > 0 ? `최근 공개 기록 ${model.sessions.length}권` : "비어 있는 첫 서가"}</strong>
-          <Link to={publicRecordsHref(publicBasePath)}>공개 기록 보기</Link>
+          <Link className="lap-cta-link" to={publicRecordsHref(publicBasePath)}>공개 기록 보기</Link>
         </div>
 
         {latest && latestDisplay ? (
@@ -174,7 +175,7 @@ function EditorialStrip({
               <h2>최근 대화 펼치기</h2>
               <strong>{latestDisplay.title}</strong>
               <p>{latestDisplay.summary}</p>
-              <Link to={publicSessionHref(latest, publicBasePath)}>기록 펼치기</Link>
+              <Link className="lap-cta-link" to={publicSessionHref(latest, publicBasePath)}>기록 펼치기</Link>
             </div>
           </article>
         ) : (
@@ -213,7 +214,7 @@ export function LivingArchivePreviewPage({ model, publicBasePath }: LivingArchiv
           <span className="living-archive-preview__club-name">{model.clubName}</span>
         </div>
         <div className="living-archive-preview__navigation">
-          <Link to={publicRecordsHref(publicBasePath)}>공개 기록 보기</Link>
+          <Link className="lap-cta-link" to={publicRecordsHref(publicBasePath)}>공개 기록 보기</Link>
           <span className="living-archive-preview__menu" role="img" aria-label="메뉴">
             <span aria-hidden="true" />
             <span aria-hidden="true" />
