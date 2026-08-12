@@ -96,6 +96,11 @@ describe("LivingArchivePreviewPage", () => {
     const latestLink = screen.getByRole("link", { name: /최근 대화 펼치기.*세 번째 책/ });
     expect(latestLink).toHaveAttribute("href", "/clubs/reading-sai/sessions/session-3");
     expect(within(latestLink).getByText("첫 문장")).toBeVisible();
+    expect(within(latestLink).getByText("— 민지")).toBeVisible();
+    expect(within(latestLink).queryByText("저자 C")).not.toBeInTheDocument();
+    expect(latestLink.querySelector("blockquote")).toBeInTheDocument();
+    expect(screen.getByText("최근 공개 기록 3권")).toBeVisible();
+    expect(screen.queryByText("3권의 공개 기록")).not.toBeInTheDocument();
 
     const composition = Array.from(
       container.querySelectorAll(".living-archive-preview__header, .living-archive-preview__statement, .lap-shelf, .lap-editorial-strip"),
@@ -112,8 +117,11 @@ describe("LivingArchivePreviewPage", () => {
     renderPreview({ ...model, latestDetail: null, readerTraces: [] });
 
     expect(screen.queryAllByTestId("reader-trace")).toHaveLength(0);
-    expect(screen.getAllByText("세 번째 공개 기록")[0]).toBeVisible();
-    expect(screen.getByRole("link", { name: /최근 대화 펼치기.*세 번째 책/ })).toBeVisible();
+    const latestLink = screen.getByRole("link", { name: /최근 대화 펼치기.*세 번째 책/ });
+    expect(within(latestLink).getByText("세 번째 공개 기록")).toBeVisible();
+    expect(latestLink.querySelector("blockquote")).not.toBeInTheDocument();
+    expect(within(latestLink).queryByText("“")).not.toBeInTheDocument();
+    expect(within(latestLink).queryByText(/^— /)).not.toBeInTheDocument();
   });
 
   it("keeps an honest empty shelf without invented books, dates, quotes, or readers", () => {

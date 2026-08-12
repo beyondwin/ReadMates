@@ -93,9 +93,7 @@ function FeaturedVolume({
 
   const display = getPublicSessionListItemDisplay(session);
   const date = splitArchiveDate(session.date);
-  const excerpt = model.latestDetail && model.readerTraces[0]
-    ? model.readerTraces[0].text
-    : display.summary;
+  const featuredTrace = model.latestDetail ? model.readerTraces[0] ?? null : null;
 
   return (
     <li className="lap-featured-volume" data-testid="archive-spine">
@@ -112,10 +110,16 @@ function FeaturedVolume({
           <span className="lap-featured-volume__title">{display.title}</span>
           <span className="lap-featured-volume__press-mark" aria-hidden="true" />
         </span>
-        <span className="lap-featured-volume__page">
-          <span className="lap-featured-volume__quote-mark" aria-hidden="true">“</span>
-          <span className="lap-featured-volume__excerpt">{excerpt}</span>
-          <span className="lap-featured-volume__author">{display.author}</span>
+        <div className="lap-featured-volume__page">
+          {featuredTrace ? (
+            <div className="lap-featured-volume__quotation">
+              <span className="lap-featured-volume__quote-mark" aria-hidden="true">“</span>
+              <blockquote className="lap-featured-volume__excerpt">{featuredTrace.text}</blockquote>
+              <cite className="lap-featured-volume__author">— {featuredTrace.authorName}</cite>
+            </div>
+          ) : (
+            <p className="lap-featured-volume__summary">{display.summary}</p>
+          )}
           {model.readerTraces.length > 0 ? (
             <span className="lap-featured-volume__participants" aria-hidden="true">
               {model.readerTraces.map((trace) => (
@@ -126,7 +130,7 @@ function FeaturedVolume({
             </span>
           ) : null}
           <span className="lap-featured-volume__promise">기록은 대화에서 시작되고, 문장은 책장을 넘어 이어집니다.</span>
-        </span>
+        </div>
       </Link>
     </li>
   );
@@ -156,7 +160,7 @@ function EditorialStrip({
       <div className="lap-editorial-strip__archive">
         <div className="lap-archive-index">
           <p>기록 아카이브</p>
-          <strong>{model.sessions.length > 0 ? `${model.sessions.length}권의 공개 기록` : "비어 있는 첫 서가"}</strong>
+          <strong>{model.sessions.length > 0 ? `최근 공개 기록 ${model.sessions.length}권` : "비어 있는 첫 서가"}</strong>
           <Link to={publicRecordsHref(publicBasePath)}>공개 기록 보기</Link>
         </div>
 
