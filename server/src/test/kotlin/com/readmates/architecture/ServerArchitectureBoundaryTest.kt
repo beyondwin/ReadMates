@@ -377,6 +377,17 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `auth web adapters do not depend on auth concrete services`() {
+        val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
+        val violations = authWebConcreteServiceImportViolations(sourceRoot)
+
+        assertTrue(
+            violations.isEmpty(),
+            "Auth web adapters must not import auth concrete services:\n${violations.joinToString("\n")}",
+        )
+    }
+
+    @Test
     fun `auth security filters consume auth ports and models instead of concrete auth resolution services`() {
         val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
         val memberAuthoritiesFilter =
@@ -1027,6 +1038,24 @@ private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
                     .mapIndexedNotNull { index, line ->
                         val importName = line.trim().removePrefix("import ").replace("`", "")
                         if (importName.startsWith("com.readmates.club.adapter.in.web")) {
+                            "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: ${line.trim()}"
+                        } else {
+                            null
+                        }
+                    }.stream()
+            }.toList()
+    }
+
+private fun authWebConcreteServiceImportViolations(sourceRoot: Path): List<String> =
+    Files.walk(sourceRoot.resolve("com/readmates/auth/adapter/in/web")).use { paths ->
+        paths
+            .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
+            .flatMap { sourceFile ->
+                sourceFile
+                    .readLines()
+                    .mapIndexedNotNull { index, line ->
+                        val importName = line.trim().removePrefix("import").trimStart().replace("`", "")
+                        if (importName.startsWith("com.readmates.auth.application.service.")) {
                             "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: ${line.trim()}"
                         } else {
                             null

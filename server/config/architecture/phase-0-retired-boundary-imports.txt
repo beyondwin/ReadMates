@@ -27,3 +27,5 @@ com/readmates/auth/adapter/in/web/AuthMeController.kt|com.readmates.club.adapter
 com/readmates/auth/adapter/in/web/MemberProfileController.kt|com.readmates.club.adapter.in.web.resolveClubContext
 com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.club.adapter.in.web.resolveClubContext
 com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.club.adapter.in.web.resolveClubContext
+com/readmates/auth/adapter/in/web/MemberProfileController.kt|com.readmates.auth.application.service.MemberProfileError
+com/readmates/auth/adapter/in/web/MemberProfileController.kt|com.readmates.auth.application.service.MemberProfileException
