@@ -954,6 +954,22 @@ class ServerArchitectureSourceBoundaryTest {
         )
     }
 
+    @Test
+    fun `capability actors remain pure shared values`() {
+        noClasses()
+            .that()
+            .haveFullyQualifiedName("com.readmates.shared.security.ClubActor")
+            .or()
+            .haveFullyQualifiedName("com.readmates.shared.security.PlatformActor")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "org.springframework..",
+                "com.readmates.auth.domain..",
+                "com.readmates.club.domain..",
+            ).check(importedClasses)
+    }
+
     @Suppress("MaxLineLength")
     private fun com.tngtech.archunit.core.domain.JavaClass.residesInAnyPackagePattern(patterns: Array<String>): Boolean =
         patterns.any { pattern ->

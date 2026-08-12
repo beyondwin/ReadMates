@@ -21,6 +21,28 @@ data class CurrentPlatformAdmin(
         get() = role == PlatformAdminRole.OWNER
 }
 
+fun CurrentPlatformAdmin.toPlatformActor(): PlatformActor =
+    PlatformActor(
+        adminId = userId,
+        capabilities =
+            when (role) {
+                PlatformAdminRole.OWNER -> PlatformCapability.entries.toSet()
+                PlatformAdminRole.OPERATOR ->
+                    setOf(
+                        PlatformCapability.VIEW_CLUBS,
+                        PlatformCapability.VIEW_CLUB_OPERATIONS,
+                        PlatformCapability.CREATE_CLUB,
+                        PlatformCapability.MANAGE_CLUBS,
+                        PlatformCapability.MANAGE_CLUB_DOMAINS,
+                    )
+                PlatformAdminRole.SUPPORT ->
+                    setOf(
+                        PlatformCapability.VIEW_CLUBS,
+                        PlatformCapability.VIEW_CLUB_OPERATIONS,
+                    )
+            },
+    )
+
 data class CurrentUser(
     val userId: UUID,
     val email: String,
