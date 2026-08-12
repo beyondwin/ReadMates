@@ -202,6 +202,20 @@ function NextSlot() {
   );
 }
 
+function InvitationBoundary({ publicBasePath }: { publicBasePath: string }) {
+  return (
+    <aside className="lap-invitation-boundary" aria-label="멤버 참여 안내">
+      <span className="lap-invitation-boundary__label">다음 자리</span>
+      <h2>기록은 누구나 읽고, 참여는 초대받은 멤버와 이어갑니다</h2>
+      <div className="lap-invitation-boundary__actions">
+        <PublicEntryActions publicBasePath={publicBasePath} />
+      </div>
+      <span className="lap-invitation-boundary__line" aria-hidden="true" />
+      <span className="lap-invitation-boundary__mark" aria-hidden="true" />
+    </aside>
+  );
+}
+
 function EditorialStrip({
   model,
   publicBasePath,
@@ -242,15 +256,6 @@ function EditorialStrip({
         )}
       </div>
 
-      <aside className="lap-invitation-boundary" aria-label="멤버 참여 안내">
-        <span className="lap-invitation-boundary__label">다음 자리</span>
-        <h2>기록은 누구나 읽고, 참여는 초대받은 멤버와 이어갑니다</h2>
-        <div className="lap-invitation-boundary__actions">
-          <PublicEntryActions publicBasePath={publicBasePath} />
-        </div>
-        <span className="lap-invitation-boundary__line" aria-hidden="true" />
-        <span className="lap-invitation-boundary__mark" aria-hidden="true" />
-      </aside>
     </section>
   );
 }
@@ -292,6 +297,10 @@ export function LivingArchivePreviewPage({ model, publicBasePath }: LivingArchiv
           <FeaturedVolume model={model} publicBasePath={publicBasePath} />
         </ol>
         <ReaderTraces traces={model.readerTraces} />
+        <div className="lap-next-entry">
+          <NextSlot />
+          <InvitationBoundary publicBasePath={publicBasePath} />
+        </div>
         <ol className="lap-shelf__history" aria-label="지난 공개 기록" data-history-count={historicalSessions.length}>
           {historicalSessions.map((session, index) => (
             <HistoricalSpine
@@ -303,7 +312,6 @@ export function LivingArchivePreviewPage({ model, publicBasePath }: LivingArchiv
             />
           ))}
         </ol>
-        <NextSlot />
         <div className="lap-shelf__ledge" aria-hidden="true" />
       </section>
 

@@ -45,6 +45,22 @@ function seconds(value: string) {
   return value.endsWith("ms") ? amount / 1000 : amount;
 }
 
+type Box = {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+};
+
+function boxesIntersect(first: Box, second: Box) {
+  return (
+    first.left < second.right - 1 &&
+    first.right > second.left + 1 &&
+    first.top < second.bottom - 1 &&
+    first.bottom > second.top + 1
+  );
+}
+
 async function mountPreview(mount: ComponentFixtures["mount"]) {
   return mount(
     <div style={{ position: "absolute", inset: 0 }}>
@@ -85,6 +101,28 @@ test("preserves the approved desktop composition at 1487 by 1058", async ({ moun
           return { className: element.className, left: bounds.left, right: bounds.right };
         })
         .sort((left, right) => left.left - right.left),
+      traceGeometry: Array.from(root.querySelectorAll<HTMLElement>(".lap-reader-trace")).map((trace) => {
+        const copy = trace.querySelector<HTMLElement>(".lap-reader-trace__copy")!;
+        const sentence = trace.querySelector<HTMLElement>(".lap-reader-trace__copy span")!;
+        const portrait = trace.querySelector<HTMLElement>(".lap-reader-trace__portrait")!;
+        const copyBounds = copy.getBoundingClientRect();
+        const portraitBounds = portrait.getBoundingClientRect();
+        return {
+          copy: {
+            top: copyBounds.top,
+            bottom: copyBounds.bottom,
+            left: copyBounds.left,
+            right: copyBounds.right,
+          },
+          portrait: {
+            top: portraitBounds.top,
+            bottom: portraitBounds.bottom,
+            left: portraitBounds.left,
+            right: portraitBounds.right,
+          },
+          copyFits: sentence.scrollHeight <= sentence.clientHeight + 1 && sentence.scrollWidth <= sentence.clientWidth + 1,
+        };
+      }),
     };
   });
 
@@ -114,6 +152,28 @@ test("preserves the approved desktop composition at 1487 by 1058", async ({ moun
       occupant.className.includes("lap-spine") && occupant.left >= geometry.next.right - 1,
     ),
   ).toBe(true);
+  expect(geometry.traceGeometry).toHaveLength(model.readerTraces.length);
+  for (const trace of geometry.traceGeometry) {
+    expect(trace.copyFits).toBe(true);
+    for (const bounds of [trace.copy, trace.portrait]) {
+      expect(bounds.left).toBeGreaterThanOrEqual(geometry.preview.left - 1);
+      expect(bounds.right).toBeLessThanOrEqual(geometry.preview.right + 1);
+      expect(bounds.top).toBeGreaterThanOrEqual(geometry.preview.top - 1);
+      expect(bounds.bottom).toBeLessThanOrEqual(geometry.preview.bottom + 1);
+      expect(bounds.bottom).toBeLessThanOrEqual(geometry.shelf.top + 1);
+    }
+    expect(boxesIntersect(trace.copy, trace.portrait)).toBe(false);
+  }
+  for (let firstIndex = 0; firstIndex < geometry.traceGeometry.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < geometry.traceGeometry.length; secondIndex += 1) {
+      const first = geometry.traceGeometry[firstIndex]!;
+      const second = geometry.traceGeometry[secondIndex]!;
+      expect(boxesIntersect(first.copy, second.copy), `trace copies ${firstIndex + 1}/${secondIndex + 1}`).toBe(false);
+      expect(boxesIntersect(first.portrait, second.portrait), `trace portraits ${firstIndex + 1}/${secondIndex + 1}`).toBe(false);
+      expect(boxesIntersect(first.copy, second.portrait), `trace copy/portrait ${firstIndex + 1}/${secondIndex + 1}`).toBe(false);
+      expect(boxesIntersect(second.copy, first.portrait), `trace copy/portrait ${secondIndex + 1}/${firstIndex + 1}`).toBe(false);
+    }
+  }
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1487);
 
   await page.screenshot({ path: testInfo.outputPath("living-archive-desktop.png"), fullPage: true });
@@ -148,6 +208,8 @@ for (const viewport of [
         featuredCover: rect(".lap-featured-volume__cover"),
         featuredPage: rect(".lap-featured-volume__page"),
         traces: rect(".lap-reader-traces"),
+        nextEntry: rect(".lap-next-entry"),
+        invitation: rect(".lap-invitation-boundary"),
         history: rect(".lap-shelf__history"),
         next: rect(".lap-next-slot"),
         strip: rect(".lap-editorial-strip"),
@@ -172,19 +234,20 @@ for (const viewport of [
     expect(flow.featured.top).toBeGreaterThanOrEqual(flow.statement.bottom - 1);
     expect(Math.abs(flow.featuredCover.bottom - flow.featuredPage.bottom)).toBeLessThanOrEqual(1);
     expect(flow.traces.top).toBeGreaterThanOrEqual(flow.featured.bottom - 1);
-    expect(flow.history.top).toBeGreaterThanOrEqual(flow.traces.bottom - 1);
-    expect(flow.next.top).toBeGreaterThanOrEqual(flow.history.bottom - 1);
-    expect(flow.strip.top).toBeGreaterThanOrEqual(flow.next.bottom - 1);
+    expect(flow.nextEntry.top).toBeGreaterThanOrEqual(flow.traces.bottom - 1);
+    expect(flow.invitation.top).toBeGreaterThanOrEqual(flow.next.bottom - 1);
+    expect(flow.history.top).toBeGreaterThanOrEqual(flow.nextEntry.bottom - 1);
+    expect(flow.strip.top).toBeGreaterThanOrEqual(flow.history.bottom - 1);
     expect(flow.historyRows.every((row, index, rows) => index === 0 || row.top >= rows[index - 1]!.bottom - 1)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
 
     const featuredIndex = flow.shelfChildOrder.indexOf("lap-shelf__featured");
     const tracesIndex = flow.shelfChildOrder.indexOf("lap-reader-traces");
+    const nextEntryIndex = flow.shelfChildOrder.indexOf("lap-next-entry");
     const historyIndex = flow.shelfChildOrder.indexOf("lap-shelf__history");
-    const nextIndex = flow.shelfChildOrder.indexOf("lap-next-slot");
     expect(featuredIndex).toBeLessThan(tracesIndex);
-    expect(tracesIndex).toBeLessThan(historyIndex);
-    expect(historyIndex).toBeLessThan(nextIndex);
+    expect(tracesIndex).toBeLessThan(nextEntryIndex);
+    expect(nextEntryIndex).toBeLessThan(historyIndex);
 
     const traceSemantics = await component.locator(".lap-reader-trace").evaluateAll((traces) =>
       traces.map((trace) => {
@@ -248,19 +311,17 @@ for (const viewport of [
 
     await page.screenshot({ path: testInfo.outputPath(`living-archive-${viewport.name}.png`), fullPage: true });
 
-    if (viewport.name === "mobile") {
-      const shelfLinkOrder = await component.locator(".lap-shelf").getByRole("link").evaluateAll((links) =>
-        links.map((link) => link.getAttribute("aria-label")),
-      );
-      expect(shelfLinkOrder[0]).toMatch(/^최근 대화 펼치기:/);
-      expect(shelfLinkOrder.slice(1).every((label) => label?.startsWith("공개 기록 "))).toBe(true);
-
-      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
-      await page.keyboard.press("Tab");
-      await expect(component.getByRole("link", { name: "공개 기록 보기" }).first()).toBeFocused();
-      await page.keyboard.press("Tab");
-      await expect(component.locator(".lap-featured-volume__link")).toBeFocused();
-    }
+    await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+    await page.keyboard.press("Tab");
+    await expect(component.getByRole("link", { name: "공개 기록 보기" }).first()).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(component.locator(".lap-featured-volume__link")).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(component.getByRole("link", { name: "둘러보기" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(component.getByRole("link", { name: "멤버로 시작" })).toBeFocused();
+    await page.keyboard.press("Tab");
+    await expect(component.locator(".lap-shelf__history .lap-spine__link").first()).toBeFocused();
 
     const recordsLink = component.getByRole("link", { name: "공개 기록 보기" }).first();
     await recordsLink.focus();

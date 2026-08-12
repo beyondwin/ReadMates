@@ -56,6 +56,8 @@ describe("router route order", () => {
 
   it("keeps the living archive preview isolated from existing public-home routes", () => {
     expect(routePathsFor("/living-archive-preview")).toContain("/living-archive-preview");
+    expect(routePathsFor("/LIVING-ARCHIVE-PREVIEW")).not.toContain("/living-archive-preview");
+    expect(routePathsFor("/LIVING-ARCHIVE-PREVIEW")).toContain("*");
     expect(routePathsFor("/")).not.toContain("/living-archive-preview");
     expect(routePathsFor("/clubs/reading-sai")).not.toContain("/living-archive-preview");
   });

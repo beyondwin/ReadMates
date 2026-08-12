@@ -1,5 +1,5 @@
 import { QueryClientProvider } from "@tanstack/react-query";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { createMemoryRouter, type RouteObject } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -403,15 +403,21 @@ describe("SPA router", () => {
 
     expect(await screen.findByRole("heading", { name: "페이지를 찾을 수 없습니다." })).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host/missing-page");
-    expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toHaveAttribute(
-      "content",
-      "noindex",
-    );
+    await waitFor(() => {
+      expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toHaveAttribute(
+        "content",
+        "noindex",
+      );
+    });
 
-    await router.navigate("/clubs/reading-sai");
+    await act(async () => {
+      await router.navigate("/clubs/reading-sai");
+    });
 
     expect(await screen.findByRole("heading", { name: "읽는사이" })).toBeInTheDocument();
-    expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toBeNull();
+    await waitFor(() => {
+      expect(document.head.querySelector('meta[name="robots"][data-readmates-club-app="true"]')).toBeNull();
+    });
   });
 
   it("returns a private scoped club as not found when the authenticated membership is inactive", async () => {
@@ -542,7 +548,7 @@ describe("SPA router", () => {
     );
     expect(screen.getByRole("link", { name: "공개 홈" })).toHaveAttribute("href", "/");
     expect(screen.getByText("입력하거나 변경한 내용은 없습니다.")).toBeInTheDocument();
-    expect(document.title).toBe("로그인을 시작할 수 없습니다 | ReadMates");
+    await waitFor(() => expect(document.title).toBe("로그인을 시작할 수 없습니다 | ReadMates"));
     expect(document.body).not.toHaveTextContent(/issued-placeholder|opaque-placeholder|joinIntent|state=/);
   });
 

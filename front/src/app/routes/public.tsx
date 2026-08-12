@@ -12,6 +12,7 @@ export function publicRoutes(queryClient: QueryClient): RouteObject {
     children: [
       {
         path: "/living-archive-preview",
+        caseSensitive: true,
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="Living Archive 프리뷰를 불러오는 중" variant="public" />,
         lazy: async () => {

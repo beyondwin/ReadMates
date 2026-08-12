@@ -130,6 +130,18 @@ describe("LivingArchivePreviewPage", () => {
       "href",
       "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
     );
+
+    const featured = container.querySelector(".lap-shelf__featured")!;
+    const traces = container.querySelector(".lap-reader-traces")!;
+    const nextEntry = container.querySelector(".lap-next-entry")!;
+    const history = container.querySelector(".lap-shelf__history")!;
+    const archiveStrip = container.querySelector(".lap-editorial-strip")!;
+    expect(nextEntry).toContainElement(screen.getByRole("img", { name: "다음 자리" }));
+    expect(nextEntry).toContainElement(invitation);
+    expect(featured.compareDocumentPosition(traces) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(traces.compareDocumentPosition(nextEntry) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(nextEntry.compareDocumentPosition(history) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(history.compareDocumentPosition(archiveStrip) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("preserves the baseline club destination for unscoped preview entry actions", () => {
