@@ -29,7 +29,7 @@
 - Stage only each task's exact allowlist, compare `git diff --cached --name-only` with it, request a fresh task review, resolve every material finding through the originating task, and use the exact commit subject prescribed below.
 - Use deterministic fixtures, local Testcontainers, and fake mail/provider dependencies. Do not deploy, push, open a PR, tag, call a live provider, send email, or use production/private member data.
 - Keep tracked and ignored reports public-safe: no local absolute paths, secrets, private domains, token-shaped examples, real emails, cookies, raw OAuth state, session tokens, invitation tokens, or deployment identifiers.
-- Exactly four file-local package-name suppressions are authorized because Kotlin's escaped `port.in` and `adapter.in` package segments trigger the package-name rule: `@file:Suppress("ktlint:standard:package-name")` at the first line of `AuthSecurityUseCases.kt`, `OAuthLoginUseCases.kt`, `AuthClubContextResolver.kt`, and `AuthClubContextResolverTest.kt`. No other new suppression and no detekt/ktlint baseline or configuration change is allowed.
+- Exactly four file-local package-name suppressions are authorized because Kotlin's escaped `port.in` and `adapter.in` package segments trigger the package-name rule: `@file:Suppress("ktlint:standard:package-name")` at the first line of `AuthSecurityUseCases.kt`, `OAuthLoginUseCases.kt`, `AuthClubContextResolver.kt`, and `AuthClubContextResolverTest.kt`. No other new suppression is allowed. No detekt/ktlint baseline or configuration change is allowed except Task 7's exact three-for-three identity-key migration in `server/config/detekt/baseline.xml` and `server/config/detekt/phase-0-approved-identities.txt`: replace only the three enumerated existing identities in both files, keep the approved current count exactly 461, keep `phase-0-retired-identities.txt` byte-for-byte unchanged, and add no approval, suppression, Detekt configuration, or rule change. This is a key migration of existing debt, not approval growth. Do not decompose `AuthSessionService` or `InvitationService` in this plan.
 
 ---
 
@@ -96,6 +96,8 @@ The four remaining current boundary identities after Task 8 are the already-appr
 - `server/config/architecture/phase-0-retired-boundary-imports.txt`
 - `server/config/architecture/feature-dependency-baseline.txt`
 - `server/config/architecture/phase-0-retired-feature-dependencies.txt`
+- `server/config/detekt/baseline.xml`
+- `server/config/detekt/phase-0-approved-identities.txt`
 - `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt`
 
@@ -802,6 +804,8 @@ com/readmates/auth/adapter/in/web/MemberProfileController.kt|com.readmates.auth.
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - Modify: `server/config/architecture/boundary-import-baseline.txt`
 - Modify: `server/config/architecture/phase-0-retired-boundary-imports.txt`
+- Modify: `server/config/detekt/baseline.xml`
+- Modify: `server/config/detekt/phase-0-approved-identities.txt`
 
 **Interfaces:**
 
@@ -848,6 +852,16 @@ com/readmates/auth/infrastructure/security/ReadmatesOAuthSuccessHandler.kt|com.r
 com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.auth.application.service.AuthSessionService
 ```
 
+**Exact Detekt identity-key migration:**
+
+| Before | After |
+| --- | --- |
+| `TooManyFunctions:AuthSessionService.kt:AuthSessionService : LogoutAuthSessionUseCase` | `TooManyFunctions:AuthSessionService.kt:AuthSessionService : ManageAuthSessionUseCaseLogoutAuthSessionUseCase` |
+| `TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCase` | `TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCaseAcceptGoogleInvitationUseCase` |
+| `ThrowsCount:InvitationService.kt:InvitationService$@Transactional fun acceptGoogleInvitation: CurrentMember` | `ThrowsCount:InvitationService.kt:InvitationService$@Transactional override fun acceptGoogleInvitation: CurrentMember` |
+
+Apply all three replacements once in each of `server/config/detekt/baseline.xml` and `server/config/detekt/phase-0-approved-identities.txt`. Required interface implementation and the required `override` keyword change only Detekt's identity strings; they do not remove or introduce underlying debt. The two files must each remain at exactly 461 current identities, every non-enumerated identity must remain byte-for-byte identical, and `server/config/detekt/phase-0-retired-identities.txt` must remain unchanged. This authorization adds no approved identity and permits no suppression, Detekt rule/configuration change, or service decomposition.
+
 - [ ] **Step 1: Write RED port-injection and OAuth/session characterization tests.**
 
   Change handler/filter fixtures to input-port fakes. Pin: success issues exactly one app session, preserves cookie attributes, rotates servlet session ID on every callback exit, consumes exact state once, preserves valid app cookie on successful login, clears only stale app cookie on domain/provider error, keeps invitation priority and target-club binding, rejects mismatched/replayed state, and preserves `membership-left` versus `google` redirect errors.
@@ -866,9 +880,9 @@ com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|
     --rerun-tasks --no-build-cache --no-configuration-cache
   ```
 
-- [ ] **Step 3: Move models/errors, implement ports, and retire five identities.**
+- [ ] **Step 3: Move models/errors, implement ports, retire five boundary identities, and migrate three Detekt keys.**
 
-  Preserve every method body except ownership/import changes and `AuthSessionService.COOKIE_NAME` replacement with the port property. Put the exact authorized `@file:Suppress("ktlint:standard:package-name")` at line 1 of `OAuthLoginUseCases.kt` only; add no other suppression or lint baseline/configuration change. Do not alter OAuth repository, cookie builder, token generation/hash, redirect construction, catch classification, or `finally` cleanup order. Move all five rows verbatim.
+  Preserve every method body except ownership/import changes and `AuthSessionService.COOKIE_NAME` replacement with the port property. Put the exact authorized `@file:Suppress("ktlint:standard:package-name")` at line 1 of `OAuthLoginUseCases.kt` only; add no other suppression or lint baseline/configuration change. Do not alter OAuth repository, cookie builder, token generation/hash, redirect construction, catch classification, or `finally` cleanup order. Move all five boundary rows verbatim. Before editing either Detekt identity file, record `TASK7_DETEKT_BASE="$(git rev-parse HEAD)"` in the ignored Task 7 report. In both Detekt files, require each exact Before string above to occur once and its After string zero times, then perform only the three exact replacements. Do not add or retire a Detekt identity, edit `phase-0-retired-identities.txt`, change a rule/configuration, add another suppression, or refactor either service body/class to avoid the finding. This is an identity-key migration of three existing findings, not approval growth; service decomposition is outside this plan.
 
 - [ ] **Step 4: Run GREEN and auth integration.**
 
@@ -891,11 +905,71 @@ com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|
     --rerun-tasks --no-build-cache --no-configuration-cache
   ```
 
-  Assert ledger arithmetic `4 current + 35 retired = 39 approved` and scan auth inbound/security production for zero `application.service` and zero `club.adapter.in` imports.
+  Assert ledger arithmetic `4 current + 35 retired = 39 approved` and scan auth inbound/security production for zero `application.service` and zero `club.adapter.in` imports. Then prove the Detekt files are the exact three-for-three migration from the recorded Task 7 base:
+
+  ```bash
+  TASK7_DETEKT_BASE="${TASK7_DETEKT_BASE:?record the Task 7 tracked base before the Detekt edits}"
+  DETEKT_AUDIT_DIR="$(mktemp -d)"
+  trap 'rm -rf "$DETEKT_AUDIT_DIR"' EXIT
+  git show "${TASK7_DETEKT_BASE}:server/config/detekt/baseline.xml" > "$DETEKT_AUDIT_DIR/baseline.before.xml"
+  git show "${TASK7_DETEKT_BASE}:server/config/detekt/phase-0-approved-identities.txt" > "$DETEKT_AUDIT_DIR/approved.before.txt"
+  git show "${TASK7_DETEKT_BASE}:server/config/detekt/phase-0-retired-identities.txt" > "$DETEKT_AUDIT_DIR/retired.before.txt"
+  python3 - \
+    "$DETEKT_AUDIT_DIR/baseline.before.xml" server/config/detekt/baseline.xml \
+    "$DETEKT_AUDIT_DIR/approved.before.txt" server/config/detekt/phase-0-approved-identities.txt \
+    "$DETEKT_AUDIT_DIR/retired.before.txt" server/config/detekt/phase-0-retired-identities.txt <<'PY'
+  from pathlib import Path
+  import sys
+
+  pairs = (
+      (
+          "TooManyFunctions:AuthSessionService.kt:AuthSessionService : LogoutAuthSessionUseCase",
+          "TooManyFunctions:AuthSessionService.kt:AuthSessionService : ManageAuthSessionUseCaseLogoutAuthSessionUseCase",
+      ),
+      (
+          "TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCase",
+          "TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCaseAcceptGoogleInvitationUseCase",
+      ),
+      (
+          "ThrowsCount:InvitationService.kt:InvitationService$@Transactional fun acceptGoogleInvitation: CurrentMember",
+          "ThrowsCount:InvitationService.kt:InvitationService$@Transactional override fun acceptGoogleInvitation: CurrentMember",
+      ),
+  )
+
+  def assert_exact_migration(before_path: str, after_path: str) -> str:
+      before = Path(before_path).read_text()
+      after = Path(after_path).read_text()
+      expected = before
+      for old, new in pairs:
+          assert before.count(old) == 1, (before_path, old)
+          assert before.count(new) == 0, (before_path, new)
+          expected = expected.replace(old, new)
+          assert after.count(old) == 0, (after_path, old)
+          assert after.count(new) == 1, (after_path, new)
+      assert after == expected, f"non-enumerated Detekt identity changed in {after_path}"
+      return after
+
+  _, baseline_before, baseline_after, approved_before, approved_after, retired_before, retired_after = sys.argv
+  baseline = assert_exact_migration(baseline_before, baseline_after)
+  approved = assert_exact_migration(approved_before, approved_after)
+  assert baseline.count("<ID>") == 461
+  assert sum(1 for line in approved.splitlines() if line.strip() and not line.startswith("#")) == 461
+  assert Path(retired_after).read_bytes() == Path(retired_before).read_bytes()
+  PY
+  test "$(git diff --name-only "$TASK7_DETEKT_BASE" -- server/config/detekt | LC_ALL=C sort)" = "$(printf '%s\n' \
+    server/config/detekt/baseline.xml \
+    server/config/detekt/phase-0-approved-identities.txt)"
+  git diff --quiet "$TASK7_DETEKT_BASE" -- \
+    server/config/detekt/detekt.yml \
+    server/config/detekt/phase-0-retired-identities.txt \
+    server/config/ktlint
+  ```
+
+  The full-file equality check proves there is no new or removed non-enumerated identity; the count checks prove the current approval ceiling remains 461; the byte comparison proves the retired Detekt identity set is unchanged.
 
 - [ ] **Step 5: Mutations, review, and commit.**
 
-  Temporarily inject `GoogleLoginService` into the handler; the architecture rule must fail. Temporarily skip `changeSessionId()` on the provider-error path; the callback-exit rotation test must fail. Restore, rerun Step 4, request review, and commit:
+  Temporarily inject `GoogleLoginService` into the handler; the architecture rule must fail. Restore it, then temporarily change one migrated After identity in only one Detekt file to any non-approved variant; the exact-migration audit must fail before Detekt can accept a mismatched key or changed approval set. Restore it, then temporarily skip `changeSessionId()` on the provider-error path; the callback-exit rotation test must fail. Restore every mutation, rerun Step 4 including the exact 461-identity audit, request review, and commit:
 
   ```bash
   git commit -m "refactor(server): port OAuth and session ingress"
@@ -1042,7 +1116,7 @@ club|auth
 
 **Ignored report contract:**
 
-The report records the plan SHA/base, full task/correction SHAs and subjects, exact changed-file inventory, all 18 enumerated mutation RED/restored-GREEN results, 19 retired boundary identities grouped by task, `4 + 35 = 39`, retired `club|auth`, `40 + 1 = 41`, focused commands and counts, canonical/full integration/E2E/public results, all reviews, skipped live evidence, residual risks, and exact clean status. It embeds the complete all-changed, candidate-eligible, and candidate-excluded inventories from Step 7, identifies the historical plan as the sole candidate-excluded changed path, and distinguishes repository, local Testcontainers, and local browser evidence from live production evidence.
+The report records the plan SHA/base, full task/correction SHAs and subjects, exact changed-file inventory, all 19 enumerated mutation RED/restored-GREEN results, 19 retired boundary identities grouped by task, `4 + 35 = 39`, the exact three-for-three Detekt identity-key migration with `461 current + 0 retired = 461 approved`, retired `club|auth`, `40 + 1 = 41`, focused commands and counts, canonical/full integration/E2E/public results, all reviews, skipped live evidence, residual risks, and exact clean status. It embeds the complete all-changed, candidate-eligible, and candidate-excluded inventories from Step 7, identifies the historical plan as the sole candidate-excluded changed path, and distinguishes repository, local Testcontainers, and local browser evidence from live production evidence.
 
 - [ ] **Step 1: Resolve the ignored SDD workspace.**
 
@@ -1095,12 +1169,67 @@ The report records the plan SHA/base, full task/correction SHAs and subjects, ex
     'server/src/main/kotlin/com/readmates/auth/application/port/in/OAuthLoginUseCases.kt|@file:Suppress("ktlint:standard:package-name")' \
     'server/src/test/kotlin/com/readmates/auth/adapter/in/security/AuthClubContextResolverTest.kt|@file:Suppress("ktlint:standard:package-name")') \
     "$SUPPRESSION_AUDIT"
-  test -z "$(git diff --name-only "$IMPLEMENTATION_BASE"..HEAD -- \
-    server/config/detekt server/config/ktlint)"
+  test -z "$(git diff --name-only "$IMPLEMENTATION_BASE"..HEAD -- server/config/ktlint)"
+  DETEKT_AUDIT_DIR="$(mktemp -d)"
+  trap 'rm -rf "$DETEKT_AUDIT_DIR"' EXIT
+  git show "${IMPLEMENTATION_BASE}:server/config/detekt/baseline.xml" > "$DETEKT_AUDIT_DIR/baseline.before.xml"
+  git show HEAD:server/config/detekt/baseline.xml > "$DETEKT_AUDIT_DIR/baseline.after.xml"
+  git show "${IMPLEMENTATION_BASE}:server/config/detekt/phase-0-approved-identities.txt" > "$DETEKT_AUDIT_DIR/approved.before.txt"
+  git show HEAD:server/config/detekt/phase-0-approved-identities.txt > "$DETEKT_AUDIT_DIR/approved.after.txt"
+  git show "${IMPLEMENTATION_BASE}:server/config/detekt/phase-0-retired-identities.txt" > "$DETEKT_AUDIT_DIR/retired.before.txt"
+  git show HEAD:server/config/detekt/phase-0-retired-identities.txt > "$DETEKT_AUDIT_DIR/retired.after.txt"
+  python3 - \
+    "$DETEKT_AUDIT_DIR/baseline.before.xml" "$DETEKT_AUDIT_DIR/baseline.after.xml" \
+    "$DETEKT_AUDIT_DIR/approved.before.txt" "$DETEKT_AUDIT_DIR/approved.after.txt" \
+    "$DETEKT_AUDIT_DIR/retired.before.txt" "$DETEKT_AUDIT_DIR/retired.after.txt" <<'PY'
+  from pathlib import Path
+  import sys
+
+  pairs = (
+      (
+          "TooManyFunctions:AuthSessionService.kt:AuthSessionService : LogoutAuthSessionUseCase",
+          "TooManyFunctions:AuthSessionService.kt:AuthSessionService : ManageAuthSessionUseCaseLogoutAuthSessionUseCase",
+      ),
+      (
+          "TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCase",
+          "TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCaseAcceptGoogleInvitationUseCase",
+      ),
+      (
+          "ThrowsCount:InvitationService.kt:InvitationService$@Transactional fun acceptGoogleInvitation: CurrentMember",
+          "ThrowsCount:InvitationService.kt:InvitationService$@Transactional override fun acceptGoogleInvitation: CurrentMember",
+      ),
+  )
+
+  def assert_exact_migration(before_path: str, after_path: str) -> str:
+      before = Path(before_path).read_text()
+      after = Path(after_path).read_text()
+      expected = before
+      for old, new in pairs:
+          assert before.count(old) == 1, (before_path, old)
+          assert before.count(new) == 0, (before_path, new)
+          expected = expected.replace(old, new)
+          assert after.count(old) == 0, (after_path, old)
+          assert after.count(new) == 1, (after_path, new)
+      assert after == expected, f"non-enumerated Detekt identity changed in {after_path}"
+      return after
+
+  _, baseline_before, baseline_after, approved_before, approved_after, retired_before, retired_after = sys.argv
+  baseline = assert_exact_migration(baseline_before, baseline_after)
+  approved = assert_exact_migration(approved_before, approved_after)
+  assert baseline.count("<ID>") == 461
+  assert sum(1 for line in approved.splitlines() if line.strip() and not line.startswith("#")) == 461
+  assert Path(retired_after).read_bytes() == Path(retired_before).read_bytes()
+  PY
+  test "$(git diff --name-only "$IMPLEMENTATION_BASE"..HEAD -- server/config/detekt | LC_ALL=C sort)" = "$(printf '%s\n' \
+    server/config/detekt/baseline.xml \
+    server/config/detekt/phase-0-approved-identities.txt)"
+  git diff --quiet "$IMPLEMENTATION_BASE"..HEAD -- \
+    server/config/detekt/detekt.yml \
+    server/config/detekt/phase-0-retired-identities.txt
   git diff --name-only "$IMPLEMENTATION_BASE"..HEAD
   ```
 
-  The suppression audit is exact and fail-closed: any fifth suppression, different annotation text/path, or detekt/ktlint baseline/configuration edit fails this task.
+  The suppression audit is exact and fail-closed: any fifth suppression or different annotation text/path fails this task. The Detekt audit is also exact and fail-closed: both current files must equal the implementation-base versions with only the three enumerated replacements, both current counts must remain 461, the retired file must be byte-for-byte unchanged, and any other Detekt/ktlint baseline, configuration, rule, approval, or retirement change fails this task.
 
 - [ ] **Step 4: Obtain a fresh dirty-doc/report review and commit docs.**
 
@@ -1197,7 +1326,7 @@ The report records the plan SHA/base, full task/correction SHAs and subjects, ex
   2. actor purity, capability parity, port/type ownership, and carrier coexistence;
   3. auth, club-context, OAuth, cookie, redirect, and authorization behavior preservation;
   4. RED/GREEN, denied-path, different-club, mutation, integration, and E2E adequacy;
-  5. release/public safety and absence of private values;
+  5. exact three-for-three Detekt identity migration, 461 current-count invariance, unchanged retired identities, release/public safety, and absence of private values;
   6. readiness for the next session ownership/cycle plan.
 
   Every material finding starts an explicit correction wave in its originating task allowlist. Use exact correction subjects: Task 1 `fix(server): correct actor capability review`; Task 2 `fix(server): correct platform actor review`; Task 3 `fix(server): correct auth club context review`; Task 4 `fix(server): correct auth security port review`; Task 5 `fix(server): correct club actor authorization review`; Task 6 `fix(server): correct auth profile boundary review`; Task 7 `fix(server): correct OAuth session boundary review`; Task 8 `fix(server): correct auth club cycle review`; docs only `docs: correct Phase 2 actor auth documentation`.
@@ -1262,10 +1391,11 @@ Every task report records exact baseline GREEN, temporary RED, failing assertion
 12. Guard leave active-host locking/quorum with `actor.can(MANAGE_MEMBERS)`; the suspended-HOST persisted-role protection must fail RED.
 13. Map `MemberProfileError.MEMBER_NOT_FOUND` to HTTP 403.
 14. Inject `GoogleLoginService` into `ReadmatesOAuthSuccessHandler`.
-15. Skip servlet session-ID rotation on an OAuth provider-error exit.
-16. Reintroduce one `club.application -> auth` import.
-17. Hash a different invitation token than the raw token returned to onboarding.
-18. Materialize cached support synthesis as MEMBER or SUSPENDED instead of explicit HOST/ACTIVE.
+15. Corrupt one of the three migrated Detekt After identities in only one current identity file; the exact full-file migration and 461-identity audit must reject the mismatch without changing the retired set.
+16. Skip servlet session-ID rotation on an OAuth provider-error exit.
+17. Reintroduce one `club.application -> auth` import.
+18. Hash a different invitation token than the raw token returned to onboarding.
+19. Materialize cached support synthesis as MEMBER or SUSPENDED instead of explicit HOST/ACTIVE.
 
 ## Explicit Residuals And Excluded Scope
 
