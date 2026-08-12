@@ -331,6 +331,8 @@ Apply the conversion to both `collect` and `verify` in `ClubReadinessOperationSi
 - Modify: `server/src/test/kotlin/com/readmates/auth/api/MemberProfileControllerTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/auth/infrastructure/security/MemberAuthoritiesFilterTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventory.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt`
 - Modify: `server/config/architecture/boundary-import-baseline.txt`
 - Modify: `server/config/architecture/phase-0-retired-boundary-imports.txt`
 
@@ -355,6 +357,8 @@ fun HttpServletRequest.resolveAuthClubContext(
 ): RequestedAuthClubContext
 ```
 
+`AuthClubContextHeader`, `AuthClubContextSource`, `RequestedAuthClubContext`, and the extension are top-level declarations at this exact auth-security path. The extension is the implementation: do not add a resolver singleton/object wrapper. It uses ordinary imports for `HttpServletRequest`, `ResolveClubContextUseCase`, and `ResolvedClubContext`; do not use fully qualified `com.readmates...` references to bypass the import inventory. `AuthClubContextHeader` remains the declared header-constant object above, not a scanner bypass. The source-shape test must reject a nested/wrapper resolver and fully qualified ReadMates references outside the ordinary import lines.
+
 Precedence and semantics remain exact: non-blank trusted slug first, then non-blank trusted host, then unscoped; a supplied unknown slug/host has `supplied=true` and `context=null`; no browser header trust is added here.
 
 **Exact retired identities:**
@@ -368,9 +372,19 @@ com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readma
 com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.club.adapter.in.web.resolveClubContext
 ```
 
-- [ ] **Step 1: Move tests first and add RED ownership rules.**
+- [ ] **Step 1: Correct the inventory detector tests first, then move helper tests and add RED ownership rules.**
 
-  The moved helper test must assert: slug beats host; blank slug falls through to host; known slug; unknown slug; known host; unknown host; and neither header. Add an architecture rule that every auth inbound/security class rejects dependencies on `com.readmates.club.adapter.in..`, and a source assertion that no production auth file imports `com.readmates.club.adapter.in.web`.
+  In `ServerArchitectureInventoryTest`, first add a fixture-level detector contract for inbound-adapter imports. It must prove all of the following:
+
+  - `auth.adapter.in.web -> auth.adapter.in.security` is same-feature and is not a boundary-debt identity.
+  - `auth.adapter.in.web -> club.adapter.in.web` is cross-feature and is a boundary-debt identity.
+  - the existing `shared.adapter.in.web` exception remains permitted.
+  - an unclassified inbound source feature or unclassified inbound target feature is debt: classification fails closed rather than silently allowing a new package.
+  - the existing inbound-to-application-service, inbound-to-adapter-out, application-to-adapter, and outbound-to-inbound/application-service clauses remain covered and unchanged.
+
+  Correct `ServerArchitectureInventory.kt` only after this RED fixture exists: derive both source and target features from the repository feature roots and classify a non-shared inbound-adapter import as debt only when either feature is unclassified or the two classified features differ. Preserve the shared-web exception and every application/outbound clause exactly; do not add a baseline row, broad exception, or replacement identity.
+
+  The moved helper test must assert: slug beats host; blank slug falls through to host; known slug; unknown slug; known host; unknown host; and neither header. Add an architecture rule that every auth inbound/security class rejects dependencies on `com.readmates.club.adapter.in..`, and a source assertion that no production auth file imports `com.readmates.club.adapter.in.web`. That source assertion also proves the exact top-level extension and ordinary imports above, and rejects a resolver wrapper or fully qualified ReadMates reference that would evade import-based detection.
 
 - [ ] **Step 2: Run RED.**
 
@@ -386,11 +400,11 @@ com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|
     --rerun-tasks --no-build-cache --no-configuration-cache
   ```
 
-  Expected: helper compilation/ownership rules fail against the current club-web helper imports.
+  Expected: the new inventory fixture fails because the current detector counts same-feature auth inbound imports; helper compilation/ownership rules also fail against the current club-web helper imports.
 
-- [ ] **Step 3: Move the helper without semantic edits and retire six identities.**
+- [ ] **Step 3: Correct the detector, move the helper without semantic edits, and retire six identities.**
 
-  Copy the exact header constants, trim, precedence, and lookup logic under the new auth names, update the five auth consumers and auth tests, delete both club helper files, and move all six rows verbatim from current to retired. `AuthClubContextHeader` owns the unchanged literal values so production and tests import no club adapter type. Put the exact authorized `@file:Suppress("ktlint:standard:package-name")` at line 1 of only `AuthClubContextResolver.kt` and `AuthClubContextResolverTest.kt`; do not introduce any other suppression or baseline/configuration change.
+  Make the detector pass the Step 1 fixtures with source/target feature comparison, then copy the exact header constants, trim, precedence, and lookup logic under the new auth names. Keep the helper implementation as the required top-level extension with ordinary imports; no resolver singleton/object wrapper or fully qualified ReadMates reference is permitted. Update the five auth consumers and auth tests, delete both club helper files, and move all six rows verbatim from current to retired. `AuthClubContextHeader` owns the unchanged literal values so production and tests import no club adapter type. The same-feature auth inbound imports created by this move are not a replacement boundary debt; the detector must still report any `auth.adapter.in.web -> club.adapter.in.web` import. Put the exact authorized `@file:Suppress("ktlint:standard:package-name")` at line 1 of only `AuthClubContextResolver.kt` and `AuthClubContextResolverTest.kt`; do not introduce any other suppression or baseline/configuration change.
 
 - [ ] **Step 4: Run GREEN and scoped integration.**
 
@@ -418,7 +432,7 @@ com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|
 
 - [ ] **Step 5: Mutation, review, and commit.**
 
-  Temporarily resolve host before slug; the slug-precedence test must fail. Temporarily treat an unknown supplied slug as unscoped; AuthMe unknown-slug 404 and security denial must fail. Restore, obtain fresh review, and commit:
+  Temporarily resolve host before slug; the slug-precedence test must fail. Temporarily treat an unknown supplied slug as unscoped; AuthMe unknown-slug 404 and security denial must fail. Temporarily classify same-feature auth inbound as cross-feature debt and separately allow an unclassified source or target; the corresponding inventory detector fixture must fail in each case. Restore, rerun the Step 4 architecture selectors so the detector tests are a GREEN gate, obtain fresh review, and commit:
 
   ```bash
   git commit -m "refactor(server): own auth club context resolution"
@@ -1018,6 +1032,7 @@ club|auth
 
 - Actors are capability-only pure Kotlin values; principals remain inbound carriers during incremental migration.
 - Auth owns HTTP club-context extraction and calls the club resolve input port.
+- Same-feature auth inbound packages may share the auth-owned HTTP club-context helper; cross-feature inbound helper ownership is forbidden.
 - Auth servlet-security and OAuth handlers inject input ports/models, not concrete services.
 - Club owns membership/access policy; `club -> auth` is gone and `auth -> club` remains.
 - Current actor carriers remain because consumers outside this slice still exist.
