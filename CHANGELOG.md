@@ -8,6 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- **Living Archive 디자인 프리뷰:** 격리된 `/living-archive-preview`를 직접 URL로만 확인할 수 있게 제공하고 `noindex,nofollow`로 검색 노출을 막습니다. 반응형·접근성·브라우저 격리 검증을 거쳤으며, 현재 `/`와 `/clubs/:slug` 화면은 변경하지 않습니다.
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
 ## v2.3.0 - 2026-08-09
