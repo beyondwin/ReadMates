@@ -776,6 +776,8 @@ class ServerArchitectureBoundaryTest {
                         },
                     )
                 }
+                addAll(nestedBlockCommentControlAssertions())
+                addAll(literalDollarControlAssertions())
             }
 
         assertAll(assertions)
@@ -786,6 +788,37 @@ private data class KotlinSourceFixture(
     val name: String,
     val source: String,
 )
+
+private fun nestedBlockCommentControlAssertions(): List<() -> Unit> =
+    listOf(
+        {
+            val fixture = nestedBlockCommentResolverFixture()
+            assertTrue(
+                resolverSourceShapeViolations(fixture.source).isEmpty(),
+                "${fixture.name} must remain ignored until the outer comment closes",
+            )
+        },
+        {
+            val fixture = nestedBlockCommentFqFixture()
+            val references = fullyQualifiedReadMatesReferences(listOf("fixture.kt" to fixture.source))
+            assertEquals(
+                listOf(
+                    "fixture.kt:5: val visible = " +
+                        "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG",
+                ),
+                references,
+                "${fixture.name} must expose only the code after the outer comment closes",
+            )
+        },
+    )
+
+private fun literalDollarControlAssertions(): List<() -> Unit> =
+    literalDollarFqFixtures().map { fixture ->
+        {
+            val references = fullyQualifiedReadMatesReferences(listOf("fixture.kt" to fixture.source))
+            assertTrue(references.isEmpty(), "${fixture.name} must keep FQ-looking text literal")
+        }
+    }
 
 private fun executableTemplateFixtures(): List<KotlinSourceFixture> {
     val fqReference = "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG"
@@ -840,6 +873,56 @@ private fun fqLexicalDecoyFixtures(): List<KotlinSourceFixture> {
         KotlinSourceFixture("block-comment FQ decoy", "/* $fqReference */"),
         KotlinSourceFixture("ordinary-string FQ decoy", "val quoted = \"$fqReference\""),
         KotlinSourceFixture("raw-string FQ decoy", "val raw = $TRIPLE_QUOTE $fqReference $TRIPLE_QUOTE"),
+    )
+}
+
+private fun nestedBlockCommentResolverFixture(): KotlinSourceFixture =
+    KotlinSourceFixture(
+        "nested block-comment resolver decoy with visible resolver control",
+        listOf(
+            "/* outer",
+            "  /* inner */",
+            "  $EXACT_AUTH_CLUB_CONTEXT_EXTENSION",
+            "*/",
+            EXACT_AUTH_CLUB_CONTEXT_EXTENSION,
+        ).joinToString("\n"),
+    )
+
+private fun nestedBlockCommentFqFixture(): KotlinSourceFixture {
+    val fqReference = "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG"
+    return KotlinSourceFixture(
+        "nested block-comment FQ decoy with visible FQ control",
+        listOf(
+            "/* outer",
+            "  /* inner */",
+            "  val hidden = $fqReference",
+            "*/",
+            "val visible = $fqReference",
+        ).joinToString("\n"),
+    )
+}
+
+private fun literalDollarFqFixtures(): List<KotlinSourceFixture> {
+    val fqReference = "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG"
+    val literalDollar = '$'
+    val rawLiteralDollarExpression = "$literalDollar{'$'}"
+    return listOf(
+        KotlinSourceFixture(
+            "normal simple-template identifier",
+            "val simple = \"$literalDollar$fqReference\"",
+        ),
+        KotlinSourceFixture(
+            "raw simple-template identifier",
+            "val simple = $TRIPLE_QUOTE$literalDollar$fqReference$TRIPLE_QUOTE",
+        ),
+        KotlinSourceFixture(
+            "normal escaped-dollar text",
+            "val escaped = \"\\$literalDollar{$fqReference}\"",
+        ),
+        KotlinSourceFixture(
+            "raw escaped-dollar expression",
+            "val escaped = $TRIPLE_QUOTE$rawLiteralDollarExpression{$fqReference}$TRIPLE_QUOTE",
+        ),
     )
 }
 
