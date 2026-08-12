@@ -681,155 +681,216 @@ class ServerArchitectureBoundaryTest {
         )
     }
 
-    private fun resolverSourceShapeViolations(source: String): List<String> =
-        buildList {
-            val lines = source.lines()
-            val declarationLines =
-                lines.indices.filter { index ->
-                    lines[index].trimStart().startsWith(AUTH_CLUB_CONTEXT_EXTENSION_PREFIX)
-                }
-            if (declarationLines.size != 1) {
-                add("expected one auth club-context extension declaration, found ${declarationLines.size}")
-            } else {
-                val declarationLine = declarationLines.single()
-                val braceDepth = kotlinBraceDepthBeforeLines(source).getValue(declarationLine)
-                if (braceDepth != 0) {
-                    add("auth club-context extension must be top-level, found at brace depth $braceDepth")
-                }
-                val declaration = lines.drop(declarationLine).take(EXACT_AUTH_CLUB_CONTEXT_EXTENSION_LINE_COUNT)
-                if (declaration.joinToString("\n") != EXACT_AUTH_CLUB_CONTEXT_EXTENSION) {
-                    add("auth club-context extension declaration does not match the required signature")
-                }
-            }
-        }
+    @Test
+    fun `auth club context source shape guard ignores lexical decoys but rejects real code`() {
+        val blockCommentDecoyWithWrappedResolver =
+            """
+            /*
+            fun HttpServletRequest.resolveAuthClubContext(resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {
+            */
+            class Wrapper { fun HttpServletRequest.resolveAuthClubContext(resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {
+                return RequestedAuthClubContext(false, AuthClubContextSource.NONE, null)
+            } }
+            """.trimIndent()
+        val rawStringDecoyWithWrappedResolver =
+            listOf(
+                "val decoy = $TRIPLE_QUOTE",
+                EXACT_AUTH_CLUB_CONTEXT_EXTENSION,
+                "} { }",
+                TRIPLE_QUOTE,
+                "class Wrapper { fun HttpServletRequest.resolveAuthClubContext(" +
+                    "resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {",
+                "    return RequestedAuthClubContext(false, AuthClubContextSource.NONE, null)",
+                "} }",
+            ).joinToString("\n")
+        val harmlessFqText =
+            listOf(
+                "// com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG",
+                "val raw = $TRIPLE_QUOTE" +
+                    "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG$TRIPLE_QUOTE",
+                "val quoted = \"com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG\"",
+                "val character = '{'",
+            ).joinToString("\n")
+        val realFqReference =
+            """
+            val bypass = com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG
+            """.trimIndent()
 
-    private fun kotlinBraceDepthBeforeLines(source: String): Map<Int, Int> {
-        var scanState = KotlinBraceScanState()
-        return source
-            .lineSequence()
-            .mapIndexed { index, line ->
-                val depthBeforeLine = scanState.braceDepth
-                scanState = scanKotlinLine(line, scanState)
-                index to depthBeforeLine
-            }.toMap()
+        assertTrue(resolverSourceShapeViolations(blockCommentDecoyWithWrappedResolver).isNotEmpty())
+        assertTrue(resolverSourceShapeViolations(rawStringDecoyWithWrappedResolver).isNotEmpty())
+        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to harmlessFqText)).isEmpty())
+        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to realFqReference)).isNotEmpty())
     }
-
-    private fun scanKotlinLine(
-        line: String,
-        initialState: KotlinBraceScanState,
-    ): KotlinBraceScanState {
-        var scanState = initialState
-        var characterIndex = 0
-        while (characterIndex < line.length) {
-            val specialStep = nextKotlinSpecialStep(line, characterIndex, scanState)
-            if (specialStep != null) {
-                scanState = specialStep.state
-                characterIndex = specialStep.nextCharacterIndex
-            } else {
-                when (line[characterIndex]) {
-                    '"' -> characterIndex = skipKotlinString(line, characterIndex)
-                    '\'' -> characterIndex = skipKotlinCharacterLiteral(line, characterIndex)
-                    '{' -> {
-                        scanState = scanState.copy(braceDepth = scanState.braceDepth + 1)
-                        characterIndex++
-                    }
-                    '}' -> {
-                        scanState = scanState.copy(braceDepth = scanState.braceDepth - 1)
-                        characterIndex++
-                    }
-                    else -> characterIndex++
-                }
-            }
-        }
-        return scanState
-    }
-
-    private fun nextKotlinSpecialStep(
-        line: String,
-        characterIndex: Int,
-        scanState: KotlinBraceScanState,
-    ): KotlinScanStep? =
-        when {
-            scanState.inBlockComment && line.startsWith("*/", characterIndex) ->
-                KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = false))
-            scanState.inBlockComment -> KotlinScanStep(characterIndex + 1, scanState)
-            scanState.inTripleQuotedString && line.startsWith("\"\"\"", characterIndex) ->
-                KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = false))
-            scanState.inTripleQuotedString -> KotlinScanStep(characterIndex + 1, scanState)
-            line.startsWith("//", characterIndex) -> KotlinScanStep(line.length, scanState)
-            line.startsWith("/*", characterIndex) ->
-                KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = true))
-            line.startsWith("\"\"\"", characterIndex) ->
-                KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = true))
-            else -> null
-        }
-
-    private fun skipKotlinString(
-        line: String,
-        openingQuote: Int,
-    ): Int {
-        var characterIndex = openingQuote + 1
-        while (characterIndex < line.length) {
-            if (line[characterIndex] == '\\') {
-                characterIndex += 2
-            } else if (line[characterIndex] == '"') {
-                return characterIndex + 1
-            } else {
-                characterIndex++
-            }
-        }
-        return characterIndex
-    }
-
-    private fun skipKotlinCharacterLiteral(
-        line: String,
-        openingQuote: Int,
-    ): Int {
-        var characterIndex = openingQuote + 1
-        while (characterIndex < line.length) {
-            if (line[characterIndex] == '\\') {
-                characterIndex += 2
-            } else if (line[characterIndex] == '\'') {
-                return characterIndex + 1
-            } else {
-                characterIndex++
-            }
-        }
-        return characterIndex
-    }
-
-    private fun fullyQualifiedReadMatesReferences(sourceFiles: List<Pair<String, String>>): List<String> =
-        sourceFiles.flatMap { (relativePath, source) ->
-            source
-                .lineSequence()
-                .mapIndexedNotNull { index, line ->
-                    val trimmed = line.trim()
-                    val isFullyQualifiedReadMatesReference =
-                        "com.readmates." in trimmed &&
-                            !trimmed.startsWith("package ") &&
-                            !trimmed.startsWith("import ")
-                    if (isFullyQualifiedReadMatesReference) "$relativePath:${index + 1}: $trimmed" else null
-                }.toList()
-        }
-
-    private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
-        Files.walk(sourceRoot.resolve("com/readmates/auth")).use { paths ->
-            paths
-                .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
-                .flatMap { sourceFile ->
-                    sourceFile
-                        .readLines()
-                        .mapIndexedNotNull { index, line ->
-                            val importName = line.trim().removePrefix("import ").replace("`", "")
-                            if (importName.startsWith("com.readmates.club.adapter.in.web")) {
-                                "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: ${line.trim()}"
-                            } else {
-                                null
-                            }
-                        }.stream()
-                }.toList()
-        }
 }
+
+private fun resolverSourceShapeViolations(source: String): List<String> =
+    buildList {
+        val lexedLines = lexKotlinSource(source)
+        val declarationLines =
+            lexedLines.indices.filter { index ->
+                lexedLines[index].code.trimStart().startsWith(AUTH_CLUB_CONTEXT_EXTENSION_PREFIX)
+            }
+        if (declarationLines.size != 1) {
+            add("expected one auth club-context extension declaration, found ${declarationLines.size}")
+        } else {
+            val declarationLine = declarationLines.single()
+            val braceDepth = lexedLines[declarationLine].braceDepth
+            if (braceDepth != 0) {
+                add("auth club-context extension must be top-level, found at brace depth $braceDepth")
+            }
+            val declaration =
+                lexedLines
+                    .drop(declarationLine)
+                    .take(EXACT_AUTH_CLUB_CONTEXT_EXTENSION_LINE_COUNT)
+                    .map(KotlinLexLine::code)
+                    .joinToString("\n")
+            if (declaration != EXACT_AUTH_CLUB_CONTEXT_EXTENSION) {
+                add("auth club-context extension declaration does not match the required signature")
+            }
+        }
+    }
+
+private fun lexKotlinSource(source: String): List<KotlinLexLine> {
+    var scanState = KotlinBraceScanState()
+    return source
+        .lineSequence()
+        .mapIndexed { index, line ->
+            val depthBeforeLine = scanState.braceDepth
+            val result = lexKotlinLine(line, scanState)
+            scanState = result.state
+            KotlinLexLine(index, result.code, depthBeforeLine)
+        }.toList()
+}
+
+private fun lexKotlinLine(
+    line: String,
+    initialState: KotlinBraceScanState,
+): KotlinLexLineResult {
+    var scanState = initialState
+    var characterIndex = 0
+    val code = StringBuilder()
+    while (characterIndex < line.length) {
+        val specialStep = nextKotlinSpecialStep(line, characterIndex, scanState)
+        if (specialStep != null) {
+            scanState = specialStep.state
+            code.append(" ".repeat(specialStep.nextCharacterIndex - characterIndex))
+            characterIndex = specialStep.nextCharacterIndex
+        } else {
+            when (line[characterIndex]) {
+                '"' -> {
+                    val nextIndex = skipKotlinString(line, characterIndex)
+                    code.append(" ".repeat(nextIndex - characterIndex))
+                    characterIndex = nextIndex
+                }
+                '\'' -> {
+                    val nextIndex = skipKotlinCharacterLiteral(line, characterIndex)
+                    code.append(" ".repeat(nextIndex - characterIndex))
+                    characterIndex = nextIndex
+                }
+                '{' -> {
+                    scanState = scanState.copy(braceDepth = scanState.braceDepth + 1)
+                    code.append('{')
+                    characterIndex++
+                }
+                '}' -> {
+                    scanState = scanState.copy(braceDepth = scanState.braceDepth - 1)
+                    code.append('}')
+                    characterIndex++
+                }
+                else -> {
+                    code.append(line[characterIndex])
+                    characterIndex++
+                }
+            }
+        }
+    }
+    return KotlinLexLineResult(code.toString(), scanState)
+}
+
+private fun nextKotlinSpecialStep(
+    line: String,
+    characterIndex: Int,
+    scanState: KotlinBraceScanState,
+): KotlinScanStep? =
+    when {
+        scanState.inBlockComment && line.startsWith("*/", characterIndex) ->
+            KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = false))
+        scanState.inBlockComment -> KotlinScanStep(characterIndex + 1, scanState)
+        scanState.inTripleQuotedString && line.startsWith("\"\"\"", characterIndex) ->
+            KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = false))
+        scanState.inTripleQuotedString -> KotlinScanStep(characterIndex + 1, scanState)
+        line.startsWith("//", characterIndex) -> KotlinScanStep(line.length, scanState)
+        line.startsWith("/*", characterIndex) ->
+            KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = true))
+        line.startsWith("\"\"\"", characterIndex) ->
+            KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = true))
+        else -> null
+    }
+
+private fun skipKotlinString(
+    line: String,
+    openingQuote: Int,
+): Int {
+    var characterIndex = openingQuote + 1
+    while (characterIndex < line.length) {
+        if (line[characterIndex] == '\\') {
+            characterIndex += 2
+        } else if (line[characterIndex] == '"') {
+            return characterIndex + 1
+        } else {
+            characterIndex++
+        }
+    }
+    return characterIndex
+}
+
+private fun skipKotlinCharacterLiteral(
+    line: String,
+    openingQuote: Int,
+): Int {
+    var characterIndex = openingQuote + 1
+    while (characterIndex < line.length) {
+        if (line[characterIndex] == '\\') {
+            characterIndex += 2
+        } else if (line[characterIndex] == '\'') {
+            return characterIndex + 1
+        } else {
+            characterIndex++
+        }
+    }
+    return characterIndex
+}
+
+private fun fullyQualifiedReadMatesReferences(sourceFiles: List<Pair<String, String>>): List<String> =
+    sourceFiles.flatMap { (relativePath, source) ->
+        lexKotlinSource(source)
+            .mapNotNull { line ->
+                val trimmed = line.code.trim()
+                val isFullyQualifiedReadMatesReference =
+                    "com.readmates." in trimmed &&
+                        !trimmed.startsWith("package ") &&
+                        !trimmed.startsWith("import ")
+                if (isFullyQualifiedReadMatesReference) "$relativePath:${line.index + 1}: $trimmed" else null
+            }
+    }
+
+private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
+    Files.walk(sourceRoot.resolve("com/readmates/auth")).use { paths ->
+        paths
+            .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
+            .flatMap { sourceFile ->
+                sourceFile
+                    .readLines()
+                    .mapIndexedNotNull { index, line ->
+                        val importName = line.trim().removePrefix("import ").replace("`", "")
+                        if (importName.startsWith("com.readmates.club.adapter.in.web")) {
+                            "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: ${line.trim()}"
+                        } else {
+                            null
+                        }
+                    }.stream()
+            }.toList()
+    }
 
 private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION =
     "fun HttpServletRequest.resolveAuthClubContext(" +
@@ -837,6 +898,7 @@ private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION =
 
 private const val AUTH_CLUB_CONTEXT_EXTENSION_PREFIX = "fun HttpServletRequest.resolveAuthClubContext("
 private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION_LINE_COUNT = 1
+private const val TRIPLE_QUOTE = "\"\"\""
 
 private data class KotlinBraceScanState(
     val braceDepth: Int = 0,
@@ -846,6 +908,17 @@ private data class KotlinBraceScanState(
 
 private data class KotlinScanStep(
     val nextCharacterIndex: Int,
+    val state: KotlinBraceScanState,
+)
+
+private data class KotlinLexLine(
+    val index: Int,
+    val code: String,
+    val braceDepth: Int,
+)
+
+private data class KotlinLexLineResult(
+    val code: String,
     val state: KotlinBraceScanState,
 )
 
