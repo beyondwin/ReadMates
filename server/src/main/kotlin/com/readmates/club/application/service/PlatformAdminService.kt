@@ -17,6 +17,8 @@ import com.readmates.club.application.port.out.UpdateClubDomainProvisioningPort
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.springframework.stereotype.Service
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -43,11 +45,11 @@ class PlatformAdminService(
         )
 
     override fun createClubDomain(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
         command: CreateClubDomainCommand,
     ): PlatformAdminClubDomain {
-        if (!admin.canManageClubDomains) {
+        if (!admin.can(PlatformCapability.MANAGE_CLUB_DOMAINS)) {
             throw AccessDeniedException("Platform admin role cannot manage club domains")
         }
 
@@ -82,10 +84,10 @@ class PlatformAdminService(
     }
 
     override fun checkClubDomainProvisioning(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         domainId: UUID,
     ): PlatformAdminClubDomain {
-        if (!admin.canManageClubDomains) {
+        if (!admin.can(PlatformCapability.MANAGE_CLUB_DOMAINS)) {
             throw AccessDeniedException("Platform admin role cannot manage club domains")
         }
 

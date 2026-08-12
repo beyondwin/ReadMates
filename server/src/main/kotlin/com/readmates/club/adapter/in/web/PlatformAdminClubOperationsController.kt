@@ -8,6 +8,7 @@ import com.readmates.club.application.model.AdminTodayClosingRiskSnapshot
 import com.readmates.club.application.port.`in`.GetAdminClubOperationsUseCase
 import com.readmates.club.application.port.`in`.ListAdminTodayClosingRisksUseCase
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.toPlatformActor
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.RequestMapping
@@ -24,7 +25,9 @@ class PlatformAdminClubOperationsController(
         admin: CurrentPlatformAdmin,
         @PathVariable clubId: UUID,
     ): AdminClubOperationsSnapshotResponse =
-        AdminClubOperationsSnapshotResponse.from(getAdminClubOperationsUseCase.operationsSnapshot(admin, clubId))
+        AdminClubOperationsSnapshotResponse.from(
+            getAdminClubOperationsUseCase.operationsSnapshot(admin.toPlatformActor(), clubId),
+        )
 }
 
 @RestController
@@ -34,7 +37,9 @@ class PlatformAdminTodayClosingRisksController(
 ) {
     @GetMapping("/closing-risks")
     fun closingRisks(admin: CurrentPlatformAdmin): AdminTodayClosingRiskSnapshotResponse =
-        AdminTodayClosingRiskSnapshotResponse.from(listAdminTodayClosingRisksUseCase.todayClosingRisks(admin))
+        AdminTodayClosingRiskSnapshotResponse.from(
+            listAdminTodayClosingRisksUseCase.todayClosingRisks(admin.toPlatformActor()),
+        )
 }
 
 data class AdminClubOperationsSnapshotResponse(

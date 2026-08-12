@@ -26,7 +26,8 @@ import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
 import com.readmates.club.application.port.out.SendPlatformAdminHostInvitationEmailPort
 import com.readmates.shared.security.AccessDeniedException
-import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -59,7 +60,7 @@ class PlatformAdminOnboardingService(
 ) : PreviewPlatformAdminClubOnboardingUseCase,
     CommitPlatformAdminClubOnboardingUseCase {
     override fun preview(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         command: PlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingPreview {
         requireOperator(admin)
@@ -95,7 +96,7 @@ class PlatformAdminOnboardingService(
     }
 
     override fun commit(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         command: PlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingResult {
         requireOperator(admin)
@@ -112,7 +113,7 @@ class PlatformAdminOnboardingService(
     }
 
     private fun persistOnboarding(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         normalized: PlatformAdminOnboardingCommand,
     ): PersistedOnboarding {
         val clubId = UUID.randomUUID()
@@ -141,7 +142,7 @@ class PlatformAdminOnboardingService(
     }
 
     private fun createFirstHostWithoutEmail(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
         command: PlatformAdminOnboardingCommand,
     ): PersistedHostWithEmail {
@@ -173,7 +174,7 @@ class PlatformAdminOnboardingService(
             CreatePlatformAdminHostInvitationCommand(
                 invitationId = invitationId,
                 clubId = clubId,
-                invitedByPlatformAdminUserId = admin.userId,
+                invitedByPlatformAdminUserId = admin.adminId,
                 email = command.firstHost.email,
                 name = command.firstHost.name,
                 tokenHash = invitationTokenService.hashToken(token),
@@ -280,8 +281,8 @@ class PlatformAdminOnboardingService(
         return command.copy(club = club, firstHost = firstHost, domain = domain)
     }
 
-    private fun requireOperator(admin: CurrentPlatformAdmin) {
-        if (!admin.canCreateClub) {
+    private fun requireOperator(admin: PlatformActor) {
+        if (!admin.can(PlatformCapability.CREATE_CLUB)) {
             throw AccessDeniedException("Platform admin role cannot onboard clubs")
         }
     }

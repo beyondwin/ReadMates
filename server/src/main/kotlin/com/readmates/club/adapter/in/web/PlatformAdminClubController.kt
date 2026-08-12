@@ -23,6 +23,7 @@ import com.readmates.club.application.port.`in`.UpdatePlatformAdminClubUseCase
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.toPlatformActor
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PatchMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -42,21 +43,25 @@ class PlatformAdminClubController(
 ) {
     @GetMapping
     fun list(admin: CurrentPlatformAdmin): PlatformAdminClubListResponse =
-        PlatformAdminClubListResponse.from(listPlatformAdminClubsUseCase.listClubs(admin))
+        PlatformAdminClubListResponse.from(listPlatformAdminClubsUseCase.listClubs(admin.toPlatformActor()))
 
     @PostMapping("/onboarding/preview")
     fun previewOnboarding(
         admin: CurrentPlatformAdmin,
         @RequestBody request: PlatformAdminOnboardingRequest,
     ): PlatformAdminOnboardingPreviewResponse =
-        PlatformAdminOnboardingPreviewResponse.from(previewOnboardingUseCase.preview(admin, request.toCommand()))
+        PlatformAdminOnboardingPreviewResponse.from(
+            previewOnboardingUseCase.preview(admin.toPlatformActor(), request.toCommand()),
+        )
 
     @PostMapping("/onboarding")
     fun commitOnboarding(
         admin: CurrentPlatformAdmin,
         @RequestBody request: PlatformAdminOnboardingRequest,
     ): PlatformAdminOnboardingResultResponse =
-        PlatformAdminOnboardingResultResponse.from(commitOnboardingUseCase.commit(admin, request.toCommand()))
+        PlatformAdminOnboardingResultResponse.from(
+            commitOnboardingUseCase.commit(admin.toPlatformActor(), request.toCommand()),
+        )
 
     @PatchMapping("/{clubId}")
     fun update(
@@ -66,7 +71,7 @@ class PlatformAdminClubController(
     ): PlatformAdminClubResponse =
         PlatformAdminClubResponse.from(
             updatePlatformAdminClubUseCase.updateClub(
-                admin = admin,
+                admin = admin.toPlatformActor(),
                 clubId = clubId,
                 command = request.toCommand(),
             ),

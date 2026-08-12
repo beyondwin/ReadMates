@@ -18,8 +18,9 @@ import com.readmates.club.application.port.out.AdminClosingRiskLedgerPort
 import com.readmates.club.application.port.out.AdminClubClosingRiskLedgerSync
 import com.readmates.club.application.port.out.AdminClubOperationsSnapshotPort
 import com.readmates.club.application.port.out.AdminTodayClosingRisksPort
-import com.readmates.club.domain.PlatformAdminRole
-import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -33,7 +34,7 @@ class AdminClubOperationsServiceTest {
     fun `support can read operations snapshot`() {
         val service = AdminClubOperationsService(FakePort(snapshot()), FakeTodayClosingRisksPort(), FakeLedgerPort())
 
-        val result = service.operationsSnapshot(admin(PlatformAdminRole.SUPPORT), CLUB_ID)
+        val result = service.operationsSnapshot(supportActor(), CLUB_ID)
 
         assertThat(result.schema).isEqualTo("admin.club_operations_snapshot.v1")
         assertThat(result.club.clubId).isEqualTo(CLUB_ID)
@@ -43,7 +44,7 @@ class AdminClubOperationsServiceTest {
     fun `not found maps to platform admin club not found`() {
         val service = AdminClubOperationsService(FakePort(null), FakeTodayClosingRisksPort(), FakeLedgerPort())
 
-        assertThatThrownBy { service.operationsSnapshot(admin(PlatformAdminRole.OWNER), CLUB_ID) }
+        assertThatThrownBy { service.operationsSnapshot(supportActor(), CLUB_ID) }
             .isInstanceOfSatisfying(PlatformAdminException::class.java) { error ->
                 assertThat(error.error).isEqualTo(PlatformAdminError.CLUB_NOT_FOUND)
             }
@@ -63,7 +64,7 @@ class AdminClubOperationsServiceTest {
                 ),
             )
 
-        val result = service.todayClosingRisks(admin(PlatformAdminRole.OWNER))
+        val result = service.todayClosingRisks(supportActor())
 
         assertThat(result.trackingUnavailable).isFalse()
         assertThat(result.items.single().ageDays).isEqualTo(3)
@@ -82,7 +83,7 @@ class AdminClubOperationsServiceTest {
                 ThrowingLedgerPort(),
             )
 
-        val result = service.todayClosingRisks(admin(PlatformAdminRole.OWNER))
+        val result = service.todayClosingRisks(supportActor())
 
         assertThat(result.trackingUnavailable).isTrue()
         assertThat(result.items.single().ledgerState).isEqualTo("UNTRACKED")
@@ -100,7 +101,7 @@ class AdminClubOperationsServiceTest {
                 FakeLedgerPort(clubSync = AdminClubClosingRiskLedgerSync(listOf(active), listOf(resolved))),
             )
 
-        val result = service.operationsSnapshot(admin(PlatformAdminRole.OWNER), CLUB_ID)
+        val result = service.operationsSnapshot(supportActor(), CLUB_ID)
         val closingRisks = result.closingRisks
         val activeItem = closingRisks.items.single()
         val resolvedItem = closingRisks.recentlyResolvedItems.single()
@@ -123,7 +124,7 @@ class AdminClubOperationsServiceTest {
                 ThrowingLedgerPort(),
             )
 
-        val result = service.operationsSnapshot(admin(PlatformAdminRole.OWNER), CLUB_ID)
+        val result = service.operationsSnapshot(supportActor(), CLUB_ID)
         val closingRisks = result.closingRisks
         val activeItem = closingRisks.items.single()
 
@@ -135,38 +136,81 @@ class AdminClubOperationsServiceTest {
         assertThat(closingRisks.recentlyResolvedItems).isEmpty()
     }
 
+    @Test
+    fun `actor without view club operations is denied before snapshot or ledger calls`() {
+        val snapshotPort = FakePort(snapshot())
+        val ledgerPort = FakeLedgerPort()
+        val service = AdminClubOperationsService(snapshotPort, FakeTodayClosingRisksPort(), ledgerPort)
+
+        assertThatThrownBy { service.operationsSnapshot(actor(), CLUB_ID) }
+            .isInstanceOf(AccessDeniedException::class.java)
+
+        assertThat(snapshotPort.calls).isZero()
+        assertThat(ledgerPort.clubSyncCalls).isZero()
+    }
+
+    @Test
+    fun `actor without view club operations is denied before today risk or ledger calls`() {
+        val todayPort = FakeTodayClosingRisksPort()
+        val ledgerPort = FakeLedgerPort()
+        val service = AdminClubOperationsService(FakePort(snapshot()), todayPort, ledgerPort)
+
+        assertThatThrownBy { service.todayClosingRisks(actor()) }.isInstanceOf(AccessDeniedException::class.java)
+
+        assertThat(todayPort.calls).isZero()
+        assertThat(ledgerPort.todaySyncCalls).isZero()
+    }
+
     private class FakePort(
         private val snapshot: AdminClubOperationsSnapshot?,
     ) : AdminClubOperationsSnapshotPort {
-        override fun loadSnapshot(clubId: UUID): AdminClubOperationsSnapshot? = snapshot
+        var calls = 0
+
+        override fun loadSnapshot(clubId: UUID): AdminClubOperationsSnapshot? {
+            calls += 1
+            return snapshot
+        }
     }
 
     private class FakeTodayClosingRisksPort(
         private val snapshot: AdminTodayClosingRiskSnapshot =
             AdminTodayClosingRiskSnapshot(generatedAt = GENERATED_AT, items = emptyList()),
     ) : AdminTodayClosingRisksPort {
-        override fun loadTodayClosingRisks(limit: Int): AdminTodayClosingRiskSnapshot = snapshot
+        var calls = 0
+
+        override fun loadTodayClosingRisks(limit: Int): AdminTodayClosingRiskSnapshot {
+            calls += 1
+            return snapshot
+        }
     }
 
     private class FakeLedgerPort(
         private val todayItems: List<AdminTodayClosingRiskItem> = emptyList(),
         private val clubSync: AdminClubClosingRiskLedgerSync = AdminClubClosingRiskLedgerSync(emptyList(), emptyList()),
     ) : AdminClosingRiskLedgerPort {
+        var todaySyncCalls = 0
+        var clubSyncCalls = 0
+
         override fun syncToday(
             items: List<AdminTodayClosingRiskItem>,
             observedAt: OffsetDateTime,
-        ): List<AdminTodayClosingRiskItem> = todayItems.ifEmpty { items }
+        ): List<AdminTodayClosingRiskItem> {
+            todaySyncCalls += 1
+            return todayItems.ifEmpty { items }
+        }
 
         override fun syncClub(
             clubId: UUID,
             items: List<AdminClubClosingRiskItem>,
             observedAt: OffsetDateTime,
-        ): AdminClubClosingRiskLedgerSync =
-            if (clubSync.activeItems.isEmpty() && clubSync.recentlyResolvedItems.isEmpty()) {
+        ): AdminClubClosingRiskLedgerSync {
+            clubSyncCalls += 1
+            return if (clubSync.activeItems.isEmpty() && clubSync.recentlyResolvedItems.isEmpty()) {
                 AdminClubClosingRiskLedgerSync(items, emptyList())
             } else {
                 clubSync
             }
+        }
     }
 
     private class ThrowingLedgerPort : AdminClosingRiskLedgerPort {
@@ -182,12 +226,10 @@ class AdminClubOperationsServiceTest {
         ): AdminClubClosingRiskLedgerSync = error("ledger unavailable")
     }
 
-    private fun admin(role: PlatformAdminRole): CurrentPlatformAdmin =
-        CurrentPlatformAdmin(
-            userId = UUID.fromString("00000000-0000-0000-0000-000000000901"),
-            email = "admin@example.com",
-            role = role,
-        )
+    private fun supportActor(): PlatformActor = actor(PlatformCapability.VIEW_CLUB_OPERATIONS)
+
+    private fun actor(vararg capabilities: PlatformCapability): PlatformActor =
+        PlatformActor(UUID.fromString("00000000-0000-0000-0000-000000000901"), capabilities.toSet())
 
     private fun snapshot(closingRisks: AdminClubClosingRisks = EMPTY_CLOSING_RISKS): AdminClubOperationsSnapshot =
         AdminClubOperationsSnapshot(

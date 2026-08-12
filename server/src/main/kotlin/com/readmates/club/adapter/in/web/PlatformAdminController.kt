@@ -11,6 +11,7 @@ import com.readmates.club.application.port.`in`.CreateClubDomainUseCase
 import com.readmates.club.application.port.`in`.PlatformAdminSummaryUseCase
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.toPlatformActor
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -39,7 +40,7 @@ class PlatformAdminController(
     ): PlatformAdminDomainResponse =
         PlatformAdminDomainResponse.from(
             createClubDomainUseCase.createClubDomain(
-                admin = admin,
+                admin = admin.toPlatformActor(),
                 clubId = clubId,
                 command =
                     CreateClubDomainCommand(
@@ -57,7 +58,7 @@ class PlatformAdminController(
     ): PlatformAdminDomainResponse =
         PlatformAdminDomainResponse.from(
             checkClubDomainProvisioningUseCase.checkClubDomainProvisioning(
-                admin = admin,
+                admin = admin.toPlatformActor(),
                 domainId = domainId,
             ),
         )
