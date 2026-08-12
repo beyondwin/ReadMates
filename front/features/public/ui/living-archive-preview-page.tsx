@@ -229,6 +229,9 @@ export function LivingArchivePreviewPage({ model, publicBasePath }: LivingArchiv
 
       <section className="lap-shelf" aria-label="공개 기록 서가">
         <ReaderTraces model={model} />
+        <ol className="lap-shelf__featured" aria-label="최근 공개 기록">
+          <FeaturedVolume model={model} publicBasePath={publicBasePath} />
+        </ol>
         <ol className="lap-shelf__history" aria-label="지난 공개 기록">
           {historicalSessions.map((session, index) => (
             <HistoricalSpine
@@ -238,9 +241,6 @@ export function LivingArchivePreviewPage({ model, publicBasePath }: LivingArchiv
               session={session}
             />
           ))}
-        </ol>
-        <ol className="lap-shelf__featured" aria-label="최근 공개 기록">
-          <FeaturedVolume model={model} publicBasePath={publicBasePath} />
         </ol>
         <NextSlot />
         <div className="lap-shelf__ledge" aria-hidden="true" />

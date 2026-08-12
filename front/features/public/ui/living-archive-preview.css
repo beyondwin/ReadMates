@@ -912,38 +912,53 @@
     left: auto;
     order: 1;
     width: min(100%, 560px);
-    height: clamp(410px, 64vw, 480px);
-    min-height: 0;
+    height: auto;
+    min-height: clamp(410px, 64vw, 480px);
     justify-self: center;
   }
 
+  .lap-featured-volume,
   .lap-featured-volume__link {
+    height: auto;
     min-width: 0;
-    min-height: 44px;
+    min-height: clamp(410px, 64vw, 480px);
   }
 
   .lap-featured-volume__cover {
     width: 35%;
+    height: auto;
     min-width: 0;
     padding: 28px 10px 18px;
+    align-self: stretch;
   }
 
   .lap-featured-volume__title {
+    max-height: none;
     margin: 34px auto 18px;
+    overflow: visible;
     font-size: clamp(0.86rem, 2.6vw, 1rem);
+    line-height: 1.5;
+    letter-spacing: 0.01em;
+    overflow-wrap: anywhere;
+    text-align: center;
+    writing-mode: horizontal-tb;
   }
 
   .lap-featured-volume__page {
     width: 65%;
     min-width: 0;
-    height: calc(100% - 18px);
+    height: auto;
+    min-height: calc(clamp(410px, 64vw, 480px) - 18px);
     margin-top: 18px;
     padding: clamp(28px, 6vw, 42px) clamp(16px, 4vw, 26px) 22px;
   }
 
   .lap-featured-volume__excerpt,
   .lap-featured-volume__summary {
+    display: block;
+    overflow: visible;
     font-size: clamp(0.79rem, 2.4vw, 0.94rem);
+    -webkit-line-clamp: unset;
   }
 
   .lap-featured-volume__author {
@@ -1002,13 +1017,13 @@
     max-height: none;
     min-height: 0;
     margin: 0;
-    display: -webkit-box;
+    display: block;
+    overflow: visible;
     font-size: clamp(0.76rem, 2.4vw, 0.9rem);
     line-height: 1.45;
     letter-spacing: -0.01em;
     writing-mode: horizontal-tb;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 2;
+    overflow-wrap: anywhere;
   }
 
   .lap-spine__press-mark {
@@ -1084,8 +1099,10 @@
 
   .lap-latest-meeting__body p {
     max-width: 42ch;
+    display: block;
+    overflow: visible;
     font-size: 0.8rem;
-    -webkit-line-clamp: 3;
+    -webkit-line-clamp: unset;
   }
 
   .lap-invitation-boundary {
@@ -1110,7 +1127,7 @@
   }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 700px) {
   .living-archive-preview__header {
     min-height: 72px;
   }
@@ -1146,7 +1163,7 @@
   }
 
   .lap-shelf__featured {
-    height: 410px;
+    min-height: 410px;
   }
 
   .lap-featured-volume__cover {
@@ -1174,9 +1191,26 @@
   .living-archive-preview *,
   .living-archive-preview *::before,
   .living-archive-preview *::after {
+    animation-delay: 0s !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  .living-archive-preview .lap-shelf,
+  .living-archive-preview .lap-featured-volume__link {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .living-archive-preview .lap-reader-trace__line {
+    opacity: 1 !important;
+    transform: rotate(var(--lap-line-angle)) scaleX(1) !important;
+  }
+
+  .living-archive-preview .lap-cta-link::after {
+    opacity: 1 !important;
+    transform: scaleX(1) !important;
   }
 }

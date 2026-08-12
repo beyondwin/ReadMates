@@ -8,11 +8,11 @@ const sessions = Array.from({ length: 6 }, (_, index) => {
   return {
     sessionId: `session-${sessionNumber}`,
     sessionNumber,
-    bookTitle: `${sessionNumber}번째 공개 책 기록`,
+    bookTitle: `${sessionNumber}번째 공개 책 기록과 Expansive Archive Volume ${sessionNumber}`,
     bookAuthor: `공개 저자 ${sessionNumber}`,
     bookImageUrl: null,
     date: `2026-0${8 - index}-03`,
-    summary: "공개된 대화의 문장이 작은 화면에서도 온전히 이어지는 기록입니다.",
+    summary: "공개된 대화와 deliberately expansive English reflection이 작은 화면에서도 온전히 이어지는 기록입니다.",
     highlightCount: 2,
     oneLinerCount: 2,
   };
@@ -25,17 +25,17 @@ const model: LivingArchivePreviewModel = {
   latestDetail: {
     ...sessions[0],
     oneLiners: [
-      { authorName: "민지", authorShortName: "민", avatarKey: "minji", text: "오늘 나눈 대화가 책 안에서 오래 자라날 것 같아요." },
-      { authorName: "준호", authorShortName: "준", avatarKey: "junho", text: "서로 다른 해석이 다음 문장을 열어 주었습니다." },
+      { authorName: "민지", authorShortName: "민", avatarKey: "minji", text: "오늘 나눈 대화와 an enduring English reflection이 책 안에서 오래 자라날 것 같아요." },
+      { authorName: "준호", authorShortName: "준", avatarKey: "junho", text: "서로 다른 해석과 expansive archival language가 다음 문장을 열어 주었습니다." },
     ],
     highlights: [
-      { text: "함께 읽은 문장이 다음 만남까지 이어집니다.", sortOrder: 1, authorName: "서연", authorShortName: "서", avatarKey: "seoyeon" },
+      { text: "함께 읽은 문장과 a continuing reader trace가 다음 만남까지 이어집니다.", sortOrder: 1, authorName: "서연", authorShortName: "서", avatarKey: "seoyeon" },
     ],
   },
   readerTraces: [
-    { id: "one-liner-0", index: 0, authorName: "민지", authorShortName: "민", avatarKey: "minji", text: "오늘 나눈 대화가 책 안에서 오래 자라날 것 같아요.", kind: "oneLiner" },
-    { id: "one-liner-1", index: 1, authorName: "준호", authorShortName: "준", avatarKey: "junho", text: "서로 다른 해석이 다음 문장을 열어 주었습니다.", kind: "oneLiner" },
-    { id: "highlight-0", index: 2, authorName: "서연", authorShortName: "서", avatarKey: "seoyeon", text: "함께 읽은 문장이 다음 만남까지 이어집니다.", kind: "highlight" },
+    { id: "one-liner-0", index: 0, authorName: "민지", authorShortName: "민", avatarKey: "minji", text: "오늘 나눈 대화와 an enduring English reflection이 책 안에서 오래 자라날 것 같아요.", kind: "oneLiner" },
+    { id: "one-liner-1", index: 1, authorName: "준호", authorShortName: "준", avatarKey: "junho", text: "서로 다른 해석과 expansive archival language가 다음 문장을 열어 주었습니다.", kind: "oneLiner" },
+    { id: "highlight-0", index: 2, authorName: "서연", authorShortName: "서", avatarKey: "seoyeon", text: "함께 읽은 문장과 a continuing reader trace가 다음 만남까지 이어집니다.", kind: "highlight" },
   ],
 };
 
@@ -120,6 +120,8 @@ for (const viewport of [
         statement: rect(".living-archive-preview__statement"),
         shelf: rect(".lap-shelf"),
         featured: rect(".lap-shelf__featured"),
+        featuredCover: rect(".lap-featured-volume__cover"),
+        featuredPage: rect(".lap-featured-volume__page"),
         history: rect(".lap-shelf__history"),
         next: rect(".lap-next-slot"),
         strip: rect(".lap-editorial-strip"),
@@ -137,6 +139,7 @@ for (const viewport of [
     expect(flow.shelfPosition).not.toBe("absolute");
     expect(flow.historyDisplay).toBe("grid");
     expect(flow.featured.top).toBeGreaterThanOrEqual(flow.statement.bottom - 1);
+    expect(Math.abs(flow.featuredCover.bottom - flow.featuredPage.bottom)).toBeLessThanOrEqual(1);
     expect(flow.history.top).toBeGreaterThanOrEqual(flow.featured.bottom - 1);
     expect(flow.next.top).toBeGreaterThanOrEqual(flow.history.bottom - 1);
     expect(flow.strip.top).toBeGreaterThanOrEqual(flow.next.bottom - 1);
@@ -152,6 +155,20 @@ for (const viewport of [
     expect(linkMetrics.every(({ width, height }) => width >= 44 && height >= 44), JSON.stringify(linkMetrics)).toBe(true);
 
     await page.screenshot({ path: testInfo.outputPath(`living-archive-${viewport.name}.png`), fullPage: true });
+
+    if (viewport.name === "mobile") {
+      const shelfLinkOrder = await component.locator(".lap-shelf").getByRole("link").evaluateAll((links) =>
+        links.map((link) => link.getAttribute("aria-label")),
+      );
+      expect(shelfLinkOrder[0]).toMatch(/^최근 대화 펼치기:/);
+      expect(shelfLinkOrder.slice(1).every((label) => label?.startsWith("공개 기록 "))).toBe(true);
+
+      await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+      await page.keyboard.press("Tab");
+      await expect(component.getByRole("link", { name: "공개 기록 보기" }).first()).toBeFocused();
+      await page.keyboard.press("Tab");
+      await expect(component.locator(".lap-featured-volume__link")).toBeFocused();
+    }
 
     const recordsLink = component.getByRole("link", { name: "공개 기록 보기" }).first();
     await recordsLink.focus();
@@ -174,6 +191,11 @@ test("reflows without horizontal scroll at 200 percent zoom", async ({ mount, pa
 
   const metrics = await component.evaluate((root) => {
     const bounds = root.getBoundingClientRect();
+    const visibleDescendants = Array.from(root.querySelectorAll<HTMLElement>("*")).filter((element) => {
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== "none" && style.visibility !== "hidden" && rect.width > 0 && rect.height > 0;
+    });
     return {
       left: bounds.left,
       right: bounds.right,
@@ -184,6 +206,34 @@ test("reflows without horizontal scroll at 200 percent zoom", async ({ mount, pa
         const rect = section.getBoundingClientRect();
         return rect.left >= -1 && rect.right <= window.innerWidth + 1;
       }),
+      descendantBoundsFit: visibleDescendants.every((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.left >= -1 && rect.right <= window.innerWidth + 1;
+      }),
+      overflowingDescendants: visibleDescendants
+        .filter((element) => element.scrollWidth > element.clientWidth + 1)
+        .map((element) => ({
+          className: element.className,
+          clientWidth: element.clientWidth,
+          scrollWidth: element.scrollWidth,
+          tagName: element.tagName,
+          text: element.textContent?.trim().slice(0, 80),
+        })),
+      clippedTextDescendants: visibleDescendants
+        .filter((element) => {
+          const ownsText = Array.from(element.childNodes).some((node) => node.nodeType === Node.TEXT_NODE && node.textContent?.trim());
+          const style = getComputedStyle(element);
+          const clipsX = style.overflowX === "hidden" || style.overflowX === "clip";
+          const clipsY = style.overflowY === "hidden" || style.overflowY === "clip";
+          return ownsText && ((clipsX && element.scrollWidth > element.clientWidth + 1) || (clipsY && element.scrollHeight > element.clientHeight + 1));
+        })
+        .map((element) => ({
+          className: element.className,
+          clientHeight: element.clientHeight,
+          scrollHeight: element.scrollHeight,
+          tagName: element.tagName,
+          text: element.textContent?.trim().slice(0, 80),
+        })),
     };
   });
 
@@ -192,7 +242,29 @@ test("reflows without horizontal scroll at 200 percent zoom", async ({ mount, pa
   expect(metrics.rootScrollWidth).toBeLessThanOrEqual(metrics.rootClientWidth);
   expect(metrics.shelfPosition).not.toBe("absolute");
   expect(metrics.sectionFits).toBe(true);
+  expect(metrics.descendantBoundsFit).toBe(true);
+  expect(
+    { clipped: metrics.clippedTextDescendants, overflowing: metrics.overflowingDescendants },
+    JSON.stringify({ clipped: metrics.clippedTextDescendants, overflowing: metrics.overflowingDescendants }),
+  ).toEqual({ clipped: [], overflowing: [] });
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(640);
+
+  const zoomedLinks = await component.getByRole("link").evaluateAll((links) =>
+    links.map((link) => {
+      const rect = link.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    }),
+  );
+  expect(zoomedLinks.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
+
+  const zoomedRecordsLink = component.getByRole("link", { name: "공개 기록 보기" }).first();
+  await zoomedRecordsLink.focus();
+  const zoomedFocus = await zoomedRecordsLink.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return { outlineStyle: style.outlineStyle, outlineWidth: Number.parseFloat(style.outlineWidth) };
+  });
+  expect(zoomedFocus.outlineStyle).not.toBe("none");
+  expect(zoomedFocus.outlineWidth).toBeGreaterThanOrEqual(2);
 });
 
 test("uses one-time authored motion and an immediate reduced-motion fallback", async ({ mount, page }) => {
@@ -225,22 +297,39 @@ test("uses one-time authored motion and an immediate reduced-motion fallback", a
   await expect(component.getByRole("heading", { name: "책 사이에 사람이 남습니다" })).toBeVisible();
 
   await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
   const reducedMotion = await component.evaluate((root) => {
-    const read = (selector: string) => {
-      const style = getComputedStyle(root.querySelector<HTMLElement>(selector)!);
+    const read = (selector: string, pseudo?: string) => {
+      const style = getComputedStyle(root.querySelector<HTMLElement>(selector)!, pseudo);
+      const matrix = style.transform === "none" ? null : new DOMMatrixReadOnly(style.transform);
       return {
+        animationDelay: style.animationDelay,
         animationDuration: style.animationDuration,
         animationIterations: style.animationIterationCount,
+        opacity: Number.parseFloat(style.opacity),
+        transform: style.transform,
+        transformDeterminant: matrix ? matrix.a * matrix.d - matrix.b * matrix.c : 1,
         transitionDuration: style.transitionDuration,
       };
     };
 
-    return [read(".lap-shelf"), read(".lap-featured-volume__cover"), read(".lap-reader-trace__line"), read(".lap-cta-link")];
+    return {
+      shelf: read(".lap-shelf"),
+      featured: read(".lap-featured-volume__link"),
+      cover: read(".lap-featured-volume__cover"),
+      line: read(".lap-reader-trace__line"),
+      cta: read(".lap-cta-link", "::after"),
+    };
   });
 
-  for (const value of reducedMotion) {
+  for (const value of Object.values(reducedMotion)) {
+    expect(seconds(value.animationDelay)).toBeLessThanOrEqual(0.00001);
     expect(seconds(value.animationDuration)).toBeLessThanOrEqual(0.00001);
     expect(Number.parseFloat(value.animationIterations)).toBeLessThanOrEqual(1);
     expect(seconds(value.transitionDuration)).toBeLessThanOrEqual(0.00001);
+    expect(value.opacity).toBe(1);
+    expect(value.transformDeterminant).toBeGreaterThan(0.9);
   }
+  expect(reducedMotion.shelf.transform).toBe("none");
+  expect(reducedMotion.featured.transform).toBe("none");
 });
