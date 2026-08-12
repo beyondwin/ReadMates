@@ -1,6 +1,8 @@
+import type { CSSProperties } from "react";
 import type { LivingArchivePreviewModel } from "@/features/public/model/living-archive-preview-model";
 import { formatDateLabel, getPublicSessionListItemDisplay } from "@/features/public/model/public-display-model";
 import { publicRecordsHref, publicSessionHref } from "@/features/public/model/public-paths";
+import { PublicEntryActions } from "@/features/public/ui/public-entry-actions";
 import { Link } from "@/features/public/ui/public-link";
 import { bookClubAvatarSrc } from "@/shared/ui/book-club-avatar";
 import "./living-archive-preview.css";
@@ -11,6 +13,50 @@ type LivingArchivePreviewPageProps = {
 };
 
 type LivingArchiveSession = LivingArchivePreviewModel["sessions"][number];
+
+type ShelfPlacement = {
+  left: number;
+  width: number;
+};
+
+const historicalShelfZones = [
+  { left: 0, width: 45.25 },
+  { left: 66.75, width: 10.75 },
+  { left: 86.5, width: 13.5 },
+] as const;
+
+function historicalShelfPlacements(count: number): ShelfPlacement[] {
+  if (count <= 0) return [];
+
+  const zoneCounts = [0, 0, 0];
+  if (count === 1) {
+    zoneCounts[0] = 1;
+  } else if (count === 2) {
+    zoneCounts[0] = 1;
+    zoneCounts[2] = 1;
+  } else {
+    zoneCounts.fill(1);
+    for (let remaining = count - historicalShelfZones.length; remaining > 0; remaining -= 1) {
+      let targetZone = 0;
+      for (let index = 1; index < historicalShelfZones.length; index += 1) {
+        const targetWidth = historicalShelfZones[targetZone]!.width / (zoneCounts[targetZone]! + 1);
+        const candidateWidth = historicalShelfZones[index]!.width / (zoneCounts[index]! + 1);
+        if (candidateWidth > targetWidth) targetZone = index;
+      }
+      zoneCounts[targetZone] = zoneCounts[targetZone]! + 1;
+    }
+  }
+
+  return historicalShelfZones.flatMap((zone, zoneIndex) => {
+    const zoneCount = zoneCounts[zoneIndex]!;
+    if (zoneCount === 0) return [];
+    const width = zone.width / zoneCount;
+    return Array.from({ length: zoneCount }, (_, index) => ({
+      left: zone.left + width * index,
+      width,
+    }));
+  });
+}
 
 function folioNumber(value: number) {
   return String(value).padStart(2, "0");
@@ -24,10 +70,12 @@ function splitArchiveDate(value: string) {
 
 function HistoricalSpine({
   index,
+  placement,
   publicBasePath,
   session,
 }: {
   index: number;
+  placement: ShelfPlacement;
   publicBasePath: string;
   session: LivingArchiveSession;
 }) {
@@ -35,7 +83,14 @@ function HistoricalSpine({
   const date = splitArchiveDate(session.date);
 
   return (
-    <li className={`lap-spine lap-spine--${index % 5}`} data-testid="archive-spine">
+    <li
+      className={`lap-spine lap-spine--${index % 5}`}
+      data-testid="archive-spine"
+      style={{
+        "--lap-spine-left": `${placement.left}%`,
+        "--lap-spine-width": `${placement.width}%`,
+      } as CSSProperties}
+    >
       <Link
         className="lap-spine__link"
         to={publicSessionHref(session, publicBasePath)}
@@ -53,30 +108,30 @@ function HistoricalSpine({
   );
 }
 
-function ReaderTraces({ model }: { model: LivingArchivePreviewModel }) {
-  if (!model.latestDetail) {
+function ReaderTraces({ traces }: { traces: LivingArchivePreviewModel["readerTraces"] }) {
+  if (traces.length === 0) {
     return null;
   }
 
   return (
-    <div className="lap-reader-traces" aria-label="최근 공개 기록에 남은 독자 문장">
-      {model.readerTraces.map((trace) => (
-        <article
+    <ol className="lap-reader-traces" aria-label="최근 공개 기록에 남은 독자 문장">
+      {traces.map((trace) => (
+        <li
           className={`lap-reader-trace lap-reader-trace--${trace.index + 1}`}
           data-testid="reader-trace"
           key={trace.id}
         >
-          <span className="lap-reader-trace__portrait" aria-hidden="true">
-            <img src={bookClubAvatarSrc(trace.avatarKey)} alt="" />
+          <span className="lap-reader-trace__portrait">
+            <img src={bookClubAvatarSrc(trace.avatarKey)} alt={`${trace.authorName} 아바타`} />
           </span>
           <span className="lap-reader-trace__copy">
             <strong>{trace.authorName}</strong>
             <span>{trace.text}</span>
           </span>
           <span className="lap-reader-trace__line" aria-hidden="true" />
-        </article>
+        </li>
       ))}
-    </div>
+    </ol>
   );
 }
 
@@ -187,9 +242,12 @@ function EditorialStrip({
         )}
       </div>
 
-      <aside className="lap-invitation-boundary">
+      <aside className="lap-invitation-boundary" aria-label="멤버 참여 안내">
         <span className="lap-invitation-boundary__label">다음 자리</span>
         <h2>기록은 누구나 읽고, 참여는 초대받은 멤버와 이어갑니다</h2>
+        <div className="lap-invitation-boundary__actions">
+          <PublicEntryActions publicBasePath={publicBasePath} />
+        </div>
         <span className="lap-invitation-boundary__line" aria-hidden="true" />
         <span className="lap-invitation-boundary__mark" aria-hidden="true" />
       </aside>
@@ -201,6 +259,7 @@ export function LivingArchivePreviewPage({ model, publicBasePath }: LivingArchiv
   const historicalSessions = model.latest
     ? model.sessions.filter((session) => session.sessionId !== model.latest?.sessionId)
     : [];
+  const shelfPlacements = historicalShelfPlacements(historicalSessions.length);
 
   return (
     <main
@@ -229,15 +288,16 @@ export function LivingArchivePreviewPage({ model, publicBasePath }: LivingArchiv
       </section>
 
       <section className="lap-shelf" aria-label="공개 기록 서가">
-        <ReaderTraces model={model} />
         <ol className="lap-shelf__featured" aria-label="최근 공개 기록">
           <FeaturedVolume model={model} publicBasePath={publicBasePath} />
         </ol>
-        <ol className="lap-shelf__history" aria-label="지난 공개 기록">
+        <ReaderTraces traces={model.readerTraces} />
+        <ol className="lap-shelf__history" aria-label="지난 공개 기록" data-history-count={historicalSessions.length}>
           {historicalSessions.map((session, index) => (
             <HistoricalSpine
               index={index}
               key={session.sessionId}
+              placement={shelfPlacements[index]!}
               publicBasePath={publicBasePath}
               session={session}
             />

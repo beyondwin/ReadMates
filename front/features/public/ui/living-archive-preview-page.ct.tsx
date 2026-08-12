@@ -78,6 +78,12 @@ test("preserves the approved desktop composition at 1487 by 1058", async ({ moun
       featured: rect(".lap-shelf__featured"),
       next: rect(".lap-next-slot"),
       strip: rect(".lap-editorial-strip"),
+      shelfOccupants: Array.from(root.querySelectorAll<HTMLElement>(".lap-spine, .lap-shelf__featured, .lap-next-slot"))
+        .map((element) => {
+          const bounds = element.getBoundingClientRect();
+          return { className: element.className, left: bounds.left, right: bounds.right };
+        })
+        .sort((left, right) => left.left - right.left),
     };
   });
 
@@ -89,6 +95,24 @@ test("preserves the approved desktop composition at 1487 by 1058", async ({ moun
   expect(Math.abs((geometry.featured.left - geometry.preview.left + geometry.featured.width / 2) / 1487 - 0.56)).toBeLessThanOrEqual(16 / 1487);
   expect(Math.abs((geometry.next.left - geometry.preview.left + geometry.next.width / 2) / 1487 - 0.82)).toBeLessThanOrEqual(16 / 1487);
   expect(Math.abs((geometry.strip.top - geometry.preview.top) / 1058 - 0.778)).toBeLessThanOrEqual(16 / 1058);
+  expect(geometry.shelfOccupants[0]?.left).toBeLessThanOrEqual(geometry.preview.left + 1);
+  expect(geometry.shelfOccupants.at(-1)?.right).toBeGreaterThanOrEqual(geometry.preview.right - 1);
+  expect(
+    geometry.shelfOccupants.every((occupant, index, occupants) =>
+      index === 0 || occupant.left <= occupants[index - 1]!.right + 1,
+    ),
+    JSON.stringify(geometry.shelfOccupants),
+  ).toBe(true);
+  expect(
+    geometry.shelfOccupants.some((occupant) =>
+      occupant.className.includes("lap-spine") && occupant.left >= geometry.featured.right - 1,
+    ),
+  ).toBe(true);
+  expect(
+    geometry.shelfOccupants.some((occupant) =>
+      occupant.className.includes("lap-spine") && occupant.left >= geometry.next.right - 1,
+    ),
+  ).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(1487);
 
   await page.screenshot({ path: testInfo.outputPath("living-archive-desktop.png"), fullPage: true });
@@ -122,11 +146,15 @@ for (const viewport of [
         featured: rect(".lap-shelf__featured"),
         featuredCover: rect(".lap-featured-volume__cover"),
         featuredPage: rect(".lap-featured-volume__page"),
+        traces: rect(".lap-reader-traces"),
         history: rect(".lap-shelf__history"),
         next: rect(".lap-next-slot"),
         strip: rect(".lap-editorial-strip"),
         shelfPosition: getComputedStyle(root.querySelector<HTMLElement>(".lap-shelf")!).position,
         historyDisplay: getComputedStyle(history).display,
+        tracesDisplay: getComputedStyle(root.querySelector<HTMLElement>(".lap-reader-traces")!).display,
+        tracesPosition: getComputedStyle(root.querySelector<HTMLElement>(".lap-reader-traces")!).position,
+        shelfChildOrder: Array.from(root.querySelector<HTMLElement>(".lap-shelf")!.children).map((element) => element.className),
         historyRows,
       };
     });
@@ -138,13 +166,50 @@ for (const viewport of [
     }
     expect(flow.shelfPosition).not.toBe("absolute");
     expect(flow.historyDisplay).toBe("grid");
+    expect(flow.tracesDisplay).toBe("grid");
+    expect(flow.tracesPosition).toBe("relative");
     expect(flow.featured.top).toBeGreaterThanOrEqual(flow.statement.bottom - 1);
     expect(Math.abs(flow.featuredCover.bottom - flow.featuredPage.bottom)).toBeLessThanOrEqual(1);
-    expect(flow.history.top).toBeGreaterThanOrEqual(flow.featured.bottom - 1);
+    expect(flow.traces.top).toBeGreaterThanOrEqual(flow.featured.bottom - 1);
+    expect(flow.history.top).toBeGreaterThanOrEqual(flow.traces.bottom - 1);
     expect(flow.next.top).toBeGreaterThanOrEqual(flow.history.bottom - 1);
     expect(flow.strip.top).toBeGreaterThanOrEqual(flow.next.bottom - 1);
     expect(flow.historyRows.every((row, index, rows) => index === 0 || row.top >= rows[index - 1]!.bottom - 1)).toBe(true);
     expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+
+    const featuredIndex = flow.shelfChildOrder.indexOf("lap-shelf__featured");
+    const tracesIndex = flow.shelfChildOrder.indexOf("lap-reader-traces");
+    const historyIndex = flow.shelfChildOrder.indexOf("lap-shelf__history");
+    const nextIndex = flow.shelfChildOrder.indexOf("lap-next-slot");
+    expect(featuredIndex).toBeLessThan(tracesIndex);
+    expect(tracesIndex).toBeLessThan(historyIndex);
+    expect(historyIndex).toBeLessThan(nextIndex);
+
+    const traceSemantics = await component.locator(".lap-reader-trace").evaluateAll((traces) =>
+      traces.map((trace) => {
+        const copy = trace.querySelector<HTMLElement>(".lap-reader-trace__copy span")!;
+        const image = trace.querySelector<HTMLImageElement>("img")!;
+        const bounds = trace.getBoundingClientRect();
+        return {
+          author: trace.querySelector("strong")?.textContent,
+          fullSentenceVisible: copy.scrollHeight <= copy.clientHeight + 1 && copy.scrollWidth <= copy.clientWidth + 1,
+          imageAlt: image.alt,
+          left: bounds.left,
+          right: bounds.right,
+          text: copy.textContent,
+        };
+      }),
+    );
+    expect(traceSemantics).toHaveLength(model.readerTraces.length);
+    expect(traceSemantics).toEqual(
+      model.readerTraces.map((trace) => expect.objectContaining({
+        author: trace.authorName,
+        fullSentenceVisible: true,
+        imageAlt: `${trace.authorName} 아바타`,
+        text: trace.text,
+      })),
+    );
+    expect(traceSemantics.every(({ left, right }) => left >= -1 && right <= viewport.width + 1)).toBe(true);
 
     const linkMetrics = await component.getByRole("link").evaluateAll((links) =>
       links.map((link) => {
@@ -153,6 +218,32 @@ for (const viewport of [
       }),
     );
     expect(linkMetrics.every(({ width, height }) => width >= 44 && height >= 44), JSON.stringify(linkMetrics)).toBe(true);
+
+    const invitationActions = linkMetrics.filter(({ label }) => label === "둘러보기" || label === "멤버로 시작");
+    expect(invitationActions.map(({ label }) => label).sort()).toEqual(["둘러보기", "멤버로 시작"].sort());
+    expect(invitationActions.every(({ width, height }) => width >= 44 && height >= 44)).toBe(true);
+
+    const primaryActionContrast = await component.getByRole("link", { name: "둘러보기" }).evaluate((link) => {
+      const context = document.createElement("canvas").getContext("2d")!;
+      const pixels = (color: string) => {
+        context.canvas.width = 1;
+        context.canvas.height = 1;
+        context.clearRect(0, 0, 1, 1);
+        context.fillStyle = color;
+        context.fillRect(0, 0, 1, 1);
+        return Array.from(context.getImageData(0, 0, 1, 1).data.slice(0, 3));
+      };
+      const luminance = (channels: number[]) => channels
+        .map((channel) => channel / 255)
+        .map((channel) => channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4)
+        .reduce((sum, channel, index) => sum + channel * [0.2126, 0.7152, 0.0722][index]!, 0);
+      const style = getComputedStyle(link);
+      const foreground = luminance(pixels(style.color));
+      const background = luminance(pixels(style.backgroundColor));
+
+      return (Math.max(foreground, background) + 0.05) / (Math.min(foreground, background) + 0.05);
+    });
+    expect(primaryActionContrast).toBeGreaterThanOrEqual(4.5);
 
     await page.screenshot({ path: testInfo.outputPath(`living-archive-${viewport.name}.png`), fullPage: true });
 

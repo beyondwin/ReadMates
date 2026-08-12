@@ -4,6 +4,7 @@ import ReactDOM from "react-dom/client";
 
 import { RouterProvider } from "react-router/dom";
 import "@/src/styles/globals.css";
+import { LivingArchivePreviewRouteLifetime } from "@/features/public/route/living-archive-preview-route-lifetime";
 import { AuthProvider } from "./app/auth-context";
 import { createReadmatesRouter } from "./app/router";
 
@@ -13,6 +14,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
+        <LivingArchivePreviewRouteLifetime router={router} />
         <RouterProvider router={router} />
       </AuthProvider>
     </QueryClientProvider>

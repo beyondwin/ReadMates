@@ -2,7 +2,7 @@
 
 작성일: 2026-08-12
 상태: APPROVED DESIGN SPEC
-구현 상태: 시작 전
+구현 상태: 격리 프리뷰 구현 완료; 현재 공개 홈(`/`, `/clubs/:slug`)은 변경하지 않음
 대상 표면: `front/`의 격리된 `/living-archive-preview` 디자인 검증 route
 
 ## 0. 구현 대상 변경 기록
@@ -17,6 +17,9 @@
 - 검색 노출을 막기 위해 `robots=noindex,nofollow`를 설치하고 route 이탈 시 제거한다.
 - 공개 API와 baseline club loader는 재사용하지만 새로운 서버/BFF/API 계약은 만들지 않는다.
 - 시안 검수와 사용자의 홈 적용 승인이 끝나기 전에는 `/` 또는 `/clubs/:slug`를 교체하지 않는다.
+- 구현된 프리뷰의 활자는 현재 repository typography contract에 따라 `--f-sans`와 `--f-mono`를
+  사용하고 모든 시각 text를 최소 `12px`로 유지한다. 아래 7.2의 명조 제안은 최초 승인 당시의
+  시각 방향 기록이며 현재 구현 계약을 덮어쓰지 않는다.
 
 아래에서 “공개 홈”이라고 쓴 시각·정보구조 설명은 프리뷰가 장차 대체할 후보 화면을 뜻한다.
 현재 운영 route가 이미 교체되었다는 의미로 해석하지 않는다.

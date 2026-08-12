@@ -1,5 +1,5 @@
 import { render, screen } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { LivingArchivePreviewRoute } from "./living-archive-preview-route";
 
 const route = vi.hoisted(() => ({
@@ -8,6 +8,7 @@ const route = vi.hoisted(() => ({
 const queries = vi.hoisted(() => ({
   useQuery: vi.fn(),
 }));
+const previewSelector = 'meta[data-readmates-living-archive-preview="true"]';
 
 vi.mock("@tanstack/react-query", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@tanstack/react-query")>()),
@@ -17,10 +18,6 @@ vi.mock("@tanstack/react-query", async (importOriginal) => ({
 vi.mock("react-router", async (importOriginal) => ({
   ...(await importOriginal<typeof import("react-router")>()),
   useLoaderData: () => route.loaderData,
-}));
-
-vi.mock("@/features/public/ui/living-archive-preview-head", () => ({
-  LivingArchivePreviewHead: () => <div data-testid="living-archive-preview-head" />,
 }));
 
 vi.mock("@/features/public/ui/living-archive-preview-page", () => ({
@@ -69,6 +66,11 @@ const detail = {
   highlights: [],
 };
 
+afterEach(() => {
+  document.head.querySelectorAll(previewSelector).forEach((node) => node.remove());
+  document.head.querySelectorAll("[data-readmates-page-head]").forEach((node) => node.remove());
+});
+
 describe("LivingArchivePreviewRoute", () => {
   beforeEach(() => {
     queries.useQuery.mockReset();
@@ -81,7 +83,8 @@ describe("LivingArchivePreviewRoute", () => {
   it("reuses the public club cache and enables the latest-session query", () => {
     render(<LivingArchivePreviewRoute />);
 
-    expect(screen.getByTestId("living-archive-preview-head")).toBeVisible();
+    expect(screen.queryByTestId("living-archive-preview-head")).not.toBeInTheDocument();
+    expect(document.head.querySelector(previewSelector)).toBeNull();
     expect(screen.getByTestId("living-archive-preview-page")).toHaveTextContent(
       JSON.stringify({ clubName: "읽는사이", latest: "session-3", traceCount: 1, publicBasePath: "" }),
     );

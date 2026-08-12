@@ -67,10 +67,10 @@ const model: LivingArchivePreviewModel = {
   ],
 };
 
-function renderPreview(previewModel: LivingArchivePreviewModel = model) {
+function renderPreview(previewModel: LivingArchivePreviewModel = model, publicBasePath = "/clubs/reading-sai") {
   return render(
     <MemoryRouter>
-      <LivingArchivePreviewPage model={previewModel} publicBasePath="/clubs/reading-sai" />
+      <LivingArchivePreviewPage model={previewModel} publicBasePath={publicBasePath} />
     </MemoryRouter>,
   );
 }
@@ -93,6 +93,15 @@ describe("LivingArchivePreviewPage", () => {
     expect(screen.getAllByTestId("archive-spine")).toHaveLength(model.sessions.length);
     expect(screen.getAllByTestId("reader-trace")).toHaveLength(model.readerTraces.length);
 
+    const traceList = screen.getByRole("list", { name: "최근 공개 기록에 남은 독자 문장" });
+    const traceItems = within(traceList).getAllByRole("listitem");
+    expect(traceItems).toHaveLength(model.readerTraces.length);
+    model.readerTraces.forEach((trace, index) => {
+      expect(within(traceItems[index]!).getByRole("img", { name: `${trace.authorName} 아바타` })).toBeVisible();
+      expect(within(traceItems[index]!).getByText(trace.authorName)).toBeVisible();
+      expect(within(traceItems[index]!).getByText(trace.text)).toBeVisible();
+    });
+
     const latestLink = screen.getByRole("link", { name: /최근 대화 펼치기.*세 번째 책/ });
     expect(latestLink).toHaveAttribute("href", "/clubs/reading-sai/sessions/session-3");
     expect(within(latestLink).getByText("첫 문장")).toBeVisible();
@@ -111,6 +120,30 @@ describe("LivingArchivePreviewPage", () => {
       "lap-shelf",
       "lap-editorial-strip",
     ]);
+
+    const invitation = screen.getByRole("complementary", { name: "멤버 참여 안내" });
+    expect(within(invitation).getByRole("link", { name: "둘러보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app",
+    );
+    expect(within(invitation).getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
+  });
+
+  it("preserves the baseline club destination for unscoped preview entry actions", () => {
+    renderPreview(model, "");
+
+    const invitation = screen.getByRole("complementary", { name: "멤버 참여 안내" });
+    expect(within(invitation).getByRole("link", { name: "둘러보기" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app",
+    );
+    expect(within(invitation).getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
+      "href",
+      "/login?returnTo=%2Fclubs%2Freading-sai%2Fapp",
+    );
   });
 
   it("uses the latest public list summary when optional session detail is unavailable", () => {

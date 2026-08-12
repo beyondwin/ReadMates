@@ -3,9 +3,7 @@ import { useLoaderData } from "react-router";
 import { buildLivingArchivePreviewModel } from "@/features/public/model/living-archive-preview-model";
 import { publicClubQuery, publicSessionQuery } from "@/features/public/queries/public-queries";
 import type { PublicClubRouteData } from "@/features/public/route/public-route-data";
-import { LivingArchivePreviewHead } from "@/features/public/ui/living-archive-preview-head";
 import { LivingArchivePreviewPage } from "@/features/public/ui/living-archive-preview-page";
-import "@/features/public/ui/living-archive-preview.css";
 
 export function LivingArchivePreviewRoute() {
   const data = useLoaderData() as PublicClubRouteData;
@@ -17,15 +15,10 @@ export function LivingArchivePreviewRoute() {
   });
 
   if (!clubQuery.data) {
-    return <LivingArchivePreviewHead />;
+    return null;
   }
 
   const model = buildLivingArchivePreviewModel(clubQuery.data, sessionQuery.data ?? null);
 
-  return (
-    <>
-      <LivingArchivePreviewHead />
-      <LivingArchivePreviewPage model={model} publicBasePath={data.publicBasePath} />
-    </>
-  );
+  return <LivingArchivePreviewPage model={model} publicBasePath={data.publicBasePath} />;
 }
