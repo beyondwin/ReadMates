@@ -53,6 +53,49 @@
   모션 규칙으로 확장하는 방식
 - [Rijksmuseum](https://www.rijksmuseum.nl/en): 한 화면에 하나의 작품과 하나의 메시지를 두는 집중도
 
+### 2.1 승인 시안과 충실도 계약
+
+사용자가 선택한 `People Between the Volumes` 3번 시안을 공개 홈 구현의 **canonical visual
+reference**로 사용한다. 참조 artifact는 `exec-822d0e31-13e4-4210-802d-e3f20aa23279.png`, 원본 크기는
+`1487 x 1058`, SHA-256은
+`5300d886fcc62edb8bd2c1b4a71dd3a0e58e39d6701cb4effa1f000fdd8a02ee`다. 로컬 절대 경로는 저장소
+문서에 기록하지 않고 구현 handoff에서 artifact 자체를 전달한다.
+
+이 시안은 분위기 참고가 아니라 desktop 구성의 승인 기준본이다. 다음 항목은 그대로 재현한다.
+
+- 상단의 얇고 조용한 wordmark/navigation과 넓은 무장식 여백
+- 좌측 상단의 2행 브랜드 문장과 바로 아래의 짧은 보조 문장
+- 첫 viewport의 가로폭 전체를 점유하는 연속된 책등, 중앙의 앞으로 나온 최신 회차, 우측의 밝은
+  `다음 자리`
+- 책등 위로 떠 있는 최대 세 명의 독자 흔적과 회차까지 이어지는 가는 선
+- 선반 아래에서 즉시 이어지는 2분할 편집 strip, 세로선, 작은 folio label, 넓은 내부 여백
+- 따뜻한 bone 배경, carbon text, 저채도 cloth spine, brass 각인, cobalt/vermilion 관계선
+- flat paper와 cloth 물성, 최소 radius, 책이 앞으로 나올 때만 생기는 절제된 그림자
+
+`1487 x 1058` 검수 viewport에서는 다음 normalized composition을 유지한다.
+
+| 구간 | 기준 | 허용 편차 |
+| --- | --- | --- |
+| header | 높이 약 `9%` | `+/- 12px` |
+| 브랜드 문장 시작점 | `x 4%`, `y 11%` | `+/- 16px` |
+| 책등 상단 | `y 36.8%` | `+/- 16px` |
+| 선반 하단 | `y 73.2%` | `+/- 16px` |
+| 최신 회차 중심 | `x 56%` | `+/- 3%` |
+| 다음 자리 중심 | `x 82%` | `+/- 3%` |
+| 하단 strip 시작 | `y 77.8%` | `+/- 20px` |
+
+실제 구현은 승인 이미지를 hero raster로 사용하지 않는다. DOM, CSS, 실제 공개 데이터로 재구성하고,
+AI 시안의 깨진 글자, 임의 인물, 임의 책과 날짜는 제품의 실제 문구와 public-safe fixture로 교정한다.
+API가 제공하는 최근 회차 수보다 많은 가짜 책등이나 가짜 멤버를 만들지 않는다. 데이터 수가 달라도
+책등의 비례, 연속된 선반, 펼친 회차, 다음 자리, 하단 strip이라는 조형은 유지한다.
+
+다음 결과는 구현 실패로 본다.
+
+- 기존 공개 홈의 카드형 구성을 유지한 채 색과 폰트만 바꾸는 것
+- 일반적인 `headline + CTA + feature cards` landing으로 단순화하는 것
+- 승인 시안과 대조하지 않고 새 component screenshot만 baseline으로 채택하는 것
+- desktop 시안을 그대로 축소해 mobile horizontal scroll을 만드는 것
+
 ## 3. 목표
 
 1. 방문자가 첫 3초 안에 ReadMates를 사람과 문장이 쌓이는 독서모임으로 이해한다.
