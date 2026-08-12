@@ -7,23 +7,38 @@ import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 
 export function publicRoutes(queryClient: QueryClient): RouteObject {
   return {
-    element: <PublicRouteLayout />,
+    id: "public-catch-all-tree",
     errorElement: <RouteErrorBoundary variant="public" />,
     children: [
       {
-        path: "/",
+        path: "/living-archive-preview",
         errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 홈을 불러오는 중" variant="public" />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="Living Archive 프리뷰를 불러오는 중" variant="public" />,
         lazy: async () => {
-          const [{ default: PublicHomePage }, { publicClubLoaderFactory }] = await Promise.all([
-            import("@/src/pages/public-home"),
+          const [{ default: LivingArchivePreviewPage }, { publicClubLoaderFactory }] = await Promise.all([
+            import("@/src/pages/living-archive-preview"),
             import("@/features/public/route/public-route-data"),
           ]);
-          return { Component: PublicHomePage, loader: publicClubLoaderFactory(queryClient) };
+          return { Component: LivingArchivePreviewPage, loader: publicClubLoaderFactory(queryClient) };
         },
       },
       {
-        path: "/about",
+        element: <PublicRouteLayout />,
+        children: [
+          {
+            path: "/",
+            errorElement: <PublicRouteError />,
+            hydrateFallbackElement: <ReadmatesRouteLoading label="공개 홈을 불러오는 중" variant="public" />,
+            lazy: async () => {
+              const [{ default: PublicHomePage }, { publicClubLoaderFactory }] = await Promise.all([
+                import("@/src/pages/public-home"),
+                import("@/features/public/route/public-route-data"),
+              ]);
+              return { Component: PublicHomePage, loader: publicClubLoaderFactory(queryClient) };
+            },
+          },
+          {
+            path: "/about",
         errorElement: <PublicRouteError />,
         hydrateFallbackElement: <ReadmatesRouteLoading label="클럽 소개를 불러오는 중" variant="public" />,
         lazy: async () => {
@@ -138,7 +153,9 @@ export function publicRoutes(queryClient: QueryClient): RouteObject {
           return { Component: ResetPasswordPage };
         },
       },
-      { path: "*", element: <NotFoundRoute variant="public" /> },
+          { path: "*", element: <NotFoundRoute variant="public" /> },
+        ],
+      },
     ],
   };
 }

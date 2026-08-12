@@ -54,6 +54,12 @@ describe("router route order", () => {
     expect(routePathsFor("/clubs/reading-sai/app/host/members")).not.toEqual(expect.arrayContaining(["*"]));
   });
 
+  it("keeps the living archive preview isolated from existing public-home routes", () => {
+    expect(routePathsFor("/living-archive-preview")).toContain("/living-archive-preview");
+    expect(routePathsFor("/")).not.toContain("/living-archive-preview");
+    expect(routePathsFor("/clubs/reading-sai")).not.toContain("/living-archive-preview");
+  });
+
   it("keeps guest-equivalent scoped routes out of protected lazy data graphs", () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const routes = buildRoutes(queryClient);
