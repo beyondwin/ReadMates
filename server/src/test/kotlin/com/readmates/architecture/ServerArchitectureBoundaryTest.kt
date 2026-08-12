@@ -615,35 +615,35 @@ class ServerArchitectureBoundaryTest {
         val taskThreeConsumerFiles =
             listOf(
                 resolver,
+                sourceRoot.resolve("com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolver.kt"),
                 sourceRoot.resolve("com/readmates/auth/adapter/in/web/AuthMeController.kt"),
                 sourceRoot.resolve("com/readmates/auth/adapter/in/web/MemberProfileController.kt"),
                 sourceRoot.resolve("com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt"),
                 sourceRoot.resolve("com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt"),
             )
+        val resolverShapeViolations = resolverSourceShapeViolations(source)
         val fullyQualifiedReferences =
-            taskThreeConsumerFiles.flatMap { sourceFile ->
-                sourceFile
-                    .readLines()
-                    .mapIndexedNotNull { index, line ->
-                        val trimmed = line.trim()
-                        val isFullyQualifiedReadMatesReference =
-                            "com.readmates." in trimmed &&
-                                !trimmed.startsWith("package ") &&
-                                !trimmed.startsWith("import ")
-                        if (isFullyQualifiedReadMatesReference) {
-                            "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: $trimmed"
-                        } else {
-                            null
-                        }
-                    }
-            }
+            fullyQualifiedReadMatesReferences(
+                taskThreeConsumerFiles.map { sourceFile ->
+                    sourceFile.relativeTo(sourceRoot).toString() to sourceFile.readText()
+                },
+            )
         val clubWebImportViolations = authClubWebImportViolations(sourceRoot)
+        val resolverFailureMessage =
+            "Auth club-context resolver must be the exact top-level extension:\n" +
+                resolverShapeViolations.joinToString("\n")
 
-        assertTrue(source.contains("fun HttpServletRequest.resolveAuthClubContext("))
+        assertTrue(
+            resolverShapeViolations.isEmpty(),
+            resolverFailureMessage,
+        )
         assertTrue(source.contains("import com.readmates.club.application.model.ResolvedClubContext"))
-        assertTrue(source.contains("import com.readmates.club.application.port.`in`.ResolveClubContextUseCase"))
+        assertTrue(
+            source.contains(
+                "import com.readmates.club.application.port.`in`.ResolveClubContextUseCase as ClubContextUseCase",
+            ),
+        )
         assertTrue(source.contains("import jakarta.servlet.http.HttpServletRequest"))
-        assertFalse(source.contains("object AuthClubContextResolver"))
         assertTrue(
             clubWebImportViolations.isEmpty(),
             "Auth production code must not import club web adapters:\n${clubWebImportViolations.joinToString("\n")}",
@@ -654,6 +654,163 @@ class ServerArchitectureBoundaryTest {
                 fullyQualifiedReferences.joinToString("\n"),
         )
     }
+
+    @Test
+    fun `auth club context source shape guard rejects wrappers and current-member FQ bypasses`() {
+        val wrappedResolver =
+            """
+            class AlternativeResolver {
+            fun HttpServletRequest.resolveAuthClubContext(resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {
+                return RequestedAuthClubContext(false, AuthClubContextSource.NONE, null)
+            }
+            }
+            """.trimIndent()
+        val currentMemberFqBypass =
+            """
+            package com.readmates.auth.adapter.`in`.security
+            val bypass = com.readmates.auth.adapter.`in`.security.AuthClubContextHeader.CLUB_SLUG
+            """.trimIndent()
+        val currentMemberResolverPath =
+            "com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolver.kt"
+
+        assertTrue(resolverSourceShapeViolations(wrappedResolver).isNotEmpty())
+        assertTrue(
+            fullyQualifiedReadMatesReferences(
+                listOf(currentMemberResolverPath to currentMemberFqBypass),
+            ).isNotEmpty(),
+        )
+    }
+
+    private fun resolverSourceShapeViolations(source: String): List<String> =
+        buildList {
+            val lines = source.lines()
+            val declarationLines =
+                lines.indices.filter { index ->
+                    lines[index].trimStart().startsWith(AUTH_CLUB_CONTEXT_EXTENSION_PREFIX)
+                }
+            if (declarationLines.size != 1) {
+                add("expected one auth club-context extension declaration, found ${declarationLines.size}")
+            } else {
+                val declarationLine = declarationLines.single()
+                val braceDepth = kotlinBraceDepthBeforeLines(source).getValue(declarationLine)
+                if (braceDepth != 0) {
+                    add("auth club-context extension must be top-level, found at brace depth $braceDepth")
+                }
+                val declaration = lines.drop(declarationLine).take(EXACT_AUTH_CLUB_CONTEXT_EXTENSION_LINE_COUNT)
+                if (declaration.joinToString("\n") != EXACT_AUTH_CLUB_CONTEXT_EXTENSION) {
+                    add("auth club-context extension declaration does not match the required signature")
+                }
+            }
+        }
+
+    private fun kotlinBraceDepthBeforeLines(source: String): Map<Int, Int> {
+        var scanState = KotlinBraceScanState()
+        return source
+            .lineSequence()
+            .mapIndexed { index, line ->
+                val depthBeforeLine = scanState.braceDepth
+                scanState = scanKotlinLine(line, scanState)
+                index to depthBeforeLine
+            }.toMap()
+    }
+
+    private fun scanKotlinLine(
+        line: String,
+        initialState: KotlinBraceScanState,
+    ): KotlinBraceScanState {
+        var scanState = initialState
+        var characterIndex = 0
+        while (characterIndex < line.length) {
+            val specialStep = nextKotlinSpecialStep(line, characterIndex, scanState)
+            if (specialStep != null) {
+                scanState = specialStep.state
+                characterIndex = specialStep.nextCharacterIndex
+            } else {
+                when (line[characterIndex]) {
+                    '"' -> characterIndex = skipKotlinString(line, characterIndex)
+                    '\'' -> characterIndex = skipKotlinCharacterLiteral(line, characterIndex)
+                    '{' -> {
+                        scanState = scanState.copy(braceDepth = scanState.braceDepth + 1)
+                        characterIndex++
+                    }
+                    '}' -> {
+                        scanState = scanState.copy(braceDepth = scanState.braceDepth - 1)
+                        characterIndex++
+                    }
+                    else -> characterIndex++
+                }
+            }
+        }
+        return scanState
+    }
+
+    private fun nextKotlinSpecialStep(
+        line: String,
+        characterIndex: Int,
+        scanState: KotlinBraceScanState,
+    ): KotlinScanStep? =
+        when {
+            scanState.inBlockComment && line.startsWith("*/", characterIndex) ->
+                KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = false))
+            scanState.inBlockComment -> KotlinScanStep(characterIndex + 1, scanState)
+            scanState.inTripleQuotedString && line.startsWith("\"\"\"", characterIndex) ->
+                KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = false))
+            scanState.inTripleQuotedString -> KotlinScanStep(characterIndex + 1, scanState)
+            line.startsWith("//", characterIndex) -> KotlinScanStep(line.length, scanState)
+            line.startsWith("/*", characterIndex) ->
+                KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = true))
+            line.startsWith("\"\"\"", characterIndex) ->
+                KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = true))
+            else -> null
+        }
+
+    private fun skipKotlinString(
+        line: String,
+        openingQuote: Int,
+    ): Int {
+        var characterIndex = openingQuote + 1
+        while (characterIndex < line.length) {
+            if (line[characterIndex] == '\\') {
+                characterIndex += 2
+            } else if (line[characterIndex] == '"') {
+                return characterIndex + 1
+            } else {
+                characterIndex++
+            }
+        }
+        return characterIndex
+    }
+
+    private fun skipKotlinCharacterLiteral(
+        line: String,
+        openingQuote: Int,
+    ): Int {
+        var characterIndex = openingQuote + 1
+        while (characterIndex < line.length) {
+            if (line[characterIndex] == '\\') {
+                characterIndex += 2
+            } else if (line[characterIndex] == '\'') {
+                return characterIndex + 1
+            } else {
+                characterIndex++
+            }
+        }
+        return characterIndex
+    }
+
+    private fun fullyQualifiedReadMatesReferences(sourceFiles: List<Pair<String, String>>): List<String> =
+        sourceFiles.flatMap { (relativePath, source) ->
+            source
+                .lineSequence()
+                .mapIndexedNotNull { index, line ->
+                    val trimmed = line.trim()
+                    val isFullyQualifiedReadMatesReference =
+                        "com.readmates." in trimmed &&
+                            !trimmed.startsWith("package ") &&
+                            !trimmed.startsWith("import ")
+                    if (isFullyQualifiedReadMatesReference) "$relativePath:${index + 1}: $trimmed" else null
+                }.toList()
+        }
 
     private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
         Files.walk(sourceRoot.resolve("com/readmates/auth")).use { paths ->
@@ -673,6 +830,24 @@ class ServerArchitectureBoundaryTest {
                 }.toList()
         }
 }
+
+private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION =
+    "fun HttpServletRequest.resolveAuthClubContext(" +
+        "resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {"
+
+private const val AUTH_CLUB_CONTEXT_EXTENSION_PREFIX = "fun HttpServletRequest.resolveAuthClubContext("
+private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION_LINE_COUNT = 1
+
+private data class KotlinBraceScanState(
+    val braceDepth: Int = 0,
+    val inBlockComment: Boolean = false,
+    val inTripleQuotedString: Boolean = false,
+)
+
+private data class KotlinScanStep(
+    val nextCharacterIndex: Int,
+    val state: KotlinBraceScanState,
+)
 
 @Tag("architecture")
 class ServerArchitectureSourceBoundaryTest {

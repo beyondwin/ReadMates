@@ -23,13 +23,16 @@ import org.springframework.web.filter.OncePerRequestFilter
  * Resolves authorities for the current principal.
  *
  * Branching rules (delegated to [AuthoritySynthesisService]):
- * - When [RequestedClubContext.source] is SLUG and the slug is registered, lookup the member and synthesize
+ * - When [RequestedAuthClubContext.source] is [AuthClubContextSource.SLUG] and the slug is registered,
+ *   lookup the member and synthesize
  *   role + host + platform admin authorities.
- * - When [RequestedClubContext.source] is SLUG and the slug is NOT registered (`supplied=true && context=null`),
+ * - When [RequestedAuthClubContext.source] is [AuthClubContextSource.SLUG] and the slug is NOT registered
+ *   (`supplied=true && context=null`),
  *   the member lookup is intentionally skipped (`member=null`). Authorities are then composed entirely from
  *   platform admin + host support grants. Do NOT add a `member==null` short-circuit guard above this branch;
  *   doing so would silently strip support-grant authorities. See ADR-0013 for context.
- * - When [RequestedClubContext.source] is HOST_FALLBACK or NONE, return an unscoped principal.
+ * - When [RequestedAuthClubContext.source] is [AuthClubContextSource.HOST_FALLBACK] or [AuthClubContextSource.NONE],
+ *   return an unscoped principal.
  *
  * This filter is in the infrastructure layer: it is allowed to use Spring Security types and
  * adapter types. It maps result authority strings → [SimpleGrantedAuthority] at this boundary.

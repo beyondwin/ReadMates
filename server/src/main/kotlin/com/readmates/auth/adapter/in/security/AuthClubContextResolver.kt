@@ -3,8 +3,8 @@
 package com.readmates.auth.adapter.`in`.security
 
 import com.readmates.club.application.model.ResolvedClubContext
-import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import jakarta.servlet.http.HttpServletRequest
+import com.readmates.club.application.port.`in`.ResolveClubContextUseCase as ClubContextUseCase
 
 object AuthClubContextHeader {
     const val CLUB_HOST = "X-Readmates-Club-Host"
@@ -23,13 +23,13 @@ data class RequestedAuthClubContext(
     val context: ResolvedClubContext?,
 )
 
-fun HttpServletRequest.resolveAuthClubContext(useCase: ResolveClubContextUseCase): RequestedAuthClubContext {
+fun HttpServletRequest.resolveAuthClubContext(resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {
     val slug = getHeader(AuthClubContextHeader.CLUB_SLUG)?.trim()?.takeIf { it.isNotEmpty() }
     if (slug != null) {
         return RequestedAuthClubContext(
             supplied = true,
             source = AuthClubContextSource.SLUG,
-            context = useCase.resolveBySlug(slug),
+            context = resolveClubContextUseCase.resolveBySlug(slug),
         )
     }
 
@@ -38,7 +38,7 @@ fun HttpServletRequest.resolveAuthClubContext(useCase: ResolveClubContextUseCase
         RequestedAuthClubContext(
             supplied = true,
             source = AuthClubContextSource.HOST_FALLBACK,
-            context = useCase.resolveByHost(host),
+            context = resolveClubContextUseCase.resolveByHost(host),
         )
     } else {
         RequestedAuthClubContext(
