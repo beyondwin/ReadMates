@@ -1,7 +1,9 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.GoogleLoginException
 import com.readmates.auth.application.InvitationDomainError
 import com.readmates.auth.application.InvitationDomainException
+import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
 import com.readmates.auth.application.port.`in`.PreviewInvitationUseCase
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand
@@ -70,7 +72,8 @@ class InvitationService(
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : ManageHostInvitationsUseCase,
-    PreviewInvitationUseCase {
+    PreviewInvitationUseCase,
+    AcceptGoogleInvitationUseCase {
     @Transactional
     override fun createInvitation(
         host: ClubActor,
@@ -142,13 +145,13 @@ class InvitationService(
     }
 
     @Transactional
-    fun acceptGoogleInvitation(
+    override fun acceptGoogleInvitation(
         rawToken: String,
         googleSubjectId: String,
         email: String,
         displayName: String?,
         profileImageUrl: String?,
-        expectedClubSlug: String? = null,
+        expectedClubSlug: String?,
     ): CurrentMember {
         val invitation = queryInvitationByToken(rawToken, forUpdate = true)
         if (expectedClubSlug != null && invitation.clubSlug != expectedClubSlug) {

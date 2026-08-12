@@ -1,10 +1,13 @@
-package com.readmates.auth.application.service
+package com.readmates.auth.application
 
+import com.readmates.auth.application.model.GoogleLoginResult
+import com.readmates.auth.application.port.`in`.LoginVerifiedGoogleUserUseCase
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.application.port.out.MembershipDuplicateException
 import com.readmates.auth.application.port.out.PlatformAdminLookupPort
+import com.readmates.auth.application.service.GoogleLoginService
 import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
@@ -39,6 +42,7 @@ import javax.sql.DataSource
 @Tag("integration")
 class GoogleLoginServiceTest(
     @param:Autowired private val googleLoginService: GoogleLoginService,
+    @param:Autowired private val loginVerifiedGoogleUserUseCase: LoginVerifiedGoogleUserUseCase,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val dataSource: DataSource,
 ) : ReadmatesMySqlIntegrationTestSupport() {
@@ -129,7 +133,7 @@ class GoogleLoginServiceTest(
     @Test
     fun `generic google login creates an account without unintended membership`() {
         val result =
-            googleLoginService.loginVerifiedGoogleUserForSession(
+            loginVerifiedGoogleUserUseCase.loginVerifiedGoogleUserForSession(
                 googleSubjectId = "google-new-viewer-user",
                 email = "new.viewer@example.com",
                 displayName = "New Viewer",

@@ -388,6 +388,18 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `auth inbound and security adapters depend on auth input ports instead of concrete services`() {
+        val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
+        val violations = authInboundConcreteServiceImportViolations(sourceRoot)
+
+        assertTrue(
+            violations.isEmpty(),
+            "Auth inbound and security adapters must not import auth concrete services:\n" +
+                violations.joinToString("\n"),
+        )
+    }
+
+    @Test
     fun `auth security filters consume auth ports and models instead of concrete auth resolution services`() {
         val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
         val memberAuthoritiesFilter =
@@ -1054,7 +1066,12 @@ private fun authWebConcreteServiceImportViolations(sourceRoot: Path): List<Strin
                 sourceFile
                     .readLines()
                     .mapIndexedNotNull { index, line ->
-                        val importName = line.trim().removePrefix("import").trimStart().replace("`", "")
+                        val importName =
+                            line
+                                .trim()
+                                .removePrefix("import")
+                                .trimStart()
+                                .replace("`", "")
                         if (importName.startsWith("com.readmates.auth.application.service.")) {
                             "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: ${line.trim()}"
                         } else {
@@ -1063,6 +1080,34 @@ private fun authWebConcreteServiceImportViolations(sourceRoot: Path): List<Strin
                     }.stream()
             }.toList()
     }
+
+private fun authInboundConcreteServiceImportViolations(sourceRoot: Path): List<String> =
+    listOf(
+        sourceRoot.resolve("com/readmates/auth/adapter/in"),
+        sourceRoot.resolve("com/readmates/auth/infrastructure/security"),
+    ).flatMap { inboundRoot ->
+        Files.walk(inboundRoot).use { paths ->
+            paths
+                .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
+                .flatMap { sourceFile ->
+                    sourceFile
+                        .readLines()
+                        .mapIndexedNotNull { index, line ->
+                            val importName =
+                                line
+                                    .trim()
+                                    .removePrefix("import")
+                                    .trimStart()
+                                    .replace("`", "")
+                            if (importName.startsWith("com.readmates.auth.application.service.")) {
+                                "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: ${line.trim()}"
+                            } else {
+                                null
+                            }
+                        }.stream()
+                }.toList()
+        }
+    }.sorted()
 
 private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION =
     "fun HttpServletRequest.resolveAuthClubContext(" +

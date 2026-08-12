@@ -398,7 +398,7 @@
     <ID>ThrowsCount:HostManualNotificationService.kt:HostManualNotificationService$private fun validateSelection</ID>
     <ID>ThrowsCount:HostNotificationOperationsService.kt:HostNotificationOperationsService$override fun retry: HostNotificationDetail</ID>
     <ID>ThrowsCount:HostSessionWriteOperations.kt:HostSessionWriteOperations$fun open: HostSessionTransitionResult</ID>
-    <ID>ThrowsCount:InvitationService.kt:InvitationService$@Transactional fun acceptGoogleInvitation: CurrentMember</ID>
+    <ID>ThrowsCount:InvitationService.kt:InvitationService$@Transactional override fun acceptGoogleInvitation: CurrentMember</ID>
     <ID>ThrowsCount:InvitationService.kt:InvitationService$private fun connectOrCreateInvitedGoogleUser: UUID</ID>
     <ID>ThrowsCount:JdbcMemberAccountAdapter.kt:JdbcMemberAccountAdapter$override fun createGoogleUser: UUID</ID>
     <ID>ThrowsCount:JdbcMemberAccountAdapter.kt:JdbcMemberAccountAdapter$override fun createViewerGoogleMember: CurrentMember</ID>
@@ -426,7 +426,7 @@
     <ID>TooGenericExceptionThrown:BffSecretFilterAuditTest.kt:BffSecretFilterAuditTest.&lt;no name provided&gt;$throw RuntimeException("db down")</ID>
     <ID>TooManyFunctions:AiGenerationJobStore.kt:AiGenerationJobStore</ID>
     <ID>TooManyFunctions:ArchiveWebMapper.kt:com.readmates.archive.adapter.in.web.ArchiveWebMapper.kt</ID>
-    <ID>TooManyFunctions:AuthSessionService.kt:AuthSessionService : LogoutAuthSessionUseCase</ID>
+    <ID>TooManyFunctions:AuthSessionService.kt:AuthSessionService : ManageAuthSessionUseCaseLogoutAuthSessionUseCase</ID>
     <ID>TooManyFunctions:FeedbackDocumentParser.kt:FeedbackDocumentParser</ID>
     <ID>TooManyFunctions:HostInvitationStorePort.kt:HostInvitationStorePort</ID>
     <ID>TooManyFunctions:HostManualNotificationService.kt:HostManualNotificationService : ManageManualHostNotificationsUseCase</ID>
@@ -434,7 +434,7 @@
     <ID>TooManyFunctions:HostNotificationController.kt:HostNotificationController</ID>
     <ID>TooManyFunctions:HostSessionQueries.kt:HostSessionQueries</ID>
     <ID>TooManyFunctions:HostSessionWriteOperations.kt:HostSessionWriteOperations</ID>
-    <ID>TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCase</ID>
+    <ID>TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCaseAcceptGoogleInvitationUseCase</ID>
     <ID>TooManyFunctions:JdbcAiGenerationOpsAuditRepository.kt:JdbcAiGenerationOpsAuditRepository : AiGenerationAuditQueryPortAiGenerationAdminActionAuditPort</ID>
     <ID>TooManyFunctions:JdbcHostInvitationStoreAdapter.kt:JdbcHostInvitationStoreAdapter : HostInvitationStorePort</ID>
     <ID>TooManyFunctions:JdbcHostSessionWriteAdapter.kt:JdbcHostSessionWriteAdapter : HostSessionQueryPortHostSessionDraftPortHostSessionLifecyclePortHostSessionDeletionPortHostSessionAttendancePortHostSessionPublicationPort</ID>

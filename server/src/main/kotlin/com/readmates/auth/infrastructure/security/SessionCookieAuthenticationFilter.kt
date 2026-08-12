@@ -2,8 +2,8 @@ package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
+import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
-import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
@@ -20,7 +20,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 
 @Component
 class SessionCookieAuthenticationFilter(
-    private val authSessionService: AuthSessionService,
+    private val manageAuthSessionUseCase: ManageAuthSessionUseCase,
     private val resolveAuthenticatedPrincipalUseCase: ResolveAuthenticatedPrincipalUseCase,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
 ) : OncePerRequestFilter() {
@@ -31,13 +31,13 @@ class SessionCookieAuthenticationFilter(
     ) {
         val rawToken =
             request.cookies
-                ?.firstOrNull { it.name == AuthSessionService.COOKIE_NAME }
+                ?.firstOrNull { it.name == manageAuthSessionUseCase.sessionCookieName }
                 ?.value
                 ?.takeIf { it.isNotBlank() }
 
         if (rawToken != null && SecurityContextHolder.getContext().authentication == null) {
             val session =
-                authSessionService
+                manageAuthSessionUseCase
                     .findValidSession(rawToken)
                     ?.takeUnless { it.revoked }
 

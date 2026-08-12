@@ -1,5 +1,8 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
+import com.readmates.auth.application.port.`in`.LoginVerifiedGoogleUserUseCase
+import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -27,7 +30,17 @@ import java.util.UUID
 class InviteAwareOAuthTest(
     @param:Autowired private val oauthReturnState: OAuthReturnState,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val manageAuthSessionUseCase: ManageAuthSessionUseCase,
+    @param:Autowired private val loginVerifiedGoogleUserUseCase: LoginVerifiedGoogleUserUseCase,
+    @param:Autowired private val acceptGoogleInvitationUseCase: AcceptGoogleInvitationUseCase,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `oauth ingress collaborators are injectable through input ports`() {
+        assertNotNull(manageAuthSessionUseCase)
+        assertNotNull(loginVerifiedGoogleUserUseCase)
+        assertNotNull(acceptGoogleInvitationUseCase)
+    }
+
     @Test
     fun `return target validation rejects protocol-relative and untrusted absolute urls`() {
         assertNull(oauthReturnState.signReturnTarget("//evil.example/app"))
