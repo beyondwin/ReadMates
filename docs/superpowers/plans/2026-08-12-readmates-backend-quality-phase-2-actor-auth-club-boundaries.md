@@ -262,7 +262,7 @@ Apply the conversion to both `collect` and `verify` in `ClubReadinessOperationSi
 
 - [ ] **Step 1: Write RED interface and denied-capability tests.**
 
-  Change every service, controller, and admin-operation-provider test fake to the signatures above before production. Add assertions that an actor without `CREATE_CLUB` gets the unchanged onboarding `AccessDeniedException`, and an actor without `MANAGE_CLUB_DOMAINS` gets the unchanged create/check/update denial. In `PlatformAdminClubRegistryServiceTest`, prove an actor without `VIEW_CLUBS` is denied before a load-port call and a SUPPORT actor can list. In `AdminClubOperationsServiceTest`, prove an actor without `VIEW_CLUB_OPERATIONS` is denied before snapshot/today-risk or ledger-port calls and a SUPPORT actor can read both operation paths. In `AdminOperationSignalProvidersTest`, assert both `collect` and `verify` convert their `CurrentPlatformAdmin` to the exact `PlatformActor` expected by migrated list/risk fakes. SUPPORT can read/list but cannot create/update.
+  Change every service, controller, and admin-operation-provider test fake to the signatures above before production. Add assertions that an actor without `CREATE_CLUB` gets the unchanged onboarding `AccessDeniedException`, an actor without `MANAGE_CLUB_DOMAINS` gets the unchanged create/check-domain denial, and an actor without `MANAGE_CLUBS` gets the unchanged update denial. In `PlatformAdminClubRegistryServiceTest`, prove an actor without `VIEW_CLUBS` is denied before a load-port call and a SUPPORT actor can list. In `AdminClubOperationsServiceTest`, prove an actor without `VIEW_CLUB_OPERATIONS` is denied before snapshot/today-risk or ledger-port calls and a SUPPORT actor can read both operation paths. In `AdminOperationSignalProvidersTest`, assert both `collect` and `verify` convert their `CurrentPlatformAdmin` to the exact `PlatformActor` expected by migrated list/risk fakes. SUPPORT can read/list but cannot create/update.
 
   The update denial uses `MANAGE_CLUBS`; create/check-domain denial uses `MANAGE_CLUB_DOMAINS`. The test must distinguish those capabilities so accidentally substituting one for the other fails.
 
@@ -569,6 +569,13 @@ com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|
 
 Every `host`, `member`, or `currentMember` parameter in `ManageHostInvitationsUseCase`, `ManageMemberApprovalsUseCase`, `ManageMemberLifecycleUseCase`, `LeaveMembershipUseCase`, and `GetPendingApprovalUseCase` becomes `ClubActor`. Controllers still accept `CurrentMember` and call `toClubActor()` at the input-port invocation.
 
+```kotlin
+override fun leave(
+    actor: ClubActor,
+    request: MemberLifecycleRequest,
+): MemberLifecycleResponse
+```
+
 Authorization is exact:
 
 ```kotlin
@@ -585,7 +592,27 @@ private fun requirePendingViewer(actor: ClubActor) {
 }
 ```
 
-Host self-mutation and last-host checks continue to use `membershipId`, `clubId`, and `MANAGE_MEMBERS` exactly as the former active-HOST predicate did.
+Host self-mutation checks use actor identity and `MANAGE_MEMBERS`, but self-leave is identity-scoped and never requires a management capability. `MemberLifecycleService.leave` must not infer the stored membership role or quorum participation from `MANAGE_MEMBERS`. `ClubActor` remains role/status-free. Preserve the existing conservative leave transaction and persisted-role semantics with this exact order for every actor, including active MEMBER, active HOST, and suspended HOST actors:
+
+```kotlin
+memberLifecycleStore.lockClubForUpdate(actor.clubId)
+memberLifecycleStore.lockActiveHostRows(actor.clubId)
+val membership =
+    memberLifecycleStore.findMembershipInClubForUpdate(actor.clubId, actor.membershipId)
+        ?: throw AuthApplicationException(
+            AuthApplicationError.AUTHENTICATION_REQUIRED,
+            "Authentication required",
+        )
+if (membership.role == MembershipRole.HOST && memberLifecycleStore.activeHostCount(actor.clubId) <= 1) {
+    throw lifecycleConflict("Last active host cannot leave")
+}
+if (!membership.status.canTransitionTo(MembershipStatus.LEFT)) {
+    throw lifecycleConflict("${membership.status} → LEFT is not allowed")
+}
+memberLifecycleStore.markMembershipLeft(actor.clubId, actor.membershipId)
+```
+
+Locking active-host rows for every leave preserves the existing HOST lock order (`club -> active-host rows -> membership`) and is deliberately more conservative for a member actor. Only the locked `LifecycleMembershipRow.role` decides whether to call `activeHostCount`; actor capabilities never do. Therefore a suspended HOST, whose actor correctly has no management capabilities, still takes the active-host lock and the persisted-HOST quorum branch before the unchanged status transition and mutation.
 
 **Exact retired identity:**
 
@@ -595,7 +622,9 @@ com/readmates/auth/adapter/in/web/PendingApprovalController.kt|com.readmates.aut
 
 - [ ] **Step 1: Write RED use-case signature and authorization matrix tests.**
 
-  Change test fakes and services to `ClubActor`. For invitation, approval, lifecycle, leave, and pending paths, assert HOST allowed, ACTIVE MEMBER denied for host writes, VIEWER allowed only pending read, SUSPENDED HOST denied host management, different `clubId` cannot mutate target-club rows, and last active host cannot leave. Pin unchanged error types/codes/statuses.
+  Change test fakes and services to `ClubActor`. For invitation, approval, lifecycle, and pending paths, assert HOST allowed, ACTIVE MEMBER denied for host writes, VIEWER allowed only pending read, SUSPENDED HOST denied host management, and different `clubId` cannot mutate target-club rows. Pin unchanged error types/codes/statuses.
+
+  Add three exact `MemberLifecycleServiceTest` leave characterizations with a recording store. Active MEMBER with no current open session must call `lock-club`, `lock-active-hosts`, `find-membership`, then `mark-left`, must not call `active-host-count`, and must return `CurrentSessionPolicyResult.NOT_APPLICABLE`. Active HOST with count 2 must call `lock-club`, `lock-active-hosts`, `find-membership`, `active-host-count`, then `mark-left`; active HOST with count 1 retains the existing last-host conflict and performs no write. Suspended HOST uses an actor with no `MANAGE_MEMBERS`, but its locked persisted row has role HOST: with count 1 it must still call through `active-host-count`, throw the same last-host conflict before `mark-left`, and perform no write. These tests pin lock order, persisted-row role ownership, quorum, error, and no-write behavior without adding role/status to `ClubActor`.
 
 - [ ] **Step 2: Run RED.**
 
@@ -611,7 +640,7 @@ com/readmates/auth/adapter/in/web/PendingApprovalController.kt|com.readmates.aut
 
 - [ ] **Step 3: Implement actor inputs and move pending models.**
 
-  Replace only authorization-input types and predicates. Keep persistence ports, transactions, current-session policy, cursor behavior, response models, and controller parameters unchanged. Move the two pending response data classes byte-for-byte to the model file and update the controller/input port import.
+  Replace only authorization-input types and predicates. For `leave`, use actor IDs only to address the lock/load/write calls, always lock active-host rows, and derive the quorum branch exclusively from the locked `LifecycleMembershipRow.role`; do not guard that lock or branch with `MANAGE_MEMBERS`. Keep persistence ports, lock primitives, transactions, current-session policy, cursor behavior, response models, and controller parameters unchanged. Move the two pending response data classes byte-for-byte to the model file and update the controller/input port import.
 
 - [ ] **Step 4: Retire the pending identity and run GREEN.**
 
@@ -637,7 +666,7 @@ com/readmates/auth/adapter/in/web/PendingApprovalController.kt|com.readmates.aut
 
 - [ ] **Step 5: Mutation, review, and commit.**
 
-  Temporarily let `MANAGE_INVITATIONS` satisfy member lifecycle management; the exact-capability denial test must fail. Temporarily pass `CurrentMember` directly to one migrated use case; the scoped input-port rule must fail. Restore, obtain review, and commit:
+  Temporarily let `MANAGE_INVITATIONS` satisfy member lifecycle management; the exact-capability denial test must fail. Temporarily guard the leave active-host lock/quorum branch with `actor.can(MANAGE_MEMBERS)`; the suspended-HOST leave test must fail because persisted-HOST protection was skipped. Temporarily pass `CurrentMember` directly to one migrated use case; the scoped input-port rule must fail. Restore each mutation, rerun Step 4, obtain review of lock ordering and persisted-role ownership, and commit:
 
   ```bash
   git commit -m "refactor(server): authorize auth use cases with club actors"
@@ -994,10 +1023,11 @@ club|auth
 - Current actor carriers remain because consumers outside this slice still exist.
 - Boundary ledger is `4/35/39`; feature ledger is `40/1/41`; session-family cycle and four boundary rows remain for the next plan.
 - No API, authorization meaning, BFF/frontend source, migration, schema, deployment, or production behavior changed.
+- The historical plan at `docs/superpowers/plans/2026-08-12-readmates-backend-quality-phase-2-actor-auth-club-boundaries.md` is a tracked repository artifact but is intentionally excluded from the public-release candidate manifest. Candidate parity applies only to candidate-eligible changed paths; this exclusion is recorded, not treated as a parity failure.
 
 **Ignored report contract:**
 
-The report records the plan SHA/base, full task/correction SHAs and subjects, exact changed-file inventory, 19 retired boundary identities grouped by task, `4 + 35 = 39`, retired `club|auth`, `40 + 1 = 41`, focused commands and counts, mutation RED/restored-GREEN evidence, canonical/full integration/E2E/public results, all reviews, skipped live evidence, residual risks, and exact clean status. It distinguishes repository, local Testcontainers, and local browser evidence from live production evidence.
+The report records the plan SHA/base, full task/correction SHAs and subjects, exact changed-file inventory, all 16 enumerated mutation RED/restored-GREEN results, 19 retired boundary identities grouped by task, `4 + 35 = 39`, retired `club|auth`, `40 + 1 = 41`, focused commands and counts, canonical/full integration/E2E/public results, all reviews, skipped live evidence, residual risks, and exact clean status. It embeds the complete all-changed, candidate-eligible, and candidate-excluded inventories from Step 7, identifies the historical plan as the sole candidate-excluded changed path, and distinguishes repository, local Testcontainers, and local browser evidence from live production evidence.
 
 - [ ] **Step 1: Resolve the ignored SDD workspace.**
 
@@ -1103,6 +1133,33 @@ The report records the plan SHA/base, full task/correction SHAs and subjects, ex
   ```bash
   ./scripts/build-public-release-candidate.sh
   ./scripts/public-release-check.sh .tmp/public-release-candidate
+  PLAN_FILE=docs/superpowers/plans/2026-08-12-readmates-backend-quality-phase-2-actor-auth-club-boundaries.md
+  ALL_CHANGED_INVENTORY="$SDD_WORKSPACE/public-all-changed.txt"
+  CANDIDATE_ELIGIBLE_INVENTORY="$SDD_WORKSPACE/public-candidate-eligible-changed.txt"
+  CANDIDATE_EXCLUDED_INVENTORY="$SDD_WORKSPACE/public-candidate-excluded-changed.txt"
+  git diff --name-only "$IMPLEMENTATION_BASE"..HEAD | LC_ALL=C sort > "$ALL_CHANGED_INVENTORY"
+  awk -v plan="$PLAN_FILE" '$0 != plan' "$ALL_CHANGED_INVENTORY" > "$CANDIDATE_ELIGIBLE_INVENTORY"
+  awk -v plan="$PLAN_FILE" '$0 == plan' "$ALL_CHANGED_INVENTORY" > "$CANDIDATE_EXCLUDED_INVENTORY"
+  test -s "$ALL_CHANGED_INVENTORY"
+  test -s "$CANDIDATE_ELIGIBLE_INVENTORY"
+  test "$(cat "$CANDIDATE_EXCLUDED_INVENTORY")" = "$PLAN_FILE"
+  awk '
+    $0 !~ /^(server\/|docs\/development\/|CHANGELOG\.md$)/ {
+      print "candidate-ineligible path: " $0 > "/dev/stderr"
+      invalid = 1
+    }
+    END { exit invalid }
+  ' "$CANDIDATE_ELIGIBLE_INVENTORY"
+  while IFS= read -r changed_file; do
+    if test -e "$changed_file"; then
+      test -f ".tmp/public-release-candidate/$changed_file"
+      cmp -s "$changed_file" ".tmp/public-release-candidate/$changed_file"
+    else
+      test ! -e ".tmp/public-release-candidate/$changed_file"
+    fi
+  done < "$CANDIDATE_ELIGIBLE_INVENTORY"
+  test -f "$PLAN_FILE"
+  test ! -e ".tmp/public-release-candidate/$PLAN_FILE"
   git diff --check "$IMPLEMENTATION_BASE"..HEAD -- \
     docs/development/architecture.md \
     docs/development/adr/0002-server-clean-architecture-with-archunit.md \
@@ -1115,7 +1172,7 @@ The report records the plan SHA/base, full task/correction SHAs and subjects, ex
   (^|[^A-Za-z0-9_])([o]cid1\.|/[U]sers/|/[Hh]ome/[^[:space:]]+|[s]k-[A-Za-z0-9]|[g]hp_[A-Za-z0-9]|[g]ithub_pat_|BEGIN (RSA|OPENSSH|PRIVATE) [K]EY)
   ```
 
-  The scan must distinguish no-match exit 1 from execution error. Confirm changed files are byte-identical in the public candidate, `.git` and symlinks are absent, and gitleaks passes.
+  The scan must distinguish no-match exit 1 from execution error. Record the exact contents and counts of all three inventories in the ignored report. Every candidate-eligible changed file still present in the source tree must be byte-identical in the candidate; an eligible deleted file must be absent from both. The tracked historical plan must be the sole candidate-excluded changed path and must remain absent from the candidate by manifest contract. Confirm `.git` and symlinks are absent and gitleaks passes.
 
 - [ ] **Step 8: Run whole-plan review with six independent verdicts.**
 
@@ -1164,7 +1221,7 @@ The report records the plan SHA/base, full task/correction SHAs and subjects, ex
 
 ## Acceptance-Matrix Mapping
 
-- **Actor or authorization — selected:** characterize anonymous GUEST, VIEWER, active MEMBER, active HOST, suspended membership, and OWNER/OPERATOR/SUPPORT platform admin. Prove locked guest direct URLs, member/viewer denied host writes, support denied platform mutations, stale authority removal, last-host protection, and exact capability sets.
+- **Actor or authorization — selected:** characterize anonymous GUEST, VIEWER, active MEMBER, active HOST, suspended membership, and OWNER/OPERATOR/SUPPORT platform admin. Prove locked guest direct URLs, member/viewer denied host writes, support denied platform mutations, stale authority removal, active-MEMBER/active-HOST/suspended-HOST leave lock order and persisted-role quorum, last-host protection, and exact capability sets.
 - **Club context — selected:** prove trusted slug precedence, host fallback, unscoped compatibility, unknown supplied context, different-club isolation, support-grant synthesis, AuthMe scoping, and profile fail-closed behavior in unit, server integration, and multi-club E2E.
 - **BFF or OAuth — selected:** BFF source is unchanged, but OAuth handler/session ingress is touched. Preserve one-use state, reverse-order multi-tab state survival, invitation priority, target-club binding, safe return path, callback-exit session rotation, valid cookie preservation, stale-cookie clearing, replay/mismatch rejection, and trusted-header semantics through existing integration and E2E evidence.
 - **Persistence or migration — excluded as a change surface:** no SQL, repository query, schema, or migration changes are authorized. Full `integrationTest` remains final regression evidence because auth and club behavior is persistence-backed.
@@ -1185,12 +1242,13 @@ Every task report records exact baseline GREEN, temporary RED, failing assertion
 7. Retain stale incoming `ROLE_HOST` for a non-member.
 8. Let `MANAGE_INVITATIONS` authorize member lifecycle mutation.
 9. Pass `CurrentMember` directly to one migrated auth host input port.
-10. Map `MemberProfileError.MEMBER_NOT_FOUND` to HTTP 403.
-11. Inject `GoogleLoginService` into `ReadmatesOAuthSuccessHandler`.
-12. Skip servlet session-ID rotation on an OAuth provider-error exit.
-13. Reintroduce one `club.application -> auth` import.
-14. Hash a different invitation token than the raw token returned to onboarding.
-15. Materialize cached support synthesis as MEMBER or SUSPENDED instead of explicit HOST/ACTIVE.
+10. Guard leave active-host locking/quorum with `actor.can(MANAGE_MEMBERS)`; the suspended-HOST persisted-role protection must fail RED.
+11. Map `MemberProfileError.MEMBER_NOT_FOUND` to HTTP 403.
+12. Inject `GoogleLoginService` into `ReadmatesOAuthSuccessHandler`.
+13. Skip servlet session-ID rotation on an OAuth provider-error exit.
+14. Reintroduce one `club.application -> auth` import.
+15. Hash a different invitation token than the raw token returned to onboarding.
+16. Materialize cached support synthesis as MEMBER or SUSPENDED instead of explicit HOST/ACTIVE.
 
 ## Explicit Residuals And Excluded Scope
 
