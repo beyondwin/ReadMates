@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/experimental-ct-react";
+import type { ComponentFixtures } from "@playwright/experimental-ct-react";
 import type { LivingArchivePreviewModel } from "@/features/public/model/living-archive-preview-model";
 import { LivingArchivePreviewPage } from "./living-archive-preview-page";
 
@@ -44,7 +45,7 @@ function seconds(value: string) {
   return value.endsWith("ms") ? amount / 1000 : amount;
 }
 
-async function mountPreview(mount: Parameters<Parameters<typeof test>[1]>[0]["mount"]) {
+async function mountPreview(mount: ComponentFixtures["mount"]) {
   return mount(
     <div style={{ position: "absolute", inset: 0 }}>
       <LivingArchivePreviewPage model={model} publicBasePath="/clubs/reading-sai" />
