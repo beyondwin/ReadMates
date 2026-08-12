@@ -84,7 +84,7 @@ class CurrentMemberArgumentResolverTest {
         val request = MockHttpServletRequest()
         val authentication = UsernamePasswordAuthenticationToken("member@example.com", "password", emptyList())
         request.userPrincipal = authentication
-        request.addHeader("X-Readmates-Club-Slug", "sample-book-club")
+        request.addHeader(AuthClubContextHeader.CLUB_SLUG, "sample-book-club")
 
         val resolved =
             resolver.resolveArgument(
@@ -105,7 +105,7 @@ class CurrentMemberArgumentResolverTest {
         val request = MockHttpServletRequest()
         val authentication = UsernamePasswordAuthenticationToken("member@example.com", "password", emptyList())
         request.userPrincipal = authentication
-        request.addHeader("X-Readmates-Club-Slug", "missing-club")
+        request.addHeader(AuthClubContextHeader.CLUB_SLUG, "missing-club")
 
         assertThrows<ResponseStatusException> {
             resolver.resolveArgument(

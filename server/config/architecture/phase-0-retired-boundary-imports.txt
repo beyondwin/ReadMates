@@ -15,3 +15,9 @@ com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.read
 com/readmates/aigen/adapter/out/resilience/ResilientProviderCallGate.kt|com.readmates.aigen.application.service.ProviderCircuitState
 com/readmates/notification/adapter/out/kafka/NotificationKafkaConfiguration.kt|com.readmates.notification.adapter.in.kafka.NotificationUnsupportedSchemaVersionException
 com/readmates/notification/adapter/out/kafka/NotificationKafkaConfiguration.kt|com.readmates.notification.application.service.NotificationDeliveryRetryableException
+com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolver.kt|com.readmates.club.adapter.in.web.resolveClubContext
+com/readmates/auth/adapter/in/web/AuthMeController.kt|com.readmates.club.adapter.in.web.ClubContextSource
+com/readmates/auth/adapter/in/web/AuthMeController.kt|com.readmates.club.adapter.in.web.resolveClubContext
+com/readmates/auth/adapter/in/web/MemberProfileController.kt|com.readmates.club.adapter.in.web.resolveClubContext
+com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.club.adapter.in.web.resolveClubContext
+com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.club.adapter.in.web.resolveClubContext

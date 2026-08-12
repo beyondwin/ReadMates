@@ -356,6 +356,19 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `auth inbound and security adapters do not depend on club inbound adapters`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage(
+                "com.readmates.auth.adapter.in..",
+                "com.readmates.auth.infrastructure.security..",
+            ).should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.club.adapter.in..")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `migrated application packages do not depend on adapters`() {
         noClasses()
             .that()
@@ -593,6 +606,72 @@ class ServerArchitectureBoundaryTest {
                 "org.springframework.scheduling..",
             ).check(importedClasses)
     }
+
+    @Test
+    fun `auth club context resolver stays a top level extension with ordinary imports`() {
+        val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
+        val resolver = sourceRoot.resolve("com/readmates/auth/adapter/in/security/AuthClubContextResolver.kt")
+        val source = resolver.readText()
+        val taskThreeConsumerFiles =
+            listOf(
+                resolver,
+                sourceRoot.resolve("com/readmates/auth/adapter/in/web/AuthMeController.kt"),
+                sourceRoot.resolve("com/readmates/auth/adapter/in/web/MemberProfileController.kt"),
+                sourceRoot.resolve("com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt"),
+                sourceRoot.resolve("com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt"),
+            )
+        val fullyQualifiedReferences =
+            taskThreeConsumerFiles.flatMap { sourceFile ->
+                sourceFile
+                    .readLines()
+                    .mapIndexedNotNull { index, line ->
+                        val trimmed = line.trim()
+                        val isFullyQualifiedReadMatesReference =
+                            "com.readmates." in trimmed &&
+                                !trimmed.startsWith("package ") &&
+                                !trimmed.startsWith("import ")
+                        if (isFullyQualifiedReadMatesReference) {
+                            "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: $trimmed"
+                        } else {
+                            null
+                        }
+                    }
+            }
+        val clubWebImportViolations = authClubWebImportViolations(sourceRoot)
+
+        assertTrue(source.contains("fun HttpServletRequest.resolveAuthClubContext("))
+        assertTrue(source.contains("import com.readmates.club.application.model.ResolvedClubContext"))
+        assertTrue(source.contains("import com.readmates.club.application.port.`in`.ResolveClubContextUseCase"))
+        assertTrue(source.contains("import jakarta.servlet.http.HttpServletRequest"))
+        assertFalse(source.contains("object AuthClubContextResolver"))
+        assertTrue(
+            clubWebImportViolations.isEmpty(),
+            "Auth production code must not import club web adapters:\n${clubWebImportViolations.joinToString("\n")}",
+        )
+        assertTrue(
+            fullyQualifiedReferences.isEmpty(),
+            "Auth club-context helper consumers must use ordinary imports:\n" +
+                fullyQualifiedReferences.joinToString("\n"),
+        )
+    }
+
+    private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
+        Files.walk(sourceRoot.resolve("com/readmates/auth")).use { paths ->
+            paths
+                .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
+                .flatMap { sourceFile ->
+                    sourceFile
+                        .readLines()
+                        .mapIndexedNotNull { index, line ->
+                            val importName = line.trim().removePrefix("import ").replace("`", "")
+                            if (importName.startsWith("com.readmates.club.adapter.in.web")) {
+                                "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: ${line.trim()}"
+                            } else {
+                                null
+                            }
+                        }.stream()
+                }.toList()
+        }
 }
 
 @Tag("architecture")

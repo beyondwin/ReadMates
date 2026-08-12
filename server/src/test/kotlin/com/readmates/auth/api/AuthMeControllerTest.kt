@@ -1,5 +1,6 @@
 package com.readmates.auth.api
 
+import com.readmates.auth.adapter.`in`.security.AuthClubContextHeader
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.infrastructure.security.MemberAuthoritiesFilter
 import com.readmates.auth.infrastructure.security.SessionCookieAuthenticationFilter
@@ -115,7 +116,7 @@ class AuthMeControllerTest(
 
         mockMvc
             .get("/api/auth/me") {
-                header("X-Readmates-Club-Slug", "sample-book-club")
+                header(AuthClubContextHeader.CLUB_SLUG, "sample-book-club")
                 cookie(cookie)
             }.andExpect {
                 status { isOk() }
@@ -179,7 +180,7 @@ class AuthMeControllerTest(
 
         mockMvc
             .get("/api/host/dashboard") {
-                header("X-Readmates-Club-Slug", "sample-book-club")
+                header(AuthClubContextHeader.CLUB_SLUG, "sample-book-club")
                 cookie(cookie)
             }.andExpect {
                 status { isForbidden() }
@@ -192,7 +193,7 @@ class AuthMeControllerTest(
 
         mockMvc
             .get("/api/auth/me") {
-                header("X-Readmates-Club-Slug", "sample-book-club")
+                header(AuthClubContextHeader.CLUB_SLUG, "sample-book-club")
                 cookie(cookie)
             }.andExpect {
                 status { isOk() }
@@ -212,7 +213,7 @@ class AuthMeControllerTest(
 
         mockMvc
             .get("/api/auth/me") {
-                header("X-Readmates-Club-Slug", "missing-club")
+                header(AuthClubContextHeader.CLUB_SLUG, "missing-club")
                 cookie(cookie)
             }.andExpect {
                 status { isNotFound() }
@@ -231,7 +232,7 @@ class AuthMeControllerTest(
 
         mockMvc
             .get("/api/auth/me") {
-                header("X-Readmates-Club-Host", "not-a-registered-host.example.test")
+                header(AuthClubContextHeader.CLUB_HOST, "not-a-registered-host.example.test")
                 cookie(cookie)
             }.andExpect {
                 status { isOk() }
@@ -254,7 +255,7 @@ class AuthMeControllerTest(
 
             mockMvc
                 .get("/api/auth/me") {
-                    header("X-Readmates-Club-Host", "readmates-authme.example.test")
+                    header(AuthClubContextHeader.CLUB_HOST, "readmates-authme.example.test")
                     cookie(cookie)
                 }.andExpect {
                     status { isOk() }

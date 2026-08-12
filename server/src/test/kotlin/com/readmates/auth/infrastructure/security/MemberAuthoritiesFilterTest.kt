@@ -1,11 +1,11 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.adapter.`in`.security.AuthClubContextHeader
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.auth.application.service.DefaultAuthoritySynthesisService
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.adapter.`in`.web.ClubContextHeader
 import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
@@ -215,12 +215,12 @@ class MemberAuthoritiesFilterTest {
 
     private fun requestWithSlugHeader(slug: String): MockHttpServletRequest =
         MockHttpServletRequest("GET", "/api/host/sessions").apply {
-            addHeader(ClubContextHeader.CLUB_SLUG, slug)
+            addHeader(AuthClubContextHeader.CLUB_SLUG, slug)
         }
 
     private fun requestWithHostHeader(host: String): MockHttpServletRequest =
         MockHttpServletRequest("GET", "/api/host/sessions").apply {
-            addHeader(ClubContextHeader.CLUB_HOST, host)
+            addHeader(AuthClubContextHeader.CLUB_HOST, host)
         }
 
     private fun setAuthentication(

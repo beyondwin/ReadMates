@@ -119,8 +119,12 @@ private fun isBoundaryDebt(
     val inbound = "/adapter/in/" in rootedSource || "/infrastructure/security/" in rootedSource
     val application = "/application/" in rootedSource
     val outbound = "/adapter/out/" in rootedSource
+    val sourceFeature = featureForSourcePath(source)
+    val targetFeature = featureFor(imported)
     val crossFeatureInbound =
-        ".adapter.in." in imported && !imported.startsWith("com.readmates.shared.adapter.in.web.")
+        ".adapter.in." in imported &&
+            !imported.startsWith("com.readmates.shared.adapter.in.web.") &&
+            (sourceFeature == null || targetFeature == null || sourceFeature != targetFeature)
     return (inbound && (".application.service." in imported || ".adapter.out." in imported || crossFeatureInbound)) ||
         (application && ".adapter." in imported) ||
         (outbound && (".adapter.in." in imported || ".application.service." in imported))
@@ -131,6 +135,13 @@ private fun featureFor(imported: String): String? =
         .mapValues { (_, path) -> path.replace('/', '.') }
         .entries
         .filter { (_, packageRoot) -> imported == packageRoot || imported.startsWith("$packageRoot.") }
+        .maxByOrNull { (_, packageRoot) -> packageRoot.length }
+        ?.key
+
+private fun featureForSourcePath(source: String): String? =
+    featurePackageRoots
+        .entries
+        .filter { (_, packageRoot) -> source == packageRoot || source.startsWith("$packageRoot/") }
         .maxByOrNull { (_, packageRoot) -> packageRoot.length }
         ?.key
 

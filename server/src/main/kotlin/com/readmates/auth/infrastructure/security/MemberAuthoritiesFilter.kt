@@ -1,10 +1,10 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.service.AuthenticatedMemberResolver
 import com.readmates.auth.application.service.AuthoritySynthesisRequest
 import com.readmates.auth.application.service.AuthoritySynthesisService
 import com.readmates.auth.application.service.ClubContextInput
-import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
@@ -50,7 +50,7 @@ class MemberAuthoritiesFilter(
         val email = authentication.emailOrNull()
 
         if (authentication != null && email != null) {
-            val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
+            val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
             val resolvedClubContext = requestedClubContext.context
 
             val member =

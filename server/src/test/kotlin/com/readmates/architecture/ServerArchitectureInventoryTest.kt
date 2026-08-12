@@ -11,6 +11,30 @@ import java.nio.file.Path
 @Tag("architecture")
 class ServerArchitectureInventoryTest {
     @Test
+    fun `inbound adapter imports allow same feature but fail closed across or outside feature boundaries`(
+        @TempDir root: Path,
+    ) {
+        writeInboundAdapterDirectionFixture(root)
+
+        val authWeb = "com/readmates/auth/adapter/in/web/AuthWeb.kt"
+        val authService = "com/readmates/auth/application/service/AuthService.kt"
+        val authAdapter = "com/readmates/auth/adapter/out/persistence/AuthAdapter.kt"
+        val unclassifiedSource = "com/readmates/unclassified/adapter/in/web/UnclassifiedSource.kt"
+        val unclassifiedTarget = "com/readmates/auth/adapter/in/web/UnclassifiedTarget.kt"
+
+        assertThat(boundaryDebtImports(root)).containsExactlyInAnyOrder(
+            "$authWeb|com.readmates.club.adapter.in.web.ClubWebHelper",
+            "$authWeb|com.readmates.auth.application.service.AuthService",
+            "$authWeb|com.readmates.auth.adapter.out.persistence.AuthAdapter",
+            "$authService|com.readmates.auth.adapter.out.persistence.AuthAdapter",
+            "$authAdapter|com.readmates.auth.adapter.in.web.AuthWeb",
+            "$authAdapter|com.readmates.auth.application.service.AuthService",
+            "$unclassifiedSource|com.readmates.auth.adapter.in.security.AuthSecurityHelper",
+            "$unclassifiedTarget|com.readmates.unclassified.adapter.in.web.UnclassifiedWebHelper",
+        )
+    }
+
+    @Test
     fun `boundary inventory detects forbidden directions but permits shared web errors`(
         @TempDir root: Path,
     ) {
@@ -306,6 +330,54 @@ class ServerArchitectureInventoryTest {
             "com/readmates/a/adapter/in/web/A.kt|com.readmates.a.application.service.AService",
             "com/readmates/b/adapter/in/web/B.kt|com.readmates.b.application.service.BService",
         )
+
+    private fun writeInboundAdapterDirectionFixture(root: Path) {
+        write(
+            root,
+            "com/readmates/auth/adapter/in/web/AuthWeb.kt",
+            """
+            package com.readmates.auth.adapter.`in`.web
+            import com.readmates.auth.adapter.`in`.security.AuthSecurityHelper
+            import com.readmates.club.adapter.`in`.web.ClubWebHelper
+            import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
+            import com.readmates.auth.application.service.AuthService
+            import com.readmates.auth.adapter.out.persistence.AuthAdapter
+            """,
+        )
+        write(
+            root,
+            "com/readmates/auth/application/service/AuthService.kt",
+            """
+            package com.readmates.auth.application.service
+            import com.readmates.auth.adapter.out.persistence.AuthAdapter
+            """,
+        )
+        write(
+            root,
+            "com/readmates/auth/adapter/out/persistence/AuthAdapter.kt",
+            """
+            package com.readmates.auth.adapter.out.persistence
+            import com.readmates.auth.adapter.`in`.web.AuthWeb
+            import com.readmates.auth.application.service.AuthService
+            """,
+        )
+        write(
+            root,
+            "com/readmates/unclassified/adapter/in/web/UnclassifiedSource.kt",
+            """
+            package com.readmates.unclassified.adapter.`in`.web
+            import com.readmates.auth.adapter.`in`.security.AuthSecurityHelper
+            """,
+        )
+        write(
+            root,
+            "com/readmates/auth/adapter/in/web/UnclassifiedTarget.kt",
+            """
+            package com.readmates.auth.adapter.`in`.web
+            import com.readmates.unclassified.adapter.`in`.web.UnclassifiedWebHelper
+            """,
+        )
+    }
 
     private fun write(
         root: Path,

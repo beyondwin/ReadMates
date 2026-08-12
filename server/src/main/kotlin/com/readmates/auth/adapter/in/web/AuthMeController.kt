@@ -1,10 +1,10 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.adapter.`in`.security.AuthClubContextSource
+import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
-import com.readmates.club.adapter.`in`.web.ClubContextSource
-import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
@@ -29,13 +29,15 @@ class AuthMeController(
     ): AuthMemberResponse {
         val sessionProfileMember = authentication?.principal as? CurrentMember
         val sessionUser = authentication?.principal as? CurrentUser
-        val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
+        val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
         if (sessionProfileMember != null) {
             val joinedClubs = resolveCurrentMemberUseCase.listJoinedClubs(sessionProfileMember.userId)
             val platformAdmin = resolveCurrentMemberUseCase.findPlatformAdmin(sessionProfileMember.userId)
 
             // Explicit slug supplied but the club is not registered → 404.
-            if (requestedClubContext.source == ClubContextSource.SLUG &&
+            if (
+                requestedClubContext.source ==
+                AuthClubContextSource.SLUG &&
                 requestedClubContext.context == null
             ) {
                 throw AuthApplicationException(
@@ -46,7 +48,9 @@ class AuthMeController(
 
             // BFF host header supplied but the host is not a registered club domain.
             // Treat as unscoped (matches dev where the host header is stripped).
-            if (requestedClubContext.source == ClubContextSource.HOST_FALLBACK &&
+            if (
+                requestedClubContext.source ==
+                AuthClubContextSource.HOST_FALLBACK &&
                 requestedClubContext.context == null
             ) {
                 return AuthMemberResponse.from(

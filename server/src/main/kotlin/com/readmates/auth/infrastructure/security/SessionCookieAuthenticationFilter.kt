@@ -1,8 +1,8 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.application.service.AuthenticatedMemberResolver
-import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
@@ -40,7 +40,7 @@ class SessionCookieAuthenticationFilter(
                     ?.takeUnless { it.revoked }
 
             if (session != null) {
-                val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
+                val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
                 val member =
                     if (requestedClubContext.supplied && requestedClubContext.context == null) {
                         null
