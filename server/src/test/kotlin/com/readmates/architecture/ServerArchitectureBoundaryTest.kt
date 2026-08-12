@@ -561,8 +561,9 @@ class ServerArchitectureBoundaryTest {
 
         noClasses()
             .that()
-            .haveFullyQualifiedName("com.readmates.notification.adapter.in.kafka.NotificationKafkaConsumerConfiguration")
-            .should()
+            .haveFullyQualifiedName(
+                "com.readmates.notification.adapter.in.kafka.NotificationKafkaConsumerConfiguration",
+            ).should()
             .dependOnClassesThat()
             .resideInAnyPackage("com.readmates.notification.adapter.out.kafka..")
             .check(importedClasses)

@@ -169,7 +169,6 @@ class KafkaNotificationEventPublisherAdapterTest {
         assertThat(sendFuture.unit).isEqualTo(TimeUnit.MILLISECONDS)
     }
 
-
     @Test
     fun `producer value serializer writes design JSON with string temporals`() {
         contextRunner
@@ -219,7 +218,6 @@ class KafkaNotificationEventPublisherAdapterTest {
                 )
             }
     }
-
 
     @Test
     fun `publisher sends headers and waits with configured timeout`() {

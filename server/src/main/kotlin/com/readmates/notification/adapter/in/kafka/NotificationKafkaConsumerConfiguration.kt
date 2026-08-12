@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.notification.adapter.`in`.kafka
 
 import com.readmates.notification.application.config.NotificationRuntimeProperties
@@ -31,9 +33,7 @@ import tools.jackson.databind.json.JsonMapper
 @EnableConfigurationProperties(NotificationRuntimeProperties::class)
 class NotificationKafkaConsumerConfiguration {
     @Bean
-    fun notificationEventConsumerFactory(
-        properties: NotificationRuntimeProperties,
-    ): ConsumerFactory<String, NotificationEventMessage> =
+    fun notificationEventConsumerFactory(properties: NotificationRuntimeProperties): NotificationEventConsumerFactory =
         DefaultKafkaConsumerFactory(
             notificationConsumerConfigs(properties.kafka),
             { StringDeserializer() },
@@ -82,7 +82,8 @@ class NotificationKafkaConsumerConfiguration {
     private fun notificationConsumerConfigs(properties: NotificationRuntimeProperties.Kafka): Map<String, Any> {
         val bootstrapServers = properties.bootstrapServers.map(String::trim).filter(String::isNotEmpty)
         require(bootstrapServers.isNotEmpty()) {
-            "readmates.notifications.kafka.bootstrap-servers must be set when readmates.notifications.kafka.enabled=true"
+            "readmates.notifications.kafka.bootstrap-servers must be set " +
+                "when readmates.notifications.kafka.enabled=true"
         }
         require(properties.consumerGroup.isNotBlank()) {
             "readmates.notifications.kafka.consumer-group must be set when readmates.notifications.kafka.enabled=true"
@@ -109,3 +110,5 @@ class NotificationKafkaConsumerConfiguration {
 
     private fun notificationEventJsonMapper(): JsonMapper = JacksonMapperUtils.enhancedJsonMapper()
 }
+
+private typealias NotificationEventConsumerFactory = ConsumerFactory<String, NotificationEventMessage>

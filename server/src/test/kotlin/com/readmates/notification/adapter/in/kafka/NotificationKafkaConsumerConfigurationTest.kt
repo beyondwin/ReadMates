@@ -1,4 +1,4 @@
-@file:Suppress("UNCHECKED_CAST")
+@file:Suppress("UNCHECKED_CAST", "ktlint:standard:package-name")
 
 package com.readmates.notification.adapter.`in`.kafka
 
@@ -139,7 +139,10 @@ class NotificationKafkaConsumerConfigurationTest {
                 "readmates.notifications.kafka.enabled=true",
                 "readmates.notifications.kafka.bootstrap-servers=kafka-a:9092",
             ).run { context ->
-                val matcher = context.getBean("notificationKafkaErrorHandler", DefaultErrorHandler::class.java).exceptionMatcher()
+                val matcher =
+                    context
+                        .getBean("notificationKafkaErrorHandler", DefaultErrorHandler::class.java)
+                        .exceptionMatcher()
 
                 assertThat(matcher.match(NotificationDeliveryRetryableException("email provider unavailable"))).isTrue()
                 assertThat(
@@ -164,7 +167,8 @@ class NotificationKafkaConsumerConfigurationTest {
 
     @Test
     fun `dead letter recoverer preserves configured topic and source partition`() {
-        val kafkaOperations = Mockito.mock(KafkaOperations::class.java) as KafkaOperations<String, NotificationEventMessage>
+        val kafkaOperations =
+            Mockito.mock(KafkaOperations::class.java) as KafkaOperations<String, NotificationEventMessage>
         Mockito.`when`(kafkaOperations.isTransactional).thenReturn(false)
         Mockito
             .`when`(kafkaOperations.send(Mockito.any<ProducerRecord<String, NotificationEventMessage>>()))
@@ -210,7 +214,8 @@ class NotificationKafkaConsumerConfigurationTest {
 
     @Test
     fun `retryable delivery is retried before exhaustion publishes to the configured DLT`() {
-        val kafkaOperations = Mockito.mock(KafkaOperations::class.java) as KafkaOperations<String, NotificationEventMessage>
+        val kafkaOperations =
+            Mockito.mock(KafkaOperations::class.java) as KafkaOperations<String, NotificationEventMessage>
         Mockito.`when`(kafkaOperations.isTransactional).thenReturn(false)
         Mockito
             .`when`(kafkaOperations.send(Mockito.any<ProducerRecord<String, NotificationEventMessage>>()))
@@ -310,7 +315,9 @@ private fun DefaultErrorHandler.exceptionMatcher(): ExceptionMatcher {
 }
 
 private fun DefaultErrorHandler.configuredBackOff(): org.springframework.util.backoff.FixedBackOff {
-    val trackerField = org.springframework.kafka.listener.FailedRecordProcessor::class.java.getDeclaredField("failureTracker")
+    val trackerField =
+        org.springframework.kafka.listener.FailedRecordProcessor::class.java
+            .getDeclaredField("failureTracker")
     trackerField.isAccessible = true
     val tracker = trackerField.get(this)
     val backOffField = tracker.javaClass.getDeclaredField("backOff")
