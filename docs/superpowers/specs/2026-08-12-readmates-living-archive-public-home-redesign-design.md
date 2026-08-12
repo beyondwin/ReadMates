@@ -3,7 +3,23 @@
 작성일: 2026-08-12
 상태: APPROVED DESIGN SPEC
 구현 상태: 시작 전
-대상 표면: `front/`의 `/`와 `/clubs/:slug` 공개 홈
+대상 표면: `front/`의 격리된 `/living-archive-preview` 디자인 검증 route
+
+## 0. 구현 대상 변경 기록
+
+2026-08-12 사용자 승인 이후 구현 위치가 변경되었다. 이 문서의 시각·브랜드·반응형 계약은
+유지하되, 현재 공개 홈(`/`, `/clubs/:slug`)에는 아직 반영하지 않는다. 첫 구현은 다음 조건을
+만족하는 격리 프리뷰로 제공한다.
+
+- 정확한 URL은 `/living-archive-preview`다.
+- 기존 공개 홈 route, `PublicHomeRoute`, `PublicHome`, 공용 `PublicRouteLayout`의 화면은 변경하지 않는다.
+- 프리뷰는 전용 header와 page shell을 사용하며 공용 공개 navigation과 footer에 링크를 추가하지 않는다.
+- 검색 노출을 막기 위해 `robots=noindex,nofollow`를 설치하고 route 이탈 시 제거한다.
+- 공개 API와 baseline club loader는 재사용하지만 새로운 서버/BFF/API 계약은 만들지 않는다.
+- 시안 검수와 사용자의 홈 적용 승인이 끝나기 전에는 `/` 또는 `/clubs/:slug`를 교체하지 않는다.
+
+아래에서 “공개 홈”이라고 쓴 시각·정보구조 설명은 프리뷰가 장차 대체할 후보 화면을 뜻한다.
+현재 운영 route가 이미 교체되었다는 의미로 해석하지 않는다.
 
 ## 1. 배경
 
