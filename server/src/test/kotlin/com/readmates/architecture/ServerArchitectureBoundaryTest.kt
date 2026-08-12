@@ -721,157 +721,90 @@ class ServerArchitectureBoundaryTest {
         assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to harmlessFqText)).isEmpty())
         assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to realFqReference)).isNotEmpty())
     }
+
+    @Test
+    fun `auth club context source shape guard detects every declaration and executable template code`() {
+        val topLevelResolver = EXACT_AUTH_CLUB_CONTEXT_EXTENSION
+        val topLevelAndSameLineNestedResolver =
+            listOf(
+                topLevelResolver,
+                "class Wrapper { $EXACT_AUTH_CLUB_CONTEXT_EXTENSION }",
+            ).joinToString("\n")
+        val nestedBlockCommentDecoy =
+            listOf(
+                "/*",
+                "  /*",
+                "  */",
+                "  $EXACT_AUTH_CLUB_CONTEXT_EXTENSION",
+                "*/",
+                topLevelResolver,
+            ).joinToString("\n")
+        val templateFqReference =
+            "val normal = \"${'$'}{run { com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG }}\""
+        val rawTemplateFqReference =
+            listOf(
+                "val raw = $TRIPLE_QUOTE",
+                "${'$'}{run { /* nested */ com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG }}",
+                TRIPLE_QUOTE,
+            ).joinToString("\n")
+        val literalDollar = '$'
+        val harmlessSimpleTemplateText =
+            "val simple = \"$literalDollar" +
+                "com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG\""
+        val escapedTemplateText =
+            "val escaped = \"\\$literalDollar" +
+                "{com.readmates.auth.adapter.in.security.AuthClubContextHeader.CLUB_SLUG}\""
+
+        assertTrue(resolverSourceShapeViolations(topLevelResolver).isEmpty())
+        assertTrue(resolverSourceShapeViolations(topLevelAndSameLineNestedResolver).isNotEmpty())
+        assertTrue(resolverSourceShapeViolations(nestedBlockCommentDecoy).isEmpty())
+        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to templateFqReference)).isNotEmpty())
+        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to rawTemplateFqReference)).isNotEmpty())
+        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to harmlessSimpleTemplateText)).isEmpty())
+        assertTrue(fullyQualifiedReadMatesReferences(listOf("fixture.kt" to escapedTemplateText)).isEmpty())
+    }
 }
 
 private fun resolverSourceShapeViolations(source: String): List<String> =
     buildList {
-        val lexedLines = lexKotlinSource(source)
-        val declarationLines =
-            lexedLines.indices.filter { index ->
-                lexedLines[index].code.trimStart().startsWith(AUTH_CLUB_CONTEXT_EXTENSION_PREFIX)
+        val lexedSource = lexKotlinSource(source)
+        val declarationOffsets =
+            lexedSource.code.indices.filter { offset ->
+                lexedSource.code.startsWith(AUTH_CLUB_CONTEXT_EXTENSION_PREFIX, offset)
             }
-        if (declarationLines.size != 1) {
-            add("expected one auth club-context extension declaration, found ${declarationLines.size}")
+        if (declarationOffsets.size != 1) {
+            add("expected one auth club-context extension declaration, found ${declarationOffsets.size}")
         } else {
-            val declarationLine = declarationLines.single()
-            val braceDepth = lexedLines[declarationLine].braceDepth
+            val declarationOffset = declarationOffsets.single()
+            val braceDepth = lexedSource.braceDepthAt(declarationOffset)
             if (braceDepth != 0) {
                 add("auth club-context extension must be top-level, found at brace depth $braceDepth")
             }
-            val declaration =
-                lexedLines
-                    .drop(declarationLine)
-                    .take(EXACT_AUTH_CLUB_CONTEXT_EXTENSION_LINE_COUNT)
-                    .map(KotlinLexLine::code)
-                    .joinToString("\n")
-            if (declaration != EXACT_AUTH_CLUB_CONTEXT_EXTENSION) {
+            if (!lexedSource.code.startsWith(EXACT_AUTH_CLUB_CONTEXT_EXTENSION, declarationOffset)) {
                 add("auth club-context extension declaration does not match the required signature")
             }
         }
     }
 
-private fun lexKotlinSource(source: String): List<KotlinLexLine> {
-    var scanState = KotlinBraceScanState()
-    return source
-        .lineSequence()
-        .mapIndexed { index, line ->
-            val depthBeforeLine = scanState.braceDepth
-            val result = lexKotlinLine(line, scanState)
-            scanState = result.state
-            KotlinLexLine(index, result.code, depthBeforeLine)
-        }.toList()
-}
-
-private fun lexKotlinLine(
-    line: String,
-    initialState: KotlinBraceScanState,
-): KotlinLexLineResult {
-    var scanState = initialState
-    var characterIndex = 0
-    val code = StringBuilder()
-    while (characterIndex < line.length) {
-        val specialStep = nextKotlinSpecialStep(line, characterIndex, scanState)
-        if (specialStep != null) {
-            scanState = specialStep.state
-            code.append(" ".repeat(specialStep.nextCharacterIndex - characterIndex))
-            characterIndex = specialStep.nextCharacterIndex
-        } else {
-            when (line[characterIndex]) {
-                '"' -> {
-                    val nextIndex = skipKotlinString(line, characterIndex)
-                    code.append(" ".repeat(nextIndex - characterIndex))
-                    characterIndex = nextIndex
-                }
-                '\'' -> {
-                    val nextIndex = skipKotlinCharacterLiteral(line, characterIndex)
-                    code.append(" ".repeat(nextIndex - characterIndex))
-                    characterIndex = nextIndex
-                }
-                '{' -> {
-                    scanState = scanState.copy(braceDepth = scanState.braceDepth + 1)
-                    code.append('{')
-                    characterIndex++
-                }
-                '}' -> {
-                    scanState = scanState.copy(braceDepth = scanState.braceDepth - 1)
-                    code.append('}')
-                    characterIndex++
-                }
-                else -> {
-                    code.append(line[characterIndex])
-                    characterIndex++
-                }
-            }
-        }
-    }
-    return KotlinLexLineResult(code.toString(), scanState)
-}
-
-private fun nextKotlinSpecialStep(
-    line: String,
-    characterIndex: Int,
-    scanState: KotlinBraceScanState,
-): KotlinScanStep? =
-    when {
-        scanState.inBlockComment && line.startsWith("*/", characterIndex) ->
-            KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = false))
-        scanState.inBlockComment -> KotlinScanStep(characterIndex + 1, scanState)
-        scanState.inTripleQuotedString && line.startsWith("\"\"\"", characterIndex) ->
-            KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = false))
-        scanState.inTripleQuotedString -> KotlinScanStep(characterIndex + 1, scanState)
-        line.startsWith("//", characterIndex) -> KotlinScanStep(line.length, scanState)
-        line.startsWith("/*", characterIndex) ->
-            KotlinScanStep(characterIndex + 2, scanState.copy(inBlockComment = true))
-        line.startsWith("\"\"\"", characterIndex) ->
-            KotlinScanStep(characterIndex + 3, scanState.copy(inTripleQuotedString = true))
-        else -> null
-    }
-
-private fun skipKotlinString(
-    line: String,
-    openingQuote: Int,
-): Int {
-    var characterIndex = openingQuote + 1
-    while (characterIndex < line.length) {
-        if (line[characterIndex] == '\\') {
-            characterIndex += 2
-        } else if (line[characterIndex] == '"') {
-            return characterIndex + 1
-        } else {
-            characterIndex++
-        }
-    }
-    return characterIndex
-}
-
-private fun skipKotlinCharacterLiteral(
-    line: String,
-    openingQuote: Int,
-): Int {
-    var characterIndex = openingQuote + 1
-    while (characterIndex < line.length) {
-        if (line[characterIndex] == '\\') {
-            characterIndex += 2
-        } else if (line[characterIndex] == '\'') {
-            return characterIndex + 1
-        } else {
-            characterIndex++
-        }
-    }
-    return characterIndex
+private fun lexKotlinSource(source: String): KotlinLexedSource {
+    val scanner = KotlinCodeScanner(source)
+    scanner.scanCode()
+    return scanner.lexedSource()
 }
 
 private fun fullyQualifiedReadMatesReferences(sourceFiles: List<Pair<String, String>>): List<String> =
     sourceFiles.flatMap { (relativePath, source) ->
-        lexKotlinSource(source)
-            .mapNotNull { line ->
-                val trimmed = line.code.trim()
+        val lexedSource = lexKotlinSource(source)
+        lexedSource.code
+            .lineSequence()
+            .mapIndexedNotNull { index, line ->
+                val trimmed = line.trim()
                 val isFullyQualifiedReadMatesReference =
                     "com.readmates." in trimmed &&
                         !trimmed.startsWith("package ") &&
                         !trimmed.startsWith("import ")
-                if (isFullyQualifiedReadMatesReference) "$relativePath:${line.index + 1}: $trimmed" else null
-            }
+                if (isFullyQualifiedReadMatesReference) "$relativePath:${index + 1}: $trimmed" else null
+            }.toList()
     }
 
 private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
@@ -897,30 +830,145 @@ private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION =
         "resolveClubContextUseCase: ClubContextUseCase): RequestedAuthClubContext {"
 
 private const val AUTH_CLUB_CONTEXT_EXTENSION_PREFIX = "fun HttpServletRequest.resolveAuthClubContext("
-private const val EXACT_AUTH_CLUB_CONTEXT_EXTENSION_LINE_COUNT = 1
 private const val TRIPLE_QUOTE = "\"\"\""
 
-private data class KotlinBraceScanState(
-    val braceDepth: Int = 0,
-    val inBlockComment: Boolean = false,
-    val inTripleQuotedString: Boolean = false,
-)
-
-private data class KotlinScanStep(
-    val nextCharacterIndex: Int,
-    val state: KotlinBraceScanState,
-)
-
-private data class KotlinLexLine(
-    val index: Int,
+private data class KotlinLexedSource(
     val code: String,
-    val braceDepth: Int,
-)
+    private val braceDepths: IntArray,
+) {
+    fun braceDepthAt(offset: Int): Int = braceDepths[offset]
+}
 
-private data class KotlinLexLineResult(
-    val code: String,
-    val state: KotlinBraceScanState,
-)
+private class KotlinCodeScanner(
+    private val source: String,
+) {
+    private val code = CharArray(source.length) { ' ' }
+    private val braceDepths = IntArray(source.length)
+    private var braceDepth = 0
+
+    fun scanCode(
+        initialIndex: Int = 0,
+        stopAtTemplateEnd: Boolean = false,
+    ): Int {
+        var index = initialIndex
+        while (index < source.length) {
+            if (stopAtTemplateEnd && source[index] == '}') {
+                writeCode(index)
+                braceDepth--
+                return index + 1
+            }
+            when {
+                source.startsWith("//", index) -> index = skipLineComment(index)
+                source.startsWith("/*", index) -> index = skipBlockComment(index)
+                source.startsWith(TRIPLE_QUOTE, index) -> index = skipRawString(index + TRIPLE_QUOTE.length)
+                source[index] == '"' -> index = skipString(index + 1)
+                source[index] == '\'' -> index = skipCharacterLiteral(index + 1)
+                source[index] == '{' -> {
+                    writeCode(index)
+                    braceDepth++
+                    index++
+                }
+                source[index] == '}' -> {
+                    writeCode(index)
+                    braceDepth--
+                    index++
+                }
+                else -> {
+                    writeCode(index)
+                    index++
+                }
+            }
+        }
+        return index
+    }
+
+    fun lexedSource(): KotlinLexedSource = KotlinLexedSource(code.concatToString(), braceDepths)
+
+    private fun skipLineComment(initialIndex: Int): Int {
+        var index = initialIndex
+        while (index < source.length && source[index] != '\n') {
+            index++
+        }
+        return index
+    }
+
+    private fun skipBlockComment(initialIndex: Int): Int {
+        var index = initialIndex + 2
+        var commentDepth = 1
+        while (index < source.length && commentDepth > 0) {
+            when {
+                source.startsWith("/*", index) -> {
+                    commentDepth++
+                    index += 2
+                }
+                source.startsWith("*/", index) -> {
+                    commentDepth--
+                    index += 2
+                }
+                else -> index++
+            }
+        }
+        return index
+    }
+
+    private fun skipRawString(initialIndex: Int): Int {
+        var index = initialIndex
+        while (index < source.length) {
+            when {
+                source.startsWith(TRIPLE_QUOTE, index) -> return index + TRIPLE_QUOTE.length
+                source.startsWith("${'$'}{", index) -> {
+                    braceDepth++
+                    index = scanCode(index + 2, stopAtTemplateEnd = true)
+                }
+                source[index] == '$' -> index = skipSimpleTemplate(index)
+                else -> index++
+            }
+        }
+        return index
+    }
+
+    private fun skipString(initialIndex: Int): Int {
+        var index = initialIndex
+        while (index < source.length) {
+            when {
+                source[index] == '\\' -> index = (index + 2).coerceAtMost(source.length)
+                source[index] == '"' -> return index + 1
+                source.startsWith("${'$'}{", index) -> {
+                    braceDepth++
+                    index = scanCode(index + 2, stopAtTemplateEnd = true)
+                }
+                source[index] == '$' -> index = skipSimpleTemplate(index)
+                else -> index++
+            }
+        }
+        return index
+    }
+
+    private fun skipSimpleTemplate(initialIndex: Int): Int {
+        var index = initialIndex + 1
+        while (index < source.length && (source[index] == '_' || source[index].isLetterOrDigit())) {
+            index++
+        }
+        return index
+    }
+
+    private fun skipCharacterLiteral(initialIndex: Int): Int {
+        var index = initialIndex
+        while (index < source.length) {
+            when {
+                source[index] == '\\' -> index = (index + 2).coerceAtMost(source.length)
+                source[index] == '\'' -> return index + 1
+                else -> index++
+            }
+        }
+        return index
+    }
+
+    private fun writeCode(index: Int) {
+        code[index] = source[index]
+        braceDepths[index] = braceDepth
+    }
+}
 
 @Tag("architecture")
 class ServerArchitectureSourceBoundaryTest {
