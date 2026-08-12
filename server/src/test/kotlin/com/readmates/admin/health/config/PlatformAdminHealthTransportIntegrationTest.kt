@@ -1,5 +1,6 @@
 package com.readmates.admin.health.config
 
+import com.readmates.admin.health.application.model.HealthCard
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.PlatformHealthRefreshState
@@ -9,6 +10,7 @@ import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.port.out.PlatformHealthProviderOutcome
 import com.readmates.admin.health.application.port.out.PlatformHealthRefreshResult
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
+import com.readmates.admin.health.application.service.HealthCardProvider
 import com.readmates.admin.health.application.service.PlatformAdminHealthService
 import com.readmates.admin.health.application.service.providers.KafkaLagHealthCardProvider
 import com.sun.net.httpserver.HttpServer
@@ -35,10 +37,17 @@ class PlatformAdminHealthTransportIntegrationTest {
 
     @Test
     fun `real transport timeout after last known good preserves exact snapshot and records one timeout`() {
-        LocalPrometheusServer(succeedFirst = true).use { server ->
+        LocalPrometheusServer().use { server ->
             withHealthContext(server) { context ->
                 val metrics = RecordingTransportMetrics()
-                val service = service(context.getBean(PrometheusQueryPort::class.java), context, metrics)
+                val transportProvider =
+                    KafkaLagHealthCardProvider(context.getBean(PrometheusQueryPort::class.java), clock)
+                val service =
+                    service(
+                        SeedLastKnownGoodProvider(transportProvider, lastKnownGoodCard()),
+                        context,
+                        metrics,
+                    )
                 val lastKnownGood = service.currentHealth()
 
                 val stale = service.refresh(PlatformHealthRefreshTrigger.SCHEDULED).get(1, TimeUnit.SECONDS)
@@ -58,10 +67,15 @@ class PlatformAdminHealthTransportIntegrationTest {
 
     @Test
     fun `real transport timeout before first success returns deterministic unavailable failure card`() {
-        LocalPrometheusServer(succeedFirst = false).use { server ->
+        LocalPrometheusServer().use { server ->
             withHealthContext(server) { context ->
                 val metrics = RecordingTransportMetrics()
-                val service = service(context.getBean(PrometheusQueryPort::class.java), context, metrics)
+                val service =
+                    service(
+                        KafkaLagHealthCardProvider(context.getBean(PrometheusQueryPort::class.java), clock),
+                        context,
+                        metrics,
+                    )
 
                 val unavailable = service.currentHealth()
 
@@ -83,16 +97,29 @@ class PlatformAdminHealthTransportIntegrationTest {
     }
 
     private fun service(
-        prometheus: PrometheusQueryPort,
+        provider: HealthCardProvider,
         context: org.springframework.context.ApplicationContext,
         metrics: PlatformAdminHealthMetricsPort,
     ): PlatformAdminHealthService =
         PlatformAdminHealthService(
-            providers = listOf(KafkaLagHealthCardProvider(prometheus, clock)),
+            providers = listOf(provider),
             clock = clock,
             executor = context.getBean("platformAdminHealthExecutor", Executor::class.java),
             properties = context.getBean(PlatformAdminHealthProperties::class.java),
             metrics = metrics,
+        )
+
+    private fun lastKnownGoodCard(): HealthCard =
+        HealthCard(
+            id = PlatformHealthProvider.KAFKA_CONSUMER_LAG.cardId,
+            title = "Kafka consumer lag",
+            status = HealthCardStatus.OK,
+            metric = null,
+            thresholds = null,
+            lastCheckedAt = now,
+            source = HealthCardSource.PROMETHEUS,
+            drill = null,
+            reason = null,
         )
 
     private fun withHealthContext(
@@ -114,11 +141,24 @@ class PlatformAdminHealthTransportIntegrationTest {
             }
     }
 
-    private class LocalPrometheusServer(
-        private val succeedFirst: Boolean,
-    ) : AutoCloseable {
+    private class SeedLastKnownGoodProvider(
+        private val delegate: HealthCardProvider,
+        private val lastKnownGood: HealthCard,
+    ) : HealthCardProvider {
+        private val invocationCount = AtomicInteger()
+
+        override val identity: PlatformHealthProvider = delegate.identity
+
+        override fun compute(): HealthCard =
+            if (invocationCount.incrementAndGet() == 1) {
+                lastKnownGood
+            } else {
+                delegate.compute()
+            }
+    }
+
+    private class LocalPrometheusServer : AutoCloseable {
         private val bodyRelease = CountDownLatch(1)
-        private val requestCount = AtomicInteger()
         private val executor: ExecutorService =
             Executors.newCachedThreadPool { runnable ->
                 Thread(runnable, "admin-health-test-http").apply { isDaemon = true }
@@ -130,9 +170,7 @@ class PlatformAdminHealthTransportIntegrationTest {
                     val body = PROMETHEUS_SUCCESS_BODY.toByteArray(StandardCharsets.UTF_8)
                     exchange.responseHeaders.add("Content-Type", "application/json")
                     exchange.sendResponseHeaders(200, body.size.toLong())
-                    if (!succeedFirst || requestCount.incrementAndGet() > 1) {
-                        check(bodyRelease.await(2, TimeUnit.SECONDS))
-                    }
+                    bodyRelease.await()
                     exchange.responseBody.use { response -> response.write(body) }
                 }
                 start()
