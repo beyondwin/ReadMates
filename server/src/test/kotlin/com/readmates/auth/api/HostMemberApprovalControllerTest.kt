@@ -1,12 +1,18 @@
 package com.readmates.auth.api
 
+import com.readmates.auth.application.AuthApplicationError
+import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.application.service.MemberApprovalService
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -30,6 +36,7 @@ class HostMemberApprovalControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
+    @param:Autowired private val memberApprovalService: MemberApprovalService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
@@ -226,6 +233,55 @@ class HostMemberApprovalControllerTest(
 
         assertEquals("VIEWER", membershipStatus(activateMembershipId))
         assertEquals("VIEWER", membershipStatus(deactivateMembershipId))
+    }
+
+    @Test
+    fun `suspended host role cannot activate viewers without persistence`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        val membershipId = insertViewerMember(uniqueEmail("suspended.host.approval"), "Suspended Host Approval")
+        suspendSeedHost()
+        try {
+            mockMvc
+                .post("/api/host/members/$membershipId/activate") {
+                    cookie(hostCookie)
+                }.andExpect {
+                    status { isForbidden() }
+                    jsonPath("$.code") { value("PERMISSION_DENIED") }
+                }
+
+            assertEquals("VIEWER", membershipStatus(membershipId))
+        } finally {
+            restoreSeedHost()
+        }
+    }
+
+    @Test
+    fun `club actor without member capability is denied before viewer activation persistence`() {
+        val membershipId = insertViewerMember(uniqueEmail("suspended.actor.approval"), "Suspended Actor Approval")
+
+        val error =
+            assertThrows(AuthApplicationException::class.java) {
+                memberApprovalService.activateViewer(suspendedHostActor(), UUID.fromString(membershipId))
+            }
+
+        assertEquals(AuthApplicationError.HOST_REQUIRED, error.error)
+        assertEquals("VIEWER", membershipStatus(membershipId))
+    }
+
+    @Test
+    fun `invitation management capability does not authorize viewer activation`() {
+        val membershipId = insertViewerMember(uniqueEmail("invitation.actor.approval"), "Invitation Actor Approval")
+
+        val error =
+            assertThrows(AuthApplicationException::class.java) {
+                memberApprovalService.activateViewer(
+                    suspendedHostActor(setOf(ClubCapability.MANAGE_INVITATIONS)),
+                    UUID.fromString(membershipId),
+                )
+            }
+
+        assertEquals(AuthApplicationError.HOST_REQUIRED, error.error)
+        assertEquals("VIEWER", membershipStatus(membershipId))
     }
 
     @Test
@@ -427,6 +483,35 @@ class HostMemberApprovalControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
+
+    private fun suspendSeedHost() {
+        jdbcTemplate.update(
+            """
+            update memberships set status = 'SUSPENDED'
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and user_id = (select id from users where email = 'host@example.com')
+            """.trimIndent(),
+        )
+    }
+
+    private fun restoreSeedHost() {
+        jdbcTemplate.update(
+            """
+            update memberships set status = 'ACTIVE'
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and user_id = (select id from users where email = 'host@example.com')
+            """.trimIndent(),
+        )
+    }
+
+    private fun suspendedHostActor(capabilities: Set<ClubCapability> = emptySet()) =
+        ClubActor(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubSlug = "reading-sai",
+            capabilities = capabilities,
+        )
 
     private fun deleteWhereIn(
         tableName: String,

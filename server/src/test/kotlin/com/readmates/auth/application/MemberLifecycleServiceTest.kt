@@ -1,9 +1,9 @@
 package com.readmates.auth.application.service
 
-import com.readmates.auth.application.MemberLifecycleRequest
-import com.readmates.auth.application.CurrentSessionPolicyResult
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
+import com.readmates.auth.application.CurrentSessionPolicyResult
+import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.port.out.HostMemberListRow
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
@@ -76,9 +76,25 @@ class MemberLifecycleServiceTest {
         val service = MemberLifecycleService(store)
         val invitationManager = host.copy(capabilities = setOf(ClubCapability.MANAGE_INVITATIONS))
 
-        val error = assertThrows(AuthApplicationException::class.java) {
-            service.suspend(invitationManager, targetMembershipId, MemberLifecycleRequest())
-        }
+        val error =
+            assertThrows(AuthApplicationException::class.java) {
+                service.suspend(invitationManager, targetMembershipId, MemberLifecycleRequest())
+            }
+
+        assertEquals(AuthApplicationError.HOST_REQUIRED, error.error)
+        assertEquals(emptyList<String>(), store.mutationCalls)
+    }
+
+    @Test
+    fun `suspended host actor cannot manage lifecycle before touching the store`() {
+        val store = RecordingMemberLifecycleStorePort()
+        val service = MemberLifecycleService(store)
+        val suspendedHost = host.copy(capabilities = emptySet())
+
+        val error =
+            assertThrows(AuthApplicationException::class.java) {
+                service.suspend(suspendedHost, targetMembershipId, MemberLifecycleRequest())
+            }
 
         assertEquals(AuthApplicationError.HOST_REQUIRED, error.error)
         assertEquals(emptyList<String>(), store.mutationCalls)
@@ -100,14 +116,34 @@ class MemberLifecycleServiceTest {
     }
 
     @Test
+    fun `active host leave protects the last locked host without writing`() {
+        val store = RecordingMemberLifecycleStorePort(role = MembershipRole.HOST, activeHostCount = 1)
+        val service = MemberLifecycleService(store)
+        val activeHost = host.copy(membershipId = targetMembershipId)
+
+        val error =
+            assertThrows(AuthApplicationException::class.java) {
+                service.leave(activeHost, MemberLifecycleRequest())
+            }
+
+        assertEquals(AuthApplicationError.MEMBER_CONFLICT, error.error)
+        assertEquals("Last active host cannot leave", error.message)
+        assertEquals(
+            listOf("lock-club", "lock-active-hosts", "find-membership", "active-host-count"),
+            store.mutationCalls,
+        )
+    }
+
+    @Test
     fun `suspended host leave protects last persisted host without management capability`() {
         val store = RecordingMemberLifecycleStorePort(role = MembershipRole.HOST, activeHostCount = 1)
         val service = MemberLifecycleService(store)
         val suspendedHost = host.copy(membershipId = targetMembershipId, capabilities = emptySet())
 
-        val error = assertThrows(AuthApplicationException::class.java) {
-            service.leave(suspendedHost, MemberLifecycleRequest())
-        }
+        val error =
+            assertThrows(AuthApplicationException::class.java) {
+                service.leave(suspendedHost, MemberLifecycleRequest())
+            }
 
         assertEquals(AuthApplicationError.MEMBER_CONFLICT, error.error)
         assertEquals("Last active host cannot leave", error.message)

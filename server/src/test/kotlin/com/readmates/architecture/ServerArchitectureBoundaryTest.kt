@@ -833,31 +833,6 @@ class ServerArchitectureBoundaryTest {
 
         assertAll(assertions)
     }
-
-    @Test
-    fun `auth web authorization input ports accept club actors instead of current members`() {
-        val useCases =
-            listOf(
-                ManageHostInvitationsUseCase::class.java,
-                ManageMemberApprovalsUseCase::class.java,
-                ManageMemberLifecycleUseCase::class.java,
-                LeaveMembershipUseCase::class.java,
-                GetPendingApprovalUseCase::class.java,
-            )
-
-        useCases.forEach { useCase ->
-            val parameterTypes = useCase.methods.flatMap { method -> method.parameterTypes.asIterable() }
-
-            assertFalse(
-                parameterTypes.contains(CurrentMember::class.java),
-                "${useCase.simpleName} must not accept CurrentMember",
-            )
-            assertTrue(
-                parameterTypes.contains(ClubActor::class.java),
-                "${useCase.simpleName} must accept ClubActor",
-            )
-        }
-    }
 }
 
 private data class KotlinSourceFixture(
@@ -1243,6 +1218,22 @@ private fun Char.isKotlinIdentifierPart(): Boolean = isKotlinIdentifierStart() |
 
 @Tag("architecture")
 class ServerArchitectureSourceBoundaryTest {
+    @Test
+    fun `auth web authorization input ports accept club actors instead of current members`() {
+        authWebAuthorizationInputPorts().forEach { useCase ->
+            val parameterTypes = useCase.methods.flatMap { method -> method.parameterTypes.asIterable() }
+
+            assertFalse(
+                parameterTypes.contains(CurrentMember::class.java),
+                "${useCase.simpleName} must not accept CurrentMember",
+            )
+            assertTrue(
+                parameterTypes.contains(ClubActor::class.java),
+                "${useCase.simpleName} must accept ClubActor",
+            )
+        }
+    }
+
     @Test
     fun `admin health application does not declare scheduled methods`() {
         val violations =
@@ -1772,3 +1763,12 @@ class ServerArchitectureSourceBoundaryTest {
         rule.check(importedClasses)
     }
 }
+
+private fun authWebAuthorizationInputPorts() =
+    listOf(
+        ManageHostInvitationsUseCase::class.java,
+        ManageMemberApprovalsUseCase::class.java,
+        ManageMemberLifecycleUseCase::class.java,
+        LeaveMembershipUseCase::class.java,
+        GetPendingApprovalUseCase::class.java,
+    )

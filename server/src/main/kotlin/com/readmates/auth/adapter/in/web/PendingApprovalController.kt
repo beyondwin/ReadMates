@@ -1,7 +1,7 @@
 package com.readmates.auth.adapter.`in`.web
 
-import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
 import com.readmates.auth.application.model.PendingApprovalAppResponse
+import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.toClubActor
 import org.springframework.web.bind.annotation.GetMapping

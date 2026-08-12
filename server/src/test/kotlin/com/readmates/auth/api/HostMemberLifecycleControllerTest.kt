@@ -348,6 +348,31 @@ class HostMemberLifecycleControllerTest(
     }
 
     @Test
+    fun `suspended host role cannot suspend members without persistence`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        val membershipId = insertLifecycleMember("suspended.host.lifecycle", "ACTIVE")
+        suspendSeedHost()
+        try {
+            mockMvc
+                .post("/api/host/members/$membershipId/suspend") {
+                    cookie(hostCookie)
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"currentSessionPolicy":"APPLY_NOW"}"""
+                }.andExpect {
+                    status { isForbidden() }
+                    jsonPath("$.code") { value("PERMISSION_DENIED") }
+                }
+
+            assertEquals("ACTIVE", membershipStatus(membershipId))
+        } finally {
+            restoreSeedHost()
+        }
+    }
+
+    @Test
     fun `host cannot mutate a membership outside their club`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
         val membershipId = insertLifecycleMemberOutsideClub("outside.lifecycle", "ACTIVE")
@@ -693,6 +718,26 @@ class HostMemberLifecycleControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected membership status for $membershipId")
+
+    private fun suspendSeedHost() {
+        jdbcTemplate.update(
+            """
+            update memberships set status = 'SUSPENDED'
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and user_id = (select id from users where email = 'host@example.com')
+            """.trimIndent(),
+        )
+    }
+
+    private fun restoreSeedHost() {
+        jdbcTemplate.update(
+            """
+            update memberships set status = 'ACTIVE'
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and user_id = (select id from users where email = 'host@example.com')
+            """.trimIndent(),
+        )
+    }
 
     private fun avatarKey(membershipId: String): String =
         jdbcTemplate.queryForObject(
