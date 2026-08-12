@@ -5,6 +5,7 @@ import { publicClubQuery, publicSessionQuery } from "@/features/public/queries/p
 import type { PublicClubRouteData } from "@/features/public/route/public-route-data";
 import { LivingArchivePreviewHead } from "@/features/public/ui/living-archive-preview-head";
 import { LivingArchivePreviewPage } from "@/features/public/ui/living-archive-preview-page";
+import "@/features/public/ui/living-archive-preview.css";
 
 export function LivingArchivePreviewRoute() {
   const data = useLoaderData() as PublicClubRouteData;
