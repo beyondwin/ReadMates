@@ -1,10 +1,10 @@
 import { useCallback, useSyncExternalStore } from "react";
-import type { Router } from "react-router";
+import type { DataRouter } from "react-router";
 import { LivingArchivePreviewHead } from "@/features/public/ui/living-archive-preview-head";
 
 const livingArchivePreviewPath = "/living-archive-preview";
 
-type PreviewLifetimeRouter = Pick<Router, "state" | "subscribe">;
+type PreviewLifetimeRouter = Pick<DataRouter, "state" | "subscribe">;
 
 function isLivingArchivePreviewPath(pathname: string | undefined) {
   return pathname === livingArchivePreviewPath || pathname === `${livingArchivePreviewPath}/`;
