@@ -1042,7 +1042,7 @@ club|auth
 
 **Ignored report contract:**
 
-The report records the plan SHA/base, full task/correction SHAs and subjects, exact changed-file inventory, all 16 enumerated mutation RED/restored-GREEN results, 19 retired boundary identities grouped by task, `4 + 35 = 39`, retired `club|auth`, `40 + 1 = 41`, focused commands and counts, canonical/full integration/E2E/public results, all reviews, skipped live evidence, residual risks, and exact clean status. It embeds the complete all-changed, candidate-eligible, and candidate-excluded inventories from Step 7, identifies the historical plan as the sole candidate-excluded changed path, and distinguishes repository, local Testcontainers, and local browser evidence from live production evidence.
+The report records the plan SHA/base, full task/correction SHAs and subjects, exact changed-file inventory, all 18 enumerated mutation RED/restored-GREEN results, 19 retired boundary identities grouped by task, `4 + 35 = 39`, retired `club|auth`, `40 + 1 = 41`, focused commands and counts, canonical/full integration/E2E/public results, all reviews, skipped live evidence, residual risks, and exact clean status. It embeds the complete all-changed, candidate-eligible, and candidate-excluded inventories from Step 7, identifies the historical plan as the sole candidate-excluded changed path, and distinguishes repository, local Testcontainers, and local browser evidence from live production evidence.
 
 - [ ] **Step 1: Resolve the ignored SDD workspace.**
 
@@ -1253,17 +1253,19 @@ Every task report records exact baseline GREEN, temporary RED, failing assertion
 3. Authorize club onboarding with `VIEW_CLUBS` instead of `CREATE_CLUB`, then independently remove the `VIEW_CLUBS` list guard and the `VIEW_CLUB_OPERATIONS` operations guards; the three exact denied-path detectors must each fail.
 4. Resolve host context before slug context.
 5. Treat an unknown supplied slug as unscoped.
-6. Replace `AuthenticatedMemberSnapshot?` with `ClubActor?` in authority synthesis and derive the authority from capabilities; the signature detector and 12-role/status matrix, including suspended HOST = `ROLE_HOST`, must fail.
-7. Retain stale incoming `ROLE_HOST` for a non-member.
-8. Let `MANAGE_INVITATIONS` authorize member lifecycle mutation.
-9. Pass `CurrentMember` directly to one migrated auth host input port.
-10. Guard leave active-host locking/quorum with `actor.can(MANAGE_MEMBERS)`; the suspended-HOST persisted-role protection must fail RED.
-11. Map `MemberProfileError.MEMBER_NOT_FOUND` to HTTP 403.
-12. Inject `GoogleLoginService` into `ReadmatesOAuthSuccessHandler`.
-13. Skip servlet session-ID rotation on an OAuth provider-error exit.
-14. Reintroduce one `club.application -> auth` import.
-15. Hash a different invitation token than the raw token returned to onboarding.
-16. Materialize cached support synthesis as MEMBER or SUSPENDED instead of explicit HOST/ACTIVE.
+6. Classify same-feature auth inbound as cross-feature debt.
+7. Allow an unclassified inbound source or target feature.
+8. Replace `AuthenticatedMemberSnapshot?` with `ClubActor?` in authority synthesis and derive the authority from capabilities; the signature detector and 12-role/status matrix, including suspended HOST = `ROLE_HOST`, must fail.
+9. Retain stale incoming `ROLE_HOST` for a non-member.
+10. Let `MANAGE_INVITATIONS` authorize member lifecycle mutation.
+11. Pass `CurrentMember` directly to one migrated auth host input port.
+12. Guard leave active-host locking/quorum with `actor.can(MANAGE_MEMBERS)`; the suspended-HOST persisted-role protection must fail RED.
+13. Map `MemberProfileError.MEMBER_NOT_FOUND` to HTTP 403.
+14. Inject `GoogleLoginService` into `ReadmatesOAuthSuccessHandler`.
+15. Skip servlet session-ID rotation on an OAuth provider-error exit.
+16. Reintroduce one `club.application -> auth` import.
+17. Hash a different invitation token than the raw token returned to onboarding.
+18. Materialize cached support synthesis as MEMBER or SUSPENDED instead of explicit HOST/ACTIVE.
 
 ## Explicit Residuals And Excluded Scope
 
