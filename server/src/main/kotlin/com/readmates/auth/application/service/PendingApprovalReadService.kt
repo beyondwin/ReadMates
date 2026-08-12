@@ -2,39 +2,24 @@ package com.readmates.auth.application.service
 
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
+import com.readmates.auth.application.model.PendingApprovalAppResponse
+import com.readmates.auth.application.model.PendingCurrentSessionResponse
 import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
 import com.readmates.auth.application.port.out.PendingApprovalRow
 import com.readmates.auth.application.port.out.PendingApprovalStorePort
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import org.springframework.stereotype.Service
-
-data class PendingApprovalAppResponse(
-    val approvalState: String,
-    val clubName: String,
-    val currentSession: PendingCurrentSessionResponse?,
-)
-
-data class PendingCurrentSessionResponse(
-    val sessionId: String,
-    val sessionNumber: Int,
-    val title: String,
-    val bookTitle: String,
-    val bookAuthor: String,
-    val date: String,
-    val locationLabel: String,
-)
 
 @Service
 class PendingApprovalReadService(
     private val pendingApprovalStore: PendingApprovalStorePort,
 ) : GetPendingApprovalUseCase {
-    override fun get(member: CurrentMember): PendingApprovalAppResponse {
-        if (!member.isViewer) {
-            throw AuthApplicationException(AuthApplicationError.PENDING_APPROVAL_REQUIRED, "Pending approval required")
-        }
+    override fun get(actor: ClubActor): PendingApprovalAppResponse {
+        requirePendingViewer(actor)
 
         return pendingApprovalStore
-            .findPendingApproval(member.clubId)
+            .findPendingApproval(actor.clubId)
             ?.toPendingApprovalAppResponse()
             ?: throw AuthApplicationException(AuthApplicationError.CLUB_NOT_FOUND, "Club not found")
     }
@@ -56,4 +41,11 @@ class PendingApprovalReadService(
                     )
                 },
         )
+
+    private fun requirePendingViewer(actor: ClubActor) {
+        if (!actor.can(ClubCapability.VIEW_PENDING_APPROVAL)) throw existingPendingApprovalFailure()
+    }
+
+    private fun existingPendingApprovalFailure(): AuthApplicationException =
+        AuthApplicationException(AuthApplicationError.PENDING_APPROVAL_REQUIRED, "Pending approval required")
 }

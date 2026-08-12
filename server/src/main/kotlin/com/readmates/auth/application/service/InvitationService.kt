@@ -17,6 +17,8 @@ import com.readmates.auth.domain.MembershipRole
 import com.readmates.shared.db.dbString
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -71,12 +73,12 @@ class InvitationService(
     PreviewInvitationUseCase {
     @Transactional
     override fun createInvitation(
-        host: CurrentMember,
+        host: ClubActor,
         email: String,
         name: String,
         applyToCurrentSession: Boolean,
     ): HostInvitationResponse {
-        requireHost(host)
+        requireInvitationManager(host)
         val normalizedEmail = normalizeEmail(email)
         val normalizedName = normalizeInvitedName(name)
         invitationStore.acquireInvitationCreateLock(invitationLockKey(host.clubId, normalizedEmail))
@@ -106,10 +108,10 @@ class InvitationService(
     }
 
     override fun listHostInvitations(
-        host: CurrentMember,
+        host: ClubActor,
         pageRequest: PageRequest,
     ): CursorPage<HostInvitationResponse> {
-        requireHost(host)
+        requireInvitationManager(host)
         val page = invitationStore.listHostInvitations(host.clubId, pageRequest)
         return CursorPage(
             items = page.items.map(::toHostInvitationResponse),
@@ -205,10 +207,10 @@ class InvitationService(
 
     @Transactional
     override fun revokeInvitation(
-        host: CurrentMember,
+        host: ClubActor,
         invitationId: UUID,
     ): HostInvitationResponse {
-        requireHost(host)
+        requireInvitationManager(host)
         invitationStore.revokePendingInvitation(host.clubId, invitationId)
         return findHostInvitation(host.clubId, invitationId)
     }
@@ -363,11 +365,12 @@ class InvitationService(
         return "$prefix****@$domain"
     }
 
-    private fun requireHost(member: CurrentMember) {
-        if (!member.isHost) {
-            throw InvitationDomainException("HOST_REQUIRED", InvitationDomainError.FORBIDDEN, "Host role required")
-        }
+    private fun requireInvitationManager(actor: ClubActor) {
+        if (!actor.can(ClubCapability.MANAGE_INVITATIONS)) throw existingHostRequiredFailure()
     }
+
+    private fun existingHostRequiredFailure(): InvitationDomainException =
+        InvitationDomainException("HOST_REQUIRED", InvitationDomainError.FORBIDDEN, "Host role required")
 
     private fun acceptUrl(
         clubSlug: String,

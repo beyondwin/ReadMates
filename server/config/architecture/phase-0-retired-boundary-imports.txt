@@ -1,4 +1,5 @@
 # Append an exact approved boundary import here when its current baseline debt is removed.
+com/readmates/auth/adapter/in/web/PendingApprovalController.kt|com.readmates.auth.application.service.PendingApprovalAppResponse
 com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.auth.application.service.AuthenticatedMemberResolver
 com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.auth.application.service.AuthoritySynthesisRequest
 com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readmates.auth.application.service.AuthoritySynthesisService

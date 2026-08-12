@@ -4,6 +4,7 @@ import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.MemberLifecycleResponse
 import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.toClubActor
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RestController
@@ -16,5 +17,5 @@ class SelfMembershipController(
     fun leave(
         currentMember: CurrentMember,
         @RequestBody request: MemberLifecycleRequest,
-    ): MemberLifecycleResponse = leaveMembership.leave(currentMember, request)
+    ): MemberLifecycleResponse = leaveMembership.leave(currentMember.toClubActor(), request)
 }

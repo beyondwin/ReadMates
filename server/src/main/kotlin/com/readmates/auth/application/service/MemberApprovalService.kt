@@ -8,7 +8,8 @@ import com.readmates.auth.application.port.out.ViewerMemberRow
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -29,10 +30,10 @@ class MemberApprovalService(
     private val memberApprovalStore: MemberApprovalStorePort,
 ) : ManageMemberApprovalsUseCase {
     override fun listViewers(
-        host: CurrentMember,
+        host: ClubActor,
         pageRequest: PageRequest,
     ): CursorPage<ViewerMemberResponse> {
-        requireHost(host)
+        requireMemberManager(host)
         val page = memberApprovalStore.listPendingViewers(host.clubId, pageRequest)
         return CursorPage(
             items = page.items.map(::mapViewerMember),
@@ -42,10 +43,10 @@ class MemberApprovalService(
 
     @Transactional
     override fun activateViewer(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
     ): ViewerMemberResponse {
-        requireHost(host)
+        requireMemberManager(host)
         if (!memberApprovalStore.activateViewer(host.clubId, membershipId)) {
             throw viewerMemberNotFound()
         }
@@ -56,10 +57,10 @@ class MemberApprovalService(
 
     @Transactional
     override fun deactivateViewer(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
     ): ViewerMemberResponse {
-        requireHost(host)
+        requireMemberManager(host)
         if (!memberApprovalStore.deactivateViewer(host.clubId, membershipId)) {
             throw viewerMemberNotFound()
         }
@@ -86,11 +87,12 @@ class MemberApprovalService(
             createdAt = row.createdAt.toString(),
         )
 
-    private fun requireHost(member: CurrentMember) {
-        if (!member.isHost) {
-            throw AuthApplicationException(AuthApplicationError.HOST_REQUIRED, "Host role required")
-        }
+    private fun requireMemberManager(actor: ClubActor) {
+        if (!actor.can(ClubCapability.MANAGE_MEMBERS)) throw existingHostRequiredFailure()
     }
+
+    private fun existingHostRequiredFailure(): AuthApplicationException =
+        AuthApplicationException(AuthApplicationError.HOST_REQUIRED, "Host role required")
 
     private fun viewerMemberNotFound(): AuthApplicationException =
         AuthApplicationException(AuthApplicationError.VIEWER_MEMBER_NOT_FOUND, "Viewer member not found")

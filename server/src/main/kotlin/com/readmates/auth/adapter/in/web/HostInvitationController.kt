@@ -5,6 +5,7 @@ import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.toClubActor
 import jakarta.validation.Valid
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -34,7 +35,7 @@ class HostInvitationController(
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
     ) = invitations.listHostInvitations(
-        currentMember,
+        currentMember.toClubActor(),
         PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
     )
 
@@ -44,7 +45,7 @@ class HostInvitationController(
         currentMember: CurrentMember,
         @Valid @RequestBody request: CreateInvitationRequest,
     ) = invitations.createInvitation(
-        host = currentMember,
+        host = currentMember.toClubActor(),
         email = request.email,
         name = request.name,
         applyToCurrentSession = request.applyToCurrentSession,
@@ -54,7 +55,7 @@ class HostInvitationController(
     fun revoke(
         currentMember: CurrentMember,
         @PathVariable invitationId: String,
-    ) = invitations.revokeInvitation(currentMember, parseInvitationId(invitationId))
+    ) = invitations.revokeInvitation(currentMember.toClubActor(), parseInvitationId(invitationId))
 
     @ExceptionHandler(MethodArgumentNotValidException::class)
     fun handleValidationError(error: MethodArgumentNotValidException): ResponseEntity<ApiErrorResponse> {

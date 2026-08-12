@@ -25,6 +25,7 @@ import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.service.HostSessionAttendanceService
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.toClubActor
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -553,7 +554,7 @@ class JdbcManualNotificationDispatchAdapterTest(
                     {
                         transactionTemplate.executeWithoutResult {
                             memberLifecycleService.suspend(
-                                host,
+                                host.toClubActor(),
                                 changedMembershipId,
                                 MemberLifecycleRequest(),
                             )
@@ -607,7 +608,7 @@ class JdbcManualNotificationDispatchAdapterTest(
                 CompletableFuture.runAsync(
                     {
                         transactionTemplate.executeWithoutResult {
-                            memberApprovalService.activateViewer(host, changedMembershipId)
+                            memberApprovalService.activateViewer(host.toClubActor(), changedMembershipId)
                             activationApplied.countDown()
                             check(releaseActivation.await(10, TimeUnit.SECONDS))
                         }

@@ -1,5 +1,12 @@
 package com.readmates.architecture
 
+import com.readmates.auth.application.port.`in`.GetPendingApprovalUseCase
+import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
+import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
+import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
+import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.CurrentMember
 import com.tngtech.archunit.base.DescribedPredicate
 import com.tngtech.archunit.core.domain.JavaClass
 import com.tngtech.archunit.core.importer.ClassFileImporter
@@ -825,6 +832,31 @@ class ServerArchitectureBoundaryTest {
             }
 
         assertAll(assertions)
+    }
+
+    @Test
+    fun `auth web authorization input ports accept club actors instead of current members`() {
+        val useCases =
+            listOf(
+                ManageHostInvitationsUseCase::class.java,
+                ManageMemberApprovalsUseCase::class.java,
+                ManageMemberLifecycleUseCase::class.java,
+                LeaveMembershipUseCase::class.java,
+                GetPendingApprovalUseCase::class.java,
+            )
+
+        useCases.forEach { useCase ->
+            val parameterTypes = useCase.methods.flatMap { method -> method.parameterTypes.asIterable() }
+
+            assertFalse(
+                parameterTypes.contains(CurrentMember::class.java),
+                "${useCase.simpleName} must not accept CurrentMember",
+            )
+            assertTrue(
+                parameterTypes.contains(ClubActor::class.java),
+                "${useCase.simpleName} must accept ClubActor",
+            )
+        }
     }
 }
 

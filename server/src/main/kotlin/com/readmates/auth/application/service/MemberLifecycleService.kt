@@ -17,7 +17,8 @@ import com.readmates.auth.domain.MembershipStatus
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -29,10 +30,10 @@ class MemberLifecycleService(
 ) : ManageMemberLifecycleUseCase,
     LeaveMembershipUseCase {
     override fun listMembers(
-        host: CurrentMember,
+        host: ClubActor,
         pageRequest: PageRequest,
     ): CursorPage<HostMemberListItem> {
-        requireHost(host)
+        requireMemberManager(host)
         val page = memberLifecycleStore.listMembers(host.clubId, pageRequest)
         return CursorPage(
             items = page.items.map { row -> row.toHostMemberListItem(host.membershipId) },
@@ -42,11 +43,11 @@ class MemberLifecycleService(
 
     @Transactional
     override fun suspend(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
-        requireHost(host)
+        requireMemberManager(host)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.SUSPENDED)) {
@@ -66,10 +67,10 @@ class MemberLifecycleService(
 
     @Transactional
     override fun restore(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
     ): MemberLifecycleResponse {
-        requireHost(host)
+        requireMemberManager(host)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.ACTIVE)) {
@@ -88,11 +89,11 @@ class MemberLifecycleService(
 
     @Transactional
     override fun deactivate(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
-        requireHost(host)
+        requireMemberManager(host)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.LEFT)) {
@@ -112,10 +113,10 @@ class MemberLifecycleService(
 
     @Transactional
     override fun addToCurrentSession(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
     ): MemberLifecycleResponse {
-        requireHost(host)
+        requireMemberManager(host)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (membership.status != MembershipStatus.ACTIVE) {
@@ -138,10 +139,10 @@ class MemberLifecycleService(
 
     @Transactional
     override fun removeFromCurrentSession(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
     ): MemberLifecycleResponse {
-        requireHost(host)
+        requireMemberManager(host)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         ensureMutableMembership(host, membershipId)
         val openSessionId =
@@ -160,39 +161,37 @@ class MemberLifecycleService(
 
     @Transactional
     override fun leave(
-        member: CurrentMember,
+        actor: ClubActor,
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
-        memberLifecycleStore.lockClubForUpdate(member.clubId)
-        if (member.role == MembershipRole.HOST) {
-            memberLifecycleStore.lockActiveHostRows(member.clubId)
-        }
+        memberLifecycleStore.lockClubForUpdate(actor.clubId)
+        memberLifecycleStore.lockActiveHostRows(actor.clubId)
         val membership =
-            memberLifecycleStore.findMembershipInClubForUpdate(member.clubId, member.membershipId)
+            memberLifecycleStore.findMembershipInClubForUpdate(actor.clubId, actor.membershipId)
                 ?: throw AuthApplicationException(AuthApplicationError.AUTHENTICATION_REQUIRED, "Authentication required")
-        if (membership.role == MembershipRole.HOST && memberLifecycleStore.activeHostCount(member.clubId) <= 1) {
+        if (membership.role == MembershipRole.HOST && memberLifecycleStore.activeHostCount(actor.clubId) <= 1) {
             throw lifecycleConflict("Last active host cannot leave")
         }
         if (!membership.status.canTransitionTo(MembershipStatus.LEFT)) {
             throw lifecycleConflict("${membership.status} → LEFT is not allowed")
         }
 
-        memberLifecycleStore.markMembershipLeft(member.clubId, member.membershipId)
+        memberLifecycleStore.markMembershipLeft(actor.clubId, actor.membershipId)
 
         val policyResult =
             applyCurrentSessionPolicy(
-                member.clubId,
-                member.membershipId,
+                actor.clubId,
+                actor.membershipId,
                 request.currentSessionPolicy,
             )
         return MemberLifecycleResponse(
-            member = findHostMemberListItem(member, member.membershipId),
+            member = findHostMemberListItem(actor, actor.membershipId),
             currentSessionPolicyResult = policyResult,
-        ).also { cacheInvalidation.evictClubContentAfterCommit(member.clubId) }
+        ).also { cacheInvalidation.evictClubContentAfterCommit(actor.clubId) }
     }
 
     private fun ensureMutableMembership(
-        host: CurrentMember,
+        host: ClubActor,
         membershipId: UUID,
     ): LifecycleMembershipRow {
         val membership =
@@ -226,7 +225,7 @@ class MemberLifecycleService(
     }
 
     private fun findHostMemberListItem(
-        currentMember: CurrentMember,
+        currentMember: ClubActor,
         membershipId: UUID,
     ): HostMemberListItem =
         memberLifecycleStore
@@ -234,11 +233,12 @@ class MemberLifecycleService(
             ?.toHostMemberListItem(currentMember.membershipId)
             ?: throw lifecycleNotFound()
 
-    private fun requireHost(member: CurrentMember) {
-        if (!member.isHost) {
-            throw AuthApplicationException(AuthApplicationError.HOST_REQUIRED, "Host role required")
-        }
+    private fun requireMemberManager(actor: ClubActor) {
+        if (!actor.can(ClubCapability.MANAGE_MEMBERS)) throw existingHostRequiredFailure()
     }
+
+    private fun existingHostRequiredFailure(): AuthApplicationException =
+        AuthApplicationException(AuthApplicationError.HOST_REQUIRED, "Host role required")
 
     private fun lifecycleNotFound(): AuthApplicationException =
         AuthApplicationException(AuthApplicationError.MEMBER_NOT_FOUND, "Member not found")
