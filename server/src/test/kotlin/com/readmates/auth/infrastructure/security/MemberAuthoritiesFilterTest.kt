@@ -3,7 +3,6 @@ package com.readmates.auth.infrastructure.security
 import com.readmates.auth.adapter.`in`.security.AuthClubContextHeader
 import com.readmates.auth.adapter.`in`.security.CurrentMemberArgumentResolver
 import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
-import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
@@ -258,7 +257,7 @@ class MemberAuthoritiesFilterTest {
                     clubId: UUID,
                 ): CurrentMember? = null
 
-                override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
+                override fun listJoinedClubs(userId: UUID) = emptyList<Nothing>()
 
                 override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
             }
