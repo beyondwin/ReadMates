@@ -1,16 +1,17 @@
-package com.readmates.sessionrecord.application.service
+package com.readmates.sessionrecord.adapter.out.codec
 
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
+import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.shared.security.Sha256
 import org.springframework.stereotype.Component
 import tools.jackson.databind.ObjectMapper
 
 @Component
-class SessionRecordSnapshotCodec(
+class JacksonSessionRecordSnapshotCodec(
     private val objectMapper: ObjectMapper,
-) {
-    fun encode(snapshot: SessionRecordSnapshot): EncodedSessionRecordSnapshot {
+) : SessionRecordSnapshotCodec {
+    override fun encode(snapshot: SessionRecordSnapshot): EncodedSessionRecordSnapshot {
         val json = objectMapper.writeValueAsString(snapshot)
         return EncodedSessionRecordSnapshot(
             json = json,
@@ -18,7 +19,7 @@ class SessionRecordSnapshotCodec(
         )
     }
 
-    fun decode(json: String): SessionRecordSnapshot {
+    override fun decode(json: String): SessionRecordSnapshot {
         val schema = objectMapper.readTree(json).path("schema").asString()
         require(schema == SESSION_RECORD_SCHEMA) {
             "Unsupported session record snapshot schema"

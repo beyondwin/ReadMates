@@ -3,6 +3,7 @@ package com.readmates.sessionrecord.application.service
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.adapter.out.codec.JacksonSessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
@@ -33,7 +34,7 @@ import java.util.UUID
 class SessionRecordDraftServiceTest {
     private val host = host()
     private val sessionId = UUID.randomUUID()
-    private val codec = SessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
+    private val codec = JacksonSessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
 
     @Test
     fun `first save copies live content into draft revision one without creating history`() {

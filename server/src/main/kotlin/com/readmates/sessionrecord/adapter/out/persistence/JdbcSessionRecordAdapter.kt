@@ -21,8 +21,8 @@ import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocume
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordSource
+import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
-import com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.utcOffsetDateTime

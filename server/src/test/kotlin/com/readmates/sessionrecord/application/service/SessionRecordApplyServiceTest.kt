@@ -11,6 +11,7 @@ import com.readmates.sessionimport.application.model.SessionImportPreviewResult
 import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
+import com.readmates.sessionrecord.adapter.out.codec.JacksonSessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
@@ -28,6 +29,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocume
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordSource
+import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.security.AuthenticatedClubActor
 import com.readmates.shared.security.CurrentMember
@@ -305,7 +307,7 @@ private class Fixture(
             updatedAt = now,
             baseSessionUpdatedAt = draftBaseSessionUpdatedAt,
         )
-    private val codec = SessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
+    private val codec = JacksonSessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
     val store = FakeApplyStore(live, draft, now, codec)
     val validator = FakeValidator()
     val replacer = FakeReplacer { store.operations += "live replacement" }

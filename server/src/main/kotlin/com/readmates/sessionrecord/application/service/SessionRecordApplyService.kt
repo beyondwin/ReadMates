@@ -24,6 +24,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
+import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember

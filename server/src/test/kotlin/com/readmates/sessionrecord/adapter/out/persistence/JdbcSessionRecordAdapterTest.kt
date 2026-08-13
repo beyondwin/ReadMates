@@ -8,7 +8,7 @@ import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftComma
 import com.readmates.sessionrecord.application.model.SessionRecordEntry
 import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
-import com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec
+import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat

@@ -1122,25 +1122,25 @@ private fun assertSessionFamilyInboundImportBoundaries() {
 private fun assertSessionRecordOutboundImportBoundary() {
     assertSessionRecordOutboundDetectorFixtures()
     assertNoForbiddenKotlinImports(
-        "com/readmates/sessionrecord/adapter/out/persistence/JdbcHostSessionHistoryAdapter.kt",
-        "The session-record history adapter must import application models and ports instead of concrete services",
+        "com/readmates/sessionrecord/adapter/out",
+        "Session-record outbound adapters must import application models and ports instead of concrete services",
         ::isForbiddenSessionRecordOutboundReference,
     )
 }
 
 private fun assertSessionRecordOutboundDetectorFixtures() {
     val serviceAlias =
-        "import com.readmates.sessionrecord.application.service.typeSort as historyTypeSort"
+        "import com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec as SnapshotCodec"
     val serviceFq =
         "val direct = com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec(mapper)"
     val serviceTemplate =
-        "val template = \"${'$'}{com.readmates.sessionrecord.application.service.typeSort}\""
+        "val template = \"${'$'}{com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec(mapper)}\""
     val source =
         listOf(
             serviceAlias,
             serviceFq,
-            "// com.readmates.sessionrecord.application.service.typeSort",
-            "val text = \"com.readmates.sessionrecord.application.service.typeSort\"",
+            "// com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec(mapper)",
+            "val text = \"com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec\"",
             serviceTemplate,
         ).joinToString("\n")
 
