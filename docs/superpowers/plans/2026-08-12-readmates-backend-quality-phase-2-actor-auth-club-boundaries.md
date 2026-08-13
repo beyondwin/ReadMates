@@ -908,7 +908,8 @@ Apply all three replacements once in each of `server/config/detekt/baseline.xml`
   Assert ledger arithmetic `4 current + 35 retired = 39 approved` and scan auth inbound/security production for zero `application.service` and zero `club.adapter.in` imports. Then prove the Detekt files are the exact three-for-three migration from the recorded Task 7 base:
 
   ```bash
-  TASK7_DETEKT_BASE="${TASK7_DETEKT_BASE:?record the Task 7 tracked base before the Detekt edits}"
+  TASK7_DETEKT_BASE=51e80c49ae202a0651809519f8d70be0137da557
+  test "${#TASK7_DETEKT_BASE}" -eq 40
   DETEKT_AUDIT_DIR="$(mktemp -d)"
   trap 'rm -rf "$DETEKT_AUDIT_DIR"' EXIT
   git show "${TASK7_DETEKT_BASE}:server/config/detekt/baseline.xml" > "$DETEKT_AUDIT_DIR/baseline.before.xml"
@@ -936,16 +937,28 @@ Apply all three replacements once in each of `server/config/detekt/baseline.xml`
       ),
   )
 
+  def identity_lines(path: str) -> list[str]:
+      lines = [line.strip() for line in Path(path).read_text().splitlines()]
+      if path.endswith(".xml"):
+          return [
+              line.removeprefix("<ID>").removesuffix("</ID>")
+              for line in lines
+              if line.startswith("<ID>") and line.endswith("</ID>")
+          ]
+      return [line for line in lines if line and not line.startswith("#")]
+
   def assert_exact_migration(before_path: str, after_path: str) -> str:
       before = Path(before_path).read_text()
       after = Path(after_path).read_text()
+      before_identities = identity_lines(before_path)
+      after_identities = identity_lines(after_path)
       expected = before
       for old, new in pairs:
-          assert before.count(old) == 1, (before_path, old)
-          assert before.count(new) == 0, (before_path, new)
+          assert before_identities.count(old) == 1, (before_path, old)
+          assert before_identities.count(new) == 0, (before_path, new)
           expected = expected.replace(old, new)
-          assert after.count(old) == 0, (after_path, old)
-          assert after.count(new) == 1, (after_path, new)
+          assert after_identities.count(old) == 0, (after_path, old)
+          assert after_identities.count(new) == 1, (after_path, new)
       assert after == expected, f"non-enumerated Detekt identity changed in {after_path}"
       return after
 
@@ -965,7 +978,7 @@ Apply all three replacements once in each of `server/config/detekt/baseline.xml`
     server/config/ktlint
   ```
 
-  The full-file equality check proves there is no new or removed non-enumerated identity; the count checks prove the current approval ceiling remains 461; the byte comparison proves the retired Detekt identity set is unchanged.
+  Reset `TASK7_DETEKT_BASE` from the recorded 40-character SHA above in every new shell before running this audit or its mutation. Exact identity-line checks avoid substring collisions such as the `InvitationService` `TooManyFunctions` replacement, the full-file equality check proves there is no new or removed non-enumerated identity, the count checks prove the current approval ceiling remains 461, and the byte comparison proves the retired Detekt identity set is unchanged.
 
 - [ ] **Step 5: Mutations, review, and commit.**
 
@@ -1209,16 +1222,28 @@ The report records the plan SHA/base, full task/correction SHAs and subjects, ex
       ),
   )
 
+  def identity_lines(path: str) -> list[str]:
+      lines = [line.strip() for line in Path(path).read_text().splitlines()]
+      if path.endswith(".xml"):
+          return [
+              line.removeprefix("<ID>").removesuffix("</ID>")
+              for line in lines
+              if line.startswith("<ID>") and line.endswith("</ID>")
+          ]
+      return [line for line in lines if line and not line.startswith("#")]
+
   def assert_exact_migration(before_path: str, after_path: str) -> str:
       before = Path(before_path).read_text()
       after = Path(after_path).read_text()
+      before_identities = identity_lines(before_path)
+      after_identities = identity_lines(after_path)
       expected = before
       for old, new in pairs:
-          assert before.count(old) == 1, (before_path, old)
-          assert before.count(new) == 0, (before_path, new)
+          assert before_identities.count(old) == 1, (before_path, old)
+          assert before_identities.count(new) == 0, (before_path, new)
           expected = expected.replace(old, new)
-          assert after.count(old) == 0, (after_path, old)
-          assert after.count(new) == 1, (after_path, new)
+          assert after_identities.count(old) == 0, (after_path, old)
+          assert after_identities.count(new) == 1, (after_path, new)
       assert after == expected, f"non-enumerated Detekt identity changed in {after_path}"
       return after
 
