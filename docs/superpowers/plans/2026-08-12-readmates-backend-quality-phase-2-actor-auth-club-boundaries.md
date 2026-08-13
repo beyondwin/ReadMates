@@ -1066,7 +1066,16 @@ club|auth
 
 - [ ] **Step 3: Move the projection, narrow synthesis, and implement the consumer-owned port.**
 
-  Preserve serialization and persistence mappings. Do not move `MembershipRole`/`MembershipStatus`, add a shared membership enum, or change token entropy/hash. At Task 8 start, rerun `rg -l 'com.readmates.club.application.model.JoinedClubSummary' server/src/test/kotlin` and require the result to equal the five test paths in this task before editing; a different set is a factual plan-path defect requiring review rather than silent scope growth.
+  Preserve serialization and persistence mappings. Do not move `MembershipRole`/`MembershipStatus`, add a shared membership enum, or change token entropy/hash. At Task 8 start, rerun `rg -l 'com.readmates.club.application.model.JoinedClubSummary' server/src/test/kotlin` and require the result to equal exactly these four `JoinedClubSummary`-importing test paths before editing:
+
+  ```text
+  server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerTest.kt
+  server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt
+  server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt
+  server/src/test/kotlin/com/readmates/sessionclosing/adapter/in/web/HostSessionClosingControllerTest.kt
+  ```
+
+  `MemberAuthoritiesFilterTest` remains a separately required Task 8 test path for `SupportMemberSynthesis` cache reuse and explicit HOST/ACTIVE-to-`ROLE_HOST` compatibility; it does not import `JoinedClubSummary`. A different `JoinedClubSummary` import set is a factual plan-path defect requiring review rather than silent scope growth.
 
 - [ ] **Step 4: Retire `club|auth` and run GREEN.**
 
