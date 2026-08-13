@@ -1018,14 +1018,20 @@ private fun lexKotlinSource(source: String): KotlinLexedSource {
     return scanner.lexedSource()
 }
 
-private fun fullyQualifiedReadMatesReferences(sourceFiles: List<Pair<String, String>>): List<String> =
+private fun fullyQualifiedReadMatesReferences(
+    sourceFiles: List<Pair<String, String>>,
+    forbiddenReference: (String) -> Boolean = { true },
+): List<String> =
     sourceFiles.flatMap { (relativePath, source) ->
         val lexedSource = lexKotlinSource(source)
         lexedSource
             .matchingTokenIndexes(READMATES_FQ_TOKENS)
             .mapNotNull { tokenIndex ->
                 val precedingToken = lexedSource.tokens.getOrNull(tokenIndex - 1)?.text
-                if (precedingToken == "package" || precedingToken == "import") {
+                val qualifiedReference = lexedSource.qualifiedNameAt(tokenIndex)
+                if (precedingToken == "package" || precedingToken == "import" ||
+                    !forbiddenReference(qualifiedReference)
+                ) {
                     null
                 } else {
                     val reference = lexedSource.tokens[tokenIndex]
@@ -1059,22 +1065,29 @@ private fun kotlinImportViolations(
     forbiddenImport: (String) -> Boolean,
 ): List<String> =
     Files.walk(sourceRoot.resolve(relativeRoot)).use { paths ->
-        paths
-            .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
-            .flatMap { sourceFile ->
-                sourceFile
-                    .readLines()
-                    .mapIndexedNotNull { index, line ->
-                        val trimmed = line.trim()
-                        if (!trimmed.startsWith("import ")) return@mapIndexedNotNull null
-                        val importName = trimmed.removePrefix("import ").replace("`", "")
-                        if (forbiddenImport(importName)) {
-                            "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: $trimmed"
-                        } else {
-                            null
-                        }
-                    }.stream()
-            }.toList()
+        val sources =
+            paths
+                .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
+                .map { sourceFile -> sourceFile.relativeTo(sourceRoot).toString() to sourceFile.readText() }
+                .toList()
+        kotlinImportViolations(sources, forbiddenImport)
+    }
+
+private fun kotlinImportViolations(
+    sources: List<Pair<String, String>>,
+    forbiddenImport: (String) -> Boolean,
+): List<String> =
+    buildList {
+        sources.forEach { (relativePath, source) ->
+            source.lineSequence().forEachIndexed { index, line ->
+                val trimmed = line.trim()
+                if (trimmed.startsWith("import ")) {
+                    val importName = trimmed.removePrefix("import ").replace("`", "")
+                    if (forbiddenImport(importName)) add("$relativePath:${index + 1}: $trimmed")
+                }
+            }
+        }
+        addAll(fullyQualifiedReadMatesReferences(sources, forbiddenImport))
     }
 
 private fun assertNoForbiddenKotlinImports(
@@ -1088,21 +1101,68 @@ private fun assertNoForbiddenKotlinImports(
 }
 
 private fun assertSessionFamilyInboundImportBoundaries() {
+    assertSessionFamilyInboundDetectorFixtures()
     assertNoForbiddenKotlinImports(
         "com/readmates/sessionclosing/adapter/in/web",
         "Session-closing web adapters must own parsing instead of importing another inbound adapter",
-    ) { importName ->
-        importName.startsWith("com.readmates.") &&
-            importName.contains(".adapter.in.") &&
-            !importName.startsWith("com.readmates.sessionclosing.adapter.in.")
-    }
+        ::isForbiddenSessionClosingInboundReference,
+    )
     assertNoForbiddenKotlinImports(
         "com/readmates/sessionimport/adapter/in/web",
         "Session-import web adapters must import application-owned contracts instead of concrete services",
-    ) { importName ->
-        importName.startsWith("com.readmates.sessionimport.application.service.")
-    }
+        ::isForbiddenSessionImportInboundReference,
+    )
 }
+
+private fun assertSessionFamilyInboundDetectorFixtures() {
+    val closingAlias = "import com.readmates.session.adapter.`in`.web.parseHostSessionId as parseClosingId"
+    val closingFq = "val direct = com.readmates.session.adapter.`in`.web.parseHostSessionId(id)"
+    val closingTemplate =
+        "val template = \"${'$'}{com.readmates.session.adapter.`in`.web.parseHostSessionId(id)}\""
+    val closingSource =
+        listOf(
+            closingAlias,
+            closingFq,
+            "// com.readmates.session.adapter.`in`.web.parseHostSessionId(id)",
+            "val text = \"com.readmates.session.adapter.`in`.web.parseHostSessionId(id)\"",
+            closingTemplate,
+        ).joinToString("\n")
+    val importAlias =
+        "import com.readmates.sessionimport.application.service.InvalidSessionImportException as InvalidImport"
+    val importFq =
+        "val direct = com.readmates.sessionimport.application.service.InvalidSessionImportException(emptyList())"
+    val importTemplate =
+        "val template = \"${'$'}{com.readmates.sessionimport.application.service.InvalidSessionImportException(emptyList())}\""
+    val importSource =
+        listOf(
+            importAlias,
+            importFq,
+            "/* com.readmates.sessionimport.application.service.InvalidSessionImportException(emptyList()) */",
+            "val text = \"com.readmates.sessionimport.application.service.InvalidSessionImportException\"",
+            importTemplate,
+        ).joinToString("\n")
+
+    assertEquals(
+        setOf(closingAlias, closingFq, closingTemplate),
+        kotlinImportViolations(listOf("closing.kt" to closingSource), ::isForbiddenSessionClosingInboundReference)
+            .map { violation -> violation.substringAfter(": ") }
+            .toSet(),
+    )
+    assertEquals(
+        setOf(importAlias, importFq, importTemplate),
+        kotlinImportViolations(listOf("import.kt" to importSource), ::isForbiddenSessionImportInboundReference)
+            .map { violation -> violation.substringAfter(": ") }
+            .toSet(),
+    )
+}
+
+private fun isForbiddenSessionClosingInboundReference(reference: String): Boolean =
+    reference.startsWith("com.readmates.") &&
+        reference.contains(".adapter.in.") &&
+        !reference.startsWith("com.readmates.sessionclosing.adapter.in.")
+
+private fun isForbiddenSessionImportInboundReference(reference: String): Boolean =
+    reference.startsWith("com.readmates.sessionimport.application.service.")
 
 private fun authWebConcreteServiceImportViolations(sourceRoot: Path): List<String> =
     Files.walk(sourceRoot.resolve("com/readmates/auth/adapter/in/web")).use { paths ->
@@ -1181,6 +1241,21 @@ private data class KotlinLexedSource(
         tokens.indices.filter { tokenIndex ->
             expectedTokens.indices.all { expectedIndex ->
                 tokens.getOrNull(tokenIndex + expectedIndex)?.text == expectedTokens[expectedIndex]
+            }
+        }
+
+    fun qualifiedNameAt(initialTokenIndex: Int): String =
+        buildString {
+            var tokenIndex = initialTokenIndex
+            while (tokenIndex < tokens.size) {
+                val token = tokens[tokenIndex].text
+                when {
+                    token == "." -> append(token)
+                    token == "`" -> Unit
+                    token.firstOrNull()?.isKotlinIdentifierStart() == true -> append(token)
+                    else -> break
+                }
+                tokenIndex++
             }
         }
 
