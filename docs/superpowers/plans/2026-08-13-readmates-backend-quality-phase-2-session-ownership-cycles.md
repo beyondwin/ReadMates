@@ -60,7 +60,7 @@ The only new feature tombstones are `sessionrecord|sessionimport` in Task 4 and 
 - `server/src/main/kotlin/com/readmates/sessionrecord/application/port/out/SessionRecordSnapshotCodec.kt` — encode/decode output port.
 - `server/src/main/kotlin/com/readmates/sessionrecord/application/port/out/ReplaceSessionRecordContentPort.kt` — consumer-owned cross-feature replacement command/result contract.
 - `server/src/main/kotlin/com/readmates/sessionrecord/adapter/out/codec/JacksonSessionRecordSnapshotCodec.kt` — Jackson/SHA-256 port implementation.
-- `server/src/test/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandlerTest.kt` — exact invalid-import response characterization.
+- `server/src/test/kotlin/com/readmates/sessionimport/api/SessionImportErrorHandlerTest.kt` — exact invalid-import response characterization in package `com.readmates.sessionimport.api`, outside the adapter package-name suppression boundary.
 - `server/src/test/kotlin/com/readmates/sessionrecord/adapter/out/codec/JacksonSessionRecordSnapshotCodecTest.kt` — moved and strengthened codec contract.
 
 ### Deleted production and test files
@@ -138,20 +138,20 @@ sealed interface SessionRecordContentReplacementResult {
 - `server/src/main/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationErrorHandler.kt`
 - `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationCommitService.kt`
 - `server/src/test/kotlin/com/readmates/sessionclosing/adapter/in/web/HostSessionClosingControllerTest.kt`
-- `server/src/test/kotlin/com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandlerTest.kt`
+- `server/src/test/kotlin/com/readmates/sessionimport/api/SessionImportErrorHandlerTest.kt`
 - `server/src/test/kotlin/com/readmates/aigen/adapter/in/web/AiGenerationErrorHandlerTest.kt`
 - `server/src/test/kotlin/com/readmates/aigen/application/service/AiGenerationCommitServiceTest.kt`
 - `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureBoundaryTest.kt`
 - `server/config/architecture/boundary-import-baseline.txt`
 - `server/config/architecture/phase-0-retired-boundary-imports.txt`
 
-- [ ] **Step 1: Write RED behavior and ownership detectors.** Add an invalid `sessionId` controller test that asserts HTTP 400 and no use-case call. Add direct error-handler tests for HTTP 400, code `INVALID_SESSION_IMPORT`, first-issue message, empty-issues fallback message, and absence of private exception text. Add architecture rules that sessionclosing inbound web source imports no other feature's inbound adapter and sessionimport inbound web source imports no concrete application service.
+- [ ] **Step 1: Write RED behavior and ownership detectors.** Add an invalid `sessionId` controller test that asserts HTTP 400 and no use-case call. Add direct error-handler tests in `SessionImportErrorHandlerTest` with package `com.readmates.sessionimport.api` for HTTP 400, code `INVALID_SESSION_IMPORT`, first-issue message, empty-issues fallback message, and absence of private exception text. Do not add a package-name suppression or baseline identity for this test. Add architecture rules that sessionclosing inbound web source imports no other feature's inbound adapter and sessionimport inbound web source imports no concrete application service.
 - [ ] **Step 2: Run RED sequentially.**
 
   ```bash
   ./server/gradlew -p server unitTest \
     --tests com.readmates.sessionclosing.adapter.in.web.HostSessionClosingControllerTest \
-    --tests com.readmates.sessionimport.adapter.in.web.SessionImportErrorHandlerTest \
+    --tests com.readmates.sessionimport.api.SessionImportErrorHandlerTest \
     --tests com.readmates.aigen.adapter.in.web.AiGenerationErrorHandlerTest \
     --tests com.readmates.aigen.application.service.AiGenerationCommitServiceTest \
     --rerun-tasks --no-build-cache --no-configuration-cache
