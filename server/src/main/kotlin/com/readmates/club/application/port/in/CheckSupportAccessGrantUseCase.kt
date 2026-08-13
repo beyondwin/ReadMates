@@ -1,7 +1,5 @@
 package com.readmates.club.application.port.`in`
 
-import com.readmates.auth.domain.MembershipRole
-import com.readmates.auth.domain.MembershipStatus
 import java.util.UUID
 
 interface CheckSupportAccessGrantUseCase {
@@ -22,6 +20,4 @@ data class SupportMemberSynthesis(
     val membershipProxyId: UUID,
     val displayName: String,
     val accountName: String,
-    val role: MembershipRole = MembershipRole.HOST,
-    val membershipStatus: MembershipStatus = MembershipStatus.ACTIVE,
 )

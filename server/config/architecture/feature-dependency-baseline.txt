@@ -18,7 +18,6 @@ auth|club
 auth|session
 auth|shared
 browse|shared
-club|auth
 club|shared
 feedback|shared
 note|shared

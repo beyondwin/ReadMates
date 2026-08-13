@@ -1,10 +1,10 @@
 package com.readmates.notification.api
 
 import com.readmates.auth.adapter.`in`.security.CurrentMemberArgumentResolver
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.notification.adapter.`in`.web.MemberNotificationController

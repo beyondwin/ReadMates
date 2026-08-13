@@ -1,9 +1,9 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
 import com.readmates.auth.application.port.out.PlatformAdminLookupPort
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.springframework.stereotype.Service

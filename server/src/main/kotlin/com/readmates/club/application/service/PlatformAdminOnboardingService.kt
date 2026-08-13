@@ -1,6 +1,5 @@
 package com.readmates.club.application.service
 
-import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.FirstHostPreviewKind
@@ -22,6 +21,7 @@ import com.readmates.club.application.port.out.CreateClubDomainPort
 import com.readmates.club.application.port.out.CreateClubDomainResult
 import com.readmates.club.application.port.out.CreatePlatformAdminClubCommand
 import com.readmates.club.application.port.out.CreatePlatformAdminHostInvitationCommand
+import com.readmates.club.application.port.out.GeneratePlatformAdminInvitationTokenPort
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
 import com.readmates.club.application.port.out.SendPlatformAdminHostInvitationEmailPort
@@ -53,7 +53,7 @@ class PlatformAdminOnboardingService(
     private val loadClubsPort: LoadPlatformAdminClubsPort,
     private val createClubDomainPort: CreateClubDomainPort,
     private val sendHostInvitationEmailPort: SendPlatformAdminHostInvitationEmailPort,
-    private val invitationTokenService: InvitationTokenService,
+    private val generateInvitationTokenPort: GeneratePlatformAdminInvitationTokenPort,
     private val transactionTemplate: TransactionTemplate,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
@@ -168,7 +168,7 @@ class PlatformAdminOnboardingService(
             )
         }
 
-        val token = invitationTokenService.generateToken()
+        val token = generateInvitationTokenPort.generate()
         val invitationId = UUID.randomUUID()
         onboardingPort.createHostInvitation(
             CreatePlatformAdminHostInvitationCommand(
@@ -177,11 +177,11 @@ class PlatformAdminOnboardingService(
                 invitedByPlatformAdminUserId = admin.adminId,
                 email = command.firstHost.email,
                 name = command.firstHost.name,
-                tokenHash = invitationTokenService.hashToken(token),
+                tokenHash = token.tokenHash,
                 expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(HOST_INVITATION_TTL_DAYS),
             ),
         )
-        val acceptUrl = "${appBaseUrl.trimEnd('/')}/clubs/${command.club.slug}/invite/$token"
+        val acceptUrl = "${appBaseUrl.trimEnd('/')}/clubs/${command.club.slug}/invite/${token.rawToken}"
         return PersistedHostWithEmail(
             host =
                 PersistedHostOnboarding(

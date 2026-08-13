@@ -41,9 +41,9 @@ class SupportAccessGrantService(
         clubSlug: String,
         clubName: String,
     ): SupportMemberSynthesis? {
-        val grant = loadGrantPort.loadActiveGrantByGranteeAndClub(userId, clubId) ?: return null
+        val activeGrant = loadGrantPort.loadActiveGrantByGranteeAndClub(userId, clubId) ?: return null
         return SupportMemberSynthesis(
-            membershipProxyId = grant.id,
+            membershipProxyId = activeGrant.id,
             displayName = email,
             accountName = email,
         )

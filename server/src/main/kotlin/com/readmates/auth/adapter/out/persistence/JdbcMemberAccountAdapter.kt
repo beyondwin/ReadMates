@@ -1,6 +1,7 @@
 package com.readmates.auth.adapter.out.persistence
 
 import com.readmates.auth.application.model.DevSeedLoginIdentity
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.out.DevSeedMemberLookupPort
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
@@ -10,7 +11,6 @@ import com.readmates.auth.application.port.out.PlatformAdminLookupPort
 import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid

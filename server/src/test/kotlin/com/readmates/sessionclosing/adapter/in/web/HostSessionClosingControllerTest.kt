@@ -1,10 +1,10 @@
 package com.readmates.sessionclosing.adapter.`in`.web
 
 import com.readmates.auth.adapter.`in`.security.CurrentMemberArgumentResolver
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionclosing.application.model.ClosingChecklistId
 import com.readmates.sessionclosing.application.model.ClosingChecklistItem

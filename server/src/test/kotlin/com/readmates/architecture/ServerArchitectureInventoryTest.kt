@@ -11,6 +11,31 @@ import java.nio.file.Path
 @Tag("architecture")
 class ServerArchitectureInventoryTest {
     @Test
+    fun `club application imports no auth source`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val clubApplicationRoot = productionSourceRoot.resolve("com/readmates/club/application")
+        val violations =
+            Files.walk(clubApplicationRoot).use { paths ->
+                paths
+                    .filter { sourceFile ->
+                        Files.isRegularFile(sourceFile) && sourceFile.fileName.toString().endsWith(".kt")
+                    }.flatMap { sourceFile ->
+                        Files
+                            .readAllLines(sourceFile)
+                            .mapIndexedNotNull { index, line ->
+                                if (line.trim().startsWith("import com.readmates.auth.")) {
+                                    "${productionSourceRoot.relativize(sourceFile)}:${index + 1}: ${line.trim()}"
+                                } else {
+                                    null
+                                }
+                            }.stream()
+                    }.toList()
+            }
+
+        assertThat(violations).isEmpty()
+    }
+
+    @Test
     fun `inbound adapter imports allow same feature but fail closed across or outside feature boundaries`(
         @TempDir root: Path,
     ) {
@@ -114,7 +139,7 @@ class ServerArchitectureInventoryTest {
                 root.resolve("server/config/architecture/phase-0-retired-feature-dependencies.txt"),
             )
         val components = cyclicFeatureComponents(actual)
-        val knownComponent = setOf("auth", "club", "notification", "session", "sessionimport", "sessionrecord")
+        val expectedComponents = setOf(setOf("session", "sessionimport", "sessionrecord"))
 
         assertThat(actual).isEqualTo(baseline)
         requireApprovedIdentityPartition(
@@ -124,7 +149,7 @@ class ServerArchitectureInventoryTest {
             ceiling = 41,
             label = "feature dependency baseline",
         )
-        assertThat(components).allMatch { component -> knownComponent.containsAll(component) }
+        assertThat(components).isEqualTo(expectedComponents)
     }
 
     @Test

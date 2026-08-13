@@ -1,7 +1,5 @@
 package com.readmates.club.application.model
 
-import com.readmates.auth.domain.MembershipRole
-import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.domain.PlatformAdminRole
 import java.util.UUID
 
@@ -45,16 +43,6 @@ data class ResolvedClubContext(
     val name: String,
     val status: String,
     val hostname: String?,
-)
-
-data class JoinedClubSummary(
-    val clubId: UUID,
-    val clubSlug: String,
-    val clubName: String,
-    val membershipId: UUID,
-    val role: MembershipRole,
-    val status: MembershipStatus,
-    val primaryHost: String?,
 )
 
 data class PlatformAdminSummary(

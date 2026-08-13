@@ -1,8 +1,11 @@
 package com.readmates.auth.infrastructure.security
 
 import com.readmates.auth.adapter.`in`.security.AuthClubContextHeader
+import com.readmates.auth.adapter.`in`.security.CurrentMemberArgumentResolver
 import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
+import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
 import com.readmates.auth.application.service.DefaultAuthoritySynthesisService
 import com.readmates.auth.domain.MembershipRole
@@ -13,17 +16,24 @@ import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
 import com.readmates.shared.security.ClubActor
 import com.readmates.shared.security.ClubCapability
+import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.CurrentUser
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
+import org.springframework.core.MethodParameter
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.web.context.request.ServletWebRequest
 import java.util.UUID
+
+private typealias SupportSynthesisLookup = (UUID) -> SupportMemberSynthesis?
 
 class MemberAuthoritiesFilterTest {
     private val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
@@ -101,7 +111,12 @@ class MemberAuthoritiesFilterTest {
                 displayName = "Support Admin",
                 accountName = "support-admin",
             )
-        val filter = filterWith(resolveBySlug = { knownClub }, supportSynthesis = { supportSynthesis })
+        var supportLookups = 0
+        val supportLookup: (UUID) -> SupportMemberSynthesis? = {
+            supportLookups += 1
+            supportSynthesis
+        }
+        val filter = filterWith(resolveBySlug = { knownClub }, supportSynthesis = supportLookup)
         val request = requestWithSlug("my-club")
         setAuthentication(email, userId, setOf("ROLE_PLATFORM_ADMIN"))
 
@@ -109,9 +124,31 @@ class MemberAuthoritiesFilterTest {
 
         assertEquals(setOf("ROLE_PLATFORM_ADMIN", "ROLE_HOST"), currentAuthorities())
         assertEquals(
+            setOf("ROLE_HOST"),
+            currentAuthorities().filterTo(mutableSetOf(), MEMBER_ROLE_AUTHORITIES::contains),
+        )
+        assertSame(
             supportSynthesis,
             request.getAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR),
         )
+        request.userPrincipal = SecurityContextHolder.getContext().authentication
+
+        val resolved =
+            supportCurrentMemberResolver(supportLookup).resolveArgument(
+                sampleMethodParameter(),
+                null,
+                ServletWebRequest(request),
+                null,
+            )
+
+        assertSame(
+            supportSynthesis,
+            request.getAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR),
+        )
+        assertEquals(1, supportLookups)
+        assertEquals(MembershipRole.HOST, resolved.role)
+        assertEquals(MembershipStatus.ACTIVE, resolved.membershipStatus)
+        assertEquals("ROLE_HOST", currentAuthorities().single(MEMBER_ROLE_AUTHORITIES::contains))
     }
 
     @Test
@@ -204,6 +241,58 @@ class MemberAuthoritiesFilterTest {
             membershipStatus = MembershipStatus.ACTIVE,
         )
 
+    private fun supportCurrentMemberResolver(supportSynthesis: SupportSynthesisLookup): CurrentMemberArgumentResolver {
+        val resolveCurrentMemberUseCase =
+            object : ResolveCurrentMemberUseCase {
+                override fun resolveByEmail(email: String): CurrentMember? = null
+
+                override fun findUserIdByEmail(email: String): UUID? = userId
+
+                override fun resolveByUserAndClub(
+                    userId: UUID,
+                    clubId: UUID,
+                ): CurrentMember? = null
+
+                override fun resolveByEmailAndClub(
+                    email: String,
+                    clubId: UUID,
+                ): CurrentMember? = null
+
+                override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
+
+                override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
+            }
+        val supportAccess =
+            object : CheckSupportAccessGrantUseCase {
+                override fun synthesizeHostCurrentMember(
+                    userId: UUID,
+                    email: String,
+                    clubId: UUID,
+                    clubSlug: String,
+                    clubName: String,
+                ): SupportMemberSynthesis? = supportSynthesis(userId)
+            }
+        return CurrentMemberArgumentResolver(
+            resolveCurrentMemberUseCase,
+            knownClubContextUseCase(),
+            supportAccess,
+        )
+    }
+
+    private fun knownClubContextUseCase(): ResolveClubContextUseCase =
+        object : ResolveClubContextUseCase {
+            override fun resolveBySlug(slug: String): ResolvedClubContext? = knownClub.takeIf { slug == it.slug }
+
+            override fun resolveByHost(host: String?): ResolvedClubContext? = null
+        }
+
+    private fun currentMemberEndpoint(member: CurrentMember) = member
+
+    private fun sampleMethodParameter(): MethodParameter {
+        val method = this::class.java.declaredMethods.first { it.name == "currentMemberEndpoint" }
+        return MethodParameter(method, 0)
+    }
+
     private fun requestWithSlug(slug: String) =
         MockHttpServletRequest("GET", "/api/host/sessions").apply {
             addHeader(AuthClubContextHeader.CLUB_SLUG, slug)
@@ -230,4 +319,8 @@ class MemberAuthoritiesFilterTest {
             ?.mapNotNull { it.authority }
             ?.toSet()
             ?: emptySet()
+
+    private companion object {
+        val MEMBER_ROLE_AUTHORITIES = setOf("ROLE_HOST", "ROLE_MEMBER", "ROLE_VIEWER")
+    }
 }

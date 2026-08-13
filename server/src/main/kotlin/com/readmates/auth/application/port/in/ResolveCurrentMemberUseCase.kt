@@ -1,6 +1,6 @@
 package com.readmates.auth.application.port.`in`
 
-import com.readmates.club.application.model.JoinedClubSummary
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
 import java.util.UUID

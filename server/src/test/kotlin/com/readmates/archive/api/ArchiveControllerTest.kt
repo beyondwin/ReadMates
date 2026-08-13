@@ -16,10 +16,10 @@ import com.readmates.archive.application.port.`in`.ListMyArchiveQuestionsUseCase
 import com.readmates.archive.application.port.`in`.ListMyArchiveReviewsUseCase
 import com.readmates.archive.application.port.`in`.ListMyJourneyUseCase
 import com.readmates.auth.adapter.`in`.security.CurrentMemberArgumentResolver
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
