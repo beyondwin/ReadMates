@@ -367,6 +367,11 @@ class ServerArchitectureBoundaryTest {
     fun `session inbound adapters own boundary imports`() = assertSessionFamilyInboundImportBoundaries()
 
     @Test
+    fun `session record outbound adapters do not depend on concrete application services`() {
+        assertSessionRecordOutboundImportBoundary()
+    }
+
+    @Test
     fun `auth inbound and security adapters do not depend on club inbound adapters`() {
         noClasses()
             .that()
@@ -1114,6 +1119,39 @@ private fun assertSessionFamilyInboundImportBoundaries() {
     )
 }
 
+private fun assertSessionRecordOutboundImportBoundary() {
+    assertSessionRecordOutboundDetectorFixtures()
+    assertNoForbiddenKotlinImports(
+        "com/readmates/sessionrecord/adapter/out/persistence/JdbcHostSessionHistoryAdapter.kt",
+        "The session-record history adapter must import application models and ports instead of concrete services",
+        ::isForbiddenSessionRecordOutboundReference,
+    )
+}
+
+private fun assertSessionRecordOutboundDetectorFixtures() {
+    val serviceAlias =
+        "import com.readmates.sessionrecord.application.service.typeSort as historyTypeSort"
+    val serviceFq =
+        "val direct = com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec(mapper)"
+    val serviceTemplate =
+        "val template = \"${'$'}{com.readmates.sessionrecord.application.service.typeSort}\""
+    val source =
+        listOf(
+            serviceAlias,
+            serviceFq,
+            "// com.readmates.sessionrecord.application.service.typeSort",
+            "val text = \"com.readmates.sessionrecord.application.service.typeSort\"",
+            serviceTemplate,
+        ).joinToString("\n")
+
+    assertEquals(
+        setOf(serviceAlias, serviceFq, serviceTemplate),
+        kotlinImportViolations(listOf("outbound.kt" to source), ::isForbiddenSessionRecordOutboundReference)
+            .map { violation -> violation.substringAfter(": ") }
+            .toSet(),
+    )
+}
+
 private fun assertSessionFamilyInboundDetectorFixtures() {
     val closingAlias = "import com.readmates.session.adapter.`in`.web.parseHostSessionId as parseClosingId"
     val closingFq = "val direct = com.readmates.session.adapter.`in`.web.parseHostSessionId(id)"
@@ -1163,6 +1201,9 @@ private fun isForbiddenSessionClosingInboundReference(reference: String): Boolea
 
 private fun isForbiddenSessionImportInboundReference(reference: String): Boolean =
     reference.startsWith("com.readmates.sessionimport.application.service.")
+
+private fun isForbiddenSessionRecordOutboundReference(reference: String): Boolean =
+    reference.startsWith("com.readmates.sessionrecord.application.service.")
 
 private fun authWebConcreteServiceImportViolations(sourceRoot: Path): List<String> =
     Files.walk(sourceRoot.resolve("com/readmates/auth/adapter/in/web")).use { paths ->
