@@ -39,13 +39,16 @@ class ServerArchitectureInventoryTest {
     fun `joined club summary test imports match corrected inventory exactly`() {
         val root = projectRoot()
         val testSourceRoot = root.resolve("server/src/test/kotlin")
-        val projectionImport = "import com.readmates.auth.application.model.JoinedClubSummary"
+        val projectionImport =
+            Regex(
+                """^\s*import\s+com\.readmates\.auth\.application\.model\.JoinedClubSummary(?:\s+as\s+\S+)?\s*${'$'}""",
+            )
         val importingTests =
             Files.walk(testSourceRoot).use { paths ->
                 paths
                     .filter(Files::isRegularFile)
                     .filter { sourceFile -> sourceFile.fileName.toString().endsWith(".kt") }
-                    .filter { sourceFile -> Files.readAllLines(sourceFile).contains(projectionImport) }
+                    .filter { sourceFile -> Files.readAllLines(sourceFile).any(projectionImport::matches) }
                     .map { sourceFile -> root.relativize(sourceFile).joinToString("/") }
                     .sorted()
                     .toList()
