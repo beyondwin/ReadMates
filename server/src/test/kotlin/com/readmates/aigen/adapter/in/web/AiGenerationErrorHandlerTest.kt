@@ -5,8 +5,8 @@ import com.readmates.aigen.application.model.AiGenerationQueueUnavailableExcepti
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.ProviderCallException
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.sessionimport.application.model.SessionImportIssue
-import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.security.AccessDeniedException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test

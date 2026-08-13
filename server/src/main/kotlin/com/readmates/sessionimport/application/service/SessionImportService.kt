@@ -3,6 +3,7 @@ package com.readmates.sessionimport.application.service
 import com.readmates.feedback.application.FeedbackDocumentParser
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.sessionimport.application.model.SESSION_IMPORT_FORMAT
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportCommitResult
@@ -24,10 +25,6 @@ import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.AuthenticatedClubActor
 import org.springframework.stereotype.Service
-
-class InvalidSessionImportException(
-    val issues: List<SessionImportIssue>,
-) : RuntimeException("Invalid session import")
 
 private fun isSafeFeedbackFileName(fileName: String): Boolean {
     val trimmed = fileName.trim()

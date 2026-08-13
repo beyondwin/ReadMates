@@ -26,6 +26,7 @@ import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.aigen.application.port.out.CommitLeaseResult
 import com.readmates.aigen.application.port.out.JobRecord
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
@@ -33,7 +34,6 @@ import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
-import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.shared.security.Sha256
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty

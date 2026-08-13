@@ -17,12 +17,12 @@ import com.readmates.aigen.application.port.out.AiGenerationMembershipChangedExc
 import com.readmates.aigen.application.port.out.AuditKind
 import com.readmates.aigen.application.port.out.AuditStatus
 import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportDraftResult
 import com.readmates.sessionimport.application.model.SessionImportIssue
 import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
-import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy

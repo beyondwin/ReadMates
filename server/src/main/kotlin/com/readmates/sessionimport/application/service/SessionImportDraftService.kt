@@ -1,5 +1,6 @@
 package com.readmates.sessionimport.application.service
 
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportDraftResult
 import com.readmates.sessionimport.application.model.SessionImportPreviewResult

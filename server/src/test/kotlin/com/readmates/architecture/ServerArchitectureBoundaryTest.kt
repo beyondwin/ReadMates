@@ -364,6 +364,9 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `session inbound adapters own boundary imports`() = assertSessionFamilyInboundImportBoundaries()
+
+    @Test
     fun `auth inbound and security adapters do not depend on club inbound adapters`() {
         noClasses()
             .that()
@@ -377,15 +380,7 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
-    fun `auth web adapters do not depend on auth concrete services`() {
-        val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
-        val violations = authWebConcreteServiceImportViolations(sourceRoot)
-
-        assertTrue(
-            violations.isEmpty(),
-            "Auth web adapters must not import auth concrete services:\n${violations.joinToString("\n")}",
-        )
-    }
+    fun `auth web adapters do not depend on auth concrete services`() = assertNoAuthWebConcreteServiceImports()
 
     @Test
     fun `auth inbound and security adapters depend on auth input ports instead of concrete services`() {
@@ -1058,6 +1053,57 @@ private fun authClubWebImportViolations(sourceRoot: Path): List<String> =
             }.toList()
     }
 
+private fun kotlinImportViolations(
+    sourceRoot: Path,
+    relativeRoot: String,
+    forbiddenImport: (String) -> Boolean,
+): List<String> =
+    Files.walk(sourceRoot.resolve(relativeRoot)).use { paths ->
+        paths
+            .filter { sourceFile -> Files.isRegularFile(sourceFile) && sourceFile.toString().endsWith(".kt") }
+            .flatMap { sourceFile ->
+                sourceFile
+                    .readLines()
+                    .mapIndexedNotNull { index, line ->
+                        val trimmed = line.trim()
+                        if (!trimmed.startsWith("import ")) return@mapIndexedNotNull null
+                        val importName = trimmed.removePrefix("import ").replace("`", "")
+                        if (forbiddenImport(importName)) {
+                            "${sourceFile.relativeTo(sourceRoot)}:${index + 1}: $trimmed"
+                        } else {
+                            null
+                        }
+                    }.stream()
+            }.toList()
+    }
+
+private fun assertNoForbiddenKotlinImports(
+    relativeRoot: String,
+    message: String,
+    forbiddenImport: (String) -> Boolean,
+) {
+    val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
+    val violations = kotlinImportViolations(sourceRoot, relativeRoot, forbiddenImport)
+    assertTrue(violations.isEmpty(), "$message:\n${violations.joinToString("\n")}")
+}
+
+private fun assertSessionFamilyInboundImportBoundaries() {
+    assertNoForbiddenKotlinImports(
+        "com/readmates/sessionclosing/adapter/in/web",
+        "Session-closing web adapters must own parsing instead of importing another inbound adapter",
+    ) { importName ->
+        importName.startsWith("com.readmates.") &&
+            importName.contains(".adapter.in.") &&
+            !importName.startsWith("com.readmates.sessionclosing.adapter.in.")
+    }
+    assertNoForbiddenKotlinImports(
+        "com/readmates/sessionimport/adapter/in/web",
+        "Session-import web adapters must import application-owned contracts instead of concrete services",
+    ) { importName ->
+        importName.startsWith("com.readmates.sessionimport.application.service.")
+    }
+}
+
 private fun authWebConcreteServiceImportViolations(sourceRoot: Path): List<String> =
     Files.walk(sourceRoot.resolve("com/readmates/auth/adapter/in/web")).use { paths ->
         paths
@@ -1080,6 +1126,15 @@ private fun authWebConcreteServiceImportViolations(sourceRoot: Path): List<Strin
                     }.stream()
             }.toList()
     }
+
+private fun assertNoAuthWebConcreteServiceImports() {
+    val sourceRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
+    val violations = authWebConcreteServiceImportViolations(sourceRoot)
+    assertTrue(
+        violations.isEmpty(),
+        "Auth web adapters must not import auth concrete services:\n${violations.joinToString("\n")}",
+    )
+}
 
 private fun authInboundConcreteServiceImportViolations(sourceRoot: Path): List<String> =
     listOf(

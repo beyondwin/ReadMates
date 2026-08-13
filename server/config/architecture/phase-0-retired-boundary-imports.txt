@@ -34,3 +34,5 @@ com/readmates/auth/infrastructure/security/MemberAuthoritiesFilter.kt|com.readma
 com/readmates/auth/infrastructure/security/SessionCookieAuthenticationFilter.kt|com.readmates.club.adapter.in.web.resolveClubContext
 com/readmates/auth/adapter/in/web/MemberProfileController.kt|com.readmates.auth.application.service.MemberProfileError
 com/readmates/auth/adapter/in/web/MemberProfileController.kt|com.readmates.auth.application.service.MemberProfileException
+com/readmates/sessionclosing/adapter/in/web/HostSessionClosingController.kt|com.readmates.session.adapter.in.web.parseHostSessionId
+com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandler.kt|com.readmates.sessionimport.application.service.InvalidSessionImportException

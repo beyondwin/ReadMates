@@ -19,6 +19,7 @@ import com.readmates.sessionclosing.application.model.HostSessionClosingStatus
 import com.readmates.sessionclosing.application.port.`in`.GetHostSessionClosingStatusUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Test
 import org.springframework.http.MediaType
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
@@ -60,6 +61,19 @@ class HostSessionClosingControllerTest {
             }
     }
 
+    @Test
+    fun `rejects an invalid session id before calling the closing status use case`() {
+        mockMvc
+            .get("/api/host/sessions/not-a-session-id/closing-status") {
+                with(hostUser())
+                accept = MediaType.APPLICATION_JSON
+            }.andExpect {
+                status { isBadRequest() }
+            }
+
+        assertEquals(0, useCase.callCount)
+    }
+
     private fun response() =
         HostSessionClosingStatus(
             session =
@@ -97,11 +111,16 @@ class HostSessionClosingControllerTest {
 
 private class FakeGetHostSessionClosingStatusUseCase : GetHostSessionClosingStatusUseCase {
     lateinit var response: HostSessionClosingStatus
+    var callCount: Int = 0
+        private set
 
     override fun getHostSessionClosingStatus(
         host: CurrentMember,
         sessionId: UUID,
-    ): HostSessionClosingStatus = response
+    ): HostSessionClosingStatus {
+        callCount += 1
+        return response
+    }
 }
 
 private val resolveCurrentMemberUseCase =

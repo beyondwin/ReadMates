@@ -1,5 +1,3 @@
 # Phase 2 removes these concrete-service, cross-adapter, and adapter-owned-contract dependencies.
-com/readmates/sessionclosing/adapter/in/web/HostSessionClosingController.kt|com.readmates.session.adapter.in.web.parseHostSessionId
-com/readmates/sessionimport/adapter/in/web/SessionImportErrorHandler.kt|com.readmates.sessionimport.application.service.InvalidSessionImportException
 com/readmates/sessionrecord/adapter/out/persistence/JdbcHostSessionHistoryAdapter.kt|com.readmates.sessionrecord.application.service.typeSort
 com/readmates/sessionrecord/adapter/out/persistence/JdbcSessionRecordAdapter.kt|com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec

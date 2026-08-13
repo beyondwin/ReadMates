@@ -4,6 +4,7 @@ import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ProviderCallException
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.shared.security.AccessDeniedException
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
@@ -125,7 +126,7 @@ class AiGenerationErrorHandler {
     @ExceptionHandler(RuntimeException::class)
     fun handleUnknown(error: RuntimeException): ResponseEntity<ProblemDetail> {
         val log = org.slf4j.LoggerFactory.getLogger(AiGenerationErrorHandler::class.java)
-        if (error is com.readmates.sessionimport.application.service.InvalidSessionImportException) {
+        if (error is InvalidSessionImportException) {
             val issueCodes = error.issues.map { it.code }.distinct()
             log.error(
                 "Unhandled AI generation exception. issueCount={}, issueCodes={}",
