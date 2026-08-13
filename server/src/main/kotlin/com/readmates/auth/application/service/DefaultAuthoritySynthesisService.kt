@@ -7,13 +7,13 @@ import com.readmates.auth.domain.MembershipStatus
 import org.springframework.stereotype.Service
 
 /**
- * Default implementation of [AuthoritySynthesisService].
+ * Default implementation of [SynthesizeAuthoritiesUseCase].
  *
  * Branching rules:
- * - When [member] is non-null, synthesise role from membership.
+ * - When [AuthoritySynthesisRequest.member] is non-null, synthesise role from membership.
  *   VIEWER membership status always → ROLE_VIEWER regardless of role.
- * - When [member] is null and the principal holds ROLE_PLATFORM_ADMIN and
- *   a known club context (clubId != null) is supplied and a [supportSynthesis] grant
+ * - When [AuthoritySynthesisRequest.member] is null and the principal holds ROLE_PLATFORM_ADMIN and
+ *   a known club context (clubId != null) is supplied and an [AuthoritySynthesisRequest.supportSynthesis] grant
  *   was pre-fetched by the filter → add ROLE_HOST and attach the synthesis.
  * - Otherwise → return the incoming authorities with MEMBER_ROLE_AUTHORITIES stripped.
  *
