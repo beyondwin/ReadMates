@@ -121,7 +121,7 @@ class RedisAiGenerationFailureRecoveryTest(
             listOf(
                 redisRoot.resolve("RedisAiGenerationRecoveryIndex.kt"),
                 redisRoot.resolve("RedisAiGenerationJobStore.kt"),
-            ).first { java.nio.file.Files.exists(it) }
+            ).first(java.nio.file.Files::exists)
         val probeSource = probeOwner.readText().substringAfter("val activeQueueProbeScript:")
         val probeBytes =
             probeSource
@@ -1520,7 +1520,9 @@ private fun assertRedisWriterInvariants(
 }
 
 private fun sha256(bytes: ByteArray): String =
-    java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
+    java.util.HexFormat
+        .of()
+        .formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
 
 private fun command(
     record: JobRecord,

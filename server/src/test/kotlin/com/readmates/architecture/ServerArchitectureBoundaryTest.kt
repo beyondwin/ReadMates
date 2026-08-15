@@ -991,7 +991,6 @@ class ServerArchitectureBoundaryTest {
         assertAll(assertions)
         assertHostSessionWriteBoundaries()
     }
-
 }
 
 private fun assertNotificationAndAiRedisBoundaries() =
@@ -1083,7 +1082,12 @@ private fun loadAiGenerationRedisBoundarySources(): AiGenerationRedisBoundarySou
         missingUnits = missingUnits,
         facade = redisRoot.resolve("RedisAiGenerationJobStore.kt").readText(),
         indexes = redisRoot.resolve("AiGenerationRedisIndexes.kt").readText(),
-        keyspace = redisRoot.resolve("AiGenerationRedisKeyspace.kt").takeIf(Files::exists)?.readText().orEmpty(),
+        keyspace =
+            redisRoot
+                .resolve("AiGenerationRedisKeyspace.kt")
+                .takeIf(Files::exists)
+                ?.readText()
+                .orEmpty(),
         focused = focusedSources,
         port = aiGenerationPortSource(),
     )
