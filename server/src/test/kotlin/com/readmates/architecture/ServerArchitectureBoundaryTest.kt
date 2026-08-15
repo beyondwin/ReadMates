@@ -343,8 +343,7 @@ private fun jacksonImportsIn(serviceRoot: Path): List<String> =
 @Tag("architecture")
 class ServerArchitectureBoundaryTest {
     @Test
-    fun `notification decomposition boundaries remain focused`() =
-        assertNotificationAndAiRedisBoundaries()
+    fun `notification decomposition boundaries remain focused`() = assertNotificationAndAiRedisBoundaries()
 
     @Test
     fun `admin operations is registered as workflow slice`() {
