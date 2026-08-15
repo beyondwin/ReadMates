@@ -504,7 +504,7 @@ class ServerArchitectureBoundaryTest {
     fun `session inbound adapters own boundary imports`() = assertSessionFamilyInboundImportBoundaries()
 
     @Test
-    fun `session record boundaries use owned models and ports`() = assertSessionRecordImportBoundaries()
+    fun `session record boundaries use owned models and ports`() = assertSessionRecordBoundaries()
 
     @Test
     fun `auth inbound and security adapters do not depend on club inbound adapters`() {
@@ -1615,6 +1615,195 @@ private fun assertSessionFamilyInboundImportBoundaries() {
         "com/readmates/sessionimport/adapter/in/web",
         "Session-import web adapters must import application-owned contracts instead of concrete services",
         ::isForbiddenSessionImportInboundReference,
+    )
+}
+
+private val sessionRecordCapabilityMethods =
+    linkedMapOf(
+        "SessionRecordReadStorePort" to setOf("loadLive", "loadDraft", "loadRevision"),
+        "SessionRecordApplyStorePort" to
+            setOf(
+                "lockEditor",
+                "findCompletedApply",
+                "findApplyReceipt",
+                "insertApplyReceipt",
+                "insertBaselineIfAbsent",
+                "insertAppliedRevision",
+                "deleteAppliedDraft",
+            ),
+        "SessionRecordDraftStorePort" to
+            setOf(
+                "insertDraft",
+                "compareAndSetDraft",
+                "rebaseDraft",
+                "deleteDraft",
+                "insertRestoredDraft",
+            ),
+    )
+
+private val sessionRecordPersistenceUnitNames =
+    listOf(
+        "JdbcSessionRecordAdapter.kt",
+        "JdbcSessionRecordReadStore.kt",
+        "JdbcSessionRecordApplyStore.kt",
+        "JdbcSessionRecordDraftStore.kt",
+        "SessionRecordPersistenceRows.kt",
+    )
+
+private data class SessionRecordPersistenceBoundarySources(
+    val missingUnits: List<String>,
+    val port: String,
+    val files: Map<String, String>,
+)
+
+private fun assertSessionRecordBoundaries() =
+    assertAll(
+        { assertSessionRecordImportBoundaries() },
+        { assertSessionRecordPersistenceBoundaries() },
+    )
+
+private fun assertSessionRecordPersistenceBoundaries() {
+    val sources = loadSessionRecordPersistenceBoundarySources()
+    assertAll(
+        {
+            assertTrue(
+                sources.missingUnits.isEmpty(),
+                "Missing focused session record persistence units: ${sources.missingUnits}",
+            )
+        },
+        { assertSessionRecordCapabilityBoundaries(sources.port) },
+        { assertSessionRecordFacadeBoundaries(sources.files.getValue("JdbcSessionRecordAdapter.kt")) },
+        { assertSessionRecordRowBoundaries(sources.files.getValue("SessionRecordPersistenceRows.kt")) },
+        { assertSessionRecordOwnershipBoundaries(sources) },
+        { assertSessionRecordSuppressionBoundaries(sources) },
+    )
+}
+
+private fun loadSessionRecordPersistenceBoundarySources(): SessionRecordPersistenceBoundarySources {
+    val mainRoot = architectureProjectRoot().resolve("server/src/main/kotlin")
+    val persistenceRoot = mainRoot.resolve("com/readmates/sessionrecord/adapter/out/persistence")
+    val port =
+        mainRoot
+            .resolve("com/readmates/sessionrecord/application/port/out/SessionRecordStorePort.kt")
+            .readText()
+    return SessionRecordPersistenceBoundarySources(
+        missingUnits = sessionRecordPersistenceUnitNames.filterNot { Files.exists(persistenceRoot.resolve(it)) },
+        port = port,
+        files =
+            sessionRecordPersistenceUnitNames.associateWith { name ->
+                persistenceRoot.resolve(name).takeIf(Files::exists)?.readText().orEmpty()
+            },
+    )
+}
+
+private fun assertSessionRecordCapabilityBoundaries(portSource: String) {
+    val actualByCapability =
+        sessionRecordCapabilityMethods.keys.associateWith { capability ->
+            interfaceBody(portSource, capability)
+                ?.let { body -> sessionRecordMethodNames(body) }
+                .orEmpty()
+        }
+    val counts = actualByCapability.values.flatten().groupingBy(String::toString).eachCount()
+    val violations =
+        sessionRecordCapabilityMethods.flatMap { (capability, expected) ->
+            buildList {
+                val actual = actualByCapability.getValue(capability)
+                if (actual != expected) add("$capability expected=$expected actual=$actual")
+                expected.filter { counts[it] != 1 }.forEach { method ->
+                    add("$method declarations=${counts[method] ?: 0}")
+                }
+            }
+        }
+    val composite = portSource.substringAfter("interface SessionRecordStorePort", "")
+    assertAll(
+        {
+            assertTrue(
+                violations.isEmpty(),
+                "Session record store capability methods must be partitioned exactly once: $violations",
+            )
+        },
+        {
+            assertFalse(
+                Regex("""(?m)^\s*fun\s+""").containsMatchIn(composite),
+                "SessionRecordStorePort must declare no direct function",
+            )
+        },
+    )
+}
+
+private fun sessionRecordMethodNames(source: String): Set<String> =
+    Regex("""(?m)^\s*fun\s+(\w+)\s*\(""")
+        .findAll(source)
+        .map { it.groupValues[1] }
+        .toSet()
+
+private fun assertSessionRecordFacadeBoundaries(source: String) {
+    val sqlTokens = listOf(".query(", ".update(", "select ", "insert into", "delete from", "\"\"\"")
+    val delegateNames =
+        listOf("JdbcSessionRecordReadStore", "JdbcSessionRecordApplyStore", "JdbcSessionRecordDraftStore")
+    assertAll(
+        {
+            assertTrue(
+                sqlTokens.none(source.lowercase()::contains),
+                "Session record JDBC facade must contain delegation only",
+            )
+        },
+        {
+            assertTrue(
+                delegateNames.all(source::contains),
+                "Session record JDBC facade must wire every focused delegate",
+            )
+        },
+    )
+}
+
+private fun assertSessionRecordRowBoundaries(source: String) {
+    val writeTokens = listOf("jdbctemplate", ".update(", "insert into", "update ", "delete from")
+    assertTrue(
+        writeTokens.none(source.lowercase()::contains),
+        "SessionRecordPersistenceRows must assemble rows without owning writes",
+    )
+}
+
+private fun assertSessionRecordOwnershipBoundaries(sources: SessionRecordPersistenceBoundarySources) {
+    val forbiddenImports =
+        listOf(
+            "application.service.SessionRecordSnapshotCodec",
+            "HostSessionHistoryType",
+            "typeSort",
+        )
+    val productionSources = sources.files.values + sources.port
+    val delegateAnnotations =
+        sources.files
+            .filterKeys { it != "JdbcSessionRecordAdapter.kt" }
+            .flatMap { (name, source) ->
+                listOf("@Repository", "@Component", "@Service")
+                    .filter(source::contains)
+                    .map { "$name $it" }
+            }
+    assertAll(
+        {
+            assertTrue(
+                productionSources.none { source -> forbiddenImports.any(source::contains) },
+                "Session record persistence must not reclaim codec or history sort policy ownership",
+            )
+        },
+        {
+            assertTrue(
+                delegateAnnotations.isEmpty(),
+                "Session record delegates must not be Spring beans: $delegateAnnotations",
+            )
+        },
+    )
+}
+
+private fun assertSessionRecordSuppressionBoundaries(sources: SessionRecordPersistenceBoundarySources) {
+    val productionSources = sources.files.values + sources.port
+    assertTrue(
+        productionSources.none { source ->
+            Regex("""@Suppress\([^)]*"TooManyFunctions"""").containsMatchIn(source)
+        },
+        "Session record capability and persistence units must not suppress TooManyFunctions",
     )
 }
 

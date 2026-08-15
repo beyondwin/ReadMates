@@ -338,6 +338,96 @@ class JdbcSessionRecordAdapterTest(
         }.isInstanceOf(DataIntegrityViolationException::class.java)
     }
 
+    @Test
+    fun `live snapshot keeps entry ordering and assembles the newest nullable feedback payload`() {
+        val fixture = fixture("live-row-order")
+        jdbcTemplate.update(
+            """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, ?, ?, ?, '두 번째 하이라이트', 1)
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            fixture.host.clubId.toString(),
+            fixture.sessionId.toString(),
+            fixture.host.membershipId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_feedback_documents (
+              id, club_id, session_id, version, source_text, document_title, file_name, content_type, file_size
+            ) values (?, ?, ?, 2, '# 최신 피드백', null, 'latest-feedback.md', 'text/markdown', 17)
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            fixture.host.clubId.toString(),
+            fixture.sessionId.toString(),
+        )
+
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+
+        assertThat(live.snapshot.highlights.map(SessionRecordEntry::text))
+            .containsExactly("하이라이트", "두 번째 하이라이트")
+        assertThat(live.snapshot.feedbackDocument)
+            .isEqualTo(SessionRecordFeedbackDocument("latest-feedback.md", "latest-feedback.md", "# 최신 피드백"))
+    }
+
+    @Test
+    fun `baseline insert never overwrites the first immutable snapshot`() {
+        val fixture = fixture("baseline-once")
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        val changed = live.snapshot.copy(publicationSummary = "덮어쓰면 안 되는 요약")
+
+        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
+        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(changed))
+
+        val storedJson =
+            jdbcTemplate.queryForObject(
+                """
+                select snapshot_json
+                from session_record_revisions
+                where club_id = ? and session_id = ? and version = 1
+                """.trimIndent(),
+                String::class.java,
+                fixture.host.clubId.toString(),
+                fixture.sessionId.toString(),
+            )
+        assertThat(codec.decode(requireNotNull(storedJson))).isEqualTo(live.snapshot)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from session_record_revisions where club_id = ? and session_id = ?",
+                Long::class.java,
+                fixture.host.clubId.toString(),
+                fixture.sessionId.toString(),
+            ),
+        ).isEqualTo(1L)
+    }
+
+    @Test
+    fun `restored draft insert is conditional and update keeps optimistic revision`() {
+        val fixture = fixture("restore-cas")
+        val revisionId =
+            insertRevision(
+                fixture,
+                version = 1,
+                snapshot = fixture.snapshot.copy(publicationSummary = "복원 요약"),
+                appliedAt = LocalDateTime.of(2026, 7, 22, 0, 0),
+            )
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        val revision = requireNotNull(adapter.loadRevision(fixture.host, fixture.sessionId, revisionId))
+        val encoded = codec.encode(revision.snapshot)
+
+        val inserted = adapter.insertRestoredDraft(fixture.host, live, revision, null, encoded)
+        val duplicateInsert = adapter.insertRestoredDraft(fixture.host, live, revision, null, encoded)
+        val staleUpdate = adapter.insertRestoredDraft(fixture.host, live, revision, 0, encoded)
+        val updated = adapter.insertRestoredDraft(fixture.host, live, revision, inserted?.draftRevision, encoded)
+
+        assertThat(inserted?.draftRevision).isEqualTo(1)
+        assertThat(inserted?.restoredFromRevisionId).isEqualTo(revisionId)
+        assertThat(duplicateInsert).isNull()
+        assertThat(staleUpdate).isNull()
+        assertThat(updated?.draftRevision).isEqualTo(2)
+        assertThat(updated?.restoredFromRevisionId).isEqualTo(revisionId)
+    }
+
     private fun insertReceipt(
         fixture: Fixture,
         requestId: UUID,
