@@ -59,7 +59,7 @@ This is the final approved large-class wave, not an attempt to eliminate all 461
 - `ManualNotificationAudienceQueries.kt` owns same-club active membership and per-channel eligibility reads.
 - `ManualNotificationPreviewStore.kt` owns preview insert/read/lock data.
 - `ManualNotificationConfirmStore.kt` owns the atomic confirm decision, audience revalidation, outbox/manual-dispatch insert, receipt lookup, and preview consume.
-- `JdbcManualNotificationDispatchAdapter.kt` remains the only `ManualNotificationDispatchPort` bean and delegates. Its confirm method remains `@Transactional(rollbackFor = [Exception::class])`.
+- `JdbcManualNotificationDispatchAdapter.kt` remains the only `ManualNotificationDispatchPort` bean and delegates. Its confirm method remains plain `@Transactional`, preserving Spring's current rollback semantics exactly.
 
 ### Host session writes
 
@@ -295,7 +295,7 @@ ReturnCount:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispa
 TooManyFunctions:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter : ManualNotificationDispatchPort
 ```
 
-- [ ] **Step 1: Pin characterization and source ownership before moving code.** Strengthen the existing DB test to assert byte-stable selection/target hashes, member/dispatch cursor continuation without duplicate IDs, masked email output, EMAIL/IN_APP eligibility, preview row lock, unchanged revision recheck, host/audience lock order, one outbox/manual-dispatch pair, preview consume-once, and retry returning the stored receipt. Add a source rule requiring the façade to contain no SQL literal and requiring each new collaborator to stay in notification persistence and depend on application ports/models only.
+- [ ] **Step 1: Pin characterization and source ownership before moving code.** Strengthen the existing DB test to assert byte-stable selection/target hashes, member/dispatch cursor continuation without duplicate IDs, masked email output, EMAIL/IN_APP eligibility, preview row lock, unchanged revision recheck, host/audience lock order, one outbox/manual-dispatch pair, preview consume-once, and retry returning the stored receipt. Add a source rule requiring the façade to contain no SQL literal and requiring each new collaborator to stay in notification persistence, forbid inbound adapters, application services, and cross-feature dependencies, and permit only notification application ports/models, notification domain models, stable shared DB/paging helpers, and required JDBC/Jackson technical libraries.
 - [ ] **Step 2: Run RED.** The source rule must fail while SQL and helpers remain in the façade.
 
   ```bash
@@ -308,7 +308,7 @@ TooManyFunctions:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotification
     --rerun-tasks --no-build-cache --no-configuration-cache
   ```
 
-- [ ] **Step 3: Extract responsibility units without changing the transaction.** Move read SQL/mapping/cursors, audience eligibility, preview persistence, confirm transition, and row mapping to the named files. Keep `confirmManualDispatch` on the façade with the exact transaction annotation and a single delegate call. Preserve club/session/preview `FOR UPDATE` order, event topic injection, SQL text/predicates, UTC timestamps, UUID generation points, and all rejection precedence.
+- [ ] **Step 3: Extract responsibility units without changing the transaction.** Move read SQL/mapping/cursors, audience eligibility, preview persistence, confirm transition, and row mapping to the named files. Keep `confirmManualDispatch` on the façade with plain `@Transactional` and a single delegate call. Preserve club/session/preview `FOR UPDATE` order, event topic injection, SQL text/predicates, UTC timestamps, UUID generation points, and all rejection precedence.
 - [ ] **Step 4: Retire the 12 exact identities atomically.** Delete only those IDs from `baseline.xml`, append the normalized strings above to the retired file, and assert `449 current + 12 retired = 461 approved`; approved seed and ktlint files are byte-identical.
 - [ ] **Step 5: Execute load-bearing mutations.** Remove the preview `FOR UPDATE` and confirm-concurrency must fail; bypass content revision recheck and the stale-revision test must fail; include EMAIL-ineligible members and channel counts/hash must fail; return raw email and masking must fail; skip preview consumption and retry/duplicate assertions must fail. Restore each mutation and rerun the exact selector.
 - [ ] **Step 6: Run GREEN, review, and commit.** Run Step 2 plus Detekt and main-source ktlint. Reviewer checks lock order, transaction ownership, SQL/result parity, no new identity, and `449/12/461`. Commit:
@@ -438,6 +438,7 @@ ThrowsCount:AdminNotificationOperationsService.kt:AdminNotificationOperationsSer
 
 - Modify: `server/src/main/kotlin/com/readmates/aigen/application/port/out/AiGenerationJobStore.kt`
 - Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt`
+- Modify: `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisIndexes.kt`
 - Create: `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisContext.kt`
 - Create: `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisKeyspace.kt`
 - Create: `server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationPayloadStore.kt`
@@ -464,8 +465,8 @@ FunctionOnlyReturningConstant:RedisAiGenerationJobStore.kt:RedisAiGenerationJobS
 TooManyFunctions:AiGenerationJobStore.kt:AiGenerationJobStore
 ```
 
-- [ ] **Step 1: Pin key, payload, transition, lease, and recovery characterization.** Add an exact keyspace table test for hash/transcript/turns/result/evidence/provider-attempt/admission/index/repair keys. Pin hash field names, TTLs, payload separation, status/revision/progress/error transitions, exact Lua keys and arguments, commit lease results, cleanup, atomic delete, corrupt/missing classification, recovery disposition, index epoch/repair/quarantine, queue probe unavailable reasons, and metric operation tags. Pin the Spring bean condition and all five implemented port types.
-- [ ] **Step 2: Run RED.** Add source rules requiring the façade to contain no Redis command or inline Lua, capability port methods to partition the old method set exactly once, key literals to exist only in keyspace/script files, and the composite port to declare no direct function. These rules fail before extraction.
+- [ ] **Step 1: Pin key, payload, transition, lease, and recovery characterization.** Add an exact keyspace table test for hash/transcript/turns/result/evidence/provider-attempt/admission/index/repair keys. Pin hash field names, TTLs, payload separation, status/revision/progress/error transitions, exact Lua keys and arguments, commit lease results, cleanup, atomic delete, corrupt/missing classification, recovery disposition, index epoch/repair/quarantine, queue probe unavailable reasons, and metric operation tags. Pin the Spring bean condition and all five implemented port types. Record the exact bytes and SHA-256 of the inline `activeQueueProbeScript` as well as both existing script files.
+- [ ] **Step 2: Run RED.** Add source rules requiring the façade to contain no Redis command or inline Lua, capability port methods to partition the old method set exactly once, key literals to exist only in keyspace/script files, `AiGenerationRedisIndexes` to obtain provider/index/session/club keys from `AiGenerationRedisKeyspace`, and the composite port to declare no direct function. These rules fail before extraction.
 
   ```bash
   ./server/gradlew -p server unitTest \
@@ -482,9 +483,9 @@ TooManyFunctions:AiGenerationJobStore.kt:AiGenerationJobStore
     --rerun-tasks --no-build-cache --no-configuration-cache
   ```
 
-- [ ] **Step 3: Split application capabilities and Redis delegates.** Move methods unchanged by responsibility. Keep script objects byte-identical and call the same script with the same key/argument order. Centralize only key construction and shared dependencies. Keep `loadMetadata` payload-free, `load` grounded-payload validation, existing default list limits/fallback behavior, time source, UUID generation points, metric names/tags, and conditional bean properties.
-- [ ] **Step 4: Remove hidden suppressions and retire two identities.** Delete `@Suppress("LargeClass", "TooManyFunctions")`, move the two exact active IDs to retired, and assert `437 current + 24 retired = 461 approved`. No delegate or capability interface may require those suppressions or produce a new baseline identity.
-- [ ] **Step 5: Execute load-bearing mutations.** Change one Redis key suffix, one transient TTL, one Lua key order, one status expected set, one lease revision argument, one recovery classification, and `Unavailable` to empty `Available`; the exact corresponding characterization must fail independently. Restore each mutation and rerun. Also compare the SHA-256 of `AiGenerationRedisScripts.kt` and `GroundedAiGenerationRedisScripts.kt` to the Task 4 base; both must be byte-identical.
+- [ ] **Step 3: Split application capabilities and Redis delegates.** Move methods unchanged by responsibility. Keep script objects byte-identical and call the same script with the same key/argument order. Move the inline active-queue probe script byte-for-byte into the focused recovery/probe collaborator. Centralize all non-script key construction in `AiGenerationRedisKeyspace`, including the keys currently owned by `AiGenerationRedisIndexes`, and share it with the index helper. Keep `loadMetadata` payload-free, `load` grounded-payload validation, existing default list limits/fallback behavior, time source, UUID generation points, metric names/tags, and conditional bean properties.
+- [ ] **Step 4: Remove hidden suppressions and retire two identities.** Delete `@Suppress("LargeClass", "TooManyFunctions")` from the façade and remove the now-unneeded `@Suppress("TooManyFunctions")` from `AiGenerationRedisIndexes`; the index suppression has no approved-seed identity and therefore no tombstone. Move the two exact active IDs to retired and assert `437 current + 24 retired = 461 approved`. No delegate, index helper, or capability interface may require those suppressions or produce a new baseline identity.
+- [ ] **Step 5: Execute load-bearing mutations.** Change one Redis key suffix, one transient TTL, one Lua key order, one status expected set, one lease revision argument, one recovery classification, and `Unavailable` to empty `Available`; the exact corresponding characterization must fail independently. Restore each mutation and rerun. Compare the SHA-256 of `AiGenerationRedisScripts.kt` and `GroundedAiGenerationRedisScripts.kt` to the Task 4 base and compare the extracted active-queue probe script bytes/hash to its Task 4 base body; all three script contracts must be byte-identical.
 - [ ] **Step 6: Run GREEN, review, and commit.** Run Step 2 plus all AI Redis unit/integration classes selected by `rg --files .../aigen/adapter/out/redis`, Detekt, main-source ktlint, and `git diff --check`. Reviewer checks one bean, exact port delegation, key/Lua/TTL parity, PII separation, failure semantics, and `437/24/461`. Commit:
 
   ```bash
@@ -559,8 +560,8 @@ TooManyFunctions:AiGenerationJobStore.kt:AiGenerationJobStore
 
 - [ ] **Step 1: Audit exact completion state before writing claims.** Record fresh counts and sets: boundary `0/39/39`, feature `37/4/41`, SCC empty, Detekt `437/24/461`, ktlint `171/0/171`, no target `LargeClass`/`TooManyFunctions` suppression, no new baseline/config exception, and no production consumer of deleted combined classes. If any value differs, stop the docs task and route the discrepancy to the originating task.
 - [ ] **Step 2: Update active docs and CHANGELOG.** Replace the explicit “large-class closeout remains” wording with the exact responsibility split and completion criteria. State that Phase 2 is complete because boundary debt is zero, cycles are zero, temporary architecture exceptions are zero, five target responsibility clusters are decomposed, and exact target identities/suppressions are removed. Explicitly state that 437 current Detekt identities and 171 ktlint identities are non-target legacy static-analysis debt, not zero and not hidden.
-- [ ] **Step 3: Write the dated closeout/release-readiness report.** Scope review to the real merge base and `origin/main..HEAD`; cover CHANGELOG/Unreleased, CI/deploy files, operator-visible behavior, security-code hygiene, architecture baselines/exceptions, public-release safety, skipped UI/E2E/live validation, and residual non-target debt. Distinguish repository/local evidence from live production evidence. Do not claim merge, push, release, or deployment.
-- [ ] **Step 4: Review dirty docs and report before commit.** Run `git diff --check` and targeted public-safety scan over the four tracked docs. Obtain independent review of factual counts, source links, completion wording, and legacy-debt honesty. Commit only after approval:
+- [ ] **Step 3: Write the dated closeout/release-readiness report with pending final evidence.** Scope review to the real merge base and `origin/main..HEAD`; cover CHANGELOG/Unreleased, CI/deploy files, operator-visible behavior, security-code hygiene, architecture baselines/exceptions, public-release safety, skipped UI/E2E/live validation, and residual non-target debt. Distinguish repository/local evidence from live production evidence, mark canonical/public/whole-program verdict fields as pending, and do not claim merge, push, release, or deployment.
+- [ ] **Step 4: Review dirty docs and pending report before the first docs commit.** Run `git diff --check` and targeted public-safety scan over the four tracked docs. Obtain independent review of factual counts, source links, completion wording, pending-evidence labels, and legacy-debt honesty. Commit only after approval:
 
   ```bash
   git commit -m "docs: close Phase 2 backend quality program"
@@ -585,9 +586,15 @@ TooManyFunctions:AiGenerationJobStore.kt:AiGenerationJobStore
   ./scripts/public-release-check.sh .tmp/public-release-candidate
   ```
 
-- [ ] **Step 7: Record explicit excluded validation.** Frontend lint/test/build and Playwright E2E are intentionally not run because no frontend/BFF/API/auth/user-flow contract changes. Live Redis/provider/email, production data, migration, deployment, tag, PR, and push are not run. If source review finds an actual contract change, this exclusion is invalid and the plan must be corrected before closeout.
+- [ ] **Step 7: Record explicit excluded validation.** Frontend lint/test/build and Playwright E2E are intentionally not run because no frontend/BFF/API/auth/user-flow contract changes. Production migration/deployment, live external Redis/provider/email, production data, tag, PR, and push are not run; local Testcontainers integration does execute Flyway and local Redis/MySQL compatibility paths. If source review finds an actual contract change, this exclusion is invalid and the plan must be corrected before closeout.
 - [ ] **Step 8: Perform fresh whole-branch release-readiness and whole-program review.** Review the entire branch against its real base, not only Task 6. Require verdicts for behavioral compatibility, architecture ownership, transaction/concurrency, Detekt partition/suppression removal, public safety, and Phase 0–2 requirement coverage. Resolve all Critical/Important/Material findings through the originating task and rerun affected focused plus canonical gates.
-- [ ] **Step 9: Final exact audit and clean-state handoff.** Write `${SDD_WORKSPACE}/final-report.md` with every command/result, mutation failure/restoration, task commit, review verdict, skipped validation, and residual non-target debt. Confirm tracked clean state and report readiness for the controller's separate local-main integration and authorized push workflow; do not merge or push from this task.
+- [ ] **Step 9: Finalize and independently review the tracked evidence report.** Replace every pending field in `docs/reports/2026-08-15-backend-quality-phase-0-2-closeout.md` with the exact canonical, integration, public-candidate, release-readiness, and whole-program results. Run diff/safety checks and obtain an independent factual review, then commit only the tracked report:
+
+  ```bash
+  git commit -m "docs: finalize Phase 2 backend quality evidence"
+  ```
+
+- [ ] **Step 10: Re-run final-HEAD gates and hand off clean state.** At the report-finalization HEAD, rerun `./scripts/server-ci-check.sh`, the full foreground `integrationTest`, public candidate build/check, and `git diff --check origin/main..HEAD` so canonical, persistence, and public evidence all apply to the exact final bytes. Write `${SDD_WORKSPACE}/final-report.md` with every command/result, mutation failure/restoration, task commit, review verdict, skipped validation, and residual non-target debt. Confirm tracked clean state and report readiness for the controller's separate local-main integration and authorized push workflow; do not merge or push from this task.
 
 ## Final Acceptance Criteria
 
