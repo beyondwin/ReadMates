@@ -169,10 +169,11 @@ ArchUnit은 test scope 의존성이다. production 빌드에 영향을 주지 �
 - 2026-08-10 application-port update: messaging/Kafka와 scheduling inbound adapter는 application input port만 호출하고, adapter-facing queue/provider/delivery failure·routing·availability 모델은 application이 소유한다. outbound Redis/resilience adapter는 concrete application service 대신 output port와 application model을 사용한다. Notification consumer factory/error handler/DLT/listener-container wiring은 inbound Kafka configuration의 책임이고 producer configuration과 분리된다.
 - 2026-08-13 actor/auth–club update: capability actor의 순수성과 principal coexistence, auth-owned club-context helper, auth servlet-security/OAuth input-port 주입, `club -> auth` 제거를 architecture/source inventory가 강제한다. Boundary ledger는 `4 current + 35 retired = 39 approved`, feature ledger는 `40 current + 1 retired = 41 approved`이며 `auth|club`은 승인된 순방향으로 남는다.
 - 2026-08-15 session-family update: sessionclosing parsing과 sessionimport failure를 inbound/application ownership으로 옮기고, history sort와 visibility/history cursor를 sessionrecord model이 소유한다. Snapshot codec은 sessionrecord output port와 Jackson outbound adapter로 분리하고, record-owned replacement port를 sessionimport가 구현한다. Boundary ledger는 `0 current + 39 retired = 39 approved`, feature ledger는 `37 current + 4 retired = 41 approved`이며 `sessionrecord|sessionimport`, `sessionrecord|session`, `aigen|session`을 새 tombstone으로 보존한다. `sessionimport|sessionrecord`, `session|sessionrecord`는 순방향으로 남고 cyclic feature component는 0개다. 바깥 apply transaction, revision/notification/cache 의미와 REST/JSON/error/cursor 계약은 유지한다.
+- 2026-08-15 large-class closeout: 수동 알림 persistence/preview/confirm, 호스트 세션 command/query/policy, 플랫폼 관리자 알림 read/replay/policy/JSON, Redis AI job capability/key/script/recovery, 세션 기록 read/apply/draft/row assembly를 분리한다. 기존 façade bean/port와 transaction, SQL/lock, role/error/receipt, Redis key/TTL/Lua, snapshot/revision 계약은 유지하고 `HostSessionWriteOperations`는 zero-consumer 상태로 삭제한다. 대상 class-level `LargeClass`·`TooManyFunctions` suppression과 현행 Detekt identity 24개를 제거해 retired ledger로 옮기며 새 baseline/config 예외는 허용하지 않는다. 따라서 Phase 2는 boundary `0/39/39`, feature `37/4/41`, cyclic component 0, temporary exception 0과 다섯 책임 cluster 분해를 모두 충족해 완료된다. Detekt `437/24/461`과 ktlint `171/0/171`은 비대상 legacy debt이며 전역 zero로 표현하지 않는다.
 
 부정적/감수한 비용:
 - 작은 feature에도 5계층 구조가 강제된다. 보일러플레이트 파일 수가 많아진다. IDE template으로 초기 파일 생성을 자동화해 단축하고 있다.
-- legacy surface와 신규 clean architecture surface가 공존한다. Phase 0 registry와 두 no-growth inventory는 현재 inbound package와 기존 경계·기능 의존 debt를 빠짐없이 고정한다. Session-family 전환 뒤 current boundary ledger와 cyclic feature component는 0개지만, large-class decomposition과 최종 Phase 2 프로그램 closeout은 별도 후속 범위다. 따라서 이 수치만으로 전체 Phase 2 완료를 선언하지 않는다.
+- legacy surface와 신규 clean architecture surface가 공존한다. Phase 0 registry와 no-growth inventory는 현재 inbound package와 기존 경계·기능 의존 debt를 빠짐없이 고정한다. Phase 2는 승인된 boundary와 cycle debt, temporary exception, 다섯 대상 responsibility cluster를 닫았지만 비대상 Detekt 437개와 ktlint 171개는 후속 legacy quality debt로 남는다.
 - cross-feature 공유 추상화의 위치(`shared/` 패키지)에 대한 규칙이 아직 명확하지 않다. 현재는 관례로 운영 중이며 별도 ADR이 필요할 수 있다.
 - ArchUnit 버전 업그레이드 시 기존 규칙과의 호환성을 확인해야 한다.
 - `JdbcTemplate` 직접 사용으로 복잡한 쿼리를 직접 작성해야 한다. 빌드 타임 타입 안전성이 없다 (jOOQ 도입은 후속 ADR 후보).
@@ -201,7 +202,7 @@ legacy surface 확인:
 
 ## 후속 작업
 
-- Actor carrier 삭제나 large-class decomposition, 최종 Phase 2 프로그램 closeout은 별도 zero-consumer/behavior-preservation 증거가 있는 계획에서 다룬다.
+- 남은 legacy surface와 비대상 Detekt/ktlint identity를 줄일 때도 exact identity retirement와 behavior-preservation 증거를 같은 변경에 둔다. 기존 inbound carrier는 전환되지 않은 slice의 계약이므로 zero-consumer 증거 없이 일괄 삭제하지 않는다.
 - cross-feature 공유 추상화(`shared/` 패키지)의 import 방향 규칙 명문화. 현재 관례로 운영 중.
 - legacy surface의 clean architecture 전환 완료 기준 및 일정 문서화. 미전환 surface 목록 관리.
 - Gradle multi-module 전환 검토 시점 기준 정의 (feature 수, 팀 규모 임계값).

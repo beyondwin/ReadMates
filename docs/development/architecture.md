@@ -203,7 +203,17 @@ Notification Kafka transport도 방향별로 분리합니다. producer configura
 
 Feature ledger에는 기존 `club|auth`와 함께 새 tombstone `sessionrecord|sessionimport`, `sessionrecord|session`, `aigen|session`이 있습니다. 순방향 `sessionimport|sessionrecord`와 `session|sessionrecord`는 current로 유지하고, feature graph의 cyclic component는 0개입니다. Session-record application은 자신이 소유한 `ReplaceSessionRecordContentPort`로 live replacement를 요청하고 `sessionimport`가 이를 구현합니다. `SessionRecordApplyService.apply`는 바깥 `@Transactional` 경계를 계속 소유해 live replacement, immutable revision, receipt, draft 삭제를 한 transaction으로 유지하고 cache invalidation은 after-commit입니다.
 
-Snapshot encode/decode는 session-record output port `SessionRecordSnapshotCodec`와 Jackson outbound adapter가 소유하며 schema `readmates-session-record:v1`, deterministic JSON과 exact-byte SHA-256 계약을 유지합니다. History ordering은 record application model의 `HostSessionHistoryType.typeSort`가 소유합니다. `SessionRecordVisibility`와 history 전용 `InvalidHostSessionHistoryCursorException`도 session-record application model이 소유하고, 일반 host-session 목록은 기존 session-owned cursor failure를 유지합니다. 이 전환은 REST route, request/response JSON, status/error code, cursor tuple, revision/notification/cache 의미, BFF/frontend source, migration/schema, deploy 또는 production behavior를 바꾸지 않았습니다. Large-class decomposition과 최종 Phase 2 프로그램 closeout은 별도 후속 범위이며, 여기서 전체 Phase 2 완료를 선언하지 않습니다.
+Snapshot encode/decode는 session-record output port `SessionRecordSnapshotCodec`와 Jackson outbound adapter가 소유하며 schema `readmates-session-record:v1`, deterministic JSON과 exact-byte SHA-256 계약을 유지합니다. History ordering은 record application model의 `HostSessionHistoryType.typeSort`가 소유합니다. `SessionRecordVisibility`와 history 전용 `InvalidHostSessionHistoryCursorException`도 session-record application model이 소유하고, 일반 host-session 목록은 기존 session-owned cursor failure를 유지합니다. 이 전환은 REST route, request/response JSON, status/error code, cursor tuple, revision/notification/cache 의미, BFF/frontend source, migration/schema, deploy 또는 production behavior를 바꾸지 않았습니다.
+
+Phase 2의 마지막 책임 분해는 다섯 개 대상 cluster를 다음 경계로 고정합니다.
+
+- 수동 알림 persistence는 read query, audience/lock, preview store, confirm store, row mapping으로 나뉘고 `JdbcManualNotificationDispatchAdapter`가 기존 `ManualNotificationDispatchPort` bean과 confirm transaction을 유지합니다.
+- 호스트 세션 write는 draft, attendance, publication, lifecycle command와 공통 query, 순수 policy로 나뉩니다. `JdbcHostSessionWriteAdapter`가 기존 여섯 output port를 구현하고 삭제된 `HostSessionWriteOperations`의 consumer는 없습니다.
+- 플랫폼 관리자 알림은 read façade, transactional replay service, 순수 replay policy, JSON output port/Jackson adapter로 나뉩니다. 기존 use-case bean, role/error/receipt 계약과 replay atomicity를 유지합니다.
+- Redis AI job store는 payload, transition, commit lease, recovery, recovery index, context/keyspace 책임과 세 capability port로 나뉩니다. 단일 conditional façade, Redis key/TTL/hash, Lua byte와 key/argument order, unavailable 의미를 유지합니다.
+- 세션 기록 persistence는 read, apply, draft capability와 row assembly로 나뉩니다. `JdbcSessionRecordAdapter`만 Spring bean으로 남고 바깥 apply transaction, SQL/optimistic revision/receipt/draft 의미를 유지합니다.
+
+이 분해로 대상 class-level `LargeClass`·`TooManyFunctions` suppression은 제거됐고, 대상 24개 Detekt identity는 현행 baseline에서 retired ledger로 이동했습니다. Phase 2 완료 기준은 boundary `0 current + 39 retired = 39 approved`, feature dependency `37 + 4 = 41`과 cyclic component 0개, temporary architecture exception 0개, 위 다섯 책임 cluster의 분해와 대상 identity/suppression 제거입니다. 정적 분석 전체가 zero라는 뜻은 아닙니다. 비대상 legacy debt는 Detekt `437 current + 24 retired = 461 approved`, ktlint `171 current + 0 retired = 171 approved`로 계속 공개적으로 추적하며 baseline regeneration, approved-seed 증가, 같은 크기 identity 대체나 config 완화로 숨기지 않습니다.
 
 ## CQRS Read vs Write Package Split
 
