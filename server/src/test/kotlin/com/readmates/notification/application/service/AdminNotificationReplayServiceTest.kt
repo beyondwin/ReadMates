@@ -4,23 +4,19 @@ import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.config.AdminNotificationReplayProperties
-import com.readmates.notification.application.model.AdminNotificationDelivery
 import com.readmates.notification.application.model.AdminNotificationFilter
-import com.readmates.notification.application.model.AdminNotificationOperationsSnapshot
-import com.readmates.notification.application.model.AdminNotificationOutboxEvent
 import com.readmates.notification.application.model.AdminNotificationReplayConfirmCommand
+import com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest
 import com.readmates.notification.application.model.AdminNotificationReplaySnapshot
 import com.readmates.notification.application.model.AdminNotificationReplayTarget
 import com.readmates.notification.application.model.adminNotificationReplaySelectionHash
 import com.readmates.notification.application.port.out.AdminNotificationAuditPort
-import com.readmates.notification.application.port.out.AdminNotificationOperationsReadPort
+import com.readmates.notification.application.port.out.AdminNotificationJsonCodec
 import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmation
 import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmationInsert
 import com.readmates.notification.application.port.out.AdminNotificationReplayPort
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewInsert
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewRecord
-import com.readmates.shared.paging.CursorPage
-import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
@@ -36,6 +32,30 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 class AdminNotificationReplayServiceTest {
+    @ParameterizedTest
+    @EnumSource(value = PlatformAdminRole::class, names = ["OWNER", "OPERATOR"])
+    fun `owner and operator can preview replay`(role: PlatformAdminRole) {
+        val replayPort = ReplayPortFake()
+
+        service(replayPort).preview(admin(role), previewRequest())
+
+        assertThat(replayPort.previewInserts.single().actorPlatformRole).isEqualTo(role.name)
+    }
+
+    @Test
+    fun `support cannot preview or confirm replay before persistence`() {
+        val previewPort = ReplayPortFake()
+        assertThatThrownBy { service(previewPort).preview(admin(PlatformAdminRole.SUPPORT), previewRequest()) }
+            .isInstanceOf(AccessDeniedException::class.java)
+        assertThat(previewPort.requestedLimit).isNull()
+        assertThat(previewPort.previewInserts).isEmpty()
+
+        val confirmPort = ReplayPortFake(preview = openV2Preview())
+        assertThatThrownBy { service(confirmPort).confirm(admin(PlatformAdminRole.SUPPORT), confirmCommand()) }
+            .isInstanceOf(AccessDeniedException::class.java)
+        assertThat(confirmPort.calls).isEmpty()
+    }
+
     @Test
     fun `preview persists exact v2 targets scope role and bounded warnings`() {
         val target = replayTarget()
@@ -51,7 +71,7 @@ class AdminNotificationReplayServiceTest {
         val service = service(replayPort)
 
         val preview =
-            service.previewReplay(
+            service.preview(
                 admin(PlatformAdminRole.OPERATOR),
                 com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest(
                     AdminNotificationFilter(clubId = CLUB_ID),
@@ -79,7 +99,7 @@ class AdminNotificationReplayServiceTest {
             )
 
         assertThatThrownBy {
-            service(replayPort, AdminNotificationReplayProperties(maxTargets = 2)).previewReplay(
+            service(replayPort, AdminNotificationReplayProperties(maxTargets = 2)).preview(
                 admin(PlatformAdminRole.OWNER),
                 com.readmates.notification.application.model
                     .AdminNotificationReplayPreviewRequest(AdminNotificationFilter()),
@@ -97,7 +117,7 @@ class AdminNotificationReplayServiceTest {
         replayPort.onLock = { assertThat(clock.readCount).isZero() }
         val auditPort = ReplayAuditFake()
 
-        val result = service(replayPort, clock = clock, auditPort = auditPort).confirmReplay(admin(), confirmCommand())
+        val result = service(replayPort, clock = clock, auditPort = auditPort).confirm(admin(), confirmCommand())
 
         assertThat(clock.readCount).isEqualTo(1)
         assertThat(result.replayedCount).isEqualTo(1)
@@ -108,6 +128,72 @@ class AdminNotificationReplayServiceTest {
         assertThat(replayPort.confirmationInsert?.platformAuditEventId).isEqualTo(AUDIT_ID)
         assertThat(replayPort.confirmationInsert?.confirmedAt).isEqualTo(CONFIRMED_AT)
         assertThat(replayPort.consumedAt).isEqualTo(CONFIRMED_AT)
+    }
+
+    @Test
+    fun `confirm trims reason before writing audit metadata`() {
+        val replayPort = ReplayPortFake(preview = openV2Preview(), replayedCount = 1)
+        val auditPort = ReplayAuditFake()
+
+        service(replayPort, auditPort = auditPort).confirm(
+            admin(),
+            confirmCommand(reason = "  Retry after provider recovery  "),
+        )
+
+        assertThat(auditPort.reason).isEqualTo("Retry after provider recovery")
+    }
+
+    @Test
+    fun `confirm rejects blank reason before locking preview`() {
+        val replayPort = ReplayPortFake(preview = openV2Preview())
+
+        assertThatThrownBy { service(replayPort).confirm(admin(), confirmCommand(reason = "  ")) }
+            .isInstanceOfSatisfying(NotificationApplicationException::class.java) {
+                assertThat(it.error).isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED)
+            }
+
+        assertThat(replayPort.calls).isEmpty()
+    }
+
+    @Test
+    fun `confirm rejects reasons above code point and UTF-8 bounds before locking preview`() {
+        listOf("a".repeat(501), "🙂".repeat(251)).forEach { reason ->
+            val replayPort = ReplayPortFake(preview = openV2Preview())
+
+            assertThatThrownBy { service(replayPort).confirm(admin(), confirmCommand(reason = reason)) }
+                .isInstanceOfSatisfying(NotificationApplicationException::class.java) {
+                    assertThat(it.error)
+                        .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_TOO_LONG)
+                }
+
+            assertThat(replayPort.calls).isEmpty()
+        }
+    }
+
+    @Test
+    fun `confirm accepts exact code point and UTF-8 reason bounds`() {
+        listOf("a".repeat(500), "🙂".repeat(250)).forEach { reason ->
+            val replayPort = ReplayPortFake(preview = openV2Preview())
+
+            service(replayPort).confirm(admin(), confirmCommand(reason = reason))
+
+            assertThat(replayPort.calls).containsExactly("lock", "receipt", "replay", "confirmation", "consume")
+        }
+    }
+
+    @Test
+    fun `consume conflict is reported after replay audit and receipt attempt`() {
+        val replayPort = ReplayPortFake(preview = openV2Preview(), consumeResult = false)
+        val auditPort = ReplayAuditFake()
+
+        assertThatThrownBy { service(replayPort, auditPort = auditPort).confirm(admin(), confirmCommand()) }
+            .isInstanceOfSatisfying(NotificationApplicationException::class.java) {
+                assertThat(it.error)
+                    .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_CONFIRMATION_CONFLICT)
+            }
+
+        assertThat(replayPort.calls).containsExactly("lock", "receipt", "replay", "confirmation", "consume")
+        assertThat(auditPort.calls).isEqualTo(1)
     }
 
     @Test
@@ -123,7 +209,7 @@ class AdminNotificationReplayServiceTest {
             )
         val auditPort = ReplayAuditFake()
 
-        val result = service(replayPort, auditPort = auditPort).confirmReplay(admin(), confirmCommand())
+        val result = service(replayPort, auditPort = auditPort).confirm(admin(), confirmCommand())
 
         assertThat(result.replayedCount).isEqualTo(1)
         assertThat(result.skippedCount).isEqualTo(1)
@@ -132,11 +218,30 @@ class AdminNotificationReplayServiceTest {
     }
 
     @Test
+    fun `expired open preview is rejected before replay mutation`() {
+        val replayPort =
+            ReplayPortFake(
+                preview = openV2Preview(expiresAt = CONFIRMED_AT),
+            )
+        val auditPort = ReplayAuditFake()
+
+        assertThatThrownBy { service(replayPort, auditPort = auditPort).confirm(admin(), confirmCommand()) }
+            .isInstanceOfSatisfying(NotificationApplicationException::class.java) {
+                assertThat(it.error)
+                    .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED)
+            }
+
+        assertThat(replayPort.calls).containsExactly("lock", "receipt")
+        assertThat(replayPort.replayedAt).isNull()
+        assertThat(auditPort.calls).isZero()
+    }
+
+    @Test
     fun `legacy open and consumed previews require a new preview without receipt lookup or mutation`() {
         listOf(null, CONFIRMED_AT.minusMinutes(1)).forEach { consumedAt ->
             val replayPort = ReplayPortFake(preview = openV2Preview(contractVersion = 1, consumedAt = consumedAt))
 
-            assertThatThrownBy { service(replayPort).confirmReplay(admin(), confirmCommand()) }
+            assertThatThrownBy { service(replayPort).confirm(admin(), confirmCommand()) }
                 .isInstanceOfSatisfying(NotificationApplicationException::class.java) {
                     assertThat(it.error).isEqualTo(
                         NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REPREVIEW_REQUIRED,
@@ -156,7 +261,7 @@ class AdminNotificationReplayServiceTest {
             )
         mismatches.forEach { (admin, command) ->
             val replayPort = ReplayPortFake(preview = openV2Preview(), confirmation = confirmation())
-            assertThatThrownBy { service(replayPort).confirmReplay(admin, command) }
+            assertThatThrownBy { service(replayPort).confirm(admin, command) }
                 .isInstanceOfAny(AccessDeniedException::class.java, NotificationApplicationException::class.java)
             assertThat(replayPort.calls).containsExactly("lock")
         }
@@ -173,7 +278,7 @@ class AdminNotificationReplayServiceTest {
         val auditPort = ReplayAuditFake()
 
         assertThatThrownBy {
-            service(replayPort, auditPort = auditPort).confirmReplay(admin(), confirmCommand())
+            service(replayPort, auditPort = auditPort).confirm(admin(), confirmCommand())
         }.isInstanceOf(AccessDeniedException::class.java)
 
         assertThat(replayPort.calls).containsExactly("lock", "receipt")
@@ -188,28 +293,13 @@ class AdminNotificationReplayServiceTest {
         properties: AdminNotificationReplayProperties = AdminNotificationReplayProperties(),
         clock: Clock = Clock.fixed(CONFIRMED_AT.toInstant(), ZoneOffset.UTC),
         auditPort: AdminNotificationAuditPort = ReplayAuditFake(),
-    ) = AdminNotificationOperationsService(
-        readPort = ReplayEmptyReadPort,
+    ) = AdminNotificationReplayService(
         replayPort = replayPort,
         auditPort = auditPort,
         jsonCodec = ReplayJson,
         replayProperties = properties,
         clock = clock,
     )
-}
-
-private object ReplayEmptyReadPort : AdminNotificationOperationsReadPort {
-    override fun snapshot(): AdminNotificationOperationsSnapshot = error("not used")
-
-    override fun listEvents(
-        filter: AdminNotificationFilter,
-        pageRequest: PageRequest,
-    ): CursorPage<AdminNotificationOutboxEvent> = CursorPage(emptyList(), null)
-
-    override fun listDeliveries(
-        filter: AdminNotificationFilter,
-        pageRequest: PageRequest,
-    ): CursorPage<AdminNotificationDelivery> = CursorPage(emptyList(), null)
 }
 
 private object ReplayJson : AdminNotificationJsonCodec {
@@ -222,7 +312,7 @@ private object ReplayJson : AdminNotificationJsonCodec {
         reason: String,
         replayedCount: Int,
         skippedCount: Int,
-    ): String = "{\"previewId\":\"$previewId\"}"
+    ): String = "{\"previewId\":\"$previewId\",\"reason\":\"$reason\"}"
 }
 
 private class ReplayPortFake(
@@ -231,6 +321,7 @@ private class ReplayPortFake(
     private val preview: AdminNotificationReplayPreviewRecord? = null,
     private val confirmation: AdminNotificationReplayConfirmation? = null,
     private val replayedCount: Int = 0,
+    private val consumeResult: Boolean = true,
 ) : AdminNotificationReplayPort {
     var requestedLimit: Int? = null
     var onLock: () -> Unit = {}
@@ -286,13 +377,14 @@ private class ReplayPortFake(
     ): Boolean {
         calls += "consume"
         this.consumedAt = consumedAt
-        return true
+        return consumeResult
     }
 }
 
 private class ReplayAuditFake : AdminNotificationAuditPort {
     var calls = 0
     var createdAt: OffsetDateTime? = null
+    var reason: String? = null
 
     override fun writeReplayConfirmed(
         actorUserId: UUID,
@@ -302,6 +394,7 @@ private class ReplayAuditFake : AdminNotificationAuditPort {
     ): UUID {
         calls += 1
         this.createdAt = createdAt
+        reason = Regex("\"reason\":\"([^\"]+)\"").find(metadataJson)?.groupValues?.get(1)
         return AUDIT_ID
     }
 }
@@ -351,8 +444,12 @@ private fun admin(
     userId: UUID = ADMIN_USER_ID,
 ) = CurrentPlatformAdmin(userId, "admin@example.com", role)
 
-private fun confirmCommand(selectionHash: String = SELECTION_HASH) =
-    AdminNotificationReplayConfirmCommand(PREVIEW_ID, selectionHash, "Retry failed deliveries")
+private fun previewRequest() = AdminNotificationReplayPreviewRequest(AdminNotificationFilter())
+
+private fun confirmCommand(
+    selectionHash: String = SELECTION_HASH,
+    reason: String = "Retry failed deliveries",
+) = AdminNotificationReplayConfirmCommand(PREVIEW_ID, selectionHash, reason)
 
 enum class ReplayReceiptIdentityMutation {
     ACTOR,

@@ -268,11 +268,83 @@ private fun isAllowedManualNotificationPersistenceImport(importName: String): Bo
         importName == "tools.jackson.databind.ObjectMapper" ||
         importName.startsWith("java.")
 
+private fun assertAdminNotificationReplayBoundaries() {
+    val notificationRoot =
+        architectureProjectRoot().resolve("server/src/main/kotlin/com/readmates/notification")
+    val serviceRoot = notificationRoot.resolve("application/service")
+    val operationsSource = serviceRoot.resolve("AdminNotificationOperationsService.kt").readText()
+    val replayService = serviceRoot.resolve("AdminNotificationReplayService.kt")
+    val replayPolicy = serviceRoot.resolve("AdminNotificationReplayPolicy.kt")
+    val codecPort = notificationRoot.resolve("application/port/out/AdminNotificationJsonCodec.kt")
+    val jacksonCodec = notificationRoot.resolve("adapter/out/codec/JacksonAdminNotificationJsonCodec.kt")
+    val jacksonServiceImports = jacksonImportsIn(serviceRoot)
+
+    assertAll(
+        {
+            assertTrue(
+                Files.exists(replayService),
+                "AdminNotificationReplayService must own replay transactions",
+            )
+        },
+        { assertTrue(Files.exists(replayPolicy), "AdminNotificationReplayPolicy must own replay policy") },
+        { assertTrue(Files.exists(codecPort), "AdminNotificationJsonCodec must be an output port") },
+        { assertTrue(Files.exists(jacksonCodec), "Jackson replay JSON must live in an output adapter") },
+        {
+            assertTrue(
+                jacksonServiceImports.isEmpty(),
+                "Application services must not import Jackson: $jacksonServiceImports",
+            )
+        },
+        {
+            assertFalse(
+                "Transactional" in operationsSource,
+                "Admin notification read facade must not own transactions",
+            )
+        },
+        {
+            if (Files.exists(replayService)) {
+                val transactionAnnotations =
+                    Regex("""@Transactional\(rollbackFor = \[Exception::class\]\)""")
+                        .findAll(replayService.readText())
+                        .count()
+                assertEquals(2, transactionAnnotations, "Replay service must own both outer transactions")
+            }
+        },
+        {
+            if (Files.exists(replayPolicy)) {
+                val forbiddenImports =
+                    replayPolicy
+                        .readLines()
+                        .map(String::trim)
+                        .filter { line ->
+                            line.startsWith("import ") &&
+                                listOf("org.springframework", "JdbcTemplate", "jackson")
+                                    .any { forbidden -> forbidden in line.lowercase() || forbidden in line }
+                        }
+                assertTrue(forbiddenImports.isEmpty(), "Replay policy must stay Spring, JDBC, and Jackson free")
+            }
+        },
+    )
+}
+
+private fun jacksonImportsIn(serviceRoot: Path): List<String> =
+    Files.walk(serviceRoot).use { paths ->
+        paths
+            .filter { path -> path.name.endsWith(".kt") }
+            .flatMap { path ->
+                path
+                    .readLines()
+                    .filter { line -> line.trim().startsWith("import ") && "jackson" in line.lowercase() }
+                    .map { line -> "${path.name}: ${line.trim()}" }
+                    .stream()
+            }.toList()
+    }
+
 @Tag("architecture")
 class ServerArchitectureBoundaryTest {
     @Test
-    fun `manual notification persistence facade owns no sql and collaborators stay outbound only`() =
-        assertManualNotificationPersistenceOwnership()
+    fun `notification decomposition boundaries remain focused`() =
+        assertAll({ assertManualNotificationPersistenceOwnership() }, { assertAdminNotificationReplayBoundaries() })
 
     @Test
     fun `admin operations is registered as workflow slice`() {

@@ -367,7 +367,6 @@
     <ID>ReturnCount:OAuthReturnState.kt:OAuthReturnState$private fun verifiedReturnTarget: String?</ID>
     <ID>ReturnCount:RateLimitFilter.kt:RateLimitFilter$private fun HttpServletRequest.trustedClientIp: String?</ID>
     <ID>ReturnCount:RedisAuthSessionCacheAdapter.kt:RedisAuthSessionCacheAdapter$override fun find: AuthSessionCacheSnapshot?</ID>
-    <ID>ThrowsCount:AdminNotificationOperationsService.kt:AdminNotificationOperationsService$override fun confirmReplay: AdminNotificationReplayConfirmResult</ID>
     <ID>ThrowsCount:AiGenerationCommitService.kt:AiGenerationCommitService$@Suppress("LongMethod", "SwallowedException") override fun commit: SessionImportCommitResult</ID>
     <ID>ThrowsCount:AiGenerationJobProducer.kt:AiGenerationJobProducer$@Suppress("TooGenericExceptionCaught") override fun publish</ID>
     <ID>ThrowsCount:AiGenerationOpsService.kt:AiGenerationOpsService$override fun forceCancel: AiOpsAdminActionResult</ID>

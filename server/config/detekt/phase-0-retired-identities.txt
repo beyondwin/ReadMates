@@ -20,3 +20,4 @@ MagicNumber:HostSessionWriteOperations.kt:HostSessionWriteOperations.<no name pr
 MagicNumber:HostSessionWriteOperations.kt:HostSessionWriteOperations.<no name provided>$4
 ThrowsCount:HostSessionWriteOperations.kt:HostSessionWriteOperations$fun open: HostSessionTransitionResult
 TooManyFunctions:HostSessionWriteOperations.kt:HostSessionWriteOperations
+ThrowsCount:AdminNotificationOperationsService.kt:AdminNotificationOperationsService$override fun confirmReplay: AdminNotificationReplayConfirmResult
