@@ -1477,6 +1477,35 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `concurrent same club draft creates receive unique contiguous session numbers`() {
+        withDelayedSessionInsert {
+            val statuses =
+                runConcurrently(workerCount = 2) {
+                    val suffix = if (Thread.currentThread().name.endsWith("1")) "A" else "B"
+                    mockMvc
+                        .post("/api/host/sessions") {
+                            with(user("host@example.com"))
+                            with(csrf())
+                            contentType = MediaType.APPLICATION_JSON
+                            content =
+                                """
+                                {
+                                  "title": "동시 생성 $suffix",
+                                  "bookTitle": "동시 생성 책 $suffix",
+                                  "bookAuthor": "테스트 저자",
+                                  "date": "2026-07-15"
+                                }
+                                """.trimIndent()
+                        }.andReturn()
+                        .response.status
+                }
+
+            assertThat(statuses).containsExactlyInAnyOrder(201, 201)
+            assertThat(generatedSessionNumbers()).containsExactly(7, 8)
+        }
+    }
+
+    @Test
     fun `member cannot create host session`() {
         mockMvc
             .post("/api/host/sessions") {
@@ -2072,6 +2101,34 @@ class HostSessionControllerDbTest(
             executor.shutdownNow()
         }
     }
+
+    private fun withDelayedSessionInsert(assertions: () -> Unit) {
+        jdbcTemplate.execute(
+            """
+            create trigger host_session_draft_concurrency_delay
+            before insert on sessions
+            for each row set @readmates_test_sleep = sleep(1)
+            """.trimIndent(),
+        )
+        try {
+            assertions()
+        } finally {
+            jdbcTemplate.execute("drop trigger if exists host_session_draft_concurrency_delay")
+        }
+    }
+
+    private fun generatedSessionNumbers(): List<Int> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select number
+                from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and number >= 7
+                order by number
+                """.trimIndent(),
+                Int::class.java,
+            ).map(::requireNotNull)
 
     private fun createDraftSession(
         title: String,
