@@ -47,7 +47,7 @@
 | After Task 2 | 1 | 38 | 40 | 1 | unchanged |
 | After Task 3 | 0 | 39 | 40 | 1 | unchanged |
 | After Task 4 | 0 | 39 | 39 | 2 | `session,sessionrecord` |
-| After Task 5 | 0 | 39 | 38 | 3 | none |
+| After Task 5 | 0 | 39 | 37 | 4 | none |
 
 The only new feature tombstones are `sessionrecord|sessionimport` in Task 4 plus `sessionrecord|session` and `aigen|session` in Task 5. The `aigen|session` edge exists at the Task 5 base only because the three AI production consumers import the session-owned `SessionRecordVisibility`; the required move to record ownership removes all three imports, so retaining that edge would require an artificial dependency. The existing `club|auth` tombstone remains untouched.
 
@@ -406,7 +406,7 @@ sealed interface SessionRecordContentReplacementResult {
   ```
 
   Do not run frontend E2E: no frontend/BFF/auth route or public JSON contract changes are authorized, and focused controller plus full server integration cover the changed risk. If a diff includes frontend/BFF or changes a public contract, remove that diff; do not expand this plan. Do not run a live provider or email test.
-- [ ] **Step 4: Run exact partition and no-substitution audit.** Use a read-only script to compare current/retired sets against the plan-base files and fail unless boundary additions are empty, boundary removals are exactly the four named identities with identical retired additions, feature additions are empty, and feature removals/retired additions are exactly the two reverse rows. Verify line counts ignoring comments/blanks: boundary `0/39/39`, feature `38/3/41`. Verify current contains `session|sessionrecord` and `sessionimport|sessionrecord`, retired contains both reverse rows, and no other plan-base current feature moved.
+- [ ] **Step 4: Run exact partition and no-substitution audit.** Use a read-only script to compare current/retired sets against the plan-base files and fail unless boundary additions are empty, boundary removals are exactly the four named identities with identical retired additions, feature additions are empty, and feature removals/retired additions are exactly the two reverse rows plus ownership-derived `aigen|session`. Verify line counts ignoring comments/blanks: boundary `0/39/39`, feature `37/4/41`. Verify current contains `session|sessionrecord` and `sessionimport|sessionrecord`, retired contains both reverse rows and `aigen|session`, and no other plan-base current feature moved.
 - [ ] **Step 5: Run source escape scans.** Require no production matches for:
 
   ```text
@@ -418,7 +418,7 @@ sealed interface SessionRecordContentReplacementResult {
   ```
 
   Exclude comments and string fixtures only through the existing Kotlin-aware scanner; do not rely on raw grep as the load-bearing detector.
-- [ ] **Step 6: Perform independent final review.** Require explicit verdicts for: (1) spec/scope coverage, (2) REST/JSON/error/cursor compatibility, (3) transaction/revision/notification/cache semantics, (4) codec/sort/import/exposure behavior, (5) exact ledger arithmetic/no third edge/zero cycles, and (6) public safety/test evidence. Resolve every Critical/Important finding in its originating task with its exact correction subject and rerun that task plus affected final gates.
+- [ ] **Step 6: Perform independent final review.** Require explicit verdicts for: (1) spec/scope coverage, (2) REST/JSON/error/cursor compatibility, (3) transaction/revision/notification/cache semantics, (4) codec/sort/import/exposure behavior, (5) exact ledger arithmetic/no fourth edge/zero cycles, and (6) public safety/test evidence. Resolve every Critical/Important finding in its originating task with its exact correction subject and rerun that task plus affected final gates.
 - [ ] **Step 7: Write the ignored final report.** Include bases/SHAs, exact changed inventory, task and correction commits, four boundary/three new feature tombstones, preserved forward edges, cycle output, mutation failures/restorations, focused and full test counts, public-candidate result, review verdicts, skipped E2E/live reasons, and remaining out-of-scope large-class/final-closeout work. Never stage the report.
 - [ ] **Step 8: Review, stage, and commit docs.** Stage only the three tracked docs and commit:
 
