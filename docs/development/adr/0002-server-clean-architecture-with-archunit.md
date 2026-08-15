@@ -96,6 +96,8 @@ ArchUnit으로 다음 경계를 컴파일 타임에 강제한다(`ServerArchitec
 
 8. **Auth–club feature 방향**: membership/access policy는 club이 소유하고 `auth -> club` 방향만 유지한다. Club이 invitation-token output port를 소유하고 auth가 구현해 `club -> auth` 역방향 application dependency를 제거한다.
 
+9. **Session-family ownership과 feature 방향**: sessionclosing inbound web은 자체 UUID parsing을 소유하고, sessionimport inbound web은 application-owned failure만 사용하며, sessionrecord outbound adapter는 sessionrecord concrete application service 대신 application model/output port에 의존한다. Session-record application은 자신이 소유한 replacement port를 호출하고 sessionimport가 구현하므로 application feature dependency `sessionrecord -> sessionimport` 역방향을 만들지 않는다. Visibility와 history cursor failure를 sessionrecord가 소유해 application feature dependency ledger의 `sessionrecord -> session`과 ownership-derived `aigen -> session`도 제거한다. `sessionimport -> sessionrecord`와 `session -> sessionrecord` application 순방향은 유지한다.
+
 JPA/Hibernate를 사용하지 않는다. 현재 backend는 `JdbcTemplate` 직접 사용 방식을 채택했다. SQL이 source of truth이고 schema는 Flyway migration 파일로 관리된다.
 
 ## 근거
@@ -166,10 +168,11 @@ ArchUnit은 test scope 의존성이다. production 빌드에 영향을 주지 �
 - `com.readmates.shared.adapter.in.web`은 Phase 0의 공통 web-error contract로 유지한다. `server/config/architecture/boundary-import-baseline.txt`와 `feature-dependency-baseline.txt`는 승인된 목표 architecture가 아니라 제거 가능한 기존 debt inventory다. Debt 제거는 (1) source debt 제거, (2) 같은 변경에서 matching current baseline row 삭제, (3) 그 exact identity를 matching retired ledger에 추가하는 순서로 수행한다. Retired identity는 삭제하지 않고 approved seed는 늘리지 않는다.
 - 2026-08-10 application-port update: messaging/Kafka와 scheduling inbound adapter는 application input port만 호출하고, adapter-facing queue/provider/delivery failure·routing·availability 모델은 application이 소유한다. outbound Redis/resilience adapter는 concrete application service 대신 output port와 application model을 사용한다. Notification consumer factory/error handler/DLT/listener-container wiring은 inbound Kafka configuration의 책임이고 producer configuration과 분리된다.
 - 2026-08-13 actor/auth–club update: capability actor의 순수성과 principal coexistence, auth-owned club-context helper, auth servlet-security/OAuth input-port 주입, `club -> auth` 제거를 architecture/source inventory가 강제한다. Boundary ledger는 `4 current + 35 retired = 39 approved`, feature ledger는 `40 current + 1 retired = 41 approved`이며 `auth|club`은 승인된 순방향으로 남는다.
+- 2026-08-15 session-family update: sessionclosing parsing과 sessionimport failure를 inbound/application ownership으로 옮기고, history sort와 visibility/history cursor를 sessionrecord model이 소유한다. Snapshot codec은 sessionrecord output port와 Jackson outbound adapter로 분리하고, record-owned replacement port를 sessionimport가 구현한다. Boundary ledger는 `0 current + 39 retired = 39 approved`, feature ledger는 `37 current + 4 retired = 41 approved`이며 `sessionrecord|sessionimport`, `sessionrecord|session`, `aigen|session`을 새 tombstone으로 보존한다. `sessionimport|sessionrecord`, `session|sessionrecord`는 순방향으로 남고 cyclic feature component는 0개다. 바깥 apply transaction, revision/notification/cache 의미와 REST/JSON/error/cursor 계약은 유지한다.
 
 부정적/감수한 비용:
 - 작은 feature에도 5계층 구조가 강제된다. 보일러플레이트 파일 수가 많아진다. IDE template으로 초기 파일 생성을 자동화해 단축하고 있다.
-- legacy surface와 신규 clean architecture surface가 공존한다. Phase 0 registry와 두 no-growth inventory는 현재 inbound package와 기존 경계·기능 의존 debt를 빠짐없이 고정한다. Actor/auth–club 전환 뒤에도 `sessionclosing` 1개, `sessionimport` 1개, `sessionrecord` 2개의 boundary row와 `session`/`sessionimport`/`sessionrecord` cyclic component가 남는다. Current boundary ledger는 4개이며 이는 전체 Phase 2 완료나 baseline zero가 아니다.
+- legacy surface와 신규 clean architecture surface가 공존한다. Phase 0 registry와 두 no-growth inventory는 현재 inbound package와 기존 경계·기능 의존 debt를 빠짐없이 고정한다. Session-family 전환 뒤 current boundary ledger와 cyclic feature component는 0개지만, large-class decomposition과 최종 Phase 2 프로그램 closeout은 별도 후속 범위다. 따라서 이 수치만으로 전체 Phase 2 완료를 선언하지 않는다.
 - cross-feature 공유 추상화의 위치(`shared/` 패키지)에 대한 규칙이 아직 명확하지 않다. 현재는 관례로 운영 중이며 별도 ADR이 필요할 수 있다.
 - ArchUnit 버전 업그레이드 시 기존 규칙과의 호환성을 확인해야 한다.
 - `JdbcTemplate` 직접 사용으로 복잡한 쿼리를 직접 작성해야 한다. 빌드 타임 타입 안전성이 없다 (jOOQ 도입은 후속 ADR 후보).
@@ -198,7 +201,7 @@ legacy surface 확인:
 
 ## 후속 작업
 
-- 후속 session ownership/cycle 계획에서 `sessionrecord|sessionimport`, `sessionrecord|session` 두 reverse feature edge와 `sessionclosing` 1개, `sessionimport` 1개, `sessionrecord` 2개의 boundary row를 각각 source 제거와 exact ledger retirement로 처리한다. Actor carrier 삭제나 large-class decomposition은 별도 zero-consumer/behavior-preservation 증거가 있는 계획에서 다룬다.
+- Actor carrier 삭제나 large-class decomposition, 최종 Phase 2 프로그램 closeout은 별도 zero-consumer/behavior-preservation 증거가 있는 계획에서 다룬다.
 - cross-feature 공유 추상화(`shared/` 패키지)의 import 방향 규칙 명문화. 현재 관례로 운영 중.
 - legacy surface의 clean architecture 전환 완료 기준 및 일정 문서화. 미전환 surface 목록 관리.
 - Gradle multi-module 전환 검토 시점 기준 정의 (feature 수, 팀 규모 임계값).
