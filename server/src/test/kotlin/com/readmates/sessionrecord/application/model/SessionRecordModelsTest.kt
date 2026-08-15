@@ -5,6 +5,14 @@ import org.junit.jupiter.api.Test
 
 class SessionRecordModelsTest {
     @Test
+    fun `record visibility preserves the exact public enum contract`() {
+        assertEquals(
+            listOf("HOST_ONLY", "MEMBER", "PUBLIC"),
+            SessionRecordVisibility.entries.map { it.name },
+        )
+    }
+
+    @Test
     fun `history types expose the exact cross-source sort policy`() {
         assertEquals(
             mapOf(

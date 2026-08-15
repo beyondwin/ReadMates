@@ -2,7 +2,7 @@
 
 package com.readmates.sessionrecord.adapter.`in`.web
 
-import com.readmates.session.application.InvalidHostSessionCursorException
+import com.readmates.sessionrecord.application.model.InvalidHostSessionHistoryCursorException
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
@@ -111,7 +111,7 @@ private fun requireValidHistoryCursor(cursor: String?): String? {
     try {
         CursorCodec.decodeStrict(cursor)
     } catch (_: IllegalArgumentException) {
-        throw InvalidHostSessionCursorException()
+        throw InvalidHostSessionHistoryCursorException()
     }
     return cursor
 }

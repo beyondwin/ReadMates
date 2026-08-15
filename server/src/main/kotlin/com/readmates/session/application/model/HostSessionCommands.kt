@@ -1,8 +1,8 @@
 package com.readmates.session.application.model
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 

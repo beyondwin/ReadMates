@@ -7,7 +7,6 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
@@ -17,6 +16,7 @@ import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.slf4j.LoggerFactory

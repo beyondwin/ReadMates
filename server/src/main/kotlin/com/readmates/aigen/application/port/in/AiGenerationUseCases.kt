@@ -11,7 +11,7 @@ import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
-import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import java.math.BigDecimal
 import java.time.Instant
 import java.util.UUID

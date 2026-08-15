@@ -2,7 +2,6 @@ package com.readmates.sessionrecord.application.model
 
 import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.session.application.SessionRecordVisibility
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -213,6 +212,8 @@ class SessionRecordException(
     val error: SessionRecordError,
     message: String,
 ) : RuntimeException(message)
+
+class InvalidHostSessionHistoryCursorException : RuntimeException("Invalid host session history cursor")
 
 private const val BASIC_INFO_SORT = 10
 private const val ATTENDANCE_SORT = 20

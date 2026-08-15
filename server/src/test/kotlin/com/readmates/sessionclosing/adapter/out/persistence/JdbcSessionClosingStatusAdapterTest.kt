@@ -1,8 +1,8 @@
 package com.readmates.sessionclosing.adapter.out.persistence
 
 import com.readmates.auth.domain.MembershipRole
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionclosing.application.model.FeedbackDocumentClosingState
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat

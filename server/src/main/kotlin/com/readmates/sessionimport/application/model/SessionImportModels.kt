@@ -1,6 +1,6 @@
 package com.readmates.sessionimport.application.model
 
-import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.AuthenticatedClubActor
 import java.time.LocalDate
 import java.util.UUID

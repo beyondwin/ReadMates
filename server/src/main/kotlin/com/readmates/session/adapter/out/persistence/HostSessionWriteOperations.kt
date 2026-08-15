@@ -14,7 +14,6 @@ import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -26,6 +25,7 @@ import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionExposure
 import com.readmates.session.domain.toCompatibility
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
 import com.readmates.shared.db.toUtcOffsetDateTime

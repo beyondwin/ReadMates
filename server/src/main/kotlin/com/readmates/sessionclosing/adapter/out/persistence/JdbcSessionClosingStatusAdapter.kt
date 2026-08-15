@@ -1,6 +1,5 @@
 package com.readmates.sessionclosing.adapter.out.persistence
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionExposure
@@ -10,6 +9,7 @@ import com.readmates.sessionclosing.application.model.NotificationClosingEvent
 import com.readmates.sessionclosing.application.model.NotificationClosingStatus
 import com.readmates.sessionclosing.application.model.SessionClosingSnapshot
 import com.readmates.sessionclosing.application.port.out.LoadSessionClosingStatusPort
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.security.CurrentMember

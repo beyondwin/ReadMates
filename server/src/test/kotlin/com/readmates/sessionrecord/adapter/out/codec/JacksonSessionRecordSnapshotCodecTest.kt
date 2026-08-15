@@ -1,9 +1,9 @@
 package com.readmates.sessionrecord.adapter.out.codec
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.SessionRecordEntry
 import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.Sha256
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy

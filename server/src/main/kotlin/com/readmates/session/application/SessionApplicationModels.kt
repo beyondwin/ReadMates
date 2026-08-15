@@ -5,6 +5,7 @@ import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -153,12 +154,6 @@ data class HostSessionFeedbackDocument(
     val fileName: String?,
     val uploadedAt: String?,
 )
-
-enum class SessionRecordVisibility {
-    HOST_ONLY,
-    MEMBER,
-    PUBLIC,
-}
 
 data class HostSessionListItem(
     val sessionId: String,

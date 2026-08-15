@@ -6,7 +6,6 @@ import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.HostSessionHistoryAttendanceTransition
@@ -25,6 +24,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocument
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.paging.CursorPage
 import jakarta.validation.Valid
 import jakarta.validation.constraints.Positive

@@ -4,6 +4,7 @@ package com.readmates.sessionrecord.adapter.`in`.web
 
 import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
+import com.readmates.sessionrecord.application.model.InvalidHostSessionHistoryCursorException
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
@@ -15,6 +16,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class SessionRecordErrorHandler {
+    @ExceptionHandler(InvalidHostSessionHistoryCursorException::class)
+    fun handleInvalidHistoryCursor(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "INVALID_CURSOR",
+            message = "커서가 현재 검색 조건과 일치하지 않습니다.",
+        )
+
     @ExceptionHandler(SessionRecordException::class)
     fun handleSessionRecord(error: SessionRecordException): ResponseEntity<ApiErrorResponse> =
         when (error.error) {

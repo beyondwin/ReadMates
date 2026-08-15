@@ -5,7 +5,6 @@ import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionclosing.application.model.ClosingChecklistId
 import com.readmates.sessionclosing.application.model.ClosingChecklistItem
 import com.readmates.sessionclosing.application.model.ClosingChecklistState
@@ -17,6 +16,7 @@ import com.readmates.sessionclosing.application.model.ClosingSessionSummary
 import com.readmates.sessionclosing.application.model.FeedbackDocumentClosingState
 import com.readmates.sessionclosing.application.model.HostSessionClosingStatus
 import com.readmates.sessionclosing.application.port.`in`.GetHostSessionClosingStatusUseCase
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.junit.jupiter.api.Assertions.assertEquals

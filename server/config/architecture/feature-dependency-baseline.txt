@@ -8,7 +8,6 @@ admin.operations|shared
 aigen|club
 aigen|feedback
 aigen|notification
-aigen|session
 aigen|sessionimport
 aigen|sessionrecord
 aigen|shared
@@ -36,5 +35,4 @@ sessionimport|session
 sessionimport|sessionrecord
 sessionimport|shared
 sessionrecord|notification
-sessionrecord|session
 sessionrecord|shared

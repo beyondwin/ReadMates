@@ -2,7 +2,6 @@ package com.readmates.sessionrecord.adapter.out.persistence
 
 import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionExposure
@@ -21,6 +20,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocume
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordSource
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.db.dbString

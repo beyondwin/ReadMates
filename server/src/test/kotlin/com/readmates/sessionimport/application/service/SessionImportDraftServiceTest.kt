@@ -1,7 +1,6 @@
 package com.readmates.sessionimport.application.service
 
 import com.readmates.auth.domain.MembershipRole
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportAttendee
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
@@ -26,6 +25,7 @@ import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftComma
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.application.port.`in`.ManageSessionRecordDraftUseCase
 import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement

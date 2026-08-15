@@ -6,7 +6,6 @@ import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionPublication
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
 import com.readmates.session.domain.PublicSiteVisibility
@@ -14,6 +13,7 @@ import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
 import java.sql.ResultSet

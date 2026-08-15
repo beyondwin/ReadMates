@@ -1135,41 +1135,48 @@ private fun assertSessionRecordApplicationImportBoundary() {
     assertSessionRecordApplicationDetectorFixtures()
     assertNoForbiddenKotlinImports(
         "com/readmates/sessionrecord/application",
-        "Session-record application must use its own ports and models instead of session-import contracts",
+        "Session-record application must use its own ports and models instead of session-family contracts",
         ::isForbiddenSessionRecordApplicationReference,
     )
 }
 
 private fun assertSessionRecordApplicationDetectorFixtures() {
-    val forbidden = "com.readmates.sessionimport.application.port.in.ReplaceValidatedSessionImportUseCase"
-    val importAlias = "import $forbidden as ImportReplacer"
-    val fullyQualified = "val direct = $forbidden::class"
-    val executableTemplate = "val template = \"${'$'}{$forbidden::class}\""
-    val decoys =
-        listOf(
-            "// $forbidden",
-            "/* $forbidden */",
-            "val quoted = \"$forbidden\"",
-            "val raw = $TRIPLE_QUOTE$forbidden$TRIPLE_QUOTE",
-        ).joinToString("\n")
+    listOf(
+        "com.readmates.sessionimport.application.port.in.ReplaceValidatedSessionImportUseCase",
+        "com.readmates.session.application.SessionRecordVisibility",
+    ).forEach { forbidden ->
+        val importAlias = "import $forbidden as ForbiddenDependency"
+        val fullyQualified = "val direct = $forbidden::class"
+        val executableTemplate = "val template = \"${'$'}{$forbidden::class}\""
+        val decoys =
+            listOf(
+                "// $forbidden",
+                "/* $forbidden */",
+                "val quoted = \"$forbidden\"",
+                "val raw = $TRIPLE_QUOTE$forbidden$TRIPLE_QUOTE",
+            ).joinToString("\n")
 
-    assertEquals(
-        3,
-        kotlinImportViolations(
-            listOf("fixture.kt" to listOf(importAlias, fullyQualified, executableTemplate).joinToString("\n")),
-            ::isForbiddenSessionRecordApplicationReference,
-        ).size,
-    )
-    assertTrue(
-        kotlinImportViolations(
-            listOf("fixture.kt" to decoys),
-            ::isForbiddenSessionRecordApplicationReference,
-        ).isEmpty(),
-    )
+        assertEquals(
+            3,
+            kotlinImportViolations(
+                listOf("fixture.kt" to listOf(importAlias, fullyQualified, executableTemplate).joinToString("\n")),
+                ::isForbiddenSessionRecordApplicationReference,
+            ).size,
+        )
+        assertTrue(
+            kotlinImportViolations(
+                listOf("fixture.kt" to decoys),
+                ::isForbiddenSessionRecordApplicationReference,
+            ).isEmpty(),
+        )
+    }
 }
 
 private fun isForbiddenSessionRecordApplicationReference(reference: String): Boolean =
-    reference.replace("`", "").startsWith("com.readmates.sessionimport.")
+    reference.replace("`", "").let { normalized ->
+        normalized.startsWith("com.readmates.sessionimport.") ||
+            normalized.startsWith("com.readmates.session.")
+    }
 
 private fun assertSessionRecordOutboundDetectorFixtures() {
     val serviceAlias =

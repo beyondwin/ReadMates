@@ -1,9 +1,9 @@
 package com.readmates.sessionrecord.application.service
 
-import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.sessionrecord.application.model.HostSessionHistoryCursor
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.HostSessionHistoryType
+import com.readmates.sessionrecord.application.model.InvalidHostSessionHistoryCursorException
 import com.readmates.sessionrecord.application.port.`in`.GetHostSessionHistoryUseCase
 import com.readmates.sessionrecord.application.port.out.HostSessionHistoryPort
 import com.readmates.shared.paging.CursorCodec
@@ -82,7 +82,7 @@ private fun Map<String, String>.toHistoryCursor(
     return HostSessionHistoryCursor(createdAt, typeSort, id)
 }
 
-private fun invalidCursor(): Nothing = throw InvalidHostSessionCursorException()
+private fun invalidCursor(): Nothing = throw InvalidHostSessionHistoryCursorException()
 
 private fun HostSessionHistoryItem.toHistoryCursor(
     clubId: UUID,

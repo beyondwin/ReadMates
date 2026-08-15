@@ -2,7 +2,6 @@ package com.readmates.sessionimport.application.service
 
 import com.readmates.feedback.application.FeedbackDocumentParser
 import com.readmates.session.application.HostSessionNotFoundException
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SESSION_IMPORT_FORMAT
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
@@ -21,6 +20,7 @@ import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUs
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
