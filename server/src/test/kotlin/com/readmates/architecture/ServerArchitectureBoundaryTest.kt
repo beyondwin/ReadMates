@@ -918,6 +918,109 @@ class ServerArchitectureBoundaryTest {
             }
 
         assertAll(assertions)
+        assertHostSessionWriteBoundaries()
+    }
+}
+
+class HostSessionWriteArchitectureTest {
+    @Test
+    fun `host session writes keep command query and policy boundaries`() {
+        assertHostSessionWriteBoundaries()
+    }
+}
+
+private val hostSessionCommandUnitNames =
+    listOf(
+        "HostSessionDraftWriteOperations.kt",
+        "HostSessionAttendanceWriteOperations.kt",
+        "HostSessionPublicationWriteOperations.kt",
+        "HostSessionLifecycleWriteOperations.kt",
+    )
+
+private val hostSessionSplitUnitNames =
+    hostSessionCommandUnitNames +
+        listOf(
+            "HostSessionWriteQueries.kt",
+            "HostSessionWritePolicy.kt",
+        )
+
+private fun hostSessionPersistenceRoot(): Path =
+    architectureProjectRoot().resolve("server/src/main/kotlin/com/readmates/session/adapter/out/persistence")
+
+private fun assertHostSessionWriteBoundaries() {
+    val persistenceRoot = hostSessionPersistenceRoot()
+    val missingUnits =
+        hostSessionSplitUnitNames.filterNot { fileName ->
+            Files.exists(persistenceRoot.resolve(fileName))
+        }
+    val combinedTypeName = listOf("HostSession", "WriteOperations").joinToString("")
+    val combinedFile = persistenceRoot.resolve("$combinedTypeName.kt")
+    assertAll(
+        { assertTrue(missingUnits.isEmpty(), "Missing focused host session write units: $missingUnits") },
+        { assertFalse(Files.exists(combinedFile), "$combinedTypeName must be deleted after all consumers move") },
+        { assertTrue(hostSessionPolicyImportViolations().isEmpty(), "Write policy must stay JDBC and Spring free") },
+        { assertTrue(hostSessionPolicyContractViolations().isEmpty(), "Write policy must keep its approved API") },
+        { assertTrue(hostSessionCommandReadViolations().isEmpty(), "Command units must not map read results") },
+        {
+            assertTrue(
+                hostSessionCombinedTypeConsumers(combinedTypeName).isEmpty(),
+                "$combinedTypeName still has consumers",
+            )
+        },
+        { assertTrue(hostSessionSuppressionViolations().isEmpty(), "Split units hide complexity with suppressions") },
+    )
+}
+
+private fun hostSessionPolicyImportViolations(): List<String> =
+    hostSessionPersistenceRoot()
+        .resolve("HostSessionWritePolicy.kt")
+        .readLines()
+        .filter { line ->
+            "org.springframework" in line || "JdbcTemplate" in line
+        }
+
+private fun hostSessionPolicyContractViolations(): List<String> {
+    val source = hostSessionPersistenceRoot().resolve("HostSessionWritePolicy.kt").readText()
+    return listOf(
+        "internal data class NormalizedHostSessionWrite(",
+        "internal object HostSessionWritePolicy {",
+        "fun normalizeCreate(request: HostSessionCommand): NormalizedHostSessionWrite",
+        "fun normalizeUpdate(",
+        "): NormalizedHostSessionWrite",
+    ).filterNot(source::contains)
+}
+
+private fun hostSessionCommandReadViolations(): List<String> =
+    hostSessionCommandUnitNames.flatMap { fileName ->
+        hostSessionPersistenceRoot()
+            .resolve(fileName)
+            .readLines()
+            .filter { line ->
+                listOf("ResultSet", "RowMapper", ".query(", ".queryForObject(").any(line::contains)
+            }.map { line -> "$fileName: ${line.trim()}" }
+    }
+
+private fun hostSessionCombinedTypeConsumers(combinedTypeName: String): List<String> =
+    listOf(
+        architectureProjectRoot().resolve("server/src/main/kotlin"),
+        architectureProjectRoot().resolve("server/src/test/kotlin"),
+    ).flatMap { root ->
+        Files.walk(root).use { paths ->
+            paths
+                .filter { path -> path.name.endsWith(".kt") }
+                .filter { path -> combinedTypeName in path.readText() }
+                .map { path -> path.relativeTo(architectureProjectRoot()).toString() }
+                .toList()
+        }
+    }
+
+private fun hostSessionSuppressionViolations(): List<String> {
+    val forbiddenRules = listOf("LargeClass", "TooManyFunctions", "LongMethod", "ThrowsCount", "MagicNumber")
+    return hostSessionSplitUnitNames.flatMap { fileName ->
+        val source = hostSessionPersistenceRoot().resolve(fileName).readText()
+        forbiddenRules
+            .filter { rule -> Regex("""@Suppress\([^)]*\"$rule\"""").containsMatchIn(source) }
+            .map { rule -> "$fileName suppresses $rule" }
     }
 }
 
