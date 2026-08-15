@@ -19,13 +19,14 @@ class RedisAiGenerationJobStoreFailureTest {
     @Test
     fun `recent index read failure returns unavailable without exception detail`() {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
+        val metrics = Mockito.mock(RedisCacheMetrics::class.java)
         val zSetOperations = zSetOperations(redisTemplate)
         val failure = RedisConnectionFailureException("test-unavailable")
         Mockito
             .`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(failure)
 
-        val result = store(redisTemplate).loadRecentForSession(UUID.randomUUID())
+        val result = store(redisTemplate, metrics).loadRecentForSession(UUID.randomUUID())
 
         assertThat(result).isEqualTo(
             AiGenerationJobListResult.Unavailable(
@@ -34,18 +35,20 @@ class RedisAiGenerationJobStoreFailureTest {
             ),
         )
         assertThat(result.toString()).doesNotContain("test-unavailable")
+        verifyFailureMetric(metrics, "loadRecentForSession")
     }
 
     @Test
     fun `active index read failure returns unavailable without exception detail`() {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
+        val metrics = Mockito.mock(RedisCacheMetrics::class.java)
         val zSetOperations = zSetOperations(redisTemplate)
         val failure = RedisConnectionFailureException("test-unavailable")
         Mockito
             .`when`(zSetOperations.reverseRange(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(failure)
 
-        val result = store(redisTemplate).loadActiveJobs()
+        val result = store(redisTemplate, metrics).loadActiveJobs()
 
         assertThat(result).isEqualTo(
             AiGenerationJobListResult.Unavailable(
@@ -54,18 +57,20 @@ class RedisAiGenerationJobStoreFailureTest {
             ),
         )
         assertThat(result.toString()).doesNotContain("test-unavailable")
+        verifyFailureMetric(metrics, "loadActiveJobs")
     }
 
     @Test
     fun `commit recovery index read failure returns unavailable without exception detail`() {
         val redisTemplate = Mockito.mock(StringRedisTemplate::class.java)
+        val metrics = Mockito.mock(RedisCacheMetrics::class.java)
         val zSetOperations = zSetOperations(redisTemplate)
         val failure = RedisConnectionFailureException("test-unavailable")
         Mockito
             .`when`(zSetOperations.range(Mockito.anyString(), Mockito.anyLong(), Mockito.anyLong()))
             .thenThrow(failure)
 
-        val result = store(redisTemplate).loadCommitRecoveryJobs()
+        val result = store(redisTemplate, metrics).loadCommitRecoveryJobs()
 
         assertThat(result).isEqualTo(
             AiGenerationJobListResult.Unavailable(
@@ -74,6 +79,7 @@ class RedisAiGenerationJobStoreFailureTest {
             ),
         )
         assertThat(result.toString()).doesNotContain("test-unavailable")
+        verifyFailureMetric(metrics, "loadCommitRecoveryJobs")
     }
 
     @Test
@@ -94,13 +100,30 @@ class RedisAiGenerationJobStoreFailureTest {
         assertThat(store.loadCommitRecoveryJobs()).isEqualTo(AiGenerationJobListResult.Available(emptyList()))
     }
 
-    private fun store(redisTemplate: StringRedisTemplate): RedisAiGenerationJobStore =
+    private fun store(
+        redisTemplate: StringRedisTemplate,
+        metrics: RedisCacheMetrics = Mockito.mock(RedisCacheMetrics::class.java),
+    ): RedisAiGenerationJobStore =
         RedisAiGenerationJobStore(
             redisTemplate,
             AiGenerationProperties(),
-            Mockito.mock(RedisCacheMetrics::class.java),
+            metrics,
             Clock.systemUTC(),
         )
+
+    private fun verifyFailureMetric(
+        metrics: RedisCacheMetrics,
+        operation: String,
+    ) {
+        Mockito.verify(metrics).increment("readmates.redis.fallbacks", "feature", "aigen.job-store")
+        Mockito.verify(metrics).increment(
+            "readmates.redis.operation.errors",
+            "feature",
+            "aigen.job-store",
+            "operation",
+            operation,
+        )
+    }
 
     @Suppress("UNCHECKED_CAST")
     private fun zSetOperations(redisTemplate: StringRedisTemplate): ZSetOperations<String, String> {

@@ -20,14 +20,8 @@ import java.time.Duration
 import java.time.Instant
 import java.util.UUID
 
-/**
- * Outbound port for storing AI generation jobs.
- * Implementations (Redis adapter) persist job state, transcripts and results
- * with TTL-based cleanup. Transcript body and result JSON live in separate
- * Redis keys per spec §8.1.
- */
-interface AiGenerationJobStore {
-    fun save(job: JobRecord): Unit
+interface AiGenerationJobReadWritePort {
+    fun save(job: JobRecord)
 
     fun load(jobId: UUID): JobRecord?
 
@@ -60,6 +54,11 @@ interface AiGenerationJobStore {
                 )
         }
 
+    /** Delete the hash and all four transient payload keys atomically. Used for stale job cleanup. */
+    fun delete(jobId: UUID)
+}
+
+interface AiGenerationJobTransitionPort {
     fun updateStatus(
         jobId: UUID,
         status: JobStatus,
@@ -100,7 +99,9 @@ interface AiGenerationJobStore {
     ): Boolean
 
     fun saveGroundedResult(command: SaveGroundedResultCommand): Boolean
+}
 
+interface AiGenerationCommitStatePort {
     fun acquireCommitLease(
         jobId: UUID,
         expectedRevision: Long,
@@ -133,10 +134,16 @@ interface AiGenerationJobStore {
      * terminal status reads until the hash TTL expires.
      */
     fun deleteTransientPayload(jobId: UUID): Unit
-
-    /** Delete the hash and all four transient payload keys atomically. Used for stale job cleanup. */
-    fun delete(jobId: UUID): Unit
 }
+
+/**
+ * Composite outbound port for storing AI generation jobs.
+ * Implementations persist job state, transcripts and results with TTL-based cleanup.
+ */
+interface AiGenerationJobStore :
+    AiGenerationJobReadWritePort,
+    AiGenerationJobTransitionPort,
+    AiGenerationCommitStatePort
 
 data class SaveGroundedResultCommand(
     val jobId: UUID,

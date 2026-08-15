@@ -124,8 +124,8 @@ class ServerQualityRatchetTest {
             label = "ktlint baseline",
         )
 
-        assertThat(identities.detektIssues).hasSize(439)
-        assertThat(retiredDetektIdentities).hasSize(22)
+        assertThat(identities.detektIssues).hasSize(437)
+        assertThat(retiredDetektIdentities).hasSize(24)
         assertThat(approvedDetektSeed).hasSize(461)
     }
 

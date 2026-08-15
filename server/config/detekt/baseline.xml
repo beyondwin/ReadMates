@@ -8,7 +8,6 @@
     <ID>CyclomaticComplexMethod:JdbcArchiveDetailBatchReadAdapter.kt:JdbcArchiveDetailBatchReadAdapter$override fun loadDetail: ArchiveDetailFragments</ID>
     <ID>CyclomaticComplexMethod:RateLimitFilter.kt:RateLimitFilter$private fun HttpServletRequest.toRateLimitCheck: RateLimitCheck?</ID>
     <ID>CyclomaticComplexMethod:SessionCookieAuthenticationFilter.kt:SessionCookieAuthenticationFilter$override fun doFilterInternal</ID>
-    <ID>FunctionOnlyReturningConstant:RedisAiGenerationJobStore.kt:RedisAiGenerationJobStore$private fun activeJobsKey</ID>
     <ID>FunctionParameterNaming:DevInvitationController.kt:DevInvitationController$@PathVariable("token") _token: String</ID>
     <ID>FunctionParameterNaming:InvitationController.kt:InvitationController$@PathVariable("clubSlug") _clubSlug: String</ID>
     <ID>FunctionParameterNaming:InvitationController.kt:InvitationController$@PathVariable("token") _token: String</ID>
@@ -404,7 +403,6 @@
     <ID>TooGenericExceptionCaught:NotificationTestMailService.kt:NotificationTestMailService$exception: Exception</ID>
     <ID>TooGenericExceptionCaught:ReadmatesOAuthSuccessHandler.kt:ReadmatesOAuthSuccessHandler$exception: RuntimeException</ID>
     <ID>TooGenericExceptionThrown:BffSecretFilterAuditTest.kt:BffSecretFilterAuditTest.&lt;no name provided&gt;$throw RuntimeException("db down")</ID>
-    <ID>TooManyFunctions:AiGenerationJobStore.kt:AiGenerationJobStore</ID>
     <ID>TooManyFunctions:ArchiveWebMapper.kt:com.readmates.archive.adapter.in.web.ArchiveWebMapper.kt</ID>
     <ID>TooManyFunctions:AuthSessionService.kt:AuthSessionService : ManageAuthSessionUseCaseLogoutAuthSessionUseCase</ID>
     <ID>TooManyFunctions:FeedbackDocumentParser.kt:FeedbackDocumentParser</ID>

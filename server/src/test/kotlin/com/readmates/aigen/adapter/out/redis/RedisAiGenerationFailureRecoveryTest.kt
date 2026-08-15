@@ -46,12 +46,14 @@ import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import java.math.BigDecimal
 import java.nio.file.Path
+import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import kotlin.io.path.readBytes
 import kotlin.io.path.readText
 
 @SpringBootTest(
@@ -106,6 +108,30 @@ class RedisAiGenerationFailureRecoveryTest(
                 REPAIR_STATE_KEY,
             ),
         )
+    }
+
+    @Test
+    fun `Redis scripts retain the exact task four base bytes`() {
+        val redisRoot = Path.of("src/main/kotlin/com/readmates/aigen/adapter/out/redis")
+        assertThat(sha256(redisRoot.resolve("AiGenerationRedisScripts.kt").readBytes()))
+            .isEqualTo("7c082fb018c385c4a5d274a92657c87ef48666727cd28e0008754f0e13a1bec5")
+        assertThat(sha256(redisRoot.resolve("GroundedAiGenerationRedisScripts.kt").readBytes()))
+            .isEqualTo("6950f03da1ac7274990e1a93d2ff7289ee21bc2add1989f1ee574686553b927c")
+        val probeOwner =
+            listOf(
+                redisRoot.resolve("RedisAiGenerationRecoveryIndex.kt"),
+                redisRoot.resolve("RedisAiGenerationJobStore.kt"),
+            ).first { java.nio.file.Files.exists(it) }
+        val probeSource = probeOwner.readText().substringAfter("val activeQueueProbeScript:")
+        val probeBytes =
+            probeSource
+                .substringAfter("\"\"\"")
+                .substringBefore("\"\"\"")
+                .trimIndent()
+                .toByteArray()
+
+        assertThat(probeBytes).hasSize(496)
+        assertThat(sha256(probeBytes)).isEqualTo("1c5b2577159c1d3b0f932d15a12c27ac576d92b5663c8e283be016a139b57477")
     }
 
     @Test
@@ -870,18 +896,23 @@ class RedisAiGenerationFailureRecoveryTest(
 
         @Test
         fun `all current Redis status writers carry exact tuple and processing index keys`() {
-            val storeSource =
-                Path.of("src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt").readText()
+            val redisRoot = Path.of("src/main/kotlin/com/readmates/aigen/adapter/out/redis")
+            val writerSources =
+                listOf(
+                    "RedisAiGenerationPayloadStore.kt",
+                    "RedisAiGenerationTransitionStore.kt",
+                    "RedisAiGenerationCommitStore.kt",
+                    "RedisAiGenerationRecoveryStore.kt",
+                    "RedisAiGenerationRecoveryIndex.kt",
+                ).joinToString("\n") { fileName -> redisRoot.resolve(fileName).readText() }
             val genericScripts =
-                Path.of("src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisScripts.kt").readText()
+                redisRoot.resolve("AiGenerationRedisScripts.kt").readText()
             val groundedScripts =
-                Path
-                    .of("src/main/kotlin/com/readmates/aigen/adapter/out/redis/GroundedAiGenerationRedisScripts.kt")
-                    .readText()
+                redisRoot.resolve("GroundedAiGenerationRedisScripts.kt").readText()
 
-            assertThat(storeSource).doesNotContain("Instant.now()", "ops.put(hashKey, \"status\"")
+            assertThat(writerSources).doesNotContain("Instant.now()", "ops.put(keyspace.hash")
             assertRedisWriterDiscovery(genericScripts, groundedScripts)
-            assertRedisWriterInvariants(storeSource, genericScripts, groundedScripts)
+            assertRedisWriterInvariants(writerSources, genericScripts, groundedScripts)
         }
     }
 
@@ -1455,7 +1486,7 @@ private fun assertRedisWriterInvariants(
         "AiGenerationRecoveryRedisScripts.recoverFailure" to false,
     ).forEach { (marker, requiresTupleArguments) ->
         val window = sourceWriterWindow(storeSource, marker)
-        assertThat(window).contains("PROCESSING_RECOVERY_KEY")
+        assertThat(window).contains("keyspace.processingRecovery")
         if (requiresTupleArguments) assertThat(window).contains("epochSecond.toString()", "nano.toString()")
     }
     listOf(
@@ -1481,12 +1512,15 @@ private fun assertRedisWriterInvariants(
         "markCleanupComplete",
     ).forEach {
         assertThat(sourceWriterWindow(storeSource, "GroundedAiGenerationRedisScripts.$it"))
-            .contains("PROCESSING_RECOVERY_KEY", "epochSecond.toString()", "nano.toString()")
+            .contains("keyspace.processingRecovery", "epochSecond.toString()", "nano.toString()")
         val block = sourceScriptBlock(groundedScripts, it)
         assertThat(block).contains("lastUpdatedAtEpochSecond", "lastUpdatedAtNano")
         assertIdentityBeforeFirstMutation(block)
     }
 }
+
+private fun sha256(bytes: ByteArray): String =
+    java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes))
 
 private fun command(
     record: JobRecord,

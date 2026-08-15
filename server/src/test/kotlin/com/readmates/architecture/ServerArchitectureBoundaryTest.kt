@@ -344,7 +344,7 @@ private fun jacksonImportsIn(serviceRoot: Path): List<String> =
 class ServerArchitectureBoundaryTest {
     @Test
     fun `notification decomposition boundaries remain focused`() =
-        assertAll({ assertManualNotificationPersistenceOwnership() }, { assertAdminNotificationReplayBoundaries() })
+        assertNotificationAndAiRedisBoundaries()
 
     @Test
     fun `admin operations is registered as workflow slice`() {
@@ -992,13 +992,274 @@ class ServerArchitectureBoundaryTest {
         assertAll(assertions)
         assertHostSessionWriteBoundaries()
     }
+
 }
+
+private fun assertNotificationAndAiRedisBoundaries() =
+    assertAll(
+        { assertManualNotificationPersistenceOwnership() },
+        { assertAdminNotificationReplayBoundaries() },
+        { assertAiGenerationRedisBoundaries() },
+    )
 
 class HostSessionWriteArchitectureTest {
     @Test
     fun `host session writes keep command query and policy boundaries`() {
         assertHostSessionWriteBoundaries()
     }
+}
+
+private val aiGenerationRedisFocusedUnitNames =
+    listOf(
+        "AiGenerationRedisContext.kt",
+        "RedisAiGenerationPayloadStore.kt",
+        "RedisAiGenerationTransitionStore.kt",
+        "RedisAiGenerationCommitStore.kt",
+        "RedisAiGenerationRecoveryStore.kt",
+        "RedisAiGenerationRecoveryIndex.kt",
+    )
+
+private val aiGenerationCapabilityMethods =
+    linkedMapOf(
+        "AiGenerationJobReadWritePort" to
+            setOf(
+                "save",
+                "load",
+                "loadMetadata",
+                "findJobById",
+                "loadRecentForSession",
+                "loadActiveJobs",
+                "loadCommitRecoveryJobs",
+                "delete",
+            ),
+        "AiGenerationJobTransitionPort" to
+            setOf(
+                "updateStatus",
+                "transitionStatus",
+                "saveResultIfStatus",
+                "saveGroundedResult",
+            ),
+        "AiGenerationCommitStatePort" to
+            setOf(
+                "acquireCommitLease",
+                "recoverExpiredCommitLease",
+                "releaseCommitLeaseForRetry",
+                "markCommittedForCleanup",
+                "markCleanupComplete",
+                "deleteTransientPayload",
+            ),
+    )
+
+private fun aiGenerationRedisRoot(): Path =
+    architectureProjectRoot().resolve("server/src/main/kotlin/com/readmates/aigen/adapter/out/redis")
+
+private fun aiGenerationPortSource(): String =
+    architectureProjectRoot()
+        .resolve("server/src/main/kotlin/com/readmates/aigen/application/port/out/AiGenerationJobStore.kt")
+        .readText()
+
+private data class AiGenerationRedisBoundarySources(
+    val missingUnits: List<String>,
+    val facade: String,
+    val indexes: String,
+    val keyspace: String,
+    val focused: List<Pair<String, String>>,
+    val port: String,
+)
+
+private fun loadAiGenerationRedisBoundarySources(): AiGenerationRedisBoundarySources {
+    val redisRoot = aiGenerationRedisRoot()
+    val expectedUnits =
+        aiGenerationRedisFocusedUnitNames +
+            listOf(
+                "AiGenerationRedisKeyspace.kt",
+                "AiGenerationRedisIndexes.kt",
+                "RedisAiGenerationJobStore.kt",
+            )
+    val missingUnits = expectedUnits.filterNot { Files.exists(redisRoot.resolve(it)) }
+    val focusedSources =
+        aiGenerationRedisFocusedUnitNames
+            .mapNotNull { name -> redisRoot.resolve(name).takeIf(Files::exists)?.let { name to it.readText() } }
+    return AiGenerationRedisBoundarySources(
+        missingUnits = missingUnits,
+        facade = redisRoot.resolve("RedisAiGenerationJobStore.kt").readText(),
+        indexes = redisRoot.resolve("AiGenerationRedisIndexes.kt").readText(),
+        keyspace = redisRoot.resolve("AiGenerationRedisKeyspace.kt").takeIf(Files::exists)?.readText().orEmpty(),
+        focused = focusedSources,
+        port = aiGenerationPortSource(),
+    )
+}
+
+private fun assertAiGenerationRedisBoundaries() {
+    val sources = loadAiGenerationRedisBoundarySources()
+
+    assertAll(
+        { assertTrue(sources.missingUnits.isEmpty(), "Missing focused AI Redis units: ${sources.missingUnits}") },
+        { assertAiGenerationCapabilityBoundaries(sources.port) },
+        { assertAiGenerationFacadeBoundaries(sources.facade) },
+        { assertAiGenerationKeyspaceBoundaries(sources) },
+        { assertAiGenerationKeyLiteralBoundaries(sources) },
+        { assertAiGenerationSuppressionBoundaries(sources) },
+    )
+}
+
+private fun assertAiGenerationCapabilityBoundaries(portSource: String) {
+    assertAll(
+        {
+            assertTrue(
+                aiGenerationCapabilityViolations(portSource).isEmpty(),
+                "AI job capability methods must be partitioned exactly once",
+            )
+        },
+        {
+            assertFalse(
+                Regex("""(?m)^\s*fun\s+""").containsMatchIn(aiGenerationCompositeDeclaration(portSource)),
+                "AiGenerationJobStore must declare no direct function",
+            )
+        },
+    )
+}
+
+private fun assertAiGenerationFacadeBoundaries(facadeSource: String) {
+    assertAll(
+        {
+            val forbiddenFacadeTokens = listOf(".execute(", ".opsFor", "DefaultRedisScript", "redis.call(", "\"\"\"")
+            assertTrue(
+                forbiddenFacadeTokens.none(facadeSource::contains),
+                "Redis AI facade must contain delegation only",
+            )
+        },
+        {
+            assertTrue(
+                listOf(
+                    "RedisAiGenerationPayloadStore",
+                    "RedisAiGenerationTransitionStore",
+                    "RedisAiGenerationCommitStore",
+                    "RedisAiGenerationRecoveryStore",
+                    "RedisAiGenerationRecoveryIndex",
+                ).all(facadeSource::contains),
+                "Redis AI facade must wire every focused delegate",
+            )
+        },
+    )
+}
+
+private fun assertAiGenerationKeyspaceBoundaries(sources: AiGenerationRedisBoundarySources) {
+    assertAll(
+        {
+            assertTrue(
+                "AiGenerationRedisKeyspace" in sources.indexes &&
+                    listOf(
+                        "keyspace.activeJobs",
+                        "keyspace.commitRecoveryJobs",
+                        "keyspace.processingRecovery",
+                        "keyspace.processingQuarantine",
+                        "keyspace.sessionRecent",
+                        "keyspace.activeClubJobs",
+                    ).all(sources.indexes::contains),
+                "Redis indexes must obtain index session and club keys from AiGenerationRedisKeyspace",
+            )
+        },
+        {
+            assertTrue(
+                listOf("providerAttempts", "admissionReceipt", "providerAdmission", "repairWorklist")
+                    .all(sources.keyspace::contains),
+                "AiGenerationRedisKeyspace must own provider admission and repair keys",
+            )
+        },
+    )
+}
+
+private fun assertAiGenerationKeyLiteralBoundaries(sources: AiGenerationRedisBoundarySources) {
+    val literalOwners =
+        buildList {
+            if ("\"aigen:" in sources.facade) add("RedisAiGenerationJobStore.kt")
+            if ("\"aigen:" in sources.indexes) add("AiGenerationRedisIndexes.kt")
+            sources.focused
+                .filter { (_, source) -> "\"aigen:" in source }
+                .forEach { (name) -> add(name) }
+        }
+    assertTrue(
+        literalOwners.isEmpty(),
+        "AI Redis key literals escaped keyspace or script files: $literalOwners",
+    )
+}
+
+private fun assertAiGenerationSuppressionBoundaries(sources: AiGenerationRedisBoundarySources) {
+    val forbiddenSuppressions = listOf("LargeClass", "TooManyFunctions")
+    val suppressionOwners =
+        buildList {
+            (sources.focused + listOf("AiGenerationRedisIndexes.kt" to sources.indexes)).forEach { (name, source) ->
+                forbiddenSuppressions
+                    .filter { rule -> Regex("""@Suppress\([^)]*\"$rule\"""").containsMatchIn(source) }
+                    .forEach { rule -> add("$name suppresses $rule") }
+            }
+            forbiddenSuppressions
+                .filter { rule -> Regex("""@Suppress\([^)]*\"$rule\"""").containsMatchIn(sources.port) }
+                .forEach { rule -> add("AiGenerationJobStore.kt suppresses $rule") }
+        }
+    assertTrue(suppressionOwners.isEmpty(), "Focused AI Redis units hide complexity: $suppressionOwners")
+}
+
+private fun aiGenerationCapabilityViolations(source: String): List<String> {
+    val expectedMethods = aiGenerationCapabilityMethods.values.flatten().toSet()
+    val actualByCapability =
+        aiGenerationCapabilityMethods.keys.associateWith { capability ->
+            interfaceBody(source, capability)
+                ?.let { body -> Regex("""(?m)^\s*fun\s+(\w+)\s*\(""").findAll(body).map { it.groupValues[1] }.toSet() }
+                .orEmpty()
+        }
+    val declarationCounts =
+        actualByCapability.values
+            .flatten()
+            .groupingBy(String::toString)
+            .eachCount()
+    return buildList {
+        aiGenerationCapabilityMethods.forEach { (capability, expected) ->
+            val actual = actualByCapability.getValue(capability)
+            if (actual != expected) add("$capability expected=$expected actual=$actual")
+        }
+        expectedMethods.filter { declarationCounts[it] != 1 }.forEach { method ->
+            add("$method declarations=${declarationCounts[method] ?: 0}")
+        }
+    }
+}
+
+private fun aiGenerationCompositeDeclaration(source: String): String {
+    val start = source.indexOf("interface AiGenerationJobStore")
+    if (start < 0) return ""
+    val end = source.indexOf("data class SaveGroundedResultCommand", start).takeIf { it >= 0 } ?: source.length
+    return source.substring(start, end)
+}
+
+private fun interfaceBody(
+    source: String,
+    interfaceName: String,
+): String? {
+    val declaration = source.indexOf("interface $interfaceName")
+    val bodyStart = if (declaration < 0) -1 else source.indexOf('{', declaration)
+    val nextInterface =
+        if (declaration < 0) {
+            -1
+        } else {
+            source.indexOf("interface ", declaration + 1).takeIf { it >= 0 } ?: source.length
+        }
+    if (declaration < 0 || bodyStart < 0 || bodyStart > nextInterface) return null
+    var depth = 0
+    var bodyEnd: Int? = null
+    for (index in bodyStart until source.length) {
+        when (source[index]) {
+            '{' -> depth += 1
+            '}' -> {
+                depth -= 1
+                if (depth == 0) {
+                    bodyEnd = index
+                    break
+                }
+            }
+        }
+    }
+    return bodyEnd?.let { source.substring(bodyStart + 1, it) }
 }
 
 private val hostSessionCommandUnitNames =

@@ -4,6 +4,8 @@ import com.readmates.aigen.application.model.AiGenerationJobListOperation
 import com.readmates.aigen.application.model.AiGenerationJobListResult
 import com.readmates.aigen.application.model.AiGenerationJobListUnavailableReason
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
 import com.readmates.aigen.application.model.GroundedEvidenceExcerpt
@@ -93,6 +95,87 @@ class RedisGroundedAiGenerationJobStoreTest(
         val loaded = store.load(record.jobId)
         assertThat(loaded?.toSessionMeta()).isEqualTo(record.toSessionMeta())
         assertThat(loaded?.groundingStatus).isEqualTo(GroundingStatus.PENDING)
+    }
+
+    @Test
+    fun `grounded hash keeps the exact safe metadata field contract`() {
+        val record = groundedRecord()
+
+        store.save(record)
+
+        assertThat(redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId)).keys)
+            .containsExactlyInAnyOrder(
+                "jobId",
+                "sessionId",
+                "clubId",
+                "hostUserId",
+                "modelProvider",
+                "modelName",
+                "authorNameMode",
+                "eligibleFallbackModels",
+                "status",
+                "stage",
+                "progressPct",
+                "tokensInput",
+                "tokensCacheWrite",
+                "tokensCached",
+                "tokensOutput",
+                "costAccumulatedUsd",
+                "llmCallCount",
+                "revision",
+                "cleanupPending",
+                "expiresAt",
+                "createdAt",
+                "lastUpdatedAt",
+                "lastUpdatedAtEpochSecond",
+                "lastUpdatedAtNano",
+                "groundingStatus",
+            )
+    }
+
+    @Test
+    fun `status transition honors the exact expected set and persists progress and safe error`() {
+        val record = groundedRecord()
+        store.save(record)
+
+        assertThat(
+            store.transitionStatus(
+                record.jobId,
+                setOf(JobStatus.RUNNING),
+                JobStatus.FAILED,
+                null,
+                100,
+                GenerationError(ErrorCode.ASYNC_PROCESSING_EXHAUSTED, "public-safe failure"),
+            ),
+        ).isFalse()
+        assertThat(
+            store.transitionStatus(
+                record.jobId,
+                setOf(JobStatus.PENDING, JobStatus.RUNNING),
+                JobStatus.RUNNING,
+                JobStage.GENERATING_RECORD,
+                37,
+                null,
+            ),
+        ).isTrue()
+        assertThat(
+            store.transitionStatus(
+                record.jobId,
+                setOf(JobStatus.RUNNING),
+                JobStatus.FAILED,
+                null,
+                100,
+                GenerationError(ErrorCode.ASYNC_PROCESSING_EXHAUSTED, "public-safe failure"),
+            ),
+        ).isTrue()
+
+        assertThat(redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId)))
+            .containsEntry("status", "FAILED")
+            .containsEntry("progressPct", "100")
+            .containsEntry("errorCode", "ASYNC_PROCESSING_EXHAUSTED")
+            .containsEntry("errorMessage", "public-safe failure")
+            .containsEntry("revision", "0")
+            .doesNotContainKey("stage")
     }
 
     @Test
