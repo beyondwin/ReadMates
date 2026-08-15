@@ -5,6 +5,7 @@ import com.readmates.admin.health.application.model.HealthCard
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.port.out.DeployLedgerPort
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.service.HealthCardProvider
 import org.springframework.stereotype.Component
 import java.time.Clock
@@ -14,7 +15,7 @@ class DeployAttemptsStripCardProvider(
     private val deployLedgerPort: DeployLedgerPort,
     private val clock: Clock,
 ) : HealthCardProvider {
-    override val cardId: String = "deploy_attempts_strip"
+    override val identity: PlatformHealthProvider = PlatformHealthProvider.DEPLOY_ATTEMPTS_STRIP
 
     override fun compute(): HealthCard {
         val now = clock.instant()

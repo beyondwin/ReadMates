@@ -3,7 +3,7 @@ package com.readmates.aigen.application.service
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.SectionReviewStatus
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
-import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.LocalDate

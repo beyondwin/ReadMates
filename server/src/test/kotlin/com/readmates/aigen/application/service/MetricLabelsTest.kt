@@ -1,10 +1,14 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.AiGenerationRecoveryResult
+import com.readmates.aigen.application.model.AiGenerationRecoverySource
+import com.readmates.aigen.application.model.CapDenialReason
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.`in`.AiGenerationQueueProbeSnapshot
 import com.readmates.aigen.application.port.out.JobKind
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -13,20 +17,20 @@ import java.math.BigDecimal
 import java.time.Duration
 
 /**
- * Enforces the label allowlist policy from spec §11.1: only the 6 enum-valued tag
- * keys (provider, model, kind, status, reason, direction) may appear on any aigen
- * meter, and high-cardinality identifiers (transcript, hostId, sessionId, clubId,
- * email) are absolutely forbidden.
+ * Enforces the label allowlist policy: only the nine enum-valued tag keys in
+ * [allowlist] may appear on any aigen meter. High-cardinality identifiers
+ * (transcript, hostId, sessionId, clubId, email) are absolutely forbidden.
  */
 class MetricLabelsTest {
-    private val allowlist = setOf("provider", "model", "kind", "status", "reason", "direction", "basis")
+    private val allowlist =
+        setOf("provider", "model", "kind", "status", "reason", "direction", "basis", "source", "result")
     private val forbidden = setOf("transcript", "hostId", "sessionId", "clubId", "email")
 
     @Test
     fun `MetricLabel enum has exactly the bounded allowlisted entries`() {
         val names = MetricLabel.values().map { it.tagKey }.toSet()
         assertThat(names).isEqualTo(allowlist)
-        assertThat(MetricLabel.values().size).isEqualTo(7)
+        assertThat(MetricLabel.values().size).isEqualTo(9)
     }
 
     @Test
@@ -50,9 +54,14 @@ class MetricLabelsTest {
         metrics.recordCost(Provider.CLAUDE, model, BigDecimal("0.05"))
         metrics.recordProviderCost(Provider.CLAUDE, CostBasis.ESTIMATED_UNKNOWN, BigDecimal("0.05"))
         metrics.recordPhysicalCallCapExhausted(Provider.CLAUDE)
+        metrics.recordFailureRecovery(AiGenerationRecoverySource.KAFKA, AiGenerationRecoveryResult.RECOVERED_RUNNING)
+        metrics.recordRecoveryIndexRepair(AiGenerationIndexRepairResultTag.PASS_COMPLETED)
         metrics.recordValidationFailure(ErrorCode.SCHEMA_INVALID)
         metrics.recordCapDenial(CapDenialReason.HOST_DAILY)
-        metrics.registerQueueDepthGauge { 0 }
+        metrics.registerQueueProbeGauges(
+            { AiGenerationQueueProbeSnapshot.unavailableBeforeFirstSample() },
+            Duration.ofSeconds(30),
+        )
 
         val allTagKeys =
             registry.meters
@@ -77,7 +86,10 @@ class MetricLabelsTest {
         metrics.recordCost(Provider.CLAUDE, model, BigDecimal("0.01"))
         metrics.recordValidationFailure(ErrorCode.AUTHOR_NAME_MISMATCH)
         metrics.recordCapDenial(CapDenialReason.CLUB_MONTHLY)
-        metrics.registerQueueDepthGauge { 0 }
+        metrics.registerQueueProbeGauges(
+            { AiGenerationQueueProbeSnapshot.unavailableBeforeFirstSample() },
+            Duration.ofSeconds(30),
+        )
 
         val allTagKeys =
             registry.meters
@@ -102,7 +114,10 @@ class MetricLabelsTest {
         metrics.recordCost(Provider.CLAUDE, model, BigDecimal("0.05"))
         metrics.recordValidationFailure(ErrorCode.SCHEMA_INVALID)
         metrics.recordCapDenial(CapDenialReason.HOST_DAILY)
-        metrics.registerQueueDepthGauge { 0 }
+        metrics.registerQueueProbeGauges(
+            { AiGenerationQueueProbeSnapshot.unavailableBeforeFirstSample() },
+            Duration.ofSeconds(30),
+        )
 
         val names = registry.meters.map { it.id.name }.toSet()
         assertThat(names).contains(
@@ -114,6 +129,9 @@ class MetricLabelsTest {
             "readmates.aigen.validation.failures",
             "readmates.aigen.cap.denials",
             "readmates.aigen.queue.depth",
+            "readmates.aigen.queue.probe.available",
+            "readmates.aigen.queue.probe.last.success.timestamp.seconds",
+            "readmates.aigen.queue.probe.sample.interval.seconds",
         )
     }
 }

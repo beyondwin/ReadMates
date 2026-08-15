@@ -8,7 +8,6 @@
     <ID>CyclomaticComplexMethod:JdbcArchiveDetailBatchReadAdapter.kt:JdbcArchiveDetailBatchReadAdapter$override fun loadDetail: ArchiveDetailFragments</ID>
     <ID>CyclomaticComplexMethod:RateLimitFilter.kt:RateLimitFilter$private fun HttpServletRequest.toRateLimitCheck: RateLimitCheck?</ID>
     <ID>CyclomaticComplexMethod:SessionCookieAuthenticationFilter.kt:SessionCookieAuthenticationFilter$override fun doFilterInternal</ID>
-    <ID>FunctionOnlyReturningConstant:RedisAiGenerationJobStore.kt:RedisAiGenerationJobStore$private fun activeJobsKey</ID>
     <ID>FunctionParameterNaming:DevInvitationController.kt:DevInvitationController$@PathVariable("token") _token: String</ID>
     <ID>FunctionParameterNaming:InvitationController.kt:InvitationController$@PathVariable("clubSlug") _clubSlug: String</ID>
     <ID>FunctionParameterNaming:InvitationController.kt:InvitationController$@PathVariable("token") _token: String</ID>
@@ -29,7 +28,6 @@
     <ID>LargeClass:HostMemberLifecycleControllerTest.kt:HostMemberLifecycleControllerTest : ReadmatesMySqlIntegrationTestSupport</ID>
     <ID>LargeClass:HostNotificationControllerTest.kt:HostNotificationControllerTest : ReadmatesMySqlIntegrationTestSupport</ID>
     <ID>LargeClass:HostSessionControllerDbTest.kt:HostSessionControllerDbTest : ReadmatesMySqlIntegrationTestSupport</ID>
-    <ID>LargeClass:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter : ManualNotificationDispatchPort</ID>
     <ID>LargeClass:JdbcNotificationDeliveryAdapterTest.kt:JdbcNotificationDeliveryAdapterTest : ReadmatesMySqlIntegrationTestSupport</ID>
     <ID>LargeClass:MySqlFlywayMigrationTest.kt:MySqlFlywayMigrationTest : ReadmatesMySqlIntegrationTestSupport</ID>
     <ID>LongMethod:ArchiveAndNotesDbTest.kt:ArchiveAndNotesDbTest$@Test @Sql( statements = [ CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL, INSERT_VIEWER_DRAFT_SESSION_SQL, INSERT_VIEWER_OPEN_SESSION_SQL, INSERT_VIEWER_CLOSED_SESSION_SQL, ], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD, ) @Sql( statements = [ CLEANUP_VIEWER_ARCHIVE_VISIBILITY_SESSIONS_SQL, ], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD, ) fun `viewer can list and read preserved sessions but cannot read feedback document`</ID>
@@ -50,14 +48,9 @@
     <ID>LongMethod:HostSessionControllerDbTest.kt:HostSessionControllerDbTest$private fun seedSessionOwnedRows</ID>
     <ID>LongMethod:HostSessionDeletionQueries.kt:HostSessionDeletionQueries$private fun countSessionDeletionRows: HostSessionDeletionCounts</ID>
     <ID>LongMethod:HostSessionQueries.kt:HostSessionQueries$fun hostDashboard: HostDashboardResult</ID>
-    <ID>LongMethod:HostSessionWriteOperations.kt:HostSessionWriteOperations$fun createDraftSession: CreatedSessionResponse</ID>
-    <ID>LongMethod:HostSessionWriteOperations.kt:HostSessionWriteOperations$fun updateHostSession: HostSessionDetailResponse</ID>
     <ID>LongMethod:JdbcArchiveDetailBatchReadAdapter.kt:JdbcArchiveDetailBatchReadAdapter$override fun loadDetail: ArchiveDetailFragments</ID>
     <ID>LongMethod:JdbcArchiveDetailBatchReadAdapter.kt:JdbcArchiveDetailBatchReadAdapter$private fun loadPersonalBatch: List&lt;PersonalBatchRow&gt;</ID>
     <ID>LongMethod:JdbcArchiveDetailBatchReadAdapter.kt:JdbcArchiveDetailBatchReadAdapter$private fun loadPublicBatch: List&lt;PublicBatchRow&gt;</ID>
-    <ID>LongMethod:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$@Transactional override fun confirmManualDispatch: ManualNotificationConfirmedDispatch?</ID>
-    <ID>LongMethod:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$override fun listDispatches: ManualNotificationDispatchList</ID>
-    <ID>LongMethod:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$override fun listMembers: CursorPage&lt;ManualNotificationMemberOption&gt;</ID>
     <ID>LongMethod:JdbcManualNotificationDispatchAdapterTest.kt:JdbcManualNotificationDispatchAdapterTest$@Test fun `confirmManualDispatch consumes preview once and returns existing dispatch on retry`</ID>
     <ID>LongMethod:JdbcMemberLifecycleStoreAdapter.kt:JdbcMemberLifecycleStoreAdapter$override fun listMembers: CursorPage&lt;HostMemberListRow&gt;</ID>
     <ID>LongMethod:JdbcNotesFeedAdapter.kt:JdbcNotesFeedAdapter$override fun loadNoteSessions: CursorPage&lt;NoteSessionResult&gt;</ID>
@@ -98,11 +91,6 @@
     <ID>MagicNumber:ClientIpHashing.kt:ClientIpHashing$32</ID>
     <ID>MagicNumber:HostManualNotificationService.kt:HostManualNotificationService$5</ID>
     <ID>MagicNumber:HostSessionQueries.kt:3</ID>
-    <ID>MagicNumber:HostSessionWriteOperations.kt:HostSessionWriteOperations$23</ID>
-    <ID>MagicNumber:HostSessionWriteOperations.kt:HostSessionWriteOperations$59</ID>
-    <ID>MagicNumber:HostSessionWriteOperations.kt:HostSessionWriteOperations$9</ID>
-    <ID>MagicNumber:HostSessionWriteOperations.kt:HostSessionWriteOperations.&lt;no name provided&gt;$3</ID>
-    <ID>MagicNumber:HostSessionWriteOperations.kt:HostSessionWriteOperations.&lt;no name provided&gt;$4</ID>
     <ID>MagicNumber:HttpClubDomainActualStateChecker.kt:HttpClubDomainActualStateChecker$0xfc</ID>
     <ID>MagicNumber:HttpClubDomainActualStateChecker.kt:HttpClubDomainActualStateChecker$0xfe</ID>
     <ID>MagicNumber:HttpClubDomainActualStateChecker.kt:HttpClubDomainActualStateChecker$200</ID>
@@ -219,9 +207,6 @@
     <ID>MaxLineLength:JdbcArchiveQueryAdapter.kt:JdbcArchiveQueryAdapter$override fun loadMyPage: MyPageResult</ID>
     <ID>MaxLineLength:JdbcCurrentMemberAdapter.kt:JdbcCurrentMemberAdapter$override fun loadActiveMemberByEmail: CurrentMember?</ID>
     <ID>MaxLineLength:JdbcHostSessionWriteAdapter.kt:JdbcHostSessionWriteAdapter$override fun detail</ID>
-    <ID>MaxLineLength:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$@param:Value("\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}") private val eventsTopic: String</ID>
-    <ID>MaxLineLength:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$emailMissingCount = if (selection.requestedChannels != ManualNotificationRequestedChannels.IN_APP) eligibility.missing else 0</ID>
-    <ID>MaxLineLength:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$val inAppIds = if (selection.requestedChannels != ManualNotificationRequestedChannels.EMAIL) finalIds else emptyList()</ID>
     <ID>MaxLineLength:JdbcManualNotificationDispatchAdapterTest.kt:JdbcManualNotificationDispatchAdapterTest$val page = adapter.listMembers(clubId, sessionId, "member", PageRequest.cursor(1, null, defaultLimit = 50, maxLimit = 100))</ID>
     <ID>MaxLineLength:JdbcMemberAccountAdapter.kt:JdbcMemberAccountAdapter$private fun java.sql.ResultSet.getStringOrNull: String?</ID>
     <ID>MaxLineLength:JdbcMemberNotificationAdapter.kt:JdbcMemberNotificationAdapter$cursor?.createdAt?.let { java.sql.Timestamp.valueOf(it.atZoneSameInstant(java.time.ZoneOffset.UTC).toLocalDateTime()) }</ID>
@@ -354,10 +339,6 @@
     <ID>ReturnCount:HttpClubDomainActualStateChecker.kt:HttpClubDomainActualStateChecker$override fun check: ClubDomainActualCheckResult</ID>
     <ID>ReturnCount:JdbcFeedbackDocumentStoreAdapter.kt:JdbcFeedbackDocumentStoreAdapter.FeedbackDocumentCursor.Companion$fun from: FeedbackDocumentCursor?</ID>
     <ID>ReturnCount:JdbcHostInvitationStoreAdapter.kt:HostInvitationCreatedAtDescCursor.Companion$fun from: HostInvitationCreatedAtDescCursor?</ID>
-    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$@Transactional override fun confirmManualDispatch: ManualNotificationConfirmedDispatch?</ID>
-    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter$private fun maskEmail: String</ID>
-    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter.ManualDispatchCursor.Companion$fun from: ManualDispatchCursor?</ID>
-    <ID>ReturnCount:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter.ManualMemberCursor.Companion$fun from: ManualMemberCursor?</ID>
     <ID>ReturnCount:JdbcMemberApprovalStoreAdapter.kt:MemberApprovalCreatedAtDescCursor.Companion$fun from: MemberApprovalCreatedAtDescCursor?</ID>
     <ID>ReturnCount:JdbcMemberArchiveReviewWriteAdapter.kt:JdbcMemberArchiveReviewWriteAdapter$override fun saveLongReview: SaveMemberArchiveLongReviewResult?</ID>
     <ID>ReturnCount:JdbcMemberLifecycleStoreAdapter.kt:HostMemberCursor.Companion$fun from: HostMemberCursor?</ID>
@@ -385,7 +366,6 @@
     <ID>ReturnCount:OAuthReturnState.kt:OAuthReturnState$private fun verifiedReturnTarget: String?</ID>
     <ID>ReturnCount:RateLimitFilter.kt:RateLimitFilter$private fun HttpServletRequest.trustedClientIp: String?</ID>
     <ID>ReturnCount:RedisAuthSessionCacheAdapter.kt:RedisAuthSessionCacheAdapter$override fun find: AuthSessionCacheSnapshot?</ID>
-    <ID>ThrowsCount:AdminNotificationOperationsService.kt:AdminNotificationOperationsService$override fun confirmReplay: AdminNotificationReplayConfirmResult</ID>
     <ID>ThrowsCount:AiGenerationCommitService.kt:AiGenerationCommitService$@Suppress("LongMethod", "SwallowedException") override fun commit: SessionImportCommitResult</ID>
     <ID>ThrowsCount:AiGenerationJobProducer.kt:AiGenerationJobProducer$@Suppress("TooGenericExceptionCaught") override fun publish</ID>
     <ID>ThrowsCount:AiGenerationOpsService.kt:AiGenerationOpsService$override fun forceCancel: AiOpsAdminActionResult</ID>
@@ -397,8 +377,7 @@
     <ID>ThrowsCount:HostManualNotificationService.kt:HostManualNotificationService$override fun confirm: ManualNotificationConfirmResult</ID>
     <ID>ThrowsCount:HostManualNotificationService.kt:HostManualNotificationService$private fun validateSelection</ID>
     <ID>ThrowsCount:HostNotificationOperationsService.kt:HostNotificationOperationsService$override fun retry: HostNotificationDetail</ID>
-    <ID>ThrowsCount:HostSessionWriteOperations.kt:HostSessionWriteOperations$fun open: HostSessionTransitionResult</ID>
-    <ID>ThrowsCount:InvitationService.kt:InvitationService$@Transactional fun acceptGoogleInvitation: CurrentMember</ID>
+    <ID>ThrowsCount:InvitationService.kt:InvitationService$@Transactional override fun acceptGoogleInvitation: CurrentMember</ID>
     <ID>ThrowsCount:InvitationService.kt:InvitationService$private fun connectOrCreateInvitedGoogleUser: UUID</ID>
     <ID>ThrowsCount:JdbcMemberAccountAdapter.kt:JdbcMemberAccountAdapter$override fun createGoogleUser: UUID</ID>
     <ID>ThrowsCount:JdbcMemberAccountAdapter.kt:JdbcMemberAccountAdapter$override fun createViewerGoogleMember: CurrentMember</ID>
@@ -424,21 +403,18 @@
     <ID>TooGenericExceptionCaught:NotificationTestMailService.kt:NotificationTestMailService$exception: Exception</ID>
     <ID>TooGenericExceptionCaught:ReadmatesOAuthSuccessHandler.kt:ReadmatesOAuthSuccessHandler$exception: RuntimeException</ID>
     <ID>TooGenericExceptionThrown:BffSecretFilterAuditTest.kt:BffSecretFilterAuditTest.&lt;no name provided&gt;$throw RuntimeException("db down")</ID>
-    <ID>TooManyFunctions:AiGenerationJobStore.kt:AiGenerationJobStore</ID>
     <ID>TooManyFunctions:ArchiveWebMapper.kt:com.readmates.archive.adapter.in.web.ArchiveWebMapper.kt</ID>
-    <ID>TooManyFunctions:AuthSessionService.kt:AuthSessionService : LogoutAuthSessionUseCase</ID>
+    <ID>TooManyFunctions:AuthSessionService.kt:AuthSessionService : ManageAuthSessionUseCaseLogoutAuthSessionUseCase</ID>
     <ID>TooManyFunctions:FeedbackDocumentParser.kt:FeedbackDocumentParser</ID>
     <ID>TooManyFunctions:HostInvitationStorePort.kt:HostInvitationStorePort</ID>
     <ID>TooManyFunctions:HostManualNotificationService.kt:HostManualNotificationService : ManageManualHostNotificationsUseCase</ID>
     <ID>TooManyFunctions:HostMemberApprovalController.kt:HostMemberApprovalController</ID>
     <ID>TooManyFunctions:HostNotificationController.kt:HostNotificationController</ID>
     <ID>TooManyFunctions:HostSessionQueries.kt:HostSessionQueries</ID>
-    <ID>TooManyFunctions:HostSessionWriteOperations.kt:HostSessionWriteOperations</ID>
-    <ID>TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCase</ID>
+    <ID>TooManyFunctions:InvitationService.kt:InvitationService : ManageHostInvitationsUseCasePreviewInvitationUseCaseAcceptGoogleInvitationUseCase</ID>
     <ID>TooManyFunctions:JdbcAiGenerationOpsAuditRepository.kt:JdbcAiGenerationOpsAuditRepository : AiGenerationAuditQueryPortAiGenerationAdminActionAuditPort</ID>
     <ID>TooManyFunctions:JdbcHostInvitationStoreAdapter.kt:JdbcHostInvitationStoreAdapter : HostInvitationStorePort</ID>
     <ID>TooManyFunctions:JdbcHostSessionWriteAdapter.kt:JdbcHostSessionWriteAdapter : HostSessionQueryPortHostSessionDraftPortHostSessionLifecyclePortHostSessionDeletionPortHostSessionAttendancePortHostSessionPublicationPort</ID>
-    <ID>TooManyFunctions:JdbcManualNotificationDispatchAdapter.kt:JdbcManualNotificationDispatchAdapter : ManualNotificationDispatchPort</ID>
     <ID>TooManyFunctions:JdbcMemberAccountAdapter.kt:JdbcMemberAccountAdapter : MemberIdentityLookupPortGoogleAccountStorePortPlatformAdminLookupPortDevSeedMemberLookupPort</ID>
     <ID>TooManyFunctions:JdbcMemberLifecycleStoreAdapter.kt:JdbcMemberLifecycleStoreAdapter : MemberLifecycleStorePort</ID>
     <ID>TooManyFunctions:JdbcNotificationDeliveryAdapter.kt:JdbcNotificationDeliveryAdapter : NotificationDeliveryPlanningPortNotificationDeliveryClaimPortNotificationDeliveryStatusPortNotificationDeliveryBacklogPortHostNotificationDeliveryLedgerPort</ID>

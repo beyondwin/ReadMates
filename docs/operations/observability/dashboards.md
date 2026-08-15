@@ -71,8 +71,17 @@
 
 실제 dashboard JSON은 `ops/grafana/dashboards/notification-dispatch.json`(title: "Notification Dispatch")입니다.
 
-### Panel: Outbox backlog (status별)
-- 목적: notification_deliveries 테이블의 status별 적체 행 수. 증가 지속 시 발송 장애.
+### Panel: Relay publish success ratio
+- 목적: 모든 fixed publish result 중 `success` 비율을 5분 rate로 표시합니다.
+- PromQL:
+  ```promql
+  (sum(rate(readmates_outbox_publish_total{result="success"}[5m])) or vector(0))
+    / clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)
+  ```
+- 해석: failure-only는 0, success-only는 1, 아직 어떤 result series도 없으면 0입니다. Prometheus datasource/query 자체가 unavailable인 상태는 이 0-fill 결과와 구분해 unavailable로 표시합니다.
+
+### Panel: Event outbox backlog (status별)
+- 목적: `notification_event_outbox`의 relay/Kafka publication 적체를 `pending|failed|dead|publishing`으로 분리합니다.
 - 메트릭: `readmates_notifications_outbox_backlog`
 - PromQL:
   ```promql
@@ -88,10 +97,16 @@
   ```promql
   readmates_notifications_outbox_backlog{status="dead"}
   ```
-  ```promql
-  readmates_notifications_outbox_backlog{status="sending"}
-  ```
 - 임계 (참고): `pending` > 100이 5분 이상 지속, 또는 `dead` > 0 지속 시 조사.
+
+### Panel: Email delivery backlog (status별)
+- 목적: `notification_deliveries`의 worker/SMTP 적체를 `pending|failed|dead|sending`으로 분리합니다.
+- 메트릭: `readmates_notifications_delivery_backlog`
+- PromQL:
+  ```promql
+  sum by (status) (readmates_notifications_delivery_backlog)
+  ```
+- 해석: 첫 refresh 전 `NaN`은 0건이 아니며, `readmates_notifications_backlog_refresh_total{result=~"partial|failure"}` 증가 시 마지막 성공 snapshot일 수 있습니다.
 
 ### Panel: Notification send rate (event_type별)
 - 목적: 알림 발송 성공 처리량 추적. 기대 발송 수에 비해 급감 시 이상.
@@ -279,7 +294,9 @@
 | Cost rate by provider/model | `readmates_aigen_cost_usd_total` | 최근 비용 증가율 확인 |
 | Top-N club cost | SQL drill-down 안내 | `club_id`를 metric label로 쓰지 않는 정책을 유지하면서 과금 원인 확인 |
 | Validation failures by reason | `readmates_aigen_validation_failures_total` | schema/author/template 실패 spike 확인 |
-| Active job backlog | `readmates_aigen_queue_depth` | Redis job store 기준 `PENDING` + `RUNNING` AI job 적체 확인 |
+| Authoritative queue depth | `readmates_aigen_queue_depth` | 완료된 현재 repair epoch 기준 `PENDING` + `RUNNING`; `NaN`은 0건이 아니라 unavailable |
+| Queue probe authority and last-success age | availability, `time() - last_success_timestamp`, sample interval | stopped sampler와 Redis/index ambiguity를 실제 backlog와 분리 |
+| Failure recovery and index repair outcomes | recovery/repair counter | Kafka·scheduler 복구와 bounded worklist/quarantine/ceiling 결과 분리 |
 | Jobs by status/provider | `readmates_aigen_jobs_completed_total` | 성공/실패/취소 비율 확인 |
 | Tokens by direction | `readmates_aigen_tokens_total` | input/cache_write_input/cache_read_input/output 4채널 사용량 확인 |
 | Cap denials by reason | `readmates_aigen_cap_denials_total` | host daily, club monthly, host per-minute cap 거절 확인 |
@@ -296,3 +313,5 @@ Latency histogram exemplar는 Grafana의 `readmates-tempo` datasource로 이동�
 - PromQL은 *복사-붙여넣기 가능*하게 단일 쿼리.
 - 도구 종속 (Grafana variables 등)은 일반화된 PromQL 위주로.
 - Micrometer 네이밍 규칙: `.`은 `_`으로 변환, counter는 `_total` suffix 자동 부착. 예: `readmates.notifications.sent` → `readmates_notifications_sent_total`.
+
+Notification Dispatch dashboard는 `readmates_outbox_publish_total` success ratio, event outbox backlog(`pending|failed|dead|publishing`), delivery backlog(`pending|failed|dead|sending`)를 분리합니다. delivery가 0이어도 relay가 정상이라는 뜻이 아니므로 outbox와 publish result를 먼저 보고, backlog refresh `partial|failure`이면 last-success snapshot의 시각을 확인합니다.

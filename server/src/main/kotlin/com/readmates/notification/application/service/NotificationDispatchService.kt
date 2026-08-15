@@ -1,6 +1,7 @@
 package com.readmates.notification.application.service
 
 import com.readmates.notification.application.model.NotificationDeliveryItem
+import com.readmates.notification.application.model.NotificationDeliveryRetryableException
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.port.`in`.DispatchNotificationEventUseCase
 import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
@@ -88,7 +89,3 @@ class NotificationDispatchService(
         )
     }
 }
-
-class NotificationDeliveryRetryableException(
-    message: String,
-) : RuntimeException(message)

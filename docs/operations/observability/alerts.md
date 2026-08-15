@@ -15,6 +15,8 @@
 ## 알림 목록 (anchors)
 
 <a id="notificationoutboxbackloghigh"></a>
+<a id="notificationoutboxrelaydead"></a>
+<a id="notificationdeliverybackloghigh"></a>
 <a id="notificationdeadletters"></a>
 <a id="notificationfailratehigh"></a>
 <a id="httperrorratehigh"></a>
@@ -28,6 +30,10 @@
 <a id="aigenschemafailurespike"></a>
 <a id="aigenbudgetexhaustion"></a>
 <a id="aigenqueuelaghigh"></a>
+<a id="aigenqueueprobeunavailable"></a>
+<a id="aigenqueueprobestale"></a>
+<a id="aigenrecoveryfailure"></a>
+<a id="aigenrecoveryindexrepairblocked"></a>
 <a id="aigenredisdown"></a>
 <a id="aigenprovidercircuitopen"></a>
 <a id="aigenestimatedunknowncostgrowth"></a>
@@ -45,7 +51,11 @@
 | `AiGenProviderErrorBurst` | warn | provider별 FAILED job ratio > 10% over 10m | `#provider-error-burst` |
 | `AiGenSchemaFailureSpike` | warn | `SCHEMA_INVALID` validation failure ratio > 20% over 1h | `#schema-failure-spike` |
 | `AiGenBudgetExhaustion` | info | aggregate 30d AI generation cost > $1000 | `#budget-exhaustion` |
-| `AiGenQueueLagHigh` | warn | Redis active AI job backlog `readmates_aigen_queue_depth > 50` for 5m | `#queue-lag-high` |
+| `AiGenQueueLagHigh` | warn | authoritative/fresh probe에서 Redis processing backlog > 50 for 5m | `#queue-lag-high` |
+| `AiGenQueueProbeUnavailable` | warn | availability가 0 또는 series absent for 2m | `#queue-probe-unavailable` |
+| `AiGenQueueProbeStale` | warn | last-success가 absent/NaN 또는 sample interval 3배 이상 stale | `#queue-probe-unavailable` |
+| `AiGenRecoveryFailure` | warn | 10m 내 job recovery `failed`/`corrupt` 증가 또는 nonzero series 최초 관측 | `#recovery-failure` |
+| `AiGenRecoveryIndexRepairBlocked` | warn | repair `quarantined`/`over_cap`/`failed` 증가 또는 nonzero series 최초 관측 | `#recovery-index-repair` |
 | `AiGenRedisDown` | critical | `redis_up == 0` and HTTP 5xx rate elevated | `#redis-down` |
 | `AiGenProviderCircuitOpen` | warn | provider circuit open for 5m | `#provider-circuit-open` |
 | `AiGenEstimatedUnknownCostGrowth` | warn | 15m unknown-estimated reserved cost growth | `#estimated-unknown-cost` |
@@ -74,10 +84,10 @@ groups:
         for: 10m
         labels:
           severity: warning
-          team: backend
+          component: notification
         annotations:
           summary: "Notification pending backlog over 100 for 10 minutes"
-          description: "Consumer가 처리 속도를 따라가지 못하거나 죽었을 가능성. consumer 로그 확인."
+          description: "Event relay가 Kafka publish 속도를 따라가지 못했거나 멈췄을 가능성. publish result와 relay/Kafka evidence 확인."
           runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationOutboxBacklogCritical
@@ -85,36 +95,53 @@ groups:
         for: 5m
         labels:
           severity: critical
-          team: backend
+          component: notification
         annotations:
           summary: "Notification pending backlog over 1000"
-          description: "Consumer가 죽었거나 의존 인프라가 unreachable. 즉시 조사."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
+          description: "Event relay 또는 Kafka publication이 중단됐을 가능성. delivery worker가 아니라 event outbox evidence를 즉시 조사."
 
       - alert: NotificationFailRateHigh
         expr: |
-          sum(rate(readmates_notifications_failed_total[5m]))
-            / clamp_min(sum(rate(readmates_notifications_sent_total[5m]))
-                       + sum(rate(readmates_notifications_failed_total[5m])), 1) > 0.05
+          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
+            / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
+                       + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9) > 0.05
         for: 10m
         labels:
           severity: warning
-          team: backend
+          component: notification
         annotations:
           summary: "Notification 실패율 5% 초과 (10분)"
-          description: "발송 실패가 지속. 외부 채널(예: FCM) 장애 또는 payload 변경 의심."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
+          description: "Email delivery 실패가 지속. SMTP/provider 또는 delivery worker evidence 확인."
 
       - alert: NotificationDeadLetters
         expr: increase(readmates_notifications_dead_total[1h]) > 0
         for: 0m
         labels:
           severity: warning
-          team: backend
+          component: notification
         annotations:
           summary: "Notification dead-letter 발생 (1시간 내)"
-          description: "발송이 최종 포기된 알림이 있습니다. notification_deliveries.status='DEAD' 로우 조사."
-          runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
+          description: "발송이 최종 포기된 알림. notification_deliveries.status='DEAD' 로우 조사."
+
+      - alert: NotificationOutboxRelayDead
+        expr: max(readmates_notifications_outbox_backlog{status="dead"}) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification event outbox DEAD row detected"
+          description: "Delivery row 생성 전 relay가 missing payload, retry exhaustion 또는 deadline으로 종료됐다. outbox 상태와 publish result를 확인."
+
+      - alert: NotificationDeliveryBacklogHigh
+        expr: max(readmates_notifications_delivery_backlog{status=~"pending|failed|sending"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification delivery backlog over 100 for 10 minutes"
+          description: "이 값은 event outbox가 아니라 delivery rows다. SMTP/provider 상태와 delivery worker를 확인."
 
   - name: readmates.http
     interval: 30s
@@ -231,3 +258,9 @@ count > 0이면 운영자에게 알림 (이메일 또는 in-app).
 - Alertmanager receiver를 운영 SMTP 또는 팀 알림 채널에 연결한다.
 - 한 달치 production data가 쌓이면 false positive와 threshold를 조정한다.
 - `node-exporter`, `cadvisor`, `blackbox-exporter`는 production v1 이후 별도 계획으로 추가한다.
+
+NotificationOutboxBacklog/RelayDead는 event relay, NotificationDeliveryBacklog/DeadLetters는 SMTP delivery 경보다. event outbox와 delivery rows를 같은 queue로 해석하지 않는다.
+
+NotificationFailRateHigh는 lazy `failed`/`sent` aggregate를 각각 `or vector(0)`으로 채우고 per-second rate 분모에 `1e-9` floor를 사용합니다. 5분에 실패 한 건뿐인 저빈도 구간은 failure ratio 1.0으로 평가해 alert가 유지되고, success-only 또는 series가 전혀 없는 구간은 ratio 0으로 평가해 이 alert가 발생하지 않습니다. Prometheus query 자체가 unavailable이면 이 0-fill contract와 별도 운영 장애로 취급합니다.
+
+Backlog gauge가 첫 refresh 전 `NaN`이거나 refresh result가 `partial|failure`인 경우 0건으로 해석하지 않습니다. 마지막 성공 snapshot과 `readmates_notifications_backlog_refresh_total`을 먼저 확인합니다.

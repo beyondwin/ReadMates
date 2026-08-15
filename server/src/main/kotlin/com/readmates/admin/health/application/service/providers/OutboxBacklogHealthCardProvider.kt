@@ -6,26 +6,23 @@ import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.PlatformAdminHealthLocalReadingsPort
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.service.HealthCardProvider
-import io.micrometer.core.instrument.MeterRegistry
 import org.springframework.stereotype.Component
 import java.time.Clock
 
 @Component
 class OutboxBacklogHealthCardProvider(
-    private val meterRegistry: MeterRegistry,
+    private val localReadings: PlatformAdminHealthLocalReadingsPort,
     private val clock: Clock,
 ) : HealthCardProvider {
-    override val cardId: String = "outbox_backlog"
+    override val identity: PlatformHealthProvider = PlatformHealthProvider.OUTBOX_BACKLOG
 
     override fun compute(): HealthCard {
         val now = clock.instant()
-        val gauge =
-            meterRegistry
-                .find("readmates.notifications.outbox.backlog")
-                .tag("status", "pending")
-                .gauge()
-        if (gauge == null) {
+        val pending = localReadings.outboxPendingBacklog()
+        if (pending == null) {
             return HealthCard(
                 id = cardId,
                 title = "Outbox backlog",
@@ -38,7 +35,6 @@ class OutboxBacklogHealthCardProvider(
                 reason = "outbox_gauge_unavailable",
             )
         }
-        val pending = gauge.value()
         val status =
             when {
                 pending >= CRIT_THRESHOLD -> HealthCardStatus.CRIT

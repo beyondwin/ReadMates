@@ -1,5 +1,8 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.GoogleLoginException
+import com.readmates.auth.application.model.GoogleLoginResult
+import com.readmates.auth.application.port.`in`.LoginVerifiedGoogleUserUseCase
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.MemberAccountDuplicateException
 import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
@@ -15,23 +18,13 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.Locale
 import java.util.UUID
 
-data class GoogleLoginResult(
-    val userId: UUID,
-    val currentMember: CurrentMember?,
-)
-
-class GoogleLoginException(
-    message: String,
-    val redirectError: String = "google",
-) : RuntimeException(message)
-
 @Service
 class GoogleLoginService(
     private val memberIdentityLookup: MemberIdentityLookupPort,
     private val googleAccountStore: GoogleAccountStorePort,
     private val platformAdminLookup: PlatformAdminLookupPort,
     private val avatarAllocation: MemberAvatarAllocationPort,
-) {
+) : LoginVerifiedGoogleUserUseCase {
     @Transactional(isolation = Isolation.READ_COMMITTED)
     fun loginVerifiedGoogleUser(
         googleSubjectId: String,
@@ -51,12 +44,12 @@ class GoogleLoginService(
     }
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
-    fun loginVerifiedGoogleUserForSession(
+    override fun loginVerifiedGoogleUserForSession(
         googleSubjectId: String,
         email: String,
         displayName: String?,
         profileImageUrl: String?,
-        targetClubSlug: String? = null,
+        targetClubSlug: String?,
     ): GoogleLoginResult {
         val normalizedSubject = requiredGoogleSubject(googleSubjectId)
         val normalizedEmail = requiredGoogleEmail(email)

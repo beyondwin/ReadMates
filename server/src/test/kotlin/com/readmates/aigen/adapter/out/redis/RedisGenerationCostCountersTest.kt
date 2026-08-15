@@ -4,14 +4,17 @@ import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.GuardDecision
+import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.data.redis.connection.DataType
 import org.springframework.data.redis.core.StringRedisTemplate
 import org.springframework.test.context.bean.override.mockito.MockitoBean
+import java.time.Duration
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -42,6 +45,7 @@ import java.util.concurrent.TimeUnit
 class RedisGenerationCostCountersTest(
     @param:Autowired private val guard: GenerationCostGuard,
     @param:Autowired private val redisTemplate: StringRedisTemplate,
+    @param:Autowired private val properties: AiGenerationProperties,
 ) : ReadmatesRedisIntegrationTestSupport() {
     @Suppress("UnusedPrivateProperty")
     @MockitoBean
@@ -58,6 +62,12 @@ class RedisGenerationCostCountersTest(
         assertThat(redisTemplate.opsForValue().get("aigen:club:$clubId:provider_admission"))
             .isEqualTo(admissionId.toString())
         assertThat(redisTemplate.getExpire("aigen:host:$hostId:daily", TimeUnit.SECONDS)).isPositive()
+        val receipt = redisTemplate.opsForHash<String, String>().entries("aigen:job:$admissionId:admission-receipt")
+        assertThat(receipt["dailyToken"]).isNotBlank()
+        assertThat(receipt["minuteToken"]).isNotBlank()
+        assertThat(receipt).containsEntry("dailyCharged", "1").containsEntry("minuteCharged", "1")
+        assertThat(redisTemplate.getExpire("aigen:job:$admissionId:admission-receipt", TimeUnit.SECONDS))
+            .isBetween(properties.job.redisTtl.seconds - 1, properties.job.redisTtl.seconds)
     }
 
     @Test
@@ -96,4 +106,164 @@ class RedisGenerationCostCountersTest(
         assertThat(redisTemplate.opsForValue().get("aigen:host:$hostId:daily")).isEqualTo("1")
         assertThat(redisTemplate.opsForValue().get("aigen:host:$hostId:minute")).isEqualTo("1")
     }
+
+    @Test
+    fun `legacy daily and minute windows rotate missing or malformed tokens without extending counter ttl`() {
+        val hostId = UUID.randomUUID()
+        val daily = "aigen:host:$hostId:daily"
+        val minute = "aigen:host:$hostId:minute"
+        val dailyToken = "$daily:window-token"
+        val minuteToken = "$minute:window-token"
+        redisTemplate.opsForValue().set(daily, "2", Duration.ofSeconds(90))
+        redisTemplate.opsForValue().set(minute, "3", Duration.ofSeconds(45))
+        redisTemplate.opsForValue().set(minuteToken, "malformed", Duration.ofSeconds(45))
+        val dailyBefore = redisTemplate.getExpire(daily, TimeUnit.MILLISECONDS)
+        val minuteBefore = redisTemplate.getExpire(minute, TimeUnit.MILLISECONDS)
+
+        val admissionId = UUID.randomUUID()
+        assertThat(guard.checkBeforeCall(hostId, UUID.randomUUID(), admissionId)).isEqualTo(GuardDecision.Allow)
+
+        val dailyAfter = redisTemplate.getExpire(daily, TimeUnit.MILLISECONDS)
+        val minuteAfter = redisTemplate.getExpire(minute, TimeUnit.MILLISECONDS)
+        assertThat(dailyAfter).isBetween(dailyBefore - 1_000, dailyBefore)
+        assertThat(minuteAfter).isBetween(minuteBefore - 1_000, minuteBefore)
+        assertThat(redisTemplate.getExpire(dailyToken, TimeUnit.MILLISECONDS))
+            .isBetween(dailyAfter - 50, dailyAfter + 50)
+        assertThat(redisTemplate.getExpire(minuteToken, TimeUnit.MILLISECONDS))
+            .isBetween(minuteAfter - 50, minuteAfter + 50)
+        assertThat(redisTemplate.opsForValue().get(dailyToken)).isNotBlank().isNotEqualTo("malformed")
+        assertThat(redisTemplate.opsForValue().get(minuteToken)).isNotBlank().isNotEqualTo("malformed")
+    }
+
+    @Test
+    fun `ordinary release cannot refund recreated daily or minute windows and deletes only matching lease`() {
+        val hostId = UUID.randomUUID()
+        val clubId = UUID.randomUUID()
+        val admissionId = UUID.randomUUID()
+        assertThat(guard.checkBeforeCall(hostId, clubId, admissionId)).isEqualTo(GuardDecision.Allow)
+        redisTemplate.opsForValue().set("aigen:host:$hostId:daily", "8", Duration.ofHours(1))
+        redisTemplate
+            .opsForValue()
+            .set("aigen:host:$hostId:daily:window-token", UUID.randomUUID().toString(), Duration.ofHours(1))
+        redisTemplate.opsForValue().set("aigen:host:$hostId:minute", "6", Duration.ofSeconds(30))
+        redisTemplate
+            .opsForValue()
+            .set("aigen:host:$hostId:minute:window-token", UUID.randomUUID().toString(), Duration.ofSeconds(30))
+        redisTemplate.opsForValue().set("aigen:club:$clubId:provider_admission", UUID.randomUUID().toString())
+
+        guard.releaseAdmission(hostId, clubId, admissionId)
+
+        assertThat(redisTemplate.opsForValue().get("aigen:host:$hostId:daily")).isEqualTo("8")
+        assertThat(redisTemplate.opsForValue().get("aigen:host:$hostId:minute")).isEqualTo("6")
+        assertThat(redisTemplate.opsForValue().get("aigen:club:$clubId:provider_admission")).isNotNull()
+        assertThat(redisTemplate.hasKey("aigen:job:$admissionId:admission-receipt")).isFalse()
+    }
+
+    @Test
+    fun `legacy counter without finite positive ttl fails closed`() {
+        val hostId = UUID.randomUUID()
+        redisTemplate.opsForValue().set("aigen:host:$hostId:daily", "1")
+
+        assertThat(guard.checkBeforeCall(hostId, UUID.randomUUID(), UUID.randomUUID()))
+            .isEqualTo(GuardDecision.Deny(ErrorCode.RATE_LIMITED))
+    }
+
+    @Test
+    fun `malformed receipt token preserves the entire admission state`() {
+        val hostId = UUID.randomUUID()
+        val clubId = UUID.randomUUID()
+        val admissionId = UUID.randomUUID()
+        assertThat(guard.checkBeforeCall(hostId, clubId, admissionId)).isEqualTo(GuardDecision.Allow)
+        redisTemplate.opsForHash<String, String>().delete(
+            "aigen:job:$admissionId:admission-receipt",
+            "dailyToken",
+        )
+
+        guard.releaseAdmission(hostId, clubId, admissionId)
+
+        assertThat(redisTemplate.opsForValue().get("aigen:host:$hostId:daily")).isEqualTo("1")
+        assertThat(redisTemplate.opsForValue().get("aigen:host:$hostId:minute")).isEqualTo("1")
+        assertThat(redisTemplate.hasKey("aigen:job:$admissionId:admission-receipt")).isTrue()
+        assertThat(redisTemplate.opsForValue().get("aigen:club:$clubId:provider_admission"))
+            .isEqualTo(admissionId.toString())
+    }
+
+    @Test
+    fun `ordinary release validates all accounting state before any mutation across retries`() {
+        listOf(
+            "daily-counter",
+            "minute-counter",
+            "daily-window-token",
+            "minute-window-token",
+            "receipt-token",
+            "receipt-shape",
+            "lease-type",
+        ).forEach { corruption ->
+            val hostId = UUID.randomUUID()
+            val clubId = UUID.randomUUID()
+            val admissionId = UUID.randomUUID()
+            assertThat(guard.checkBeforeCall(hostId, clubId, admissionId)).isEqualTo(GuardDecision.Allow)
+            val dailyKey = "aigen:host:$hostId:daily"
+            val minuteKey = "aigen:host:$hostId:minute"
+            val dailyTokenKey = "$dailyKey:window-token"
+            val minuteTokenKey = "$minuteKey:window-token"
+            val receiptKey = "aigen:job:$admissionId:admission-receipt"
+            val leaseKey = "aigen:club:$clubId:provider_admission"
+            when (corruption) {
+                "daily-counter" -> redisTemplate.opsForValue().set(dailyKey, "01")
+                "minute-counter" -> redisTemplate.opsForValue().set(minuteKey, "01")
+                "daily-window-token" ->
+                    redisTemplate.opsForValue().set(dailyTokenKey, "00000000-0000-0000-0000-00000000000-")
+                "minute-window-token" -> redisTemplate.opsForValue().set(minuteTokenKey, "malformed")
+                "receipt-token" ->
+                    redisTemplate.opsForHash<String, String>().put(receiptKey, "minuteToken", "malformed")
+                "receipt-shape" ->
+                    redisTemplate.opsForHash<String, String>().put(receiptKey, "unexpected", "value")
+                "lease-type" -> {
+                    redisTemplate.delete(leaseKey)
+                    redisTemplate.opsForHash<String, String>().put(leaseKey, "unexpected", "value")
+                }
+            }
+            val before = admissionSnapshot(dailyKey, minuteKey, dailyTokenKey, minuteTokenKey, receiptKey, leaseKey)
+
+            repeat(2) {
+                guard.releaseAdmission(hostId, clubId, admissionId)
+                assertThat(
+                    admissionSnapshot(dailyKey, minuteKey, dailyTokenKey, minuteTokenKey, receiptKey, leaseKey),
+                ).describedAs(corruption).isEqualTo(before)
+            }
+        }
+    }
+
+    private fun admissionSnapshot(
+        dailyKey: String,
+        minuteKey: String,
+        dailyTokenKey: String,
+        minuteTokenKey: String,
+        receiptKey: String,
+        leaseKey: String,
+    ) = AdmissionSnapshot(
+        daily = redisTemplate.opsForValue().get(dailyKey),
+        minute = redisTemplate.opsForValue().get(minuteKey),
+        dailyToken = redisTemplate.opsForValue().get(dailyTokenKey),
+        minuteToken = redisTemplate.opsForValue().get(minuteTokenKey),
+        receipt = redisTemplate.opsForHash<String, String>().entries(receiptKey),
+        leaseType = redisTemplate.type(leaseKey),
+        lease =
+            if (redisTemplate.type(leaseKey) == DataType.STRING) {
+                redisTemplate.opsForValue().get(leaseKey)
+            } else {
+                null
+            },
+    )
 }
+
+private data class AdmissionSnapshot(
+    val daily: String?,
+    val minute: String?,
+    val dailyToken: String?,
+    val minuteToken: String?,
+    val receipt: Map<String, String>,
+    val leaseType: DataType?,
+    val lease: String?,
+)

@@ -1,18 +1,20 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
-import com.readmates.notification.application.model.sanitizeNotificationError
 import com.readmates.notification.application.port.out.MailDeliveryCommand
+import com.readmates.notification.application.port.out.MailDeliveryFailure
+import com.readmates.notification.application.port.out.MailDeliveryFailureKind
 import com.readmates.notification.application.port.out.MailDeliveryPort
 import com.readmates.notification.application.port.out.NotificationDeliveryStatusPort
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import org.slf4j.LoggerFactory
-import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import java.time.Clock
 import java.util.UUID
 
-private const val MAX_DELIVERY_ENGINE_ERROR_LENGTH = 500
-private val DEFAULT_DELIVERY_ENGINE_RETRY_DELAYS_MINUTES = listOf(5L, 15L, 60L, 240L)
+private const val DELIVERY_EXPIRED_ERROR = "DELIVERY_EXPIRED"
+private const val DELIVERY_CONTENT_INVALID_ERROR = "DELIVERY_CONTENT_INVALID"
 
 sealed interface DeliveryEngineResult {
     data object Sent : DeliveryEngineResult
@@ -29,25 +31,43 @@ class NotificationDeliveryEngine(
     private val deliveryStatusPort: NotificationDeliveryStatusPort,
     private val mailDeliveryPort: MailDeliveryPort,
     private val metrics: ReadmatesOperationalMetrics,
-    @param:Value("\${readmates.notifications.kafka.max-delivery-attempts:5}") private val maxAttempts: Int,
-    @param:Value("\${readmates.notifications.retry-delay-minutes:5,15,60,240}")
-    private val retryDelayMinutesConfig: List<Long>,
+    private val runtimeProperties: NotificationRuntimeProperties,
+    private val clock: Clock,
 ) {
-    fun sendClaimed(item: ClaimedNotificationDeliveryItem): DeliveryEngineResult {
-        val command =
-            MailDeliveryCommand(
-                to = requiredDeliveryField(item.id, "recipientEmail", item.recipientEmail),
-                subject = requiredDeliveryField(item.id, "subject", item.subject),
-                text = requiredDeliveryField(item.id, "bodyText", item.bodyText),
-                html = item.bodyHtml?.takeIf { it.isNotBlank() },
-            )
+    init {
+        require(
+            runtimeProperties.worker.retryDelays.size >=
+                runtimeProperties.kafka.maxDeliveryAttempts - 1,
+        ) {
+            "readmates.notifications.worker.retry-delays must cover every nonterminal delivery attempt"
+        }
+    }
 
+    fun sendClaimed(item: ClaimedNotificationDeliveryItem): DeliveryEngineResult {
+        val now = clock.instant()
+        val deadline = item.createdAt.toInstant().plus(runtimeProperties.worker.deliveryMaxAge)
+        return if (now.isBefore(deadline)) {
+            item
+                .toMailDeliveryCommand()
+                ?.let { command -> deliver(item, command) }
+                ?: markDead(item, DELIVERY_CONTENT_INVALID_ERROR)
+        } else {
+            markDead(item, DELIVERY_EXPIRED_ERROR)
+        }
+    }
+
+    private fun deliver(
+        item: ClaimedNotificationDeliveryItem,
+        command: MailDeliveryCommand,
+    ): DeliveryEngineResult =
         try {
             mailDeliveryPort.send(command)
-        } catch (exception: Exception) {
-            return markFailure(item, exception)
+            markSent(item)
+        } catch (failure: MailDeliveryFailure) {
+            handleMailFailure(item, failure.kind)
         }
 
+    private fun markSent(item: ClaimedNotificationDeliveryItem): DeliveryEngineResult {
         if (!deliveryStatusPort.markDeliverySent(item.id, item.lockedAt)) {
             throw staleDeliveryLeaseException(item.id, NotificationDeliveryStatus.SENT)
         }
@@ -60,24 +80,14 @@ class NotificationDeliveryEngine(
         return DeliveryEngineResult.Sent
     }
 
-    private fun markFailure(
+    private fun handleMailFailure(
         item: ClaimedNotificationDeliveryItem,
-        exception: Exception,
+        kind: MailDeliveryFailureKind,
     ): DeliveryEngineResult {
-        val error = exception.toStorageError()
-        if (item.attemptCount + 1 >= maxAttempts.coerceAtLeast(1)) {
-            if (!deliveryStatusPort.markDeliveryDead(item.id, item.lockedAt, error)) {
-                throw staleDeliveryLeaseException(item.id, NotificationDeliveryStatus.DEAD)
-            }
-            metrics.dead(item.eventType)
-            logger.warn(
-                "Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}",
-                item.id,
-                item.eventType,
-                item.attemptCount + 1,
-                error,
-            )
-            return DeliveryEngineResult.Dead
+        val error = kind.storageCode
+        val attemptsExhausted = item.attemptCount + 1 >= runtimeProperties.kafka.maxDeliveryAttempts
+        if (kind == MailDeliveryFailureKind.PERMANENT || attemptsExhausted) {
+            return markDead(item, error)
         }
 
         val marked =
@@ -85,7 +95,7 @@ class NotificationDeliveryEngine(
                 id = item.id,
                 lockedAt = item.lockedAt,
                 error = error,
-                nextAttemptDelayMinutes = retryDelayMinutes(item.attemptCount),
+                nextAttemptDelayMinutes = runtimeProperties.worker.retryDelays[item.attemptCount].toMinutes(),
             )
         if (!marked) {
             throw staleDeliveryLeaseException(item.id, NotificationDeliveryStatus.FAILED)
@@ -98,32 +108,47 @@ class NotificationDeliveryEngine(
             item.attemptCount + 1,
             error,
         )
-        return DeliveryEngineResult.RetryableFailure(
-            "Email delivery ${item.id} failed and is scheduled for retry: $error",
+        return DeliveryEngineResult.RetryableFailure(error)
+    }
+
+    private fun markDead(
+        item: ClaimedNotificationDeliveryItem,
+        error: String,
+    ): DeliveryEngineResult {
+        if (!deliveryStatusPort.markDeliveryDead(item.id, item.lockedAt, error)) {
+            throw staleDeliveryLeaseException(item.id, NotificationDeliveryStatus.DEAD)
+        }
+        metrics.dead(item.eventType)
+        logger.warn(
+            "Notification email delivery dead deliveryId={} eventType={} attemptCount={} error={}",
+            item.id,
+            item.eventType,
+            item.attemptCount + 1,
+            error,
         )
+        return DeliveryEngineResult.Dead
     }
 
-    private fun retryDelayMinutes(attemptCount: Int): Long {
-        val delays = retryDelayMinutesConfig.ifEmpty { DEFAULT_DELIVERY_ENGINE_RETRY_DELAYS_MINUTES }
-        return delays[attemptCount.coerceIn(0, delays.lastIndex)]
+    private fun ClaimedNotificationDeliveryItem.toMailDeliveryCommand(): MailDeliveryCommand? {
+        val to = recipientEmail?.takeIf(String::isNotBlank)
+        val mailSubject = subject?.takeIf(String::isNotBlank)
+        val text = bodyText?.takeIf(String::isNotBlank)
+        return if (to == null || mailSubject == null || text == null) {
+            null
+        } else {
+            MailDeliveryCommand(
+                to = to,
+                subject = mailSubject,
+                text = text,
+                html = bodyHtml?.takeIf(String::isNotBlank),
+            )
+        }
     }
-
-    private fun requiredDeliveryField(
-        deliveryId: UUID,
-        name: String,
-        value: String?,
-    ): String =
-        value?.takeIf { it.isNotBlank() }
-            ?: throw IllegalStateException("Claimed email delivery $deliveryId missing $name")
 
     private fun staleDeliveryLeaseException(
         id: UUID,
         status: NotificationDeliveryStatus,
     ): IllegalStateException = IllegalStateException("Could not mark email delivery $id $status; delivery lease changed")
-
-    private fun Exception.toStorageError(): String =
-        sanitizeNotificationError(message ?: javaClass.simpleName, MAX_DELIVERY_ENGINE_ERROR_LENGTH)
-            ?: javaClass.simpleName.take(MAX_DELIVERY_ENGINE_ERROR_LENGTH)
 
     private companion object {
         private val logger = LoggerFactory.getLogger(NotificationDeliveryEngine::class.java)

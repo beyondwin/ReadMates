@@ -8,12 +8,12 @@ import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.InvalidHostSessionCursorException
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.requireHost
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
@@ -229,7 +229,7 @@ internal class HostSessionQueries {
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.toHostDashboardOpenMetrics() },
                 member.clubId.dbString(),
-            ) ?: HostDashboardOpenMetrics(rsvpPending = 0, checkinMissing = 0)
+            )
 
         val publishPending =
             jdbcTemplate.queryForObject(

@@ -1,13 +1,13 @@
 package com.readmates.aigen.adapter.out.resilience
 
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCircuitState
+import com.readmates.aigen.application.port.out.AiGenerationAdapterMetricsPort
 import com.readmates.aigen.application.port.out.ProviderCallGate
 import com.readmates.aigen.application.port.out.ProviderCallPermit
 import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
 import com.readmates.aigen.application.port.out.ProviderGateRejection
 import com.readmates.aigen.application.port.out.ProviderPermitDecision
-import com.readmates.aigen.application.service.AiGenerationMetrics
-import com.readmates.aigen.application.service.ProviderCircuitState
 import com.readmates.aigen.config.AiGenerationProperties
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
@@ -22,14 +22,14 @@ import java.util.concurrent.TimeUnit
 @Component
 class ResilientProviderCallGate internal constructor(
     properties: AiGenerationProperties,
-    private val metrics: AiGenerationMetrics,
+    private val metrics: AiGenerationAdapterMetricsPort,
     private val circuitBreakerRegistry: CircuitBreakerRegistry,
     meterRegistry: MeterRegistry,
 ) : ProviderCallGate {
     @Autowired
     constructor(
         properties: AiGenerationProperties,
-        metrics: AiGenerationMetrics,
+        metrics: AiGenerationAdapterMetricsPort,
         meterRegistry: MeterRegistry,
     ) : this(properties, metrics, CircuitBreakerRegistry.ofDefaults(), meterRegistry)
 
@@ -92,7 +92,7 @@ class ResilientProviderCallGate internal constructor(
         private val provider: Provider,
         private val circuitBreaker: CircuitBreaker,
         private val semaphore: Semaphore,
-        private val metrics: AiGenerationMetrics,
+        private val metrics: AiGenerationAdapterMetricsPort,
     ) : ProviderCallPermit {
         private var lifecycleState = PermitLifecycleState.ACTIVE
 

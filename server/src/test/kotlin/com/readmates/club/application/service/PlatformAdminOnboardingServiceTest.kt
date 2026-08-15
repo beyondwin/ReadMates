@@ -1,6 +1,5 @@
 package com.readmates.club.application.service
 
-import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.FirstHostOnboardingState
@@ -16,6 +15,8 @@ import com.readmates.club.application.port.out.CreateClubDomainPort
 import com.readmates.club.application.port.out.CreateClubDomainResult
 import com.readmates.club.application.port.out.CreatePlatformAdminClubCommand
 import com.readmates.club.application.port.out.CreatePlatformAdminHostInvitationCommand
+import com.readmates.club.application.port.out.GeneratePlatformAdminInvitationTokenPort
+import com.readmates.club.application.port.out.GeneratedPlatformAdminInvitationToken
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
 import com.readmates.club.application.port.out.PlatformAdminExistingUser
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
@@ -24,8 +25,9 @@ import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
-import com.readmates.club.domain.PlatformAdminRole
-import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
@@ -47,7 +49,7 @@ class PlatformAdminOnboardingServiceTest {
         val service = service(ports, mail)
 
         assertThatThrownBy {
-            service.commit(operatorAdmin(), commandWithNewHostAndDomain())
+            service.commit(operatorActor(), commandWithNewHostAndDomain())
         }.isInstanceOfSatisfying(PlatformAdminException::class.java) {
             assertThat(it.error).isEqualTo(PlatformAdminError.CLUB_DOMAIN_CONFLICT)
         }
@@ -59,15 +61,33 @@ class PlatformAdminOnboardingServiceTest {
     fun `commit sends one invitation email after successful persistence`() {
         val ports = FakePlatformAdminOnboardingPorts()
         val mail = FakePlatformAdminInvitationMail()
-        val service = service(ports, mail)
+        val transactionManager = RecordingTransactionManager()
+        mail.transactionState = { transactionManager.transactionActive }
+        val service = service(ports, mail, transactionManager = transactionManager)
 
-        val result = service.commit(operatorAdmin(), commandWithNewHostAndDomain())
+        val result = service.commit(operatorActor(), commandWithNewHostAndDomain())
 
         assertThat(result.hostOnboarding.kind).isEqualTo(HostOnboardingResultKind.INVITATION_CREATED)
         assertThat(result.hostOnboarding.emailDelivery.status).isEqualTo(PlatformAdminEmailDeliveryStatus.SENT)
         assertThat(mail.sent).hasSize(1)
         assertThat(mail.sent.single().email).isEqualTo("host@example.com")
-        assertThat(mail.sent.single().acceptUrl).startsWith("https://app.example.com/clubs/new-club/invite/")
+        assertThat(mail.sent.single().acceptUrl)
+            .isEqualTo("https://app.example.com/clubs/new-club/invite/platform-admin-raw-token")
+        assertThat(ports.createdInvitations.single().tokenHash)
+            .isEqualTo("platform-admin-token-hash")
+        assertThat(mail.transactionStates).containsExactly(false)
+    }
+
+    @Test
+    fun `support actor is denied before onboarding ports are touched`() {
+        val ports = FakePlatformAdminOnboardingPorts()
+        val service = service(ports, FakePlatformAdminInvitationMail())
+
+        assertThatThrownBy {
+            service.preview(supportActor(), commandWithNewHostAndDomain())
+        }.isInstanceOf(AccessDeniedException::class.java)
+
+        assertThat(ports.onboardingReads).isZero()
     }
 }
 
@@ -84,25 +104,71 @@ private class NoOpTransactionManager : AbstractPlatformTransactionManager() {
     override fun doRollback(status: DefaultTransactionStatus) = Unit
 }
 
+private class RecordingTransactionManager : AbstractPlatformTransactionManager() {
+    var transactionActive = false
+        private set
+
+    override fun doGetTransaction(): Any = Any()
+
+    override fun doBegin(
+        transaction: Any,
+        definition: TransactionDefinition,
+    ) {
+        transactionActive = true
+    }
+
+    override fun doCommit(status: DefaultTransactionStatus) {
+        transactionActive = false
+    }
+
+    override fun doRollback(status: DefaultTransactionStatus) {
+        transactionActive = false
+    }
+}
+
 private fun service(
     ports: FakePlatformAdminOnboardingPorts,
     mail: FakePlatformAdminInvitationMail,
+    tokenGenerator: GeneratePlatformAdminInvitationTokenPort = fixedTokenGenerator(),
+    transactionManager: AbstractPlatformTransactionManager = NoOpTransactionManager(),
 ): PlatformAdminOnboardingService =
     PlatformAdminOnboardingService(
         onboardingPort = ports,
         loadClubsPort = ports,
         createClubDomainPort = ports,
         sendHostInvitationEmailPort = mail,
-        invitationTokenService = InvitationTokenService(),
-        transactionTemplate = TransactionTemplate(NoOpTransactionManager()),
+        generateInvitationTokenPort = tokenGenerator,
+        transactionTemplate = TransactionTemplate(transactionManager),
         appBaseUrl = "https://app.example.com",
     )
 
-private fun operatorAdmin(): CurrentPlatformAdmin =
-    CurrentPlatformAdmin(
-        userId = UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
-        email = "admin@example.com",
-        role = PlatformAdminRole.OPERATOR,
+private fun fixedTokenGenerator(): GeneratePlatformAdminInvitationTokenPort =
+    GeneratePlatformAdminInvitationTokenPort {
+        GeneratedPlatformAdminInvitationToken(
+            rawToken = "platform-admin-raw-token",
+            tokenHash = "platform-admin-token-hash",
+        )
+    }
+
+private fun operatorActor(): PlatformActor =
+    actorWith(
+        PlatformCapability.VIEW_CLUBS,
+        PlatformCapability.VIEW_CLUB_OPERATIONS,
+        PlatformCapability.CREATE_CLUB,
+        PlatformCapability.MANAGE_CLUBS,
+        PlatformCapability.MANAGE_CLUB_DOMAINS,
+    )
+
+private fun actorWith(vararg capabilities: PlatformCapability): PlatformActor =
+    PlatformActor(
+        adminId = UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
+        capabilities = capabilities.toSet(),
+    )
+
+private fun supportActor(): PlatformActor =
+    actorWith(
+        PlatformCapability.VIEW_CLUBS,
+        PlatformCapability.VIEW_CLUB_OPERATIONS,
     )
 
 private fun commandWithNewHostAndDomain(): PlatformAdminOnboardingCommand =
@@ -135,12 +201,15 @@ private class FakePlatformAdminInvitationMail : SendPlatformAdminHostInvitationE
     )
 
     val sent = mutableListOf<Sent>()
+    val transactionStates = mutableListOf<Boolean>()
+    var transactionState: () -> Boolean = { false }
 
     override fun send(
         to: String,
         clubName: String,
         acceptUrl: String,
     ) {
+        transactionStates += transactionState()
         sent += Sent(to, clubName, acceptUrl)
     }
 }
@@ -153,16 +222,23 @@ private class FakePlatformAdminOnboardingPorts :
     var existingSlugs: MutableSet<String> = mutableSetOf()
     var existingDomainHostnames: MutableSet<String> = mutableSetOf()
     var createDomainResult: CreateClubDomainResult? = null
+    var onboardingReads: Int = 0
 
     val createdClubs = mutableListOf<CreatePlatformAdminClubCommand>()
     val createdInvitations = mutableListOf<CreatePlatformAdminHostInvitationCommand>()
     val upsertedMemberships = mutableListOf<Triple<UUID, UUID, String>>()
 
-    override fun slugExists(slug: String): Boolean = slug in existingSlugs
+    override fun slugExists(slug: String): Boolean {
+        onboardingReads += 1
+        return slug in existingSlugs
+    }
 
     override fun domainHostnameExists(hostname: String): Boolean = hostname in existingDomainHostnames
 
-    override fun findUserByEmail(email: String): PlatformAdminExistingUser? = existingUserByEmail
+    override fun findUserByEmail(email: String): PlatformAdminExistingUser? {
+        onboardingReads += 1
+        return existingUserByEmail
+    }
 
     override fun createClub(command: CreatePlatformAdminClubCommand): UUID {
         createdClubs += command

@@ -1,12 +1,12 @@
 package com.readmates.admin.health.application.service.providers
 
-import com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 import com.readmates.admin.health.application.model.HealthCard
 import com.readmates.admin.health.application.model.HealthCardDrill
 import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import com.readmates.admin.health.application.service.HealthCardProvider
 import org.springframework.stereotype.Component
@@ -18,23 +18,17 @@ class NotificationDispatchSuccessCardProvider(
     private val prometheusQueryPort: PrometheusQueryPort,
     private val clock: Clock,
 ) : HealthCardProvider {
-    override val cardId: String = "notification_dispatch_success"
+    override val identity: PlatformHealthProvider = PlatformHealthProvider.NOTIFICATION_DISPATCH_SUCCESS
 
-    @Suppress("ReturnCount", "SwallowedException")
+    @Suppress("ReturnCount")
     override fun compute(): HealthCard {
         val now = clock.instant()
         val ratio =
-            try {
-                prometheusQueryPort
-                    .query(PROMQL)
-                    .values
-                    .firstOrNull()
-                    ?.value
-            } catch (ignored: PrometheusQueryException) {
-                // Health probes must never throw — a degraded metric source surfaces as
-                // an UNKNOWN card so one unreachable backend can't fail the dashboard.
-                return failure(now, "prometheus_unreachable")
-            }
+            prometheusQueryPort
+                .query(PROMQL)
+                .values
+                .firstOrNull()
+                ?.value
         if (ratio == null) {
             return failure(now, "no_data")
         }
@@ -77,7 +71,7 @@ class NotificationDispatchSuccessCardProvider(
         private const val CRIT_THRESHOLD = 0.95
         private val DRILL = HealthCardDrill.AdminRoute("/admin/notifications?focus=notification_dispatch_success")
         private const val PROMQL =
-            "sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) / " +
-                "clamp_min(sum(rate(readmates_outbox_publish_total[5m])), 1)"
+            "(sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) or vector(0)) / " +
+                "clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)"
     }
 }

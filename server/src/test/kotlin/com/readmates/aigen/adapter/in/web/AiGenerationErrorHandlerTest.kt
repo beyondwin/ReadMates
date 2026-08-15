@@ -1,12 +1,12 @@
 package com.readmates.aigen.adapter.`in`.web
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.ProviderCallException
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.sessionimport.application.model.SessionImportIssue
-import com.readmates.sessionimport.application.service.InvalidSessionImportException
 import com.readmates.shared.security.AccessDeniedException
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -15,6 +15,7 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import java.util.UUID
+import java.util.concurrent.TimeoutException
 
 class AiGenerationErrorHandlerTest {
     private val handler = AiGenerationErrorHandler()
@@ -29,7 +30,8 @@ class AiGenerationErrorHandlerTest {
                 ),
             )
 
-        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT)
+        assertThat(response.statusCode.value()).isEqualTo(422)
         assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         assertThat(response.body!!.code).isEqualTo("TRANSCRIPT_SPEAKER_NOT_MEMBER")
         assertThat(response.body!!.invalidSpeakerLabels).containsExactly("없는이름", "화자 1")
@@ -98,14 +100,15 @@ class AiGenerationErrorHandlerTest {
     }
 
     @Test
-    fun `maps AiGenerationJobPublishException to 503 QUEUE_UNAVAILABLE`() {
-        val response =
-            handler.handleQueueFailure(
-                AiGenerationJobPublishException("boom", RuntimeException("inner")),
-            )
+    fun `maps queue failures to the fixed safe 503 problem`() {
+        val cause = TimeoutException("raw provider payload for 11111111-2222-4333-8444-555555555555")
+        val response = handler.handleQueueFailure(AiGenerationQueueUnavailableException(cause))
+
         assertThat(response.statusCode).isEqualTo(HttpStatus.SERVICE_UNAVAILABLE)
         assertThat(response.headers.contentType).isEqualTo(MediaType.APPLICATION_PROBLEM_JSON)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.QUEUE_UNAVAILABLE.name)
+        assertThat(response.body!!.detail).isEqualTo("Generation queue unavailable")
+        assertThat(response.body!!.detail).doesNotContain(cause.message)
     }
 
     @Test
@@ -125,7 +128,8 @@ class AiGenerationErrorHandlerTest {
             handler.handleLlmGeneration(
                 ProviderCallException(GenerationError(ErrorCode.SCHEMA_INVALID, "bad schema")),
             )
-        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_ENTITY)
+        assertThat(response.statusCode).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT)
+        assertThat(response.statusCode.value()).isEqualTo(422)
         assertThat(response.body!!.code).isEqualTo(ErrorCode.SCHEMA_INVALID.name)
     }
 
@@ -203,19 +207,19 @@ class AiGenerationErrorHandlerTest {
                 arrayOf(ErrorCode.QUEUE_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE),
                 arrayOf(ErrorCode.PROVIDER_UNAVAILABLE, HttpStatus.BAD_GATEWAY),
                 arrayOf(ErrorCode.PROVIDER_RATE_LIMITED, HttpStatus.BAD_GATEWAY),
-                arrayOf(ErrorCode.SCHEMA_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.AUTHOR_NAME_MISMATCH, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.HIGHLIGHTS_OUT_OF_RANGE, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.ONE_LINE_REVIEWS_DUPLICATE, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.FEEDBACK_TEMPLATE_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_FORMAT_INVALID, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_EMPTY, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_DURATION_EXCEEDED, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.SCHEMA_INVALID, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.AUTHOR_NAME_MISMATCH, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.HIGHLIGHTS_OUT_OF_RANGE, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.ONE_LINE_REVIEWS_DUPLICATE, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.FEEDBACK_TEMPLATE_INVALID, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_FORMAT_INVALID, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_EMPTY, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_DURATION_EXCEEDED, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_NOT_MEMBER, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS, HttpStatus.UNPROCESSABLE_CONTENT),
                 arrayOf(ErrorCode.MODEL_CAPABILITY_UNAVAILABLE, HttpStatus.SERVICE_UNAVAILABLE),
-                arrayOf(ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL, HttpStatus.UNPROCESSABLE_ENTITY),
-                arrayOf(ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED, HttpStatus.UNPROCESSABLE_ENTITY),
+                arrayOf(ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL, HttpStatus.UNPROCESSABLE_CONTENT),
+                arrayOf(ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED, HttpStatus.UNPROCESSABLE_CONTENT),
                 arrayOf(ErrorCode.STALE_GENERATION_REVISION, HttpStatus.CONFLICT),
                 arrayOf(ErrorCode.MEMBERSHIP_CHANGED, HttpStatus.CONFLICT),
                 arrayOf(ErrorCode.UNKNOWN, HttpStatus.INTERNAL_SERVER_ERROR),

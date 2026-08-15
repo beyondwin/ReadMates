@@ -19,6 +19,6 @@ class FeedbackDocumentErrorHandler {
             FeedbackDocumentError.STORAGE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE
             FeedbackDocumentError.ACTIVE_MEMBERSHIP_REQUIRED -> HttpStatus.FORBIDDEN
             FeedbackDocumentError.INVALID_TEMPLATE -> HttpStatus.BAD_REQUEST
-            FeedbackDocumentError.INVALID_STORED_DOCUMENT -> HttpStatus.UNPROCESSABLE_ENTITY
+            FeedbackDocumentError.INVALID_STORED_DOCUMENT -> HttpStatus.UNPROCESSABLE_CONTENT
         }
 }

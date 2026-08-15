@@ -14,11 +14,24 @@ class AiGenerationConfigValidatorTest {
     @Test
     fun `passes when aigen is disabled regardless of queue beans`() {
         assertThatCode {
-            AiGenerationConfigValidator(
+            validator(
                 aigenEnabled = false,
                 beanFactory = emptyBeanFactory(),
             ).validate()
         }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `cross-property recovery budget fails startup while the AI kill switch is disabled`() {
+        assertThatThrownBy {
+            validator(
+                aigenEnabled = false,
+                beanFactory = emptyBeanFactory(),
+                properties = validProperties(),
+                kafkaProperties = AiGenerationKafkaProperties(maxPollInterval = Duration.ofMinutes(20)),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("readmates.aigen.job.processing-deadline")
     }
 
     @Test
@@ -29,7 +42,7 @@ class AiGenerationConfigValidatorTest {
             RootBeanDefinition(NoopQueue::class.java),
         )
         assertThatCode {
-            AiGenerationConfigValidator(
+            validator(
                 aigenEnabled = true,
                 beanFactory = factory,
                 properties = validProperties(),
@@ -40,7 +53,7 @@ class AiGenerationConfigValidatorTest {
     @Test
     fun `accepts max poll interval equal to three calls two backoffs and safety margin`() {
         assertThatCode {
-            AiGenerationConfigValidator(
+            validator(
                 aigenEnabled = true,
                 beanFactory = queueBeanFactory(),
                 properties = validProperties(),
@@ -52,7 +65,7 @@ class AiGenerationConfigValidatorTest {
     @Test
     fun `fails closed when max poll interval is below worst case processing budget`() {
         assertThatThrownBy {
-            AiGenerationConfigValidator(
+            validator(
                 aigenEnabled = true,
                 beanFactory = queueBeanFactory(),
                 properties = validProperties(),
@@ -80,7 +93,7 @@ class AiGenerationConfigValidatorTest {
             )
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(
+            validator(
                 aigenEnabled = true,
                 beanFactory = queueBeanFactory(),
                 properties = properties,
@@ -94,9 +107,74 @@ class AiGenerationConfigValidatorTest {
     }
 
     @Test
+    fun `accepts processing deadline equal to poll interval plus generic retry window`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                job = base.job.copy(processingDeadline = Duration.ofMinutes(16).plusSeconds(45)),
+            )
+
+        assertThatCode {
+            validator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = properties,
+                kafkaProperties = AiGenerationKafkaProperties(),
+            ).validate()
+        }.doesNotThrowAnyException()
+    }
+
+    @Test
+    fun `rejects processing deadline below poll interval plus generic retry window without truncation`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                job =
+                    base.job.copy(
+                        processingDeadline = Duration.ofMinutes(16).plusSeconds(45).minusNanos(1),
+                    ),
+            )
+
+        assertThatThrownBy {
+            validator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = properties,
+                kafkaProperties = AiGenerationKafkaProperties(),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("readmates.aigen.job.processing-deadline")
+            .hasMessageContaining("readmates.aigen.kafka.max-poll-interval")
+    }
+
+    @Test
+    fun `rejects processing deadline equal to Redis ttl`() {
+        val base = validProperties()
+        val properties =
+            base.copy(
+                job =
+                    base.job.copy(
+                        redisTtl = Duration.ofHours(1),
+                        processingDeadline = Duration.ofHours(1),
+                    ),
+            )
+
+        assertThatThrownBy {
+            validator(
+                aigenEnabled = true,
+                beanFactory = queueBeanFactory(),
+                properties = properties,
+                kafkaProperties = AiGenerationKafkaProperties(),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("readmates.aigen.job.processing-deadline")
+            .hasMessageContaining("readmates.aigen.job.redis-ttl")
+    }
+
+    @Test
     fun `fails fast with an actionable message when aigen is enabled but no queue bean is wired`() {
         assertThatThrownBy {
-            AiGenerationConfigValidator(
+            validator(
                 aigenEnabled = true,
                 beanFactory = emptyBeanFactory(),
             ).validate()
@@ -109,7 +187,7 @@ class AiGenerationConfigValidatorTest {
     @Test
     fun `rejects grounded output reservation above application ceiling`() {
         assertThatThrownBy {
-            AiGenerationConfigValidator(
+            validator(
                 aigenEnabled = true,
                 beanFactory = queueBeanFactory(),
                 properties = validProperties(reservedOutputTokens = 16_385),
@@ -123,7 +201,7 @@ class AiGenerationConfigValidatorTest {
         val properties = validProperties().copy(grounded = validProperties().grounded.copy(safetyMarginTokens = 0))
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("safety-margin-tokens")
     }
@@ -141,7 +219,7 @@ class AiGenerationConfigValidatorTest {
                 )
 
             assertThatThrownBy {
-                AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+                validator(true, queueBeanFactory(), properties).validate()
             }.isInstanceOf(IllegalStateException::class.java)
                 .hasMessageContaining("limits must be positive")
         }
@@ -162,7 +240,7 @@ class AiGenerationConfigValidatorTest {
             )
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("exceeds max-output-tokens")
     }
@@ -172,7 +250,7 @@ class AiGenerationConfigValidatorTest {
         val properties = validProperties().copy(pricing = emptyMap())
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("pricing")
     }
@@ -195,7 +273,7 @@ class AiGenerationConfigValidatorTest {
             )
 
         assertThatCode {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.doesNotThrowAnyException()
     }
 
@@ -207,7 +285,7 @@ class AiGenerationConfigValidatorTest {
             )
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("fallback-default-model")
     }
@@ -234,7 +312,7 @@ class AiGenerationConfigValidatorTest {
             )
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessage("Enabled Anthropic grounded model lacks verified native structured output or pricing")
             .hasMessageNotContaining("claude-unverified-public-test")
@@ -257,7 +335,7 @@ class AiGenerationConfigValidatorTest {
             )
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessage("Enabled Anthropic grounded model lacks verified native structured output or pricing")
             .hasMessageNotContaining("claude-sonnet-4-6")
@@ -268,7 +346,7 @@ class AiGenerationConfigValidatorTest {
         val properties = validAnthropicProperties(pricing = emptyMap())
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessage("Enabled Anthropic grounded model lacks verified native structured output or pricing")
             .hasMessageNotContaining("claude-sonnet-4-6")
@@ -279,7 +357,7 @@ class AiGenerationConfigValidatorTest {
         val properties = validGeminiProperties(paidTierRetentionConfirmed = false)
 
         assertThatThrownBy {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.isInstanceOf(IllegalStateException::class.java)
             .hasMessage(
                 "readmates.aigen.providers.google.paid-tier-retention-confirmed must be true when GEMINI is enabled",
@@ -292,9 +370,22 @@ class AiGenerationConfigValidatorTest {
         val properties = validGeminiProperties(paidTierRetentionConfirmed = false).copy(mock = true)
 
         assertThatCode {
-            AiGenerationConfigValidator(true, queueBeanFactory(), properties).validate()
+            validator(true, queueBeanFactory(), properties).validate()
         }.doesNotThrowAnyException()
     }
+
+    private fun validator(
+        aigenEnabled: Boolean,
+        beanFactory: DefaultListableBeanFactory,
+        properties: AiGenerationProperties = validProperties(),
+        kafkaProperties: AiGenerationKafkaProperties = AiGenerationKafkaProperties(),
+    ): AiGenerationConfigValidator =
+        AiGenerationConfigValidator(
+            aigenEnabled = aigenEnabled,
+            beanFactory = beanFactory,
+            properties = properties,
+            kafkaProperties = kafkaProperties,
+        )
 
     private fun validProperties(reservedOutputTokens: Long = 16_384): AiGenerationProperties =
         AiGenerationProperties(

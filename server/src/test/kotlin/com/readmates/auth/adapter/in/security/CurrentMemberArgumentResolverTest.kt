@@ -1,15 +1,20 @@
 package com.readmates.auth.adapter.`in`.security
 
+import com.readmates.auth.adapter.`in`.web.AuthMemberResponse
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
+import com.readmates.club.application.port.`in`.SupportMemberSynthesis
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.CurrentUser
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
@@ -18,6 +23,7 @@ import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.web.context.request.ServletWebRequest
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
 class CurrentMemberArgumentResolverTest {
@@ -84,7 +90,7 @@ class CurrentMemberArgumentResolverTest {
         val request = MockHttpServletRequest()
         val authentication = UsernamePasswordAuthenticationToken("member@example.com", "password", emptyList())
         request.userPrincipal = authentication
-        request.addHeader("X-Readmates-Club-Slug", "sample-book-club")
+        request.addHeader(AuthClubContextHeader.CLUB_SLUG, "sample-book-club")
 
         val resolved =
             resolver.resolveArgument(
@@ -105,7 +111,7 @@ class CurrentMemberArgumentResolverTest {
         val request = MockHttpServletRequest()
         val authentication = UsernamePasswordAuthenticationToken("member@example.com", "password", emptyList())
         request.userPrincipal = authentication
-        request.addHeader("X-Readmates-Club-Slug", "missing-club")
+        request.addHeader(AuthClubContextHeader.CLUB_SLUG, "missing-club")
 
         assertThrows<ResponseStatusException> {
             resolver.resolveArgument(
@@ -116,6 +122,97 @@ class CurrentMemberArgumentResolverTest {
             )
         }
         assertEquals(0, resolveMembers.legacyEmailLookups)
+    }
+
+    @Test
+    fun `reuses cached support synthesis as an active host current member`() {
+        val userId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+        val synthesis =
+            SupportMemberSynthesis(
+                membershipProxyId = UUID.fromString("00000000-0000-0000-0000-000000000302"),
+                displayName = "Support Admin",
+                accountName = "support-admin",
+            )
+        var supportLookups = 0
+        val supportAccess =
+            object : CheckSupportAccessGrantUseCase {
+                override fun synthesizeHostCurrentMember(
+                    userId: UUID,
+                    email: String,
+                    clubId: UUID,
+                    clubSlug: String,
+                    clubName: String,
+                ): SupportMemberSynthesis? {
+                    supportLookups += 1
+                    return null
+                }
+            }
+        val resolver =
+            CurrentMemberArgumentResolver(
+                FakeResolveCurrentMemberUseCase(null),
+                FakeResolveClubContextUseCase(),
+                supportAccess,
+            )
+        val request = MockHttpServletRequest()
+        request.userPrincipal =
+            UsernamePasswordAuthenticationToken(
+                CurrentUser(userId, "support@example.com"),
+                null,
+                emptyList(),
+            )
+        request.addHeader(AuthClubContextHeader.CLUB_SLUG, "sample-book-club")
+        request.setAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR, synthesis)
+
+        val resolved =
+            resolver.resolveArgument(
+                sampleMethodParameter("currentMemberEndpoint"),
+                null,
+                ServletWebRequest(request),
+                null,
+            )
+
+        assertSame(synthesis, request.getAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR))
+        assertEquals(0, supportLookups)
+        assertEquals(userId, resolved.userId)
+        assertEquals(synthesis.membershipProxyId, resolved.membershipId)
+        assertEquals(UUID.fromString("00000000-0000-0000-0000-000000000002"), resolved.clubId)
+        assertEquals("sample-book-club", resolved.clubSlug)
+        assertEquals("support@example.com", resolved.email)
+        assertEquals(synthesis.displayName, resolved.displayName)
+        assertEquals(synthesis.accountName, resolved.accountName)
+        assertEquals(MembershipRole.HOST, resolved.role)
+        assertEquals(MembershipStatus.ACTIVE, resolved.membershipStatus)
+        assertEquals("Sample Book Club", resolved.clubName)
+    }
+
+    @Test
+    fun `joined club summary keeps membership enum strings in auth response JSON`() {
+        val joinedClub =
+            JoinedClubSummary(
+                clubId = UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                clubSlug = "sample-book-club",
+                clubName = "Sample Book Club",
+                membershipId = UUID.fromString("00000000-0000-0000-0000-000000000202"),
+                role = MembershipRole.HOST,
+                status = MembershipStatus.SUSPENDED,
+                primaryHost = "club.example.com",
+            )
+        val response =
+            AuthMemberResponse.authenticatedUser(
+                userId = legacyMember.userId,
+                email = legacyMember.email,
+                joinedClubs = listOf(joinedClub),
+                platformAdmin = null,
+            )
+        val objectMapper = JsonMapper.builder().findAndAddModules().build()
+        val joinedClubJson =
+            objectMapper
+                .readTree(objectMapper.writeValueAsString(response))
+                .path("joinedClubs")
+                .path(0)
+
+        assertEquals("HOST", joinedClubJson.path("role").stringValue())
+        assertEquals("SUSPENDED", joinedClubJson.path("status").stringValue())
     }
 
     private fun currentMemberEndpoint(member: CurrentMember) = member

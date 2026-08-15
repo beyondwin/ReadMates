@@ -68,4 +68,124 @@ grep -Fq 'READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED' "$import_script"
 grep -Fq 'READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED=false' "$env_example" ||
   fail ".env.example must show the fail-closed false default"
 
+read_env_example_value() {
+  local key="$1"
+  local count
+  count="$(awk -F= -v key="$key" '$1 == key { count += 1 } END { print count + 0 }' "$env_example")"
+  [ "$count" -eq 1 ] || fail "missing $key from .env.example or found duplicate assignments"
+  awk -F= -v key="$key" '$1 == key { print substr($0, length(key) + 2) }' "$env_example"
+}
+
+duration_milliseconds() {
+  local key="$1"
+  local value="$2"
+  if [[ ! "$value" =~ ^([0-9]+)(ms|s|m|h)$ ]]; then
+    fail "$key must use an explicit ms, s, m, or h duration unit"
+  fi
+  local amount="${BASH_REMATCH[1]}"
+  local unit="${BASH_REMATCH[2]}"
+  [ "${#amount}" -le 9 ] || fail "$key is outside its approved duration range"
+  local numeric_amount=$((10#$amount))
+  case "$unit" in
+    ms) echo "$numeric_amount" ;;
+    s) echo $((numeric_amount * 1000)) ;;
+    m) echo $((numeric_amount * 60 * 1000)) ;;
+    h) echo $((numeric_amount * 60 * 60 * 1000)) ;;
+  esac
+}
+
+require_duration_range() {
+  local key="$1"
+  local value="$2"
+  local minimum_milliseconds="$3"
+  local maximum_milliseconds="$4"
+  local milliseconds
+  milliseconds="$(duration_milliseconds "$key" "$value")"
+  [ "$milliseconds" -ge "$minimum_milliseconds" ] && [ "$milliseconds" -le "$maximum_milliseconds" ] ||
+    fail "$key is outside its approved duration range"
+}
+
+require_integer_range() {
+  local key="$1"
+  local value="$2"
+  local minimum="$3"
+  local maximum="$4"
+  [[ "$value" =~ ^[0-9]+$ ]] || fail "$key must be an integer"
+  [ "${#value}" -le 9 ] || fail "$key must be between $minimum and $maximum"
+  local numeric_value=$((10#$value))
+  [ "$numeric_value" -ge "$minimum" ] && [ "$numeric_value" -le "$maximum" ] ||
+    fail "$key must be between $minimum and $maximum"
+}
+
+retry_delay="$(read_env_example_value READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY)"
+consumer_attempts="$(read_env_example_value READMATES_AIGEN_KAFKA_CONSUMER_MAX_ATTEMPTS)"
+processing_deadline="$(read_env_example_value READMATES_AIGEN_PROCESSING_DEADLINE)"
+recovery_delay="$(read_env_example_value READMATES_AIGEN_RECOVERY_FIXED_DELAY)"
+recovery_batch="$(read_env_example_value READMATES_AIGEN_RECOVERY_BATCH_SIZE)"
+repair_batch="$(read_env_example_value READMATES_AIGEN_RECOVERY_INDEX_REPAIR_BATCH_SIZE)"
+repair_maximum="$(read_env_example_value READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS)"
+probe_delay="$(read_env_example_value READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY)"
+
+require_duration_range READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY "$retry_delay" 1 60000
+require_integer_range READMATES_AIGEN_KAFKA_CONSUMER_MAX_ATTEMPTS "$consumer_attempts" 1 100
+require_duration_range READMATES_AIGEN_PROCESSING_DEADLINE "$processing_deadline" 60000 7200000
+require_duration_range READMATES_AIGEN_RECOVERY_FIXED_DELAY "$recovery_delay" 1000 600000
+require_integer_range READMATES_AIGEN_RECOVERY_BATCH_SIZE "$recovery_batch" 1 500
+require_integer_range READMATES_AIGEN_RECOVERY_INDEX_REPAIR_BATCH_SIZE "$repair_batch" 1 5000
+[[ "$repair_maximum" =~ ^[0-9]+$ ]] ||
+  fail "READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS must be an integer"
+[ "${#repair_maximum}" -le 9 ] ||
+  fail "READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS must be at most 50000"
+repair_maximum_number=$((10#$repair_maximum))
+repair_batch_number=$((10#$repair_batch))
+[ "$repair_maximum_number" -ge 1 ] ||
+  fail "READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS must be positive"
+[ "$repair_maximum_number" -le 50000 ] ||
+  fail "READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS must be at most 50000"
+[ "$repair_maximum_number" -ge "$repair_batch_number" ] ||
+  fail "READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS must be at least READMATES_AIGEN_RECOVERY_INDEX_REPAIR_BATCH_SIZE"
+require_duration_range READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY "$probe_delay" 1000 600000
+
+require_config_surface() {
+  local key="$1"
+  local expected="$2"
+  local application_fragment="$3"
+  local actual
+  actual="$(read_env_example_value "$key")"
+  [ "$actual" = "$expected" ] || fail "$key must use the approved default $expected"
+  grep -Fq "$application_fragment" "$repo_root/server/src/main/resources/application.yml" ||
+    fail "application.yml must bind $key with default $expected"
+  grep -Fq "$key: \${{ vars.$key || '$expected' }}" "$workflow" ||
+    fail "sync-config must source $key with default $expected"
+  grep -Fq "printf '$key=%s\\n' \"\$$key\"" "$workflow" ||
+    fail "sync-config must render $key"
+  grep -Eq "^[[:space:]]{2}$key$" "$import_script" ||
+    fail "bulk config import must classify $key"
+}
+
+require_config_surface \
+  READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY 5s \
+  "consumer-retry-delay: \${READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY:5s}"
+require_config_surface \
+  READMATES_AIGEN_KAFKA_CONSUMER_MAX_ATTEMPTS 10 \
+  "consumer-max-attempts: \${READMATES_AIGEN_KAFKA_CONSUMER_MAX_ATTEMPTS:10}"
+require_config_surface \
+  READMATES_AIGEN_PROCESSING_DEADLINE 20m \
+  "processing-deadline: \${READMATES_AIGEN_PROCESSING_DEADLINE:20m}"
+require_config_surface \
+  READMATES_AIGEN_RECOVERY_FIXED_DELAY 1m \
+  "recovery-fixed-delay: \${READMATES_AIGEN_RECOVERY_FIXED_DELAY:1m}"
+require_config_surface \
+  READMATES_AIGEN_RECOVERY_BATCH_SIZE 50 \
+  "recovery-batch-size: \${READMATES_AIGEN_RECOVERY_BATCH_SIZE:50}"
+require_config_surface \
+  READMATES_AIGEN_RECOVERY_INDEX_REPAIR_BATCH_SIZE 500 \
+  "recovery-index-repair-batch-size: \${READMATES_AIGEN_RECOVERY_INDEX_REPAIR_BATCH_SIZE:500}"
+require_config_surface \
+  READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS 5000 \
+  "recovery-index-repair-max-members: \${READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS:5000}"
+require_config_surface \
+  READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY 30s \
+  "queue-probe-fixed-delay: \${READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY:30s}"
+
 echo "Production AI config contract OK"

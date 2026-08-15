@@ -1,8 +1,8 @@
 package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionListItem
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 

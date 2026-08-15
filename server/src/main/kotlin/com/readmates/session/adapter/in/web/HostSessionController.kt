@@ -2,7 +2,6 @@ package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.InvalidHostSessionCursorException
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
@@ -11,6 +10,7 @@ import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.`in`.HostSessionQueryUseCase
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember

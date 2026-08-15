@@ -2,7 +2,6 @@ package com.readmates.sessionrecord.application.model
 
 import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.session.application.SessionRecordVisibility
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -214,13 +213,24 @@ class SessionRecordException(
     message: String,
 ) : RuntimeException(message)
 
-enum class HostSessionHistoryType {
-    BASIC_INFO_UPDATED,
-    ATTENDANCE_UPDATED,
-    RECORD_REVISION_APPLIED,
-    RECORD_REVISION_RESTORED,
-    NOTIFICATION_SENT,
-    NOTIFICATION_SKIPPED,
+class InvalidHostSessionHistoryCursorException : RuntimeException("Invalid host session history cursor")
+
+private const val BASIC_INFO_SORT = 10
+private const val ATTENDANCE_SORT = 20
+private const val RECORD_REVISION_APPLIED_SORT = 30
+private const val RECORD_REVISION_RESTORED_SORT = 40
+private const val NOTIFICATION_SENT_SORT = 50
+private const val NOTIFICATION_SKIPPED_SORT = 60
+
+enum class HostSessionHistoryType(
+    val typeSort: Int,
+) {
+    BASIC_INFO_UPDATED(BASIC_INFO_SORT),
+    ATTENDANCE_UPDATED(ATTENDANCE_SORT),
+    RECORD_REVISION_APPLIED(RECORD_REVISION_APPLIED_SORT),
+    RECORD_REVISION_RESTORED(RECORD_REVISION_RESTORED_SORT),
+    NOTIFICATION_SENT(NOTIFICATION_SENT_SORT),
+    NOTIFICATION_SKIPPED(NOTIFICATION_SKIPPED_SORT),
 }
 
 data class HostSessionHistoryAttendanceTransition(

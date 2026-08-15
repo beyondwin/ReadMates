@@ -91,7 +91,6 @@ class RedisReadCacheInvalidationAdapter(
                     collected.add(String(cursor.next(), Charsets.UTF_8))
                 }
             }
-            Unit
         }
         return collected
     }

@@ -4,6 +4,7 @@ import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.CreateSupportAccessGrantCommand
 import com.readmates.club.application.model.SupportAccessGrant
+import com.readmates.club.application.port.`in`.SupportMemberSynthesis
 import com.readmates.club.application.port.out.AdminSupportGrantLedgerPort
 import com.readmates.club.application.port.out.CreateSupportAccessGrantPort
 import com.readmates.club.application.port.out.LoadSupportAccessGrantPort
@@ -13,6 +14,7 @@ import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.club.domain.SupportAccessGrantScope
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
+import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import tools.jackson.databind.ObjectMapper
@@ -21,6 +23,40 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 class SupportAccessGrantServiceTest {
+    @Test
+    fun `active grant synthesizes only the support member identity projection`() {
+        val grant =
+            SupportAccessGrant(
+                GRANT_ID,
+                CLUB_ID,
+                OWNER_ID,
+                GRANTEE_ID,
+                SupportAccessGrantScope.HOST_SUPPORT_READ,
+                "Ticket escalation",
+                OffsetDateTime.now(ZoneOffset.UTC).plusHours(2),
+                null,
+                OffsetDateTime.now(ZoneOffset.UTC),
+            )
+
+        val synthesis =
+            service(loadGrantPort = FakeLoadGrantPort(grant)).synthesizeHostCurrentMember(
+                userId = GRANTEE_ID,
+                email = "support@example.com",
+                clubId = CLUB_ID,
+                clubSlug = "reading-sai",
+                clubName = "Reading Sai",
+            )
+
+        assertThat(synthesis)
+            .isEqualTo(
+                SupportMemberSynthesis(
+                    membershipProxyId = GRANT_ID,
+                    displayName = "support@example.com",
+                    accountName = "support@example.com",
+                ),
+            )
+    }
+
     @Test
     fun `operator cannot create grant`() {
         assertThatThrownBy {
@@ -80,11 +116,14 @@ class SupportAccessGrantServiceTest {
             }
     }
 
-    private fun service(ledger: FakeLedgerPort = FakeLedgerPort()): SupportAccessGrantService =
+    private fun service(
+        ledger: FakeLedgerPort = FakeLedgerPort(),
+        loadGrantPort: LoadSupportAccessGrantPort = FakeLoadGrantPort(),
+    ): SupportAccessGrantService =
         SupportAccessGrantService(
             createGrantPort = FakeCreateGrantPort(),
             revokeGrantPort = FakeRevokeGrantPort(),
-            loadGrantPort = FakeLoadGrantPort(),
+            loadGrantPort = loadGrantPort,
             grantLedgerPort = ledger,
             auditEventPort = FakeAuditPort(),
             objectMapper = ObjectMapper(),
@@ -157,7 +196,9 @@ private class FakeRevokeGrantPort : RevokeSupportAccessGrantPort {
     ): SupportAccessGrant? = null
 }
 
-private class FakeLoadGrantPort : LoadSupportAccessGrantPort {
+private class FakeLoadGrantPort(
+    private val activeGrant: SupportAccessGrant? = null,
+) : LoadSupportAccessGrantPort {
     override fun loadActiveGrantsByClub(clubId: UUID) = emptyList<SupportAccessGrant>()
 
     override fun loadActiveGrantsByGrantee(granteeUserId: UUID) = emptyList<SupportAccessGrant>()
@@ -165,7 +206,7 @@ private class FakeLoadGrantPort : LoadSupportAccessGrantPort {
     override fun loadActiveGrantByGranteeAndClub(
         granteeUserId: UUID,
         clubId: UUID,
-    ): SupportAccessGrant? = null
+    ): SupportAccessGrant? = activeGrant
 }
 
 private class FakeAuditPort : WritePlatformAuditEventPort {
@@ -181,3 +222,4 @@ private class FakeAuditPort : WritePlatformAuditEventPort {
 private val OWNER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000901")
 private val GRANTEE_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000903")
 private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
+private val GRANT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000904")

@@ -13,6 +13,7 @@ import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.toPlatformActor
 import org.springframework.stereotype.Component
 import java.time.Clock
 import java.time.OffsetDateTime
@@ -26,7 +27,7 @@ class ClubReadinessOperationSignalProvider(
     override val sourceType = AdminOperationSourceType.CLUB_READINESS
 
     override fun collect(admin: CurrentPlatformAdmin): AdminOperationSignalBatch {
-        val clubs = listClubsUseCase.listClubs(admin).items
+        val clubs = listClubsUseCase.listClubs(admin.toPlatformActor()).items
         val generatedAt = OffsetDateTime.now(clock)
         val authoritative = clubs.size < CLUB_PAGE_LIMIT
         return AdminOperationSignalBatch(
@@ -44,7 +45,7 @@ class ClubReadinessOperationSignalProvider(
         sourceKey: String,
     ): AdminOperationSignalVerification {
         val clubId = sourceKey.clubReadinessId() ?: return AdminOperationSignalVerification.ABSENT
-        val clubs = listClubsUseCase.listClubs(admin).items
+        val clubs = listClubsUseCase.listClubs(admin.toPlatformActor()).items
         val club = clubs.firstOrNull { it.clubId == clubId }
         if (club != null) {
             return if (club.toSignal(OffsetDateTime.now(clock)) == null) {

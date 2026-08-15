@@ -1,7 +1,7 @@
 package com.readmates.admin.health.application.service.providers
 
 import com.readmates.admin.health.application.model.HealthCardStatus
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.time.Clock
@@ -13,11 +13,10 @@ class DbPoolHealthCardProviderTest {
 
     @Test
     fun `status is OK when hikari pending is zero`() {
-        val registry = SimpleMeterRegistry()
-        registry.gauge("hikaricp.connections.pending", 0.0)
+        val provider = DbPoolHealthCardProvider(localReadings(dbPoolPending = 0.0), clock)
+        val card = provider.compute()
 
-        val card = DbPoolHealthCardProvider(registry, clock).compute()
-
+        assertThat(provider.identity).isEqualTo(PlatformHealthProvider.DB_POOL)
         assertThat(card.id).isEqualTo("db_pool")
         assertThat(card.status).isEqualTo(HealthCardStatus.OK)
         assertThat(card.metric?.value).isEqualTo(0.0)
@@ -28,24 +27,19 @@ class DbPoolHealthCardProviderTest {
 
     @Test
     fun `status is WARN when hikari pending is between warn and crit`() {
-        val registry = SimpleMeterRegistry()
-        registry.gauge("hikaricp.connections.pending", 2.0)
-        val card = DbPoolHealthCardProvider(registry, clock).compute()
+        val card = DbPoolHealthCardProvider(localReadings(dbPoolPending = 2.0), clock).compute()
         assertThat(card.status).isEqualTo(HealthCardStatus.WARN)
     }
 
     @Test
     fun `status is CRIT when hikari pending is at or above crit`() {
-        val registry = SimpleMeterRegistry()
-        registry.gauge("hikaricp.connections.pending", 5.0)
-        assertThat(DbPoolHealthCardProvider(registry, clock).compute().status)
+        assertThat(DbPoolHealthCardProvider(localReadings(dbPoolPending = 5.0), clock).compute().status)
             .isEqualTo(HealthCardStatus.CRIT)
     }
 
     @Test
     fun `status is UNKNOWN when hikari gauge is absent`() {
-        val registry = SimpleMeterRegistry()
-        val card = DbPoolHealthCardProvider(registry, clock).compute()
+        val card = DbPoolHealthCardProvider(localReadings(), clock).compute()
         assertThat(card.status).isEqualTo(HealthCardStatus.UNKNOWN)
         assertThat(card.reason).isEqualTo("hikari_gauge_unavailable")
     }

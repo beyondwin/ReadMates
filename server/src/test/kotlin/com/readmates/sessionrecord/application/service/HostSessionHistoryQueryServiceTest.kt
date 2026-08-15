@@ -2,10 +2,10 @@ package com.readmates.sessionrecord.application.service
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.sessionrecord.application.model.HostSessionHistoryCursor
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.HostSessionHistoryType
+import com.readmates.sessionrecord.application.model.InvalidHostSessionHistoryCursorException
 import com.readmates.sessionrecord.application.port.out.HostSessionHistoryPort
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
@@ -97,7 +97,7 @@ class HostSessionHistoryQueryServiceTest {
                 SESSION_ID,
                 PageRequest(limit = 10, cursor = mapOf("createdAt" to "not-a-time", "id" to "bad")),
             )
-        }.isInstanceOf(InvalidHostSessionCursorException::class.java)
+        }.isInstanceOf(InvalidHostSessionHistoryCursorException::class.java)
 
         assertThat(historyPort.cursors).isEmpty()
     }
@@ -115,7 +115,7 @@ class HostSessionHistoryQueryServiceTest {
 
         assertThatThrownBy {
             service.history(host(), SESSION_ID, PageRequest(limit = 10, cursor = cursor))
-        }.isInstanceOf(InvalidHostSessionCursorException::class.java)
+        }.isInstanceOf(InvalidHostSessionHistoryCursorException::class.java)
 
         assertThat(historyPort.cursors).isEmpty()
     }
@@ -140,7 +140,7 @@ class HostSessionHistoryQueryServiceTest {
                     cursor = baseCursor + ("clubId" to "00000000-0000-0000-0000-000000000002"),
                 ),
             )
-        }.isInstanceOf(InvalidHostSessionCursorException::class.java)
+        }.isInstanceOf(InvalidHostSessionHistoryCursorException::class.java)
         assertThatThrownBy {
             service.history(
                 host(),
@@ -150,7 +150,7 @@ class HostSessionHistoryQueryServiceTest {
                     cursor = baseCursor + ("sessionId" to "00000000-0000-0000-0000-000000000302"),
                 ),
             )
-        }.isInstanceOf(InvalidHostSessionCursorException::class.java)
+        }.isInstanceOf(InvalidHostSessionHistoryCursorException::class.java)
 
         assertThat(historyPort.cursors).isEmpty()
     }

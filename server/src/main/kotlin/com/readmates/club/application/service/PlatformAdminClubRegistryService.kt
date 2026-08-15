@@ -13,7 +13,8 @@ import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
 import com.readmates.shared.security.AccessDeniedException
-import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -26,18 +27,22 @@ class PlatformAdminClubRegistryService(
     private val updateClubPort: UpdatePlatformAdminClubPort,
 ) : ListPlatformAdminClubsUseCase,
     UpdatePlatformAdminClubUseCase {
-    override fun listClubs(admin: CurrentPlatformAdmin): PlatformAdminClubList =
-        PlatformAdminClubList(
+    override fun listClubs(admin: PlatformActor): PlatformAdminClubList {
+        if (!admin.can(PlatformCapability.VIEW_CLUBS)) {
+            throw AccessDeniedException("Platform admin role cannot view clubs")
+        }
+        return PlatformAdminClubList(
             loadClubsPort.listClubs(limit = PLATFORM_ADMIN_CLUB_LIST_LIMIT),
         )
+    }
 
     @Transactional
     override fun updateClub(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
         command: UpdatePlatformAdminClubCommand,
     ): PlatformAdminClubListItem {
-        if (!admin.canManageClubDomains) {
+        if (!admin.can(PlatformCapability.MANAGE_CLUBS)) {
             throw AccessDeniedException("Platform admin role cannot update clubs")
         }
 

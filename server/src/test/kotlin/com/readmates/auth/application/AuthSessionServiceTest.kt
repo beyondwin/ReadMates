@@ -1,8 +1,10 @@
-package com.readmates.auth.application.service
+package com.readmates.auth.application
 
 import com.readmates.auth.application.model.StoredAuthSession
+import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import com.readmates.auth.application.port.out.AuthSessionCachePort
 import com.readmates.auth.application.port.out.AuthSessionStorePort
+import com.readmates.auth.application.service.AuthSessionService
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -129,19 +131,28 @@ class AuthSessionServiceTest {
     }
 
     @Test
-    fun `session cookies can be scoped to a configured shared domain`() {
+    fun `session ingress preserves the exact configured cookie contract`() {
         val service =
             AuthSessionService(
                 authSessionStore = repository,
                 secureCookie = true,
                 sessionCookieDomain = ".readmates.example",
             )
+        val sessionIngress: ManageAuthSessionUseCase = service
 
-        val cookie = service.sessionCookie("opaque-token")
-        val clearedCookie = service.clearedSessionCookie()
+        val cookie = sessionIngress.sessionCookie("opaque-token")
+        val clearedCookie = sessionIngress.clearedSessionCookie()
 
-        assertTrue(cookie.contains("Domain=.readmates.example"))
-        assertTrue(clearedCookie.contains("Domain=.readmates.example"))
+        assertEquals("readmates_session", sessionIngress.sessionCookieName)
+        assertEquals(
+            "readmates_session=opaque-token; Path=/; Max-Age=1209600; " +
+                "Domain=.readmates.example; Secure; HttpOnly; SameSite=Lax",
+            cookie,
+        )
+        assertEquals(
+            "readmates_session=; Path=/; Max-Age=0; Domain=.readmates.example; Secure; HttpOnly; SameSite=Lax",
+            clearedCookie,
+        )
     }
 
     @Test

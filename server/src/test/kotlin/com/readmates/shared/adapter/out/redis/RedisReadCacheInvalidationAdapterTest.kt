@@ -16,10 +16,10 @@ import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
 import com.readmates.publication.application.service.PublicQueryService
 import com.readmates.session.application.HostPublicationResponse
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.service.HostSessionPublicationService
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
 import com.readmates.shared.cache.RedisCacheMetrics

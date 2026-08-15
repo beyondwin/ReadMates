@@ -1,12 +1,12 @@
 package com.readmates.sessionimport.adapter.`in`.web
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportDraftResult
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionCommand
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import java.time.LocalDate
 import java.util.UUID

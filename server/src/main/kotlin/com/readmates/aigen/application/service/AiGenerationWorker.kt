@@ -2,6 +2,7 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.GenerationCostGuard
 import com.readmates.aigen.application.port.out.JobRecord
@@ -28,8 +29,8 @@ class AiGenerationWorker(
     private val properties: AiGenerationProperties,
     private val clock: Clock,
     private val metrics: AiGenerationMetrics,
-) {
-    fun process(jobId: UUID) {
+) : ProcessAiGenerationJobUseCase {
+    override fun process(jobId: UUID) {
         val record = jobStore.load(jobId) ?: return
         val start = clock.instant()
         when (record.status) {

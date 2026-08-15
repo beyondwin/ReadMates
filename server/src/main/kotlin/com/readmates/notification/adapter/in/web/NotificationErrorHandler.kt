@@ -47,9 +47,13 @@ class NotificationErrorHandler {
             NotificationApplicationError.MANUAL_NOTIFICATION_STATE_INVALID -> HttpStatus.CONFLICT
             NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED -> HttpStatus.FORBIDDEN
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED -> HttpStatus.BAD_REQUEST
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_TOO_LONG -> HttpStatus.BAD_REQUEST
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_TOO_MANY_TARGETS -> HttpStatus.UNPROCESSABLE_CONTENT
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED -> HttpStatus.CONFLICT
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_NOT_FOUND -> HttpStatus.NOT_FOUND
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_SELECTION_MISMATCH -> HttpStatus.CONFLICT
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REPREVIEW_REQUIRED -> HttpStatus.CONFLICT
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_CONFIRMATION_CONFLICT -> HttpStatus.CONFLICT
         }
 
     @Suppress("CyclomaticComplexMethod")
@@ -83,11 +87,19 @@ class NotificationErrorHandler {
             NotificationApplicationError.MEMBERSHIP_NOT_ALLOWED -> "선택한 멤버를 알림 대상에 사용할 수 없습니다."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED ->
                 "재처리 사유를 입력해 주세요."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_TOO_LONG ->
+                "재처리 사유가 허용된 길이를 초과했습니다."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_TOO_MANY_TARGETS ->
+                "재처리 대상이 너무 많습니다. 클럽이나 상태 범위를 좁혀 주세요."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED ->
                 "재처리 미리보기가 만료되었습니다."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_NOT_FOUND ->
                 "재처리 미리보기를 찾을 수 없습니다."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_SELECTION_MISMATCH ->
                 "재처리 미리보기와 선택 내용이 일치하지 않습니다."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REPREVIEW_REQUIRED ->
+                "기존 재처리 미리보기입니다. 새 미리보기를 생성해 주세요."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_CONFIRMATION_CONFLICT ->
+                "재처리 확정 상태를 확인할 수 없습니다. 새 미리보기를 생성해 주세요."
         }
 }

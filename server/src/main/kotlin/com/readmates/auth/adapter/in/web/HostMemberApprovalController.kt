@@ -5,6 +5,7 @@ import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.toClubActor
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
@@ -26,7 +27,7 @@ class HostMemberApprovalController(
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
     ) = memberLifecycle.listMembers(
-        currentMember,
+        currentMember.toClubActor(),
         PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
     )
 
@@ -36,7 +37,7 @@ class HostMemberApprovalController(
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
     ) = memberApprovals.listViewers(
-        currentMember,
+        currentMember.toClubActor(),
         PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
     )
 
@@ -46,7 +47,7 @@ class HostMemberApprovalController(
         @RequestParam(required = false) limit: Int?,
         @RequestParam(required = false) cursor: String?,
     ) = memberApprovals.listViewers(
-        currentMember,
+        currentMember.toClubActor(),
         PageRequest.cursor(limit, cursor, defaultLimit = 50, maxLimit = 100),
     )
 
@@ -54,55 +55,55 @@ class HostMemberApprovalController(
     fun activate(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
-    ) = memberApprovals.activateViewer(currentMember, membershipId)
+    ) = memberApprovals.activateViewer(currentMember.toClubActor(), membershipId)
 
     @PostMapping("/{membershipId}/approve")
     fun approve(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
-    ) = memberApprovals.activateViewer(currentMember, membershipId)
+    ) = memberApprovals.activateViewer(currentMember.toClubActor(), membershipId)
 
     @PostMapping("/{membershipId}/deactivate-viewer")
     fun deactivateViewer(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
-    ) = memberApprovals.deactivateViewer(currentMember, membershipId)
+    ) = memberApprovals.deactivateViewer(currentMember.toClubActor(), membershipId)
 
     @PostMapping("/{membershipId}/reject")
     fun reject(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
-    ) = memberApprovals.deactivateViewer(currentMember, membershipId)
+    ) = memberApprovals.deactivateViewer(currentMember.toClubActor(), membershipId)
 
     @PostMapping("/{membershipId}/suspend")
     fun suspend(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
         @RequestBody request: MemberLifecycleRequest,
-    ) = memberLifecycle.suspend(currentMember, membershipId, request)
+    ) = memberLifecycle.suspend(currentMember.toClubActor(), membershipId, request)
 
     @PostMapping("/{membershipId}/restore")
     fun restore(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
-    ) = memberLifecycle.restore(currentMember, membershipId)
+    ) = memberLifecycle.restore(currentMember.toClubActor(), membershipId)
 
     @PostMapping("/{membershipId}/deactivate")
     fun deactivate(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
         @RequestBody request: MemberLifecycleRequest,
-    ) = memberLifecycle.deactivate(currentMember, membershipId, request)
+    ) = memberLifecycle.deactivate(currentMember.toClubActor(), membershipId, request)
 
     @PostMapping("/{membershipId}/current-session/add")
     fun addToCurrentSession(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
-    ) = memberLifecycle.addToCurrentSession(currentMember, membershipId)
+    ) = memberLifecycle.addToCurrentSession(currentMember.toClubActor(), membershipId)
 
     @PostMapping("/{membershipId}/current-session/remove")
     fun removeFromCurrentSession(
         currentMember: CurrentMember,
         @PathVariable membershipId: UUID,
-    ) = memberLifecycle.removeFromCurrentSession(currentMember, membershipId)
+    ) = memberLifecycle.removeFromCurrentSession(currentMember.toClubActor(), membershipId)
 }

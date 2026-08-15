@@ -1,9 +1,9 @@
 package com.readmates.session.adapter.`in`.web
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
 import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank

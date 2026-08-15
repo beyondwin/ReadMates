@@ -130,7 +130,22 @@ bash scripts/observability-local-smoke.sh
 
 AI span의 허용 dimension은 provider, allowlisted model, call mode, outcome, safe error code, job/attempt correlation뿐입니다. Prompt/completion/transcript/evidence/raw error와 user/session/club identity를 검색 편의를 위해 추가하지 않습니다. Tempo가 down이어도 server health와 product 요청이 유지되어야 하며 exporter failure/queue-drop meter로 손실을 별도로 확인합니다.
 
-## 6. Alerts And SLOs
+## 6. Admin health refresh 장애 격리
+
+`/admin/health`는 platform-admin 전용 운영 진단입니다. Actuator liveness/readiness endpoint가 아니며 live AI provider를 호출하거나 email을 보내지 않습니다. 개별 card를 해석하기 전에 server response metadata를 확인합니다.
+
+| `refreshState` | 운영 의미와 다음 조치 |
+| --- | --- |
+| `FRESH` | complete provider wave가 성공했습니다. card-local signal을 정상적으로 해석합니다. |
+| `REFRESHING` | scheduled 또는 lazy wave가 진행 중이며 현재 화면에는 마지막으로 보였던 snapshot이 남습니다. `lastSuccessfulAt`이 있으면 그것이 last-known-good snapshot이지만, `null`이면 첫 complete success 전 partial/`UNKNOWN` snapshot일 수 있으므로 `lastSuccessfulAt`과 `refreshState`를 함께 구분합니다. outcome이 보이기 전 새 incident로 단정하지 않습니다. |
+| `STALE` | failed wave 뒤 이전 complete snapshot을 보존한 상태입니다. card에 조치하기 전 `lastSuccessfulAt`, `staleAgeSeconds`, provider outcome counter, transport availability, executor saturation을 확인합니다. |
+| `UNAVAILABLE` | complete success wave가 아직 없습니다. card에 provider-local `UNKNOWN`이 있어도 fresh로 가정하지 말고 initial wave가 끝나지 못한 이유를 찾습니다. |
+
+다음 bounded metric을 함께 봅니다. `readmates.admin.health.provider.outcomes`는 `TIMEOUT`, `REJECTED` 등 provider outcome을 구분하고, `readmates.admin.health.refresh.overlap`은 existing wave에 join한 demand를 보이며, `readmates.admin.health.refresh.duration`은 완료된 `FRESH`/`STALE`/`UNAVAILABLE` wave를 분리하고, `readmates.admin.health.snapshot.stale.age.seconds`는 current age를 표시합니다. label은 fixed enum이므로 endpoint, URL, exception, club, user, deployment 값을 time series에서 찾지 않습니다.
+
+`REJECTED`가 증가하면 dedicated bounded executor가 포화되어 request thread에서 provider work를 실행하는 대신 의도적으로 거절한 것입니다. workload와 configured executor capacity를 확인하되 caller-runs로 바꾸지 않습니다. timeout outcome이 늘면 Prometheus transport path와 configured connect, connection-request, read timeout의 provider deadline 관계를 점검합니다. invalid configuration은 fallback을 적용하지 않고 startup에서 application을 실패시키므로 restart 전 typed `readmates.admin.health` 값을 검증합니다. scheduler는 refresh input port를 비동기로 호출하고 failure에는 fixed safe warning만 남기므로 provider payload를 log에서 찾기보다 metric과 response metadata를 사용합니다.
+
+## 7. Alerts And SLOs
 
 Prometheus alert rule source는 `ops/prometheus/alerts/*.yml`입니다. SLO 사람 읽기용 문서는 `docs/operations/observability/slos.md`이고, 서버 resource source는 `server/src/main/resources/slo/slos.yaml`입니다.
 
@@ -145,7 +160,7 @@ sed -n '1,160p' docs/operations/observability/slos.md
 
 초보자가 자주 헷갈리는 점: 알림이 울리지 않았다고 장애가 없는 것은 아닙니다. 반대로 알림 하나만으로 root cause가 확정되는 것도 아닙니다.
 
-## 7. ELK/Kibana
+## 8. ELK/Kibana
 
 ELK는 로그를 중앙 수집, 저장, 검색, 시각화하는 스택입니다.
 
@@ -164,3 +179,17 @@ ReadMates의 현재 결정:
 - production, preview, local 환경 분리
 
 초보자가 자주 헷갈리는 점: Kibana는 로그를 "보는 화면"이고, Logback은 로그를 "쓰는 라이브러리"입니다. 둘 사이에는 수집기와 저장소가 필요합니다.
+
+## Notification recovery
+
+### Relay/Kafka publication
+
+`readmates_outbox_publish_total`의 `failure|dead|missing_payload|expired|stale_lease` 분포, event-outbox `pending|failed|dead|publishing`, backlog refresh result와 row의 `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`, transition time, request ID를 함께 확인합니다. Event deadline은 `created_at +` 현재 배포의 `READMATES_NOTIFICATION_EVENT_MAX_AGE`이며 UTC 현재 시각이 deadline과 같거나 늦으면 만료입니다. `next_attempt_at`은 deadline이 아닙니다. `DEAD` 원인이 missing payload/deadline/config/Kafka 장애 중 무엇인지 확인하고 원인이 제거되기 전에는 같은 business event를 다시 만들거나 delivery replay를 대신 실행하지 않습니다. 현재 slice에는 relay DEAD를 안전하게 되돌리는 범용 action이 없으므로 DB row를 직접 수정하지 않고 incident와 forward recovery를 분리합니다. Manual composer preview/confirm은 새 event를 만드는 명시적 forward action이지 기존 event replay가 아닙니다.
+
+### Email worker/SMTP
+
+Delivery `pending|failed|dead|sending`, sent/failed/dead counter와 row의 `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`을 확인합니다. Delivery deadline은 `created_at +` 현재 배포의 `READMATES_NOTIFICATION_DELIVERY_MAX_AGE`이고 equality부터 만료이며, lease는 `locked_at + READMATES_NOTIFICATION_CLAIM_LEASE`로 평가합니다. `PERMANENT`는 주소/구성 원인이 교정된 exact delivery ID만 host가 `POST /api/host/notifications/items/{id}/restore`로 명시적으로 복구합니다. 이 endpoint는 한 EMAIL delivery를 `PENDING`으로 되돌리는 action이며 manual preview/confirm처럼 새 event를 만들지 않습니다. `RETRYABLE`은 provider 회복과 lease 상태를 먼저 확인합니다. `AMBIGUOUS`는 provider acceptance 또는 recipient-side evidence로 미수락이 확인되지 않으면 restore하거나 resend하지 않습니다.
+
+Platform admin bulk replay도 새 event/outbox를 만드는 forward 발송이 아니라 exact delivery 복구입니다. Preview는 최대 1,000개(설정 범위 `1..5000`)의 byte-exact `EMAIL` + `FAILED|DEAD` + `MAIL_RETRYABLE|MAIL_PERMANENT` target만 selection hash에 고정하며 `AMBIGUOUS`, expired, invalid-content, null/blank, unknown, case/padding lookalike는 제외합니다. Confirm은 현재 row가 preview의 status, attempt count, failure code, `updated_at`과 일치하고 active lease가 없을 때만 `PENDING`으로 되돌리며 달라진 row는 skip합니다. Reset, 단일 protected audit, receipt, preview consume는 한 DB transaction이고 동일 actor/hash 명령 재시도는 receipt 결과를 반환합니다. Legacy v1 preview는 count를 지어내지 않고 새 preview를 요구합니다. Audit API에는 bounded count/hash/scope/timestamp만 남기고 confirm reason, recipient/email, provider response, delivery ID list는 복사하지 않습니다.
+
+Raw address, payload, provider response, stack trace는 ticket에 넣지 않습니다. SMTP accepted-before-`SENT` CAS는 lease reclaim 뒤 중복될 수 있는 at-least-once 경계입니다. Exactly-once에는 provider idempotency key/receipt API가 필요하며 현재 범위 밖입니다.

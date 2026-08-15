@@ -9,7 +9,9 @@ import com.readmates.club.application.port.`in`.ListAdminTodayClosingRisksUseCas
 import com.readmates.club.application.port.out.AdminClosingRiskLedgerPort
 import com.readmates.club.application.port.out.AdminClubOperationsSnapshotPort
 import com.readmates.club.application.port.out.AdminTodayClosingRisksPort
-import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.AccessDeniedException
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.springframework.stereotype.Service
 import java.util.UUID
 
@@ -21,9 +23,10 @@ class AdminClubOperationsService(
 ) : GetAdminClubOperationsUseCase,
     ListAdminTodayClosingRisksUseCase {
     override fun operationsSnapshot(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
     ): AdminClubOperationsSnapshot {
+        requireViewClubOperations(admin)
         val snapshot =
             snapshotPort.loadSnapshot(clubId)
                 ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
@@ -49,8 +52,9 @@ class AdminClubOperationsService(
         }
     }
 
-    override fun todayClosingRisks(admin: CurrentPlatformAdmin): AdminTodayClosingRiskSnapshot =
-        todayClosingRisksPort.loadTodayClosingRisks(TODAY_CLOSING_RISK_LIMIT).let { snapshot ->
+    override fun todayClosingRisks(admin: PlatformActor): AdminTodayClosingRiskSnapshot {
+        requireViewClubOperations(admin)
+        return todayClosingRisksPort.loadTodayClosingRisks(TODAY_CLOSING_RISK_LIMIT).let { snapshot ->
             try {
                 snapshot.copy(
                     items = ledgerPort.syncToday(snapshot.items, snapshot.generatedAt),
@@ -63,6 +67,13 @@ class AdminClubOperationsService(
                 )
             }
         }
+    }
+
+    private fun requireViewClubOperations(admin: PlatformActor) {
+        if (!admin.can(PlatformCapability.VIEW_CLUB_OPERATIONS)) {
+            throw AccessDeniedException("Platform admin role cannot view club operations")
+        }
+    }
 
     private companion object {
         private const val TODAY_CLOSING_RISK_LIMIT = 25

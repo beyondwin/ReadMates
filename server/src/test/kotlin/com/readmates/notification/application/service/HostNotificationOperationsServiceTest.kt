@@ -2,6 +2,7 @@ package com.readmates.notification.application.service
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ClaimedNotificationDeliveryItem
 import com.readmates.notification.application.model.HostNotificationDelivery
 import com.readmates.notification.application.model.HostNotificationDetail
@@ -31,6 +32,7 @@ import com.readmates.shared.security.CurrentMember
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
+import java.time.Clock
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -53,8 +55,8 @@ class HostNotificationOperationsServiceTest {
                         deliveryStatusPort = deliveryPort,
                         mailDeliveryPort = mailPort,
                         metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                        maxAttempts = 5,
-                        retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+                        runtimeProperties = NotificationRuntimeProperties(),
+                        clock = Clock.fixed(TIMESTAMP.toInstant(), ZoneOffset.UTC),
                     ),
                 transactionalOps = NotificationDeliveryTransactionalOperations(NoopDeliveryPlanningPort, deliveryPort),
                 deliveryEnabled = false,
@@ -258,6 +260,7 @@ private fun claimedDelivery(
         status = NotificationDeliveryStatus.SENDING,
         attemptCount = attemptCount,
         lockedAt = TIMESTAMP,
+        createdAt = TIMESTAMP,
         recipientEmail = "member@example.com",
         subject = "Feedback document is ready",
         bodyText = "ReadMates에서 확인해 주세요.",

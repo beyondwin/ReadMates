@@ -58,6 +58,7 @@ class NotificationEventModelsTest {
     @Test
     fun `claimed delivery model carries a non-null lock token`() {
         val lockedAt = OffsetDateTime.parse("2026-04-29T00:01:00Z")
+        val createdAt = OffsetDateTime.parse("2026-04-29T00:00:00Z")
         val item =
             ClaimedNotificationDeliveryItem(
                 id = UUID.randomUUID(),
@@ -69,6 +70,7 @@ class NotificationEventModelsTest {
                 status = NotificationDeliveryStatus.SENDING,
                 attemptCount = 1,
                 lockedAt = lockedAt,
+                createdAt = createdAt,
                 recipientEmail = "member@example.test",
                 subject = "Notification subject",
                 bodyText = "Notification body",
@@ -76,5 +78,6 @@ class NotificationEventModelsTest {
             )
 
         assertThat(item.lockedAt).isEqualTo(lockedAt)
+        assertThat(item.createdAt).isEqualTo(createdAt)
     }
 }

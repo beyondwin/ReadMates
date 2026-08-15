@@ -306,12 +306,44 @@ for required_workspace_file in \
   "design/system/package.json" \
   "design/docs/package.json" \
   "scripts/check-deploy-workflow-contract.py" \
+  "scripts/check-flyway-migration-immutability.py" \
   "scripts/fixtures/public-release-candidate-coverage.txt"
 do
   if [[ ! -f "$candidate_dir/$required_workspace_file" ]]; then
     fail "public release candidate is missing required workspace file: $required_workspace_file"
   fi
 done
+
+for required_operating_evidence in \
+  "CHANGELOG.md" \
+  "docs/operations/observability/metrics-catalog.md" \
+  "docs/operations/observability/dashboards.md" \
+  "docs/operations/observability/alerts.md" \
+  "docs/operations/observability/slos.md" \
+  "docs/operations/observability/operator-guide.md"
+do
+  if [[ ! -f "$candidate_dir/$required_operating_evidence" ]]; then
+    fail "public release candidate is missing required operating evidence: $required_operating_evidence"
+  fi
+done
+
+if [[ ! -f "$candidate_dir/ops/prometheus/tests/notification-rules.test.yml" ]]; then
+  fail "public release candidate is missing notification promtool rule tests"
+fi
+
+if [[ -e "$candidate_dir/.git" ]]; then
+  fail "public release candidate unexpectedly contains Git metadata"
+fi
+
+if ! (
+  cd "$candidate_dir"
+  python3 -B scripts/check-flyway-migration-immutability.py --self-test
+) > "$fixture_root/flyway-checker-self-test.out" 2> "$fixture_root/flyway-checker-self-test.err"
+then
+  sed 's/^/  /' "$fixture_root/flyway-checker-self-test.out" >&2
+  sed 's/^/  /' "$fixture_root/flyway-checker-self-test.err" >&2
+  fail "public release candidate Flyway checker self-test failed without Git metadata"
+fi
 
 for required_oauth_file in \
   "scripts/run-local-google-oauth.sh" \

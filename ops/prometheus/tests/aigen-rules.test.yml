@@ -1,0 +1,249 @@
+rule_files:
+  - ../alerts/aigen-rules.yml
+
+evaluation_interval: 1m
+
+tests:
+  - name: fresh authoritative high depth fires queue lag
+    interval: 1m
+    input_series:
+      - series: readmates_aigen_queue_depth
+        values: '60x10'
+      - series: readmates_aigen_queue_probe_available
+        values: '1x10'
+      - series: readmates_aigen_queue_probe_last_success_timestamp_seconds
+        values: '0 60 120 180 240 300 360 420 480 540 600'
+      - series: readmates_aigen_queue_probe_sample_interval_seconds
+        values: '30x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AiGenQueueLagHigh
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation queue lag above 50 for 5m"
+              description: "readmates_aigen_queue_depth = 60 (threshold: 50) sustained for 5m. Check worker pool saturation and provider latency."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-lag-high"
+
+  - name: unavailable and NaN values never become queue lag
+    interval: 1m
+    input_series:
+      - series: readmates_aigen_queue_depth
+        values: 'NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN'
+      - series: readmates_aigen_queue_probe_available
+        values: '0x10'
+      - series: readmates_aigen_queue_probe_last_success_timestamp_seconds
+        values: 'NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN NaN'
+      - series: readmates_aigen_queue_probe_sample_interval_seconds
+        values: '30x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AiGenQueueProbeUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation queue probe is unavailable"
+              description: "The latest queue sample is unavailable or the availability series is absent. Do not interpret queue depth as zero."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-probe-unavailable"
+      - eval_time: 3m
+        alertname: AiGenQueueProbeStale
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation queue probe has no fresh success"
+              description: "The last-success timestamp is absent, NaN, or older than three configured sample intervals. Queue-lag alerts are suppressed until sampling recovers."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-probe-unavailable"
+      - eval_time: 6m
+        alertname: AiGenQueueLagHigh
+        exp_alerts: []
+
+  - name: absent availability is explicitly unavailable
+    interval: 1m
+    input_series:
+      - series: readmates_aigen_queue_depth
+        values: '60x10'
+      - series: readmates_aigen_queue_probe_last_success_timestamp_seconds
+        values: '0 60 120 180 240 300 360 420 480 540 600'
+      - series: readmates_aigen_queue_probe_sample_interval_seconds
+        values: '30x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AiGenQueueProbeUnavailable
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation queue probe is unavailable"
+              description: "The latest queue sample is unavailable or the availability series is absent. Do not interpret queue depth as zero."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-probe-unavailable"
+      - eval_time: 6m
+        alertname: AiGenQueueLagHigh
+        exp_alerts: []
+
+  - name: absent last success suppresses queue lag and reports stale
+    interval: 1m
+    input_series:
+      - series: readmates_aigen_queue_depth
+        values: '60x10'
+      - series: readmates_aigen_queue_probe_available
+        values: '1x10'
+      - series: readmates_aigen_queue_probe_sample_interval_seconds
+        values: '30x10'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: AiGenQueueProbeStale
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation queue probe has no fresh success"
+              description: "The last-success timestamp is absent, NaN, or older than three configured sample intervals. Queue-lag alerts are suppressed until sampling recovers."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-probe-unavailable"
+      - eval_time: 6m
+        alertname: AiGenQueueLagHigh
+        exp_alerts: []
+
+  - name: stopped sampler stale timestamp suppresses frozen high depth
+    interval: 1m
+    input_series:
+      - series: readmates_aigen_queue_depth
+        values: '60x10'
+      - series: readmates_aigen_queue_probe_available
+        values: '1x10'
+      - series: readmates_aigen_queue_probe_last_success_timestamp_seconds
+        values: '0x10'
+      - series: readmates_aigen_queue_probe_sample_interval_seconds
+        values: '30x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AiGenQueueProbeStale
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation queue probe has no fresh success"
+              description: "The last-success timestamp is absent, NaN, or older than three configured sample intervals. Queue-lag alerts are suppressed until sampling recovers."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#queue-probe-unavailable"
+      - eval_time: 6m
+        alertname: AiGenQueueLagHigh
+        exp_alerts: []
+
+  - name: stopped high target cannot borrow fresh probe state from another target
+    interval: 1m
+    input_series:
+      - series: 'readmates_aigen_queue_depth{job="readmates-server",instance="stopped"}'
+        values: '60x10'
+      - series: 'readmates_aigen_queue_probe_available{job="readmates-server",instance="stopped"}'
+        values: '1x10'
+      - series: 'readmates_aigen_queue_probe_last_success_timestamp_seconds{job="readmates-server",instance="stopped"}'
+        values: '0x10'
+      - series: 'readmates_aigen_queue_probe_sample_interval_seconds{job="readmates-server",instance="stopped"}'
+        values: '30x10'
+      - series: 'readmates_aigen_queue_depth{job="readmates-server",instance="live"}'
+        values: '10x10'
+      - series: 'readmates_aigen_queue_probe_available{job="readmates-server",instance="live"}'
+        values: '1x10'
+      - series: 'readmates_aigen_queue_probe_last_success_timestamp_seconds{job="readmates-server",instance="live"}'
+        values: '0 60 120 180 240 300 360 420 480 540 600'
+      - series: 'readmates_aigen_queue_probe_sample_interval_seconds{job="readmates-server",instance="live"}'
+        values: '30x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AiGenQueueLagHigh
+        exp_alerts: []
+
+  - name: failed recovery alerts while deferred-only does not
+    interval: 1m
+    input_series:
+      - series: 'readmates_aigen_failure_recovery_total{source="scheduled",result="failed"}'
+        values: '0+1x10'
+      - series: 'readmates_aigen_failure_recovery_total{source="scheduled",result="deferred_in_flight"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AiGenRecoveryFailure
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation failure recovery needs operator review"
+              description: "A Kafka or scheduled recovery failed, or encountered corrupt recovery metadata. Inspect fixed recovery outcomes before any replay."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#recovery-failure"
+
+  - name: deferred recovery alone does not page
+    interval: 1m
+    input_series:
+      - series: 'readmates_aigen_failure_recovery_total{source="scheduled",result="deferred_in_flight"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AiGenRecoveryFailure
+        exp_alerts: []
+
+  - name: first observed recovery and repair failures are not lost without a zero baseline
+    interval: 1m
+    input_series:
+      - series: 'readmates_aigen_failure_recovery_total{source="scheduled",result="failed"}'
+        values: '1x10'
+      - series: 'readmates_aigen_recovery_index_repair_total{result="quarantined"}'
+        values: '1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AiGenRecoveryFailure
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+            exp_annotations:
+              summary: "AI generation failure recovery needs operator review"
+              description: "A Kafka or scheduled recovery failed, or encountered corrupt recovery metadata. Inspect fixed recovery outcomes before any replay."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#recovery-failure"
+      - eval_time: 6m
+        alertname: AiGenRecoveryIndexRepairBlocked
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+              result: quarantined
+            exp_annotations:
+              summary: "AI generation recovery-index repair is blocked"
+              description: "Recovery-index repair reported quarantined. Queue depth remains unavailable until the current epoch has a completed unambiguous pass."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#recovery-index-repair"
+
+  - name: quarantined and over-cap repair outcomes alert independently
+    interval: 1m
+    input_series:
+      - series: 'readmates_aigen_recovery_index_repair_total{result="quarantined"}'
+        values: '0+1x10'
+      - series: 'readmates_aigen_recovery_index_repair_total{result="over_cap"}'
+        values: '0+1x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: AiGenRecoveryIndexRepairBlocked
+        exp_alerts:
+          - exp_labels:
+              severity: warn
+              component: aigen
+              result: quarantined
+            exp_annotations:
+              summary: "AI generation recovery-index repair is blocked"
+              description: "Recovery-index repair reported quarantined. Queue depth remains unavailable until the current epoch has a completed unambiguous pass."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#recovery-index-repair"
+          - exp_labels:
+              severity: warn
+              component: aigen
+              result: over_cap
+            exp_annotations:
+              summary: "AI generation recovery-index repair is blocked"
+              description: "Recovery-index repair reported over_cap. Queue depth remains unavailable until the current epoch has a completed unambiguous pass."
+              runbook_url: "https://github.com/readmates/readmates/blob/main/docs/operations/runbooks/ai-session-generation.md#recovery-index-repair"

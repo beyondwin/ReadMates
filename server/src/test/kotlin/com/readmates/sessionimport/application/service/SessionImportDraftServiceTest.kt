@@ -1,7 +1,6 @@
 package com.readmates.sessionimport.application.service
 
 import com.readmates.auth.domain.MembershipRole
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportAttendee
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
@@ -17,7 +16,6 @@ import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
@@ -27,7 +25,11 @@ import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftComma
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.application.port.`in`.ManageSessionRecordDraftUseCase
+import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AuthenticatedClubActor
 import com.readmates.shared.security.CurrentMember
@@ -188,25 +190,65 @@ class SessionImportDraftServiceTest {
     }
 
     @Test
-    fun `validated replacement keeps normalized live write and cache invalidation contract`() {
+    fun `record owned replacement validates and keeps normalized live write and cache invalidation contract`() {
         val fixture = Fixture()
         val preview = fixture.validator.validate(fixture.command)
-        val writePort = RecordingWritePort()
+        val writePort = RecordingWritePort(fixture.target())
         val cache = RecordingCacheInvalidation()
-        val service = SessionImportService(writePort, cache)
+        val service: ReplaceSessionRecordContentPort = SessionImportService(writePort, cache)
 
         val result =
             service.replace(
-                ValidatedSessionImportReplacement(
-                    command = fixture.command,
-                    preview = preview,
-                    snapshot = fixture.command.toCanonicalSnapshot(preview),
+                SessionRecordContentReplacement(
+                    host = fixture.host,
+                    sessionId = fixture.command.sessionId,
+                    sessionNumber = fixture.command.session.number,
+                    bookTitle = fixture.command.session.bookTitle,
+                    meetingDate = fixture.command.session.meetingDate,
+                    snapshot =
+                        fixture.command
+                            .toCanonicalSnapshot(preview)
+                            .copy(publicationSummary = "  Summary  "),
+                    source = SessionRecordDraftSource.JSON_IMPORT,
+                    trustedAuthorBindings = mapOf("Member" to fixture.authorMembershipId),
+                    historicalAuthorBindings = emptyMap(),
                 ),
             )
 
         assertThat(writePort.replacement?.publicationSummary).isEqualTo("Summary")
-        assertThat(result.sessionId).isEqualTo(fixture.command.sessionId.toString())
+        assertThat(result).isInstanceOf(SessionRecordContentReplacementResult.Applied::class.java)
+        assertThat((result as SessionRecordContentReplacementResult.Applied).canonicalSnapshot.publicationSummary)
+            .isEqualTo("Summary")
         assertThat(cache.evictedClubId).isEqualTo(fixture.host.clubId)
+    }
+
+    @Test
+    fun `record owned replacement rejects invalid content without a live write`() {
+        val fixture = Fixture()
+        val writePort = RecordingWritePort(fixture.target())
+        val service: ReplaceSessionRecordContentPort = SessionImportService(writePort)
+        val invalidSnapshot =
+            fixture.command.toCanonicalSnapshot(fixture.validator.validate(fixture.command)).copy(
+                publicationSummary = " ",
+            )
+
+        val result =
+            service.replace(
+                SessionRecordContentReplacement(
+                    host = fixture.host,
+                    sessionId = fixture.command.sessionId,
+                    sessionNumber = fixture.command.session.number,
+                    bookTitle = fixture.command.session.bookTitle,
+                    meetingDate = fixture.command.session.meetingDate,
+                    snapshot = invalidSnapshot,
+                    source = SessionRecordDraftSource.JSON_IMPORT,
+                    trustedAuthorBindings = mapOf("Member" to fixture.authorMembershipId),
+                    historicalAuthorBindings = emptyMap(),
+                ),
+            )
+
+        assertThat(result).isEqualTo(SessionRecordContentReplacementResult.Invalid)
+        assertThat(writePort.replacement).isNull()
     }
 
     private class Fixture {
@@ -235,12 +277,29 @@ class SessionImportDraftServiceTest {
                 feedbackDocument =
                     SessionImportFeedbackDocumentCommand(
                         "feedback.md",
-                        "<!-- readmates-feedback:v1 -->\n\n# Feedback\n",
+                        VALID_FEEDBACK_MARKDOWN,
                     ),
             )
         val validator = FakeValidator(authorMembershipId)
         val drafts = FakeDrafts(authorMembershipId)
         val service = SessionImportDraftService(validator, drafts)
+
+        fun target() =
+            SessionImportTarget(
+                sessionId = command.sessionId,
+                clubId = host.clubId,
+                sessionNumber = command.session.number,
+                bookTitle = command.session.bookTitle,
+                meetingDate = command.session.meetingDate,
+                attendees =
+                    listOf(
+                        SessionImportAttendee(
+                            membershipId = authorMembershipId,
+                            displayName = "Member",
+                            active = true,
+                        ),
+                    ),
+            )
     }
 
     private class FakeValidator(
@@ -368,13 +427,15 @@ class SessionImportDraftServiceTest {
             error("Live replacement must not run")
     }
 
-    private class RecordingWritePort : SessionImportWritePort {
+    private class RecordingWritePort(
+        private val target: SessionImportTarget,
+    ) : SessionImportWritePort {
         var replacement: SessionImportRecordReplacement? = null
 
         override fun loadTarget(
             host: AuthenticatedClubActor,
             sessionId: UUID,
-        ): SessionImportTarget? = null
+        ): SessionImportTarget = target
 
         override fun replaceRecords(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument {
             replacement = command
@@ -395,3 +456,54 @@ class SessionImportDraftServiceTest {
         }
     }
 }
+
+private val VALID_FEEDBACK_MARKDOWN =
+    """
+    <!-- readmates-feedback:v1 -->
+
+    # 독서모임 1차 피드백
+
+    Book · 2026.07.23
+
+    ## 메타
+
+    - 책: Book
+
+    ## 관찰자 노트
+
+    Test note.
+
+    ## 참여자별 피드백
+
+    ### 01. Member
+
+    역할: 참여자
+
+    #### 참여 스타일
+
+    Steady.
+
+    #### 실질 기여
+
+    - Shared a perspective.
+
+    #### 문제점과 자기모순
+
+    ##### 1. Scope
+
+    - 핵심: Broad.
+    - 근거: Several examples.
+    - 해석: Narrow it.
+
+    #### 실천 과제
+
+    1. Lead with the conclusion.
+
+    #### 드러난 한 문장
+
+    > Keep it focused.
+
+    맥락: Test
+
+    주석: Test fixture.
+    """.trimIndent()

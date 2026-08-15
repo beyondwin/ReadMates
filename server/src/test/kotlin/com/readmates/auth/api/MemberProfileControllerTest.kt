@@ -1,6 +1,16 @@
 package com.readmates.auth.api
 
+import com.readmates.auth.adapter.`in`.security.AuthClubContextHeader
+import com.readmates.auth.adapter.`in`.web.MemberProfileController
+import com.readmates.auth.application.MemberProfileError
+import com.readmates.auth.application.MemberProfileException
+import com.readmates.auth.application.port.`in`.ReplaceOwnMemberProfileUseCase
+import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
+import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
+import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
+import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.AfterEach
@@ -8,9 +18,11 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpStatus
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
@@ -46,6 +58,109 @@ class MemberProfileControllerTest(
     private val createdUserIds = linkedSetOf<String>()
     private val createdClubIds = linkedSetOf<String>()
 
+    private data class ProfileErrorResponseCase(
+        val error: MemberProfileError,
+        val status: HttpStatus,
+        val code: String,
+        val message: String,
+    )
+
+    private val profileErrorResponseCases =
+        listOf(
+            ProfileErrorResponseCase(
+                MemberProfileError.AUTHENTICATION_REQUIRED,
+                HttpStatus.UNAUTHORIZED,
+                "AUTHENTICATION_REQUIRED",
+                "Authentication required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.HOST_ROLE_REQUIRED,
+                HttpStatus.FORBIDDEN,
+                "HOST_ROLE_REQUIRED",
+                "Host role required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.MEMBERSHIP_NOT_ALLOWED,
+                HttpStatus.FORBIDDEN,
+                "MEMBERSHIP_NOT_ALLOWED",
+                "Membership is not allowed to edit profile",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.MEMBER_NOT_FOUND,
+                HttpStatus.NOT_FOUND,
+                "MEMBER_NOT_FOUND",
+                "Member not found",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_REQUIRED,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_REQUIRED",
+                "Display name is required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_TOO_LONG,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_TOO_LONG",
+                "Display name must be 20 characters or fewer",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_INVALID,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_INVALID",
+                "Display name is invalid",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_RESERVED,
+                HttpStatus.BAD_REQUEST,
+                "DISPLAY_NAME_RESERVED",
+                "Display name is reserved",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.DISPLAY_NAME_DUPLICATE,
+                HttpStatus.CONFLICT,
+                "DISPLAY_NAME_DUPLICATE",
+                "Display name is already used in this club",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.AVATAR_KEY_REQUIRED,
+                HttpStatus.BAD_REQUEST,
+                "AVATAR_KEY_REQUIRED",
+                "Avatar key is required",
+            ),
+            ProfileErrorResponseCase(
+                MemberProfileError.AVATAR_KEY_INVALID,
+                HttpStatus.BAD_REQUEST,
+                "AVATAR_KEY_INVALID",
+                "Avatar key is invalid",
+            ),
+        )
+
+    @Test
+    fun `member profile errors preserve their public response matrix`() {
+        val controller =
+            MemberProfileController(
+                mock(ReplaceOwnMemberProfileUseCase::class.java),
+                mock(UpdateOwnMemberProfileUseCase::class.java),
+                mock(UpdateOwnMemberAvatarUseCase::class.java),
+                mock(UpdateHostMemberProfileUseCase::class.java),
+                mock(ResolveClubContextUseCase::class.java),
+            )
+
+        profileErrorResponseCases.forEach { expected ->
+            val response = controller.handleMemberProfileException(MemberProfileException(expected.error))
+
+            assertEquals(expected.status, response.statusCode)
+            assertEquals(
+                ApiErrorResponse(
+                    code = expected.code,
+                    message = expected.message,
+                    status = expected.status.value(),
+                ),
+                response.body,
+            )
+        }
+    }
+
     @Test
     fun `member atomically replaces own profile in the trusted club context`() {
         val email = insertProfileMember("self.replace.multi", "ACTIVE", shortName = "Before")
@@ -57,7 +172,7 @@ class MemberProfileControllerTest(
             .put("/api/me/profile") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -92,7 +207,7 @@ class MemberProfileControllerTest(
                 .put("/api/me/profile") {
                     cookie(sessionCookieForEmail(email))
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
-                    clubSlug?.let { header("X-Readmates-Club-Slug", it) }
+                    clubSlug?.let { header(AuthClubContextHeader.CLUB_SLUG, it) }
                     header("Origin", "http://localhost:3000")
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
@@ -120,7 +235,7 @@ class MemberProfileControllerTest(
             .put("/api/me/profile") {
                 cookie(sessionCookieForEmail(email))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -170,7 +285,7 @@ class MemberProfileControllerTest(
                 .put("/api/me/profile") {
                     cookie(cookie)
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
-                    header("X-Readmates-Club-Slug", "reading-sai")
+                    header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                     header("Origin", "http://localhost:3000")
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
@@ -220,7 +335,7 @@ class MemberProfileControllerTest(
                                 .put("/api/me/profile") {
                                     cookie(cookie)
                                     header("X-Readmates-Bff-Secret", "test-bff-secret")
-                                    header("X-Readmates-Club-Slug", "reading-sai")
+                                    header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                                     header("Origin", "http://localhost:3000")
                                     with(csrf())
                                     contentType = MediaType.APPLICATION_JSON
@@ -290,7 +405,7 @@ class MemberProfileControllerTest(
                                 .put("/api/me/profile") {
                                     cookie(cookie)
                                     header("X-Readmates-Bff-Secret", "test-bff-secret")
-                                    header("X-Readmates-Club-Slug", "reading-sai")
+                                    header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                                     header("Origin", "http://localhost:3000")
                                     with(csrf())
                                     contentType = MediaType.APPLICATION_JSON
@@ -336,7 +451,7 @@ class MemberProfileControllerTest(
                 .put("/api/me/profile") {
                     cookie(sessionCookieForEmail(email))
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
-                    header("X-Readmates-Club-Slug", "reading-sai")
+                    header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                     header("Origin", "http://localhost:3000")
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
@@ -357,7 +472,7 @@ class MemberProfileControllerTest(
         mockMvc
             .put("/api/me/profile") {
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -434,7 +549,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -460,7 +575,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -509,7 +624,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -527,7 +642,7 @@ class MemberProfileControllerTest(
         mockMvc
             .patch("/api/me/avatar") {
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -549,7 +664,7 @@ class MemberProfileControllerTest(
                 .patch("/api/me/avatar") {
                     cookie(cookie)
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
-                    header("X-Readmates-Club-Slug", "reading-sai")
+                    header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                     header("Origin", "http://localhost:3000")
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
@@ -572,7 +687,7 @@ class MemberProfileControllerTest(
             .patch("/api/me/avatar") {
                 cookie(cookie)
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
-                header("X-Readmates-Club-Slug", "reading-sai")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
                 header("Origin", "http://localhost:3000")
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON

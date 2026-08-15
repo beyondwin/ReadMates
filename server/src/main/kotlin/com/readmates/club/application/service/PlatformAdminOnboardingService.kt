@@ -1,6 +1,5 @@
 package com.readmates.club.application.service
 
-import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.FirstHostPreviewKind
@@ -22,11 +21,13 @@ import com.readmates.club.application.port.out.CreateClubDomainPort
 import com.readmates.club.application.port.out.CreateClubDomainResult
 import com.readmates.club.application.port.out.CreatePlatformAdminClubCommand
 import com.readmates.club.application.port.out.CreatePlatformAdminHostInvitationCommand
+import com.readmates.club.application.port.out.GeneratePlatformAdminInvitationTokenPort
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
 import com.readmates.club.application.port.out.SendPlatformAdminHostInvitationEmailPort
 import com.readmates.shared.security.AccessDeniedException
-import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -52,14 +53,14 @@ class PlatformAdminOnboardingService(
     private val loadClubsPort: LoadPlatformAdminClubsPort,
     private val createClubDomainPort: CreateClubDomainPort,
     private val sendHostInvitationEmailPort: SendPlatformAdminHostInvitationEmailPort,
-    private val invitationTokenService: InvitationTokenService,
+    private val generateInvitationTokenPort: GeneratePlatformAdminInvitationTokenPort,
     private val transactionTemplate: TransactionTemplate,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : PreviewPlatformAdminClubOnboardingUseCase,
     CommitPlatformAdminClubOnboardingUseCase {
     override fun preview(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         command: PlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingPreview {
         requireOperator(admin)
@@ -95,7 +96,7 @@ class PlatformAdminOnboardingService(
     }
 
     override fun commit(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         command: PlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingResult {
         requireOperator(admin)
@@ -105,14 +106,14 @@ class PlatformAdminOnboardingService(
         val persisted =
             transactionTemplate.execute {
                 persistOnboarding(admin, normalized)
-            } ?: error("Platform admin onboarding transaction returned no result")
+            }
 
         val deliveryStatus = sendInvitationAfterCommit(persisted.pendingEmail)
         return persisted.toResult(deliveryStatus)
     }
 
     private fun persistOnboarding(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         normalized: PlatformAdminOnboardingCommand,
     ): PersistedOnboarding {
         val clubId = UUID.randomUUID()
@@ -141,7 +142,7 @@ class PlatformAdminOnboardingService(
     }
 
     private fun createFirstHostWithoutEmail(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
         command: PlatformAdminOnboardingCommand,
     ): PersistedHostWithEmail {
@@ -167,20 +168,20 @@ class PlatformAdminOnboardingService(
             )
         }
 
-        val token = invitationTokenService.generateToken()
+        val token = generateInvitationTokenPort.generate()
         val invitationId = UUID.randomUUID()
         onboardingPort.createHostInvitation(
             CreatePlatformAdminHostInvitationCommand(
                 invitationId = invitationId,
                 clubId = clubId,
-                invitedByPlatformAdminUserId = admin.userId,
+                invitedByPlatformAdminUserId = admin.adminId,
                 email = command.firstHost.email,
                 name = command.firstHost.name,
-                tokenHash = invitationTokenService.hashToken(token),
+                tokenHash = token.tokenHash,
                 expiresAt = OffsetDateTime.now(ZoneOffset.UTC).plusDays(HOST_INVITATION_TTL_DAYS),
             ),
         )
-        val acceptUrl = "${appBaseUrl.trimEnd('/')}/clubs/${command.club.slug}/invite/$token"
+        val acceptUrl = "${appBaseUrl.trimEnd('/')}/clubs/${command.club.slug}/invite/${token.rawToken}"
         return PersistedHostWithEmail(
             host =
                 PersistedHostOnboarding(
@@ -280,8 +281,8 @@ class PlatformAdminOnboardingService(
         return command.copy(club = club, firstHost = firstHost, domain = domain)
     }
 
-    private fun requireOperator(admin: CurrentPlatformAdmin) {
-        if (!admin.canCreateClub) {
+    private fun requireOperator(admin: PlatformActor) {
+        if (!admin.can(PlatformCapability.CREATE_CLUB)) {
             throw AccessDeniedException("Platform admin role cannot onboard clubs")
         }
     }

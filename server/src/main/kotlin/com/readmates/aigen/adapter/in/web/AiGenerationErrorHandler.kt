@@ -1,9 +1,10 @@
 package com.readmates.aigen.adapter.`in`.web
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobPublishException
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationQueueUnavailableException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.ProviderCallException
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.shared.security.AccessDeniedException
 import org.springframework.core.annotation.Order
 import org.springframework.http.HttpStatus
@@ -38,7 +39,7 @@ class AiGenerationErrorHandler {
     @Suppress("MaxLineLength")
     fun handleInvalidTranscriptSpeakers(error: AiGenerationException.InvalidTranscriptSpeakers): ResponseEntity<ProblemDetail> =
         problem(
-            status = HttpStatus.UNPROCESSABLE_ENTITY,
+            status = HttpStatus.UNPROCESSABLE_CONTENT,
             code = error.code.name,
             detail = "대본의 화자명을 활성 회원 이름과 맞춘 뒤 다시 업로드하세요.",
             invalidSpeakerLabels = error.invalidSpeakerLabels,
@@ -89,9 +90,9 @@ class AiGenerationErrorHandler {
             type = PROBLEM_AI_OPS_ACTION,
         )
 
-    @ExceptionHandler(AiGenerationJobPublishException::class)
+    @ExceptionHandler(AiGenerationQueueUnavailableException::class)
     fun handleQueueFailure(
-        @Suppress("UNUSED_PARAMETER") error: AiGenerationJobPublishException,
+        @Suppress("UNUSED_PARAMETER") error: AiGenerationQueueUnavailableException,
     ): ResponseEntity<ProblemDetail> =
         problem(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.QUEUE_UNAVAILABLE.name, "Generation queue unavailable")
 
@@ -105,7 +106,7 @@ class AiGenerationErrorHandler {
     fun handleUnreadableRequest(
         @Suppress("UNUSED_PARAMETER") error: HttpMessageNotReadableException,
     ): ResponseEntity<ProblemDetail> =
-        problem(HttpStatus.UNPROCESSABLE_ENTITY, ErrorCode.SCHEMA_INVALID.name, ErrorCode.SCHEMA_INVALID.safeDetail())
+        problem(HttpStatus.UNPROCESSABLE_CONTENT, ErrorCode.SCHEMA_INVALID.name, ErrorCode.SCHEMA_INVALID.safeDetail())
 
     @ExceptionHandler(AccessDeniedException::class)
     fun handleAccessDenied(
@@ -125,7 +126,7 @@ class AiGenerationErrorHandler {
     @ExceptionHandler(RuntimeException::class)
     fun handleUnknown(error: RuntimeException): ResponseEntity<ProblemDetail> {
         val log = org.slf4j.LoggerFactory.getLogger(AiGenerationErrorHandler::class.java)
-        if (error is com.readmates.sessionimport.application.service.InvalidSessionImportException) {
+        if (error is InvalidSessionImportException) {
             val issueCodes = error.issues.map { it.code }.distinct()
             log.error(
                 "Unhandled AI generation exception. issueCount={}, issueCodes={}",
@@ -188,11 +189,13 @@ internal fun ErrorCode.toHttpStatus(): HttpStatus =
         ErrorCode.TRANSCRIPT_SPEAKER_AMBIGUOUS,
         ErrorCode.TRANSCRIPT_TOO_LONG_FOR_MODEL,
         ErrorCode.TRANSCRIPT_ALIAS_MODE_UNSUPPORTED,
-        -> HttpStatus.UNPROCESSABLE_ENTITY
+        -> HttpStatus.UNPROCESSABLE_CONTENT
         ErrorCode.STALE_GENERATION_REVISION,
         ErrorCode.MEMBERSHIP_CHANGED,
         -> HttpStatus.CONFLICT
-        ErrorCode.UNKNOWN -> HttpStatus.INTERNAL_SERVER_ERROR
+        ErrorCode.ASYNC_PROCESSING_EXHAUSTED,
+        ErrorCode.UNKNOWN,
+        -> HttpStatus.INTERNAL_SERVER_ERROR
     }
 
 internal fun ErrorCode.safeDetail(): String =

@@ -37,7 +37,7 @@
 
 선택: **MySQL transactional outbox + Kafka relay + state machine consumer**.
 
-알림 의사결정이 확정되는 DB 트랜잭션에 `notification_event_outbox` row를 INSERT합니다. 자동 도메인 이벤트는 해당 mutation과, 호스트 수동 발송은 consumed preview 및 `notification_manual_dispatches`와 같은 트랜잭션을 사용합니다. relay가 outbox를 polling해서 Kafka로 publish하고, consumer가 Kafka 메시지를 받아 `notification_deliveries`에 채널별 delivery row를 INSERT한 뒤 실제 발송을 실행합니다. 각 단계는 idempotency key(`dedupe_key`)로 중복 실행이 안전하며, 각자 독립적으로 재시도합니다.
+알림 의사결정이 확정되는 DB 트랜잭션에 `notification_event_outbox` row를 INSERT합니다. 자동 도메인 이벤트는 해당 mutation과, 호스트 수동 발송은 consumed preview 및 `notification_manual_dispatches`와 같은 트랜잭션을 사용합니다. Relay가 outbox를 polling해서 Kafka로 publish하고, consumer가 Kafka 메시지를 받아 `notification_deliveries`에 채널별 delivery row를 INSERT한 뒤 실제 발송을 실행합니다. DB/Kafka 단계는 `dedupe_key`와 exact-lease CAS로 논리 중복을 제한하지만, SMTP 외부 side effect는 provider idempotency receipt가 없어 at-least-once입니다.
 
 ## 구현
 
@@ -49,7 +49,7 @@
   └─ INSERT notification_event_outbox row   (같은 트랜잭션 commit)
                 |
                 v
-      [NotificationEventRelayScheduler]     (30초 고정 지연, idempotent)
+      [NotificationEventRelayScheduler]     (inbound adapter, typed 30초 지연)
        └─ NotificationRelayService.publishPending(batchSize)
                 |
                 v  claimPublishable → publish → markPublished
@@ -68,8 +68,9 @@
   [NotificationDeliveryEngine.sendClaimed]
       |
       ├── success → markDeliverySent  → SENT
-      ├── retryable failure → markDeliveryFailed → FAILED (재시도 예약)
-      └── max attempts exceeded → markDeliveryDead → DEAD
+      ├── PERMANENT/expired → markDeliveryDead → DEAD (SMTP 호출 없음 또는 즉시 종료)
+      ├── RETRYABLE/AMBIGUOUS → markDeliveryFailed → FAILED (재시도 예약)
+      └── max attempts/deadline → markDeliveryDead → DEAD
 ```
 
 **마이그레이션 이력**
@@ -80,6 +81,7 @@
 - `V20__kafka_notification_pipeline.sql` — `notification_event_outbox` (이벤트 payload JSON) + `notification_deliveries` (채널별 delivery 상태). Kafka 도입으로 outbox와 delivery를 분리.
 - `V27__manual_notification_dispatch.sql`, `V28__manual_notification_dispatch_hardening.sql` — 10분 TTL preview와 수동 dispatch 감사 원장, preview 소비 및 dispatch 1:1 제약.
 - `V42__host_notification_composer.sql` — current content revision, `SELECTED_MEMBERS`, opt-in 클럽 리마인더 정책을 추가하고 명시적 composer 발송을 강화.
+- `V48__make_admin_notification_replay_atomic.sql` — platform admin의 exact delivery target snapshot, v2 confirmation receipt, actor/club scope, legacy v1 호환 evidence를 additive하게 추가.
 
 **outbox 삽입 — `JdbcNotificationEventOutboxAdapter.enqueueEvent`**
 
@@ -122,33 +124,13 @@ override fun publishPending(limit: Int): Int {
 }
 ```
 
-`claimPublishable`은 `status = 'PENDING'`인 row에 `locked_at`을 기록해 선점합니다 (lease timeout 15분). 선점 성공 후 Kafka publish에 성공하면 `markPublished`, 실패하면 retry 횟수에 따라 `markPublishFailed` 또는 `markPublishDead`를 호출합니다. `NotificationEventRelayScheduler`가 30초(`fixed-delay-ms: 30000`) 마다 `publishPending(batchSize)` (기본 50)를 실행합니다.
+`claimPublishable`은 `PENDING`/재시도 가능한 `FAILED` row에 `locked_at`을 기록해 선점합니다(lease 15분). Application service는 주입된 `Clock` 하나로 `createdAt + eventMaxAge`(기본 24시간)를 먼저 검사하고, deadline equality부터 Kafka를 호출하지 않고 `DEAD`로 전환합니다. 선점 성공 후 Kafka publish에 성공하면 `markPublished`, 실패하면 공유 retry schedule과 최대 5회에 따라 `markPublishFailed` 또는 `markPublishDead`를 호출합니다. `@Scheduled`는 application service가 아니라 inbound adapter인 `NotificationEventRelayScheduler`가 소유하고 typed `NotificationRuntimeProperties.Worker`의 30초 fixed delay와 batch 50을 사용합니다.
 
 **consumer → delivery engine — `NotificationDeliveryEngine.sendClaimed`**
 
 `NotificationEventKafkaListener`가 `readmates.notification.events.v1` 토픽의 메시지를 받으면 `NotificationDispatchService.dispatch`로 위임합니다. dispatch는 `notification_deliveries`에 EMAIL/IN_APP 채널별 row를 INSERT한 뒤 EMAIL delivery를 즉시 claim해서 `NotificationDeliveryEngine.sendClaimed`를 호출합니다.
 
-```kotlin
-// server/src/main/kotlin/com/readmates/notification/application/service/NotificationDeliveryEngine.kt:32
-fun sendClaimed(item: ClaimedNotificationDeliveryItem): DeliveryEngineResult {
-    val command = MailDeliveryCommand(
-        to = requiredDeliveryField(item.id, "recipientEmail", item.recipientEmail),
-        subject = requiredDeliveryField(item.id, "subject", item.subject),
-        text = requiredDeliveryField(item.id, "bodyText", item.bodyText),
-        html = item.bodyHtml?.takeIf { it.isNotBlank() },
-    )
-    try {
-        mailDeliveryPort.send(command)
-    } catch (exception: Exception) {
-        return markFailure(item, exception)  // FAILED 또는 DEAD
-    }
-    deliveryStatusPort.markDeliverySent(item.id, item.lockedAt)
-    metrics.sent(item.eventType)
-    return DeliveryEngineResult.Sent
-}
-```
-
-`markFailure`는 `item.attemptCount + 1 >= maxAttempts`(기본 5)이면 `markDeliveryDead`, 미만이면 `markDeliveryFailed`로 다음 재시도 시각(5→15→60→240분)을 예약합니다. 결과는 `DeliveryEngineResult` sealed interface(`Sent`, `Dead`, `RetryableFailure`)로 반환되며, `RetryableFailure`만 Kafka consumer retry를 유발합니다. claim 시점에 delivery row 상태를 찾지 못한 `UNKNOWN` 경로는 dead-letter로 보내지 않고 retryable로 처리하며 `notification.dispatch.unknown_status` counter를 증가시킵니다.
+`NotificationDeliveryEngine`도 주입된 `Clock`으로 `createdAt + deliveryMaxAge`(기본 24시간)를 먼저 검사합니다. 만료 equality 또는 필수 mail content 누락은 SMTP를 호출하지 않고 `DEAD`입니다. SMTP adapter는 Spring/Jakarta/transport exception을 application-owned `MailDeliveryFailureKind`로 변환합니다. `PERMANENT`(잘못된 주소/메시지 준비, 인증, 명시적 permanent rejection)는 첫 시도에 `DEAD`; `RETRYABLE`(명시적 transient rejection)과 `AMBIGUOUS`(timeout, connection loss, accepted recipient가 있는 send failure)는 공유 5→15→60→240분 schedule을 따르고 최대 5회 또는 deadline에서 `DEAD`가 됩니다. Raw exception/response/email은 상태·metric label에 저장하지 않습니다. Exact `lockedAt` CAS가 실패하면 stale-lease 오류를 내고 성공/실패 transition을 허위로 기록하지 않습니다.
 
 **state machine**
 
@@ -166,7 +148,7 @@ enum class NotificationEventOutboxStatus { PENDING, PUBLISHING, PUBLISHED, FAILE
 enum class NotificationDeliveryStatus { PENDING, SENDING, SENT, FAILED, DEAD, SKIPPED }
 ```
 
-두 state machine은 독립적으로 동작합니다. outbox가 PUBLISHED가 되어야 Kafka consumer가 delivery를 생성할 수 있고, delivery가 SENT가 되어야 최종 발송이 완료됩니다.
+두 state machine은 독립적으로 동작합니다. Kafka publish가 `markPublished`보다 먼저이므로 mark 유실 뒤 outbox가 `PUBLISHING`인 동안에도 consumer는 dedupe 계약에 따라 delivery를 멱등하게 생성·처리할 수 있습니다. `PUBLISHED`는 producer-side mark 완료를 확인하는 상태이지 consumer 처리의 선행 조건이 아니며, 전체 전달 계약은 at-least-once입니다. Delivery가 `SENT`가 되어야 애플리케이션의 최종 발송 상태가 완료됩니다.
 
 **이메일 본문 — `NotificationEmailTemplates.eventCopy`**
 
@@ -180,6 +162,12 @@ plain text와 HTML body를 `NotificationEmailTemplates.eventCopy()` 단일 호�
 
 `/app/host/notifications`는 서버 확인 정책과 backlog 지표를 상태 레일로 먼저 보여주고, `회차 → 알림 종류 → 대상과 채널` 세 결정을 한 작업대에서 받습니다. Preview는 current `contentRevision`, selection hash, 10분 TTL을 고정하고 최종 수신 인원과 채널별 예상 건수를 side sheet에서 보여줍니다. 확정 CTA만 `notification_manual_dispatches`와 outbox row를 만들며 닫기, Escape, backdrop, route navigation은 아무 발송도 만들지 않습니다. 최근 수동 발송 3건은 기본 원장에, 전체 event/delivery와 retry/recovery 도구는 조건부 운영 상세에 둡니다.
 
+**Platform admin exact delivery replay**
+
+`/api/admin/notifications/replay-preview`는 최대 1,000개(설정 범위 `1..5000`)의 byte-exact `EMAIL` + `FAILED|DEAD` + `MAIL_RETRYABLE|MAIL_PERMANENT` delivery tuple을 고정 순서 canonical hash와 v2 target row로 저장합니다. `MAIL_AMBIGUOUS`, 만료·content-invalid, 빈 값, unknown, 대소문자·padding lookalike는 warning count에만 포함됩니다. Confirm은 stored filter로 새 대상을 찾지 않고 snapshot과 status, attempt count, failure code, `updated_at`, null lease가 그대로인 row만 직접 `PENDING`으로 reset하며 달라진 row는 skip합니다.
+
+이 복구는 수동 발송과 달리 `notification_event_outbox`를 INSERT하거나 source event를 재발행하지 않습니다. Delivery reset, 단일 protected platform audit, immutable receipt, preview consume가 하나의 transaction에 들어가고 같은 actor/hash 명령의 응답 유실 재시도는 기존 receipt를 반환합니다. Legacy v1 preview는 정확한 receipt가 없으므로 성공 count를 지어내지 않고 다시 preview해야 합니다. DB 단계의 원자성과 멱등성은 SMTP side effect를 exactly-once로 바꾸지 않습니다.
+
 ## 검증
 
 **통합 테스트**
@@ -192,16 +180,21 @@ plain text와 HTML body를 `NotificationEmailTemplates.eventCopy()` 단일 호�
 
 **backlog 메트릭**
 
-`CachedNotificationBacklogProvider.refresh()`가 60초 고정 지연(`@Scheduled(fixedDelay = 60_000L)`)으로 `notification_deliveries` backlog 집계를 실행하고 결과를 `AtomicReference`에 캐시합니다. `ReadmatesOperationalMetrics`가 초기화 시 `Gauge`를 등록해 스냅샷을 Prometheus에 노출합니다.
+Inbound adapter인 `NotificationBacklogRefreshScheduler`가 typed initial delay 5초/fixed delay 60초로 refresh input port를 호출합니다. Application-owned `CachedNotificationBacklogProvider`는 event outbox와 delivery를 각각 조회해 마지막 성공 snapshot을 보존합니다. 첫 성공 전 gauge는 `NaN`; 한쪽 실패는 `partial`, 양쪽 실패는 `failure`이고 실패한 쪽을 거짓 0으로 덮지 않습니다.
 
 ```
 readmates.notifications.outbox.backlog{status="pending"}
 readmates.notifications.outbox.backlog{status="failed"}
 readmates.notifications.outbox.backlog{status="dead"}
-readmates.notifications.outbox.backlog{status="sending"}
+readmates.notifications.outbox.backlog{status="publishing"}
+readmates.notifications.delivery.backlog{status="pending"}
+readmates.notifications.delivery.backlog{status="failed"}
+readmates.notifications.delivery.backlog{status="dead"}
+readmates.notifications.delivery.backlog{status="sending"}
+readmates.notifications.backlog.refresh{result=~"success|partial|failure"}
 ```
 
-backlog가 증가하기 시작하면 relay 또는 consumer 중 하나가 정체되고 있다는 신호입니다.
+Event outbox gauge는 relay/Kafka publication, delivery gauge는 email worker/SMTP를 진단합니다. 서로 대체해서 해석하지 않습니다.
 
 **발송 결과 카운터**
 
@@ -214,6 +207,10 @@ notification.dispatch.unknown_status
 
 알림 성공/실패/dead counter의 태그는 `NotificationEventType` enum 값만 허용합니다. `club_id`, `user_id`, `recipient_email` 등 고카디널리티 값은 태그로 사용하지 않습니다 (별도 시계열 폭발 방지). `notification.dispatch.unknown_status`는 태그 없는 counter입니다. row 단위 감사 쿼리는 `notification_deliveries` 테이블을 사용합니다.
 
+**at-least-once 잔여 위험**
+
+SMTP provider가 메시지를 수락한 뒤 `markDeliverySent` CAS/DB commit 전에 프로세스가 중단되면 15분 lease reclaim 후 같은 mail이 다시 전송될 수 있습니다. DB/Kafka dedupe만으로 외부 side effect를 exactly-once로 만들 수 없으므로 `AMBIGUOUS`를 영구 실패로 축소하지 않습니다. Exactly-once 보장에는 provider idempotency key와 receipt API가 필요하며 현재 범위 밖입니다. 운영자는 provider acceptance 또는 recipient-side evidence 없이 `AMBIGUOUS` delivery를 blind resend하지 않습니다.
+
 **e2e**
 
 호스트 알림 작업대 E2E는 options → preview → confirm, 선택 회원, duplicate resend, side sheet close/Escape/navigation no-send, 최근 dispatch 원장과 mobile bottom sheet를 검증합니다. 운영 상세에서는 최근 delivery의 `sent_at`, 채널, 이벤트 유형, masked recipient를 확인합니다.
@@ -221,8 +218,8 @@ notification.dispatch.unknown_status
 ## Trade-off와 한계
 
 - **Kafka 운영 부담**: Redpanda(Kafka 호환)를 단일 노드로 운영하더라도 lifecycle 관리, 마이그레이션, 재시작 시 lag 확인이 필요합니다.
-- **backlog 모니터링 필수**: backlog gauge가 지속적으로 증가하면 consumer가 죽었거나 relay가 막혔다는 신호입니다. `docs/operations/observability/alerts.md`에 권장 alert rule은 있지만, 실제 Alertmanager 배포 여부는 운영 환경에서 별도 확인해야 합니다.
-- **DEAD row 수동 처리**: `notification_event_outbox.status = 'DEAD'` 또는 `notification_deliveries.status = 'DEAD'` row는 호스트 운영 화면과 DB audit으로 확인하고 복구합니다. 정기적인 수동 audit 또는 실제 운영 alert 연결이 필요합니다.
+- **backlog 모니터링 필수**: event outbox backlog 증가는 relay/Kafka, delivery backlog 증가는 worker/SMTP 신호입니다. 첫 refresh 전 `NaN`과 last-success snapshot을 0으로 해석하지 않습니다. 실제 Alertmanager routing은 운영 환경의 별도 확인 대상입니다.
+- **DEAD recovery 분리**: event-outbox `DEAD`에는 이 slice의 범용 replay action이 없으므로 원인 제거와 forward recovery를 분리하고 DB를 직접 수정하지 않습니다. Manual preview/confirm은 새 event를 만드는 forward action입니다. Delivery `DEAD`는 exact 대상과 failure/deadline/lease evidence를 확인한 뒤 host가 한 건씩 복구하거나, OWNER/OPERATOR가 bounded admin preview/confirm으로 allowlisted exact delivery 묶음만 원자적으로 `PENDING` 복구합니다. Admin replay는 새 outbox/event를 만들지 않고 changed/leased target을 skip하며, `AMBIGUOUS`는 미수락 evidence 없이 restore/blind resend하지 않습니다.
 - **consumer single instance**: `NotificationEventKafkaListener`는 단일 인스턴스로 실행됩니다. 처리량이 늘면 Kafka partition 수와 consumer 인스턴스를 맞춰 scale-out해야 하지만 현재 구성에서는 single consumer입니다.
 - **relay polling 지연**: `NotificationEventRelayScheduler`는 30초 고정 지연으로 실행되므로, commit → relay → Kafka publish 사이에 최대 30초 지연이 발생할 수 있습니다.
 

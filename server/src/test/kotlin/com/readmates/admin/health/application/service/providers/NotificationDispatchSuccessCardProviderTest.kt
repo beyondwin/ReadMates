@@ -1,12 +1,14 @@
 package com.readmates.admin.health.application.service.providers
 
-import com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 import com.readmates.admin.health.application.model.HealthCardDrill
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.port.out.PromInstantValue
 import com.readmates.admin.health.application.port.out.PromQueryResult
+import com.readmates.admin.health.application.port.out.PrometheusQueryException
+import com.readmates.admin.health.application.port.out.PrometheusQueryFailureKind
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.time.Clock
 import java.time.Instant
@@ -18,7 +20,28 @@ class NotificationDispatchSuccessCardProviderTest {
     private class FakePrometheus(
         private val behaviour: () -> PromQueryResult,
     ) : PrometheusQueryPort {
-        override fun query(promql: String): PromQueryResult = behaviour()
+        var lastQuery: String? = null
+
+        override fun query(promql: String): PromQueryResult {
+            lastQuery = promql
+            return behaviour()
+        }
+    }
+
+    @Test
+    fun `query zero fills lazy counters and keeps the epsilon rate floor`() {
+        val prometheus =
+            FakePrometheus {
+                PromQueryResult(listOf(PromInstantValue(emptyMap(), 1.0)))
+            }
+
+        NotificationDispatchSuccessCardProvider(prometheus, clock).compute()
+
+        assertThat(prometheus.lastQuery)
+            .isEqualTo(
+                "(sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) or vector(0)) / " +
+                    "clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)",
+            )
     }
 
     @Test
@@ -55,20 +78,22 @@ class NotificationDispatchSuccessCardProviderTest {
     }
 
     @Test
-    fun `status UNKNOWN on empty result or prometheus error`() {
-        val empty =
+    fun `status UNKNOWN on empty result`() {
+        val card =
             NotificationDispatchSuccessCardProvider(
                 FakePrometheus { PromQueryResult(emptyList()) },
                 clock,
             ).compute()
-        val error =
-            NotificationDispatchSuccessCardProvider(
-                FakePrometheus { throw PrometheusQueryException("boom") },
-                clock,
-            ).compute()
-        assertThat(empty.status).isEqualTo(HealthCardStatus.UNKNOWN)
-        assertThat(empty.reason).isEqualTo("no_data")
-        assertThat(error.status).isEqualTo(HealthCardStatus.UNKNOWN)
-        assertThat(error.reason).isEqualTo("prometheus_unreachable")
+
+        assertThat(card.status).isEqualTo(HealthCardStatus.UNKNOWN)
+        assertThat(card.reason).isEqualTo("no_data")
+    }
+
+    @Test
+    fun `typed prometheus failure reaches refresh orchestration`() {
+        val failure = PrometheusQueryException(PrometheusQueryFailureKind.CONNECTION)
+        val provider = NotificationDispatchSuccessCardProvider(FakePrometheus { throw failure }, clock)
+
+        assertThatThrownBy(provider::compute).isSameAs(failure)
     }
 }

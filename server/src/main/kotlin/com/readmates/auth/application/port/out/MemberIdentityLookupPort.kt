@@ -1,7 +1,7 @@
 package com.readmates.auth.application.port.out
 
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
 import java.util.UUID

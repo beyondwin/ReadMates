@@ -1,5 +1,7 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.MemberProfileError
+import com.readmates.auth.application.MemberProfileException
 import com.readmates.auth.application.model.ReplaceOwnMemberProfileCommand
 import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand

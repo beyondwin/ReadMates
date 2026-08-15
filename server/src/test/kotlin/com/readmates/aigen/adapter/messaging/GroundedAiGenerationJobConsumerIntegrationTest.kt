@@ -3,6 +3,8 @@ package com.readmates.aigen.adapter.messaging
 import com.readmates.aigen.adapter.`in`.messaging.AiGenerationJobConsumer
 import com.readmates.aigen.adapter.out.messaging.AiGenerationJobProducer
 import com.readmates.aigen.adapter.out.redis.RedisProviderCallReservationAdapter
+import com.readmates.aigen.application.model.AiGenerationRecoveryResult
+import com.readmates.aigen.application.model.AiGenerationRecoverySource
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
@@ -20,6 +22,9 @@ import com.readmates.aigen.application.model.ProviderCallException
 import com.readmates.aigen.application.model.ProviderCallMode
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
+import com.readmates.aigen.application.port.`in`.RecordUnroutableAiGenerationRecordUseCase
+import com.readmates.aigen.application.port.`in`.RecoverExhaustedAiGenerationJobUseCase
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
 import com.readmates.aigen.application.port.out.AiTraceContextPort
 import com.readmates.aigen.application.port.out.GroundedGenerationOutput
@@ -86,8 +91,13 @@ import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneId
+import java.time.ZoneOffset
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 
 @SpringBootTest(
     classes = [
@@ -114,7 +124,7 @@ internal class GroundedAiGenerationJobConsumerIntegrationTest(
     @Test
     fun `Kafka redelivery recovers stale crashed fallback and preserves the bounded retry ledger`() {
         waitForListenerAssignment()
-        val now = Instant.now()
+        val now = runtime.clock.instant()
         val record = runtime.newRecord(now)
         runtime.jobStore.save(record)
         prepareRedis(record.jobId, record.clubId)
@@ -132,12 +142,44 @@ internal class GroundedAiGenerationJobConsumerIntegrationTest(
         )
 
         await()
+            .atMost(Duration.ofSeconds(10))
+            .untilAsserted {
+                assertThat(runtime.crashingReservations.crashes).isEqualTo(1)
+                assertThat(runtime.crashingReservations.activeRecoveries).isGreaterThanOrEqualTo(1)
+                assertThat(runtime.jobStore.load(record.jobId)?.status).isEqualTo(JobStatus.RUNNING)
+                assertThat(runtime.claude.calls).isEqualTo(1)
+                assertThat(runtime.openAi.calls).isEqualTo(1)
+            }
+
+        val liveLedger = providerLedger(record.jobId)
+        val liveModes = liveLedger.filterKeys { it.endsWith(":mode") }.values.map(ProviderCallMode::valueOf)
+        assertThat(liveModes).hasSize(2)
+
+        stopListener()
+        val recoveriesAtStop = runtime.crashingReservations.activeRecoveries
+        startListener()
+
+        await()
+            .atMost(Duration.ofSeconds(10))
+            .untilAsserted {
+                assertThat(runtime.crashingReservations.activeRecoveries).isGreaterThan(recoveriesAtStop)
+                assertThat(runtime.claude.calls).isEqualTo(1)
+                assertThat(runtime.openAi.calls).isEqualTo(1)
+                assertThat(providerAttemptCount(record.jobId)).isEqualTo(2)
+            }
+
+        runtime.clock.advance(Duration.ofSeconds(1))
+        await()
             .atMost(Duration.ofSeconds(30))
             .untilAsserted {
                 assertThat(runtime.jobStore.load(record.jobId)?.status).isEqualTo(JobStatus.SUCCEEDED)
             }
 
-        val ledger = redisTemplate.opsForHash<String, String>().entries("aigen:job:${record.jobId}:provider-attempts")
+        assertFinalProviderLedger(record.jobId)
+    }
+
+    private fun assertFinalProviderLedger(jobId: UUID) {
+        val ledger = providerLedger(jobId)
         val modes = ledger.filterKeys { it.endsWith(":mode") }.values.map(ProviderCallMode::valueOf)
         val states = ledger.filterKeys { it.endsWith(":state") }.values
         assertThat(runtime.crashingReservations.crashes).isEqualTo(1)
@@ -148,11 +190,16 @@ internal class GroundedAiGenerationJobConsumerIntegrationTest(
         assertThat(modes.count { it == ProviderCallMode.FALLBACK }).isEqualTo(1)
         assertThat(states.count { it == "UNKNOWN" }).isGreaterThanOrEqualTo(2)
         assertThat(states.count { it == "SUCCEEDED" }).isEqualTo(1)
-        assertThat(redisTemplate.opsForHash<String, String>().get("aigen:job:${record.jobId}", "llmCallCount"))
+        assertThat(redisTemplate.opsForHash<String, String>().get("aigen:job:$jobId", "llmCallCount"))
             .isEqualTo("3")
         assertThat(ledger.keys.joinToString("|").lowercase())
             .doesNotContain("transcript", "prompt", "completion", "evidence", "providerresponse")
     }
+
+    private fun providerLedger(jobId: UUID): Map<String, String> =
+        redisTemplate.opsForHash<String, String>().entries("aigen:job:$jobId:provider-attempts")
+
+    private fun providerAttemptCount(jobId: UUID): Int = providerLedger(jobId).keys.count { it.endsWith(":mode") }
 
     private fun prepareRedis(
         jobId: UUID,
@@ -174,6 +221,19 @@ internal class GroundedAiGenerationJobConsumerIntegrationTest(
         ContainerTestUtils.waitForAssignment(listenerRegistry.listenerContainers.single(), 1)
     }
 
+    private fun stopListener() {
+        val container = listenerRegistry.listenerContainers.single()
+        val stopped = CountDownLatch(1)
+        container.stop(stopped::countDown)
+        assertThat(stopped.await(10, TimeUnit.SECONDS)).isTrue()
+    }
+
+    private fun startListener() {
+        val container = listenerRegistry.listenerContainers.single()
+        container.start()
+        ContainerTestUtils.waitForAssignment(container, 1)
+    }
+
     @SpringBootConfiguration
     @EnableKafka
     @ImportAutoConfiguration(DataRedisAutoConfiguration::class)
@@ -192,10 +252,25 @@ internal class GroundedAiGenerationJobConsumerIntegrationTest(
         ): GroundedRuntime = GroundedRuntime(redisTemplate, properties)
 
         @Bean
-        fun aiGenerationWorker(runtime: GroundedRuntime): AiGenerationWorker = runtime.worker
+        fun processAiGenerationJobUseCase(runtime: GroundedRuntime): ProcessAiGenerationJobUseCase = runtime.worker
 
         @Bean
         fun aiGenerationMetrics(runtime: GroundedRuntime): AiGenerationMetrics = runtime.metrics
+
+        @Bean
+        fun recoverExhaustedAiGenerationJobUseCase(): RecoverExhaustedAiGenerationJobUseCase =
+            object : RecoverExhaustedAiGenerationJobUseCase {
+                override fun recoverExhausted(
+                    jobId: UUID,
+                    source: AiGenerationRecoverySource,
+                ): AiGenerationRecoveryResult = AiGenerationRecoveryResult.MISSING
+            }
+
+        @Bean
+        fun recordUnroutableAiGenerationRecordUseCase(): RecordUnroutableAiGenerationRecordUseCase =
+            object : RecordUnroutableAiGenerationRecordUseCase {
+                override fun recordUnroutableKafkaRecord() = Unit
+            }
     }
 
     companion object {
@@ -212,6 +287,7 @@ internal class GroundedAiGenerationJobConsumerIntegrationTest(
             registry.add("readmates.aigen.kafka.bootstrap-servers") { bootstrapServers }
             registry.add("readmates.aigen.kafka.topic-jobs") { topicJobs }
             registry.add("readmates.aigen.kafka.consumer-group") { consumerGroup }
+            registry.add("readmates.aigen.kafka.consumer-retry-delay") { "1ms" }
         }
 
         private fun createTopic(
@@ -231,6 +307,7 @@ internal class GroundedRuntime(
     redisTemplate: StringRedisTemplate,
     private val properties: AiGenerationProperties,
 ) {
+    val clock = GroundedMutableClock()
     val jobStore = FakeJobStore()
     val metrics = AiGenerationMetrics(SimpleMeterRegistry())
     private val audit = FakeAuditPort()
@@ -251,7 +328,7 @@ internal class GroundedRuntime(
             modelCatalog = modelCatalog,
             auditPort = audit,
             traceContext = AiTraceContextPort { "0123456789abcdef0123456789abcdef" },
-            clock = Clock.systemUTC(),
+            clock = clock,
             maxCalls = 3,
         )
     private val groundedExecutor =
@@ -285,7 +362,7 @@ internal class GroundedRuntime(
             providerCallReservations = crashingReservations,
             costGuard = FakeCostGuard(),
             properties = properties,
-            clock = Clock.systemUTC(),
+            clock = clock,
             metrics = metrics,
         )
 
@@ -336,18 +413,34 @@ internal class GroundedRuntime(
     }
 }
 
+internal class GroundedMutableClock : Clock() {
+    private val current = AtomicReference(Instant.parse("2026-08-10T10:00:00Z"))
+
+    fun advance(duration: Duration) {
+        current.updateAndGet { it.plus(duration) }
+    }
+
+    override fun instant(): Instant = current.get()
+
+    override fun getZone(): ZoneId = ZoneOffset.UTC
+
+    override fun withZone(zone: ZoneId): Clock = Clock.fixed(instant(), zone)
+}
+
 internal class SequencedGroundedGenerator(
     override val provider: Provider,
     private val failFirst: Boolean,
 ) : WholeTranscriptGroundedGenerator {
-    var calls = 0
+    private val callCount = AtomicInteger()
+    val calls: Int
+        get() = callCount.get()
 
     override fun generate(
         model: ModelId,
         request: RenderedGroundedRequest,
     ): GroundedGenerationOutput {
-        calls += 1
-        if (failFirst && calls == 1) {
+        val call = callCount.incrementAndGet()
+        if (failFirst && call == 1) {
             throw ProviderCallException(GenerationError(ErrorCode.PROVIDER_UNAVAILABLE, "safe unavailable"))
         }
         return GroundedGenerationOutput(validDraft(), USAGE)
@@ -419,8 +512,12 @@ internal class CrashBeforeFallbackReconciliation(
     private val delegate: ProviderCallReservationPort,
 ) : ProviderCallReservationPort {
     private val modesByAttempt = mutableMapOf<UUID, ProviderCallMode>()
-    var crashes = 0
-    var activeRecoveries = 0
+    private val crashCount = AtomicInteger()
+    private val activeRecoveryCount = AtomicInteger()
+    val crashes: Int
+        get() = crashCount.get()
+    val activeRecoveries: Int
+        get() = activeRecoveryCount.get()
 
     override fun reserve(command: ProviderCallReservationCommand): ProviderCallReservationResult =
         delegate.reserve(command).also { result ->
@@ -430,8 +527,10 @@ internal class CrashBeforeFallbackReconciliation(
         }
 
     override fun reconcile(command: ProviderCallReconciliationCommand): ProviderCallReconciliationResult {
-        if (modesByAttempt[command.attemptId] == ProviderCallMode.FALLBACK && crashes == 0) {
-            crashes += 1
+        if (
+            modesByAttempt[command.attemptId] == ProviderCallMode.FALLBACK &&
+            crashCount.compareAndSet(0, 1)
+        ) {
             throw IllegalStateException("synthetic crash before reconciliation")
         }
         return delegate.reconcile(command)
@@ -443,7 +542,7 @@ internal class CrashBeforeFallbackReconciliation(
         now: Instant,
     ): ProviderCallRecoveryResult =
         delegate.recoverStaleInFlightUnknown(jobId, staleBefore, now).also {
-            if (it.activeInFlight) activeRecoveries += 1
+            if (it.activeInFlight) activeRecoveryCount.incrementAndGet()
         }
 
     override fun clubMonthlyCost(clubId: UUID): BigDecimal = delegate.clubMonthlyCost(clubId)

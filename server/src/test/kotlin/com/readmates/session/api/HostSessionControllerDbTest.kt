@@ -1,6 +1,12 @@
 package com.readmates.session.api
 
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.session.application.InvalidSessionScheduleException
+import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.UpdateHostSessionCommand
+import com.readmates.session.application.port.out.HostSessionDraftPort
 import com.readmates.shared.paging.CursorCodec
+import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers.hasItem
@@ -9,6 +15,7 @@ import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.test.context.TestConfiguration
@@ -230,6 +237,7 @@ private const val RESET_MEMBER1_ACTIVE_AVATAR_KEY_SQL = """
 class HostSessionControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val hostSessionDraftPort: HostSessionDraftPort,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `host creates draft upcoming session without participants`() {
@@ -261,6 +269,142 @@ class HostSessionControllerDbTest(
                 Int::class.java,
             )
         assertEquals(0, participantCount)
+    }
+
+    @Test
+    fun `host draft defaults schedule deadline and optional meeting fields`() {
+        val response =
+            mockMvc
+                .post("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "title": "7회차 · 기본값 테스트",
+                          "bookTitle": "기본값 테스트",
+                          "bookAuthor": "테스트 저자",
+                          "date": "2026-05-20"
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isCreated() }
+                    jsonPath("$.startTime") { value("20:00") }
+                    jsonPath("$.endTime") { value("22:00") }
+                    jsonPath("$.questionDeadlineAt") { value("2026-05-19T14:59Z") }
+                    jsonPath("$.locationLabel") { value("온라인") }
+                    jsonPath("$.meetingUrl") { doesNotExist() }
+                    jsonPath("$.meetingPasscode") { doesNotExist() }
+                }.andReturn()
+        val sessionId =
+            """"sessionId"\s*:\s*"([^"]+)""""
+                .toRegex()
+                .find(response.response.contentAsString)
+                ?.groupValues
+                ?.get(1)
+                ?: error("created session response did not include a sessionId")
+
+        val stored =
+            jdbcTemplate.queryForMap(
+                """
+                select start_time, end_time, question_deadline_at, location_label, meeting_url, meeting_passcode
+                from sessions
+                where id = ?
+                """.trimIndent(),
+                sessionId,
+            )
+        assertEquals("20:00:00", stored["start_time"].toString())
+        assertEquals("22:00:00", stored["end_time"].toString())
+        assertEquals("2026-05-19T14:59", stored["question_deadline_at"].toString())
+        assertEquals("온라인", stored["location_label"])
+        assertNull(stored["meeting_url"])
+        assertNull(stored["meeting_passcode"])
+    }
+
+    @Test
+    fun `host update preserves null patches and normalizes blanks`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "title": "7회차 · 수정된 책",
+                      "bookTitle": "수정된 책",
+                      "bookAuthor": "수정된 저자",
+                      "bookLink": "   ",
+                      "date": "2026-05-21",
+                      "locationLabel": " ",
+                      "meetingUrl": "",
+                      "questionDeadlineAt": ""
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.startTime") { value("20:00") }
+                jsonPath("$.endTime") { value("22:00") }
+                jsonPath("$.questionDeadlineAt") { value("2026-05-20T14:59Z") }
+                jsonPath("$.bookLink") { doesNotExist() }
+                jsonPath("$.bookImageUrl") { value("https://example.com/covers/test-book.jpg") }
+                jsonPath("$.locationLabel") { value("온라인") }
+                jsonPath("$.meetingUrl") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `host update rejects an end time equal to the stored start time`() {
+        val sessionId = createDraftSessionSeven()
+
+        val beforeRejectedUpdate = jdbcTemplate.queryForMap("select * from sessions where id = ?", sessionId)
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "title": "동일 시각 거부",
+                      "bookTitle": "수정된 책",
+                      "bookAuthor": "수정된 저자",
+                      "date": "2026-05-21",
+                      "endTime": "20:00"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
+        assertEquals(beforeRejectedUpdate, jdbcTemplate.queryForMap("select * from sessions where id = ?", sessionId))
+
+        assertThrows<InvalidSessionScheduleException> {
+            hostSessionDraftPort.update(
+                UpdateHostSessionCommand(
+                    host = hostMember(),
+                    sessionId = java.util.UUID.fromString(sessionId),
+                    session =
+                        HostSessionCommand(
+                            host = hostMember(),
+                            title = "동일 시각 거부",
+                            bookTitle = "수정된 책",
+                            bookAuthor = "수정된 저자",
+                            bookLink = null,
+                            bookImageUrl = null,
+                            date = "2026-05-21",
+                            startTime = null,
+                            endTime = "20:00",
+                            questionDeadlineAt = null,
+                            locationLabel = null,
+                            meetingUrl = null,
+                            meetingPasscode = null,
+                        ),
+                ),
+            )
+        }
     }
 
     @Test
@@ -1093,6 +1237,30 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host cannot publish guest readable session when publication summary is blank`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+        updateSessionVisibility(sessionId, "MEMBER")
+        insertPublicationRow(sessionId, visibility = "MEMBER", isPublic = false, published = false)
+        withBlankPublicationSummary(sessionId) {
+            val beforePublish = lifecycleDbEvidence(sessionId)
+
+            mockMvc
+                .post("/api/host/sessions/$sessionId/publish") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                }.andExpect {
+                    status { isConflict() }
+                    jsonPath("$.code") { value("CONFLICT") }
+                    jsonPath("$.status") { value(409) }
+                }
+
+            assertEquals(beforePublish, lifecycleDbEvidence(sessionId))
+        }
+    }
+
+    @Test
     fun `host cannot publish open draft host only or unpublished sessions`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
@@ -1275,6 +1443,66 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isConflict() }
             }
+    }
+
+    @Test
+    fun `concurrent host opens serialize on the club and leave one open session`() {
+        val firstSessionId = createDraftSessionSeven()
+        val secondSessionId = createDraftSessionEight()
+
+        val statuses =
+            runConcurrently(workerCount = 2) {
+                val sessionId = if (Thread.currentThread().name.endsWith("1")) firstSessionId else secondSessionId
+                mockMvc
+                    .post("/api/host/sessions/$sessionId/open") {
+                        with(user("host@example.com"))
+                        with(csrf())
+                    }.andReturn()
+                    .response.status
+            }
+
+        assertThat(statuses).containsExactlyInAnyOrder(200, 409)
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and state = 'OPEN'
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+    }
+
+    @Test
+    fun `concurrent same club draft creates receive unique contiguous session numbers`() {
+        withDelayedSessionInsert {
+            val statuses =
+                runConcurrently(workerCount = 2) {
+                    val suffix = if (Thread.currentThread().name.endsWith("1")) "A" else "B"
+                    mockMvc
+                        .post("/api/host/sessions") {
+                            with(user("host@example.com"))
+                            with(csrf())
+                            contentType = MediaType.APPLICATION_JSON
+                            content =
+                                """
+                                {
+                                  "title": "동시 생성 $suffix",
+                                  "bookTitle": "동시 생성 책 $suffix",
+                                  "bookAuthor": "테스트 저자",
+                                  "date": "2026-07-15"
+                                }
+                                """.trimIndent()
+                        }.andReturn()
+                        .response.status
+                }
+
+            assertThat(statuses).containsExactlyInAnyOrder(201, 201)
+            assertThat(generatedSessionNumbers()).containsExactly(7, 8)
+        }
     }
 
     @Test
@@ -1834,6 +2062,18 @@ class HostSessionControllerDbTest(
         }
         """.trimIndent()
 
+    private fun hostMember() =
+        CurrentMember(
+            userId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubSlug = "readmates",
+            email = "host@example.com",
+            displayName = "김호스트",
+            accountName = "김호스트",
+            role = MembershipRole.HOST,
+        )
+
     private fun createDraftSessionSeven(): String = createDraftSession("7회차 · 테스트 책", "테스트 책", "2026-05-20")
 
     private fun createDraftSessionEight(): String = createDraftSession("8회차 · 다음 책", "다음 책", "2026-06-17")
@@ -1861,6 +2101,34 @@ class HostSessionControllerDbTest(
             executor.shutdownNow()
         }
     }
+
+    private fun withDelayedSessionInsert(assertions: () -> Unit) {
+        jdbcTemplate.execute(
+            """
+            create trigger host_session_draft_concurrency_delay
+            before insert on sessions
+            for each row set @readmates_test_sleep = sleep(1)
+            """.trimIndent(),
+        )
+        try {
+            assertions()
+        } finally {
+            jdbcTemplate.execute("drop trigger if exists host_session_draft_concurrency_delay")
+        }
+    }
+
+    private fun generatedSessionNumbers(): List<Int> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select number
+                from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and number >= 7
+                order by number
+                """.trimIndent(),
+                Int::class.java,
+            ).map(::requireNotNull)
 
     private fun createDraftSession(
         title: String,
@@ -2411,6 +2679,32 @@ class HostSessionControllerDbTest(
             visibility,
             published,
         )
+    }
+
+    private fun withBlankPublicationSummary(
+        sessionId: String,
+        assertions: () -> Unit,
+    ) {
+        jdbcTemplate.execute(
+            "alter table public_session_publications " +
+                "alter check public_session_publications_summary_check not enforced",
+        )
+        try {
+            jdbcTemplate.update(
+                "update public_session_publications set public_summary = '   ' where session_id = ?",
+                sessionId,
+            )
+            assertions()
+        } finally {
+            jdbcTemplate.update(
+                "update public_session_publications set public_summary = '기존 공개 요약' where session_id = ?",
+                sessionId,
+            )
+            jdbcTemplate.execute(
+                "alter table public_session_publications " +
+                    "alter check public_session_publications_summary_check enforced",
+            )
+        }
     }
 
     private fun updateSessionVisibility(

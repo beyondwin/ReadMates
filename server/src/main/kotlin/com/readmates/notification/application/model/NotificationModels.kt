@@ -262,6 +262,7 @@ data class ClaimedNotificationDeliveryItem(
     val status: NotificationDeliveryStatus,
     val attemptCount: Int,
     val lockedAt: OffsetDateTime,
+    val createdAt: OffsetDateTime,
     val recipientEmail: String?,
     val subject: String?,
     val bodyText: String?,
@@ -556,6 +557,21 @@ data class NotificationDeliveryBacklog(
     val dead: Int,
     val sending: Int,
 )
+
+data class NotificationEventOutboxBacklog(
+    val pending: Int,
+    val failed: Int,
+    val dead: Int,
+    val publishing: Int,
+)
+
+enum class NotificationBacklogRefreshResult(
+    val tag: String,
+) {
+    SUCCESS("success"),
+    PARTIAL("partial"),
+    FAILURE("failure"),
+}
 
 data class NotificationPreferences(
     val emailEnabled: Boolean,

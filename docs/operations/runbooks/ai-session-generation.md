@@ -45,6 +45,18 @@ PENDING/RUNNING           -> FAILED
 - `aigen:job:<jobId>:provider-attempts` ledger는 `IN_FLIGHT`/`SUCCEEDED`/`FAILED`/`UNKNOWN`, ordinal, call mode, reserved cost, cost basis, safe error, timestamp를 6시간 보존합니다. 응답 유실/timeout/crash처럼 bytes 전송 여부가 불명확하면 비용을 자동 환불하지 않습니다. Kafka redelivery는 살아 있는 `IN_FLIGHT`를 재전송하지 않고 stale attempt를 `UNKNOWN`/`ESTIMATED_UNKNOWN`으로 닫은 뒤 남은 slot에만 새 attempt를 만듭니다.
 - Reservation Lua는 job/status/club, 5분 admission owner, 월 비용, 최대 3회와 single-use mode를 한 번에 확인합니다. Redis가 불명확하면 provider 호출을 시작하지 않습니다. 이 원자성은 현재 single-node Redis 전제이며 Redis Cluster 전환 전 재설계가 필요합니다.
 
+### Kafka exhaustion과 restart recovery
+
+- Generic listener failure는 고정 5초 간격의 총 10회 delivery budget을 사용합니다. Exhaustion recoverer가 durable terminal/no-op 결과를 얻은 뒤에만 offset을 commit하며 DLT는 만들지 않습니다. 살아 있는 provider attempt, 상태 변경, deadline 이전, corrupt metadata 또는 Redis persistence failure면 recoverer가 throw하여 offset을 남기고 다음 delivery에서 현재 Redis 상태를 다시 분류합니다.
+- Kafka value와 content-free `readmates-aigen-job-id` header가 모두 유효하면 canonical UUID가 같아야 합니다. Null value는 유효 header로만 복구할 수 있습니다. Value/header absent·invalid·mismatch는 어느 ID도 선택하지 않고 10회 poison budget 뒤 `unroutable_record`만 기록·commit하며, 연관 job이 있다면 scheduler deadline recovery가 backstop입니다.
+- Scheduler는 typed fixed delay(기본 1분)마다 한 bounded wave를 시작하고 `lastUpdatedAt <= now - processingDeadline`인 job만 선택합니다. 이 processing cutoff는 inclusive입니다. RUNNING provider attempt는 `startedAt < providerStaleBefore`일 때만 strict-stale `UNKNOWN/ESTIMATED_UNKNOWN`으로 조정하며, live attempt가 하나라도 남으면 job을 FAILED로 만들지 않습니다.
+- PENDING terminal recovery는 per-job admission receipt의 daily/minute window token이 현재 token과 일치하고 counter가 양수일 때만 그 charge를 환불합니다. Expired/recreated window와 newer lease를 건드리지 않고, missing counter는 terminalization을 막지 않습니다. Receipt가 없는 legacy PENDING은 `recovered_pending_unaccounted`로 terminalize하되 counter를 추측하지 않습니다. RUNNING은 이미 소비한 call/cost evidence를 보존하고 matching lease만 정리합니다.
+- Global active set을 configured ceiling(기본 5,000) 이내에서 persisted repair worklist로 snapshot하고 wave마다 configured batch(기본 최대 500개)만 처리합니다. Repair state의 `activeIndexEpoch`, `passId`, `remainingCount`, `completedEpoch`가 restart와 마지막 response loss를 견디며, corrupt row는 quarantine으로 분리합니다. Ceiling 초과는 `over_cap`, Redis/repair 실패는 `failed`; 어떤 경우도 wall-clock 완료 시간을 약속하지 않습니다.
+- Queue sampler는 typed fixed delay(기본 30초)마다 Redis Lua를 한 번 실행해 expired quarantine을 prune하고 `completedEpoch == activeIndexEpoch`, active count ceiling 이내, quarantine 0을 모두 확인합니다. 성공 depth의 0은 실제 빈 queue이고 unavailable depth는 `NaN`/availability 0입니다. 실패 뒤 last-success timestamp는 보존되므로 age는 `time() - readmates_aigen_queue_probe_last_success_timestamp_seconds`로 계산하며 sampler가 멈춰도 증가합니다.
+- 이 recovery/probe Lua는 현재 single-node Redis authority 전용입니다. 배포 때 old writer를 먼저 drain하고 새 sampler의 첫 authoritative current-epoch pass가 끝날 때까지 availability 0을 정상으로 봅니다. Mixed-version concurrent writer와 Redis Cluster cross-slot 동작은 지원하지 않습니다.
+
+반복된 `failed`/`corrupt` 또는 `quarantined`/`over_cap`은 아래 alert 절차로 조사합니다. `deferred_in_flight`만 증가하면 provider request timeout과 attempt timestamp를 먼저 확인하고, live attempt가 있는 동안 consumer offset seek, admin retry, counter/lease 수정, blind replay를 하지 않습니다.
+
 운영자가 job 상태만 확인해야 할 때는 payload를 열지 말고 hash metadata와 key 존재 여부만 봅니다.
 
 ```bash
@@ -335,11 +347,29 @@ Gemini provider가 enabled이면 `READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CON
 
 ### <a id="queue-lag-high"></a> AiGenQueueLagHigh (warn)
 
-- **조건**: Redis active AI job backlog `readmates_aigen_queue_depth > 50` 5m 지속. 이 gauge는 `PENDING` + `RUNNING` job 수를 `AiGenerationJobStore.loadActiveJobs()`에서 읽는다.
+- **조건**: availability 1이고 last-success age가 sample interval 3배 미만인 authoritative sample에서 `readmates_aigen_queue_depth > 50`이 5m 지속. `NaN`은 0건이 아니며 stopped sampler의 frozen depth는 이 alert를 발생시키지 않는다.
 - **즉시 triage**: `/admin/ai-ops`에서 `PENDING`/`RUNNING` job을 확인하고, worker 로그, Redis 연결 상태, provider latency burst를 순서대로 본다.
 - **Kafka 확인**: Kafka consumer group lag은 같은 증상의 원인일 수 있지만 이 metric 자체의 의미는 아니다. Kafka lag이 필요하면 별도 consumer lag metric 또는 broker 도구로 확인한다.
 - **에스컬레이션**: 실제 backlog면 worker 인스턴스 추가, provider 장애 동반이면 §7. Backbone 장애 의심이면 §8.
 - **연관 항목**: [§7 provider fallback](#7-provider-장애-임시-fallback), [§8 kill switch](#8-전체-disable-kill-switch).
+
+### <a id="queue-probe-unavailable"></a> AiGenQueueProbeUnavailable / AiGenQueueProbeStale (warn)
+
+- **조건**: availability가 0/absent이거나 last-success timestamp가 absent/`NaN`/sample interval 3배 이상 stale.
+- **즉시 triage**: Redis connectivity, `activeIndexEpoch`와 repair state의 `completedEpoch`, global active cardinality ceiling, quarantine cardinality를 content-free metadata로 확인합니다. Queue depth `NaN`을 0으로 변환하지 않습니다.
+- **대응**: Redis를 복구한 뒤 current epoch full pass가 끝나도록 scheduler를 둡니다. Quarantine row는 hash metadata를 검토·수정한 승인 경로 후 quarantine member만 제거합니다. Active cardinality가 ceiling을 넘으면 무제한 snapshot을 만들거나 ceiling을 즉시 올리지 말고 증가 원인과 TTL/writer 상태를 먼저 조사합니다.
+
+### <a id="recovery-failure"></a> AiGenRecoveryFailure (warn)
+
+- **조건**: 10분 안에 `readmates_aigen_failure_recovery_total{result=~"failed|corrupt"}` 증가 또는 lazy counter가 nonzero로 최초 관측됨.
+- **즉시 triage**: `source=kafka|scheduled`와 fixed result, job hash의 status/lastUpdatedAt/owner identity, provider-attempt state만 확인합니다. Transcript/result/evidence와 raw provider body는 열거나 incident 기록에 복사하지 않습니다.
+- **대응**: Redis persistence가 회복되면 자동 redelivery/scheduler를 먼저 관찰합니다. Live provider attempt가 있으면 blind replay하지 않습니다. Corrupt metadata는 quarantine 상태를 유지한 채 승인된 operator repair 후 다음 full pass로 authority를 회복합니다.
+
+### <a id="recovery-index-repair"></a> AiGenRecoveryIndexRepairBlocked (warn)
+
+- **조건**: repair `quarantined`, `over_cap`, `failed` outcome 증가 또는 lazy counter가 nonzero로 최초 관측됨.
+- **즉시 triage**: persisted `activeIndexEpoch/passId/remainingCount/completedEpoch`, worklist 존재, ceiling과 quarantine cardinality를 확인합니다. 한 wave는 bounded하지만 Redis/network retry 시간은 bounded가 아니므로 wall-clock recovery deadline을 추정하지 않습니다.
+- **대응**: `failed`는 Redis 복구 후 같은 pass를 재개하고, `over_cap`은 active row/TTL 원인을 줄인 뒤 새 bounded pass를 허용합니다. `quarantined`는 hash evidence를 보존하고 승인된 수정·member removal 뒤 다음 pass로 reclassify합니다.
 
 ### <a id="redis-down"></a> AiGenRedisDown (critical)
 

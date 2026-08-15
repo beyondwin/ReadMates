@@ -1,5 +1,6 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.AiGenerationJobListResult
 import com.readmates.aigen.application.model.AuthorNameMode
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
@@ -42,6 +43,9 @@ internal class FakeJobStore : AiGenerationJobStore {
     val deleted: MutableList<UUID> = mutableListOf()
     val transientPayloadDeleted: MutableList<UUID> = mutableListOf()
     val statusTransitions: MutableList<Triple<UUID, JobStatus, JobStatus>> = mutableListOf()
+    var recentJobsResult: AiGenerationJobListResult? = null
+    var activeJobsResult: AiGenerationJobListResult? = null
+    var commitRecoveryJobsResult: AiGenerationJobListResult? = null
 
     /**
      * Unified order log for ordering invariants — e.g. "commit must transition to
@@ -62,19 +66,23 @@ internal class FakeJobStore : AiGenerationJobStore {
     override fun loadRecentForSession(
         sessionId: UUID,
         limit: Int,
-    ): List<JobRecord> =
-        records
-            .values
-            .filter { it.sessionId == sessionId }
-            .sortedByDescending { it.lastUpdatedAt }
-            .take(limit)
+    ): AiGenerationJobListResult =
+        recentJobsResult ?: AiGenerationJobListResult.Available(
+            records
+                .values
+                .filter { it.sessionId == sessionId }
+                .sortedByDescending { it.lastUpdatedAt }
+                .take(limit),
+        )
 
-    override fun loadActiveJobs(limit: Int): List<JobRecord> =
-        records
-            .values
-            .filter { it.status in ACTIVE_JOB_STATUSES }
-            .sortedByDescending { it.lastUpdatedAt }
-            .take(limit)
+    override fun loadActiveJobs(limit: Int): AiGenerationJobListResult =
+        activeJobsResult ?: AiGenerationJobListResult.Available(
+            records
+                .values
+                .filter { it.status in ACTIVE_JOB_STATUSES }
+                .sortedByDescending { it.lastUpdatedAt }
+                .take(limit),
+        )
 
     override fun updateStatus(
         jobId: UUID,
@@ -216,13 +224,15 @@ internal class FakeJobStore : AiGenerationJobStore {
         return true
     }
 
-    override fun loadCommitRecoveryJobs(limit: Int): List<JobRecord> =
-        records.values
-            .filter {
-                it.status == JobStatus.COMMITTING || it.status == JobStatus.COMMIT_RETRY ||
-                    (it.status == JobStatus.COMMITTED && it.cleanupPending)
-            }.sortedBy { it.lastUpdatedAt }
-            .take(limit)
+    override fun loadCommitRecoveryJobs(limit: Int): AiGenerationJobListResult =
+        commitRecoveryJobsResult ?: AiGenerationJobListResult.Available(
+            records.values
+                .filter {
+                    it.status == JobStatus.COMMITTING || it.status == JobStatus.COMMIT_RETRY ||
+                        (it.status == JobStatus.COMMITTED && it.cleanupPending)
+                }.sortedBy { it.lastUpdatedAt }
+                .take(limit),
+        )
 
     override fun markCommittedForCleanup(
         jobId: UUID,

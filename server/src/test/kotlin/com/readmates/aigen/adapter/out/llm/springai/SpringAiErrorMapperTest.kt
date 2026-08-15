@@ -1,9 +1,10 @@
 package com.readmates.aigen.adapter.out.llm.springai
 
+import com.readmates.aigen.adapter.out.llm.common.LlmStructuredOutputException
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.ProviderCallException
-import com.readmates.aigen.application.service.ProviderFailureClass
+import com.readmates.aigen.application.model.ProviderFailureClass
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpHeaders
@@ -12,6 +13,7 @@ import org.springframework.web.client.HttpClientErrorException
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.time.Duration
+import java.util.concurrent.TimeoutException
 
 class SpringAiErrorMapperTest {
     private val mapper = SpringAiErrorMapper()
@@ -52,5 +54,47 @@ class SpringAiErrorMapperTest {
         assertThat(thrown.message).isEqualTo("Provider request outcome unknown")
         assertThat(thrown.cause).isNull()
         assertThat(thrown.toString()).doesNotContain("raw-secret", raw.toString())
+    }
+
+    @Test
+    fun `preserves status timeout schema and terminal provider classifications with safe output`() {
+        val raw = "provider-body secret@example.test"
+        val cases =
+            listOf(
+                HttpClientErrorException.create(
+                    HttpStatus.REQUEST_TIMEOUT,
+                    raw,
+                    HttpHeaders(),
+                    raw.toByteArray(),
+                    StandardCharsets.UTF_8,
+                ) to
+                    ProviderFailureClass.TRANSIENT,
+                HttpClientErrorException.create(
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    raw,
+                    HttpHeaders(),
+                    raw.toByteArray(),
+                    StandardCharsets.UTF_8,
+                ) to
+                    ProviderFailureClass.TRANSIENT,
+                HttpClientErrorException.create(
+                    HttpStatus.BAD_REQUEST,
+                    raw,
+                    HttpHeaders(),
+                    raw.toByteArray(),
+                    StandardCharsets.UTF_8,
+                ) to
+                    ProviderFailureClass.TERMINAL,
+                TimeoutException(raw) to ProviderFailureClass.TRANSIENT,
+                LlmStructuredOutputException(IllegalArgumentException(raw)) to ProviderFailureClass.SCHEMA_OR_PARSE,
+            )
+
+        cases.forEach { (failure, expectedClass) ->
+            val mapped = mapper.map(failure, Provider.OPENAI)
+
+            assertThat(mapped.failureClass).isEqualTo(expectedClass)
+            assertThat(mapped.error.message).doesNotContain(raw, "secret@example.test")
+            assertThat(mapped.toException().message).doesNotContain(raw, "secret@example.test")
+        }
     }
 }

@@ -20,6 +20,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
 
       - name: Detect private guidance source contract
         shell: bash
@@ -60,6 +62,48 @@ jobs:
 
       - name: Deploy workflow contract
         run: python3 -B scripts/check-deploy-workflow-contract.py
+
+      - name: Flyway migration checker self-tests
+        run: python3 -B scripts/check-flyway-migration-immutability.py --self-test
+
+      - name: Flyway migration workflow contract
+        run: python3 -B scripts/check-flyway-migration-immutability.py --check-workflow .github/workflows/ci.yml
+
+      - name: Flyway migration history immutability
+        env:
+          READMATES_FLYWAY_EVENT_NAME: ${{ github.event_name }}
+          READMATES_FLYWAY_PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          READMATES_FLYWAY_PUSH_BEFORE_SHA: ${{ github.event.before }}
+        shell: bash
+        run: |
+          base_sha=""
+          case "${READMATES_FLYWAY_EVENT_NAME}" in
+            pull_request)
+              base_sha="${READMATES_FLYWAY_PR_BASE_SHA}"
+              ;;
+            push)
+              base_sha="${READMATES_FLYWAY_PUSH_BEFORE_SHA}"
+              if [[ "$base_sha" =~ ^0+$ ]]; then
+                if ! base_sha="$(git rev-parse --verify --quiet 'HEAD^^{commit}')"; then
+                  echo "Flyway comparison base is unavailable." >&2
+                  exit 1
+                fi
+              fi
+              ;;
+            *)
+              echo "Unsupported Flyway comparison event." >&2
+              exit 1
+              ;;
+          esac
+          if [[ -z "$base_sha" ]]; then
+            echo "Flyway comparison base is empty." >&2
+            exit 1
+          fi
+          if ! base_sha="$(git rev-parse --verify --quiet "${base_sha}^{commit}")"; then
+            echo "Flyway comparison base cannot be resolved locally." >&2
+            exit 1
+          fi
+          python3 -B scripts/check-flyway-migration-immutability.py --base-ref "$base_sha"
 
       - name: Install script tools
         if: ${{ always() }}

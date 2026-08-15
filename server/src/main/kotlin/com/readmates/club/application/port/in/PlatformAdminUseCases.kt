@@ -12,6 +12,7 @@ import com.readmates.club.application.model.PlatformAdminOnboardingPreview
 import com.readmates.club.application.model.PlatformAdminOnboardingResult
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
 import java.util.UUID
 
 interface PlatformAdminSummaryUseCase {
@@ -20,7 +21,7 @@ interface PlatformAdminSummaryUseCase {
 
 interface CreateClubDomainUseCase {
     fun createClubDomain(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
         command: CreateClubDomainCommand,
     ): PlatformAdminClubDomain
@@ -28,18 +29,18 @@ interface CreateClubDomainUseCase {
 
 interface CheckClubDomainProvisioningUseCase {
     fun checkClubDomainProvisioning(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         domainId: UUID,
     ): PlatformAdminClubDomain
 }
 
 interface ListPlatformAdminClubsUseCase {
-    fun listClubs(admin: CurrentPlatformAdmin): PlatformAdminClubList
+    fun listClubs(admin: PlatformActor): PlatformAdminClubList
 }
 
 interface UpdatePlatformAdminClubUseCase {
     fun updateClub(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
         command: UpdatePlatformAdminClubCommand,
     ): PlatformAdminClubListItem
@@ -47,25 +48,25 @@ interface UpdatePlatformAdminClubUseCase {
 
 interface PreviewPlatformAdminClubOnboardingUseCase {
     fun preview(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         command: PlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingPreview
 }
 
 interface CommitPlatformAdminClubOnboardingUseCase {
     fun commit(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         command: PlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingResult
 }
 
 interface GetAdminClubOperationsUseCase {
     fun operationsSnapshot(
-        admin: CurrentPlatformAdmin,
+        admin: PlatformActor,
         clubId: UUID,
     ): AdminClubOperationsSnapshot
 }
 
 interface ListAdminTodayClosingRisksUseCase {
-    fun todayClosingRisks(admin: CurrentPlatformAdmin): AdminTodayClosingRiskSnapshot
+    fun todayClosingRisks(admin: PlatformActor): AdminTodayClosingRiskSnapshot
 }

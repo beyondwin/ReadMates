@@ -1,11 +1,13 @@
 package com.readmates.notification.kafka
 
 import com.readmates.notification.adapter.`in`.kafka.NotificationEventKafkaListener
+import com.readmates.notification.adapter.`in`.kafka.NotificationKafkaConsumerConfiguration
 import com.readmates.notification.adapter.out.kafka.KafkaNotificationEventPublisherAdapter
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfiguration
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaProperties
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapter
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapter
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
 import com.readmates.notification.application.model.ManualNotificationSendMode
@@ -66,7 +68,9 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.context.jdbc.Sql
 import tools.jackson.databind.ObjectMapper
 import java.nio.charset.StandardCharsets.UTF_8
+import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
@@ -94,14 +98,17 @@ private const val CLEANUP_NOTIFICATION_KAFKA_PIPELINE_SQL = """
     classes = [
         NotificationKafkaPipelineIntegrationTest.TestApplication::class,
         NotificationKafkaConfiguration::class,
+        NotificationKafkaConsumerConfiguration::class,
         NotificationEventKafkaListener::class,
         NotificationKafkaPipelineIntegrationTest.TestDispatchConfiguration::class,
     ],
     properties = [
         "readmates.notifications.enabled=true",
+        "readmates.notifications.sender-email=no-reply@example.test",
+        "readmates.notifications.sender-name=ReadMates",
         "readmates.notifications.kafka.enabled=true",
         "readmates.notifications.kafka.delivery-retry-backoff=10ms",
-        "readmates.notifications.kafka.delivery-retry-max-attempts=0",
+        "readmates.notifications.kafka.delivery-retry-max-attempts=1",
         "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
     ],
 )
@@ -124,6 +131,7 @@ class NotificationKafkaPipelineIntegrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val objectMapper: ObjectMapper,
     @param:Autowired private val notificationEventOutboxAdapter: JdbcNotificationEventOutboxAdapter,
+    @param:Autowired private val notificationRuntimeProperties: NotificationRuntimeProperties,
     @param:Autowired
     @param:Qualifier("notificationEventConsumerFactory")
     private val observerConsumerFactory: ConsumerFactory<String, NotificationEventMessage>,
@@ -176,16 +184,24 @@ class NotificationKafkaPipelineIntegrationTest(
         waitForListenerAssignment()
 
         observeBrokerFromCurrentEnd().use { observer ->
-            val firstRelay = relay(RejectPublishedMarkOutboxPort(notificationEventOutboxAdapter))
+            val relayMetrics = SimpleMeterRegistry()
+            val firstRelay = relay(RejectPublishedMarkOutboxPort(notificationEventOutboxAdapter), relayMetrics)
 
             assertThat(firstRelay.publishPending(1)).isEqualTo(1)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "stale_lease").count())
+                .isEqualTo(1.0)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "success").count()).isZero()
             val firstBrokerRecord = observeNextBrokerRecord(observer)
             awaitDispatches(persistedMessage, requestId, expectedCount = 1)
             assertPublishingAfterLostMark(persistedMessage.eventId, requestId)
 
             makePublishingLeaseStale(persistedMessage.eventId)
 
-            assertThat(relay(notificationEventOutboxAdapter).publishPending(1)).isEqualTo(1)
+            assertThat(relay(notificationEventOutboxAdapter, relayMetrics).publishPending(1)).isEqualTo(1)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "success").count())
+                .isEqualTo(1.0)
+            assertThat(relayMetrics.counter("readmates.outbox.publish", "result", "stale_lease").count())
+                .isEqualTo(1.0)
             val secondBrokerRecord = observeNextBrokerRecord(observer)
             awaitExactlyOnceRecovery(persistedMessage, requestId)
 
@@ -295,12 +311,16 @@ class NotificationKafkaPipelineIntegrationTest(
         return requireNotNull(notificationEventOutboxAdapter.loadMessage(message.eventId))
     }
 
-    private fun relay(outboxPort: NotificationEventOutboxPort): NotificationRelayService =
+    private fun relay(
+        outboxPort: NotificationEventOutboxPort,
+        registry: SimpleMeterRegistry,
+    ): NotificationRelayService =
         NotificationRelayService(
             notificationEventOutboxPort = outboxPort,
             notificationEventPublisherPort = notificationEventPublisherPort,
-            operationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-            maxAttempts = 5,
+            operationalMetrics = ReadmatesOperationalMetrics(registry),
+            runtimeProperties = notificationRuntimeProperties,
+            clock = Clock.systemUTC(),
         )
 
     private fun observeBrokerFromCurrentEnd(): Consumer<String, NotificationEventMessage> {
@@ -521,9 +541,10 @@ class NotificationKafkaPipelineIntegrationTest(
         fun jdbcNotificationDeliveryAdapter(
             jdbcTemplate: JdbcTemplate,
             objectMapper: ObjectMapper,
+            runtimeProperties: NotificationRuntimeProperties,
         ): JdbcNotificationDeliveryAdapter {
             val appBaseUrl = PIPELINE_APP_BASE_URL
-            return JdbcNotificationDeliveryAdapter(jdbcTemplate, objectMapper, appBaseUrl)
+            return JdbcNotificationDeliveryAdapter(jdbcTemplate, objectMapper, appBaseUrl, runtimeProperties)
         }
 
         @Bean
@@ -531,9 +552,10 @@ class NotificationKafkaPipelineIntegrationTest(
             jdbcTemplate: JdbcTemplate,
             objectMapper: ObjectMapper,
             @Value("\${readmates.notifications.kafka.events-topic}") eventsTopic: String,
+            runtimeProperties: NotificationRuntimeProperties,
         ): JdbcNotificationEventOutboxAdapter {
             val topic = eventsTopic
-            return JdbcNotificationEventOutboxAdapter(jdbcTemplate, objectMapper, topic)
+            return JdbcNotificationEventOutboxAdapter(jdbcTemplate, objectMapper, topic, runtimeProperties)
         }
 
         @Bean
@@ -548,13 +570,14 @@ class NotificationKafkaPipelineIntegrationTest(
         fun notificationDeliveryEngine(
             adapter: JdbcNotificationDeliveryAdapter,
             mailDeliveryPort: RecordingMailDeliveryPort,
+            runtimeProperties: NotificationRuntimeProperties,
         ): NotificationDeliveryEngine =
             NotificationDeliveryEngine(
                 deliveryStatusPort = adapter,
                 mailDeliveryPort = mailDeliveryPort,
                 metrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                maxAttempts = 5,
-                retryDelayMinutesConfig = listOf(5L, 15L, 60L, 240L),
+                runtimeProperties = runtimeProperties,
+                clock = Clock.fixed(Instant.parse("2026-04-29T00:00:00Z"), ZoneOffset.UTC),
             )
 
         @Bean

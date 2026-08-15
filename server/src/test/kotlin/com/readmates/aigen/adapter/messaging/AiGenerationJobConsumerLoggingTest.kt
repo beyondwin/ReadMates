@@ -5,19 +5,24 @@ import ch.qos.logback.classic.Logger
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.aigen.adapter.`in`.messaging.AiGenerationJobConsumer
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
+import com.readmates.aigen.application.model.AI_GENERATION_JOB_ID_HEADER
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
 import com.readmates.aigen.application.port.out.JobKind
-import com.readmates.aigen.application.service.AiGenerationWorker
+import org.apache.kafka.clients.consumer.ConsumerRecord
+import org.apache.kafka.common.header.internals.RecordHeader
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.doThrow
 import org.mockito.Mockito.mock
+import org.mockito.Mockito.verifyNoInteractions
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.kafka.support.Acknowledgment
+import java.nio.charset.StandardCharsets
 import java.util.UUID
 
 class AiGenerationJobConsumerLoggingTest {
@@ -28,16 +33,20 @@ class AiGenerationJobConsumerLoggingTest {
 
     @Test
     fun `worker failure log and MDC contain only safe correlation metadata`() {
-        val worker = mock(AiGenerationWorker::class.java)
+        val worker = mock(ProcessAiGenerationJobUseCase::class.java)
         val acknowledgment = mock(Acknowledgment::class.java)
         val message = message()
         val failure = IllegalStateException(RAW_FAILURE)
         doThrow(failure).`when`(worker).process(message.jobId)
+        MDC.put("jobId", "previous-job")
+        MDC.put("provider", "previous-provider")
+        MDC.put("stage", "previous-stage")
+        MDC.put("baggage", "unrelated-listener-context")
         val logger = LoggerFactory.getLogger(AiGenerationJobConsumer::class.java) as Logger
         val appender = ListAppender<ILoggingEvent>().apply { start() }
         logger.addAppender(appender)
         try {
-            assertThatThrownBy { AiGenerationJobConsumer(worker).onMessage(message, acknowledgment) }
+            assertThatThrownBy { AiGenerationJobConsumer(worker).onMessage(record(message), acknowledgment) }
                 .isSameAs(failure)
         } finally {
             logger.detachAppender(appender)
@@ -68,7 +77,16 @@ class AiGenerationJobConsumerLoggingTest {
                 "secret@example.test",
                 "baggage",
             )
-        assertThat(MDC.getCopyOfContextMap()).isNullOrEmpty()
+        assertThat(MDC.getCopyOfContextMap())
+            .containsExactlyInAnyOrderEntriesOf(
+                mapOf(
+                    "jobId" to "previous-job",
+                    "provider" to "previous-provider",
+                    "stage" to "previous-stage",
+                    "baggage" to "unrelated-listener-context",
+                ),
+            )
+        verifyNoInteractions(acknowledgment)
     }
 
     private fun message() =
@@ -81,6 +99,16 @@ class AiGenerationJobConsumerLoggingTest {
             model = "gpt-5.4-mini",
             kind = JobKind.FULL,
         )
+
+    private fun record(message: AiGenerationJobMessage) =
+        ConsumerRecord("jobs", 0, 0L, "club", message).also {
+            it.headers().add(
+                RecordHeader(
+                    AI_GENERATION_JOB_ID_HEADER,
+                    message.jobId.toString().toByteArray(StandardCharsets.US_ASCII),
+                ),
+            )
+        }
 
     private companion object {
         const val RAW_FAILURE = "raw provider response contains synthetic prompt and secret@example.test"

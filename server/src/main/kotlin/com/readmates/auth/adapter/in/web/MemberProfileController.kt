@@ -1,5 +1,8 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
+import com.readmates.auth.application.MemberProfileError
+import com.readmates.auth.application.MemberProfileException
 import com.readmates.auth.application.model.ReplaceOwnMemberProfileCommand
 import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
@@ -7,9 +10,6 @@ import com.readmates.auth.application.port.`in`.ReplaceOwnMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
-import com.readmates.auth.application.service.MemberProfileError
-import com.readmates.auth.application.service.MemberProfileException
-import com.readmates.club.adapter.`in`.web.resolveClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
@@ -44,7 +44,7 @@ class MemberProfileController(
     ): MemberProfileResponse {
         val currentClubId =
             request
-                .resolveClubContext(resolveClubContextUseCase)
+                .resolveAuthClubContext(resolveClubContextUseCase)
                 .context
                 ?.clubId
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
@@ -81,7 +81,7 @@ class MemberProfileController(
     ): MemberProfileResponse {
         val currentClubId =
             request
-                .resolveClubContext(resolveClubContextUseCase)
+                .resolveAuthClubContext(resolveClubContextUseCase)
                 .context
                 ?.clubId
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)

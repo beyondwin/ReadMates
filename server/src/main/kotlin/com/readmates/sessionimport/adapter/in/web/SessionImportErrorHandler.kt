@@ -1,6 +1,6 @@
 package com.readmates.sessionimport.adapter.`in`.web
 
-import com.readmates.sessionimport.application.service.InvalidSessionImportException
+import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import org.springframework.http.HttpStatus

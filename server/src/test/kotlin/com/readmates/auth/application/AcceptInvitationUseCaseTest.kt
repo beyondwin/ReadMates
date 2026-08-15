@@ -1,10 +1,14 @@
-package com.readmates.auth.application.service
+package com.readmates.auth.application
 
+import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.HostInvitationStorePort
 import com.readmates.auth.application.port.out.InvitationTokenRow
 import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
 import com.readmates.auth.application.port.out.MemberIdentityLookupPort
+import com.readmates.auth.application.service.AcceptInvitationUseCase
+import com.readmates.auth.application.service.InvitationService
+import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.auth.domain.InvitationStatus
 import com.readmates.auth.domain.MembershipRole
@@ -89,9 +93,10 @@ class AcceptInvitationUseCaseTest {
                 avatarAllocation,
                 "http://localhost:3000",
             )
+        val acceptGoogleInvitationUseCase: AcceptGoogleInvitationUseCase = service
 
         val actual =
-            service.acceptGoogleInvitation(
+            acceptGoogleInvitationUseCase.acceptGoogleInvitation(
                 rawToken = rawToken,
                 googleSubjectId = "google-invited-avatar",
                 email = invitation.email,

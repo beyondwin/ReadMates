@@ -60,6 +60,8 @@ class RedisProviderCallReservationAdapter(
                         ADMISSION_TTL.seconds.toString(),
                         command.clubId.toString(),
                         command.now.toEpochMilli().toString(),
+                        command.now.epochSecond.toString(),
+                        command.now.nano.toString(),
                     )
             ) {
                 null -> error("Redis reservation returned no result")

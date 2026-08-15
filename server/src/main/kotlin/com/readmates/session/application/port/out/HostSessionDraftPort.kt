@@ -2,11 +2,11 @@ package com.readmates.session.application.port.out
 
 import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostSessionDetailResponse
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import java.time.OffsetDateTime
 
 interface HostSessionDraftPort {

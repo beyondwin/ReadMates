@@ -1,12 +1,12 @@
 package com.readmates.admin.health.application.service.providers
 
-import com.readmates.admin.health.adapter.out.prometheus.PrometheusQueryException
 import com.readmates.admin.health.application.model.HealthCard
 import com.readmates.admin.health.application.model.HealthCardDrill
 import com.readmates.admin.health.application.model.HealthCardMetric
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
 import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.PlatformHealthProvider
 import com.readmates.admin.health.application.port.out.PrometheusQueryPort
 import com.readmates.admin.health.application.service.HealthCardProvider
 import org.springframework.stereotype.Component
@@ -18,20 +18,12 @@ class AiProviderAvailabilityCardProvider(
     private val prometheusQueryPort: PrometheusQueryPort,
     private val clock: Clock,
 ) : HealthCardProvider {
-    override val cardId: String = "ai_provider_availability"
+    override val identity: PlatformHealthProvider = PlatformHealthProvider.AI_PROVIDER_AVAILABILITY
 
-    @Suppress("ReturnCount", "SwallowedException")
+    @Suppress("ReturnCount")
     override fun compute(): HealthCard {
         val now = clock.instant()
-        val minRatio =
-            try {
-                val result = prometheusQueryPort.query(PROMQL)
-                result.values.minOfOrNull { it.value }
-            } catch (ignored: PrometheusQueryException) {
-                // Health probes must never throw — a degraded metric source surfaces as
-                // an UNKNOWN card so one unreachable backend can't fail the dashboard.
-                return failure(now, "prometheus_unreachable")
-            }
+        val minRatio = prometheusQueryPort.query(PROMQL).values.minOfOrNull { it.value }
         if (minRatio == null) {
             return failure(now, "no_data")
         }

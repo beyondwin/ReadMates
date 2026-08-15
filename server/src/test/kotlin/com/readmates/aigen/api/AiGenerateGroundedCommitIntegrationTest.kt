@@ -9,7 +9,6 @@ import com.readmates.aigen.application.port.out.AiGenerationCommitReceipt
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.support.AiGenerationTestModels
 import com.readmates.aigen.support.SyntheticTranscriptTurn
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
@@ -18,6 +17,7 @@ import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.port.`in`.SaveValidatedSessionRecordDraftUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportDraftInput
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.support.KafkaTestContainer
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.apache.kafka.clients.admin.AdminClient

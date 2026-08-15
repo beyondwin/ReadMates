@@ -1,7 +1,7 @@
 package com.readmates.sessionclosing.application.model
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID

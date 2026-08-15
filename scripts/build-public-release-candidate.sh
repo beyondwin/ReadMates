@@ -425,6 +425,7 @@ copy_manifest() {
   copy_required_file ".node-version"
   copy_required_file "README.md"
   copy_required_file "PRODUCT.md"
+  copy_required_file "CHANGELOG.md"
   copy_required_file "compose.yml"
   copy_required_file "package.json"
   copy_required_file "pnpm-lock.yaml"
@@ -459,13 +460,20 @@ copy_manifest() {
   copy_dir "docs/development"
   copy_dir "docs/case-studies"
   copy_required_file "docs/operations/README.md"
+  copy_required_file "docs/operations/observability/metrics-catalog.md"
+  copy_required_file "docs/operations/observability/dashboards.md"
+  copy_required_file "docs/operations/observability/alerts.md"
+  copy_required_file "docs/operations/observability/slos.md"
+  copy_required_file "docs/operations/observability/operator-guide.md"
   copy_dir "docs/operations/runbooks"
   copy_dir "ops/grafana/dashboards"
   copy_dir "ops/observability/local"
   copy_dir "ops/prometheus/alerts"
+  copy_dir "ops/prometheus/tests"
   copy_dir "ops/tempo"
   copy_required_file "scripts/build-public-release-candidate.sh"
   copy_required_file "scripts/check-deploy-workflow-contract.py"
+  copy_required_file "scripts/check-flyway-migration-immutability.py"
   copy_required_file "scripts/README.md"
   copy_optional_file "scripts/run-local-google-oauth.sh"
   copy_optional_file "scripts/check-local-google-oauth-redirect.py"
@@ -504,8 +512,8 @@ is_forbidden_candidate_path() {
   lower="$(printf '%s' "$rel" | tr '[:upper:]' '[:lower:]')"
   lower_base="${lower##*/}"
 
-  # Special exception: .env.example is explicitly permitted.
-  [[ "$lower" == ".env.example" ]] && return 1
+  # Special exceptions explicitly included by the public release manifest.
+  [[ "$lower" == ".env.example" || "$lower" == "changelog.md" ]] && return 1
 
   # Credential and sensitive file extensions (matched on basename).
   case "$lower_base" in
@@ -561,7 +569,7 @@ is_forbidden_candidate_path() {
     gemini.md|*/gemini.md) return 0 ;;
     .impeccable.md|*/.impeccable.md) return 0 ;;
     *.local.md) return 0 ;;
-    # Changelog is an internal artifact, not part of the public release manifest
+    # Nested changelogs remain outside the public release manifest.
     changelog.md|*/changelog.md) return 0 ;;
   esac
 

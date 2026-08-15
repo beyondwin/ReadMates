@@ -26,11 +26,12 @@ import java.time.Duration
 class AiGenerationConfigValidator(
     @param:Value("\${readmates.aigen.enabled:false}") private val aigenEnabled: Boolean,
     private val beanFactory: ListableBeanFactory,
-    private val properties: AiGenerationProperties = AiGenerationProperties(),
-    private val kafkaProperties: AiGenerationKafkaProperties = AiGenerationKafkaProperties(),
+    private val properties: AiGenerationProperties,
+    private val kafkaProperties: AiGenerationKafkaProperties,
 ) {
     @PostConstruct
     fun validate() {
+        validateRecoveryProcessingBudget()
         if (!aigenEnabled) return
         val queueBeans = beanFactory.getBeanNamesForType(AiGenerationJobQueue::class.java)
         check(queueBeans.isNotEmpty()) {
@@ -57,6 +58,19 @@ class AiGenerationConfigValidator(
         check(kafkaProperties.maxPollInterval >= required) {
             "readmates.aigen.kafka.max-poll-interval must be at least ${required.contractText()} " +
                 "for the configured provider-call processing budget"
+        }
+    }
+
+    private fun validateRecoveryProcessingBudget() {
+        val retryWindow =
+            kafkaProperties.consumerRetryDelay.multipliedBy((kafkaProperties.consumerMaxAttempts - 1).toLong())
+        val minimumDeadline = kafkaProperties.maxPollInterval.plus(retryWindow)
+        check(properties.job.processingDeadline >= minimumDeadline) {
+            "readmates.aigen.job.processing-deadline must be at least readmates.aigen.kafka.max-poll-interval " +
+                "plus the configured consumer retry window (${minimumDeadline.contractText()})"
+        }
+        check(properties.job.processingDeadline < properties.job.redisTtl) {
+            "readmates.aigen.job.processing-deadline must be less than readmates.aigen.job.redis-ttl"
         }
     }
 

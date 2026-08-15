@@ -2,15 +2,11 @@ package com.readmates.admin.health.application.service.providers
 
 import com.readmates.admin.health.application.model.HealthCardSource
 import com.readmates.admin.health.application.model.HealthCardStatus
-import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
-import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
-import io.micrometer.core.instrument.MeterRegistry
-import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import com.readmates.admin.health.application.model.HealthCardThresholds
+import com.readmates.admin.health.application.port.out.OutboundResilienceHealthPort
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
-import org.springframework.beans.factory.ObjectProvider
 import java.time.Clock
-import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
 
@@ -19,57 +15,29 @@ class OutboundResilienceHealthCardProviderTest {
 
     @Test
     fun `card id is outbound-resilience`() {
-        val provider = OutboundResilienceHealthCardProvider(breakers(), clock)
+        val provider = OutboundResilienceHealthCardProvider(OutboundResilienceHealthPort { 0 }, clock)
 
         assertThat(provider.cardId).isEqualTo("outbound-resilience")
     }
 
     @Test
     fun `status is OK when no circuit is open`() {
-        val breakers = breakers()
-        breakers.execute("svc", fallback = { "f" }) { "ok" }
-
-        val card = OutboundResilienceHealthCardProvider(breakers, clock).compute()
+        val card = OutboundResilienceHealthCardProvider(OutboundResilienceHealthPort { 0 }, clock).compute()
 
         assertThat(card.id).isEqualTo("outbound-resilience")
         assertThat(card.status).isEqualTo(HealthCardStatus.OK)
         assertThat(card.metric?.value).isEqualTo(0.0)
+        assertThat(card.metric?.unit).isEqualTo("open circuits")
+        assertThat(card.thresholds).isEqualTo(HealthCardThresholds(warn = 1.0, crit = 1.0))
         assertThat(card.source).isEqualTo(HealthCardSource.IN_PROCESS)
         assertThat(card.lastCheckedAt).isEqualTo(clock.instant())
     }
 
     @Test
     fun `status is CRIT when a circuit is open`() {
-        val breakers = breakers()
-        repeat(2) { breakers.execute("svc", fallback = { "f" }) { throw IllegalStateException("boom") } }
-
-        val card = OutboundResilienceHealthCardProvider(breakers, clock).compute()
+        val card = OutboundResilienceHealthCardProvider(OutboundResilienceHealthPort { 1 }, clock).compute()
 
         assertThat(card.status).isEqualTo(HealthCardStatus.CRIT)
         assertThat(card.metric?.value).isEqualTo(1.0)
     }
-
-    private fun breakers(): OutboundCircuitBreakers =
-        OutboundCircuitBreakers(
-            properties =
-                OutboundResilienceProperties(
-                    slidingWindowSize = 2,
-                    minimumNumberOfCalls = 2,
-                    waitDurationInOpenState = Duration.ofSeconds(60),
-                ),
-            meterRegistryProvider = noop(),
-        )
-
-    private fun noop(): ObjectProvider<MeterRegistry> =
-        object : ObjectProvider<MeterRegistry> {
-            private val registry = SimpleMeterRegistry()
-
-            override fun getObject() = registry
-
-            override fun getObject(vararg args: Any?) = registry
-
-            override fun getIfAvailable() = registry
-
-            override fun getIfUnique() = registry
-        }
 }

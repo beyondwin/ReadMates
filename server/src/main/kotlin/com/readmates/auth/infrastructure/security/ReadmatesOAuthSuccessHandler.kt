@@ -1,10 +1,10 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.application.GoogleLoginException
 import com.readmates.auth.application.InvitationDomainException
-import com.readmates.auth.application.service.AuthSessionService
-import com.readmates.auth.application.service.GoogleLoginException
-import com.readmates.auth.application.service.GoogleLoginService
-import com.readmates.auth.application.service.InvitationService
+import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
+import com.readmates.auth.application.port.`in`.LoginVerifiedGoogleUserUseCase
+import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
@@ -24,9 +24,9 @@ import java.util.Locale
 
 @Component
 class ReadmatesOAuthSuccessHandler(
-    private val googleLoginService: GoogleLoginService,
-    private val invitationService: InvitationService,
-    private val authSessionService: AuthSessionService,
+    private val loginVerifiedGoogleUserUseCase: LoginVerifiedGoogleUserUseCase,
+    private val acceptGoogleInvitationUseCase: AcceptGoogleInvitationUseCase,
+    private val manageAuthSessionUseCase: ManageAuthSessionUseCase,
     private val oauthReturnState: OAuthReturnState,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
@@ -52,7 +52,7 @@ class ReadmatesOAuthSuccessHandler(
             val login =
                 if (inviteToken != null) {
                     val acceptedMember =
-                        invitationService.acceptGoogleInvitation(
+                        acceptGoogleInvitationUseCase.acceptGoogleInvitation(
                             rawToken = inviteToken,
                             googleSubjectId = oidcUser.subject,
                             email = oidcUser.email,
@@ -71,7 +71,7 @@ class ReadmatesOAuthSuccessHandler(
                     )
                 } else {
                     val loginResult =
-                        googleLoginService.loginVerifiedGoogleUserForSession(
+                        loginVerifiedGoogleUserUseCase.loginVerifiedGoogleUserForSession(
                             googleSubjectId = oidcUser.subject,
                             email = oidcUser.email,
                             displayName = oidcUser.fullName ?: oidcUser.getClaimAsString("name"),
@@ -84,13 +84,13 @@ class ReadmatesOAuthSuccessHandler(
                     )
                 }
             val issuedSession =
-                authSessionService.issueSession(
+                manageAuthSessionUseCase.issueSession(
                     userId = login.userId.toString(),
                     userAgent = request.getHeader("User-Agent"),
                     ipAddress = request.remoteAddr,
                 )
 
-            response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.sessionCookie(issuedSession.rawToken))
+            response.addHeader(HttpHeaders.SET_COOKIE, manageAuthSessionUseCase.sessionCookie(issuedSession.rawToken))
             response.sendRedirect(oauthReturnState.redirectUrl(login.returnTarget))
         } catch (exception: RuntimeException) {
             redirectDomainLoginError(request, response, exception, signedReturnState)
@@ -165,11 +165,11 @@ class ReadmatesOAuthSuccessHandler(
     ) {
         val rawToken =
             request.cookies
-                ?.firstOrNull { it.name == AuthSessionService.COOKIE_NAME }
+                ?.firstOrNull { it.name == manageAuthSessionUseCase.sessionCookieName }
                 ?.value
                 ?: return
-        if (authSessionService.findValidSession(rawToken) == null) {
-            response.addHeader(HttpHeaders.SET_COOKIE, authSessionService.clearedSessionCookie())
+        if (manageAuthSessionUseCase.findValidSession(rawToken) == null) {
+            response.addHeader(HttpHeaders.SET_COOKIE, manageAuthSessionUseCase.clearedSessionCookie())
         }
     }
 

@@ -41,6 +41,15 @@ class SessionRecordErrorHandlerTest {
         assertNotificationError(HostActionNotificationError.DUPLICATE_EVENT, "NOTIFICATION_DUPLICATE_EVENT")
     }
 
+    @Test
+    fun `maps invalid history cursor to the stable public contract`() {
+        val response = handler.handleInvalidHistoryCursor()
+
+        assertThat(response.statusCode.value()).isEqualTo(400)
+        assertThat(response.body?.code).isEqualTo("INVALID_CURSOR")
+        assertThat(response.body?.message).isEqualTo("커서가 현재 검색 조건과 일치하지 않습니다.")
+    }
+
     private fun assertRecordError(
         error: SessionRecordError,
         status: Int,

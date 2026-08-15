@@ -79,6 +79,20 @@ management:
 
 readmates:
   app-base-url: ${READMATES_APP_BASE_URL:http://localhost:3000}
+  admin:
+    health:
+      refresh-interval: ${READMATES_ADMIN_HEALTH_REFRESH_INTERVAL:10s}
+      freshness: ${READMATES_ADMIN_HEALTH_FRESHNESS:30s}
+      provider-deadline: ${READMATES_ADMIN_HEALTH_PROVIDER_DEADLINE:2500ms}
+      executor:
+        threads: ${READMATES_ADMIN_HEALTH_EXECUTOR_THREADS:4}
+        queue-capacity: ${READMATES_ADMIN_HEALTH_EXECUTOR_QUEUE_CAPACITY:16}
+        shutdown-await: ${READMATES_ADMIN_HEALTH_EXECUTOR_SHUTDOWN_AWAIT:5s}
+      prometheus:
+        base-url: ${READMATES_ADMIN_HEALTH_PROMETHEUS_BASE_URL:http://prometheus:9090}
+        connect-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_CONNECT_TIMEOUT:500ms}
+        connection-request-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT:500ms}
+        read-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_READ_TIMEOUT:2000ms}
   host-action-confirmation:
     required: false
   auth:
@@ -98,25 +112,39 @@ readmates:
       allow-empty-secret: false
   notifications:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
-    sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:ReadMates}
-    sender-email: ${READMATES_NOTIFICATION_SENDER_EMAIL:no-reply@example.com}
+    sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:}
+    sender-email: ${READMATES_NOTIFICATION_SENDER_EMAIL:}
     reminder-cron: ${READMATES_NOTIFICATION_REMINDER_CRON:0 0 0 * * *}
     reminder-zone: ${READMATES_NOTIFICATION_REMINDER_ZONE:Asia/Seoul}
     retry-delay-minutes: ${READMATES_NOTIFICATION_RETRY_DELAY_MINUTES:5,15,60,240}
     worker:
       enabled: ${READMATES_NOTIFICATIONS_WORKER_ENABLED:true}
-      fixed-delay-ms: ${READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS:30000}
-      batch-size: ${READMATES_NOTIFICATION_WORKER_BATCH_SIZE:20}
-      max-attempts: ${READMATES_NOTIFICATION_MAX_ATTEMPTS:5}
+      fixed-delay: ${READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS:30s}
+      relay-batch-size: ${READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE:50}
+      claim-lease: ${READMATES_NOTIFICATION_CLAIM_LEASE:15m}
+      event-max-age: ${READMATES_NOTIFICATION_EVENT_MAX_AGE:24h}
+      delivery-max-age: ${READMATES_NOTIFICATION_DELIVERY_MAX_AGE:24h}
+      retry-delays: ${READMATES_NOTIFICATION_RETRY_DELAY_MINUTES:5,15,60,240}
+      backlog-refresh-interval: ${READMATES_NOTIFICATION_BACKLOG_REFRESH_INTERVAL:60s}
+      backlog-initial-delay: ${READMATES_NOTIFICATION_BACKLOG_INITIAL_DELAY:5s}
     kafka:
       enabled: ${READMATES_KAFKA_ENABLED:false}
       bootstrap-servers: ${READMATES_KAFKA_BOOTSTRAP_SERVERS:}
       events-topic: ${READMATES_KAFKA_NOTIFICATION_EVENTS_TOPIC:readmates.notification.events.v1}
       dlq-topic: ${READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC:readmates.notification.events.dlq.v1}
       consumer-group: ${READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP:readmates-notification-dispatcher}
-      relay-batch-size: ${READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE:50}
+      send-timeout: ${READMATES_KAFKA_NOTIFICATION_SEND_TIMEOUT:10s}
       max-publish-attempts: ${READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS:5}
       max-delivery-attempts: ${READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS:5}
+      delivery-retry-backoff: ${READMATES_KAFKA_NOTIFICATION_DELIVERY_RETRY_BACKOFF:5m}
+      delivery-retry-max-attempts: ${READMATES_KAFKA_NOTIFICATION_DELIVERY_RETRY_MAX_ATTEMPTS:72}
+    smtp:
+      connection-timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT:5s}
+      read-timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT:5s}
+      write-timeout: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT:5s}
+    admin-replay:
+      preview-ttl: ${READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL:10m}
+      max-targets: ${READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS:1000}
   redis:
     enabled: ${READMATES_REDIS_ENABLED:false}
   rate-limit:
@@ -168,6 +196,12 @@ readmates:
       redis-ttl: ${READMATES_AIGEN_REDIS_TTL:6h}
       notification-latency-threshold: ${READMATES_AIGEN_NOTIFICATION_LATENCY_THRESHOLD:60s}
       max-llm-calls-per-job: ${READMATES_AIGEN_MAX_LLM_CALLS_PER_JOB:3}
+      processing-deadline: ${READMATES_AIGEN_PROCESSING_DEADLINE:20m}
+      recovery-fixed-delay: ${READMATES_AIGEN_RECOVERY_FIXED_DELAY:1m}
+      recovery-batch-size: ${READMATES_AIGEN_RECOVERY_BATCH_SIZE:50}
+      recovery-index-repair-batch-size: ${READMATES_AIGEN_RECOVERY_INDEX_REPAIR_BATCH_SIZE:500}
+      recovery-index-repair-max-members: ${READMATES_AIGEN_RECOVERY_INDEX_REPAIR_MAX_MEMBERS:5000}
+      queue-probe-fixed-delay: ${READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY:30s}
     provider-calls:
       request-timeout: ${READMATES_AIGEN_PROVIDER_REQUEST_TIMEOUT:4m}
       max-concurrent-per-provider: ${READMATES_AIGEN_MAX_CONCURRENT_PER_PROVIDER:2}
@@ -212,3 +246,5 @@ readmates:
       topic-jobs: ${READMATES_AIGEN_KAFKA_TOPIC_JOBS:readmates.aigen.jobs.v1}
       consumer-group: ${READMATES_AIGEN_KAFKA_CONSUMER_GROUP:readmates-aigen-worker}
       max-poll-interval: ${READMATES_AIGEN_KAFKA_MAX_POLL_INTERVAL:16m}
+      consumer-retry-delay: ${READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY:5s}
+      consumer-max-attempts: ${READMATES_AIGEN_KAFKA_CONSUMER_MAX_ATTEMPTS:10}

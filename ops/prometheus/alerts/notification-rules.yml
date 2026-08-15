@@ -12,7 +12,7 @@ groups:
           component: notification
         annotations:
           summary: "Notification pending backlog over 100 for 10 minutes"
-          description: "Consumer가 처리 속도를 따라가지 못하거나 죽었을 가능성. consumer 로그 확인."
+          description: "Event relay가 Kafka publish 속도를 따라가지 못했거나 멈췄을 가능성. publish result와 relay/Kafka evidence 확인."
           runbook_url: "https://github.com/${READMATES_REPO}/blob/main/docs/operations/runbooks/observability-bootstrap.md#notification-backlog"
 
       - alert: NotificationOutboxBacklogCritical
@@ -23,20 +23,20 @@ groups:
           component: notification
         annotations:
           summary: "Notification pending backlog over 1000"
-          description: "Consumer가 죽었거나 의존 인프라가 unreachable. 즉시 조사."
+          description: "Event relay 또는 Kafka publication이 중단됐을 가능성. delivery worker가 아니라 event outbox evidence를 즉시 조사."
 
       - alert: NotificationFailRateHigh
         expr: |
-          sum(rate(readmates_notifications_failed_total[5m]))
-            / clamp_min(sum(rate(readmates_notifications_sent_total[5m]))
-                       + sum(rate(readmates_notifications_failed_total[5m])), 1) > 0.05
+          (sum(rate(readmates_notifications_failed_total[5m])) or vector(0))
+            / clamp_min((sum(rate(readmates_notifications_sent_total[5m])) or vector(0))
+                       + (sum(rate(readmates_notifications_failed_total[5m])) or vector(0)), 1e-9) > 0.05
         for: 10m
         labels:
           severity: warning
           component: notification
         annotations:
           summary: "Notification 실패율 5% 초과 (10분)"
-          description: "발송 실패가 지속. 외부 채널 장애 또는 payload 변경 의심."
+          description: "Email delivery 실패가 지속. SMTP/provider 또는 delivery worker evidence 확인."
 
       - alert: NotificationDeadLetters
         expr: increase(readmates_notifications_dead_total[1h]) > 0
@@ -47,3 +47,23 @@ groups:
         annotations:
           summary: "Notification dead-letter 발생 (1시간 내)"
           description: "발송이 최종 포기된 알림. notification_deliveries.status='DEAD' 로우 조사."
+
+      - alert: NotificationOutboxRelayDead
+        expr: max(readmates_notifications_outbox_backlog{status="dead"}) > 0
+        for: 0m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification event outbox DEAD row detected"
+          description: "Delivery row 생성 전 relay가 missing payload, retry exhaustion 또는 deadline으로 종료됐다. outbox 상태와 publish result를 확인."
+
+      - alert: NotificationDeliveryBacklogHigh
+        expr: max(readmates_notifications_delivery_backlog{status=~"pending|failed|sending"}) > 100
+        for: 10m
+        labels:
+          severity: warning
+          component: notification
+        annotations:
+          summary: "Notification delivery backlog over 100 for 10 minutes"
+          description: "이 값은 event outbox가 아니라 delivery rows다. SMTP/provider 상태와 delivery worker를 확인."

@@ -1,6 +1,11 @@
 package com.readmates.aigen.adapter.out.redis
 
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableReason
 import com.readmates.aigen.application.model.AuthorNameMode
+import com.readmates.aigen.application.model.ErrorCode
+import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.GenerationItem
 import com.readmates.aigen.application.model.GroundedEvidenceBundle
 import com.readmates.aigen.application.model.GroundedEvidenceExcerpt
@@ -23,6 +28,7 @@ import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.support.ReadmatesRedisIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -92,6 +98,87 @@ class RedisGroundedAiGenerationJobStoreTest(
     }
 
     @Test
+    fun `grounded hash keeps the exact safe metadata field contract`() {
+        val record = groundedRecord()
+
+        store.save(record)
+
+        assertThat(redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId)).keys)
+            .containsExactlyInAnyOrder(
+                "jobId",
+                "sessionId",
+                "clubId",
+                "hostUserId",
+                "modelProvider",
+                "modelName",
+                "authorNameMode",
+                "eligibleFallbackModels",
+                "status",
+                "stage",
+                "progressPct",
+                "tokensInput",
+                "tokensCacheWrite",
+                "tokensCached",
+                "tokensOutput",
+                "costAccumulatedUsd",
+                "llmCallCount",
+                "revision",
+                "cleanupPending",
+                "expiresAt",
+                "createdAt",
+                "lastUpdatedAt",
+                "lastUpdatedAtEpochSecond",
+                "lastUpdatedAtNano",
+                "groundingStatus",
+            )
+    }
+
+    @Test
+    fun `status transition honors the exact expected set and persists progress and safe error`() {
+        val record = groundedRecord()
+        store.save(record)
+
+        assertThat(
+            store.transitionStatus(
+                record.jobId,
+                setOf(JobStatus.RUNNING),
+                JobStatus.FAILED,
+                null,
+                100,
+                GenerationError(ErrorCode.ASYNC_PROCESSING_EXHAUSTED, "public-safe failure"),
+            ),
+        ).isFalse()
+        assertThat(
+            store.transitionStatus(
+                record.jobId,
+                setOf(JobStatus.PENDING, JobStatus.RUNNING),
+                JobStatus.RUNNING,
+                JobStage.GENERATING_RECORD,
+                37,
+                null,
+            ),
+        ).isTrue()
+        assertThat(
+            store.transitionStatus(
+                record.jobId,
+                setOf(JobStatus.RUNNING),
+                JobStatus.FAILED,
+                null,
+                100,
+                GenerationError(ErrorCode.ASYNC_PROCESSING_EXHAUSTED, "public-safe failure"),
+            ),
+        ).isTrue()
+
+        assertThat(redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId)))
+            .containsEntry("status", "FAILED")
+            .containsEntry("progressPct", "100")
+            .containsEntry("errorCode", "ASYNC_PROCESSING_EXHAUSTED")
+            .containsEntry("errorMessage", "public-safe failure")
+            .containsEntry("revision", "0")
+            .doesNotContainKey("stage")
+    }
+
+    @Test
     fun `grounded save changes RUNNING to SUCCEEDED and revision zero to one atomically`() {
         val record = groundedRecord(JobStatus.RUNNING, JobStage.GENERATING_SUMMARY)
         store.save(record)
@@ -107,6 +194,19 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(loaded.result).isEqualTo(snapshot())
         assertThat(loaded.evidence).isEqualTo(evidence(1))
         assertThat(loaded.tokens.cacheWriteInputTokens).isEqualTo(3L)
+    }
+
+    @Test
+    fun `corrupt identity rejects grounded result before any hash or payload mutation`() {
+        val record = groundedRecord(JobStatus.RUNNING, JobStage.GENERATING_SUMMARY)
+        store.save(record)
+        redisTemplate.opsForHash<String, String>().delete(hashKey(record.jobId), "clubId")
+        val before = redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId))
+
+        assertThatThrownBy { store.saveGroundedResult(resultCommand(record, expectedRevision = 0)) }
+        assertThat(redisTemplate.opsForHash<String, String>().entries(hashKey(record.jobId))).isEqualTo(before)
+        assertThat(redisTemplate.hasKey("${hashKey(record.jobId)}:result")).isFalse()
+        assertThat(redisTemplate.hasKey("${hashKey(record.jobId)}:evidence")).isFalse()
     }
 
     @Test
@@ -208,7 +308,10 @@ class RedisGroundedAiGenerationJobStoreTest(
 
         assertThat(store.releaseCommitLeaseForRetry(record.jobId, 0)).isFalse()
         assertThat(store.releaseCommitLeaseForRetry(record.jobId, 1)).isTrue()
-        val candidate = store.loadCommitRecoveryJobs().single { it.jobId == record.jobId }
+        val candidate =
+            (store.loadCommitRecoveryJobs() as AiGenerationJobListResult.Available)
+                .records
+                .single { it.jobId == record.jobId }
         assertThat(candidate.status).isEqualTo(JobStatus.COMMIT_RETRY)
         assertThat(candidate.commitLeaseExpiresAt).isNull()
         assertThat(candidate.transcript).isEmpty()
@@ -252,7 +355,8 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(store.markCommittedForCleanup(record.jobId, 1)).isTrue()
         assertThat(store.markCommittedForCleanup(record.jobId, 1)).isFalse()
         assertThat(store.load(record.jobId)?.cleanupPending).isTrue()
-        assertThat(store.loadCommitRecoveryJobs().map { it.jobId }).contains(record.jobId)
+        assertThat((store.loadCommitRecoveryJobs() as AiGenerationJobListResult.Available).records.map { it.jobId })
+            .contains(record.jobId)
         assertThat(redisTemplate.opsForHash<String, String>().hasKey(hashKey(record.jobId), "sessionMeta")).isFalse()
         assertThat(redisTemplate.opsForHash<String, String>().hasKey(hashKey(record.jobId), "instructions")).isFalse()
 
@@ -260,7 +364,8 @@ class RedisGroundedAiGenerationJobStoreTest(
         assertThat(store.markCleanupComplete(record.jobId, 1)).isTrue()
         assertThat(store.markCleanupComplete(record.jobId, 1)).isFalse()
         assertThat(store.load(record.jobId)?.cleanupPending).isFalse()
-        assertThat(store.loadCommitRecoveryJobs().map { it.jobId }).doesNotContain(record.jobId)
+        assertThat((store.loadCommitRecoveryJobs() as AiGenerationJobListResult.Available).records.map { it.jobId })
+            .doesNotContain(record.jobId)
     }
 
     @Test
@@ -315,7 +420,10 @@ class RedisGroundedAiGenerationJobStoreTest(
         payloadKeys(record.jobId).forEach { key -> redisTemplate.opsForValue().set(key, "not-json") }
 
         val direct = store.findJobById(record.jobId)
-        val active = store.loadActiveJobs().single { it.jobId == record.jobId }
+        val active =
+            (store.loadActiveJobs() as AiGenerationJobListResult.Available)
+                .records
+                .single { it.jobId == record.jobId }
 
         assertThat(direct?.transcript).isEmpty()
         assertThat(direct?.validatedTurns).isEmpty()
@@ -331,7 +439,12 @@ class RedisGroundedAiGenerationJobStoreTest(
         redisTemplate.delete("${hashKey(record.jobId)}:evidence")
 
         assertThat(store.findJobById(record.jobId)).isNull()
-        assertThat(store.loadActiveJobs().map { it.jobId }).doesNotContain(record.jobId)
+        assertThat(store.loadActiveJobs()).isEqualTo(
+            AiGenerationJobListResult.Unavailable(
+                AiGenerationJobListOperation.ACTIVE,
+                AiGenerationJobListUnavailableReason.STORE_READ_FAILED,
+            ),
+        )
         assertThat(redisTemplate.hasKey(hashKey(record.jobId))).isFalse()
     }
 

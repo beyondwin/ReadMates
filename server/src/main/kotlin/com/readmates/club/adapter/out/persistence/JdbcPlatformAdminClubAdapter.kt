@@ -30,7 +30,6 @@ class JdbcPlatformAdminClubAdapter(
     PlatformAdminOnboardingPort {
     override fun listClubs(limit: Int): List<PlatformAdminClubListItem> =
         jdbcTemplate.query(CLUB_LIST_SQL, ::mapPlatformAdminClub, limit.coerceIn(1, MAX_CLUB_LIST_LIMIT))
-            ?: emptyList()
 
     override fun loadClub(clubId: UUID): PlatformAdminClubListItem? =
         jdbcTemplate

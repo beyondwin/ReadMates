@@ -10,6 +10,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.ProviderAttempt
 import com.readmates.aigen.application.model.ProviderAttemptState
 import com.readmates.aigen.application.model.ProviderCallMode
+import com.readmates.aigen.application.model.ProviderFailureClass
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiProviderObservationContext
 import com.readmates.aigen.application.port.out.AiProviderObservationPort

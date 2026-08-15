@@ -1,7 +1,9 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.GoogleLoginException
 import com.readmates.auth.application.InvitationDomainError
 import com.readmates.auth.application.InvitationDomainException
+import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
 import com.readmates.auth.application.port.`in`.PreviewInvitationUseCase
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand
@@ -17,6 +19,8 @@ import com.readmates.auth.domain.MembershipRole
 import com.readmates.shared.db.dbString
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import com.readmates.shared.security.CurrentMember
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
@@ -68,15 +72,16 @@ class InvitationService(
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : ManageHostInvitationsUseCase,
-    PreviewInvitationUseCase {
+    PreviewInvitationUseCase,
+    AcceptGoogleInvitationUseCase {
     @Transactional
     override fun createInvitation(
-        host: CurrentMember,
+        host: ClubActor,
         email: String,
         name: String,
         applyToCurrentSession: Boolean,
     ): HostInvitationResponse {
-        requireHost(host)
+        requireInvitationManager(host)
         val normalizedEmail = normalizeEmail(email)
         val normalizedName = normalizeInvitedName(name)
         invitationStore.acquireInvitationCreateLock(invitationLockKey(host.clubId, normalizedEmail))
@@ -106,10 +111,10 @@ class InvitationService(
     }
 
     override fun listHostInvitations(
-        host: CurrentMember,
+        host: ClubActor,
         pageRequest: PageRequest,
     ): CursorPage<HostInvitationResponse> {
-        requireHost(host)
+        requireInvitationManager(host)
         val page = invitationStore.listHostInvitations(host.clubId, pageRequest)
         return CursorPage(
             items = page.items.map(::toHostInvitationResponse),
@@ -140,13 +145,13 @@ class InvitationService(
     }
 
     @Transactional
-    fun acceptGoogleInvitation(
+    override fun acceptGoogleInvitation(
         rawToken: String,
         googleSubjectId: String,
         email: String,
         displayName: String?,
         profileImageUrl: String?,
-        expectedClubSlug: String? = null,
+        expectedClubSlug: String?,
     ): CurrentMember {
         val invitation = queryInvitationByToken(rawToken, forUpdate = true)
         if (expectedClubSlug != null && invitation.clubSlug != expectedClubSlug) {
@@ -205,10 +210,10 @@ class InvitationService(
 
     @Transactional
     override fun revokeInvitation(
-        host: CurrentMember,
+        host: ClubActor,
         invitationId: UUID,
     ): HostInvitationResponse {
-        requireHost(host)
+        requireInvitationManager(host)
         invitationStore.revokePendingInvitation(host.clubId, invitationId)
         return findHostInvitation(host.clubId, invitationId)
     }
@@ -363,11 +368,12 @@ class InvitationService(
         return "$prefix****@$domain"
     }
 
-    private fun requireHost(member: CurrentMember) {
-        if (!member.isHost) {
-            throw InvitationDomainException("HOST_REQUIRED", InvitationDomainError.FORBIDDEN, "Host role required")
-        }
+    private fun requireInvitationManager(actor: ClubActor) {
+        if (!actor.can(ClubCapability.MANAGE_INVITATIONS)) throw existingHostRequiredFailure()
     }
+
+    private fun existingHostRequiredFailure(): InvitationDomainException =
+        InvitationDomainException("HOST_REQUIRED", InvitationDomainError.FORBIDDEN, "Host role required")
 
     private fun acceptUrl(
         clubSlug: String,

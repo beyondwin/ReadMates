@@ -55,6 +55,45 @@ data class CurrentMember(
                 )
 }
 
+fun CurrentMember.toClubActor(): ClubActor =
+    ClubActor(
+        userId = userId,
+        membershipId = membershipId,
+        clubId = clubId,
+        clubSlug = clubSlug,
+        capabilities =
+            when (membershipStatus) {
+                MembershipStatus.VIEWER ->
+                    setOf(
+                        ClubCapability.BROWSE_MEMBER_CONTENT,
+                        ClubCapability.EDIT_OWN_PROFILE,
+                        ClubCapability.VIEW_PENDING_APPROVAL,
+                    )
+                MembershipStatus.ACTIVE ->
+                    setOf(
+                        ClubCapability.BROWSE_MEMBER_CONTENT,
+                        ClubCapability.EDIT_OWN_PROFILE,
+                    ) +
+                        if (role == MembershipRole.HOST) {
+                            setOf(
+                                ClubCapability.MANAGE_INVITATIONS,
+                                ClubCapability.MANAGE_MEMBERS,
+                            )
+                        } else {
+                            emptySet()
+                        }
+                MembershipStatus.SUSPENDED ->
+                    setOf(
+                        ClubCapability.BROWSE_MEMBER_CONTENT,
+                        ClubCapability.EDIT_OWN_PROFILE,
+                    )
+                MembershipStatus.INVITED,
+                MembershipStatus.LEFT,
+                MembershipStatus.INACTIVE,
+                -> emptySet()
+            },
+    )
+
 data class GoogleOidcIdentity(
     val subject: String,
     val email: String,

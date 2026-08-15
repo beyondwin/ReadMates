@@ -1,6 +1,8 @@
 package com.readmates.aigen.config
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
+import com.readmates.aigen.adapter.`in`.messaging.AiGenerationConsumerRecordRecoverer
+import com.readmates.aigen.adapter.`in`.messaging.AiGenerationRoutingMismatchException
+import com.readmates.aigen.application.model.AiGenerationJobMessage
 import com.readmates.aigen.application.service.ProviderCallStillInFlightException
 import org.apache.kafka.clients.consumer.ConsumerConfig
 import org.apache.kafka.clients.producer.ProducerConfig
@@ -13,6 +15,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
+import org.springframework.context.annotation.Import
 import org.springframework.kafka.annotation.EnableKafka
 import org.springframework.kafka.config.ConcurrentKafkaListenerContainerFactory
 import org.springframework.kafka.core.ConsumerFactory
@@ -24,6 +27,7 @@ import org.springframework.kafka.listener.CommonErrorHandler
 import org.springframework.kafka.listener.ContainerProperties
 import org.springframework.kafka.listener.DefaultErrorHandler
 import org.springframework.kafka.support.JacksonMapperUtils
+import org.springframework.kafka.support.serializer.DeserializationException
 import org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
 import org.springframework.kafka.support.serializer.JacksonJsonDeserializer
 import org.springframework.kafka.support.serializer.JacksonJsonSerializer
@@ -35,7 +39,7 @@ import tools.jackson.databind.json.JsonMapper
  *
  * - Producer: idempotent, acks=all, JSON value serializer (Jackson 3 via Spring Kafka).
  * - Consumer: manual ack mode, earliest offset reset, read_committed isolation;
- *   the listener acks only after [com.readmates.aigen.application.service.AiGenerationWorker.process]
+ *   the listener acks only after [com.readmates.aigen.application.port.in.ProcessAiGenerationJobUseCase.process]
  *   returns successfully.
  *
  * Wired only when both `readmates.aigen.enabled=true` and
@@ -48,6 +52,7 @@ private const val PRODUCER_MAX_IN_FLIGHT_REQUESTS = 5
 @ConditionalOnProperty(prefix = "readmates.aigen.kafka", name = ["enabled"], havingValue = "true")
 @EnableKafka
 @EnableConfigurationProperties(AiGenerationKafkaProperties::class, AiGenerationProperties::class)
+@Import(AiGenerationConsumerRecordRecoverer::class)
 class AiGenerationKafkaConfig {
     @Suppress("MaxLineLength")
     @Bean
@@ -75,8 +80,24 @@ class AiGenerationKafkaConfig {
         )
 
     @Bean
-    fun aiGenerationKafkaErrorHandler(properties: AiGenerationProperties): CommonErrorHandler =
-        DefaultErrorHandler().also { handler ->
+    fun aiGenerationKafkaErrorHandler(
+        kafkaProperties: AiGenerationKafkaProperties,
+        properties: AiGenerationProperties,
+        aiGenerationConsumerRecordRecoverer: AiGenerationConsumerRecordRecoverer,
+    ): CommonErrorHandler =
+        DefaultErrorHandler(
+            aiGenerationConsumerRecordRecoverer,
+            FixedBackOff(
+                kafkaProperties.consumerRetryDelay.toMillis(),
+                (kafkaProperties.consumerMaxAttempts - 1).toLong(),
+            ),
+        ).also { handler ->
+            handler.setAckAfterHandle(true)
+            handler.setResetStateOnRecoveryFailure(true)
+            handler.addRetryableExceptions(
+                DeserializationException::class.java,
+                AiGenerationRoutingMismatchException::class.java,
+            )
             handler.setBackOffFunction { _, failure ->
                 if (failure.hasCause<ProviderCallStillInFlightException>()) {
                     FixedBackOff(
@@ -102,9 +123,9 @@ class AiGenerationKafkaConfig {
             it.setConsumerFactory(consumerFactory)
             it.setCommonErrorHandler(errorHandler)
             // Manual ack: the listener calls Acknowledgment.acknowledge() only after
-            // AiGenerationWorker.process(jobId) returns successfully. Throwing skips
-            // the ack so the container redelivers. Live provider attempts use a
-            // timeout-sized unlimited backoff until recovery can safely mark them stale.
+            // ProcessAiGenerationJobUseCase.process(jobId) returns successfully. Throwing skips
+            // the ack so the container redelivers. Generic exhaustion is settled by
+            // the recoverer; live provider attempts retain timeout-sized unlimited backoff.
             it.containerProperties.ackMode = ContainerProperties.AckMode.MANUAL
             it.containerProperties.isObservationEnabled = true
         }

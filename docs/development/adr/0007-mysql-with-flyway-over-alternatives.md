@@ -47,9 +47,9 @@ ReadMates의 핵심 데이터(멤버십, 세션, 기록, 피드백 문서, 알�
 
 **DB 선택**: OCI MySQL HeatWave free tier를 운영 DB로 사용한다.
 
-**Migration 방식**: `server/src/main/resources/db/mysql/migration/` 아래 `V{N}__{description}.sql` 파일로 관리한다. Flyway가 startup 시 순서대로 적용한다. 이미 적용된 파일의 checksum이 변경되면 startup이 실패한다.
+**Migration 방식**: `server/src/main/resources/db/mysql/migration/` 아래 `V{positive integer}__{lower_snake_case_description}.sql` 파일로 관리한다. Flyway가 startup 시 순서대로 적용한다. 기준 Git tree에 존재하는 migration은 repository checker가 merge 전에 byte identity를 확인하고, 이미 적용된 파일은 Flyway가 저장된 checksum과 비교해 startup 시 다시 검증한다.
 
-**Forward-only 원칙**: rollback migration 파일(`R__` prefix)을 작성하지 않는다. schema rollback이 필요하면 새 forward migration으로 처리한다.
+**Forward-only 원칙**: repeatable `R__` migration을 도입하지 않는다. 과거 versioned migration의 수정·삭제·rename, 낮거나 재사용한 version, `flyway repair`, baseline 증가는 보정 방법이 아니다. schema 보정은 비교 base의 최고 version보다 큰 새 versioned migration으로 처리한다.
 
 **Reversible pair 패턴**: 위험한 변경(컬럼 rename, drop)은 두 번의 배포로 나눈다:
 - 배포 1: 새 컬럼 추가 또는 rename (V24)
@@ -72,35 +72,15 @@ spring:
 
 테스트 환경에서는 `spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev`로 dev seed migration을 추가 적용한다. dev seed는 테스트 전용 seed data(`V1001__seed_*.sql` 형식)를 포함하며, 운영 DB에는 절대 적용되지 않는다.
 
-**버전 번호 gap 정책**: `V2`~`V8`은 초기 개발 중 통합되거나 삭제된 migration 번호다. gap이 존재해도 `out-of-order=false`가 현재 파일의 버전 순서를 강제한다. 새 migration은 현재 최신 번호(`V28`) 다음인 `V29`부터 시작한다.
+**버전 번호 gap 정책**: `V2`~`V8`은 초기 개발 중 통합되거나 삭제된 migration 번호다. gap이 존재해도 `out-of-order=false`가 현재 파일의 버전 순서를 강제한다. 새 migration은 gap을 채우지 않고 repository checker가 보고한 비교 base의 최고 version보다 커야 한다.
 
 ### 현재 migration 파일 목록
 
-`V1`~`V28` 범위에 총 21개 migration 파일 (버전 번호 gap은 초기 개발 중 통합된 migration에 해당):
+현재 source of truth는 canonical migration directory의 파일 자체다. 이 ADR의 2026-08-09 검증 기록은 `V1`, `V9`~`V47`의 40개 파일이었고, 이후 `V48`이 additive하게 추가되어 이 변경 시점에는 41개다. 이후의 정확한 개수와 최신 version은 수동 표가 아니라 아래 checker의 `base-count`, `current-count`, `next-version` 출력으로 확인한다.
 
-| 버전 | 설명 |
-|------|------|
-| V1 | 초기 baseline schema |
-| V9 | Google OAuth pending approval 상태 |
-| V10 | 멤버 lifecycle, 세션 관리 |
-| V11 | viewer 멤버십 상태 |
-| V12 | 읽기 진행도, 세션 공개 범위 |
-| V13 | 멤버 표시 이름 유일성 |
-| V14 | 세션 기록 공개 범위 |
-| V15 | 세션 공개 범위 개선 |
-| V16 | notification outbox 초기 테이블 |
-| V17 | DB 쿼리 최적화 인덱스 |
-| V18 | 알림 설정, 테스트 메일 audit |
-| V19 | outbox metadata 컬럼 추가 |
-| V20 | Kafka notification 파이프라인 (전체 재설계) |
-| V21 | multi-club platform (`club_domains` 테이블) |
-| V22 | note count 쿼리 인덱스 |
-| V23 | 세션 state/visibility 불변식 constraint |
-| V24 | legacy password hash rename (reversible pair 1단계) |
-| V25 | legacy password hash drop (reversible pair 2단계) |
-| V26 | BFF secret rotation audit 테이블 |
-| V27 | 수동 알림 발송 preview/dispatch 테이블 |
-| V28 | 수동 알림 발송 preview consumed 상태와 preview-dispatch 1:1 제약 |
+```bash
+python3 -B scripts/check-flyway-migration-immutability.py --base-ref <trusted-base-ref>
+```
 
 ## 근거
 
@@ -119,18 +99,20 @@ OCI MySQL HeatWave는 Oracle이 운영하는 MySQL 8 관리형 서비스다. OCI
 
 PostgreSQL은 OCI Always Free에 관리형 서비스가 없어 VM에 직접 설치해야 한다. 백업, 패치, 재시작 관리가 추가 운영 부담이다.
 
-### Flyway checksum으로 drift 방지
+### Repository history와 Flyway checksum으로 drift 방지
 
-Flyway는 이미 적용된 migration 파일의 checksum을 `flyway_schema_history`에 저장한다. 파일 내용이 변경되면 startup이 `FlywayException: Checksum mismatch for migration V5` 등의 오류로 실패한다.
+Repository checker는 명시한 base ref와 현재 checkout의 merge base를 해석한 뒤, base tree에 있던 production migration의 경로와 내용을 index 및 worktree와 비교한다. 수정·삭제·rename·이동, 잘못된 위치·이름, 중복 version, 불완전한 history를 merge 전에 fail closed로 차단한다. Pull request CI는 `github.event.pull_request.base.sha`, `main` push는 `github.event.before`를 base로 사용하고 history comparison을 수행하는 scripts job만 `fetch-depth: 0`으로 checkout한다.
 
-이 동작이 "production에 적용된 migration 파일은 절대 수정하지 않는다"는 규칙을 코드 수준에서 강제한다.
+Flyway는 이미 적용된 migration 파일의 checksum을 `flyway_schema_history`에 저장하고 startup validation에서 불일치를 거부한다. Repository gate는 이미 적용된 DB가 없어도 과거 source 변조를 막고, Flyway checksum은 적용된 database에서 runtime backstop 역할을 한다. 둘은 대체 관계가 아니다.
 
 ### Testcontainers 동일 버전
 
-`MySqlFlywayMigrationTest`가 Testcontainers MySQL을 실행해 모든 migration을 순서대로 적용하고 실패 없이 완료되는지 검증한다:
+`MySqlFlywayMigrationTest`가 Testcontainers MySQL을 실행해 clean install과 populated V42/V44 schema에서 현재 V48까지의 지원 upgrade를 검증한다. `FlywayChecksumImmutabilityTest`는 합성 filesystem migration으로 checksum mismatch와 정상 forward-only successor를 검증한다:
 
 ```bash
-./server/gradlew -p server test --tests "com.readmates.support.MySqlFlywayMigrationTest"
+./server/gradlew -p server integrationTest \
+  --tests com.readmates.support.FlywayChecksumImmutabilityTest \
+  --tests com.readmates.support.MySqlFlywayMigrationTest
 ```
 
 새 migration이 추가될 때마다 이 테스트가 CI에서 실행된다. 잘못된 SQL syntax나 constraint violation이 즉시 발견된다.
@@ -142,7 +124,7 @@ Flyway는 이미 적용된 migration 파일의 checksum을 `flyway_schema_histor
 - V24: `ALTER TABLE members RENAME COLUMN password_hash TO legacy_password_hash` — rename으로 구 컬럼을 새 이름으로 이동. 코드는 이 시점에서 구 이름을 더 이상 참조하지 않도록 업데이트.
 - V25: `ALTER TABLE members DROP COLUMN legacy_password_hash` — 구 컬럼 완전 제거.
 
-V24 배포 후 운영 상태를 확인하고 안전하면 V25를 별도 배포한다. V24 배포 직후 문제가 발견되면 V26(rename back)을 forward migration으로 추가해 롤백한다.
+V24 배포 후 운영 상태를 확인하고 안전하면 V25를 별도 배포한다. 배포 직후 문제가 발견되더라도 이미 사용된 version을 재사용하지 않고, 그 시점의 최고 version보다 큰 새 forward migration으로 호환 상태를 복원한다.
 
 ### JPA 미사용 이유
 
@@ -169,10 +151,10 @@ ArchUnit(`ADR-0002`)이 persistence adapter가 `JdbcTemplate`을 직접 주입�
 
 긍정적:
 - schema 진화가 SQL 파일로 명시적이어서 git diff로 변경 의도가 자명하다.
-- `MySqlFlywayMigrationTest`가 CI에서 모든 migration의 idempotency를 검증한다.
+- `MySqlFlywayMigrationTest`가 CI에서 clean install과 지원되는 V42/V44 upgrade를 검증한다.
 - Testcontainers로 테스트 환경이 운영과 동일한 MySQL 버전/schema를 사용한다.
 - OCI MySQL HeatWave free tier 활용으로 DB 운영 비용이 없다.
-- Flyway checksum 검증으로 "이미 배포된 migration 파일 수정" 실수를 startup 시점에 발견한다.
+- Repository base-tree 검사와 Flyway checksum 검증이 각각 merge 전과 startup 시점에 과거 migration 변조를 발견한다.
 - reversible pair 패턴으로 위험한 schema 변경을 안전하게 처리한다.
 
 부정적/감수한 비용:
@@ -185,7 +167,9 @@ ArchUnit(`ADR-0002`)이 persistence adapter가 `JdbcTemplate`을 직접 주입�
 
 migration 통합 테스트:
 ```bash
-./server/gradlew -p server test --tests "com.readmates.support.MySqlFlywayMigrationTest"
+./server/gradlew -p server integrationTest \
+  --tests com.readmates.support.FlywayChecksumImmutabilityTest \
+  --tests com.readmates.support.MySqlFlywayMigrationTest
 ```
 
 전체 서버 테스트 (Testcontainers MySQL 포함):
@@ -194,11 +178,13 @@ migration 통합 테스트:
 ./server/gradlew -p server integrationTest
 ```
 
-기대: V1~V28 (21개) migration이 순서대로 적용되고 schema constraint 검증 통과.
+기대: V1/V9~V48의 41개 production migration clean install, populated V42/V44에서 V48까지의 upgrade, checksum mismatch 거부와 더 높은 forward-only successor 적용이 통과한다.
 
 migration 파일 추가 규칙 검증:
-- 새 migration 파일이 `V{N+1}__{설명}.sql` 형식인지 확인
-- 기존 migration 파일을 수정하면 `FlywayException: Checksum mismatch` 발생 확인 (startup 실패)
+- `python3 -B scripts/check-flyway-migration-immutability.py --self-test`
+- `python3 -B scripts/check-flyway-migration-immutability.py --check-workflow .github/workflows/ci.yml`
+- `python3 -B scripts/check-flyway-migration-immutability.py --base-ref <trusted-base-ref>`
+- 기존 migration을 수정·삭제·rename하거나 `repair`하지 않고, checker가 안내한 version 이상의 새 forward-only migration으로 보정한다.
 
 ## 후속 작업
 

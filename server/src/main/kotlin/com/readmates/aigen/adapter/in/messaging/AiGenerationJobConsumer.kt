@@ -1,7 +1,8 @@
 package com.readmates.aigen.adapter.`in`.messaging
 
-import com.readmates.aigen.adapter.out.messaging.AiGenerationJobMessage
-import com.readmates.aigen.application.service.AiGenerationWorker
+import com.readmates.aigen.application.model.AiGenerationJobMessage
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationJobUseCase
+import org.apache.kafka.clients.consumer.ConsumerRecord
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
@@ -13,11 +14,11 @@ import org.springframework.stereotype.Component
  * Kafka consumer for AI-generation job-routing messages (spec §8.1).
  *
  * Behavior:
- *  - On each message: invoke [AiGenerationWorker.process] with the [AiGenerationJobMessage.jobId].
+ *  - On each message: require one canonical header matching [AiGenerationJobMessage.jobId], then invoke the worker.
  *  - On success: acknowledge the offset (manual ack mode — see [com.readmates.aigen.config.AiGenerationKafkaConfig]).
  *  - On exception: log and rethrow — the container's default error handler then triggers
  *    redelivery. We do NOT call [Acknowledgment.acknowledge] on the failure path; the
- *    worker is responsible for marking the job FAILED in Redis if redelivery exhausts.
+ *    explicit Kafka recoverer owns durable terminalization when generic redelivery exhausts.
  *
  * Wired only when both `readmates.aigen.enabled=true` and
  * `readmates.aigen.kafka.enabled=true`.
@@ -26,7 +27,7 @@ import org.springframework.stereotype.Component
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.aigen.kafka", name = ["enabled"], havingValue = "true")
 class AiGenerationJobConsumer(
-    private val worker: AiGenerationWorker,
+    private val processAiGenerationJob: ProcessAiGenerationJobUseCase,
 ) {
     private val log = LoggerFactory.getLogger(javaClass)
 
@@ -37,12 +38,17 @@ class AiGenerationJobConsumer(
     )
     @Suppress("TooGenericExceptionCaught")
     fun onMessage(
-        message: AiGenerationJobMessage,
+        record: ConsumerRecord<String, AiGenerationJobMessage?>,
         acknowledgment: Acknowledgment,
     ) {
+        val route = record.aiGenerationRoute()
+        val message = record.value()
+        if (route !is AiGenerationKafkaRoute.Routable || message == null) {
+            throw AiGenerationRoutingMismatchException()
+        }
         withWorkerMdc(message) {
             try {
-                worker.process(message.jobId)
+                processAiGenerationJob.process(message.jobId)
                 acknowledgment.acknowledge()
             } catch (ex: RuntimeException) {
                 // Do NOT ack — let the container redeliver. Never attach the raw
@@ -60,25 +66,23 @@ class AiGenerationJobConsumer(
     private fun <T> withWorkerMdc(
         message: AiGenerationJobMessage,
         block: () -> T,
-    ): T =
-        withMdcValue("jobId", message.jobId.toString()) {
-            withMdcValue("provider", message.provider.name.lowercase()) {
-                withMdcValue("stage", "worker") { block() }
-            }
-        }
-
-    private fun <T> withMdcValue(
-        key: String,
-        value: String,
-        block: () -> T,
     ): T {
-        val previous = MDC.get(key)
-        val closeable = MDC.putCloseable(key, value)
+        val previous = MDC.getCopyOfContextMap()
+        MDC.setContextMap(
+            mapOf(
+                "jobId" to message.jobId.toString(),
+                "provider" to message.provider.name.lowercase(),
+                "stage" to "worker",
+            ),
+        )
         try {
             return block()
         } finally {
-            closeable.close()
-            previous?.let { MDC.put(key, it) }
+            if (previous.isNullOrEmpty()) {
+                MDC.clear()
+            } else {
+                MDC.setContextMap(previous)
+            }
         }
     }
 }

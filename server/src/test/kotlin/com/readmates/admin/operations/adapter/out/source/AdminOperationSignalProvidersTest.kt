@@ -40,6 +40,8 @@ import com.readmates.notification.application.port.`in`.ManageAdminNotificationO
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.toPlatformActor
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -74,12 +76,13 @@ class AdminOperationSignalProvidersTest {
             )
         val readyClub = club(index = 3)
         val publicClub = club(index = 4, publicVisibility = ClubPublicVisibility.PUBLIC)
+        val clubsUseCase =
+            FakeListPlatformAdminClubsUseCase(
+                listOf(domainClub, setupClub, readyClub, publicClub),
+            )
         val provider =
             ClubReadinessOperationSignalProvider(
-                listClubsUseCase =
-                    FakeListPlatformAdminClubsUseCase(
-                        listOf(domainClub, setupClub, readyClub, publicClub),
-                    ),
+                listClubsUseCase = clubsUseCase,
                 clock = clock,
             )
 
@@ -110,6 +113,8 @@ class AdminOperationSignalProvidersTest {
             .isEqualTo(AdminOperationSignalVerification.ACTIVE)
         assertThat(provider.verify(admin, "CLUB_READINESS:${publicClub.clubId}"))
             .isEqualTo(AdminOperationSignalVerification.ABSENT)
+        assertThat(clubsUseCase.observedAdmins)
+            .containsExactly(admin.toPlatformActor(), admin.toPlatformActor(), admin.toPlatformActor())
     }
 
     @Test
@@ -263,9 +268,10 @@ class AdminOperationSignalProvidersTest {
         val blocked = closingRisk(index = 1, overallState = "BLOCKED", occurrenceCount = 4)
         val inProgress = closingRisk(index = 2, overallState = "IN_PROGRESS")
         val ready = closingRisk(index = 3, overallState = "READY")
+        val risksUseCase = FakeClosingRisksUseCase(closingSnapshot(listOf(blocked, inProgress, ready)))
         val provider =
             ClosingRiskOperationSignalProvider(
-                FakeClosingRisksUseCase(closingSnapshot(listOf(blocked, inProgress, ready))),
+                risksUseCase,
             )
 
         val batch = provider.collect(admin)
@@ -291,6 +297,8 @@ class AdminOperationSignalProvidersTest {
         assertSafeProjection(batch.signals.flatMap { listOf(it.sourceKey, it.summaryCode, it.detailHref) })
         assertThat(provider.verify(admin, "CLOSING_RISK:${blocked.sessionId}"))
             .isEqualTo(AdminOperationSignalVerification.ACTIVE)
+        assertThat(risksUseCase.observedAdmins)
+            .containsExactly(admin.toPlatformActor(), admin.toPlatformActor())
     }
 
     @Test
@@ -466,7 +474,10 @@ private class FakeListPlatformAdminClubsUseCase(
     private val items: List<PlatformAdminClubListItem> = emptyList(),
     private val error: Throwable? = null,
 ) : ListPlatformAdminClubsUseCase {
-    override fun listClubs(admin: CurrentPlatformAdmin): PlatformAdminClubList {
+    val observedAdmins = mutableListOf<PlatformActor>()
+
+    override fun listClubs(admin: PlatformActor): PlatformAdminClubList {
+        observedAdmins += admin
         error?.let { throw it }
         return PlatformAdminClubList(items)
     }
@@ -532,5 +543,10 @@ private class FakeGetAiOpsJobUseCase(
 private class FakeClosingRisksUseCase(
     private val value: AdminTodayClosingRiskSnapshot,
 ) : ListAdminTodayClosingRisksUseCase {
-    override fun todayClosingRisks(admin: CurrentPlatformAdmin): AdminTodayClosingRiskSnapshot = value
+    val observedAdmins = mutableListOf<PlatformActor>()
+
+    override fun todayClosingRisks(admin: PlatformActor): AdminTodayClosingRiskSnapshot {
+        observedAdmins += admin
+        return value
+    }
 }

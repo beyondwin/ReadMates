@@ -1,5 +1,6 @@
 package com.readmates.notification.adapter.out.persistence
 
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.AdminNotificationClubHealth
 import com.readmates.notification.application.model.AdminNotificationClubRef
 import com.readmates.notification.application.model.AdminNotificationDelivery
@@ -10,13 +11,9 @@ import com.readmates.notification.application.model.AdminNotificationManualDispa
 import com.readmates.notification.application.model.AdminNotificationOperationsSnapshot
 import com.readmates.notification.application.model.AdminNotificationOutboxEvent
 import com.readmates.notification.application.model.AdminNotificationRelaySummary
-import com.readmates.notification.application.model.AdminNotificationReplayEstimate
 import com.readmates.notification.application.model.AdminNotificationStatusSummary
 import com.readmates.notification.application.model.NotificationDispatchSource
-import com.readmates.notification.application.port.out.AdminNotificationAuditPort
 import com.readmates.notification.application.port.out.AdminNotificationOperationsReadPort
-import com.readmates.notification.application.port.out.AdminNotificationReplayPort
-import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewRecord
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
 import com.readmates.notification.domain.NotificationEventOutboxStatus
@@ -42,10 +39,13 @@ import java.util.UUID
 @Repository
 class JdbcAdminNotificationOperationsAdapter(
     private val jdbcTemplate: JdbcTemplate,
-) : AdminNotificationOperationsReadPort,
-    AdminNotificationReplayPort,
-    AdminNotificationAuditPort {
-    private val snapshotQueries = AdminNotificationSnapshotQueries(jdbcTemplate)
+    runtimeProperties: NotificationRuntimeProperties,
+) : AdminNotificationOperationsReadPort {
+    private val snapshotQueries =
+        AdminNotificationSnapshotQueries(
+            jdbcTemplate = jdbcTemplate,
+            claimLeaseMicroseconds = runtimeProperties.worker.claimLeaseMicroseconds,
+        )
 
     override fun snapshot(): AdminNotificationOperationsSnapshot = snapshotQueries.snapshot()
 
@@ -164,124 +164,11 @@ class JdbcAdminNotificationOperationsAdapter(
             updatedAtDescCursor(row.updatedAt, row.createdAt, row.deliveryId.toString())
         }
     }
-
-    override fun estimateReplayableDeliveries(filter: AdminNotificationFilter): AdminNotificationReplayEstimate {
-        val predicates = replayableDeliveryPredicates(filter)
-        val rows =
-            JdbcArguments.query(
-                jdbcTemplate,
-                """
-                select status, count(*) as count
-                from notification_deliveries
-                ${predicates.sql}
-                group by status
-                """.trimIndent(),
-                predicates.args,
-                { resultSet, _ -> resultSet.getString("status") to resultSet.getInt("count") },
-            )
-        val byStatus = rows.associate { it.first to it.second }
-        return AdminNotificationReplayEstimate(
-            matchedCount = byStatus.values.sum(),
-            estimatedByStatus = byStatus,
-        )
-    }
-
-    override fun createPreview(
-        actorUserId: UUID,
-        filterJson: String,
-        selectionHash: String,
-        matchedCount: Int,
-        expiresAt: OffsetDateTime,
-    ): UUID {
-        val id = UUID.randomUUID()
-        jdbcTemplate.update(
-            """
-            insert into admin_notification_replay_previews
-              (id, actor_user_id, filter_json, selection_hash, matched_count, expires_at)
-            values (?, ?, cast(? as json), ?, ?, ?)
-            """.trimIndent(),
-            id.dbString(),
-            actorUserId.dbString(),
-            filterJson,
-            selectionHash,
-            matchedCount,
-            expiresAt.toUtcLocalDateTime(),
-        )
-        return id
-    }
-
-    override fun loadOpenPreview(previewId: UUID): AdminNotificationReplayPreviewRecord? =
-        jdbcTemplate
-            .query(
-                """
-                select id, actor_user_id, filter_json, selection_hash, matched_count, expires_at
-                from admin_notification_replay_previews
-                where id = ?
-                  and consumed_at is null
-                """.trimIndent(),
-                { resultSet, _ ->
-                    AdminNotificationReplayPreviewRecord(
-                        previewId = resultSet.uuid("id"),
-                        actorUserId = resultSet.uuid("actor_user_id"),
-                        filterJson = resultSet.getString("filter_json"),
-                        selectionHash = resultSet.getString("selection_hash"),
-                        matchedCount = resultSet.getInt("matched_count"),
-                        expiresAt = resultSet.utcOffsetDateTime("expires_at"),
-                    )
-                },
-                previewId.dbString(),
-            ).firstOrNull()
-
-    override fun markPreviewConsumed(previewId: UUID): Boolean =
-        jdbcTemplate.update(
-            """
-            update admin_notification_replay_previews
-            set consumed_at = utc_timestamp(6)
-            where id = ?
-              and consumed_at is null
-            """.trimIndent(),
-            previewId.dbString(),
-        ) == 1
-
-    override fun replayDeadOrFailedDeliveries(filter: AdminNotificationFilter): Int {
-        val predicates = replayableDeliveryPredicates(filter)
-        return JdbcArguments.update(
-            jdbcTemplate,
-            """
-            update notification_deliveries
-            set status = 'PENDING',
-                attempt_count = 0,
-                next_attempt_at = utc_timestamp(6),
-                locked_at = null,
-                last_error = null,
-                updated_at = utc_timestamp(6)
-            ${predicates.sql}
-            """.trimIndent(),
-            predicates.args,
-        )
-    }
-
-    override fun writeReplayConfirmed(
-        actorUserId: UUID,
-        actorPlatformRole: String,
-        metadataJson: String,
-    ) {
-        jdbcTemplate.update(
-            """
-            insert into platform_audit_events
-              (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
-            values (?, ?, ?, null, 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED', cast(? as json), utc_timestamp(6))
-            """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            actorUserId.dbString(),
-            actorPlatformRole,
-            metadataJson,
-        )
-    }
 }
 
 private class AdminNotificationSnapshotQueries(
     private val jdbcTemplate: JdbcTemplate,
+    private val claimLeaseMicroseconds: Long,
 ) {
     fun snapshot(): AdminNotificationOperationsSnapshot =
         AdminNotificationOperationsSnapshot(
@@ -289,7 +176,7 @@ private class AdminNotificationSnapshotQueries(
                 jdbcTemplate.queryForObject(
                     "select utc_timestamp(6)",
                     OffsetDateTimeRowMapper,
-                ) ?: OffsetDateTime.now(),
+                ),
             outboxSummary = outboxSummary(),
             deliverySummary = deliverySummary(),
             relaySummary = relaySummary(),
@@ -344,9 +231,10 @@ private class AdminNotificationSnapshotQueries(
                     select count(*)
                     from notification_event_outbox
                     where status = 'PUBLISHING'
-                      and locked_at < timestampadd(MINUTE, -15, utc_timestamp(6))
+                      and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
                     """.trimIndent(),
                     Int::class.java,
+                    -claimLeaseMicroseconds,
                 ) ?: 0,
             staleSending =
                 jdbcTemplate.queryForObject(
@@ -354,9 +242,10 @@ private class AdminNotificationSnapshotQueries(
                     select count(*)
                     from notification_deliveries
                     where status = 'SENDING'
-                      and locked_at < timestampadd(MINUTE, -15, utc_timestamp(6))
+                      and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
                     """.trimIndent(),
                     Int::class.java,
+                    -claimLeaseMicroseconds,
                 ) ?: 0,
         )
 
@@ -478,12 +367,7 @@ private object OffsetDateTimeRowMapper : RowMapper<OffsetDateTime> {
     ): OffsetDateTime = rs.getObject(1, LocalDateTime::class.java).atOffset(ZoneOffset.UTC)
 }
 
-private data class SqlPredicates(
-    val sql: String,
-    val args: List<Any>,
-)
-
-private object JdbcArguments {
+internal object JdbcArguments {
     fun <T> query(
         jdbcTemplate: JdbcTemplate,
         sql: String,
@@ -514,26 +398,6 @@ private object JdbcArguments {
             statement.setObject(index + 1, arg)
         }
     }
-}
-
-private fun replayableDeliveryPredicates(filter: AdminNotificationFilter): SqlPredicates {
-    val predicates =
-        mutableListOf(
-            "channel = 'EMAIL'",
-            "status in ('FAILED', 'DEAD')",
-        )
-    val args = mutableListOf<Any>()
-    filter.clubId?.let {
-        predicates += "club_id = ?"
-        args += it.dbString()
-    }
-    filter.deliveryStatus
-        ?.takeIf { it in setOf(NotificationDeliveryStatus.FAILED, NotificationDeliveryStatus.DEAD) }
-        ?.let {
-            predicates += "status = ?"
-            args += it.name
-        }
-    return SqlPredicates("where ${predicates.joinToString(" and ")}", args)
 }
 
 private data class FailureClusterSeed(

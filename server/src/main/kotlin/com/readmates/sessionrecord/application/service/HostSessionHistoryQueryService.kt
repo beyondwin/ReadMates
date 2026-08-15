@@ -1,9 +1,9 @@
 package com.readmates.sessionrecord.application.service
 
-import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.sessionrecord.application.model.HostSessionHistoryCursor
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.HostSessionHistoryType
+import com.readmates.sessionrecord.application.model.InvalidHostSessionHistoryCursorException
 import com.readmates.sessionrecord.application.port.`in`.GetHostSessionHistoryUseCase
 import com.readmates.sessionrecord.application.port.out.HostSessionHistoryPort
 import com.readmates.shared.paging.CursorCodec
@@ -51,17 +51,6 @@ private val historyComparator =
         .thenByDescending { it.type.typeSort }
         .thenByDescending { it.id.toString() }
 
-internal val HostSessionHistoryType.typeSort: Int
-    get() =
-        when (this) {
-            HostSessionHistoryType.BASIC_INFO_UPDATED -> BASIC_INFO_SORT
-            HostSessionHistoryType.ATTENDANCE_UPDATED -> ATTENDANCE_SORT
-            HostSessionHistoryType.RECORD_REVISION_APPLIED -> REVISION_APPLIED_SORT
-            HostSessionHistoryType.RECORD_REVISION_RESTORED -> REVISION_RESTORED_SORT
-            HostSessionHistoryType.NOTIFICATION_SENT -> NOTIFICATION_SENT_SORT
-            HostSessionHistoryType.NOTIFICATION_SKIPPED -> NOTIFICATION_SKIPPED_SORT
-        }
-
 private fun Map<String, String>.toHistoryCursor(
     expectedClubId: UUID,
     expectedSessionId: UUID,
@@ -93,7 +82,7 @@ private fun Map<String, String>.toHistoryCursor(
     return HostSessionHistoryCursor(createdAt, typeSort, id)
 }
 
-private fun invalidCursor(): Nothing = throw InvalidHostSessionCursorException()
+private fun invalidCursor(): Nothing = throw InvalidHostSessionHistoryCursorException()
 
 private fun HostSessionHistoryItem.toHistoryCursor(
     clubId: UUID,
@@ -109,18 +98,4 @@ private fun HostSessionHistoryItem.toHistoryCursor(
         ),
     )
 
-private const val BASIC_INFO_SORT = 10
-private const val ATTENDANCE_SORT = 20
-private const val REVISION_APPLIED_SORT = 30
-private const val REVISION_RESTORED_SORT = 40
-private const val NOTIFICATION_SENT_SORT = 50
-private const val NOTIFICATION_SKIPPED_SORT = 60
-private val HISTORY_TYPE_SORTS =
-    setOf(
-        BASIC_INFO_SORT,
-        ATTENDANCE_SORT,
-        REVISION_APPLIED_SORT,
-        REVISION_RESTORED_SORT,
-        NOTIFICATION_SENT_SORT,
-        NOTIFICATION_SKIPPED_SORT,
-    )
+private val HISTORY_TYPE_SORTS = HostSessionHistoryType.entries.map { it.typeSort }.toSet()

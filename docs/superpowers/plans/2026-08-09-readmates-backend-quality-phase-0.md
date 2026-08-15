@@ -1050,3 +1050,115 @@ git diff --check HEAD~6..HEAD
 Expected: the worktree is clean, the six narrow plan commits are visible, both server gates PASS on final HEAD, and the diff check is clean. Do not merge, push, deploy, call a live AI provider, or send email without a separate user instruction.
 
 After final verification, create the next independent implementation plan for administrator-health failure containment and Flyway migration immutability using the fresh Phase 0 baseline; do not implement Phase 1 from this plan.
+
+---
+
+### Task 7: Human-Adjudicated Temporal Ratchet Tombstones
+
+**Decision:** After the Phase 0 whole-plan breaker identified that a removed approved identity could later return without a control-data change, the user selected the recommended hermetic retired-identity tombstone design. This Task is the explicit human adjudication addendum and is not a second implicit final-review fix wave.
+
+**Files:**
+- Create: `server/config/detekt/phase-0-retired-identities.txt`
+- Create: `server/config/ktlint/phase-0-retired-identities.txt`
+- Create: `server/config/architecture/phase-0-retired-boundary-imports.txt`
+- Create: `server/config/architecture/phase-0-retired-feature-dependencies.txt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerIdentityRatchet.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerQualityBaselineReader.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerQualityRatchetTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventory.kt`
+- Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt`
+- Modify: `docs/development/test-guide.md`
+- Modify: `docs/development/adr/0002-server-clean-architecture-with-archunit.md`
+
+**Interfaces:**
+- Preserves each immutable approved Phase 0 seed at `461`, `171`, `39`, and `41` identities.
+- Adds an append-only retired identity ledger for each ratchet.
+- Requires the current and retired identities to form an exact disjoint partition of the approved seed.
+- Keeps current source-to-baseline equality, JaCoCo `0.43`, all-inbound discovery, and exact OAuth repository exceptions unchanged.
+
+- [ ] **Step 1: Add RED temporal-monotonicity fixtures**
+
+For the shared ratchet helper and real-file contracts, add fixtures that prove:
+
+```text
+seed={a,b}, current={a,b}, retired={}       -> PASS
+seed={a,b}, current={a},   retired={b}      -> PASS
+seed={a,b}, current={a,b}, retired={b}      -> FAIL (reintroduction)
+seed={a,b}, current={a},   retired={}       -> FAIL (removal without tombstone)
+seed={a,b}, current={a,c}, retired={b}      -> FAIL (unapproved substitution)
+```
+
+Also prove that duplicate, malformed, or outside-seed retired rows fail closed. Run only `ServerQualityRatchetTest` and `ServerArchitectureInventoryTest` and capture the expected RED against the current subset-only helper.
+
+- [ ] **Step 2: Implement the minimal hermetic partition contract**
+
+Enforce all five invariants for every ratchet:
+
+```text
+approvedSeed.size == approvedCeiling
+current subsetOf approvedSeed
+retired subsetOf approvedSeed
+current intersect retired == empty
+current union retired == approvedSeed
+```
+
+The four initial retired ledgers contain only a public-safe comment because current baselines still exactly equal the approved seeds. Reuse the existing strict normalized identity readers; do not weaken malformed/duplicate rejection.
+
+- [ ] **Step 3: Verify removal and reintroduction behavior**
+
+Use temporary test fixtures only. Demonstrate that removing an identity requires moving it to retired, and that putting it back into current while it remains retired fails. Do not modify any current production debt or active baseline file.
+
+- [ ] **Step 4: Update active contributor guidance**
+
+Document the exact removal workflow in the active test guide and ADR:
+
+1. remove source debt;
+2. remove the matching current baseline row in the same change;
+3. append that exact identity to the matching retired ledger;
+4. never delete a retired identity or grow an approved seed.
+
+Do not rewrite unrelated commands or architecture sections.
+
+- [ ] **Step 5: Commit narrow slices**
+
+```bash
+git add \
+  server/config/detekt/phase-0-retired-identities.txt \
+  server/config/ktlint/phase-0-retired-identities.txt \
+  server/config/architecture/phase-0-retired-boundary-imports.txt \
+  server/config/architecture/phase-0-retired-feature-dependencies.txt \
+  server/src/test/kotlin/com/readmates/architecture/ServerIdentityRatchet.kt \
+  server/src/test/kotlin/com/readmates/architecture/ServerQualityBaselineReader.kt \
+  server/src/test/kotlin/com/readmates/architecture/ServerQualityRatchetTest.kt \
+  server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventory.kt \
+  server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt
+git commit -m "test(server): prevent quality debt reintroduction"
+
+git add \
+  docs/development/test-guide.md \
+  docs/development/adr/0002-server-clean-architecture-with-archunit.md
+git commit -m "docs: record temporal quality ratchets"
+```
+
+- [ ] **Step 6: Run canonical and public-safety verification**
+
+```bash
+./server/gradlew -p server architectureTest \
+  --tests com.readmates.architecture.ServerQualityRatchetTest \
+  --tests com.readmates.architecture.ServerArchitectureInventoryTest \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+./server/gradlew -p server architectureTest \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+./scripts/server-ci-check.sh
+./server/gradlew -p server integrationTest \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+git diff --check
+./scripts/build-public-release-candidate.sh
+./scripts/public-release-check.sh .tmp/public-release-candidate
+```
+
+Expected: all commands PASS, the four retired ledgers contain zero identities, the worktree is clean, and no production/API/auth/DB/migration behavior changed.
+
+- [ ] **Step 7: Request fresh task and whole-plan reviews**
+
+Require the task reviewer to verify the partition algebra and realistic removal/reintroduction fixtures. Then request a fresh whole-plan review over `58fc2895..HEAD`, treating this human-approved addendum as the governing resolution of the prior breaker. Do not begin Phase 1 until both reviews are clean.

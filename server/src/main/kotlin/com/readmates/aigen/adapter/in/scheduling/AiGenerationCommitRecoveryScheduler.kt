@@ -2,7 +2,7 @@
 
 package com.readmates.aigen.adapter.`in`.scheduling
 
-import com.readmates.aigen.application.service.AiGenerationCommitRecoveryService
+import com.readmates.aigen.application.port.`in`.RecoverAiGenerationCommitsUseCase
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component
 @Component
 @ConditionalOnProperty(prefix = "readmates", name = ["aigen.enabled"], havingValue = "true")
 class AiGenerationCommitRecoveryScheduler(
-    private val recoveryService: AiGenerationCommitRecoveryService,
+    private val recoveryService: RecoverAiGenerationCommitsUseCase,
 ) {
     @Scheduled(fixedDelayString = "\${readmates.aigen.commit-recovery-fixed-delay-ms:60000}")
     fun recover() {

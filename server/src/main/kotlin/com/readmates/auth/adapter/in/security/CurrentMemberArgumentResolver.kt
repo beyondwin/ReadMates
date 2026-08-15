@@ -1,7 +1,8 @@
 package com.readmates.auth.adapter.`in`.security
 
 import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
-import com.readmates.club.adapter.`in`.web.resolveClubContext
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
@@ -41,7 +42,7 @@ class CurrentMemberArgumentResolver(
         val email =
             authentication.emailOrNull()
                 ?: throw ResponseStatusException(HttpStatus.UNAUTHORIZED)
-        val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
+        val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
         if (requestedClubContext.supplied) {
             val clubContext =
                 requestedClubContext.context
@@ -78,8 +79,8 @@ class CurrentMemberArgumentResolver(
                         email = email,
                         displayName = synthesis.displayName,
                         accountName = synthesis.accountName,
-                        role = synthesis.role,
-                        membershipStatus = synthesis.membershipStatus,
+                        role = MembershipRole.HOST,
+                        membershipStatus = MembershipStatus.ACTIVE,
                         clubName = clubContext.name,
                     )
                 }

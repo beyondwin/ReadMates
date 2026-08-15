@@ -5,10 +5,9 @@ import com.readmates.shared.db.dbString
 import org.springframework.jdbc.core.JdbcTemplate
 import java.util.UUID
 
-private const val DELIVERY_LEASE_TIMEOUT_MINUTES = 15
-
 internal class NotificationDeliveryClaimOperations(
     private val rowMappers: NotificationDeliveryRowMappers,
+    private val claimLeaseMicroseconds: Long,
 ) {
     fun claimEmailDelivery(
         jdbcTemplate: JdbcTemplate,
@@ -214,6 +213,7 @@ internal class NotificationDeliveryClaimOperations(
               notification_deliveries.status,
               notification_deliveries.attempt_count,
               notification_deliveries.locked_at,
+              notification_deliveries.created_at,
               notification_event_outbox.event_type,
               notification_event_outbox.aggregate_id,
               notification_event_outbox.payload_json,
@@ -251,10 +251,10 @@ internal class NotificationDeliveryClaimOperations(
                 updated_at = utc_timestamp(6)
             where channel = 'EMAIL'
               and status = 'SENDING'
-              and locked_at < timestampadd(MINUTE, ?, utc_timestamp(6))
+              and $NOTIFICATION_CLAIM_LEASE_EXPIRED_PREDICATE
               $clubPredicate
             """.trimIndent(),
-            -DELIVERY_LEASE_TIMEOUT_MINUTES,
+            -claimLeaseMicroseconds,
             *args,
         )
     }

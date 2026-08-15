@@ -1,9 +1,14 @@
 package com.readmates.auth.api
 
+import com.readmates.auth.application.InvitationDomainException
+import com.readmates.auth.application.service.InvitationService
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.hamcrest.Matchers.startsWith
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNotEquals
+import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -16,6 +21,7 @@ import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import java.util.UUID
 import java.util.concurrent.Callable
 import java.util.concurrent.CyclicBarrier
 import java.util.concurrent.Executors
@@ -34,6 +40,7 @@ import java.util.concurrent.TimeUnit
 class HostInvitationControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val invitationService: InvitationService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `host creates a pending member invitation with a one time accept url`() {
@@ -188,6 +195,73 @@ class HostInvitationControllerTest(
             }.andExpect {
                 status { isForbidden() }
             }
+    }
+
+    @Test
+    fun `suspended host role cannot create invitations without persistence`() {
+        suspendSeedHost()
+        try {
+            mockMvc
+                .post("/api/host/invitations") {
+                    with(user("host@example.com"))
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"email":"suspended.host@example.com","name":"중지 호스트"}"""
+                }.andExpect {
+                    status { isForbidden() }
+                    jsonPath("$.code") { value("HOST_REQUIRED") }
+                }
+
+            val invitationCount =
+                jdbcTemplate.queryForObject(
+                    "select count(*) from invitations where invited_email = 'suspended.host@example.com'",
+                    Long::class.java,
+                ) ?: 0L
+            assertEquals(0L, invitationCount)
+        } finally {
+            restoreSeedHost()
+        }
+    }
+
+    @Test
+    fun `club actor without invitation capability is denied before invitation persistence`() {
+        val error =
+            assertThrows(InvitationDomainException::class.java) {
+                invitationService.createInvitation(
+                    host = suspendedHostActor(),
+                    email = "suspended.actor.service@example.com",
+                    name = "중지 actor",
+                    applyToCurrentSession = false,
+                )
+            }
+
+        assertEquals("HOST_REQUIRED", error.code)
+        val invitationCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from invitations where invited_email = 'suspended.actor.service@example.com'",
+                Long::class.java,
+            ) ?: 0L
+        assertEquals(0L, invitationCount)
+    }
+
+    @Test
+    fun `member management capability does not authorize invitations`() {
+        val error =
+            assertThrows(InvitationDomainException::class.java) {
+                invitationService.createInvitation(
+                    host = suspendedHostActor(setOf(ClubCapability.MANAGE_MEMBERS)),
+                    email = "member.manager.invitation@example.com",
+                    name = "멤버 관리 actor",
+                    applyToCurrentSession = false,
+                )
+            }
+
+        assertEquals("HOST_REQUIRED", error.code)
+        val invitationCount =
+            jdbcTemplate.queryForObject(
+                "select count(*) from invitations where invited_email = 'member.manager.invitation@example.com'",
+                Long::class.java,
+            ) ?: 0L
+        assertEquals(0L, invitationCount)
     }
 
     @Test
@@ -400,6 +474,35 @@ class HostInvitationControllerTest(
         jdbcTemplate.execute("drop trigger if exists test_invitation_insert_delay")
     }
 
+    private fun suspendSeedHost() {
+        jdbcTemplate.update(
+            """
+            update memberships set status = 'SUSPENDED'
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and user_id = (select id from users where email = 'host@example.com')
+            """.trimIndent(),
+        )
+    }
+
+    private fun restoreSeedHost() {
+        jdbcTemplate.update(
+            """
+            update memberships set status = 'ACTIVE'
+            where club_id = '00000000-0000-0000-0000-000000000001'
+              and user_id = (select id from users where email = 'host@example.com')
+            """.trimIndent(),
+        )
+    }
+
+    private fun suspendedHostActor(capabilities: Set<ClubCapability> = emptySet()) =
+        ClubActor(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            clubSlug = "reading-sai",
+            capabilities = capabilities,
+        )
+
     companion object {
         const val CLEANUP_SQL = """
             delete from invitations
@@ -407,6 +510,7 @@ class HostInvitationControllerTest(
               'new.member@example.com',
               'invite.apply@example.com',
               'blocked@example.com',
+              'member.manager.invitation@example.com',
               'repeat@example.com',
               'list.member@example.com',
               'accepted.list.member@example.com',

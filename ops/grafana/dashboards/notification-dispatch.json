@@ -11,7 +11,7 @@
       "title": "Outbox publish success ratio (5m rate)",
       "targets": [
         {
-          "expr": "sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) / sum(rate(readmates_outbox_publish_total[5m]))",
+          "expr": "(sum(rate(readmates_outbox_publish_total{result=\"success\"}[5m])) or vector(0)) / clamp_min((sum(rate(readmates_outbox_publish_total[5m])) or vector(0)), 1e-9)",
           "refId": "A"
         }
       ],
@@ -21,14 +21,40 @@
     {
       "id": 2,
       "type": "stat",
-      "title": "Outbox DEAD count",
+      "title": "Event outbox DEAD count",
       "targets": [
         {
-          "expr": "sum(readmates_outbox_dead_total)",
+          "expr": "sum(readmates_notifications_outbox_backlog{status=\"dead\"})",
           "refId": "A"
         }
       ],
       "gridPos": { "h": 8, "w": 6, "x": 12, "y": 0 }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Event outbox backlog by status",
+      "targets": [
+        {
+          "expr": "sum by (status) (readmates_notifications_outbox_backlog)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Email delivery backlog by status",
+      "targets": [
+        {
+          "expr": "sum by (status) (readmates_notifications_delivery_backlog)",
+          "legendFormat": "{{status}}",
+          "refId": "A"
+        }
+      ],
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 }
     }
   ]
 }

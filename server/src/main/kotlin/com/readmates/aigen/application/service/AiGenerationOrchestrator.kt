@@ -1,6 +1,7 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationJobListResult
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GROUNDED_PIPELINE_VERSION
 import com.readmates.aigen.application.model.GenerationError
@@ -190,10 +191,14 @@ class AiGenerationOrchestrator(
     }
 
     override fun recent(sessionId: UUID): JobView? =
-        jobStore
-            .loadRecentForSession(sessionId)
-            .firstOrNull { record -> record.sessionId == sessionId && record.isRecoverableRecentJob() }
-            ?.let(::toJobView)
+        when (val jobs = jobStore.loadRecentForSession(sessionId)) {
+            is AiGenerationJobListResult.Available ->
+                jobs.records
+                    .firstOrNull { record -> record.sessionId == sessionId && record.isRecoverableRecentJob() }
+                    ?.let(::toJobView)
+
+            is AiGenerationJobListResult.Unavailable -> null
+        }
 
     private fun toJobView(record: JobRecord): JobView {
         val warnings = mutableListOf<String>()

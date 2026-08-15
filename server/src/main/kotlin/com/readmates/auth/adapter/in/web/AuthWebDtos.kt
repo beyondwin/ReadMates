@@ -1,8 +1,8 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.application.model.JoinedClubSummary
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin

@@ -1,6 +1,9 @@
 package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.AiGenerationException
+import com.readmates.aigen.application.model.AiGenerationJobListOperation
+import com.readmates.aigen.application.model.AiGenerationJobListResult
+import com.readmates.aigen.application.model.AiGenerationJobListUnavailableReason
 import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsCostWindow
 import com.readmates.aigen.application.model.AiOpsDeltaDirection
@@ -64,6 +67,44 @@ class AiGenerationOpsServiceTest {
         assertThatThrownBy {
             service.forceCancel(support, job.jobId)
         }.isInstanceOf(AccessDeniedException::class.java)
+    }
+
+    @Test
+    fun `summary projects available empty and unavailable active lists as zero live jobs`() {
+        jobStore.activeJobsResult = AiGenerationJobListResult.Available(emptyList())
+
+        assertThat(service.summary(admin(PlatformAdminRole.SUPPORT)).activeJobCount).isZero()
+
+        jobStore.activeJobsResult =
+            AiGenerationJobListResult.Unavailable(
+                AiGenerationJobListOperation.ACTIVE,
+                AiGenerationJobListUnavailableReason.STORE_READ_FAILED,
+            )
+
+        val summary = service.summary(admin(PlatformAdminRole.SUPPORT))
+        assertThat(summary.activeJobCount).isZero()
+        assertThat(summary.failedLast24h).isZero()
+        assertThat(summary.monthToDateCostEstimateUsd).isEqualByComparingTo(BigDecimal.ZERO)
+    }
+
+    @Test
+    fun `list preserves historical items for available empty and unavailable active lists`() {
+        val historical = historicalItem()
+        auditQuery.listResult = AiOpsJobList(listOf(historical), "historical-next")
+        val filters = AiOpsJobFilters(null, null, null, null)
+        jobStore.activeJobsResult = AiGenerationJobListResult.Available(emptyList())
+
+        assertThat(service.list(admin(PlatformAdminRole.OWNER), filters))
+            .isEqualTo(AiOpsJobList(listOf(historical), "historical-next"))
+
+        jobStore.activeJobsResult =
+            AiGenerationJobListResult.Unavailable(
+                AiGenerationJobListOperation.ACTIVE,
+                AiGenerationJobListUnavailableReason.STORE_READ_FAILED,
+            )
+
+        assertThat(service.list(admin(PlatformAdminRole.OWNER), filters))
+            .isEqualTo(AiOpsJobList(listOf(historical), "historical-next"))
     }
 
     @Test
@@ -221,10 +262,34 @@ class AiGenerationOpsServiceTest {
             email = "${role.name.lowercase()}@example.com",
             role = role,
         )
+
+    private fun historicalItem(): AiOpsJobListItem =
+        AiOpsJobListItem(
+            jobId = UUID.randomUUID(),
+            clubId = UUID.randomUUID(),
+            clubSlug = "history-club",
+            clubName = "History Club",
+            sessionId = UUID.randomUUID(),
+            sessionNumber = 3,
+            bookTitle = "Archived Book",
+            status = JobStatus.COMMITTED,
+            stage = null,
+            provider = AiGenerationTestFixtures.CLAUDE_MODEL.provider,
+            model = AiGenerationTestFixtures.CLAUDE_MODEL.name,
+            errorCode = null,
+            safeErrorMessage = null,
+            costEstimateUsd = BigDecimal("1.2500"),
+            createdAt = Instant.parse("2026-05-17T00:00:00Z"),
+            lastUpdatedAt = Instant.parse("2026-05-17T00:00:00Z"),
+            expiresAt = null,
+            staleCandidate = false,
+            availableActions = emptySet(),
+        )
 }
 
 private class EmptyAuditQueryPort : AiGenerationAuditQueryPort {
     var jobById: AiOpsJobListItem? = null
+    var listResult: AiOpsJobList = AiOpsJobList(emptyList(), null)
     val usageByStart = mutableMapOf<Instant, AiOpsWindowUsage>()
 
     override fun countFailuresSince(since: Instant): Long = 0
@@ -240,7 +305,7 @@ private class EmptyAuditQueryPort : AiGenerationAuditQueryPort {
         endExclusive: Instant,
     ): AiOpsWindowUsage = usageByStart[start] ?: AiOpsWindowUsage(BigDecimal.ZERO, 0)
 
-    override fun listJobs(filters: AiOpsJobFilters): AiOpsJobList = AiOpsJobList(emptyList(), null)
+    override fun listJobs(filters: AiOpsJobFilters): AiOpsJobList = listResult
 
     override fun findJobById(jobId: UUID): AiOpsJobListItem? = jobById
 }

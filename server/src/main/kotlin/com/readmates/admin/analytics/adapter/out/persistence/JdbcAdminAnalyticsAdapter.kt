@@ -212,7 +212,7 @@ private fun JdbcTemplate.benchmark(w: Long): List<AdminAnalyticsBenchmarkRaw> =
         w,
         w,
         w,
-    ) ?: emptyList()
+    )
 
 // Each series metric is one grouped query keyed by bucket index, so the number of
 // round trips stays fixed regardless of how many buckets the window spans.

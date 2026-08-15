@@ -10,6 +10,7 @@ import com.readmates.admin.operations.application.port.out.AdminOperationSignalV
 import com.readmates.club.application.model.AdminTodayClosingRiskItem
 import com.readmates.club.application.port.`in`.ListAdminTodayClosingRisksUseCase
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.toPlatformActor
 import org.springframework.stereotype.Component
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -21,7 +22,7 @@ class ClosingRiskOperationSignalProvider(
     override val sourceType = AdminOperationSourceType.CLOSING_RISK
 
     override fun collect(admin: CurrentPlatformAdmin): AdminOperationSignalBatch {
-        val snapshot = closingRisksUseCase.todayClosingRisks(admin)
+        val snapshot = closingRisksUseCase.todayClosingRisks(admin.toPlatformActor())
         val authoritative = snapshot.items.size < CLOSING_RISK_LIMIT
         return AdminOperationSignalBatch(
             sourceType = sourceType,
@@ -38,7 +39,7 @@ class ClosingRiskOperationSignalProvider(
         sourceKey: String,
     ): AdminOperationSignalVerification {
         val sessionId = sourceKey.closingRiskId() ?: return AdminOperationSignalVerification.ABSENT
-        val snapshot = closingRisksUseCase.todayClosingRisks(admin)
+        val snapshot = closingRisksUseCase.todayClosingRisks(admin.toPlatformActor())
         if (snapshot.items.any { it.sessionId == sessionId }) {
             return AdminOperationSignalVerification.ACTIVE
         }

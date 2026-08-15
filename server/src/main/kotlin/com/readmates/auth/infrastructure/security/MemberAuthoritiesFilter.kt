@@ -1,10 +1,11 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.auth.application.service.AuthenticatedMemberResolver
-import com.readmates.auth.application.service.AuthoritySynthesisRequest
-import com.readmates.auth.application.service.AuthoritySynthesisService
-import com.readmates.auth.application.service.ClubContextInput
-import com.readmates.club.adapter.`in`.web.resolveClubContext
+import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
+import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
+import com.readmates.auth.application.model.AuthoritySynthesisRequest
+import com.readmates.auth.application.model.ClubContextInput
+import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
+import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
@@ -22,22 +23,25 @@ import org.springframework.web.filter.OncePerRequestFilter
 /**
  * Resolves authorities for the current principal.
  *
- * Branching rules (delegated to [AuthoritySynthesisService]):
- * - When [RequestedClubContext.source] is SLUG and the slug is registered, lookup the member and synthesize
+ * Branching rules (delegated to [SynthesizeAuthoritiesUseCase]):
+ * - When [RequestedAuthClubContext.source] is [AuthClubContextSource.SLUG] and the slug is registered,
+ *   lookup the member and synthesize
  *   role + host + platform admin authorities.
- * - When [RequestedClubContext.source] is SLUG and the slug is NOT registered (`supplied=true && context=null`),
+ * - When [RequestedAuthClubContext.source] is [AuthClubContextSource.SLUG] and the slug is NOT registered
+ *   (`supplied=true && context=null`),
  *   the member lookup is intentionally skipped (`member=null`). Authorities are then composed entirely from
  *   platform admin + host support grants. Do NOT add a `member==null` short-circuit guard above this branch;
  *   doing so would silently strip support-grant authorities. See ADR-0013 for context.
- * - When [RequestedClubContext.source] is HOST_FALLBACK or NONE, return an unscoped principal.
+ * - When [RequestedAuthClubContext.source] is [AuthClubContextSource.HOST_FALLBACK] or [AuthClubContextSource.NONE],
+ *   return an unscoped principal.
  *
  * This filter is in the infrastructure layer: it is allowed to use Spring Security types and
  * adapter types. It maps result authority strings → [SimpleGrantedAuthority] at this boundary.
  */
 @Component
 class MemberAuthoritiesFilter(
-    private val authoritySynthesisService: AuthoritySynthesisService,
-    private val authenticatedMemberResolver: AuthenticatedMemberResolver,
+    private val synthesizeAuthoritiesUseCase: SynthesizeAuthoritiesUseCase,
+    private val resolveAuthenticatedPrincipalUseCase: ResolveAuthenticatedPrincipalUseCase,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
     private val checkSupportAccessGrantUseCase: CheckSupportAccessGrantUseCase,
 ) : OncePerRequestFilter() {
@@ -50,14 +54,14 @@ class MemberAuthoritiesFilter(
         val email = authentication.emailOrNull()
 
         if (authentication != null && email != null) {
-            val requestedClubContext = request.resolveClubContext(resolveClubContextUseCase)
+            val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
             val resolvedClubContext = requestedClubContext.context
 
             val member =
                 if (requestedClubContext.supplied && resolvedClubContext == null) {
                     null
                 } else {
-                    authenticatedMemberResolver.resolveByEmail(email, resolvedClubContext)
+                    resolveAuthenticatedPrincipalUseCase.resolveByEmail(email, resolvedClubContext)
                 }
 
             val userId =
@@ -103,7 +107,7 @@ class MemberAuthoritiesFilter(
                     supportSynthesis = supportSynthesis,
                 )
 
-            val result = authoritySynthesisService.synthesize(synthesisRequest)
+            val result = synthesizeAuthoritiesUseCase.synthesize(synthesisRequest)
 
             // Attach synthesis to request attribute so CurrentMemberArgumentResolver can reuse it
             result.supportSynthesisToAttach?.let { synthesis ->
@@ -115,7 +119,7 @@ class MemberAuthoritiesFilter(
 
             val mappedAuthentication =
                 UsernamePasswordAuthenticationToken(
-                    authentication.principal ?: authentication.name,
+                    member?.toCurrentMember() ?: authentication.principal ?: authentication.name,
                     authentication.credentials,
                     grantedAuthorities,
                 )
@@ -125,4 +129,19 @@ class MemberAuthoritiesFilter(
 
         filterChain.doFilter(request, response)
     }
+
+    private fun AuthenticatedMemberSnapshot.toCurrentMember(): CurrentMember =
+        CurrentMember(
+            userId = actor.userId,
+            membershipId = actor.membershipId,
+            clubId = actor.clubId,
+            clubSlug = actor.clubSlug,
+            email = email,
+            displayName = displayName,
+            accountName = accountName,
+            role = role,
+            membershipStatus = membershipStatus,
+            clubName = clubName,
+            avatarKey = avatarKey,
+        )
 }

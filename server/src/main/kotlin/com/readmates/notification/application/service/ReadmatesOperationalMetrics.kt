@@ -1,6 +1,10 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.model.NotificationBacklogRefreshResult
 import com.readmates.notification.application.model.NotificationDeliveryBacklog
+import com.readmates.notification.application.model.NotificationEventOutboxBacklog
+import com.readmates.notification.application.port.`in`.ReadNotificationBacklogUseCase
+import com.readmates.notification.application.port.out.NotificationBacklogObservationPort
 import com.readmates.notification.domain.NotificationEventType
 import io.micrometer.core.instrument.Counter
 import io.micrometer.core.instrument.Gauge
@@ -11,13 +15,25 @@ import org.springframework.transaction.support.TransactionSynchronization
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Duration
 
+enum class NotificationEventPublishResult(
+    val tag: String,
+) {
+    SUCCESS("success"),
+    FAILURE("failure"),
+    DEAD("dead"),
+    MISSING_PAYLOAD("missing_payload"),
+    EXPIRED("expired"),
+    STALE_LEASE("stale_lease"),
+}
+
 @Service
 class ReadmatesOperationalMetrics(
     private val meterRegistry: MeterRegistry,
-    private val cachedBacklogProvider: CachedNotificationBacklogProvider? = null,
-) {
+    private val cachedBacklogProvider: ReadNotificationBacklogUseCase? = null,
+) : NotificationBacklogObservationPort {
     init {
         registerOutboxBacklogGauges()
+        registerDeliveryBacklogGauges()
     }
 
     /**
@@ -152,7 +168,15 @@ class ReadmatesOperationalMetrics(
                     Duration.ofMinutes(SLO_BUCKET_5_MINUTES),
                     Duration.ofMinutes(SLO_BUCKET_15_MINUTES),
                 ).register(meterRegistry)
-        timer.record(latency)
+        timer.record(if (latency.isNegative) Duration.ZERO else latency)
+    }
+
+    fun recordOutboxPublish(result: NotificationEventPublishResult) {
+        meterRegistry.counter("readmates.outbox.publish", "result", result.tag).increment()
+    }
+
+    override fun recordBacklogRefresh(result: NotificationBacklogRefreshResult) {
+        meterRegistry.counter("readmates.notifications.backlog.refresh", "result", result.tag).increment()
     }
 
     private companion object {
@@ -165,10 +189,22 @@ class ReadmatesOperationalMetrics(
 
     private fun registerOutboxBacklogGauges() {
         val provider = cachedBacklogProvider ?: return
-        OutboxBacklogStatus.entries.forEach { status ->
+        EventOutboxBacklogStatus.entries.forEach { status ->
             Gauge
                 .builder("readmates.notifications.outbox.backlog") {
-                    provider.snapshot().count(status).toDouble()
+                    provider.eventOutboxSnapshot()?.count(status)?.toDouble() ?: Double.NaN
+                }.description("Current notification event outbox rows by status")
+                .tag("status", status.tag)
+                .register(meterRegistry)
+        }
+    }
+
+    private fun registerDeliveryBacklogGauges() {
+        val provider = cachedBacklogProvider ?: return
+        DeliveryBacklogStatus.entries.forEach { status ->
+            Gauge
+                .builder("readmates.notifications.delivery.backlog") {
+                    provider.deliverySnapshot()?.count(status)?.toDouble() ?: Double.NaN
                 }.description("Current email notification delivery rows by status")
                 .tag("status", status.tag)
                 .register(meterRegistry)
@@ -176,7 +212,16 @@ class ReadmatesOperationalMetrics(
     }
 }
 
-private enum class OutboxBacklogStatus(
+private enum class EventOutboxBacklogStatus(
+    val tag: String,
+) {
+    PENDING("pending"),
+    FAILED("failed"),
+    DEAD("dead"),
+    PUBLISHING("publishing"),
+}
+
+private enum class DeliveryBacklogStatus(
     val tag: String,
 ) {
     PENDING("pending"),
@@ -185,10 +230,18 @@ private enum class OutboxBacklogStatus(
     SENDING("sending"),
 }
 
-private fun NotificationDeliveryBacklog.count(status: OutboxBacklogStatus): Int =
+private fun NotificationEventOutboxBacklog.count(status: EventOutboxBacklogStatus): Int =
     when (status) {
-        OutboxBacklogStatus.PENDING -> pending
-        OutboxBacklogStatus.FAILED -> failed
-        OutboxBacklogStatus.DEAD -> dead
-        OutboxBacklogStatus.SENDING -> sending
+        EventOutboxBacklogStatus.PENDING -> pending
+        EventOutboxBacklogStatus.FAILED -> failed
+        EventOutboxBacklogStatus.DEAD -> dead
+        EventOutboxBacklogStatus.PUBLISHING -> publishing
+    }
+
+private fun NotificationDeliveryBacklog.count(status: DeliveryBacklogStatus): Int =
+    when (status) {
+        DeliveryBacklogStatus.PENDING -> pending
+        DeliveryBacklogStatus.FAILED -> failed
+        DeliveryBacklogStatus.DEAD -> dead
+        DeliveryBacklogStatus.SENDING -> sending
     }

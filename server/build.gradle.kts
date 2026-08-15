@@ -28,6 +28,12 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach 
     }
 }
 
+tasks.named<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>("compileKotlin") {
+    compilerOptions {
+        allWarningsAsErrors.set(true)
+    }
+}
+
 repositories {
     mavenCentral()
 }
@@ -100,9 +106,11 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter-oauth2-client")
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.springframework.boot:spring-boot-starter-mail")
+    compileOnly("org.eclipse.angus:angus-mail")
     implementation("org.springframework.boot:spring-boot-starter-security")
     implementation("org.springframework.boot:spring-boot-starter-validation")
     implementation("org.springframework.boot:spring-boot-starter-web")
+    implementation("org.apache.httpcomponents.client5:httpclient5")
     implementation("org.springframework.kafka:spring-kafka")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     // SLO catalog yaml parsing (com.fasterxml.jackson.dataformat.yaml.YAMLFactory).
@@ -346,8 +354,8 @@ tasks.named<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
             limit {
                 counter = "LINE"
                 value = "COVEREDRATIO"
-                // baseline 0.2504 (measured 2026-05-14) -2pp; raised in Task 4 if needed.
-                minimum = "0.23".toBigDecimal()
+                // Phase 0 baseline 0.4577 (measured 2026-08-09) -2pp safety margin.
+                minimum = "0.43".toBigDecimal()
             }
         }
     }

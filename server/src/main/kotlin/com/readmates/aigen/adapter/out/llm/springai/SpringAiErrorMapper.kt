@@ -9,7 +9,7 @@ import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GenerationError
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.ProviderCallException
-import com.readmates.aigen.application.service.ProviderFailureClass
+import com.readmates.aigen.application.model.ProviderFailureClass
 import org.springframework.ai.retry.NonTransientAiException
 import org.springframework.ai.retry.TransientAiException
 import org.springframework.http.HttpHeaders

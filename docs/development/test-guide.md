@@ -261,7 +261,7 @@ Backend fast lanes:
 ./server/gradlew -p server architectureTest
 ```
 
-이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary만 실행합니다. Backend 변경을 ship하기 전에는 PR-level wrapper를 실행하고, Testcontainers evidence가 필요한 변경에서는 integration lane도 별도로 실행합니다.
+이 fast lane은 개발 중 빠른 피드백용이며 release baseline을 대체하지 않습니다. `unitTest`는 `integration`, `container`, `architecture` tag를 제외하고, `integrationTest`는 Spring/Testcontainers 성격 tag를 포함하며, `architectureTest`는 ArchUnit boundary와 품질 baseline·architecture inventory contract를 실행합니다. Backend 변경을 ship하기 전에는 PR-level wrapper를 실행하고, Testcontainers evidence가 필요한 변경에서는 integration lane도 별도로 실행합니다.
 
 For release-risk review that touches SQL plans, API contracts, or query budgets, run the targeted integration lane explicitly:
 
@@ -282,15 +282,66 @@ PR-level quality gate는 단일 `check` task로 통합되어 있습니다.
 
 `check`는 다음 게이트를 한 번에 검증합니다.
 
-- **ktlint baseline gate**: `org.jlleitschuh.gradle.ktlint` 12.1.1 + ktlint tool 1.7.1. 기존 위반은 `server/config/ktlint/baseline.xml`로 grandfather, 신규 위반만 차단합니다. Auto-format은 `./server/gradlew -p server ktlintFormat`로 적용합니다.
-- **detekt baseline gate**: detekt 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. 기존 위반은 `server/config/detekt/baseline.xml`로 grandfather. detekt 1.23.x는 Java 25 daemon에서 동작하지 않아 Java 25/Kotlin 2.4/Gradle 9.x 검증 범위에 있는 detekt 2.x line으로 올렸고, baseline은 detekt 2 rule id 기준으로 재생성했습니다.
-- **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.23(측정치 -2pp)을 강제합니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때는 측정치 -2pp baseline rule을 유지합니다.
+- **production compiler warning gate**: production `compileKotlin`은 `allWarningsAsErrors`를 사용해 신규 Kotlin warning을 build error로 처리합니다. Test source warning은 별도 inventory이며 Phase 0 hard gate는 아닙니다.
+- **ktlint baseline gate**: `org.jlleitschuh.gradle.ktlint` 12.1.1 + ktlint tool 1.7.1. `server/config/ktlint/baseline.xml`은 최대 171건이며 현재 identity와 retired identity가 승인된 Phase 0 seed를 겹침 없이 정확히 분할해야 합니다. Auto-format은 `./server/gradlew -p server ktlintFormat`로 적용합니다.
+- **detekt baseline gate**: detekt 2.0.0-alpha.5 + `server/config/detekt/detekt.yml`. `server/config/detekt/baseline.xml`은 최대 461건이며 현재 identity와 retired identity가 승인된 Phase 0 seed를 겹침 없이 정확히 분할해야 합니다. detekt 1.23.x는 Java 25 daemon에서 동작하지 않아 Java 25/Kotlin 2.4/Gradle 9.x 검증 범위에 있는 detekt 2.x line으로 올렸고, baseline은 detekt 2 rule id 기준으로 재생성했습니다.
+- **JaCoCo line coverage gate**: `unitTest`의 `JacocoTaskExtension`이 `build/jacoco/unitTest.exec`를 생성하고, `jacocoTestCoverageVerification`이 LINE `COVEREDRATIO` 최소 0.43을 강제합니다. 현재 rule은 안정 측정치에서 약 2 percentage points를 뺀 floor입니다. `Application`/`dto`/`config`는 report에서 제외합니다. Threshold를 올릴 때도 이 baseline rule을 유지합니다.
+- **architecture no-growth gate**: `server/config/architecture/boundary-import-baseline.txt`는 최대 39개 import, `server/config/architecture/feature-dependency-baseline.txt`는 최대 41개 application feature edge를 허용하며 두 파일 모두 현재 source inventory와 정확히 일치해야 합니다. 각 current baseline과 retired ledger는 승인된 Phase 0 seed를 겹침 없이 정확히 분할합니다. 네 seed 파일은 늘리거나 줄이지 않는 control data이며 목표 아키텍처가 아닙니다.
+
+품질 또는 아키텍처 debt 제거는 (1) source debt를 제거하고, (2) 같은 변경에서 current baseline의 정확히 일치하는 identity를 삭제하고, (3) 그 identity를 matching retired ledger에 그대로 추가합니다. Retired identity는 삭제하지 않고 approved seed는 늘리지 않습니다.
 
 CI backend job은 `./scripts/server-ci-check.sh` 단일 호출로 구성되어 있습니다 — wrapper가 실행하는 `check`는 `:unitTest + :architectureTest + :detekt + :jacoco*`를 모두 의존하므로 별도 architectureTest step은 불필요합니다. ktlint/detekt/JaCoCo report 아티팩트는 `if: always()`로 항상 업로드합니다(실패시 `backend-reports` 별도 업로드 유지).
 
 Backend test suite에는 MySQL 기반 persistence adapter/controller 검증이 포함되어 있습니다. `server/build.gradle.kts`는 `org.testcontainers:testcontainers-mysql`을 사용하고, Docker가 필요합니다. Colima를 쓰는 로컬 환경에서는 기본 Docker socket env가 비어 있고 Colima socket이 있으면 Gradle test task가 `DOCKER_HOST`와 `TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE`를 설정합니다.
 
 Backend `integrationTest`는 Testcontainers가 필요한 MySQL lifecycle을 직접 관리합니다. 로컬 `compose.yml`의 MySQL은 서버를 수동으로 띄우거나 Playwright E2E database를 준비할 때 쓰며, integration lane을 실행하기 전에 `docker compose up`을 먼저 실행할 필요는 없습니다.
+
+### Flyway migration 불변성
+
+Production migration은 repository history gate와 Flyway runtime checksum을 함께 검증합니다. 전자는 명시한 base의 merge base에 있던 SQL과 현재 index/worktree를 비교해 수정·삭제·rename·이동, 잘못된 catalog와 불완전한 history를 merge 전에 fail closed로 차단합니다. 후자는 이미 적용된 database의 `flyway_schema_history` checksum mismatch를 startup에 거부합니다.
+
+로컬에서는 complete Git history와 trusted base ref를 사용합니다. `--self-test`는 Git repository나 network 없이 실행할 수 있고 clean public release candidate에서도 같은 entry point를 검증합니다.
+
+```bash
+python3 -B scripts/check-flyway-migration-immutability.py --self-test
+python3 -B scripts/check-flyway-migration-immutability.py \
+  --check-workflow .github/workflows/ci.yml
+python3 -B scripts/check-flyway-migration-immutability.py \
+  --base-ref <trusted-base-ref>
+```
+
+CI의 scripts job만 `fetch-depth: 0`을 사용합니다. Pull request는 `github.event.pull_request.base.sha`, `main` push는 `github.event.before`를 immutable base로 선택합니다. Push before가 all-zero이면 local `HEAD^`가 실제로 resolve될 때만 fallback하고, 빈 값·unresolved base·missing merge base·shallow history는 검사 생략이 아니라 실패입니다. 실패 증거는 violation category, repository-relative path, exact merge-base와 다음 허용 version으로 제한하며 SQL 본문과 로컬 절대 경로는 출력하지 않습니다.
+
+Runtime evidence는 synthetic checksum fixture와 production migration suite를 같은 active `integrationTest` lane에서 실행합니다. `MySqlFlywayMigrationTest`는 41개 production migration의 clean install과 populated V42/V44 schema에서 현재 V48까지의 지원 upgrade를 보존합니다.
+
+```bash
+./server/gradlew -p server integrationTest \
+  --tests com.readmates.support.FlywayChecksumImmutabilityTest \
+  --tests com.readmates.support.MySqlFlywayMigrationTest \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+```
+
+Historical migration의 edit/delete/rename, `flyway repair`, baseline 증가, 낮거나 재사용한 version은 remediation이 아닙니다. Checker가 보고한 base 최고 version보다 큰 새 `V{N}__{lower_snake_case_description}.sql` forward-only migration으로 보정합니다. 이 불변성 gate 자체는 production schema를 변경하지 않습니다.
+
+### Admin health 장애 격리
+
+`admin.health`의 transport, executor, single-flight, stale snapshot, scheduler, metric, additive response contract를 변경하면 아래 focused lane을 먼저 실행합니다. transport test는 응답 body를 보류하는 local HTTP server를 사용하며 live Prometheus/provider를 호출하지 않습니다. scheduler, executor, frontend browser fixture도 local 또는 fake infrastructure만 사용합니다.
+
+```bash
+./server/gradlew -p server unitTest \
+  --tests 'com.readmates.admin.health.*' \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+./server/gradlew -p server architectureTest \
+  --tests com.readmates.architecture.ServerArchitectureInventoryTest \
+  --tests com.readmates.architecture.ServerArchitectureBoundaryTest \
+  --rerun-tasks --no-build-cache --no-configuration-cache
+corepack pnpm --dir front exec vitest run \
+  features/platform-admin/ui/admin-health-grid.test.tsx \
+  features/platform-admin/route/admin-health-route.test.tsx
+corepack pnpm --dir front exec playwright test tests/e2e/admin-health.spec.ts
+```
+
+회귀 matrix는 executor 생성 전 invalid typed property의 startup failure, 실제 read timeout, caller-runs 없는 bounded-queue rejection, lazy/scheduled single-flight, timeout/error/rejection, stale last-known-good, initial unavailable와 recovery, bounded metric label, scheduler-to-input-port 방향, additive metadata/UI state를 포함해야 합니다. ship 전에는 `./scripts/server-ci-check.sh`, `./server/gradlew -p server integrationTest`, full frontend lint/test/build/E2E lane, 변경 scope에 맞는 public-release candidate check를 실행합니다.
 
 로컬 image 재현성 검증은 `./server/gradlew -p server bootJar` 후 `docker build -t readmates-server:local server`를 사용하며, 이 명령은 `server/Dockerfile`을 사용합니다. Release workflow는 CI가 jar를 빌드한 뒤 `server/Dockerfile.release`로 이미지를 만들고, 같은 digest를 scan한 다음 promote합니다. Java 25 test JVM은 Netty가 포함된 classpath(`ALL-UNNAMED`)의 native access를 명시적으로 허용하고 그 밖의 module에서 발생하는 illegal native access를 거절하며, `ProtobufJava25CompatibilityTest`가 제거 예정인 `sun.misc.Unsafe` 메모리 접근 없이 OTLP payload를 직렬화하는 fallback을 고정합니다.
 
@@ -346,13 +397,15 @@ pnpm --dir front test:e2e
 
 Targeted Redis adapter test는 Testcontainers Redis를 직접 띄우므로 수동 Redis server가 필요하지 않습니다. Testcontainers가 로컬 `localhost`를 반환하면 test helper는 Redis URL host를 `127.0.0.1`로 정규화해 IPv6 localhost에서 다른 로컬 서비스와 port가 겹치는 flake를 피합니다. Rate limit, auth session cache, public cache, notes cache, read-cache invalidation을 바꾸면 관련 `Redis*AdapterTest`, application cache test, `ServerArchitectureBoundaryTest`를 함께 확인합니다.
 
-Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`는 전환된 web adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인하고, 전환된 application package가 adapter, Spring JDBC, Spring DAO, Spring Web/HTTP 세부사항에 의존하지 않는지 확인합니다. Application service에서 `ResponseStatusException`, `HttpStatus`, Spring Web type을 쓰지 말고 feature application error를 `adapter.in.web`에서 HTTP response로 매핑합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
+Backend test suite에는 ArchUnit 기반 아키텍처 경계 테스트도 포함됩니다. `ServerArchitectureBoundaryTest`의 slice registry는 web, messaging/Kafka, scheduler, adapter security, auth servlet-security inbound package를 등록하고, 등록된 inbound adapter가 legacy repository, `JdbcTemplate`, outbound persistence adapter에 직접 의존하지 않는지 확인합니다. `ServerArchitectureInventoryTest`는 39개 boundary import와 41개 application feature edge의 no-growth baseline을 현재 source와 대조합니다. 전환된 application package가 adapter, Spring JDBC, Spring DAO, Spring Web/HTTP 세부사항에 의존하지 않는지도 확인합니다. Application service에서 `ResponseStatusException`, `HttpStatus`, Spring Web type을 쓰지 말고 feature application error를 `adapter.in.web`에서 HTTP response로 매핑합니다. 세션/노트 쓰기 흐름을 수정했다면 아래 focused command로 경계 테스트와 관련 controller/service test를 먼저 확인할 수 있습니다.
 
 ```bash
-./server/gradlew -p server test \
+./server/gradlew -p server architectureTest \
+  --tests com.readmates.architecture.ServerArchitectureBoundaryTest
+./server/gradlew -p server unitTest \
   --tests com.readmates.auth.adapter.in.security.CurrentMemberArgumentResolverTest \
-  --tests com.readmates.architecture.ServerArchitectureBoundaryTest \
-  --tests com.readmates.session.application.service.SessionMemberWriteServiceTest \
+  --tests com.readmates.session.application.service.SessionMemberWriteServiceTest
+./server/gradlew -p server integrationTest \
   --tests com.readmates.session.api.CurrentSessionControllerDbTest \
   --tests com.readmates.session.api.HostSessionControllerDbTest \
   --tests com.readmates.session.api.HostDashboardControllerTest \

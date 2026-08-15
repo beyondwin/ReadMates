@@ -1,6 +1,7 @@
 package com.readmates.notification
 
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapter
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventPayload
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
@@ -17,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
+import java.time.Clock
 import java.util.Collections
 import java.util.UUID
 
@@ -47,6 +49,7 @@ private const val CORRELATION_NOTIFICATION_EVENTS_TOPIC = "readmates.notificatio
 class CorrelationIdEndToEndTest(
     @param:Autowired private val outboxAdapter: JdbcNotificationEventOutboxAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val notificationRuntimeProperties: NotificationRuntimeProperties,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-0000000000c1")
     private val sessionId = UUID.fromString("00000000-0000-0000-0000-0000000000c2")
@@ -62,7 +65,8 @@ class CorrelationIdEndToEndTest(
                 notificationEventOutboxPort = outboxAdapter,
                 notificationEventPublisherPort = capturingPublisher,
                 operationalMetrics = ReadmatesOperationalMetrics(SimpleMeterRegistry()),
-                maxAttempts = 5,
+                runtimeProperties = notificationRuntimeProperties,
+                clock = Clock.systemUTC(),
             )
 
         // Step 1: enqueue under an MDC scope simulating an inbound HTTP request that

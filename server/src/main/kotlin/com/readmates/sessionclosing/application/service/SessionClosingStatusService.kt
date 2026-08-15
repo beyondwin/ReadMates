@@ -1,7 +1,6 @@
 package com.readmates.sessionclosing.application.service
 
 import com.readmates.session.application.HostSessionNotFoundException
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionclosing.application.model.ClosingChecklistId
 import com.readmates.sessionclosing.application.model.ClosingChecklistItem
 import com.readmates.sessionclosing.application.model.ClosingChecklistState
@@ -17,6 +16,7 @@ import com.readmates.sessionclosing.application.model.SessionClosingSnapshot
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionclosing.application.port.`in`.GetHostSessionClosingStatusUseCase
 import com.readmates.sessionclosing.application.port.out.LoadSessionClosingStatusPort
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service

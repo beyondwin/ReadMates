@@ -1,15 +1,19 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.model.AuthoritySynthesisRequest
+import com.readmates.auth.application.model.AuthoritySynthesisResult
+import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
+import com.readmates.auth.domain.MembershipStatus
 import org.springframework.stereotype.Service
 
 /**
- * Default implementation of [AuthoritySynthesisService].
+ * Default implementation of [SynthesizeAuthoritiesUseCase].
  *
  * Branching rules:
- * - When [member] is non-null, synthesise role from membership.
+ * - When [AuthoritySynthesisRequest.member] is non-null, synthesise role from membership.
  *   VIEWER membership status always → ROLE_VIEWER regardless of role.
- * - When [member] is null and the principal holds ROLE_PLATFORM_ADMIN and
- *   a known club context (clubId != null) is supplied and a [supportSynthesis] grant
+ * - When [AuthoritySynthesisRequest.member] is null and the principal holds ROLE_PLATFORM_ADMIN and
+ *   a known club context (clubId != null) is supplied and an [AuthoritySynthesisRequest.supportSynthesis] grant
  *   was pre-fetched by the filter → add ROLE_HOST and attach the synthesis.
  * - Otherwise → return the incoming authorities with MEMBER_ROLE_AUTHORITIES stripped.
  *
@@ -17,7 +21,7 @@ import org.springframework.stereotype.Service
  * The infrastructure layer (MemberAuthoritiesFilter) maps strings → SimpleGrantedAuthority.
  */
 @Service
-class DefaultAuthoritySynthesisService : AuthoritySynthesisService {
+class DefaultAuthoritySynthesisService : SynthesizeAuthoritiesUseCase {
     override fun synthesize(request: AuthoritySynthesisRequest): AuthoritySynthesisResult {
         val baseAuthorities =
             request.incomingAuthorities
@@ -25,7 +29,12 @@ class DefaultAuthoritySynthesisService : AuthoritySynthesisService {
                 .toMutableSet()
 
         if (request.member != null) {
-            val roleAuthority = if (request.member.isViewer) ROLE_VIEWER else "$ROLE_PREFIX${request.member.role}"
+            val roleAuthority =
+                if (request.member.membershipStatus == MembershipStatus.VIEWER) {
+                    ROLE_VIEWER
+                } else {
+                    "$ROLE_PREFIX${request.member.role}"
+                }
             baseAuthorities += roleAuthority
             return AuthoritySynthesisResult(baseAuthorities, null)
         }

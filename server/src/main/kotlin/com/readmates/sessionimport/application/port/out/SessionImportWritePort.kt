@@ -1,9 +1,9 @@
 package com.readmates.sessionimport.application.port.out
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.AuthenticatedClubActor
 import java.util.UUID
 

@@ -4,6 +4,7 @@
 .gitleaks.toml
 .node-version
 compose.yml
+CHANGELOG.md
 deploy
 design
 docs

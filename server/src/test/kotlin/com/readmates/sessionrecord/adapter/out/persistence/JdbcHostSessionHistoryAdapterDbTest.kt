@@ -36,14 +36,15 @@ class JdbcHostSessionHistoryAdapterDbTest(
     @param:Autowired private val historyService: HostSessionHistoryQueryService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
-    fun `paginates equal timestamps deterministically and excludes baseline revisions`() {
+    fun `paginates equal timestamps across every history source without duplicates or gaps`() {
         insertFirstClubHistory()
+        insertNotificationHistory()
 
         val firstPage = historyService.history(host(), SESSION_ID, PageRequest(limit = 2, cursor = emptyMap()))
 
         assertThat(firstPage.items.map { it.type }).containsExactly(
-            HostSessionHistoryType.RECORD_REVISION_APPLIED,
-            HostSessionHistoryType.BASIC_INFO_UPDATED,
+            HostSessionHistoryType.NOTIFICATION_SKIPPED,
+            HostSessionHistoryType.NOTIFICATION_SENT,
         )
         assertThat(firstPage.items.map { it.id }).doesNotContain(BASELINE_REVISION_ID)
         assertThat(firstPage.nextCursor).isNotNull()
@@ -55,9 +56,33 @@ class JdbcHostSessionHistoryAdapterDbTest(
                 PageRequest(limit = 2, cursor = CursorCodec.decode(firstPage.nextCursor).orEmpty()),
             )
 
-        assertThat(secondPage.items.map { it.id }).containsExactly(OLDER_AUDIT_ID)
+        assertThat(secondPage.items.map { it.type }).containsExactly(
+            HostSessionHistoryType.RECORD_REVISION_APPLIED,
+            HostSessionHistoryType.BASIC_INFO_UPDATED,
+        )
         assertThat(secondPage.items.map { it.id }).doesNotContainAnyElementsOf(firstPage.items.map { it.id })
-        assertThat(secondPage.nextCursor).isNull()
+        assertThat(secondPage.nextCursor).isNotNull()
+
+        val thirdPage =
+            historyService.history(
+                host(),
+                SESSION_ID,
+                PageRequest(limit = 2, cursor = CursorCodec.decode(secondPage.nextCursor).orEmpty()),
+            )
+
+        assertThat(thirdPage.items.map { it.id }).containsExactly(OLDER_AUDIT_ID)
+        assertThat(thirdPage.items.map { it.id })
+            .doesNotContainAnyElementsOf(firstPage.items.map { it.id } + secondPage.items.map { it.id })
+        assertThat(thirdPage.nextCursor).isNull()
+        assertThat(firstPage.items + secondPage.items + thirdPage.items)
+            .extracting<UUID> { it.id }
+            .containsExactly(
+                SKIP_DECISION_ID,
+                SEND_DECISION_ID,
+                APPLIED_REVISION_ID,
+                SAME_TIME_AUDIT_ID,
+                OLDER_AUDIT_ID,
+            )
     }
 
     @Test

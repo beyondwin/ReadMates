@@ -85,8 +85,17 @@ READMATES_KAFKA_NOTIFICATION_DLQ_TOPIC=readmates.notification.events.dlq.v1
 READMATES_KAFKA_NOTIFICATION_CONSUMER_GROUP=readmates-notification-dispatcher
 READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50
 READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5
+READMATES_KAFKA_NOTIFICATION_SEND_TIMEOUT=10s
 READMATES_NOTIFICATION_RETRY_DELAY_MINUTES=5,15,60,240
 READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5
+READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS=30s
+READMATES_NOTIFICATION_CLAIM_LEASE=15m
+READMATES_NOTIFICATION_EVENT_MAX_AGE=24h
+READMATES_NOTIFICATION_DELIVERY_MAX_AGE=24h
+READMATES_NOTIFICATION_BACKLOG_REFRESH_INTERVAL=60s
+READMATES_NOTIFICATION_BACKLOG_INITIAL_DELAY=5s
+READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL=10m
+READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS=1000
 SPRING_MAIL_HOST=smtp.email.<oci-region>.oci.oraclecloud.com
 SPRING_MAIL_PORT=587
 SPRING_MAIL_USERNAME=<oci-smtp-username>
@@ -94,7 +103,7 @@ SPRING_MAIL_PASSWORD=<oci-smtp-password>
 SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH=true
 SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE=true
 SPRING_MAIL_PROPERTIES_MAIL_SMTP_CONNECTIONTIMEOUT=5000
-SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=3000
+SPRING_MAIL_PROPERTIES_MAIL_SMTP_TIMEOUT=5000
 SPRING_MAIL_PROPERTIES_MAIL_SMTP_WRITETIMEOUT=5000
 # Legacy host JAR rollback only. Compose stack overrides this to container-internal 0.0.0.0 and does not publish 8081.
 READMATES_MANAGEMENT_ADDRESS=127.0.0.1
@@ -320,7 +329,7 @@ Kafka relay/consumer와 실제 SMTP 발송은 아래 조건이 모두 맞을 때
 
 Relay/consumer 처리 기준:
 
-- relay scheduler는 기본 `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS=30000`으로 30초마다 `notification_event_outbox`의 `PENDING`/`FAILED` row를 처리합니다.
+- relay scheduler는 기본 `READMATES_NOTIFICATION_WORKER_FIXED_DELAY_MS=30s`로 30초마다 `notification_event_outbox`의 `PENDING`/`FAILED` row를 처리합니다.
 - 한 번에 기본 `READMATES_KAFKA_NOTIFICATION_RELAY_BATCH_SIZE=50`건을 claim합니다.
 - Kafka publish 성공 시 event row는 `PUBLISHED`가 됩니다.
 - Kafka publish 실패 시 event row는 `FAILED`가 되고, 기본 최대 `READMATES_KAFKA_NOTIFICATION_MAX_PUBLISH_ATTEMPTS=5`회까지 재시도합니다.
@@ -328,18 +337,21 @@ Relay/consumer 처리 기준:
 - consumer가 만드는 email delivery는 `PENDING`, `SENDING`, `SENT`, `FAILED`, `DEAD`, `SKIPPED` 상태를 사용하고, 기본 최대 `READMATES_NOTIFICATION_MAX_DELIVERY_ATTEMPTS=5`회까지 재시도합니다.
 - in-app delivery는 `member_notifications` row 생성 뒤 `SENT`로 기록됩니다.
 
-Email delivery dispatch/worker retry 간격은 `READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`로 조정하며 기본값은 순서대로 5분, 15분, 60분, 240분입니다. Kafka event publish retry도 같은 기본 간격을 사용하지만 현재 runtime env override 대상은 email delivery retry입니다. Kafka publish 오류, SMTP credential 오류, provider reject가 지속되면 host dashboard의 pending/failed/dead count와 `readmates_notifications_*` metrics를 함께 확인합니다.
+`READMATES_NOTIFICATION_RETRY_DELAY_MINUTES`는 relay와 email delivery가 공유하는 runtime schedule이며 기본값은 5분, 15분, 60분, 240분입니다. Relay는 최대 publish 5회와 event max age 24시간, delivery는 최대 5회와 delivery max age 24시간 중 먼저 닿는 경계에서 종료됩니다. 두 단계의 상태와 metric은 아래 evidence-gated 절차로 분리해 확인합니다.
 
 수동 처리:
 
-- Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인합니다.
+- Relay 장애는 `readmates_outbox_publish_total` result와 event-outbox `pending|failed|dead|publishing`, backlog refresh result, `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`을 먼저 확인합니다. Event deadline은 `created_at + READMATES_NOTIFICATION_EVENT_MAX_AGE`의 현재 배포값으로 계산하며 equality부터 만료입니다. Relay 원인이 제거되기 전에는 delivery replay나 새 event 생성을 복구로 사용하지 않으며 DB row를 직접 수정하지 않습니다.
+- SMTP 장애는 delivery `pending|failed|dead|sending`, `attempt_count`, `next_attempt_at`, `locked_at`, bounded `last_error`, `created_at`과 provider/recipient acceptance evidence를 확인합니다. Delivery deadline은 `created_at + READMATES_NOTIFICATION_DELIVERY_MAX_AGE`, stale lease는 `locked_at + READMATES_NOTIFICATION_CLAIM_LEASE`의 현재 배포값으로 평가합니다. `next_attempt_at`은 deadline이 아닙니다.
+- Host dashboard의 알림 섹션에서 pending/failed/dead/sentLast24h를 확인하되, 이 host count가 relay와 delivery 어느 단계를 나타내는지 event/delivery ledger로 확정합니다.
 - 호스트 알림 운영 페이지는 `/app/host/notifications`입니다.
-- 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인하고, pending/failed email delivery를 처리하며, `DEAD` email delivery를 retry 가능한 상태로 복구할 수 있습니다.
+- 호스트 알림 운영 페이지에서 현재 host club의 event outbox와 channel delivery ledger를 확인합니다. 원인이 교정되고 exact 대상·failure kind·deadline·lease가 확인된 한 건의 `DEAD` EMAIL delivery만 host가 `POST /api/host/notifications/items/{id}/restore`로 명시적으로 복구합니다. 이 endpoint는 해당 delivery를 `PENDING`으로 되돌리고 `next_attempt_at`을 현재 시각으로 설정하며 새 event를 만들지 않습니다. `AMBIGUOUS`는 provider/recipient evidence로 미수락이 확인되지 않으면 restore하지 않습니다.
 - 같은 페이지와 콘텐츠 변경 직후 열린 composer에서 세션, 템플릿, 대상 그룹, 채널을 선택한 뒤 preview와 confirm을 거쳐 알림 이벤트를 만들 수 있습니다. 이벤트별 기본 대상은 `NEXT_BOOK_PUBLISHED`·`SESSION_REMINDER_DUE`의 `ALL_ACTIVE_MEMBERS`, `FEEDBACK_DOCUMENT_PUBLISHED`·`SESSION_RECORD_UPDATED`의 `CONFIRMED_ATTENDEES`이고 기본 채널은 모두 `BOTH`입니다. 피드백 문서와 세션 기록은 전달 계획에서도 같은 `feedback_document_published_enabled` 멤버 선호도를 사용합니다. `SELECTED_MEMBERS`는 호스트가 명시적으로 선택해야 하며 현재 클럽의 중복 없는 활성 membership을 한 명 이상 요구합니다. Preview는 현재 `contentRevision`과 함께 10분 TTL로 저장되며, stale revision이나 같은 세션/템플릿/revision의 최근 수동 발송은 재-preview 또는 명시적 재발송 확인을 요구합니다.
+- Composer의 manual preview/confirm은 새 notification event를 만드는 발송 절차이며 기존 delivery restore나 event relay replay가 아닙니다. Platform admin replay는 OWNER/OPERATOR가 기본 최대 1,000개(설정 범위 `1..5000`)의 byte-exact `EMAIL` + `FAILED|DEAD` + `MAIL_RETRYABLE|MAIL_PERMANENT` delivery만 preview의 exact snapshot과 selection hash로 고정하는 별도 복구 경로입니다. Confirm은 snapshot 이후 status·attempt·failure code·`updated_at`이 달라지지 않고 active lease가 없는 exact delivery만 직접 `PENDING`으로 되돌리며, 달라진 대상은 skip하고 새 event/outbox row를 만들지 않습니다. Reset·audit·receipt·preview consume은 한 DB transaction이고 같은 actor/hash 명령 재시도는 저장된 receipt를 반환하며, legacy v1 preview는 새 preview가 필요합니다. `MAIL_AMBIGUOUS`는 provider/recipient evidence로 미수락이 확인되지 않으면 대상에 포함하지 않으며, SMTP 수락 후 `SENT` CAS/commit 전 중단은 lease reclaim 뒤 중복 발송될 수 있는 at-least-once 경계로 남습니다.
 - 같은 페이지의 리마인더 정책은 기본 꺼짐입니다. Host `GET/PUT /api/host/notifications/policy`가 `sessionReminderEnabled=true`를 저장한 클럽만 scheduler 자동 outbox 생성 대상입니다.
 - 호스트 알림 운영 페이지에서 redesigned template helper를 쓰는 테스트 메일을 보낼 수 있습니다. 테스트 메일 copy는 별도 문구를 사용하고 CTA/deep link는 포함하지 않습니다. 테스트 메일 audit은 masked recipient email과 hash만 저장하고 raw recipient email은 저장하지 않습니다.
-- Host dashboard의 수동 처리 action은 현재 host club의 pending/failed 알림만 처리합니다.
-- Kafka consumer retry를 기다리지 않고 즉시 확인이 필요할 때만 수동 처리를 사용합니다.
+- Host dashboard의 수동 처리 action은 현재 host club의 pending/failed delivery만 처리합니다. Event relay DEAD 복구와 혼동하지 않습니다.
+- Kafka consumer retry를 기다리지 않는다는 이유만으로 수동 처리를 사용하지 않습니다. Root cause 제거와 exact 대상 evidence가 모두 있을 때만 실행합니다.
 
 Host 알림 detail API는 subject, masked recipient, deep link, allowlist metadata와 delivery 상태를 노출합니다. Plain/HTML 이메일 본문은 API 응답에 포함하지 않습니다. 수동 발송 감사 원장은 `notification_manual_dispatch_previews`와 `notification_manual_dispatches`를 사용하며, host-facing 응답에는 요청자 표시명, 대상 수, 예상 채널별 건수, 재발송 여부 같은 운영 metadata만 노출합니다.
 
@@ -443,3 +455,9 @@ where used_at < utc_timestamp() - interval 30 day;
 `READMATES_IP_HASH_BASE_SECRET` 환경변수는 client IP hash의 주간 salt rotation에서 base secret 역할을 한다. 한 번 생성한 후 manual rotation 대상이 아니다.
 생성: `openssl rand -base64 32`. 값은 1Password에 저장하고, GitHub Secrets `READMATES_IP_HASH_BASE_SECRET`에 등록한 뒤 `sync-config` 워크플로로 `/etc/readmates/readmates.env`에 반영한다.
 운영 프로파일(`spring.profiles.active`가 비어 있거나 `production` 포함)에서 비어 있으면 startup이 명시적 메시지와 함께 실패한다(DEF-002). local/test 등 비운영 프로파일도 기본값은 실패이며, 빈 값을 허용하려면 `readmates.security.ip-hash.allow-empty-secret=true`를 명시해야 한다. 이 opt-in 설정일 때만 startup이 계속되고 WARN이 출력되며, 운영에서는 이 설정으로도 빈 값을 허용하지 않는다.
+
+## Notification runtime contract
+
+알림 환경은 Kafka send timeout `10s`, claim lease `15m`, event/delivery max age `24h`, SMTP connection/read/write timeout 각 `5s`를 함께 렌더링한다. 시작 시 모든 값·retry schedule을 검증하고, claim lease가 `24h`를 초과하거나 event/delivery max age보다 짧지 않거나 Kafka timeout 및 SMTP timeout 합계보다 길지 않으면 fail-fast한다.
+
+관리자 delivery replay preview는 `READMATES_NOTIFICATION_ADMIN_REPLAY_PREVIEW_TTL=10m`, `READMATES_NOTIFICATION_ADMIN_REPLAY_MAX_TARGETS=1000`을 기본으로 사용한다. TTL은 `1m..1h`의 whole-millisecond duration, 대상 상한은 `1..5000`만 허용하며 잘못된 값은 첫 요청이 아니라 서버 시작을 실패시킨다. 한도를 넘는 preview는 저장하지 않고 클럽 또는 delivery 상태로 범위를 좁혀 다시 요청해야 한다.

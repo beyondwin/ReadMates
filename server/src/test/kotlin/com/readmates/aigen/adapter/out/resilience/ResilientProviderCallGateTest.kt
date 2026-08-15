@@ -1,11 +1,12 @@
 package com.readmates.aigen.adapter.out.resilience
 
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCircuitState
+import com.readmates.aigen.application.port.out.AiGenerationAdapterMetricsPort
 import com.readmates.aigen.application.port.out.ProviderCallPermit
 import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
 import com.readmates.aigen.application.port.out.ProviderGateRejection
 import com.readmates.aigen.application.port.out.ProviderPermitDecision
-import com.readmates.aigen.application.service.AiGenerationMetrics
 import com.readmates.aigen.config.AiGenerationProperties
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
 import io.github.resilience4j.circuitbreaker.CircuitBreakerConfig
@@ -72,20 +73,23 @@ class ResilientProviderCallGateTest {
     @Test
     fun `circuit permission is checked before the provider semaphore`() {
         val circuitRegistry = circuitRegistry()
-        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry)
+        val metrics = FakeAiGenerationAdapterMetricsPort()
+        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry, metrics = metrics)
         val held = gate.acquire(Provider.OPENAI)
         circuitRegistry.circuitBreaker("aigen-provider-openai").transitionToForcedOpenState()
 
         val decision = gate.tryAcquire(Provider.OPENAI)
 
         assertThat(decision).isEqualTo(ProviderPermitDecision.Rejected(ProviderGateRejection.CIRCUIT_OPEN))
+        assertThat(metrics.rejections).containsExactly(Provider.OPENAI to ProviderGateRejection.CIRCUIT_OPEN)
         held.close()
     }
 
     @Test
     fun `half open semaphore rejection returns circuit probe permission`() {
         val circuitRegistry = circuitRegistry()
-        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry)
+        val metrics = FakeAiGenerationAdapterMetricsPort()
+        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry, metrics = metrics)
         val held = gate.acquire(Provider.OPENAI)
         val circuit = circuitRegistry.circuitBreaker("aigen-provider-openai")
         circuit.transitionToOpenState()
@@ -93,8 +97,13 @@ class ResilientProviderCallGateTest {
 
         assertThat(gate.tryAcquire(Provider.OPENAI))
             .isEqualTo(ProviderPermitDecision.Rejected(ProviderGateRejection.CONCURRENCY_LIMIT))
+        assertThat(metrics.rejections).containsExactly(Provider.OPENAI to ProviderGateRejection.CONCURRENCY_LIMIT)
         assertThat(gate.tryAcquire(Provider.OPENAI))
             .isEqualTo(ProviderPermitDecision.Rejected(ProviderGateRejection.CONCURRENCY_LIMIT))
+        assertThat(metrics.rejections).containsExactly(
+            Provider.OPENAI to ProviderGateRejection.CONCURRENCY_LIMIT,
+            Provider.OPENAI to ProviderGateRejection.CONCURRENCY_LIMIT,
+        )
 
         circuit.transitionToClosedState()
         held.close()
@@ -168,7 +177,8 @@ class ResilientProviderCallGateTest {
     @Test
     fun `close winning the lifecycle race prevents later circuit recording`() {
         val circuitRegistry = circuitRegistry()
-        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry)
+        val metrics = FakeAiGenerationAdapterMetricsPort()
+        val gate = gate(maxConcurrentPerProvider = 1, circuitRegistry = circuitRegistry, metrics = metrics)
         val permit = gate.acquire(Provider.CLAUDE)
 
         permit.close()
@@ -177,7 +187,48 @@ class ResilientProviderCallGateTest {
         val circuit = circuitRegistry.circuitBreaker("aigen-provider-claude")
         assertThat(circuit.metrics.numberOfFailedCalls).isZero()
         assertThat(circuit.metrics.numberOfSuccessfulCalls).isZero()
+        assertThat(metrics.calls).isEmpty()
         gate.acquire(Provider.CLAUDE).close()
+    }
+
+    @Test
+    fun `provider call outcomes forward their exact duration once`() {
+        val metrics = FakeAiGenerationAdapterMetricsPort()
+        val gate = gate(metrics = metrics)
+
+        gate.acquire(Provider.OPENAI).use { it.record(ProviderCircuitOutcome.SUCCESS, Duration.ofMillis(11)) }
+        gate.acquire(Provider.CLAUDE).use { it.record(ProviderCircuitOutcome.TRANSIENT_FAILURE, Duration.ofMillis(12)) }
+        gate.acquire(Provider.GEMINI).use { it.record(ProviderCircuitOutcome.IGNORED_FAILURE, Duration.ofMillis(13)) }
+
+        assertThat(metrics.calls).containsExactly(
+            ProviderCall(Provider.OPENAI, ProviderCircuitOutcome.SUCCESS, Duration.ofMillis(11)),
+            ProviderCall(Provider.CLAUDE, ProviderCircuitOutcome.TRANSIENT_FAILURE, Duration.ofMillis(12)),
+            ProviderCall(Provider.GEMINI, ProviderCircuitOutcome.IGNORED_FAILURE, Duration.ofMillis(13)),
+        )
+    }
+
+    @Test
+    fun `circuit transitions map to the application owned state`() {
+        val metrics = FakeAiGenerationAdapterMetricsPort()
+        val circuitRegistry = circuitRegistry()
+        gate(circuitRegistry = circuitRegistry, metrics = metrics)
+        val circuit = circuitRegistry.circuitBreaker("aigen-provider-openai")
+
+        circuit.transitionToOpenState()
+        circuit.transitionToHalfOpenState()
+        circuit.transitionToClosedState()
+        circuit.transitionToMetricsOnlyState()
+        circuit.transitionToDisabledState()
+        circuit.transitionToForcedOpenState()
+
+        assertThat(metrics.transitions.map { it.second }).containsExactly(
+            ProviderCircuitState.OPEN,
+            ProviderCircuitState.HALF_OPEN,
+            ProviderCircuitState.CLOSED,
+            ProviderCircuitState.METRICS_ONLY,
+            ProviderCircuitState.DISABLED,
+            ProviderCircuitState.FORCED_OPEN,
+        )
     }
 
     @Test
@@ -239,6 +290,7 @@ class ResilientProviderCallGateTest {
     private fun gate(
         maxConcurrentPerProvider: Int = 2,
         circuitRegistry: CircuitBreakerRegistry = circuitRegistry(),
+        metrics: AiGenerationAdapterMetricsPort = FakeAiGenerationAdapterMetricsPort(),
     ): ResilientProviderCallGate =
         ResilientProviderCallGate(
             properties =
@@ -248,7 +300,7 @@ class ResilientProviderCallGateTest {
                             maxConcurrentPerProvider = maxConcurrentPerProvider,
                         ),
                 ),
-            metrics = AiGenerationMetrics(meterRegistry),
+            metrics = metrics,
             circuitBreakerRegistry = circuitRegistry,
             meterRegistry = meterRegistry,
         )
@@ -267,4 +319,40 @@ class ResilientProviderCallGateTest {
                 .waitDurationInOpenState(Duration.ofMinutes(1))
                 .build(),
         )
+
+    private data class ProviderCall(
+        val provider: Provider,
+        val outcome: ProviderCircuitOutcome,
+        val duration: Duration,
+    )
+
+    private class FakeAiGenerationAdapterMetricsPort : AiGenerationAdapterMetricsPort {
+        val calls = mutableListOf<ProviderCall>()
+        val rejections = mutableListOf<Pair<Provider, ProviderGateRejection>>()
+        val transitions = mutableListOf<Pair<Provider, ProviderCircuitState>>()
+
+        override fun recordProviderCall(
+            provider: Provider,
+            outcome: ProviderCircuitOutcome,
+            duration: Duration,
+        ) {
+            calls += ProviderCall(provider, outcome, duration)
+        }
+
+        override fun recordProviderGateRejection(
+            provider: Provider,
+            reason: ProviderGateRejection,
+        ) {
+            rejections += provider to reason
+        }
+
+        override fun recordProviderCircuitTransition(
+            provider: Provider,
+            state: ProviderCircuitState,
+        ) {
+            transitions += provider to state
+        }
+
+        override fun recordCapDenial(reason: com.readmates.aigen.application.model.CapDenialReason) = Unit
+    }
 }

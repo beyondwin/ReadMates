@@ -1,6 +1,5 @@
 package com.readmates.sessionimport.adapter.out.persistence
 
-import com.readmates.session.application.SessionRecordVisibility
 import com.readmates.session.domain.SessionExposure
 import com.readmates.session.domain.toCompatibility
 import com.readmates.sessionimport.application.model.SessionImportAttendee
@@ -9,6 +8,7 @@ import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.AuthenticatedClubActor

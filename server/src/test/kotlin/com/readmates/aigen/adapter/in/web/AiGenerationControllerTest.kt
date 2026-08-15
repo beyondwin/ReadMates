@@ -38,7 +38,7 @@ import com.readmates.aigen.application.port.`in`.StartGenerationUseCase
 import com.readmates.aigen.config.AiGenerationProperties
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.session.application.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat

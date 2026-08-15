@@ -1,39 +1,113 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
+import com.readmates.auth.application.model.AuthoritySynthesisRequest
+import com.readmates.auth.application.model.ClubContextInput
+import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
-import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertNotNull
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
-/**
- * Unit tests for [DefaultAuthoritySynthesisService].
- *
- * All assertions use plain strings (authority names) — no Spring Security types.
- * This tests purely application logic: authority composition rules.
- */
 class DefaultAuthoritySynthesisServiceTest {
-    private val service: AuthoritySynthesisService = DefaultAuthoritySynthesisService()
-
+    private val service: SynthesizeAuthoritiesUseCase = DefaultAuthoritySynthesisService()
     private val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000002")
     private val email = "user@example.com"
 
-    private fun noClubContext() =
-        ClubContextInput(
-            supplied = false,
-            clubId = null,
-            clubSlug = null,
-            clubName = null,
-        )
+    @Test
+    fun `role and status compatibility matrix keeps Spring authorities independent from actor capabilities`() {
+        roleStatusRows().forEach { row ->
+            val member = snapshot(role = row.role, status = row.status)
 
-    private fun suppliedKnownClubContext() =
+            val result =
+                service.synthesize(
+                    AuthoritySynthesisRequest(
+                        incomingAuthorities = setOf("ROLE_USER", "ROLE_HOST", "ROLE_MEMBER", "ROLE_VIEWER"),
+                        email = email,
+                        userId = userId,
+                        clubContext = knownClubContext(),
+                        member = member,
+                        supportSynthesis = null,
+                    ),
+                )
+
+            assertEquals(setOf("ROLE_USER", row.expectedAuthority), result.authorities, row.description)
+            assertNull(result.supportSynthesisToAttach, row.description)
+            assertEquals(row.expectedCapabilities, member.actor.capabilities, row.description)
+        }
+    }
+
+    @Test
+    fun `suspended HOST retains ROLE_HOST despite no management capabilities`() {
+        val member = snapshot(MembershipRole.HOST, MembershipStatus.SUSPENDED)
+
+        val result =
+            service.synthesize(
+                AuthoritySynthesisRequest(
+                    incomingAuthorities = setOf("ROLE_USER"),
+                    email = email,
+                    userId = userId,
+                    clubContext = knownClubContext(),
+                    member = member,
+                    supportSynthesis = null,
+                ),
+            )
+
+        assertEquals(setOf("ROLE_USER", "ROLE_HOST"), result.authorities)
+        assertFalse(member.actor.can(ClubCapability.MANAGE_INVITATIONS))
+        assertFalse(member.actor.can(ClubCapability.MANAGE_MEMBERS))
+    }
+
+    @Test
+    fun `non-member loses stale member role authority`() {
+        val result =
+            service.synthesize(
+                AuthoritySynthesisRequest(
+                    incomingAuthorities = setOf("ROLE_USER", "ROLE_HOST"),
+                    email = email,
+                    userId = userId,
+                    clubContext = knownClubContext(),
+                    member = null,
+                    supportSynthesis = null,
+                ),
+            )
+
+        assertEquals(setOf("ROLE_USER"), result.authorities)
+    }
+
+    @Test
+    fun `platform admin gets host authority only with a valid support synthesis`() {
+        val synthesis =
+            SupportMemberSynthesis(
+                membershipProxyId = UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                displayName = "Admin",
+                accountName = "admin",
+            )
+
+        val result =
+            service.synthesize(
+                AuthoritySynthesisRequest(
+                    incomingAuthorities = setOf("ROLE_PLATFORM_ADMIN"),
+                    email = email,
+                    userId = userId,
+                    clubContext = knownClubContext(),
+                    member = null,
+                    supportSynthesis = synthesis,
+                ),
+            )
+
+        assertEquals(setOf("ROLE_PLATFORM_ADMIN", "ROLE_HOST"), result.authorities)
+        assertEquals(synthesis, result.supportSynthesisToAttach)
+    }
+
+    private fun knownClubContext() =
         ClubContextInput(
             supplied = true,
             clubId = clubId,
@@ -41,278 +115,96 @@ class DefaultAuthoritySynthesisServiceTest {
             clubName = "My Club",
         )
 
-    private fun suppliedUnknownClubContext() =
-        ClubContextInput(
-            supplied = true,
-            clubId = null,
-            clubSlug = null,
-            clubName = null,
-        )
-
-    private fun memberOf(
+    private fun snapshot(
         role: MembershipRole,
-        status: MembershipStatus = MembershipStatus.ACTIVE,
-    ) = CurrentMember(
-        userId = userId,
-        membershipId = UUID.randomUUID(),
-        clubId = clubId,
-        clubSlug = "my-club",
-        email = email,
-        displayName = "Test User",
-        accountName = "testuser",
-        role = role,
-        membershipStatus = status,
-    )
-
-    private fun fakeSynthesis() =
-        SupportMemberSynthesis(
-            membershipProxyId = UUID.randomUUID(),
-            displayName = "Admin",
-            accountName = "admin",
+        status: MembershipStatus,
+    ): AuthenticatedMemberSnapshot =
+        AuthenticatedMemberSnapshot(
+            actor =
+                ClubActor(
+                    userId = userId,
+                    membershipId = UUID.fromString("00000000-0000-0000-0000-000000000004"),
+                    clubId = clubId,
+                    clubSlug = "my-club",
+                    capabilities = capabilitiesFor(role, status),
+                ),
+            email = email,
+            displayName = "Test User",
+            accountName = "testuser",
+            clubName = "My Club",
+            avatarKey = "mushroom-green-book",
+            role = role,
+            membershipStatus = status,
         )
 
-    // -----------------------------------------------------------------------
-    // 1. Member found → role added from membership, no synthesis
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `active HOST member gets ROLE_HOST added`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_USER"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedKnownClubContext(),
-                member = memberOf(MembershipRole.HOST),
-                supportSynthesis = null,
-            )
-
-        val result = service.synthesize(request)
-
-        assertTrue("ROLE_HOST" in result.authorities) {
-            "Expected ROLE_HOST but got ${result.authorities}"
+    private fun capabilitiesFor(
+        role: MembershipRole,
+        status: MembershipStatus,
+    ): Set<ClubCapability> =
+        when (status) {
+            MembershipStatus.VIEWER ->
+                setOf(
+                    ClubCapability.BROWSE_MEMBER_CONTENT,
+                    ClubCapability.EDIT_OWN_PROFILE,
+                    ClubCapability.VIEW_PENDING_APPROVAL,
+                )
+            MembershipStatus.ACTIVE ->
+                setOf(
+                    ClubCapability.BROWSE_MEMBER_CONTENT,
+                    ClubCapability.EDIT_OWN_PROFILE,
+                ) +
+                    if (role == MembershipRole.HOST) {
+                        setOf(ClubCapability.MANAGE_INVITATIONS, ClubCapability.MANAGE_MEMBERS)
+                    } else {
+                        emptySet()
+                    }
+            MembershipStatus.SUSPENDED ->
+                setOf(ClubCapability.BROWSE_MEMBER_CONTENT, ClubCapability.EDIT_OWN_PROFILE)
+            MembershipStatus.INVITED,
+            MembershipStatus.LEFT,
+            MembershipStatus.INACTIVE,
+            -> emptySet()
         }
-        assertNull(result.supportSynthesisToAttach) {
-            "No support synthesis should be attached when member is found"
-        }
-    }
 
-    @Test
-    fun `active MEMBER member gets ROLE_MEMBER added`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_USER"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedKnownClubContext(),
-                member = memberOf(MembershipRole.MEMBER),
-                supportSynthesis = null,
-            )
+    private fun roleStatusRows() =
+        listOf(
+            RoleStatusRow(MembershipRole.HOST, MembershipStatus.INVITED, "ROLE_HOST", emptySet()),
+            RoleStatusRow(MembershipRole.HOST, MembershipStatus.VIEWER, "ROLE_VIEWER", viewerCapabilities()),
+            RoleStatusRow(MembershipRole.HOST, MembershipStatus.ACTIVE, "ROLE_HOST", activeHostCapabilities()),
+            RoleStatusRow(MembershipRole.HOST, MembershipStatus.SUSPENDED, "ROLE_HOST", activeMemberCapabilities()),
+            RoleStatusRow(MembershipRole.HOST, MembershipStatus.LEFT, "ROLE_HOST", emptySet()),
+            RoleStatusRow(MembershipRole.HOST, MembershipStatus.INACTIVE, "ROLE_HOST", emptySet()),
+            RoleStatusRow(MembershipRole.MEMBER, MembershipStatus.INVITED, "ROLE_MEMBER", emptySet()),
+            RoleStatusRow(MembershipRole.MEMBER, MembershipStatus.VIEWER, "ROLE_VIEWER", viewerCapabilities()),
+            RoleStatusRow(MembershipRole.MEMBER, MembershipStatus.ACTIVE, "ROLE_MEMBER", activeMemberCapabilities()),
+            RoleStatusRow(MembershipRole.MEMBER, MembershipStatus.SUSPENDED, "ROLE_MEMBER", activeMemberCapabilities()),
+            RoleStatusRow(MembershipRole.MEMBER, MembershipStatus.LEFT, "ROLE_MEMBER", emptySet()),
+            RoleStatusRow(MembershipRole.MEMBER, MembershipStatus.INACTIVE, "ROLE_MEMBER", emptySet()),
+        )
 
-        val result = service.synthesize(request)
+    private fun viewerCapabilities() =
+        setOf(
+            ClubCapability.BROWSE_MEMBER_CONTENT,
+            ClubCapability.EDIT_OWN_PROFILE,
+            ClubCapability.VIEW_PENDING_APPROVAL,
+        )
 
-        assertTrue("ROLE_MEMBER" in result.authorities) {
-            "Expected ROLE_MEMBER but got ${result.authorities}"
-        }
-    }
+    private fun activeMemberCapabilities(): Set<ClubCapability> =
+        setOf(
+            ClubCapability.BROWSE_MEMBER_CONTENT,
+            ClubCapability.EDIT_OWN_PROFILE,
+        )
 
-    @Test
-    fun `VIEWER membership status gets ROLE_VIEWER added instead of role`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_USER"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedKnownClubContext(),
-                member = memberOf(MembershipRole.MEMBER, MembershipStatus.VIEWER),
-                supportSynthesis = null,
-            )
+    private fun activeHostCapabilities() =
+        activeMemberCapabilities() + setOf(ClubCapability.MANAGE_INVITATIONS, ClubCapability.MANAGE_MEMBERS)
 
-        val result = service.synthesize(request)
-
-        assertTrue("ROLE_VIEWER" in result.authorities) {
-            "Expected ROLE_VIEWER for VIEWER membership status, got ${result.authorities}"
-        }
-        assertFalse("ROLE_MEMBER" in result.authorities) {
-            "ROLE_MEMBER must not be added when status is VIEWER, got ${result.authorities}"
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // 2. Incoming MEMBER_ROLE_AUTHORITIES are stripped before synthesis
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `stale ROLE_HOST in incoming authorities is stripped when member has MEMBER role`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_USER", "ROLE_HOST"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedKnownClubContext(),
-                member = memberOf(MembershipRole.MEMBER),
-                supportSynthesis = null,
-            )
-
-        val result = service.synthesize(request)
-
-        assertFalse("ROLE_HOST" in result.authorities) {
-            "Stale ROLE_HOST from incoming authorities must be stripped; got ${result.authorities}"
-        }
-        assertTrue("ROLE_MEMBER" in result.authorities) {
-            "Expected fresh ROLE_MEMBER from member role; got ${result.authorities}"
-        }
-    }
-
-    // -----------------------------------------------------------------------
-    // 3. Platform admin + known club context + synthesis → ROLE_HOST added, synthesis attached
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `platform admin with known club context and synthesis grant gets ROLE_HOST and synthesis attached`() {
-        val synthesis = fakeSynthesis()
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_PLATFORM_ADMIN"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedKnownClubContext(),
-                member = null,
-                supportSynthesis = synthesis,
-            )
-
-        val result = service.synthesize(request)
-
-        assertTrue("ROLE_HOST" in result.authorities) {
-            "Expected ROLE_HOST for platform admin with synthesis grant; got ${result.authorities}"
-        }
-        assertNotNull(result.supportSynthesisToAttach) {
-            "Expected synthesis to be attached; got null"
-        }
-        assertEquals(synthesis, result.supportSynthesisToAttach)
-    }
-
-    // -----------------------------------------------------------------------
-    // 4. Platform admin + no club context → no ROLE_HOST, no synthesis
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `platform admin with no club context does not get ROLE_HOST`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_PLATFORM_ADMIN"),
-                email = email,
-                userId = userId,
-                clubContext = noClubContext(),
-                member = null,
-                supportSynthesis = null,
-            )
-
-        val result = service.synthesize(request)
-
-        assertFalse("ROLE_HOST" in result.authorities) {
-            "ROLE_HOST must not be added when club context is not supplied; got ${result.authorities}"
-        }
-        assertNull(result.supportSynthesisToAttach)
-    }
-
-    // -----------------------------------------------------------------------
-    // 5. Platform admin + slug supplied but unknown club (context=null) → no ROLE_HOST
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `platform admin with supplied but unknown club context does not get ROLE_HOST`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_PLATFORM_ADMIN"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedUnknownClubContext(),
-                member = null,
-                supportSynthesis = null,
-            )
-
-        val result = service.synthesize(request)
-
-        assertFalse("ROLE_HOST" in result.authorities) {
-            "ROLE_HOST must not be added when clubId is null (unknown club); got ${result.authorities}"
-        }
-        assertNull(result.supportSynthesisToAttach)
-    }
-
-    // -----------------------------------------------------------------------
-    // 6. Platform admin + known club context but synthesis = null → no ROLE_HOST
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `platform admin with known club but no synthesis grant does not get ROLE_HOST`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_PLATFORM_ADMIN"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedKnownClubContext(),
-                member = null,
-                supportSynthesis = null,
-            )
-
-        val result = service.synthesize(request)
-
-        assertFalse("ROLE_HOST" in result.authorities) {
-            "ROLE_HOST must not be added when there is no synthesis grant; got ${result.authorities}"
-        }
-        assertNull(result.supportSynthesisToAttach)
-    }
-
-    // -----------------------------------------------------------------------
-    // 7. Regular user with no member, no admin → passthrough (no club roles)
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `regular user with no member and no admin authority gets no club roles`() {
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_USER"),
-                email = email,
-                userId = userId,
-                clubContext = noClubContext(),
-                member = null,
-                supportSynthesis = null,
-            )
-
-        val result = service.synthesize(request)
-
-        assertTrue("ROLE_USER" in result.authorities) {
-            "ROLE_USER must be preserved; got ${result.authorities}"
-        }
-        assertFalse("ROLE_HOST" in result.authorities)
-        assertFalse("ROLE_MEMBER" in result.authorities)
-        assertFalse("ROLE_VIEWER" in result.authorities)
-        assertNull(result.supportSynthesisToAttach)
-    }
-
-    // -----------------------------------------------------------------------
-    // 8. ROLE_PLATFORM_ADMIN is preserved (not in MEMBER_ROLE_AUTHORITIES)
-    // -----------------------------------------------------------------------
-
-    @Test
-    fun `ROLE_PLATFORM_ADMIN is preserved through synthesis`() {
-        val synthesis = fakeSynthesis()
-        val request =
-            AuthoritySynthesisRequest(
-                incomingAuthorities = setOf("ROLE_PLATFORM_ADMIN"),
-                email = email,
-                userId = userId,
-                clubContext = suppliedKnownClubContext(),
-                member = null,
-                supportSynthesis = synthesis,
-            )
-
-        val result = service.synthesize(request)
-
-        assertTrue("ROLE_PLATFORM_ADMIN" in result.authorities) {
-            "ROLE_PLATFORM_ADMIN must be preserved through synthesis; got ${result.authorities}"
-        }
-        assertTrue("ROLE_HOST" in result.authorities)
+    private data class RoleStatusRow(
+        val role: MembershipRole,
+        val status: MembershipStatus,
+        val expectedAuthority: String,
+        val expectedCapabilities: Set<ClubCapability>,
+    ) {
+        val description: String
+            get() = "$role/$status must synthesize $expectedAuthority"
     }
 }

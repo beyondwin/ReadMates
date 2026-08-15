@@ -1,201 +1,198 @@
 package com.readmates.auth.infrastructure.security
 
-import com.readmates.auth.application.port.out.MemberIdentityLookupPort
-import com.readmates.auth.application.port.out.MemberProfileStorePort
-import com.readmates.auth.application.service.AuthenticatedMemberResolver
+import com.readmates.auth.adapter.`in`.security.AuthClubContextHeader
+import com.readmates.auth.adapter.`in`.security.CurrentMemberArgumentResolver
+import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
+import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
+import com.readmates.auth.application.port.`in`.ResolveCurrentMemberUseCase
+import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
 import com.readmates.auth.application.service.DefaultAuthoritySynthesisService
+import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
-import com.readmates.club.adapter.`in`.web.ClubContextHeader
-import com.readmates.club.application.model.JoinedClubSummary
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
+import com.readmates.shared.security.ClubActor
+import com.readmates.shared.security.ClubCapability
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.CurrentUser
 import org.junit.jupiter.api.AfterEach
-import org.junit.jupiter.api.Assertions.assertFalse
-import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Test
+import org.springframework.core.MethodParameter
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
+import org.springframework.web.context.request.ServletWebRequest
 import java.util.UUID
 
-/**
- * Unit tests for [MemberAuthoritiesFilter] that pin the intended behavior of the
- * null-context branch (`supplied=true && context==null`).
- *
- * These tests operate entirely in-process using fake collaborators: no Spring context
- * is loaded and no database is required.
- */
+private typealias SupportSynthesisLookup = (UUID) -> SupportMemberSynthesis?
+
 class MemberAuthoritiesFilterTest {
     private val userId = UUID.fromString("00000000-0000-0000-0000-000000000001")
-    private val email = "admin@example.com"
+    private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000002")
+    private val email = "member@example.com"
+    private val knownClub =
+        ResolvedClubContext(
+            clubId = clubId,
+            slug = "my-club",
+            name = "My Club",
+            status = "ACTIVE",
+            hostname = null,
+        )
 
     @AfterEach
     fun clearSecurityContext() {
         SecurityContextHolder.clearContext()
     }
 
-    // ---------------------------------------------------------------------------
-    // Scenario 1: SLUG supplied, unknown club (context=null), platform admin user
-    // ---------------------------------------------------------------------------
-
-    /**
-     * When a slug is supplied but the club is not registered (context=null),
-     * a platform admin's `ROLE_PLATFORM_ADMIN` authority must be preserved and
-     * no member-role authority (`ROLE_HOST`, `ROLE_MEMBER`, `ROLE_VIEWER`) must be added.
-     *
-     * The synthesis path is guarded by `context != null`, so it cannot fire here.
-     */
     @Test
-    fun `slug supplied with unknown club assigns platform admin grant only`() {
-        val filter = filterWith(resolveBySlug = { null }, synthesize = { null })
+    fun `anonymous and no-email requests preserve their exact authorities`() {
+        val filter = filterWith()
 
-        val request = requestWithSlugHeader("unknown-club")
-        setAuthentication(email, userId, authorities = listOf("ROLE_PLATFORM_ADMIN", "ROLE_USER"))
+        filter.doFilter(MockHttpServletRequest(), MockHttpServletResponse(), MockFilterChain())
+
+        assertEquals(emptySet<String>(), currentAuthorities())
+
+        setAuthentication(" ", userId, setOf("ROLE_HOST", "ROLE_USER"))
+        filter.doFilter(MockHttpServletRequest(), MockHttpServletResponse(), MockFilterChain())
+
+        assertEquals(setOf("ROLE_HOST", "ROLE_USER"), currentAuthorities())
+    }
+
+    @Test
+    fun `unknown supplied club removes stale member authorities`() {
+        val filter = filterWith(resolveBySlug = { null })
+        setAuthentication(email, userId, setOf("ROLE_USER", "ROLE_HOST"))
+
+        filter.doFilter(requestWithSlug("unknown-club"), MockHttpServletResponse(), MockFilterChain())
+
+        assertEquals(setOf("ROLE_USER"), currentAuthorities())
+    }
+
+    @Test
+    fun `different-club membership does not receive a member authority`() {
+        val filter =
+            filterWith(
+                resolveBySlug = { knownClub },
+                resolveMember = { _, context ->
+                    if (context?.clubId == clubId) null else activeMemberSnapshot()
+                },
+            )
+        setAuthentication(email, userId, setOf("ROLE_MEMBER", "ROLE_USER"))
+
+        filter.doFilter(requestWithSlug("my-club"), MockHttpServletResponse(), MockFilterChain())
+
+        assertEquals(setOf("ROLE_USER"), currentAuthorities())
+    }
+
+    @Test
+    fun `platform admin without support grant has no synthesized host authority`() {
+        val filter = filterWith(resolveBySlug = { knownClub }, supportSynthesis = { null })
+        setAuthentication(email, userId, setOf("ROLE_PLATFORM_ADMIN", "ROLE_HOST"))
+
+        filter.doFilter(requestWithSlug("my-club"), MockHttpServletResponse(), MockFilterChain())
+
+        assertEquals(setOf("ROLE_PLATFORM_ADMIN"), currentAuthorities())
+    }
+
+    @Test
+    fun `platform admin with valid support grant gets exact host authority and request attribute`() {
+        val supportSynthesis =
+            SupportMemberSynthesis(
+                membershipProxyId = UUID.fromString("00000000-0000-0000-0000-000000000003"),
+                displayName = "Support Admin",
+                accountName = "support-admin",
+            )
+        var supportLookups = 0
+        val supportLookup: (UUID) -> SupportMemberSynthesis? = {
+            supportLookups += 1
+            supportSynthesis
+        }
+        val filter = filterWith(resolveBySlug = { knownClub }, supportSynthesis = supportLookup)
+        val request = requestWithSlug("my-club")
+        setAuthentication(email, userId, setOf("ROLE_PLATFORM_ADMIN"))
 
         filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
 
-        val authorities = currentAuthorities()
-        assertTrue(authorities.contains("ROLE_PLATFORM_ADMIN")) {
-            "Expected ROLE_PLATFORM_ADMIN to be preserved; got $authorities"
-        }
-        assertTrue(authorities.contains("ROLE_USER")) {
-            "Expected ROLE_USER baseline to be preserved; got $authorities"
-        }
-        assertFalse(authorities.contains("ROLE_HOST")) {
-            "ROLE_HOST must not be added when club context is null; got $authorities"
-        }
-        assertFalse(authorities.contains("ROLE_MEMBER")) {
-            "ROLE_MEMBER must not be added when club context is null; got $authorities"
-        }
+        assertEquals(setOf("ROLE_PLATFORM_ADMIN", "ROLE_HOST"), currentAuthorities())
+        assertEquals(
+            setOf("ROLE_HOST"),
+            currentAuthorities().filterTo(mutableSetOf(), MEMBER_ROLE_AUTHORITIES::contains),
+        )
+        assertSame(
+            supportSynthesis,
+            request.getAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR),
+        )
+        request.userPrincipal = SecurityContextHolder.getContext().authentication
+
+        val resolved =
+            supportCurrentMemberResolver(supportLookup).resolveArgument(
+                sampleMethodParameter(),
+                null,
+                ServletWebRequest(request),
+                null,
+            )
+
+        assertSame(
+            supportSynthesis,
+            request.getAttribute(CheckSupportAccessGrantUseCase.SUPPORT_SYNTHESIS_REQUEST_ATTR),
+        )
+        assertEquals(1, supportLookups)
+        assertEquals(MembershipRole.HOST, resolved.role)
+        assertEquals(MembershipStatus.ACTIVE, resolved.membershipStatus)
+        assertEquals("ROLE_HOST", currentAuthorities().single(MEMBER_ROLE_AUTHORITIES::contains))
     }
 
-    // ---------------------------------------------------------------------------
-    // Scenario 2: SLUG supplied, unknown club (context=null), host-support grant preserved
-    // ---------------------------------------------------------------------------
-
-    /**
-     * When `context=null` and the user already holds `ROLE_PLATFORM_ADMIN` (the authority
-     * that underpins host-support access), that authority passes through the filter unchanged.
-     *
-     * The synthesis branch (`synthesizeHostCurrentMember`) is gated on `context != null` and
-     * therefore cannot execute here; no `ROLE_HOST` is synthesised from a DB grant.
-     * Instead, the pre-existing platform-admin authority survives untouched.
-     */
     @Test
-    fun `slug supplied with unknown club preserves platform admin host-support authority`() {
-        val filter = filterWith(resolveBySlug = { null }, synthesize = { null })
+    fun `resolved member replaces stale incoming member role authority`() {
+        val filter =
+            filterWith(
+                resolveBySlug = { knownClub },
+                resolveMember = { _, _ -> activeMemberSnapshot(role = MembershipRole.MEMBER) },
+            )
+        setAuthentication(email, userId, setOf("ROLE_HOST", "ROLE_USER"))
 
-        val request = requestWithSlugHeader("unknown-club")
-        // The "host support grant" capability is signalled by ROLE_PLATFORM_ADMIN —
-        // it is not in MEMBER_ROLE_AUTHORITIES, so it must survive the filter unmodified.
-        setAuthentication(email, userId, authorities = listOf("ROLE_PLATFORM_ADMIN"))
+        filter.doFilter(requestWithSlug("my-club"), MockHttpServletResponse(), MockFilterChain())
 
-        filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
-
-        val authorities = currentAuthorities()
-        assertTrue(authorities.contains("ROLE_PLATFORM_ADMIN")) {
-            "Expected ROLE_PLATFORM_ADMIN (host-support grant authority) to be preserved; got $authorities"
-        }
-        assertFalse(authorities.contains("ROLE_HOST")) {
-            "ROLE_HOST must not be synthesised when context is null; got $authorities"
-        }
+        assertEquals(setOf("ROLE_MEMBER", "ROLE_USER"), currentAuthorities())
     }
-
-    // ---------------------------------------------------------------------------
-    // Scenario 3: SLUG supplied, unknown club (context=null), regular user
-    // ---------------------------------------------------------------------------
-
-    /**
-     * A regular user (no grants, no admin role) hitting an unknown club slug gets no
-     * club-specific authorities added. Their member-role authorities, if any exist,
-     * are stripped by the filter; no new ones are synthesised.
-     */
-    @Test
-    fun `slug supplied with unknown club assigns no club authorities for regular user`() {
-        val filter = filterWith(resolveBySlug = { null }, synthesize = { null })
-
-        val request = requestWithSlugHeader("unknown-club")
-        // Regular user — has only ROLE_USER, no admin or member-role grants
-        setAuthentication(email, userId, authorities = listOf("ROLE_USER"))
-
-        filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
-
-        val authorities = currentAuthorities()
-        assertFalse(authorities.contains("ROLE_HOST")) {
-            "ROLE_HOST must not be added for a regular user with null context; got $authorities"
-        }
-        assertFalse(authorities.contains("ROLE_MEMBER")) {
-            "ROLE_MEMBER must not be added for a regular user with null context; got $authorities"
-        }
-        assertFalse(authorities.contains("ROLE_VIEWER")) {
-            "ROLE_VIEWER must not be added for a regular user with null context; got $authorities"
-        }
-        assertTrue(authorities.contains("ROLE_USER")) {
-            "Expected baseline ROLE_USER to be preserved; got $authorities"
-        }
-    }
-
-    // ---------------------------------------------------------------------------
-    // Scenario 4: HOST_FALLBACK source, unknown host → unscoped principal
-    // ---------------------------------------------------------------------------
-
-    /**
-     * When the club context is supplied via the host header but the host is not registered
-     * (`source=HOST_FALLBACK, context=null`), the filter must NOT add any club-specific
-     * authority. `member` is resolved through the normal else-branch which calls
-     * `resolveByEmail(email, null)` — returning null when no legacy membership exists —
-     * and the synthesis branch is guarded by `context != null`.
-     *
-     * Result: authentication is "unscoped" — only baseline non-member-role authorities remain.
-     */
-    @Test
-    fun `host fallback with unknown host yields unscoped principal`() {
-        val filter = filterWith(resolveBySlug = { null }, synthesize = { null })
-
-        val request = requestWithHostHeader("unknown.example.com")
-        setAuthentication(email, userId, authorities = listOf("ROLE_USER"))
-
-        filter.doFilter(request, MockHttpServletResponse(), MockFilterChain())
-
-        val authorities = currentAuthorities()
-        assertFalse(authorities.contains("ROLE_HOST")) {
-            "ROLE_HOST must not be added when host is unknown; got $authorities"
-        }
-        assertFalse(authorities.contains("ROLE_MEMBER")) {
-            "ROLE_MEMBER must not be added when host is unknown; got $authorities"
-        }
-        assertTrue(authorities.contains("ROLE_USER")) {
-            "Expected baseline ROLE_USER to survive for host-fallback with unknown host; got $authorities"
-        }
-    }
-
-    // ---------------------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------------------
 
     private fun filterWith(
-        resolveBySlug: (String) -> ResolvedClubContext?,
-        synthesize: (UUID) -> SupportMemberSynthesis?,
+        resolveBySlug: (String) -> ResolvedClubContext? = { null },
+        resolveMember: (String, ResolvedClubContext?) -> AuthenticatedMemberSnapshot? = { _, _ -> null },
+        supportSynthesis: (UUID) -> SupportMemberSynthesis? = { null },
     ): MemberAuthoritiesFilter {
-        val fakeClubContextUseCase =
+        val resolveAuthenticatedPrincipalUseCase =
+            object : ResolveAuthenticatedPrincipalUseCase {
+                override fun resolveByEmail(
+                    email: String?,
+                    clubContext: ResolvedClubContext?,
+                ): AuthenticatedMemberSnapshot? = resolveMember(email.orEmpty(), clubContext)
+
+                override fun resolveByUserId(
+                    userId: String,
+                    clubContext: ResolvedClubContext?,
+                ): AuthenticatedMemberSnapshot? = null
+
+                override fun resolveProfileByUserId(userId: String): AuthenticatedMemberSnapshot? = null
+
+                override fun resolveUserById(userId: String): CurrentUser? = null
+            }
+        val synthesizeAuthoritiesUseCase: SynthesizeAuthoritiesUseCase = DefaultAuthoritySynthesisService()
+        val resolveClubContextUseCase =
             object : ResolveClubContextUseCase {
                 override fun resolveBySlug(slug: String): ResolvedClubContext? = resolveBySlug(slug)
 
                 override fun resolveByHost(host: String?): ResolvedClubContext? = null
             }
-        val fakeAuthenticatedMemberResolver =
-            AuthenticatedMemberResolver(
-                memberIdentityLookup = NoOpMemberIdentityLookupPort(),
-                memberProfileStore = NoOpMemberProfileStorePort(),
-            )
-        val fakeSupportGrantUseCase =
+        val checkSupportAccessGrantUseCase =
             object : CheckSupportAccessGrantUseCase {
                 override fun synthesizeHostCurrentMember(
                     userId: UUID,
@@ -203,35 +200,114 @@ class MemberAuthoritiesFilterTest {
                     clubId: UUID,
                     clubSlug: String,
                     clubName: String,
-                ): SupportMemberSynthesis? = synthesize(userId)
+                ): SupportMemberSynthesis? = supportSynthesis(userId)
             }
+
         return MemberAuthoritiesFilter(
-            authoritySynthesisService = DefaultAuthoritySynthesisService(),
-            authenticatedMemberResolver = fakeAuthenticatedMemberResolver,
-            resolveClubContextUseCase = fakeClubContextUseCase,
-            checkSupportAccessGrantUseCase = fakeSupportGrantUseCase,
+            synthesizeAuthoritiesUseCase,
+            resolveAuthenticatedPrincipalUseCase,
+            resolveClubContextUseCase,
+            checkSupportAccessGrantUseCase,
         )
     }
 
-    private fun requestWithSlugHeader(slug: String): MockHttpServletRequest =
-        MockHttpServletRequest("GET", "/api/host/sessions").apply {
-            addHeader(ClubContextHeader.CLUB_SLUG, slug)
+    private fun activeMemberSnapshot(role: MembershipRole = MembershipRole.HOST) =
+        AuthenticatedMemberSnapshot(
+            actor =
+                ClubActor(
+                    userId = userId,
+                    membershipId = UUID.fromString("00000000-0000-0000-0000-000000000004"),
+                    clubId = clubId,
+                    clubSlug = knownClub.slug,
+                    capabilities =
+                        if (role == MembershipRole.HOST) {
+                            setOf(
+                                ClubCapability.BROWSE_MEMBER_CONTENT,
+                                ClubCapability.EDIT_OWN_PROFILE,
+                                ClubCapability.MANAGE_INVITATIONS,
+                                ClubCapability.MANAGE_MEMBERS,
+                            )
+                        } else {
+                            setOf(ClubCapability.BROWSE_MEMBER_CONTENT, ClubCapability.EDIT_OWN_PROFILE)
+                        },
+                ),
+            email = email,
+            displayName = "Member",
+            accountName = "member",
+            clubName = knownClub.name,
+            avatarKey = "mushroom-green-book",
+            role = role,
+            membershipStatus = MembershipStatus.ACTIVE,
+        )
+
+    private fun supportCurrentMemberResolver(supportSynthesis: SupportSynthesisLookup): CurrentMemberArgumentResolver {
+        val resolveCurrentMemberUseCase =
+            object : ResolveCurrentMemberUseCase {
+                override fun resolveByEmail(email: String): CurrentMember? = null
+
+                override fun findUserIdByEmail(email: String): UUID? = userId
+
+                override fun resolveByUserAndClub(
+                    userId: UUID,
+                    clubId: UUID,
+                ): CurrentMember? = null
+
+                override fun resolveByEmailAndClub(
+                    email: String,
+                    clubId: UUID,
+                ): CurrentMember? = null
+
+                override fun listJoinedClubs(userId: UUID) = emptyList<Nothing>()
+
+                override fun findPlatformAdmin(userId: UUID): CurrentPlatformAdmin? = null
+            }
+        val supportAccess =
+            object : CheckSupportAccessGrantUseCase {
+                override fun synthesizeHostCurrentMember(
+                    userId: UUID,
+                    email: String,
+                    clubId: UUID,
+                    clubSlug: String,
+                    clubName: String,
+                ): SupportMemberSynthesis? = supportSynthesis(userId)
+            }
+        return CurrentMemberArgumentResolver(
+            resolveCurrentMemberUseCase,
+            knownClubContextUseCase(),
+            supportAccess,
+        )
+    }
+
+    private fun knownClubContextUseCase(): ResolveClubContextUseCase =
+        object : ResolveClubContextUseCase {
+            override fun resolveBySlug(slug: String): ResolvedClubContext? = knownClub.takeIf { slug == it.slug }
+
+            override fun resolveByHost(host: String?): ResolvedClubContext? = null
         }
 
-    private fun requestWithHostHeader(host: String): MockHttpServletRequest =
+    private fun currentMemberEndpoint(member: CurrentMember) = member
+
+    private fun sampleMethodParameter(): MethodParameter {
+        val method = this::class.java.declaredMethods.first { it.name == "currentMemberEndpoint" }
+        return MethodParameter(method, 0)
+    }
+
+    private fun requestWithSlug(slug: String) =
         MockHttpServletRequest("GET", "/api/host/sessions").apply {
-            addHeader(ClubContextHeader.CLUB_HOST, host)
+            addHeader(AuthClubContextHeader.CLUB_SLUG, slug)
         }
 
     private fun setAuthentication(
         email: String,
         userId: UUID,
-        authorities: List<String>,
+        authorities: Set<String>,
     ) {
-        val principal = CurrentUser(userId = userId, email = email)
-        val grantedAuthorities = authorities.map { SimpleGrantedAuthority(it) }
-        val authentication = UsernamePasswordAuthenticationToken(principal, null, grantedAuthorities)
-        SecurityContextHolder.getContext().authentication = authentication
+        SecurityContextHolder.getContext().authentication =
+            UsernamePasswordAuthenticationToken(
+                CurrentUser(userId = userId, email = email),
+                null,
+                authorities.map(::SimpleGrantedAuthority),
+            )
     }
 
     private fun currentAuthorities(): Set<String> =
@@ -243,88 +319,7 @@ class MemberAuthoritiesFilterTest {
             ?.toSet()
             ?: emptySet()
 
-    /**
-     * A no-op account store that never finds any membership.
-     * Used to ensure the filter's member-lookup step returns null.
-     */
-    private class NoOpMemberIdentityLookupPort : MemberIdentityLookupPort {
-        override fun findActiveMemberByEmail(email: String): CurrentMember? = null
-
-        override fun findActiveMemberByUserId(userId: String): CurrentMember? = null
-
-        override fun findMemberByUserIdAndClubId(
-            userId: UUID,
-            clubId: UUID,
-        ): CurrentMember? = null
-
-        override fun findMemberByEmailAndClubId(
-            email: String,
-            clubId: UUID,
-        ): CurrentMember? = null
-
-        override fun findMemberByUserIdIncludingViewer(userId: UUID): CurrentMember? = null
-
-        override fun findAnyUserIdByEmail(email: String): UUID? = null
-
-        override fun findUserById(userId: UUID): CurrentUser? = null
-
-        override fun findMembershipStatusByUserId(userId: UUID): MembershipStatus? = null
-
-        override fun listJoinedClubs(userId: UUID): List<JoinedClubSummary> = emptyList()
-    }
-
-    /**
-     * A no-op profile store that never finds any profile.
-     */
-    private class NoOpMemberProfileStorePort : MemberProfileStorePort {
-        override fun findProfileMemberByEmail(
-            email: String,
-            clubId: UUID?,
-        ) = null
-
-        override fun findProfileMemberByUserId(userId: UUID) = null
-
-        override fun findProfileMemberInClubForUpdate(
-            clubId: UUID,
-            membershipId: UUID,
-        ) = null
-
-        override fun lockClubProfileNames(clubId: UUID): Boolean = false
-
-        override fun displayNameExistsInClub(
-            clubId: UUID,
-            displayName: String,
-            excludingMembershipId: UUID,
-        ): Boolean = false
-
-        override fun updateOwnDisplayName(
-            clubId: UUID,
-            membershipId: UUID,
-            displayName: String,
-        ): Boolean = false
-
-        override fun updateOwnAvatarKey(
-            clubId: UUID,
-            membershipId: UUID,
-            avatarKey: String,
-        ): Boolean = false
-
-        override fun updateOwnProfile(
-            clubId: UUID,
-            membershipId: UUID,
-            displayName: String,
-            avatarKey: String,
-        ): Boolean = false
-
-        override fun updateDisplayName(
-            clubId: UUID,
-            membershipId: UUID,
-            displayName: String,
-        ): Boolean = false
-
-        override fun findHostMemberListItem(
-            clubId: UUID,
-            membershipId: UUID,
-        ) = null
+    private companion object {
+        val MEMBER_ROLE_AUTHORITIES = setOf("ROLE_HOST", "ROLE_MEMBER", "ROLE_VIEWER")
     }
 }

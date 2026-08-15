@@ -1,11 +1,17 @@
 package com.readmates.aigen.application.service
 
+import com.readmates.aigen.application.model.AiGenerationRecoveryResult
+import com.readmates.aigen.application.model.AiGenerationRecoverySource
+import com.readmates.aigen.application.model.CapDenialReason
 import com.readmates.aigen.application.model.CostBasis
 import com.readmates.aigen.application.model.ErrorCode
 import com.readmates.aigen.application.model.GroundingFailureReason
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.model.ProviderCircuitState
+import com.readmates.aigen.application.port.`in`.AiGenerationQueueProbeSnapshot
+import com.readmates.aigen.application.port.out.AiGenerationAdapterMetricsPort
 import com.readmates.aigen.application.port.out.JobKind
 import com.readmates.aigen.application.port.out.ProviderCircuitOutcome
 import com.readmates.aigen.application.port.out.ProviderGateRejection
@@ -21,11 +27,9 @@ import java.time.Duration
 import java.util.concurrent.atomic.AtomicReference
 
 /**
- * Encapsulates the 8 Prometheus meters specified in AI Generation spec §11.1
- * plus the bounded grounded-section repair outcome counter.
+ * Encapsulates the fixed-cardinality AI generation, recovery, and queue-probe meters.
  *
- * **Label allowlist policy.** Only the 6 enum-valued tag keys defined in
- * [MetricLabel] (`provider`, `model`, `kind`, `status`, `reason`, `direction`)
+ * **Label allowlist policy.** Only enum-valued tag keys defined in [MetricLabel]
  * may appear on any aigen meter. Every meter registration in this class routes
  * through the [aigenMeter] helper which accepts only typed [MetricLabel] keys —
  * making it a compile-time error to add high-cardinality tags such as
@@ -46,11 +50,14 @@ import java.util.concurrent.atomic.AtomicReference
 @Suppress("TooManyFunctions")
 class AiGenerationMetrics(
     private val meterRegistry: MeterRegistry,
-) {
-    private val queueDepthSupplier = AtomicReference<() -> Number>({ 0 })
+) : AiGenerationAdapterMetricsPort {
+    private val queueProbeSnapshotSupplier =
+        AtomicReference<() -> AiGenerationQueueProbeSnapshot>({
+            AiGenerationQueueProbeSnapshot.unavailableBeforeFirstSample()
+        })
 
     @Volatile
-    private var queueDepthRegistered = false
+    private var queueProbeGaugesRegistered = false
 
     /** `readmates_aigen_jobs_total` — counter, no tags. */
     fun recordJobStarted() {
@@ -70,6 +77,35 @@ class AiGenerationMetrics(
             .tags(aigenMeter())
             .register(meterRegistry)
             .increment()
+    }
+
+    fun recordFailureRecovery(
+        source: AiGenerationRecoverySource,
+        result: AiGenerationRecoveryResult,
+    ) {
+        runCatching {
+            Counter
+                .builder(NAME_FAILURE_RECOVERY)
+                .description("AI generation failure recovery outcomes")
+                .tags(
+                    aigenMeter(
+                        MetricLabel.SOURCE to source.name.lowercase(),
+                        MetricLabel.RESULT to result.name.lowercase(),
+                    ),
+                ).register(meterRegistry)
+                .increment()
+        }
+    }
+
+    fun recordRecoveryIndexRepair(result: AiGenerationIndexRepairResultTag) {
+        runCatching {
+            Counter
+                .builder(NAME_RECOVERY_INDEX_REPAIR)
+                .description("AI generation processing-index repair outcomes")
+                .tags(aigenMeter(MetricLabel.RESULT to result.name.lowercase()))
+                .register(meterRegistry)
+                .increment()
+        }
     }
 
     /**
@@ -223,7 +259,7 @@ class AiGenerationMetrics(
             .increment()
     }
 
-    fun recordProviderCall(
+    override fun recordProviderCall(
         provider: Provider,
         outcome: ProviderCircuitOutcome,
         duration: Duration,
@@ -248,7 +284,7 @@ class AiGenerationMetrics(
             .record(duration)
     }
 
-    fun recordProviderGateRejection(
+    override fun recordProviderGateRejection(
         provider: Provider,
         reason: ProviderGateRejection,
     ) {
@@ -264,7 +300,7 @@ class AiGenerationMetrics(
             .increment()
     }
 
-    fun recordProviderCircuitTransition(
+    override fun recordProviderCircuitTransition(
         provider: Provider,
         state: ProviderCircuitState,
     ) {
@@ -281,7 +317,7 @@ class AiGenerationMetrics(
     }
 
     /** `readmates_aigen_cap_denials_total{reason}` — counter. */
-    fun recordCapDenial(reason: CapDenialReason) {
+    override fun recordCapDenial(reason: CapDenialReason) {
         Counter
             .builder(NAME_CAP_DENIALS)
             .description("Cap-guard denials before invoking an AI provider")
@@ -290,26 +326,45 @@ class AiGenerationMetrics(
             .increment()
     }
 
-    /**
-     * `readmates_aigen_queue_depth` — gauge bound to [supplier].
-     *
-     * Calling this multiple times replaces the active supplier; the gauge itself
-     * is registered exactly once with Micrometer so Prometheus retains a stable
-     * time series identity. `AiGenerationQueueDepthGaugeBinder` wires this to the
-     * Redis-backed active job count (`PENDING` + `RUNNING`). Kafka consumer group
-     * lag is a separate operational signal and should not be described with this
-     * metric name.
-     */
+    /** Registers the sampled, I/O-free queue-probe snapshot gauges exactly once. */
     @Synchronized
-    fun registerQueueDepthGauge(supplier: () -> Number) {
-        queueDepthSupplier.set(supplier)
-        if (!queueDepthRegistered) {
+    fun registerQueueProbeGauges(
+        supplier: () -> AiGenerationQueueProbeSnapshot,
+        sampleInterval: Duration,
+    ) {
+        require(!sampleInterval.isZero && !sampleInterval.isNegative) { "Queue probe sample interval must be positive" }
+        queueProbeSnapshotSupplier.set(supplier)
+        if (!queueProbeGaugesRegistered) {
             Gauge
-                .builder(NAME_QUEUE_DEPTH) { queueDepthSupplier.get().invoke().toDouble() }
-                .description("Active AI generation jobs in Redis job store")
+                .builder(NAME_QUEUE_DEPTH) { queueProbeSnapshotSupplier.get().invoke().depth }
+                .description("Authoritative active AI generation jobs from the sampled Redis recovery index")
                 .tags(aigenMeter())
                 .register(meterRegistry)
-            queueDepthRegistered = true
+            Gauge
+                .builder(NAME_QUEUE_PROBE_AVAILABLE) {
+                    if (queueProbeSnapshotSupplier.get().invoke().available) 1.0 else 0.0
+                }.description("Whether the latest AI generation queue probe was authoritative")
+                .tags(aigenMeter())
+                .register(meterRegistry)
+            Gauge
+                .builder(NAME_QUEUE_PROBE_LAST_SUCCESS_TIMESTAMP) {
+                    queueProbeSnapshotSupplier
+                        .get()
+                        .invoke()
+                        .lastSuccessAt
+                        ?.epochSecond
+                        ?.toDouble()
+                        ?: Double.NaN
+                }.description("Unix timestamp of the latest successful AI generation queue probe")
+                .tags(aigenMeter())
+                .register(meterRegistry)
+            Gauge
+                .builder(NAME_QUEUE_PROBE_SAMPLE_INTERVAL) {
+                    sampleInterval.toMillis().toDouble() / MILLISECONDS_PER_SECOND
+                }.description("Configured AI generation queue probe sampling interval")
+                .tags(aigenMeter())
+                .register(meterRegistry)
+            queueProbeGaugesRegistered = true
         }
     }
 
@@ -325,8 +380,11 @@ class AiGenerationMetrics(
     }
 
     private companion object {
+        const val MILLISECONDS_PER_SECOND = 1_000.0
         const val NAME_JOBS = "readmates.aigen.jobs"
         const val NAME_COMMIT_RECOVERY_FAILURES = "readmates.aigen.commit.recovery.failures"
+        const val NAME_FAILURE_RECOVERY = "readmates.aigen.failure.recovery"
+        const val NAME_RECOVERY_INDEX_REPAIR = "readmates.aigen.recovery.index.repair"
         const val NAME_JOBS_COMPLETED = "readmates.aigen.jobs.completed"
         const val NAME_LATENCY = "readmates.aigen.latency"
         const val NAME_TOKENS = "readmates.aigen.tokens"
@@ -335,6 +393,10 @@ class AiGenerationMetrics(
         const val NAME_GROUNDING_REPAIRS = "readmates.aigen.grounding.repairs"
         const val NAME_CAP_DENIALS = "readmates.aigen.cap.denials"
         const val NAME_QUEUE_DEPTH = "readmates.aigen.queue.depth"
+        const val NAME_QUEUE_PROBE_AVAILABLE = "readmates.aigen.queue.probe.available"
+        const val NAME_QUEUE_PROBE_LAST_SUCCESS_TIMESTAMP =
+            "readmates.aigen.queue.probe.last.success.timestamp.seconds"
+        const val NAME_QUEUE_PROBE_SAMPLE_INTERVAL = "readmates.aigen.queue.probe.sample.interval.seconds"
         const val NAME_PROVIDER_CALLS = "readmates.aigen.provider.calls"
         const val NAME_PROVIDER_CALL_LATENCY = "readmates.aigen.provider.call.latency"
         const val NAME_PROVIDER_GATE_REJECTIONS = "readmates.aigen.provider.gate.rejections"
@@ -347,20 +409,11 @@ class AiGenerationMetrics(
 
 enum class GroundingRepairOutcome { SUCCEEDED, FAILED }
 
-enum class ProviderCircuitState {
-    CLOSED,
-    OPEN,
-    HALF_OPEN,
-    DISABLED,
-    FORCED_OPEN,
-    METRICS_ONLY,
-}
-
 /**
- * The 6 enum-valued Prometheus tag keys permitted on any `readmates.aigen.*` meter
- * (spec §11.1). High-cardinality identifiers (transcript, hostId, sessionId,
- * clubId, email) are explicitly forbidden — for row-level audit use the
- * `ai_generation_audit_log` table instead.
+ * The nine fixed enum-valued Prometheus tag keys permitted on any
+ * `readmates.aigen.*` meter. High-cardinality identifiers (transcript, hostId,
+ * sessionId, clubId, email) are explicitly forbidden — for row-level audit use
+ * the `ai_generation_audit_log` table instead.
  */
 enum class MetricLabel(
     val tagKey: String,
@@ -372,6 +425,17 @@ enum class MetricLabel(
     REASON("reason"),
     DIRECTION("direction"),
     BASIS("basis"),
+    SOURCE("source"),
+    RESULT("result"),
+}
+
+enum class AiGenerationIndexRepairResultTag {
+    PAGE_COMPLETED,
+    PASS_COMPLETED,
+    EPOCH_RESET,
+    QUARANTINED,
+    OVER_CAP,
+    FAILED,
 }
 
 /**
@@ -385,15 +449,4 @@ enum class TokenDirection(
     CACHE_WRITE_INPUT("cache_write_input"),
     CACHE_READ_INPUT("cache_read_input"),
     OUTPUT("output"),
-}
-
-/**
- * Reason tag values for `readmates_aigen_cap_denials_total`. Maps to the three
- * cap surfaces in the spec: host daily call count, club monthly cost, and
- * host per-minute call rate (the last enforced by the shared rate-limit port).
- */
-enum class CapDenialReason {
-    HOST_DAILY,
-    CLUB_MONTHLY,
-    HOST_PER_MINUTE,
 }

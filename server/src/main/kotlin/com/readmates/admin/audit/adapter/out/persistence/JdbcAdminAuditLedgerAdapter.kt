@@ -92,16 +92,19 @@ class JdbcAdminAuditLedgerAdapter(
     ): List<AdminAuditSourceRow> =
         jdbcTemplate.query(
             """
-            select id, actor_user_id, cast(filter_json as char) as filter_json, selection_hash,
+            select id, contract_version, actor_user_id, actor_platform_role, club_id, selection_hash,
                    matched_count, expires_at, consumed_at, created_at
             from admin_notification_replay_previews
             where created_at >= ? and created_at < ?
+              and (? is null or club_id = ?)
             order by created_at desc, id desc
             limit ?
             """.trimIndent(),
             { rs, _ -> rs.toReplayPreviewRow() },
             filter.from.toSqlTimestamp(),
             filter.to.toSqlTimestamp(),
+            filter.clubId?.dbString(),
+            filter.clubId?.dbString(),
             pageRequest.limit,
         )
 
@@ -165,14 +168,16 @@ class JdbcAdminAuditLedgerAdapter(
     }
 
     private fun ResultSet.toReplayPreviewRow(): AdminAuditSourceRow {
+        val contractVersion = getInt("contract_version")
+        val consumedAt = getTimestamp("consumed_at")?.toInstant()?.atOffset(ZoneOffset.UTC)
+        val projection = replayPreviewProjection(contractVersion, consumedAt != null)
         val metadataJson =
             objectMapper.writeValueAsString(
                 mapOf(
                     "matchedCount" to getInt("matched_count"),
                     "selectionHash" to getString("selection_hash"),
                     "expiresAt" to getTimestamp("expires_at").toInstant().atOffset(ZoneOffset.UTC).toString(),
-                    "consumedAt" to getTimestamp("consumed_at")?.toInstant()?.atOffset(ZoneOffset.UTC)?.toString(),
-                    "filter" to getString("filter_json"),
+                    "consumedAt" to consumedAt?.toString(),
                 ),
             )
         return AdminAuditSourceRow(
@@ -180,16 +185,34 @@ class JdbcAdminAuditLedgerAdapter(
             sourceId = getString("id"),
             occurredAt = getTimestamp("created_at").toInstant().atOffset(ZoneOffset.UTC),
             actorUserId = uuidOrNull("actor_user_id"),
-            actorRole = "OWNER",
-            clubId = null,
+            actorRole = getString("actor_platform_role"),
+            clubId = uuidOrNull("club_id"),
             targetUserId = null,
-            actionType = "ADMIN_NOTIFICATION_REPLAY_PREVIEW",
-            outcomeHint = "PREPARED",
+            actionType = projection.actionType,
+            outcomeHint = projection.outcomeHint,
             metadataJson = metadataJson,
         )
     }
 }
 
+private fun replayPreviewProjection(
+    contractVersion: Int,
+    consumed: Boolean,
+): ReplayPreviewProjection =
+    when {
+        contractVersion != ATOMIC_REPLAY_CONTRACT_VERSION ->
+            ReplayPreviewProjection("ADMIN_NOTIFICATION_REPLAY_PREVIEW_LEGACY", "UNKNOWN")
+        consumed -> ReplayPreviewProjection("ADMIN_NOTIFICATION_REPLAY_PREVIEW_CONSUMED", "CONSUMED")
+        else -> ReplayPreviewProjection("ADMIN_NOTIFICATION_REPLAY_PREVIEW_PREPARED", "PREPARED")
+    }
+
+private data class ReplayPreviewProjection(
+    val actionType: String,
+    val outcomeHint: String,
+)
+
 private fun ResultSet.uuidOrNull(column: String): UUID? = getString(column)?.let(UUID::fromString)
 
 private fun OffsetDateTime.toSqlTimestamp(): Timestamp = Timestamp.from(toInstant())
+
+private const val ATOMIC_REPLAY_CONTRACT_VERSION = 2

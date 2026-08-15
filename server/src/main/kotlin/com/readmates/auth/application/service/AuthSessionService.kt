@@ -1,7 +1,9 @@
 package com.readmates.auth.application.service
 
+import com.readmates.auth.application.model.IssuedAuthSession
 import com.readmates.auth.application.model.StoredAuthSession
 import com.readmates.auth.application.port.`in`.LogoutAuthSessionUseCase
+import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import com.readmates.auth.application.port.out.AuthSessionCachePort
 import com.readmates.auth.application.port.out.AuthSessionCacheSnapshot
 import com.readmates.auth.application.port.out.AuthSessionStorePort
@@ -17,13 +19,6 @@ import java.util.Base64
 import java.util.HexFormat
 import java.util.UUID
 
-data class IssuedAuthSession(
-    val rawToken: String,
-    val storedTokenHash: String,
-    val userId: String,
-    val expiresAt: OffsetDateTime,
-)
-
 @Service
 class AuthSessionService(
     private val authSessionStore: AuthSessionStorePort,
@@ -33,12 +28,13 @@ class AuthSessionService(
     private val secureCookie: Boolean = false,
     @param:Value("\${readmates.auth.session-cookie-domain:}")
     private val sessionCookieDomain: String = "",
-) : LogoutAuthSessionUseCase {
+) : ManageAuthSessionUseCase,
+    LogoutAuthSessionUseCase {
     private val secureRandom = SecureRandom()
 
     override val sessionCookieName: String = COOKIE_NAME
 
-    fun issueSession(
+    override fun issueSession(
         userId: String,
         userAgent: String?,
         ipAddress: String?,
@@ -70,7 +66,7 @@ class AuthSessionService(
         )
     }
 
-    fun findValidSession(rawToken: String): StoredAuthSession? {
+    override fun findValidSession(rawToken: String): StoredAuthSession? {
         val tokenHash = hashToken(rawToken)
         val now = OffsetDateTime.now(ZoneOffset.UTC)
         val cached =
@@ -113,9 +109,9 @@ class AuthSessionService(
         return clearedSessionCookie()
     }
 
-    fun sessionCookie(rawToken: String): String = buildCookie(COOKIE_NAME, rawToken, SESSION_TTL, includeDomain = true)
+    override fun sessionCookie(rawToken: String): String = buildCookie(COOKIE_NAME, rawToken, SESSION_TTL, true)
 
-    fun clearedSessionCookie(): String = buildCookie(COOKIE_NAME, "", Duration.ZERO, includeDomain = true)
+    override fun clearedSessionCookie(): String = buildCookie(COOKIE_NAME, "", Duration.ZERO, includeDomain = true)
 
     override fun clearedServletSessionCookie(): String = buildCookie(SERVLET_SESSION_COOKIE_NAME, "", Duration.ZERO, includeDomain = false)
 

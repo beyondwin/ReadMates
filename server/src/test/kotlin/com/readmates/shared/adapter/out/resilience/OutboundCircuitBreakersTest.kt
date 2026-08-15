@@ -1,6 +1,7 @@
 package com.readmates.shared.adapter.out.resilience
 
 import io.github.resilience4j.circuitbreaker.CircuitBreaker
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -73,6 +74,21 @@ class OutboundCircuitBreakersTest {
                 .counter()
         assertThat(toOpen).isNotNull
         assertThat(toOpen!!.count()).isEqualTo(1.0)
+    }
+
+    @Test
+    fun `uses the injected circuit breaker registry`() {
+        val registry = CircuitBreakerRegistry.ofDefaults()
+        val cb =
+            OutboundCircuitBreakers(
+                properties = OutboundResilienceProperties(),
+                meterRegistryProvider = registryProvider(SimpleMeterRegistry()),
+                registry = registry,
+            )
+
+        cb.execute("svc", fallback = { "fallback" }) { "ok" }
+
+        assertThat(registry.circuitBreaker("svc").state).isEqualTo(CircuitBreaker.State.CLOSED)
     }
 
     private fun registryProvider(registry: MeterRegistry): ObjectProvider<MeterRegistry> =

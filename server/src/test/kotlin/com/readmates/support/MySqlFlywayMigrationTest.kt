@@ -71,6 +71,7 @@ class MySqlFlywayMigrationTest(
             ).isZero()
             insertAvatarBackfillFixtures(upgradeJdbc)
             insertExposureBackfillFixtures(upgradeJdbc)
+            val legacyReplayFixtures = insertLegacyAdminReplayPreviewFixtures(upgradeJdbc)
 
             val upgradeResult =
                 Flyway
@@ -80,7 +81,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(5)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(6)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -92,7 +93,9 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("47")
+            assertThat(latestVersion).isEqualTo("48")
+            assertAtomicAdminReplaySchema(upgradeJdbc)
+            assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
                 upgradeJdbc.queryForObject(
                     """
@@ -357,6 +360,7 @@ class MySqlFlywayMigrationTest(
             assertThat(v44Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("44")
             val upgradeJdbc = JdbcTemplate(dataSource)
             insertV44AvatarUpgradeFixtures(upgradeJdbc)
+            val legacyReplayFixtures = insertLegacyAdminReplayPreviewFixtures(upgradeJdbc)
 
             val upgradeResult =
                 Flyway
@@ -366,7 +370,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -378,7 +382,9 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("47")
+            assertThat(latestVersion).isEqualTo("48")
+            assertAtomicAdminReplaySchema(upgradeJdbc)
+            assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
             listOf(AVATAR_FIXTURE_FIRST_CLUB_ID, avatarFixtureClubId(clubNumber = 2)).forEach { clubId ->
                 val assignments = integratedAvatarAssignmentsForClub(upgradeJdbc, clubId)
@@ -678,6 +684,639 @@ class MySqlFlywayMigrationTest(
         val prefix = if (memberNumber >= 22) "30000000" else "31000000"
         return "$prefix-0000-0000-${clubNumber.toString().padStart(4, '0')}-" +
             memberNumber.toString().padStart(12, '0')
+    }
+
+    @Test
+    fun `mysql creates atomic admin replay receipts with byte exact v2 evidence`() {
+        assertAtomicAdminReplaySchema(jdbcTemplate)
+        assertOldBinaryAdminReplayInsertRemainsV1(jdbcTemplate)
+        assertV2AdminReplayConstraintsAndCycleSafeCleanup(jdbcTemplate)
+    }
+
+    private fun assertOldBinaryAdminReplayInsertRemainsV1(jdbcTemplate: JdbcTemplate) {
+        val previewId = UUID.randomUUID().toString()
+        val actorUserId =
+            jdbcTemplate.queryForObject("select id from users order by id limit 1", String::class.java)
+                ?: error("Expected a seeded migration-test user")
+        try {
+            jdbcTemplate.update(
+                """
+                insert into admin_notification_replay_previews (
+                  id, actor_user_id, filter_json, selection_hash, matched_count, expires_at, created_at
+                ) values (?, ?, json_object('channel', 'EMAIL'), ?, 0,
+                          '2026-08-10 00:10:00.000000', '2026-08-10 00:00:00.000000')
+                """.trimIndent(),
+                previewId,
+                actorUserId,
+                "a".repeat(64),
+            )
+            val row =
+                jdbcTemplate.queryForMap(
+                    """
+                    select contract_version, actor_platform_role, club_id, consumed_confirmation_id
+                    from admin_notification_replay_previews
+                    where id = ?
+                    """.trimIndent(),
+                    previewId,
+                )
+            assertThat(row["CONTRACT_VERSION"]).isEqualTo(1)
+            assertThat(row["ACTOR_PLATFORM_ROLE"]).isNull()
+            assertThat(row["CLUB_ID"]).isNull()
+            assertThat(row["CONSUMED_CONFIRMATION_ID"]).isNull()
+        } finally {
+            jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", previewId)
+        }
+    }
+
+    private fun assertV2AdminReplayConstraintsAndCycleSafeCleanup(jdbcTemplate: JdbcTemplate) {
+        val fixture = insertV2AdminReplayFixtureMetadata()
+        try {
+            assertV2ReplayPreviewRoleAndHashConstraints(jdbcTemplate, fixture)
+            assertV2ReplayTargetConstraints(jdbcTemplate, fixture)
+            insertV2ReplayAuditMetadata(jdbcTemplate, fixture)
+            assertV2ReplayConfirmationConstraints(jdbcTemplate, fixture)
+            assertV2ReplayConsumeConstraints(jdbcTemplate, fixture)
+        } finally {
+            cleanupV2AdminReplayFixtureCycleSafely(jdbcTemplate, fixture)
+        }
+    }
+
+    private fun insertV2AdminReplayFixtureMetadata(): V2AdminReplayFixture {
+        val fixture = V2AdminReplayFixture()
+        insertClub(fixture.clubId, "atomic-replay-${fixture.suffix}")
+        insertProfileUser(
+            fixture.actorUserId,
+            "atomic-replay-${fixture.suffix}@example.com",
+            "Atomic Replay",
+            "Replay${fixture.suffix}",
+        )
+        return fixture
+    }
+
+    private fun assertV2ReplayPreviewRoleAndHashConstraints(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+    ) {
+        listOf("owner", "OwNeR", "OWNER ").forEach { invalidRole ->
+            assertConstraintRejected {
+                insertV2ReplayPreview(
+                    jdbcTemplate,
+                    UUID.randomUUID().toString(),
+                    fixture.actorUserId,
+                    fixture.clubId,
+                    invalidRole,
+                )
+            }
+        }
+        assertConstraintRejected {
+            insertV2ReplayPreview(
+                jdbcTemplate,
+                UUID.randomUUID().toString(),
+                fixture.actorUserId,
+                fixture.clubId,
+                "OWNER",
+                selectionHash = "A".repeat(64),
+            )
+        }
+        insertV2ReplayPreview(jdbcTemplate, fixture.previewId, fixture.actorUserId, fixture.clubId, "OWNER")
+        insertV2ReplayPreview(jdbcTemplate, fixture.operatorPreviewId, fixture.actorUserId, fixture.clubId, "OPERATOR")
+    }
+
+    private fun assertV2ReplayTargetConstraints(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+    ) {
+        insertReplayTarget(
+            jdbcTemplate,
+            fixture.operatorPreviewId,
+            UUID.randomUUID().toString(),
+            fixture.clubId,
+            "DEAD",
+            "MAIL_PERMANENT",
+        )
+        listOf("failed", "FaIlEd", "FAILED ").forEach { invalidStatus ->
+            assertReplayTargetRejected(jdbcTemplate, fixture, invalidStatus, "MAIL_RETRYABLE")
+        }
+        listOf("mail_retryable", "Mail_Retryable", "MAIL_RETRYABLE ").forEach { invalidCode ->
+            assertReplayTargetRejected(jdbcTemplate, fixture, "FAILED", invalidCode)
+        }
+        assertReplayTargetRejected(jdbcTemplate, fixture, "FAILED", "MAIL_RETRYABLE", expectedAttemptCount = -1)
+        insertReplayTarget(
+            jdbcTemplate,
+            fixture.previewId,
+            fixture.deliveryId,
+            fixture.clubId,
+            "FAILED",
+            "MAIL_RETRYABLE",
+        )
+    }
+
+    private fun assertReplayTargetRejected(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+        status: String,
+        failureCode: String,
+        expectedAttemptCount: Int = 1,
+    ) {
+        assertConstraintRejected {
+            insertReplayTarget(
+                jdbcTemplate,
+                fixture.previewId,
+                UUID.randomUUID().toString(),
+                fixture.clubId,
+                status,
+                failureCode,
+                expectedAttemptCount,
+            )
+        }
+    }
+
+    private fun insertV2ReplayAuditMetadata(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_audit_events (
+              id, actor_user_id, actor_platform_role, event_type, metadata_json, created_at
+            ) values (?, ?, 'OWNER', 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED', json_object(),
+                      '2026-08-10 00:01:00.000000')
+            """.trimIndent(),
+            fixture.auditId,
+            fixture.actorUserId,
+        )
+    }
+
+    private fun assertV2ReplayConfirmationConstraints(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+    ) {
+        listOf("operator", "OpErAtOr", "OPERATOR ").forEach { invalidRole ->
+            assertReplayConfirmationRejected(jdbcTemplate, fixture, actorPlatformRole = invalidRole)
+        }
+        assertReplayConfirmationRejected(jdbcTemplate, fixture, replayedCount = -1)
+        assertReplayConfirmationRejected(jdbcTemplate, fixture, selectionHash = "A".repeat(64))
+        assertReplayConfirmationRejected(jdbcTemplate, fixture, skippedCount = -1)
+        insertReplayConfirmation(
+            jdbcTemplate,
+            fixture.confirmationId,
+            fixture.previewId,
+            fixture.actorUserId,
+            "OWNER",
+            fixture.clubId,
+            fixture.auditId,
+        )
+        assertUniqueConstraintRejected("admin_notification_replay_confirmations_preview_uk") {
+            insertReplayConfirmation(
+                jdbcTemplate,
+                UUID.randomUUID().toString(),
+                fixture.previewId,
+                fixture.actorUserId,
+                "OWNER",
+                fixture.clubId,
+                fixture.auditId,
+            )
+        }
+    }
+
+    private fun assertReplayConfirmationRejected(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+        actorPlatformRole: String = "OWNER",
+        selectionHash: String = "a".repeat(64),
+        replayedCount: Int = 1,
+        skippedCount: Int = 0,
+    ) {
+        assertConstraintRejected {
+            insertReplayConfirmation(
+                jdbcTemplate,
+                UUID.randomUUID().toString(),
+                fixture.previewId,
+                fixture.actorUserId,
+                actorPlatformRole,
+                fixture.clubId,
+                fixture.auditId,
+                replayedCount = replayedCount,
+                skippedCount = skippedCount,
+                selectionHash = selectionHash,
+            )
+        }
+    }
+
+    private fun assertV2ReplayConsumeConstraints(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+    ) {
+        assertConstraintRejected {
+            jdbcTemplate.update(
+                """
+                update admin_notification_replay_previews
+                set consumed_at = '2026-08-10 00:01:00.000000'
+                where id = ?
+                """.trimIndent(),
+                fixture.previewId,
+            )
+        }
+        assertConstraintRejected {
+            jdbcTemplate.update(
+                "update admin_notification_replay_previews set consumed_confirmation_id = ? where id = ?",
+                fixture.confirmationId,
+                fixture.previewId,
+            )
+        }
+        jdbcTemplate.update(
+            """
+            update admin_notification_replay_previews
+            set consumed_at = '2026-08-10 00:01:00.000000', consumed_confirmation_id = ?
+            where id = ?
+            """.trimIndent(),
+            fixture.confirmationId,
+            fixture.previewId,
+        )
+        assertConstraintRejected {
+            jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", fixture.previewId)
+        }
+        assertConstraintRejected {
+            insertV2ReplayPreview(
+                jdbcTemplate,
+                fixture.nullRolePreviewId,
+                fixture.actorUserId,
+                fixture.clubId,
+                null,
+            )
+        }
+    }
+
+    private fun cleanupV2AdminReplayFixtureCycleSafely(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V2AdminReplayFixture,
+    ) {
+        jdbcTemplate.update(
+            """
+            update admin_notification_replay_previews
+            set consumed_at = null, consumed_confirmation_id = null
+            where id = ? and contract_version = 2
+            """.trimIndent(),
+            fixture.previewId,
+        )
+        jdbcTemplate.update(
+            "delete from admin_notification_replay_confirmations where preview_id = ?",
+            fixture.previewId,
+        )
+        jdbcTemplate.update("delete from platform_audit_events where id = ?", fixture.auditId)
+        jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", fixture.previewId)
+        jdbcTemplate.update(
+            "delete from admin_notification_replay_previews where id in (?, ?)",
+            fixture.operatorPreviewId,
+            fixture.nullRolePreviewId,
+        )
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from admin_notification_replay_preview_targets where preview_id = ?",
+                Int::class.java,
+                fixture.previewId,
+            ),
+        ).isZero()
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from admin_notification_replay_confirmations where preview_id = ?",
+                Int::class.java,
+                fixture.previewId,
+            ),
+        ).isZero()
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from platform_audit_events where id = ?",
+                Int::class.java,
+                fixture.auditId,
+            ),
+        ).isZero()
+        jdbcTemplate.update("delete from users where id = ?", fixture.actorUserId)
+        jdbcTemplate.update("delete from clubs where id = ?", fixture.clubId)
+    }
+
+    private data class V2AdminReplayFixture(
+        val suffix: String = UUID.randomUUID().toString().take(8),
+        val clubId: String = UUID.randomUUID().toString(),
+        val actorUserId: String = UUID.randomUUID().toString(),
+        val previewId: String = UUID.randomUUID().toString(),
+        val operatorPreviewId: String = UUID.randomUUID().toString(),
+        val nullRolePreviewId: String = UUID.randomUUID().toString(),
+        val deliveryId: String = UUID.randomUUID().toString(),
+        val auditId: String = UUID.randomUUID().toString(),
+        val confirmationId: String = UUID.randomUUID().toString(),
+    )
+
+    private fun assertAtomicAdminReplaySchema(jdbcTemplate: JdbcTemplate) {
+        assertAtomicAdminReplayColumns(jdbcTemplate)
+        assertAtomicAdminReplayIndexesAndChecks(jdbcTemplate)
+        assertAtomicAdminReplayForeignKeys(jdbcTemplate)
+    }
+
+    private fun assertAtomicAdminReplayColumns(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "admin_notification_replay_previews"))
+            .contains("contract_version", "actor_platform_role", "club_id", "consumed_confirmation_id")
+        assertThat(columns(jdbcTemplate, "admin_notification_replay_preview_targets"))
+            .containsExactlyInAnyOrder(
+                "preview_id",
+                "delivery_id",
+                "club_id",
+                "expected_status",
+                "expected_attempt_count",
+                "expected_failure_code",
+                "expected_updated_at",
+            )
+        assertThat(columns(jdbcTemplate, "admin_notification_replay_confirmations"))
+            .containsExactlyInAnyOrder(
+                "id",
+                "preview_id",
+                "actor_user_id",
+                "actor_platform_role",
+                "club_id",
+                "selection_hash",
+                "replayed_count",
+                "skipped_count",
+                "platform_audit_event_id",
+                "confirmed_at",
+            )
+        val contractVersion = columnMetadata(jdbcTemplate, "admin_notification_replay_previews", "contract_version")
+        assertThat(contractVersion["IS_NULLABLE"]).isEqualTo("NO")
+        assertThat(contractVersion["COLUMN_DEFAULT"].toString()).isEqualTo("1")
+        listOf(
+            "admin_notification_replay_previews" to "actor_platform_role",
+            "admin_notification_replay_preview_targets" to "expected_status",
+            "admin_notification_replay_preview_targets" to "expected_failure_code",
+            "admin_notification_replay_confirmations" to "actor_platform_role",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("varchar")
+            assertThat(metadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
+            assertThat(metadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
+        }
+        assertThat(
+            columnMetadata(
+                jdbcTemplate,
+                "admin_notification_replay_preview_targets",
+                "expected_updated_at",
+            )["DATETIME_PRECISION"],
+        ).isEqualTo(6L)
+        assertThat(
+            columnMetadata(
+                jdbcTemplate,
+                "admin_notification_replay_confirmations",
+                "confirmed_at",
+            )["DATETIME_PRECISION"],
+        ).isEqualTo(6L)
+    }
+
+    private fun assertAtomicAdminReplayIndexesAndChecks(jdbcTemplate: JdbcTemplate) {
+        assertEquals(
+            "preview_id,delivery_id",
+            indexColumns(jdbcTemplate, "admin_notification_replay_preview_targets", "PRIMARY"),
+        )
+        assertEquals(
+            "preview_id,delivery_id,expected_status,expected_attempt_count,expected_updated_at",
+            indexColumns(
+                jdbcTemplate,
+                "admin_notification_replay_preview_targets",
+                "admin_notification_replay_preview_targets_confirm_idx",
+            ),
+        )
+        assertEquals(
+            "preview_id",
+            indexColumns(
+                jdbcTemplate,
+                "admin_notification_replay_confirmations",
+                "admin_notification_replay_confirmations_preview_uk",
+            ),
+        )
+        assertThat(
+            indexNonUnique(
+                jdbcTemplate,
+                "admin_notification_replay_confirmations",
+                "admin_notification_replay_confirmations_preview_uk",
+            ),
+        ).isZero()
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_replay_previews_versioned_check"))
+            .contains("contract_version", "actor_platform_role", "selection_hash", "consumed_confirmation_id")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_replay_preview_targets_status_check"))
+            .contains("FAILED", "DEAD")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_replay_preview_targets_failure_code_check"))
+            .contains("MAIL_RETRYABLE", "MAIL_PERMANENT")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_replay_confirmations_counts_check"))
+            .contains("replayed_count", "skipped_count")
+    }
+
+    private fun assertAtomicAdminReplayForeignKeys(jdbcTemplate: JdbcTemplate) {
+        assertEquals(
+            "admin_notification_replay_previews:id",
+            foreignKeyReference(
+                jdbcTemplate,
+                "admin_notification_replay_preview_targets",
+                "admin_notification_replay_preview_targets_preview_fk",
+            ),
+        )
+        assertEquals(
+            "CASCADE",
+            foreignKeyDeleteRule(
+                jdbcTemplate,
+                "admin_notification_replay_preview_targets",
+                "admin_notification_replay_preview_targets_preview_fk",
+            ),
+        )
+        mapOf(
+            "admin_notification_replay_confirmations_preview_fk" to "admin_notification_replay_previews:id",
+            "admin_notification_replay_confirmations_actor_fk" to "users:id",
+            "admin_notification_replay_confirmations_club_fk" to "clubs:id",
+            "admin_notification_replay_confirmations_audit_fk" to "platform_audit_events:id",
+        ).forEach { (constraint, expectedReference) ->
+            assertEquals(
+                expectedReference,
+                foreignKeyReference(jdbcTemplate, "admin_notification_replay_confirmations", constraint),
+            )
+            assertEquals(
+                "RESTRICT",
+                foreignKeyDeleteRule(jdbcTemplate, "admin_notification_replay_confirmations", constraint),
+            )
+        }
+        assertEquals(
+            "admin_notification_replay_confirmations:id",
+            foreignKeyReference(
+                jdbcTemplate,
+                "admin_notification_replay_previews",
+                "admin_notification_replay_previews_confirmation_fk",
+            ),
+        )
+        assertEquals(
+            "RESTRICT",
+            foreignKeyDeleteRule(
+                jdbcTemplate,
+                "admin_notification_replay_previews",
+                "admin_notification_replay_previews_confirmation_fk",
+            ),
+        )
+    }
+
+    private fun insertV2ReplayPreview(
+        jdbcTemplate: JdbcTemplate,
+        previewId: String,
+        actorUserId: String,
+        clubId: String,
+        actorRole: String?,
+        selectionHash: String = "a".repeat(64),
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_previews (
+              id, actor_user_id, actor_platform_role, club_id, contract_version,
+              filter_json, selection_hash, matched_count, expires_at, created_at
+            ) values (?, ?, ?, ?, 2, json_object('channel', 'EMAIL'), ?, 1,
+                      '2026-08-10 00:10:00.000000', '2026-08-10 00:00:00.000000')
+            """.trimIndent(),
+            previewId,
+            actorUserId,
+            actorRole,
+            clubId,
+            selectionHash,
+        )
+    }
+
+    private fun insertReplayTarget(
+        jdbcTemplate: JdbcTemplate,
+        previewId: String,
+        deliveryId: String,
+        clubId: String,
+        expectedStatus: String,
+        expectedFailureCode: String,
+        expectedAttemptCount: Int = 1,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_preview_targets (
+              preview_id, delivery_id, club_id, expected_status, expected_attempt_count,
+              expected_failure_code, expected_updated_at
+            ) values (?, ?, ?, ?, ?, ?, '2026-08-10 00:00:00.000000')
+            """.trimIndent(),
+            previewId,
+            deliveryId,
+            clubId,
+            expectedStatus,
+            expectedAttemptCount,
+            expectedFailureCode,
+        )
+    }
+
+    private fun insertReplayConfirmation(
+        jdbcTemplate: JdbcTemplate,
+        confirmationId: String,
+        previewId: String,
+        actorUserId: String,
+        actorRole: String,
+        clubId: String,
+        auditId: String,
+        replayedCount: Int = 1,
+        skippedCount: Int = 0,
+        selectionHash: String = "a".repeat(64),
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_confirmations (
+              id, preview_id, actor_user_id, actor_platform_role, club_id, selection_hash,
+              replayed_count, skipped_count, platform_audit_event_id, confirmed_at
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, '2026-08-10 00:01:00.000000')
+            """.trimIndent(),
+            confirmationId,
+            previewId,
+            actorUserId,
+            actorRole,
+            clubId,
+            selectionHash,
+            replayedCount,
+            skippedCount,
+            auditId,
+        )
+    }
+
+    private fun assertConstraintRejected(block: () -> Unit) {
+        val error = assertThrows(RuntimeException::class.java, block)
+        assertThat(error).isInstanceOfAny(
+            DataIntegrityViolationException::class.java,
+            UncategorizedSQLException::class.java,
+        )
+        val causalMessages =
+            generateSequence<Throwable>(error) { it.cause }
+                .mapNotNull { it.message }
+                .joinToString("\n")
+        assertThat(causalMessages).containsIgnoringCase("constraint")
+    }
+
+    private fun assertUniqueConstraintRejected(
+        constraintName: String,
+        block: () -> Unit,
+    ) {
+        val error = assertThrows(DataIntegrityViolationException::class.java, block)
+        val causalMessages =
+            generateSequence<Throwable>(error) { it.cause }
+                .mapNotNull { it.message }
+                .joinToString("\n")
+        assertThat(causalMessages).contains(constraintName)
+    }
+
+    private data class LegacyReplayFixtures(
+        val openPreviewId: String,
+        val consumedPreviewId: String,
+    )
+
+    private fun insertLegacyAdminReplayPreviewFixtures(jdbcTemplate: JdbcTemplate): LegacyReplayFixtures {
+        val actorUserId =
+            jdbcTemplate.queryForObject("select id from users order by id limit 1", String::class.java)
+                ?: error("Expected a user before inserting legacy replay fixtures")
+        val fixtures = LegacyReplayFixtures(UUID.randomUUID().toString(), UUID.randomUUID().toString())
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_previews (
+              id, actor_user_id, filter_json, selection_hash, matched_count, expires_at, consumed_at, created_at
+            ) values
+              (?, ?, json_object('channel', 'EMAIL'), ?, 1,
+               '2026-08-10 00:10:00.000000', null, '2026-08-10 00:00:00.000000'),
+              (?, ?, json_object('channel', 'EMAIL'), ?, 2,
+               '2026-08-10 00:10:00.000000', '2026-08-10 00:01:00.000000', '2026-08-10 00:00:00.000000')
+            """.trimIndent(),
+            fixtures.openPreviewId,
+            actorUserId,
+            "b".repeat(64),
+            fixtures.consumedPreviewId,
+            actorUserId,
+            "c".repeat(64),
+        )
+        return fixtures
+    }
+
+    private fun assertLegacyAdminReplayPreviewFixtures(
+        jdbcTemplate: JdbcTemplate,
+        fixtures: LegacyReplayFixtures,
+    ) {
+        val rows =
+            jdbcTemplate.queryForList(
+                """
+                select id, contract_version, actor_platform_role, club_id, consumed_at, consumed_confirmation_id
+                from admin_notification_replay_previews
+                where id in (?, ?)
+                order by id
+                """.trimIndent(),
+                fixtures.openPreviewId,
+                fixtures.consumedPreviewId,
+            )
+        assertThat(rows).hasSize(2)
+        assertThat(rows).allSatisfy { row ->
+            assertThat(row["CONTRACT_VERSION"]).isEqualTo(1)
+            assertThat(row["ACTOR_PLATFORM_ROLE"]).isNull()
+            assertThat(row["CLUB_ID"]).isNull()
+            assertThat(row["CONSUMED_CONFIRMATION_ID"]).isNull()
+        }
+        val consumedAtById = rows.associate { it["ID"].toString() to it["CONSUMED_AT"] }
+        assertThat(consumedAtById[fixtures.openPreviewId]).isNull()
+        assertThat(consumedAtById[fixtures.consumedPreviewId]).isNotNull()
     }
 
     @Test
@@ -1916,6 +2555,90 @@ class MySqlFlywayMigrationTest(
             String::class.java,
             constraintName,
         ) ?: error("Check constraint $constraintName does not exist")
+
+    private fun columns(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+    ): Set<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select column_name
+                from information_schema.columns
+                where table_schema = database() and table_name = ?
+                """.trimIndent(),
+                String::class.java,
+                tableName,
+            ).filterNotNull()
+            .toSet()
+
+    private fun columnMetadata(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+        columnName: String,
+    ): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select data_type, is_nullable, column_default, character_set_name, collation_name, datetime_precision
+            from information_schema.columns
+            where table_schema = database() and table_name = ? and column_name = ?
+            """.trimIndent(),
+            tableName,
+            columnName,
+        )
+
+    private fun indexNonUnique(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+        indexName: String,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select max(non_unique)
+            from information_schema.statistics
+            where table_schema = database() and table_name = ? and index_name = ?
+            """.trimIndent(),
+            Int::class.java,
+            tableName,
+            indexName,
+        ) ?: error("Index $tableName.$indexName does not exist")
+
+    private fun foreignKeyReference(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+        constraintName: String,
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select concat(referenced_table_name, ':', group_concat(referenced_column_name order by ordinal_position separator ','))
+            from information_schema.key_column_usage
+            where constraint_schema = database()
+              and table_name = ?
+              and constraint_name = ?
+            group by referenced_table_name
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            constraintName,
+        ) ?: error("Foreign key $tableName.$constraintName does not exist")
+
+    private fun foreignKeyDeleteRule(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+        constraintName: String,
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select delete_rule
+            from information_schema.referential_constraints
+            where constraint_schema = database()
+              and table_name = ?
+              and constraint_name = ?
+            """.trimIndent(),
+            String::class.java,
+            tableName,
+            constraintName,
+        ) ?: error("Foreign key $tableName.$constraintName does not exist")
 
     private fun deleteWhereIn(
         tableName: String,

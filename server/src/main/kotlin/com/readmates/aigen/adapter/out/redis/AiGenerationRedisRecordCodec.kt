@@ -17,14 +17,12 @@ import com.readmates.aigen.application.port.out.GroundedSourceContext
 import com.readmates.aigen.application.port.out.JobRecord
 import tools.jackson.databind.ObjectMapper
 import java.math.BigDecimal
-import java.time.Duration
 import java.time.Instant
 import java.time.LocalDate
 import java.util.UUID
 
 internal class AiGenerationRedisRecordCodec(
     private val objectMapper: ObjectMapper,
-    private val ttl: Duration,
 ) {
     fun toHash(job: JobRecord): Map<String, String> {
         val map = baseHash(job)
@@ -65,6 +63,8 @@ internal class AiGenerationRedisRecordCodec(
             "expiresAt" to job.expiresAt.toString(),
             "createdAt" to job.createdAt.toString(),
             "lastUpdatedAt" to job.lastUpdatedAt.toString(),
+            "lastUpdatedAtEpochSecond" to job.lastUpdatedAt.epochSecond.toString(),
+            "lastUpdatedAtNano" to job.lastUpdatedAt.nano.toString(),
         )
 
     fun fromHash(
@@ -111,12 +111,31 @@ internal class AiGenerationRedisRecordCodec(
     }
 
     private fun readTimestamps(hash: Map<String, String>): JobTimestamps {
-        val expiresAt = parseInstant(hash["expiresAt"]) ?: Instant.now().plus(ttl)
-        val createdAt = parseInstant(hash["createdAt"]) ?: expiresAt.minus(ttl)
-        return JobTimestamps(expiresAt, createdAt, parseInstant(hash["lastUpdatedAt"]) ?: createdAt)
+        val expiresAt = requiredInstant(hash, "expiresAt")
+        val createdAt = requiredInstant(hash, "createdAt")
+        val lastUpdatedAt = requiredInstant(hash, "lastUpdatedAt")
+        val epochSecondRaw = hash["lastUpdatedAtEpochSecond"]
+        val nanoRaw = hash["lastUpdatedAtNano"]
+        if ((epochSecondRaw == null) != (nanoRaw == null)) {
+            throw CorruptAiGenerationJobRecordException("lastUpdatedAt exact tuple is invalid")
+        }
+        if (epochSecondRaw != null) {
+            val epochSecond = epochSecondRaw.toLongOrNull()
+            val nano = nanoRaw?.toIntOrNull()
+            if (epochSecond != lastUpdatedAt.epochSecond || nano != lastUpdatedAt.nano) {
+                throw CorruptAiGenerationJobRecordException("lastUpdatedAt exact tuple is invalid")
+            }
+        }
+        return JobTimestamps(expiresAt, createdAt, lastUpdatedAt)
     }
 
-    private fun parseInstant(value: String?): Instant? = value?.let { runCatching { Instant.parse(it) }.getOrNull() }
+    private fun requiredInstant(
+        hash: Map<String, String>,
+        field: String,
+    ): Instant =
+        hash[field]
+            ?.let { runCatching { Instant.parse(it) }.getOrNull() }
+            ?: throw CorruptAiGenerationJobRecordException("$field is invalid")
 
     private fun readModel(
         hash: Map<String, String>,
@@ -165,3 +184,7 @@ internal class AiGenerationRedisRecordCodec(
         const val MAX_ERROR_MESSAGE_LENGTH = 512
     }
 }
+
+internal class CorruptAiGenerationJobRecordException(
+    message: String,
+) : RuntimeException(message)
