@@ -1062,9 +1062,7 @@ class JdbcManualNotificationDispatchAdapterTest(
         }
     }
 
-    private fun insertManualDispatchFixture(
-        identitySeed: String = "manual-dispatch-list",
-    ) =
+    private fun insertManualDispatchFixture(identitySeed: String = "manual-dispatch-list") =
         adapter.insertManualDispatch(
             clubId = clubId,
             hostMembershipId = hostMembershipId,
