@@ -157,6 +157,7 @@ PUBLIC_SCAN_SUPPORT_PATHS = (
     "ops/tempo/tempo.yml",
     "ops/observability/local/compose.yml",
     "ops/observability/local/grafana/provisioning/datasources/tempo.yml",
+    "server/src/main/resources/application.yml",
     "scripts/validate-production-ai-config.sh",
     "scripts/sync-config/import-from-prod-env.sh",
 )
@@ -552,6 +553,7 @@ class GuidanceCheckerTests(unittest.TestCase):
                 "deploy/oci/compose.infra.yml",
                 "ops/observability/local/grafana/provisioning/datasources/tempo.yml",
                 "deploy/oci/grafana/provisioning/datasources/tempo.yml",
+                "server/src/main/resources/application.yml",
                 "scripts/validate-production-ai-config.sh",
                 "scripts/sync-config/import-from-prod-env.sh",
             )

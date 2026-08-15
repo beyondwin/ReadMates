@@ -181,6 +181,7 @@ placeholder_contract_files=(
   "ops/tempo/tempo.yml"
   "ops/observability/local/compose.yml"
   "ops/observability/local/grafana/provisioning/datasources/tempo.yml"
+  "server/src/main/resources/application.yml"
   "scripts/validate-production-ai-config.sh"
   "scripts/sync-config/import-from-prod-env.sh"
 )
