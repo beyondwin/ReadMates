@@ -1694,7 +1694,11 @@ private fun loadSessionRecordPersistenceBoundarySources(): SessionRecordPersiste
         port = port,
         files =
             sessionRecordPersistenceUnitNames.associateWith { name ->
-                persistenceRoot.resolve(name).takeIf(Files::exists)?.readText().orEmpty()
+                persistenceRoot
+                    .resolve(name)
+                    .takeIf(Files::exists)
+                    ?.readText()
+                    .orEmpty()
             },
     )
 }
@@ -1706,7 +1710,11 @@ private fun assertSessionRecordCapabilityBoundaries(portSource: String) {
                 ?.let { body -> sessionRecordMethodNames(body) }
                 .orEmpty()
         }
-    val counts = actualByCapability.values.flatten().groupingBy(String::toString).eachCount()
+    val counts =
+        actualByCapability.values
+            .flatten()
+            .groupingBy(String::toString)
+            .eachCount()
     val violations =
         sessionRecordCapabilityMethods.flatMap { (capability, expected) ->
             buildList {
