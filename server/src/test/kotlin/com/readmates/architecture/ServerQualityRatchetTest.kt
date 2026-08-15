@@ -123,6 +123,10 @@ class ServerQualityRatchetTest {
             ceiling = MAX_KTLINT_BASELINE_ERRORS,
             label = "ktlint baseline",
         )
+
+        assertThat(identities.detektIssues).hasSize(449)
+        assertThat(retiredDetektIdentities).hasSize(12)
+        assertThat(approvedDetektSeed).hasSize(461)
     }
 
     @Test

@@ -207,8 +207,73 @@ private val legacyRepositoryDependencyTarget: DescribedPredicate<JavaClass> =
             )
     }
 
+private fun assertManualNotificationPersistenceOwnership() {
+    val sourceRoot =
+        listOf(Path.of("src/main/kotlin"), Path.of("server/src/main/kotlin"))
+            .first(Files::exists)
+    val persistenceRoot = sourceRoot.resolve("com/readmates/notification/adapter/out/persistence")
+    val facadeSource = persistenceRoot.resolve("JdbcManualNotificationDispatchAdapter.kt").readText()
+    val collaborators =
+        listOf(
+            "ManualNotificationDispatchReadQueries.kt",
+            "ManualNotificationAudienceQueries.kt",
+            "ManualNotificationPreviewStore.kt",
+            "ManualNotificationConfirmStore.kt",
+            "ManualNotificationDispatchRows.kt",
+        )
+    val inlineSqlLiteral =
+        Regex(
+            """(?i)\"[^\"\n]*\b(select|insert|update|delete|from|where|join|limit|for update)\b[^\"\n]*\"""",
+        )
+
+    assertFalse("\"\"\"" in facadeSource, "Manual notification persistence facade must not own raw SQL literals")
+    assertFalse(inlineSqlLiteral.containsMatchIn(facadeSource), "Facade must not own inline SQL literals")
+    collaborators.forEach { collaboratorName ->
+        assertManualNotificationPersistenceCollaborator(persistenceRoot.resolve(collaboratorName), collaboratorName)
+    }
+}
+
+private fun assertManualNotificationPersistenceCollaborator(
+    collaborator: Path,
+    collaboratorName: String,
+) {
+    assertTrue(Files.exists(collaborator), "$collaboratorName must exist in notification persistence")
+    val source = collaborator.readText()
+    assertTrue(
+        source.startsWith("package com.readmates.notification.adapter.out.persistence\n"),
+        "$collaboratorName must stay in notification persistence",
+    )
+    val forbiddenImports =
+        source
+            .lineSequence()
+            .map(String::trim)
+            .filter { line -> line.startsWith("import ") }
+            .map { line -> line.removePrefix("import ") }
+            .filterNot(::isAllowedManualNotificationPersistenceImport)
+            .toList()
+    assertTrue(
+        forbiddenImports.isEmpty(),
+        "$collaboratorName may depend only on notification models and ports, notification domain, " +
+            "stable shared DB or paging helpers, JDBC, Jackson, and JDK types: $forbiddenImports",
+    )
+}
+
+private fun isAllowedManualNotificationPersistenceImport(importName: String): Boolean =
+    importName.startsWith("com.readmates.notification.application.model.") ||
+        importName.startsWith("com.readmates.notification.application.port.out.") ||
+        importName.startsWith("com.readmates.notification.domain.") ||
+        importName.startsWith("com.readmates.shared.db.") ||
+        importName.startsWith("com.readmates.shared.paging.") ||
+        importName == "org.springframework.jdbc.core.JdbcTemplate" ||
+        importName == "tools.jackson.databind.ObjectMapper" ||
+        importName.startsWith("java.")
+
 @Tag("architecture")
 class ServerArchitectureBoundaryTest {
+    @Test
+    fun `manual notification persistence facade owns no sql and collaborators stay outbound only`() =
+        assertManualNotificationPersistenceOwnership()
+
     @Test
     fun `admin operations is registered as workflow slice`() {
         val adminOperations = serverSlices.single { slice -> slice.name == "admin.operations" }

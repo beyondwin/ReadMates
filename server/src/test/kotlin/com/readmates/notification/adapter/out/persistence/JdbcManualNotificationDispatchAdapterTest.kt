@@ -148,36 +148,88 @@ class JdbcManualNotificationDispatchAdapterTest(
 
     @Test
     fun `previewTargets applies audience edits and email preference counts`() {
-        disablePreference("member1@example.com")
-        val selection =
-            selection(
-                excludedMembershipIds = listOf(membershipId("member2@example.com")),
-                includedMembershipIds = emptyList(),
-            )
+        val emailDisabledMemberId = membershipId("member1@example.com")
+        val originalPreference = mutableReplayState(emailDisabledMemberId).preference
+        val excludedMemberId = membershipId("member2@example.com")
+        try {
+            disablePreference("member1@example.com")
+            val selection =
+                selection(
+                    excludedMembershipIds = listOf(excludedMemberId),
+                    includedMembershipIds = emptyList(),
+                )
 
-        val snapshot = adapter.previewTargets(clubId, selection)
+            val snapshot = adapter.previewTargets(clubId, selection)
 
-        assertThat(snapshot.finalTargetCount).isGreaterThan(0)
-        assertThat(snapshot.excludedCount).isEqualTo(1)
-        assertThat(snapshot.emailSkippedByPreferenceCount).isGreaterThanOrEqualTo(1)
-        assertThat(snapshot.targetMembershipIds).hasSize(snapshot.finalTargetCount)
-        assertThat(snapshot.inAppMembershipIds).hasSize(snapshot.inAppEligibleCount)
-        assertThat(snapshot.emailMembershipIds).hasSize(snapshot.emailEligibleCount)
-        assertThat(snapshot.targetMembershipIds).doesNotContain(membershipId("member2@example.com"))
+            assertThat(snapshot.baseCount).isEqualTo(6)
+            assertThat(snapshot.finalTargetCount).isEqualTo(5)
+            assertThat(snapshot.excludedCount).isEqualTo(1)
+            assertThat(snapshot.inAppEligibleCount).isEqualTo(5)
+            assertThat(snapshot.emailEligibleCount).isEqualTo(4)
+            assertThat(snapshot.emailSkippedByPreferenceCount).isEqualTo(1)
+            assertThat(snapshot.emailMissingCount).isZero()
+            assertThat(snapshot.targetMembershipIds).hasSize(snapshot.finalTargetCount)
+            assertThat(snapshot.inAppMembershipIds).hasSize(snapshot.inAppEligibleCount)
+            assertThat(snapshot.emailMembershipIds).hasSize(snapshot.emailEligibleCount)
+            assertThat(snapshot.targetMembershipIds).contains(emailDisabledMemberId).doesNotContain(excludedMemberId)
+            assertThat(snapshot.inAppMembershipIds).contains(emailDisabledMemberId)
+            assertThat(snapshot.emailMembershipIds).doesNotContain(emailDisabledMemberId)
+        } finally {
+            restorePreference(emailDisabledMemberId, originalPreference)
+        }
     }
 
     @Test
     fun `previewTargets freezes only email eligible ids for email only requests`() {
-        disablePreference("member1@example.com")
-        val snapshot =
-            adapter.previewTargets(
-                clubId,
-                selection(requestedChannels = ManualNotificationRequestedChannels.EMAIL),
-            )
+        val changedMembershipId = membershipId("member1@example.com")
+        val originalPreference = mutableReplayState(changedMembershipId).preference
+        try {
+            disablePreference("member1@example.com")
+            val snapshot =
+                adapter.previewTargets(
+                    clubId,
+                    selection(requestedChannels = ManualNotificationRequestedChannels.EMAIL),
+                )
 
-        assertThat(snapshot.inAppMembershipIds).isEmpty()
-        assertThat(snapshot.emailMembershipIds).hasSize(snapshot.emailEligibleCount)
-        assertThat(snapshot.targetMembershipIds).hasSize(snapshot.finalTargetCount)
+            assertThat(snapshot.inAppMembershipIds).isEmpty()
+            assertThat(snapshot.emailMembershipIds).hasSize(snapshot.emailEligibleCount)
+            assertThat(snapshot.targetMembershipIds).hasSize(snapshot.finalTargetCount)
+        } finally {
+            restorePreference(changedMembershipId, originalPreference)
+        }
+    }
+
+    @Test
+    fun `previewTargets keeps all active recipients eligible for in app only requests`() {
+        val changedMembershipId = membershipId("member1@example.com")
+        val originalPreference = mutableReplayState(changedMembershipId).preference
+        try {
+            disablePreference("member1@example.com")
+
+            val snapshot =
+                adapter.previewTargets(
+                    clubId,
+                    selection(requestedChannels = ManualNotificationRequestedChannels.IN_APP),
+                )
+
+            assertThat(snapshot.finalTargetCount).isEqualTo(6)
+            assertThat(snapshot.inAppEligibleCount).isEqualTo(6)
+            assertThat(snapshot.emailEligibleCount).isZero()
+            assertThat(snapshot.emailSkippedByPreferenceCount).isZero()
+            assertThat(snapshot.emailMissingCount).isZero()
+            assertThat(snapshot.inAppMembershipIds).contains(changedMembershipId)
+            assertThat(snapshot.emailMembershipIds).isEmpty()
+        } finally {
+            restorePreference(changedMembershipId, originalPreference)
+        }
+    }
+
+    @Test
+    fun `preview target hash remains byte stable for the seeded audience`() {
+        val snapshot = adapter.previewTargets(clubId, selection())
+
+        assertThat(snapshot.snapshotHash())
+            .isEqualTo("89613ad89b63f48a69300f5986783c5b779272de3aa2d0248592452d43863d58")
     }
 
     @Test
@@ -213,6 +265,7 @@ class JdbcManualNotificationDispatchAdapterTest(
                 PageRequest.cursor(10, page.nextCursor, defaultLimit = 50, maxLimit = 100),
             )
         assertThat(next.items.map { it.membershipId }).doesNotContain(page.items.single().membershipId)
+        assertThat(page.items.single().maskedEmail).isEqualTo("m***@example.com")
     }
 
     @Test
@@ -235,20 +288,97 @@ class JdbcManualNotificationDispatchAdapterTest(
             )
 
         assertThat(page.items.map { it.manualDispatchId }).contains(stored.manualDispatchId)
-        assertThat(page.items.single { it.manualDispatchId == stored.manualDispatchId }.requestedBy).contains("***@")
+        assertThat(page.items.single { it.manualDispatchId == stored.manualDispatchId }.requestedBy)
+            .isEqualTo("h***@example.com")
+    }
+
+    @Test
+    fun `listDispatches continues without duplicate ids`() {
+        val storedIds =
+            (1..3)
+                .map { index -> insertManualDispatchFixture("manual-dispatch-page-$index").manualDispatchId }
+                .toSet()
+
+        val first =
+            adapter.listDispatches(
+                clubId,
+                sessionId,
+                NotificationEventType.SESSION_REMINDER_DUE,
+                PageRequest.cursor(2, null, defaultLimit = 50, maxLimit = 100),
+            )
+        val second =
+            adapter.listDispatches(
+                clubId,
+                sessionId,
+                NotificationEventType.SESSION_REMINDER_DUE,
+                PageRequest.cursor(2, first.nextCursor, defaultLimit = 50, maxLimit = 100),
+            )
+
+        assertThat(first.items).hasSize(2)
+        assertThat(first.nextCursor).isNotBlank()
+        assertThat(second.items).hasSize(1)
+        assertThat(second.nextCursor).isNull()
+        assertThat(first.items.map { it.manualDispatchId }).doesNotContainAnyElementsOf(
+            second.items.map { it.manualDispatchId },
+        )
+        assertThat((first.items + second.items).map { it.manualDispatchId })
+            .containsExactlyInAnyOrderElementsOf(storedIds)
     }
 
     @Test
     fun `insertPreview and findPreview round trip host scoped preview`() {
         val expiresAt = OffsetDateTime.of(2026, 5, 13, 9, 10, 0, 0, ZoneOffset.UTC)
 
-        val targetSnapshotHash = "b".repeat(64)
-        val id = adapter.insertPreview(clubId, hostMembershipId, "a".repeat(64), targetSnapshotHash, expiresAt)
+        val selectionHash = "388bfc07eacd106f40fd7d98d76d77e66b1226e28bf3bb4b34519b32fe6ffb36"
+        val targetSnapshotHash = "89613ad89b63f48a69300f5986783c5b779272de3aa2d0248592452d43863d58"
+        val id = adapter.insertPreview(clubId, hostMembershipId, selectionHash, targetSnapshotHash, expiresAt)
         val record = adapter.findPreview(id, clubId, hostMembershipId)
 
-        assertThat(record!!.selectionHash).isEqualTo("a".repeat(64))
+        assertThat(record!!.selectionHash).isEqualTo(selectionHash)
         assertThat(record.targetSnapshotHash).isEqualTo(targetSnapshotHash)
         assertThat(record.expiresAt).isEqualTo(expiresAt)
+    }
+
+    @Test
+    fun `confirm waits for the preview row lock before consuming it`() {
+        val now = OffsetDateTime.of(2026, 7, 23, 0, 0, 0, 0, ZoneOffset.UTC)
+        val currentSelection = selection()
+        val previewId = insertLockTestPreview(now, currentSelection)
+        val executor = Executors.newSingleThreadExecutor()
+
+        openProbeConnection().use { sessionLock ->
+            sessionLock.autoCommit = false
+            sessionLock
+                .prepareStatement(
+                    "select id from sessions where club_id = ? and id = ? for update",
+                ).use { statement ->
+                    statement.setString(1, clubId.toString())
+                    statement.setString(2, sessionId.toString())
+                    statement.executeQuery().use { resultSet -> assertThat(resultSet.next()).isTrue() }
+                }
+            val confirmation =
+                CompletableFuture.supplyAsync(
+                    { confirm(previewId, now, currentSelection) },
+                    executor,
+                )
+
+            try {
+                assertThatThrownBy { confirmation.get(250, TimeUnit.MILLISECONDS) }
+                    .isInstanceOf(TimeoutException::class.java)
+                assertConfirmOwnsPreviewRow(previewId)
+                sessionLock.commit()
+
+                val stored = confirmed(confirmation.get(10, TimeUnit.SECONDS))
+                assertThat(stored.status).isEqualTo(ManualNotificationConfirmInsertStatus.CREATED)
+                assertThat(eventCount(stored.eventId)).isEqualTo(1)
+                assertThat(previewManualDispatchCount(previewId)).isEqualTo(1)
+            } finally {
+                if (!sessionLock.autoCommit) {
+                    sessionLock.rollback()
+                }
+                executor.shutdownNow()
+            }
+        }
     }
 
     @Test
@@ -311,6 +441,8 @@ class JdbcManualNotificationDispatchAdapterTest(
             assertThat(first.status).isEqualTo(ManualNotificationConfirmInsertStatus.CREATED)
             assertThat(second.status).isEqualTo(ManualNotificationConfirmInsertStatus.ALREADY_CONSUMED)
             assertThat(first.eventId).isEqualTo(second.eventId)
+            assertThat(first.manualDispatchId).isEqualTo(second.manualDispatchId)
+            assertThat(first.createdAt).isEqualTo(second.createdAt)
             assertThat(second.summary).isEqualTo(first.summary)
             assertThat(second.summary.targetCount).isEqualTo(snapshot.finalTargetCount)
             assertThat(second.summary.expectedInAppCount).isEqualTo(snapshot.inAppEligibleCount)
@@ -930,7 +1062,9 @@ class JdbcManualNotificationDispatchAdapterTest(
         }
     }
 
-    private fun insertManualDispatchFixture() =
+    private fun insertManualDispatchFixture(
+        identitySeed: String = "manual-dispatch-list",
+    ) =
         adapter.insertManualDispatch(
             clubId = clubId,
             hostMembershipId = hostMembershipId,
@@ -942,7 +1076,7 @@ class JdbcManualNotificationDispatchAdapterTest(
                     bookTitle = "Example Book",
                     manualDispatch =
                         NotificationManualDispatchPayload(
-                            id = UUID.nameUUIDFromBytes("manual-dispatch-list".toByteArray()),
+                            id = UUID.nameUUIDFromBytes(identitySeed.toByteArray()),
                             source = NotificationDispatchSource.MANUAL,
                             requestedByMembershipId = hostMembershipId,
                             requestedChannels = ManualNotificationRequestedChannels.BOTH,
@@ -1258,6 +1392,22 @@ class JdbcManualNotificationDispatchAdapterTest(
                         assertThat(resultSet.getString("id")).isEqualTo(previewId.toString())
                     }
                 }
+            connection.rollback()
+        }
+    }
+
+    private fun assertConfirmOwnsPreviewRow(previewId: UUID) {
+        openProbeConnection().use { connection ->
+            connection.autoCommit = false
+            assertThatThrownBy {
+                connection
+                    .prepareStatement(
+                        "select id from notification_manual_dispatch_previews where id = ? for update nowait",
+                    ).use { statement ->
+                        statement.setString(1, previewId.toString())
+                        statement.executeQuery().use { it.next() }
+                    }
+            }.isInstanceOf(SQLException::class.java)
             connection.rollback()
         }
     }
