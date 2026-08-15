@@ -21,8 +21,8 @@
   com/readmates/sessionrecord/adapter/out/persistence/JdbcSessionRecordAdapter.kt|com.readmates.sessionrecord.application.service.SessionRecordSnapshotCodec
   ```
 
-- Retire exactly `sessionrecord|sessionimport` and `sessionrecord|session`. Preserve current `sessionimport|sessionrecord` and `session|sessionrecord`. Do not retire or invent a third feature edge.
-- Initial architecture partitions are `4 current + 35 retired = 39 approved` boundary identities and `40 current + 1 retired = 41 approved` feature identities. Final partitions must be `0 + 39 = 39` and `38 + 3 = 41`, with `cyclicFeatureComponents(actual) == emptySet()`.
+- Retire exactly `sessionrecord|sessionimport`, `sessionrecord|session`, and the ownership-derived `aigen|session` edge. Preserve current `sessionimport|sessionrecord` and `session|sessionrecord`. Do not retire or invent a fourth feature edge.
+- Initial architecture partitions are `4 current + 35 retired = 39 approved` boundary identities and `40 current + 1 retired = 41 approved` feature identities. Final partitions must be `0 + 39 = 39` and `37 + 4 = 41`, with `cyclicFeatureComponents(actual) == emptySet()`.
 - Preserve every REST route, request/response JSON field and enum spelling, status, public error code/message, cursor key and sort tuple, draft/live revision and replay rule, notification composer choice and dedupe independence, transaction boundary and rollback behavior, snapshot JSON/schema/hash, author attribution, normalized import content, cache invalidation timing, import preview/commit behavior, and exposure compatibility mapping.
 - Do not change frontend/BFF source, migrations, schema, SQL meaning, deploy files, auth/actor behavior, notification delivery, or public/guest access policy. No live provider, email, production data, deployment, tag, push, or PR action is authorized.
 - Use application-owned models, failures, and consumer-owned ports. Do not move session-family values into `shared`, inject concrete services across features, or create an adapter-to-adapter dependency.
@@ -49,7 +49,7 @@
 | After Task 4 | 0 | 39 | 39 | 2 | `session,sessionrecord` |
 | After Task 5 | 0 | 39 | 38 | 3 | none |
 
-The only new feature tombstones are `sessionrecord|sessionimport` in Task 4 and `sessionrecord|session` in Task 5. The existing `club|auth` tombstone remains untouched.
+The only new feature tombstones are `sessionrecord|sessionimport` in Task 4 plus `sessionrecord|session` and `aigen|session` in Task 5. The `aigen|session` edge exists at the Task 5 base only because the three AI production consumers import the session-owned `SessionRecordVisibility`; the required move to record ownership removes all three imports, so retaining that edge would require an artificial dependency. The existing `club|auth` tombstone remains untouched.
 
 ## File Structure
 
@@ -356,9 +356,9 @@ sealed interface SessionRecordContentReplacementResult {
   ```
 
 - [ ] **Step 3: Move visibility and split cursor failure.** Move the unchanged three-value enum out of `SessionApplicationModels.kt`. Update all exact imports; do not change fields, JSON annotations, database strings, or compatibility conversion. Add `InvalidHostSessionHistoryCursorException` beside record application errors and use it in controller strict decode and history service validation. Map it in `SessionRecordErrorHandler`; leave session's exception/handler/query behavior intact.
-- [ ] **Step 4: Retire exactly one feature row and finish cycles.** Move `sessionrecord|session` verbatim to retired. Change expected cyclic components to `emptySet()`. Assert `38 current + 3 retired = 41 approved`, `session|sessionrecord` and `sessionimport|sessionrecord` remain current, and the only new retired rows relative to the plan base are the two required reverse edges.
+- [ ] **Step 4: Retire exactly two feature rows and finish cycles.** Move `sessionrecord|session` and the ownership-derived `aigen|session` verbatim to retired. Change expected cyclic components to `emptySet()`. Assert `37 current + 4 retired = 41 approved`, `session|sessionrecord` and `sessionimport|sessionrecord` remain current, and the only new retired rows relative to the plan base are the two required reverse edges plus `aigen|session`.
 - [ ] **Step 5: Mutations and GREEN.** Rename `MEMBER`, map history cursor to 404, remove club/session cursor binding, and map `PUBLIC` to non-public exposure one at a time. Exact enum/JSON, error, cursor, and import-apply exposure tests must fail. Restore and rerun Step 2.
-- [ ] **Step 6: Review and commit.** Review all enum consumers, API JSON, ordinary versus history cursor separation, public exposure dual-write, no third feature retirement, forward edges, and zero cycles. Commit:
+- [ ] **Step 6: Review and commit.** Review all enum consumers, API JSON, ordinary versus history cursor separation, public exposure dual-write, exact three-row total feature retirement across Tasks 4–5, forward edges, and zero cycles. Commit:
 
   ```bash
   git commit -m "refactor(server): own session record visibility"
@@ -389,7 +389,7 @@ sealed interface SessionRecordContentReplacementResult {
   ```
 
   Record the actual plan commit and implementation base in the ignored report. Do not use the historical plan base as the implementation diff base.
-- [ ] **Step 2: Update active docs.** State that boundary debt is `0 + 39 = 39`, feature debt is `38 + 3 = 41`, and cycle count is zero. Name the four boundary and two feature tombstones, both preserved forward directions, port ownership, codec ownership, visibility/cursor ownership, and transaction preservation. State that large-class decomposition and final Phase 2 program closeout remain separate.
+- [ ] **Step 2: Update active docs.** State that boundary debt is `0 + 39 = 39`, feature debt is `37 + 4 = 41`, and cycle count is zero. Name the four boundary and three new feature tombstones, both preserved forward directions, port ownership, codec ownership, visibility/cursor ownership, and transaction preservation. State that large-class decomposition and final Phase 2 program closeout remain separate.
 - [ ] **Step 3: Run final gates sequentially at final candidate HEAD.**
 
   ```bash
@@ -419,7 +419,7 @@ sealed interface SessionRecordContentReplacementResult {
 
   Exclude comments and string fixtures only through the existing Kotlin-aware scanner; do not rely on raw grep as the load-bearing detector.
 - [ ] **Step 6: Perform independent final review.** Require explicit verdicts for: (1) spec/scope coverage, (2) REST/JSON/error/cursor compatibility, (3) transaction/revision/notification/cache semantics, (4) codec/sort/import/exposure behavior, (5) exact ledger arithmetic/no third edge/zero cycles, and (6) public safety/test evidence. Resolve every Critical/Important finding in its originating task with its exact correction subject and rerun that task plus affected final gates.
-- [ ] **Step 7: Write the ignored final report.** Include bases/SHAs, exact changed inventory, task and correction commits, four boundary/two feature tombstones, preserved forward edges, cycle output, mutation failures/restorations, focused and full test counts, public-candidate result, review verdicts, skipped E2E/live reasons, and remaining out-of-scope large-class/final-closeout work. Never stage the report.
+- [ ] **Step 7: Write the ignored final report.** Include bases/SHAs, exact changed inventory, task and correction commits, four boundary/three new feature tombstones, preserved forward edges, cycle output, mutation failures/restorations, focused and full test counts, public-candidate result, review verdicts, skipped E2E/live reasons, and remaining out-of-scope large-class/final-closeout work. Never stage the report.
 - [ ] **Step 8: Review, stage, and commit docs.** Stage only the three tracked docs and commit:
 
   ```bash
@@ -444,9 +444,9 @@ sealed interface SessionRecordContentReplacementResult {
 
 - [ ] Exactly six tasks completed with exact commit subjects or documented correction subjects.
 - [ ] Exactly four boundary identities retired; partition `0 + 39 = 39`.
-- [ ] Exactly two new feature identities retired; partition `38 + 3 = 41`.
+- [ ] Exactly three new feature identities retired; partition `37 + 4 = 41`.
 - [ ] `sessionimport|sessionrecord` and `session|sessionrecord` remain current.
-- [ ] No third feature edge was retired or introduced; cyclic components are empty.
+- [ ] No fourth feature edge was retired or introduced; cyclic components are empty.
 - [ ] REST/JSON/status/error/cursor/revision/notification/transaction/codec/sort/import/commit/exposure behavior is characterized and green.
 - [ ] No frontend/BFF, migration/schema, deploy, live provider, email, or production-data change exists.
 - [ ] No suppression/baseline/config exception was added.
