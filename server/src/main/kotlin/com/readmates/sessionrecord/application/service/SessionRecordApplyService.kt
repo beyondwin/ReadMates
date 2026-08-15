@@ -2,16 +2,6 @@ package com.readmates.sessionrecord.application.service
 
 import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.sessionimport.application.model.SESSION_IMPORT_FORMAT
-import com.readmates.sessionimport.application.model.SessionImportCommand
-import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
-import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
-import com.readmates.sessionimport.application.model.SessionImportRecordCommand
-import com.readmates.sessionimport.application.model.SessionImportSessionCommand
-import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
-import com.readmates.sessionimport.application.service.toCanonicalSnapshot
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
@@ -24,6 +14,9 @@ import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
+import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.security.AccessDeniedException
@@ -36,8 +29,7 @@ import java.util.UUID
 class SessionRecordApplyService(
     private val store: SessionRecordStorePort,
     private val codec: SessionRecordSnapshotCodec,
-    private val validator: ValidateSessionImportUseCase,
-    private val replacer: ReplaceValidatedSessionImportUseCase,
+    private val replacer: ReplaceSessionRecordContentPort,
 ) : ApplySessionRecordUseCase {
     override fun preview(
         host: CurrentMember,
@@ -96,26 +88,33 @@ class SessionRecordApplyService(
                 "Session record draft hash is invalid",
             )
         }
-        val importCommand = draft.toImportCommand(host, editor.live)
-        val validated =
-            validator.validate(
-                importCommand,
-                draft.trustedAuthorBindings(),
-                draft.historicalAuthorBindings(editor.live, draft.trustedAuthorBindings()),
-                trustAuthorDisplayNames =
-                    draft.source == com.readmates.sessionrecord.application.model.SessionRecordDraftSource.AI_GENERATED,
-            )
-        if (!validated.valid) {
-            throw SessionRecordException(
-                SessionRecordError.INVALID_RECORD,
-                "Session record draft is invalid",
-            )
-        }
         val encodedLive = codec.encode(editor.live.snapshot)
-        val canonicalSnapshot = importCommand.toCanonicalSnapshot(validated)
-        val encodedDraft = codec.encode(canonicalSnapshot)
+        val trustedAuthorBindings = draft.trustedAuthorBindings()
         store.insertBaselineIfAbsent(host, editor.live, encodedLive)
-        replacer.replace(ValidatedSessionImportReplacement(importCommand, validated, canonicalSnapshot))
+        val replacement =
+            replacer.replace(
+                SessionRecordContentReplacement(
+                    host = host,
+                    sessionId = draft.sessionId,
+                    sessionNumber = editor.live.sessionNumber,
+                    bookTitle = editor.live.bookTitle,
+                    meetingDate = editor.live.meetingDate,
+                    snapshot = draft.snapshot,
+                    source = draft.source,
+                    trustedAuthorBindings = trustedAuthorBindings,
+                    historicalAuthorBindings = draft.historicalAuthorBindings(editor.live, trustedAuthorBindings),
+                ),
+            )
+        val canonicalSnapshot =
+            when (replacement) {
+                is SessionRecordContentReplacementResult.Applied -> replacement.canonicalSnapshot
+                SessionRecordContentReplacementResult.Invalid ->
+                    throw SessionRecordException(
+                        SessionRecordError.INVALID_RECORD,
+                        "Session record draft is invalid",
+                    )
+            }
+        val encodedDraft = codec.encode(canonicalSnapshot)
         val revision = store.insertAppliedRevision(host, editor, encodedDraft)
         store.insertApplyReceipt(host, command, requestHash, eventType, revision)
         if (!store.deleteAppliedDraft(host, command.sessionId, command.expectedDraftRevision)) {
@@ -191,25 +190,6 @@ class SessionRecordApplyService(
                         "Session record author attribution is ambiguous for $name",
                     )
             }
-
-    private fun SessionRecordDraft.toImportCommand(
-        host: CurrentMember,
-        live: LiveSessionRecord,
-    ) = SessionImportCommand(
-        host = host,
-        sessionId = sessionId,
-        recordVisibility = snapshot.visibility,
-        format = SESSION_IMPORT_FORMAT,
-        session = SessionImportSessionCommand(live.sessionNumber, live.bookTitle, live.meetingDate),
-        publication = SessionImportPublicationCommand(snapshot.publicationSummary),
-        highlights = snapshot.highlights.map { SessionImportRecordCommand(it.authorDisplayName, it.text) },
-        oneLineReviews = snapshot.oneLineReviews.map { SessionImportRecordCommand(it.authorDisplayName, it.text) },
-        feedbackDocument =
-            SessionImportFeedbackDocumentCommand(
-                snapshot.feedbackDocument.fileName,
-                snapshot.feedbackDocument.markdown,
-            ),
-    )
 
     private fun requireHost(host: CurrentMember) {
         if (!host.isHost) throw AccessDeniedException("Host role required")

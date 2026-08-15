@@ -6,18 +6,24 @@ import com.readmates.notification.application.port.out.NotificationEventOutboxPo
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
+import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.sessionrecord.application.service.SessionRecordApplyService
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.assertThrows
+import org.mockito.Mockito.doThrow
+import org.mockito.Mockito.verify
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
@@ -112,7 +118,11 @@ class HostSessionImportControllerDbTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val applyService: SessionRecordApplyService,
     @param:Autowired private val eventOutbox: NotificationEventOutboxPort,
+    @param:Autowired private val snapshotCodec: SessionRecordSnapshotCodec,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @MockitoSpyBean
+    private lateinit var sessionRecordStore: SessionRecordStorePort
+
     @Test
     fun `host previews valid session import json`() {
         mockMvc
@@ -248,6 +258,50 @@ class HostSessionImportControllerDbTest(
             scalar("select cast(is_public as char) from public_session_publications where session_id = '$SESSION_ID'"),
         )
         assertEquals(0, countRows("session_record_drafts"))
+    }
+
+    @Test
+    fun `applied revision failure rolls back live replacement revision receipt and draft deletion`() {
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/session-import/commit") {
+                with(user("session-import-host@example.test"))
+                contentType = MediaType.APPLICATION_JSON
+                content = validImportJson(recordVisibility = "PUBLIC")
+            }.andExpect {
+                status { isOk() }
+            }
+        val host = directHost()
+        val preview =
+            applyService.preview(
+                host,
+                PreviewSessionRecordApplyCommand(
+                    sessionId = UUID.fromString(SESSION_ID),
+                    expectedDraftRevision = 1,
+                    expectedLiveRevision = 0,
+                ),
+            )
+        val before = rollbackState()
+        val expectedEditor = requireNotNull(sessionRecordStore.lockEditor(host, UUID.fromString(SESSION_ID)))
+        val expectedEncodedSnapshot = snapshotCodec.encode(requireNotNull(expectedEditor.draft).snapshot)
+        doThrow(IllegalStateException("test-only failure after live replacement"))
+            .`when`(sessionRecordStore)
+            .insertAppliedRevision(host, expectedEditor, expectedEncodedSnapshot)
+
+        assertThrows<IllegalStateException> {
+            applyService.apply(
+                host,
+                ApplySessionRecordCommand(
+                    sessionId = UUID.fromString(SESSION_ID),
+                    applyRequestId = UUID.nameUUIDFromBytes("rollback-import-apply".toByteArray()),
+                    expectedDraftRevision = 1,
+                    expectedLiveRevision = 0,
+                    expectedDraftHash = preview.expectedDraftHash,
+                ),
+            )
+        }
+
+        verify(sessionRecordStore).insertAppliedRevision(host, expectedEditor, expectedEncodedSnapshot)
+        assertEquals(before, rollbackState())
     }
 
     @Test
@@ -412,6 +466,64 @@ class HostSessionImportControllerDbTest(
 
     private fun scalar(sql: String): String? = jdbcTemplate.queryForObject(sql, String::class.java)
 
+    private fun rollbackState() =
+        ApplyRollbackState(
+            sessionExposure =
+                requireNotNull(
+                    scalar(
+                        "select concat_ws('|', visibility, access_scope) from sessions where id = '$SESSION_ID'",
+                    ),
+                ),
+            publication =
+                requireNotNull(
+                    scalar(
+                        """
+                        select concat_ws('|', public_summary, visibility, site_visibility, cast(is_public as char))
+                        from public_session_publications
+                        where session_id = '$SESSION_ID'
+                        """.trimIndent(),
+                    ),
+                ),
+            highlights = stateRows("highlights", "concat_ws('|', membership_id, text, sort_order)", "sort_order, id"),
+            reviews = stateRows("one_line_reviews", "concat_ws('|', membership_id, text, visibility)", "id"),
+            feedback =
+                stateRows(
+                    "session_feedback_documents",
+                    "concat_ws('|', version, source_text, document_title, file_name, content_type, file_size)",
+                    "version, id",
+                ),
+            revisions =
+                stateRows(
+                    "session_record_revisions",
+                    "concat_ws('|', version, source, snapshot_json, snapshot_sha256, applied_by_membership_id)",
+                    "version, id",
+                ),
+            receipts =
+                stateRows(
+                    "session_record_apply_receipts",
+                    "concat_ws('|', apply_request_id, expected_draft_revision, " +
+                        "expected_live_revision, draft_sha256, revision_id)",
+                    "apply_request_id",
+                ),
+            drafts =
+                stateRows(
+                    "session_record_drafts",
+                    "concat_ws('|', base_live_revision, draft_revision, source, snapshot_json, snapshot_sha256)",
+                    "draft_revision",
+                ),
+        )
+
+    private fun stateRows(
+        table: String,
+        projection: String,
+        orderBy: String,
+    ): List<String> =
+        jdbcTemplate
+            .queryForList(
+                "select $projection from $table where session_id = '$SESSION_ID' order by $orderBy",
+                String::class.java,
+            ).map(::requireNotNull)
+
     private fun directHost() =
         CurrentMember(
             userId = UUID.fromString(HOST_USER_ID),
@@ -424,6 +536,17 @@ class HostSessionImportControllerDbTest(
             role = MembershipRole.HOST,
         )
 }
+
+private data class ApplyRollbackState(
+    val sessionExposure: String,
+    val publication: String,
+    val highlights: List<String>,
+    val reviews: List<String>,
+    val feedback: List<String>,
+    val revisions: List<String>,
+    val receipts: List<String>,
+    val drafts: List<String>,
+)
 
 private fun validImportJson(
     sessionNumber: Int = 7951,

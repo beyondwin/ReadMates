@@ -37,5 +37,4 @@ sessionimport|sessionrecord
 sessionimport|shared
 sessionrecord|notification
 sessionrecord|session
-sessionrecord|sessionimport
 sessionrecord|shared

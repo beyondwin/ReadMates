@@ -166,7 +166,7 @@ class ServerArchitectureInventoryTest {
                 root.resolve("server/config/architecture/phase-0-retired-feature-dependencies.txt"),
             )
         val components = cyclicFeatureComponents(actual)
-        val expectedComponents = setOf(setOf("session", "sessionimport", "sessionrecord"))
+        val expectedComponents = setOf(setOf("session", "sessionrecord"))
 
         assertThat(actual).isEqualTo(baseline)
         requireApprovedIdentityPartition(

@@ -1,2 +1,3 @@
 # Append an exact approved feature dependency here when its current baseline debt is removed.
 club|auth
+sessionrecord|sessionimport

@@ -5,12 +5,6 @@ import com.readmates.notification.application.port.`in`.ConfirmHostActionNotific
 import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.sessionimport.application.model.SessionImportCommitResult
-import com.readmates.sessionimport.application.model.SessionImportCommittedFeedbackDocument
-import com.readmates.sessionimport.application.model.SessionImportPreviewResult
-import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
 import com.readmates.sessionrecord.adapter.out.codec.JacksonSessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
@@ -29,6 +23,9 @@ import com.readmates.sessionrecord.application.model.SessionRecordFeedbackDocume
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
 import com.readmates.sessionrecord.application.model.SessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordSource
+import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.security.AuthenticatedClubActor
@@ -67,15 +64,20 @@ class SessionRecordApplyServiceTest {
 
         fixture.apply()
 
-        assertEquals(1, fixture.validator.calls)
-        assertEquals(fixture.draft.snapshot, fixture.replacer.lastSnapshot)
+        assertEquals(fixture.draft.snapshot, fixture.replacer.lastInput?.snapshot)
+        assertEquals(fixture.host, fixture.replacer.lastInput?.host)
+        assertEquals(fixture.sessionId, fixture.replacer.lastInput?.sessionId)
+        assertEquals(28, fixture.replacer.lastInput?.sessionNumber)
+        assertEquals("Apply Test Book", fixture.replacer.lastInput?.bookTitle)
+        assertEquals(LocalDate.of(2026, 7, 23), fixture.replacer.lastInput?.meetingDate)
+        assertEquals(fixture.draft.source, fixture.replacer.lastInput?.source)
         assertEquals(
             mapOf("Host" to fixture.host.membershipId),
-            fixture.validator.lastTrustedBindings,
+            fixture.replacer.lastInput?.trustedAuthorBindings,
         )
         assertEquals(
             mapOf("Host" to fixture.host.membershipId),
-            fixture.validator.lastHistoricalBindings,
+            fixture.replacer.lastInput?.historicalAuthorBindings,
         )
         assertTrue(fixture.replacer.committed)
     }
@@ -86,7 +88,12 @@ class SessionRecordApplyServiceTest {
 
         fixture.apply()
 
-        assertEquals("Summary", fixture.replacer.lastSnapshot?.publicationSummary)
+        assertEquals(
+            "  Summary  ",
+            fixture.replacer.lastInput
+                ?.snapshot
+                ?.publicationSummary,
+        )
         assertEquals(
             "Summary",
             fixture.store.revisions
@@ -190,7 +197,7 @@ class SessionRecordApplyServiceTest {
 
         assertEquals(first, replay)
         assertEquals(1, fixture.store.receipts.size)
-        assertEquals(1, fixture.validator.calls)
+        assertEquals(1, fixture.replacer.calls)
     }
 
     @Test
@@ -237,7 +244,22 @@ class SessionRecordApplyServiceTest {
             listOf("baseline", "live replacement", "applied revision"),
             fixture.store.operations,
         )
-        assertNotNull(fixture.replacer.lastSnapshot)
+        assertNotNull(fixture.replacer.lastInput)
+        assertTrue(fixture.store.receipts.isEmpty())
+        assertNotNull(fixture.store.draft)
+    }
+
+    @Test
+    fun `invalid replacement leaves record store unchanged`() {
+        val fixture = Fixture(liveRevision = 3)
+        fixture.replacer.invalid = true
+
+        assertThrows(SessionRecordException::class.java) {
+            fixture.apply()
+        }.also { assertEquals(SessionRecordError.INVALID_RECORD, it.error) }
+
+        assertEquals(emptyList<String>(), fixture.store.operations)
+        assertTrue(fixture.store.revisions.isEmpty())
         assertTrue(fixture.store.receipts.isEmpty())
         assertNotNull(fixture.store.draft)
     }
@@ -309,13 +331,11 @@ private class Fixture(
         )
     private val codec = JacksonSessionRecordSnapshotCodec(JsonMapper.builder().findAndAddModules().build())
     val store = FakeApplyStore(live, draft, now, codec)
-    val validator = FakeValidator()
     val replacer = FakeReplacer { store.operations += "live replacement" }
     private val service =
         SessionRecordApplyService(
             store = store,
             codec = codec,
-            validator = validator,
             replacer = replacer,
         )
 
@@ -562,93 +582,25 @@ private class FakeApplyStore(
     )
 }
 
-private class FakeValidator : ValidateSessionImportUseCase {
-    var calls = 0
-    var lastTrustedBindings: Map<String, UUID> = emptyMap()
-    var lastHistoricalBindings: Map<String, UUID> = emptyMap()
-
-    override fun validate(
-        command: com.readmates.sessionimport.application.model.SessionImportCommand,
-        trustedAuthorBindings: Map<String, UUID>,
-        historicalAuthorBindings: Map<String, UUID>,
-        trustAuthorDisplayNames: Boolean,
-    ): SessionImportPreviewResult {
-        calls += 1
-        lastTrustedBindings = trustedAuthorBindings
-        lastHistoricalBindings = historicalAuthorBindings
-        return command.validPreview(trustedAuthorBindings)
-    }
-}
-
 private class FakeReplacer(
     private val onReplace: () -> Unit = {},
-) : ReplaceValidatedSessionImportUseCase {
-    var lastSnapshot: SessionRecordSnapshot? = null
+) : ReplaceSessionRecordContentPort {
+    var calls = 0
+    var lastInput: SessionRecordContentReplacement? = null
     var committed = false
+    var invalid = false
 
-    override fun replace(input: ValidatedSessionImportReplacement): SessionImportCommitResult {
+    override fun replace(input: SessionRecordContentReplacement): SessionRecordContentReplacementResult {
+        calls += 1
+        lastInput = input
+        if (invalid) return SessionRecordContentReplacementResult.Invalid
         onReplace()
-        lastSnapshot = input.snapshot
-        return input.preview.commitResult()
+        return SessionRecordContentReplacementResult.Applied(
+            input.snapshot.copy(publicationSummary = input.snapshot.publicationSummary.trim()),
+        )
     }
 
     fun commit() {
         committed = true
     }
 }
-
-@Suppress("MaxLineLength")
-private fun com.readmates.sessionimport.application.model.SessionImportCommand.validPreview(trustedAuthorBindings: Map<String, UUID>) =
-    SessionImportPreviewResult(
-        valid = true,
-        session =
-            com.readmates.sessionimport.application.model.SessionImportSessionPreview(
-                session.number,
-                session.bookTitle,
-                session.meetingDate.toString(),
-            ),
-        publication =
-            com.readmates.sessionimport.application.model.SessionImportPublicationPreview(
-                publication.summary.trim(),
-            ),
-        highlights =
-            highlights.map {
-                com.readmates.sessionimport.application.model.SessionImportRecordPreview(
-                    it.authorName,
-                    it.text.trim(),
-                    true,
-                    trustedAuthorBindings.getValue(it.authorName).toString(),
-                )
-            },
-        oneLineReviews =
-            oneLineReviews.map {
-                com.readmates.sessionimport.application.model.SessionImportRecordPreview(
-                    it.authorName,
-                    it.text.trim(),
-                    true,
-                    trustedAuthorBindings.getValue(it.authorName).toString(),
-                )
-            },
-        feedbackDocument =
-            com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentPreview(
-                feedbackDocument.fileName,
-                "Feedback",
-                true,
-            ),
-        issues = emptyList(),
-    )
-
-private fun SessionImportPreviewResult.commitResult() =
-    SessionImportCommitResult(
-        sessionId = UUID.randomUUID().toString(),
-        publication = publication,
-        highlights = highlights,
-        oneLineReviews = oneLineReviews,
-        feedbackDocument =
-            SessionImportCommittedFeedbackDocument(
-                uploaded = true,
-                fileName = feedbackDocument.fileName,
-                title = requireNotNull(feedbackDocument.title),
-                uploadedAt = "2026-07-23T00:00:00Z",
-            ),
-    )

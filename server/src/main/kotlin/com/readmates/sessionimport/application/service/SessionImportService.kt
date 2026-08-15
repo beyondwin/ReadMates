@@ -3,24 +3,27 @@ package com.readmates.sessionimport.application.service
 import com.readmates.feedback.application.FeedbackDocumentParser
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.SessionRecordVisibility
-import com.readmates.sessionimport.application.InvalidSessionImportException
 import com.readmates.sessionimport.application.model.SESSION_IMPORT_FORMAT
 import com.readmates.sessionimport.application.model.SessionImportCommand
-import com.readmates.sessionimport.application.model.SessionImportCommitResult
-import com.readmates.sessionimport.application.model.SessionImportCommittedFeedbackDocument
+import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
 import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentPreview
 import com.readmates.sessionimport.application.model.SessionImportIssue
 import com.readmates.sessionimport.application.model.SessionImportPreviewResult
+import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
 import com.readmates.sessionimport.application.model.SessionImportPublicationPreview
+import com.readmates.sessionimport.application.model.SessionImportRecordCommand
 import com.readmates.sessionimport.application.model.SessionImportRecordPreview
+import com.readmates.sessionimport.application.model.SessionImportSessionCommand
 import com.readmates.sessionimport.application.model.SessionImportSessionPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.`in`.PreviewSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ReplaceValidatedSessionImportUseCase
 import com.readmates.sessionimport.application.port.`in`.ValidateSessionImportUseCase
-import com.readmates.sessionimport.application.port.`in`.ValidatedSessionImportReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
+import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
+import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
+import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.AuthenticatedClubActor
@@ -47,7 +50,7 @@ class SessionImportService(
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : PreviewSessionImportUseCase,
     ValidateSessionImportUseCase,
-    ReplaceValidatedSessionImportUseCase {
+    ReplaceSessionRecordContentPort {
     private val parser = FeedbackDocumentParser()
 
     override fun preview(command: SessionImportCommand): SessionImportPreviewResult {
@@ -73,45 +76,37 @@ class SessionImportService(
         )
     }
 
-    override fun replace(input: ValidatedSessionImportReplacement): SessionImportCommitResult {
-        val command = input.command
-        val preview = input.preview
+    override fun replace(input: SessionRecordContentReplacement): SessionRecordContentReplacementResult {
+        val command = input.toImportCommand()
         requireHost(command.host)
-        if (!preview.valid) throw InvalidSessionImportException(preview.issues)
-        val feedbackTitle =
-            preview.feedbackDocument.title
-                ?: throw InvalidSessionImportException(
-                    listOf(SessionImportIssue("INVALID_FEEDBACK_DOCUMENT", "피드백 문서가 ReadMates 피드백 템플릿 형식이 아닙니다.")),
-                )
-
-        val storedFeedback =
-            writePort.replaceRecords(
-                SessionImportRecordReplacement(
-                    host = command.host,
-                    sessionId = command.sessionId,
-                    visibility = command.recordVisibility,
-                    publicationSummary = preview.publication.summary,
-                    highlights = preview.highlights,
-                    oneLineReviews = preview.oneLineReviews,
-                    feedbackDocument = command.feedbackDocument,
-                    feedbackTitle = feedbackTitle,
-                ),
+        val target = writePort.loadTarget(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        val preview =
+            validateAgainstTarget(
+                command,
+                target,
+                input.trustedAuthorBindings,
+                input.historicalAuthorBindings,
+                trustAuthorDisplayNames = input.source == SessionRecordDraftSource.AI_GENERATED,
             )
+        val feedbackTitle = preview.feedbackDocument.title
+        if (!preview.valid || feedbackTitle == null) return SessionRecordContentReplacementResult.Invalid
+        val canonicalSnapshot = command.toCanonicalSnapshot(preview)
+
+        writePort.replaceRecords(
+            SessionImportRecordReplacement(
+                host = command.host,
+                sessionId = command.sessionId,
+                visibility = command.recordVisibility,
+                publicationSummary = preview.publication.summary,
+                highlights = preview.highlights,
+                oneLineReviews = preview.oneLineReviews,
+                feedbackDocument = command.feedbackDocument,
+                feedbackTitle = feedbackTitle,
+            ),
+        )
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
 
-        return SessionImportCommitResult(
-            sessionId = command.sessionId.toString(),
-            publication = preview.publication,
-            highlights = preview.highlights,
-            oneLineReviews = preview.oneLineReviews,
-            feedbackDocument =
-                SessionImportCommittedFeedbackDocument(
-                    uploaded = true,
-                    fileName = storedFeedback.fileName,
-                    title = storedFeedback.title,
-                    uploadedAt = storedFeedback.uploadedAt,
-                ),
-        )
+        return SessionRecordContentReplacementResult.Applied(canonicalSnapshot)
     }
 
     private fun validateAgainstTarget(
@@ -289,3 +284,20 @@ class SessionImportService(
         private const val MAX_HIGHLIGHT_COUNT = 6
     }
 }
+
+private fun SessionRecordContentReplacement.toImportCommand() =
+    SessionImportCommand(
+        host = host,
+        sessionId = sessionId,
+        recordVisibility = snapshot.visibility,
+        format = SESSION_IMPORT_FORMAT,
+        session = SessionImportSessionCommand(sessionNumber, bookTitle, meetingDate),
+        publication = SessionImportPublicationCommand(snapshot.publicationSummary),
+        highlights = snapshot.highlights.map { SessionImportRecordCommand(it.authorDisplayName, it.text) },
+        oneLineReviews = snapshot.oneLineReviews.map { SessionImportRecordCommand(it.authorDisplayName, it.text) },
+        feedbackDocument =
+            SessionImportFeedbackDocumentCommand(
+                snapshot.feedbackDocument.fileName,
+                snapshot.feedbackDocument.markdown,
+            ),
+    )
