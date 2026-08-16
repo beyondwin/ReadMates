@@ -8,6 +8,12 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
+
+## v2.4.0 - 2026-08-17
+
+### Highlights
+
 - **Living Archive 디자인 프리뷰:** 격리된 `/living-archive-preview`를 직접 URL로만 확인할 수 있게 제공하고 `noindex,nofollow`로 검색 노출을 막습니다. 반응형·접근성·브라우저 격리 검증을 거쳤으며, 현재 `/`와 `/clubs/:slug` 화면은 변경하지 않습니다.
 - **애플리케이션 port 경계 정리:** AI messaging/scheduler inbound adapter는 concrete service 대신 input port를 호출하고, queue/provider failure·routing·Redis job-list availability는 application-owned 안전 모델로 전달합니다. Redis/job-list unavailable은 authoritative empty와 내부적으로 구분하되 기존 API projection은 유지하고, notification Kafka consumer wiring은 inbound ownership으로 producer configuration과 분리했습니다. outbound Redis/resilience adapter는 output port와 model에 의존합니다. 이후 actor/auth–club, session-family cycle, 대형 책임 클래스까지 같은 래칫 아래 정리해 Phase 2를 완료했습니다.
 - **관리자 delivery replay 원자성:** OWNER/OPERATOR replay preview는 최대 1,000개(설정 범위 `1..5000`)의 byte-exact EMAIL 실패 delivery를 exact tuple과 canonical hash로 고정하고, confirm은 unchanged·unleased target만 직접 `PENDING`으로 되돌립니다. Reset, 단일 protected audit, immutable receipt, preview consume를 한 트랜잭션으로 묶어 같은 명령 재시도에 저장된 결과를 반환하며 새 event/outbox row는 만들지 않습니다. Legacy v1은 다시 preview해야 하고 `MAIL_AMBIGUOUS` 등 비허용 상태는 제외됩니다. Flyway V48은 additive이며 REST/BFF/frontend success contract는 유지되고 live SMTP 검증은 수행하지 않았습니다.
@@ -20,6 +26,29 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **Phase 2 책임 분해 완료:** 수동 알림 persistence/preview/confirm, 호스트 세션 command/query/policy, 플랫폼 관리자 알림 read/replay/policy/JSON, Redis AI job capability/key/script/recovery, 세션 기록 read/apply/draft/row assembly를 각각 분리했습니다. `HostSessionWriteOperations`는 삭제했고 나머지 façade는 기존 bean/port 계약을 유지하는 위임 경계로 축소했습니다. 대상 `LargeClass`·`TooManyFunctions` suppression과 24개 정확한 Detekt identity를 현행 baseline에서 제거해 retired ledger로 옮겼으며, 새 baseline/config 예외나 대체 identity는 만들지 않았습니다. 이 책임 분해는 REST/API/auth, DB migration/schema, Kafka, Redis wire storage, frontend/BFF, deploy와 public behavior를 바꾸지 않습니다.
 - **플랫폼 health 장애 격리:** `/api/admin/health/snapshot`은 실제 Prometheus transport timeout, bounded dedicated executor와 single-flight refresh, last-known-good fallback을 사용합니다. 기존 snapshot contract에 refresh metadata만 additive로 추가하고, `/admin/health`는 서버가 제공한 `FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE` 상태를 표시합니다. platform-admin authorization, 외부 API 제거, schema migration, live provider 호출, email 발송 동작은 바꾸지 않았습니다.
 - **Flyway migration 불변성:** CI가 pull request base 또는 `main` push before SHA의 complete history와 현재 index/worktree를 비교해 기존 production migration의 수정·삭제·rename·이동을 fail closed로 차단합니다. 운영 보정은 `repair`나 과거 SQL 변경이 아니라 더 높은 새 forward-only migration으로 수행하며, Flyway runtime checksum과 V42/V44 지원 upgrade 테스트를 함께 유지합니다. 이 gate는 production schema를 변경하지 않습니다.
+
+### Fixed
+
+- **릴리즈 CI 복구:** AI Redis/Kafka 책임 분해 뒤 PII 검사가 새 keyspace와 application-owned routing model을 따라가도록 고쳤고, runtime duration 검증의 구형 ShellCheck 호환성을 복구했습니다. Platform health connection-pool timeout test는 점유 요청의 read timeout과 pool request timeout을 분리해 CI scheduling 지연에도 같은 실패 경계를 검증합니다.
+- **200% zoom 포커스 검증:** Living Archive CT가 CSS zoom 환경의 계산값이 아니라 실제 렌더링된 outline 두께를 확인해 접근성 계약을 유지하면서 Linux renderer의 pixel snapping 오탐을 제거했습니다.
+- **릴리즈 의존성 보안:** 전이 의존성 `nanoid`를 새 HIGH advisory의 수정 버전 `3.3.18`로 강제해 workspace audit를 복구했습니다.
+
+### Database
+
+- **Flyway V48:** 관리자 notification replay preview에 contract version과 actor/club context를 추가하고, immutable preview target과 confirmation receipt를 additive table로 저장합니다. 기존 v1 preview는 보존하되 v2 confirm은 exact selection hash, 단일 confirmation, protected audit event와 consume 상태를 일관되게 연결합니다. Rollback 대신 V48 schema를 보존한 compatible image 또는 새 forward-fix migration을 사용합니다.
+
+### Deployment Notes
+
+- Release commit의 `main` CI가 성공한 뒤 annotated `v2.4.0` tag에서 `Deploy Server Image`가 scan한 digest를 같은 tag로 promote합니다. 이번 릴리즈는 production runtime rendering이 바뀌므로 `sync-config(restart_api=false, dry_run=false)`로 notification·AI recovery 설정을 먼저 반영한 뒤, 최근 48시간 backup을 확인하고 OCI backend를 배포합니다.
+- Spring startup Flyway가 V48까지 적용되고 exact image digest, restart count 0, `/internal/health`, deploy ledger와 BFF auth가 정상인 경우에만 같은 `v2.4.0` tag로 Cloudflare Pages frontend를 배포합니다. 이미 발행한 tag와 migration은 이동·수정하지 않고 새 patch tag와 forward-fix로 복구합니다.
+- Final smoke는 public app/auth, OAuth redirect/error, public read와 anonymous admin deny를 read-only/no-send 방식으로 확인합니다. 실제 Google OAuth 완료, AI provider 호출, 이메일 발송, member/admin mutation은 수행하지 않습니다.
+
+### Verification
+
+- Release candidate gate: repository-pinned `pnpm@11.13.1`로 frontend lint, 279 files / 2,181 tests와 coverage(84.51% statements, 79.67% branches, 84.44% functions, 85.30% lines), production build와 Zod fixture freshness를 확인했습니다. Docker Chromium CT 60/60도 통과했습니다.
+- Server evidence: PR quality gate에서 unit 1,452 tests(1 skipped)와 architecture 94 tests가 통과했고, MySQL/Testcontainers integration 1,005 tests가 통과했습니다. Chromium E2E는 150/150이 통과했습니다.
+- Release safety: deploy/Flyway workflow contract, production AI config, public release candidate/gitleaks, Prometheus/Tempo/Grafana/Alertmanager 검증과 repository-pinned HIGH dependency audit 0건을 확인했습니다.
+- 원격 `main` CI, server image scan/promote, sync-config, OCI Flyway/health, same-tag frontend deployment와 production smoke의 실제 결과는 [v2.4.0 release readiness evidence](docs/reports/2026-08-17-release-readiness-v2.4.0.md)에 단계별로 기록합니다.
 
 ## v2.3.0 - 2026-08-09
 

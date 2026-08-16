@@ -414,10 +414,13 @@ test("reflows without horizontal scroll at 200 percent zoom", async ({ mount, pa
   await zoomedRecordsLink.focus();
   const zoomedFocus = await zoomedRecordsLink.evaluate((element) => {
     const style = getComputedStyle(element);
-    return { outlineStyle: style.outlineStyle, outlineWidth: Number.parseFloat(style.outlineWidth) };
+    return {
+      outlineStyle: style.outlineStyle,
+      renderedOutlineWidth: Number.parseFloat(style.outlineWidth) * Number.parseFloat(getComputedStyle(document.documentElement).zoom),
+    };
   });
   expect(zoomedFocus.outlineStyle).not.toBe("none");
-  expect(zoomedFocus.outlineWidth).toBeGreaterThanOrEqual(2);
+  expect(zoomedFocus.renderedOutlineWidth).toBeGreaterThanOrEqual(2);
 });
 
 test("uses one-time authored motion and an immediate reduced-motion fallback", async ({ mount, page }) => {

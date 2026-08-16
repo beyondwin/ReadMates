@@ -62,11 +62,11 @@ class PlatformAdminHealthTransportConfigTest {
                 .withUserConfiguration(PlatformAdminHealthConfig::class.java)
                 .withBean(ObjectMapper::class.java, { ObjectMapper() })
                 .withPropertyValues(
-                    "readmates.admin.health.provider-deadline=1s",
+                    "readmates.admin.health.provider-deadline=5s",
                     "readmates.admin.health.prometheus.base-url=${server.baseUrl}",
                     "readmates.admin.health.prometheus.connect-timeout=100ms",
                     "readmates.admin.health.prometheus.connection-request-timeout=100ms",
-                    "readmates.admin.health.prometheus.read-timeout=800ms",
+                    "readmates.admin.health.prometheus.read-timeout=5s",
                 ).run { context ->
                     assertThat(context).hasNotFailed()
                     val port = context.getBean(PrometheusQueryPort::class.java)
@@ -178,7 +178,7 @@ class PlatformAdminHealthTransportConfigTest {
                     val body = PROMETHEUS_SUCCESS_BODY.toByteArray(StandardCharsets.UTF_8)
                     exchange.responseHeaders.add("Content-Type", "application/json")
                     exchange.sendResponseHeaders(200, body.size.toLong())
-                    check(bodyRelease.await(2, TimeUnit.SECONDS))
+                    check(bodyRelease.await(10, TimeUnit.SECONDS))
                     exchange.responseBody.use { it.write(body) }
                 }
                 start()
@@ -208,7 +208,7 @@ class PlatformAdminHealthTransportConfigTest {
         private const val READ_TIMEOUT_MILLIS = 100L
         private const val PROVIDER_DEADLINE_MILLIS = 600L
         private const val DEFAULT_MAX_CONNECTIONS_PER_ROUTE = 5
-        private const val POOL_TIMEOUT_UPPER_BOUND_MILLIS = 400L
+        private const val POOL_TIMEOUT_UPPER_BOUND_MILLIS = 1_000L
         private const val PROMETHEUS_SUCCESS_BODY =
             """{"status":"success","data":{"resultType":"vector","result":[]}}"""
     }

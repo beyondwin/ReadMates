@@ -200,19 +200,20 @@ check5_redis_transcript_scope() {
 }
 
 check6_grounded_payload_scope_and_lifecycle() {
-  local production_hits unexpected adapter tests
+  local production_hits unexpected keyspace tests
   production_hits=$(grep -RIn --include='*.kt' -E 'aigen:job:.*:(transcript|turns|result|evidence)' \
     server/src/main/kotlin/com/readmates/aigen/ 2>/dev/null || true)
-  unexpected=$(printf '%s\n' "$production_hits" | grep -v 'RedisAiGenerationJobStore.kt' || true)
+  unexpected=$(printf '%s\n' "$production_hits" | grep -vE 'RedisAiGenerationJobStore.kt|AiGenerationRedisKeyspace.kt' || true)
   if [[ -n "$unexpected" ]]; then
     echo "FAIL [check6]: grounded Redis payload literal escaped the Redis adapter:" >&2
     echo "$unexpected" >&2
     return 1
   fi
-  adapter=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/RedisAiGenerationJobStore.kt
+  keyspace=server/src/main/kotlin/com/readmates/aigen/adapter/out/redis/AiGenerationRedisKeyspace.kt
   tests=server/src/test/kotlin/com/readmates/aigen/adapter/out/redis/RedisGroundedAiGenerationJobStoreTest.kt
   for suffix in transcript turns result evidence; do
-    if ! grep -q "private fun ${suffix}Key" "$adapter"; then
+    if ! grep -q "val ${suffix}: (UUID) -> String" "$keyspace" ||
+       ! grep -q "\${hash(jobId)}:${suffix}" "$keyspace"; then
       echo "FAIL [check6]: missing $suffix payload key boundary" >&2
       return 1
     fi
@@ -250,7 +251,7 @@ check7_grounded_hash_boundary() {
 
 check8_kafka_message_content_free() {
   local message fields forbidden
-  message=server/src/main/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobMessage.kt
+  message=server/src/main/kotlin/com/readmates/aigen/application/model/AiGenerationJobMessage.kt
   fields=$(sed -n '/data class AiGenerationJobMessage(/,/^)/p' "$message")
   forbidden=$(printf '%s\n' "$fields" | grep -Ei '\b(transcript|turns?|speaker|result|evidence|excerpt|prompt|instructions|name)\b' || true)
   if [[ -n "$forbidden" ]]; then
@@ -384,7 +385,7 @@ check14_observation_attribute_allowlist() {
 
 check15_kafka_payload_and_header_allowlist() {
   local message fields unexpected_fields header_calls unexpected_headers producer kafka_constants
-  message=server/src/main/kotlin/com/readmates/aigen/adapter/out/messaging/AiGenerationJobMessage.kt
+  message=server/src/main/kotlin/com/readmates/aigen/application/model/AiGenerationJobMessage.kt
   fields=$(sed -n '/data class AiGenerationJobMessage(/,/^)/p' "$message" | sed -nE 's/.*val ([a-zA-Z0-9_]+):.*/\1/p')
   unexpected_fields=$(printf '%s\n' "$fields" | grep -vE '^(jobId|sessionId|clubId|hostUserId|provider|model|kind)$' || true)
   header_calls=$(rg -n '(?:setHeader[A-Za-z]*|addHeader|copyHeaders|copyHeadersIfAbsent|RecordHeader|headers?(?:\(\))?\.add)\s*\(' \

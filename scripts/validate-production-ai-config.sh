@@ -101,8 +101,9 @@ require_duration_range() {
   local maximum_milliseconds="$4"
   local milliseconds
   milliseconds="$(duration_milliseconds "$key" "$value")"
-  [ "$milliseconds" -ge "$minimum_milliseconds" ] && [ "$milliseconds" -le "$maximum_milliseconds" ] ||
+  if [ "$milliseconds" -lt "$minimum_milliseconds" ] || [ "$milliseconds" -gt "$maximum_milliseconds" ]; then
     fail "$key is outside its approved duration range"
+  fi
 }
 
 require_integer_range() {
@@ -113,8 +114,9 @@ require_integer_range() {
   [[ "$value" =~ ^[0-9]+$ ]] || fail "$key must be an integer"
   [ "${#value}" -le 9 ] || fail "$key must be between $minimum and $maximum"
   local numeric_value=$((10#$value))
-  [ "$numeric_value" -ge "$minimum" ] && [ "$numeric_value" -le "$maximum" ] ||
+  if [ "$numeric_value" -lt "$minimum" ] || [ "$numeric_value" -gt "$maximum" ]; then
     fail "$key must be between $minimum and $maximum"
+  fi
 }
 
 retry_delay="$(read_env_example_value READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY)"
