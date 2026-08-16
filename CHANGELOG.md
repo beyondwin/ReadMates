@@ -10,7 +10,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 - 다음 릴리즈 후보 변경을 이 섹션에 기록합니다.
 
-## v2.4.0 - 2026-08-17
+## v2.4.1 - 2026-08-17
 
 ### Highlights
 
@@ -32,6 +32,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - **릴리즈 CI 복구:** AI Redis/Kafka 책임 분해 뒤 PII 검사가 새 keyspace와 application-owned routing model을 따라가도록 고쳤고, runtime duration 검증의 구형 ShellCheck 호환성을 복구했습니다. Platform health connection-pool timeout test는 점유 요청의 read timeout과 pool request timeout을 분리해 CI scheduling 지연에도 같은 실패 경계를 검증합니다.
 - **200% zoom 포커스 검증:** Living Archive CT가 CSS zoom 환경의 계산값이 아니라 실제 렌더링된 outline 두께를 확인해 접근성 계약을 유지하면서 Linux renderer의 pixel snapping 오탐을 제거했습니다.
 - **릴리즈 의존성 보안:** 전이 의존성 `nanoid`를 새 HIGH advisory의 수정 버전 `3.3.18`로 강제해 workspace audit를 복구했습니다.
+- **서버 이미지 보안:** `v2.4.0` tag의 image scan이 발견한 HttpComponents Core HIGH DoS 취약점 2건을 수정 버전 `5.4.3`으로 고정했습니다. 차단된 `v2.4.0` image는 promote·배포하지 않았고 immutable tag를 이동하지 않은 채 `v2.4.1`로 forward-fix합니다.
 
 ### Database
 
@@ -39,8 +40,8 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Deployment Notes
 
-- Release commit의 `main` CI가 성공한 뒤 annotated `v2.4.0` tag에서 `Deploy Server Image`가 scan한 digest를 같은 tag로 promote합니다. 이번 릴리즈는 production runtime rendering이 바뀌므로 `sync-config(restart_api=false, dry_run=false)`로 notification·AI recovery 설정을 먼저 반영한 뒤, 최근 48시간 backup을 확인하고 OCI backend를 배포합니다.
-- Spring startup Flyway가 V48까지 적용되고 exact image digest, restart count 0, `/internal/health`, deploy ledger와 BFF auth가 정상인 경우에만 같은 `v2.4.0` tag로 Cloudflare Pages frontend를 배포합니다. 이미 발행한 tag와 migration은 이동·수정하지 않고 새 patch tag와 forward-fix로 복구합니다.
+- Release commit의 `main` CI가 성공한 뒤 annotated `v2.4.1` tag에서 `Deploy Server Image`가 scan한 digest를 같은 tag로 promote합니다. 이번 릴리즈는 production runtime rendering이 바뀌므로 `sync-config(restart_api=false, dry_run=false)`로 notification·AI recovery 설정을 먼저 반영한 뒤, 최근 48시간 backup을 확인하고 OCI backend를 배포합니다.
+- Spring startup Flyway가 V48까지 적용되고 exact image digest, restart count 0, `/internal/health`, deploy ledger와 BFF auth가 정상인 경우에만 같은 `v2.4.1` tag로 Cloudflare Pages frontend를 배포합니다. 이미 발행한 tag와 migration은 이동·수정하지 않고 새 patch tag와 forward-fix로 복구합니다.
 - Final smoke는 public app/auth, OAuth redirect/error, public read와 anonymous admin deny를 read-only/no-send 방식으로 확인합니다. 실제 Google OAuth 완료, AI provider 호출, 이메일 발송, member/admin mutation은 수행하지 않습니다.
 
 ### Verification
@@ -48,7 +49,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 - Release candidate gate: repository-pinned `pnpm@11.13.1`로 frontend lint, 279 files / 2,181 tests와 coverage(84.51% statements, 79.67% branches, 84.44% functions, 85.30% lines), production build와 Zod fixture freshness를 확인했습니다. Docker Chromium CT 60/60도 통과했습니다.
 - Server evidence: PR quality gate에서 unit 1,452 tests(1 skipped)와 architecture 94 tests가 통과했고, MySQL/Testcontainers integration 1,005 tests가 통과했습니다. Chromium E2E는 150/150이 통과했습니다.
 - Release safety: deploy/Flyway workflow contract, production AI config, public release candidate/gitleaks, Prometheus/Tempo/Grafana/Alertmanager 검증과 repository-pinned HIGH dependency audit 0건을 확인했습니다.
-- 원격 `main` CI, server image scan/promote, sync-config, OCI Flyway/health, same-tag frontend deployment와 production smoke의 실제 결과는 [v2.4.0 release readiness evidence](docs/reports/2026-08-17-release-readiness-v2.4.0.md)에 단계별로 기록합니다.
+- 원격 `main` CI, server image scan/promote, sync-config, OCI Flyway/health, same-tag frontend deployment와 production smoke의 실제 결과는 [v2.4.1 release readiness evidence](docs/reports/2026-08-17-release-readiness-v2.4.1.md)에 단계별로 기록합니다.
 
 ## v2.3.0 - 2026-08-09
 

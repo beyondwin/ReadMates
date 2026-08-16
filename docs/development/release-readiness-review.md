@@ -101,4 +101,4 @@ findings를 우선순위별로 보고합니다.
 
 ## 릴리스 증거 보관
 
-버전별 검토와 실제 배포 결과는 `docs/reports`의 날짜가 있는 evidence 문서에 보관합니다. 이전 릴리스는 [2026-08-09 v2.3.0 release readiness evidence](../reports/2026-08-09-release-readiness-v2.3.0.md)에 있고, 현재 릴리스는 [2026-08-17 v2.4.0 release readiness evidence](../reports/2026-08-17-release-readiness-v2.4.0.md)에 기록합니다. 새 릴리스 증거를 이 체크리스트 본문에 누적하지 않습니다.
+버전별 검토와 실제 배포 결과는 `docs/reports`의 날짜가 있는 evidence 문서에 보관합니다. 이전 릴리스는 [2026-08-09 v2.3.0 release readiness evidence](../reports/2026-08-09-release-readiness-v2.3.0.md)에 있고, 현재 릴리스는 [2026-08-17 v2.4.1 release readiness evidence](../reports/2026-08-17-release-readiness-v2.4.1.md)에 기록합니다. 새 릴리스 증거를 이 체크리스트 본문에 누적하지 않습니다.

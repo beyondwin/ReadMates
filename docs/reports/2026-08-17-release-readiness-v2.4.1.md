@@ -1,19 +1,19 @@
-# ReadMates v2.4.0 Release Readiness Evidence
+# ReadMates v2.4.1 Release Readiness Evidence
 
-이 문서는 `v2.3.0..v2.4.0` 전체의 릴리스 검토와 실제 배포 증거를 보관하는 시점별 snapshot입니다. 현재 절차와 완료 기준은 [release-readiness-review.md](../development/release-readiness-review.md)와 [release publish runbook](../deploy/release-publish-runbook.md)을 우선합니다.
+이 문서는 `v2.3.0..v2.4.1` 전체의 릴리스 검토와 실제 배포 증거를 보관하는 시점별 snapshot입니다. 현재 절차와 완료 기준은 [release-readiness-review.md](../development/release-readiness-review.md)와 [release publish runbook](../deploy/release-publish-runbook.md)을 우선합니다.
 
 ## 범위와 버전 결정
 
 - 검토 범위는 `v2.3.0..HEAD` 전체입니다. Backend quality hardening Phase 0–2, platform health failure containment, notification runtime/replay reliability, AI Kafka·Redis recovery, Flyway immutability, Living Archive 격리 preview와 릴리즈 CI 복구를 포함합니다.
-- Release class는 **minor**입니다. 새 운영 복구·관측 동작, additive Flyway V48, production runtime rendering과 사용자 확인용 preview route가 추가되므로 patch로 축소하지 않고 `v2.4.0`을 사용합니다.
-- 기존 `v2.3.0` tag는 이동하거나 덮어쓰지 않습니다. Tag image, backend promotion 또는 frontend deployment가 실패하면 원인을 수정한 새 patch tag로 forward-fix합니다.
+- Product change class는 **minor**입니다. 새 운영 복구·관측 동작, additive Flyway V48, production runtime rendering과 사용자 확인용 preview route가 추가됩니다. 최초 `v2.4.0` tag의 image scan이 HttpComponents Core HIGH CVE 2건을 차단했으므로 image를 promote·배포하지 않았고, source를 수정한 immutable forward-fix `v2.4.1`을 사용합니다.
+- 기존 `v2.3.0`과 실패한 `v2.4.0` tag는 이동하거나 덮어쓰지 않습니다. 이후 tag image, backend promotion 또는 frontend deployment가 실패해도 원인을 수정한 새 patch tag로 forward-fix합니다.
 
 ## Migration, runtime과 호환 배포
 
 - V48은 versioned admin notification replay preview에 immutable target rows와 confirmation receipt를 additive하게 추가합니다. 기존 v1 preview는 다시 preview해야 하며 schema rollback 대신 V48-compatible image 또는 더 높은 migration을 사용합니다.
-- Notification relay/SMTP deadline·claim lease·retry schedule과 AI Kafka/Redis recovery scheduler·repair/probe 값이 runtime rendering에 추가됐습니다. `sync-config`를 `restart_api=false`, `dry_run=false`로 먼저 성공시켜 구 image를 새 설정으로 재시작하지 않고 다음 v2.4.0 container가 값을 읽게 합니다.
+- Notification relay/SMTP deadline·claim lease·retry schedule과 AI Kafka/Redis recovery scheduler·repair/probe 값이 runtime rendering에 추가됐습니다. `sync-config`를 `restart_api=false`, `dry_run=false`로 먼저 성공시켜 구 image를 새 설정으로 재시작하지 않고 다음 v2.4.1 container가 값을 읽게 합니다.
 - 기존 public REST/BFF success shape와 authorization 의미는 유지됩니다. Platform health snapshot은 refresh metadata를 additive하게 제공하고 frontend는 서버의 `FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE` 상태를 표시합니다.
-- 배포 순서는 release commit의 `main` CI → annotated `v2.4.0` tag → `Deploy Server Image` scan/promote → `sync-config(restart_api=false, dry_run=false)` → 최근 backup 확인 → OCI Compose backend/Flyway V48/health → `Deploy Front(release_tag=v2.4.0)` → GitHub Release → final production smoke입니다.
+- 배포 순서는 release commit의 `main` CI → annotated `v2.4.1` tag → `Deploy Server Image` scan/promote → `sync-config(restart_api=false, dry_run=false)` → 최근 backup 확인 → OCI Compose backend/Flyway V48/health → `Deploy Front(release_tag=v2.4.1)` → GitHub Release → final production smoke입니다.
 
 ## Release risk review
 
@@ -40,13 +40,13 @@
 | Dependency audit | **PASS** — repository-pinned `pnpm@11.13.1`에서 HIGH known vulnerability 0건입니다. |
 | Full release gate | **PASS** — `./scripts/pre-push-check.sh --full --release`: frontend 279 files / 2,181 tests, CT 60/60, unit 1,452(1 skipped), architecture 94, integration 1,005, Chromium E2E 150/150, build/fixtures, deploy/Flyway contracts, public candidate/gitleaks와 observability config가 통과했습니다. |
 | Remote main CI | Release commit push 뒤 run ID와 결론을 기록합니다. |
-| Server image / runtime config | Tag image scan/promote와 `sync-config` 결과를 기록합니다. |
+| Server image / runtime config | **FORWARD-FIX IN PROGRESS** — `v2.4.0` scan이 `httpcore5`/`httpcore5-h2` 5.3.6의 HIGH CVE 2건을 차단해 promote하지 않았습니다. 두 모듈을 fixed 5.4.3으로 고정하고 boot JAR 확인과 Trivy 0.70.0 local image scan 0건을 통과했으며 `v2.4.1` 원격 결과를 기록합니다. |
 | OCI backend / Flyway | Exact digest, restart count, health, deploy ledger와 Flyway V48 결과를 기록합니다. |
 | Cloudflare frontend / smoke | Same-tag deployment와 sanitized read-only/no-send smoke 결과를 기록합니다. |
 
 ## Production boundary
 
-- OCI backend와 frontend는 같은 `v2.4.0` tag를 사용합니다.
+- OCI backend와 frontend는 같은 `v2.4.1` tag를 사용합니다.
 - Backend promotion 전 scanned image와 runtime config sync, 최근 48시간 DB backup을 확인합니다.
 - Backend promotion 뒤 Flyway V48, `/internal/health`, anonymous BFF auth와 deploy ledger를 확인한 뒤에만 frontend를 dispatch합니다.
 - Final smoke는 read-only/no-send 경로만 사용합니다. 실제 OAuth provider 완료, AI generation, email dispatch, member/admin mutation은 별도 승인 없이는 실행하지 않습니다.

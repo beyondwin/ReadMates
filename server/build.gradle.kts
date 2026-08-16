@@ -56,6 +56,13 @@ configurations.configureEach {
             useVersion("3.1.4")
             because("Trivy flags CVE-2026-54512 and CVE-2026-54513 in tools.jackson databind 3.1.2.")
         }
+        if (
+            requested.group == "org.apache.httpcomponents.core5" &&
+            requested.name in setOf("httpcore5", "httpcore5-h2")
+        ) {
+            useVersion("5.4.3")
+            because("Trivy flags CVE-2026-54399 and CVE-2026-54428 in HttpComponents Core 5.3.6.")
+        }
     }
 }
 

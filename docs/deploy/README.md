@@ -190,7 +190,7 @@ OCI helper script는 placeholder 기반이며 운영자가 값을 주입하는 �
 
 백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 실제 OCI compose stack promotion은 여전히 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차이며, VM 접속 credential이나 self-hosted runner가 GitHub Actions에 구성되어 있다고 가정하지 않습니다.
 
-DB migration이 포함된 릴리즈는 같은 tag의 backend를 먼저 올리고 Spring startup Flyway와 health를 확인한 뒤에만 frontend를 배포합니다. 현재 `v2.4.0` 릴리즈는 V47 schema 위에 V48의 versioned admin notification replay target/confirmation ledger를 additive하게 적용합니다. Notification·AI recovery runtime rendering도 바뀌므로 backend promotion 전에 `sync-config(restart_api=false, dry_run=false)`를 성공시킵니다. 실패 시 migration을 되돌리거나 이미 발행한 tag를 이동하지 않고 schema를 보존한 호환 image 또는 새 forward-fix tag로 복구합니다.
+DB migration이 포함된 릴리즈는 같은 tag의 backend를 먼저 올리고 Spring startup Flyway와 health를 확인한 뒤에만 frontend를 배포합니다. 현재 `v2.4.1` 릴리즈는 V47 schema 위에 V48의 versioned admin notification replay target/confirmation ledger를 additive하게 적용합니다. Notification·AI recovery runtime rendering도 바뀌므로 backend promotion 전에 `sync-config(restart_api=false, dry_run=false)`를 성공시킵니다. 실패 시 migration을 되돌리거나 이미 발행한 tag를 이동하지 않고 schema를 보존한 호환 image 또는 새 forward-fix tag로 복구합니다.
 
 Server workflow의 tag checkout, exact semver, annotated-tag/HEAD 일치, same-digest scan/promote 계약은 배포 전에 repository checker로 검증합니다.
 
