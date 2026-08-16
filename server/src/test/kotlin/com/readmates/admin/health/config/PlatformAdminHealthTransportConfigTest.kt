@@ -70,20 +70,29 @@ class PlatformAdminHealthTransportConfigTest {
                 ).run { context ->
                     assertThat(context).hasNotFailed()
                     val port = context.getBean(PrometheusQueryPort::class.java)
-                    val occupyingCalls =
-                        (1..DEFAULT_MAX_CONNECTIONS_PER_ROUTE).map {
-                            CompletableFuture.supplyAsync { catchThrowable { port.query("up") } }
-                        }
-                    assertThat(server.awaitAccepted(DEFAULT_MAX_CONNECTIONS_PER_ROUTE)).isTrue()
+                    val occupyingExecutor = Executors.newFixedThreadPool(DEFAULT_MAX_CONNECTIONS_PER_ROUTE)
+                    try {
+                        val occupyingCalls =
+                            (1..DEFAULT_MAX_CONNECTIONS_PER_ROUTE).map {
+                                CompletableFuture.supplyAsync(
+                                    { catchThrowable { port.query("up") } },
+                                    occupyingExecutor,
+                                )
+                            }
+                        assertThat(server.awaitAccepted(DEFAULT_MAX_CONNECTIONS_PER_ROUTE)).isTrue()
 
-                    var thrown: Throwable? = null
-                    val elapsedMillis = measureTimeMillis { thrown = catchThrowable { port.query("up") } }
+                        var thrown: Throwable? = null
+                        val elapsedMillis = measureTimeMillis { thrown = catchThrowable { port.query("up") } }
 
-                    assertFailure(thrown, PrometheusQueryFailureKind.TIMEOUT)
-                    assertThat(elapsedMillis).isLessThan(POOL_TIMEOUT_UPPER_BOUND_MILLIS)
-                    assertThat(server.acceptedRequests()).isEqualTo(DEFAULT_MAX_CONNECTIONS_PER_ROUTE)
-                    server.releaseBodies()
-                    occupyingCalls.forEach { call -> assertThat(call.get(1, TimeUnit.SECONDS)).isNull() }
+                        assertFailure(thrown, PrometheusQueryFailureKind.TIMEOUT)
+                        assertThat(elapsedMillis).isLessThan(POOL_TIMEOUT_UPPER_BOUND_MILLIS)
+                        assertThat(server.acceptedRequests()).isEqualTo(DEFAULT_MAX_CONNECTIONS_PER_ROUTE)
+                        server.releaseBodies()
+                        occupyingCalls.forEach { call -> assertThat(call.get(1, TimeUnit.SECONDS)).isNull() }
+                    } finally {
+                        server.releaseBodies()
+                        occupyingExecutor.shutdownNow()
+                    }
                 }
         }
     }
