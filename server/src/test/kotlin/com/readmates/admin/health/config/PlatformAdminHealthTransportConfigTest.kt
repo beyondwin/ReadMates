@@ -62,11 +62,11 @@ class PlatformAdminHealthTransportConfigTest {
                 .withUserConfiguration(PlatformAdminHealthConfig::class.java)
                 .withBean(ObjectMapper::class.java, { ObjectMapper() })
                 .withPropertyValues(
-                    "readmates.admin.health.provider-deadline=5s",
+                    "readmates.admin.health.provider-deadline=15s",
                     "readmates.admin.health.prometheus.base-url=${server.baseUrl}",
                     "readmates.admin.health.prometheus.connect-timeout=100ms",
                     "readmates.admin.health.prometheus.connection-request-timeout=100ms",
-                    "readmates.admin.health.prometheus.read-timeout=5s",
+                    "readmates.admin.health.prometheus.read-timeout=15s",
                 ).run { context ->
                     assertThat(context).hasNotFailed()
                     val port = context.getBean(PrometheusQueryPort::class.java)
@@ -178,7 +178,7 @@ class PlatformAdminHealthTransportConfigTest {
                     val body = PROMETHEUS_SUCCESS_BODY.toByteArray(StandardCharsets.UTF_8)
                     exchange.responseHeaders.add("Content-Type", "application/json")
                     exchange.sendResponseHeaders(200, body.size.toLong())
-                    check(bodyRelease.await(10, TimeUnit.SECONDS))
+                    check(bodyRelease.await(20, TimeUnit.SECONDS))
                     exchange.responseBody.use { it.write(body) }
                 }
                 start()
@@ -188,7 +188,7 @@ class PlatformAdminHealthTransportConfigTest {
 
         fun awaitAccepted(expected: Int): Boolean {
             check(expected == DEFAULT_MAX_CONNECTIONS_PER_ROUTE)
-            return acceptedLatch.await(1, TimeUnit.SECONDS)
+            return acceptedLatch.await(5, TimeUnit.SECONDS)
         }
 
         fun acceptedRequests(): Int = accepted.get()

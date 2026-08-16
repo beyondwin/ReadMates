@@ -36,7 +36,7 @@
 
 | Evidence | Result |
 | --- | --- |
-| CI blocker reproduction | **PASS after fix** — remote failed run에서 CT focus width, platform health pool timeout, ShellCheck/AI PII path drift를 분리했고 CT 60/60, focused backend 5회, tracked shell/PII 검사를 로컬에서 재검증했습니다. |
+| CI blocker reproduction | **PASS after fix** — remote failed run에서 CT focus width, platform health pool setup/timeout, ShellCheck/AI PII path drift를 분리했고 CT 60/60, 최종 focused backend 10회와 server PR gate, tracked shell/PII 검사를 로컬에서 재검증했습니다. |
 | Dependency audit | **PASS** — repository-pinned `pnpm@11.13.1`에서 HIGH known vulnerability 0건입니다. |
 | Full release gate | **PASS** — `./scripts/pre-push-check.sh --full --release`: frontend 279 files / 2,181 tests, CT 60/60, unit 1,452(1 skipped), architecture 94, integration 1,005, Chromium E2E 150/150, build/fixtures, deploy/Flyway contracts, public candidate/gitleaks와 observability config가 통과했습니다. |
 | Remote main CI | Release commit push 뒤 run ID와 결론을 기록합니다. |
