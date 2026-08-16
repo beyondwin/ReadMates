@@ -39,10 +39,11 @@
 | CI blocker reproduction | **PASS after fix** — remote failed run에서 CT focus width, platform health pool setup/timeout, ShellCheck/AI PII path drift를 분리했고 CT 60/60, 최종 2-core equivalent focused backend 10회와 server PR gate, tracked shell/PII 검사를 로컬에서 재검증했습니다. |
 | Dependency audit | **PASS** — repository-pinned `pnpm@11.13.1`에서 HIGH known vulnerability 0건입니다. |
 | Full release gate | **PASS** — `./scripts/pre-push-check.sh --full --release`: frontend 279 files / 2,181 tests, CT 60/60, unit 1,452(1 skipped), architecture 94, integration 1,005, Chromium E2E 150/150, build/fixtures, deploy/Flyway contracts, public candidate/gitleaks와 observability config가 통과했습니다. |
-| Remote main CI | Release commit push 뒤 run ID와 결론을 기록합니다. |
-| Server image / runtime config | **FORWARD-FIX IN PROGRESS** — `v2.4.0` scan이 `httpcore5`/`httpcore5-h2` 5.3.6의 HIGH CVE 2건을 차단해 promote하지 않았습니다. 두 모듈을 fixed 5.4.3으로 고정하고 boot JAR 확인과 Trivy 0.70.0 local image scan 0건을 통과했으며 `v2.4.1` 원격 결과를 기록합니다. |
-| OCI backend / Flyway | Exact digest, restart count, health, deploy ledger와 Flyway V48 결과를 기록합니다. |
-| Cloudflare frontend / smoke | Same-tag deployment와 sanitized read-only/no-send smoke 결과를 기록합니다. |
+| Remote main CI | **PASS** — release source commit `573778b7`의 main CI run `31963363071`에서 10개 job이 모두 성공했습니다. |
+| Server image / runtime config | **PASS** — `v2.4.0` scan이 `httpcore5`/`httpcore5-h2` 5.3.6의 HIGH CVE 2건을 차단해 promote하지 않았습니다. 두 모듈을 fixed 5.4.3으로 고정하고 boot JAR 확인과 Trivy 0.70.0 local image scan 0건을 통과했습니다. `v2.4.1` server image run `31963781079`는 HIGH/CRITICAL 0건으로 같은 digest `sha256:c24162c82d70d414114d507e976f3ab06f3b53e280c5ac02803db1bb0f4de55b`를 promote했고, sync-config run `31964024657`은 `restart_api=false`, `dry_run=false`로 성공했습니다. |
+| OCI backend / Flyway | **PASS** — 최근 backup 확인 뒤 promoted `v2.4.1` digest를 배포했습니다. Running tag와 digest 일치, restart count 0, Flyway V48, internal health, deploy ledger `SUCCESS`, 배포 후 관찰과 BFF/OAuth 경계를 확인했습니다. |
+| Cloudflare frontend / smoke | **PASS** — Deploy Front run `31964205567`이 같은 `v2.4.1` tag를 Cloudflare Pages에 배포했습니다. Public integration smoke와 OAuth redirect가 통과했고, `/living-archive-preview`는 HTTP 200, runtime `noindex,nofollow`, browser console error 0건이었습니다. Anonymous admin health는 HTTP 401로 거절됐습니다. |
+| GitHub Release | **PASS** — immutable tag `v2.4.1`의 공개 GitHub Release를 발행했습니다. |
 
 ## Production boundary
 
