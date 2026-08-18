@@ -10,12 +10,14 @@ data class ApiErrorResponse(
     val message: String,
     val status: Int,
     val traceId: String? = null,
+    val openSessionId: String? = null,
 )
 
 fun apiErrorResponse(
     status: HttpStatus,
     code: String,
     message: String = status.defaultApiErrorMessage(),
+    openSessionId: String? = null,
 ): ResponseEntity<ApiErrorResponse> =
     ResponseEntity
         .status(status)
@@ -25,6 +27,7 @@ fun apiErrorResponse(
                 message = message,
                 status = status.value(),
                 traceId = MDC.get(RequestIdFilter.MDC_KEY),
+                openSessionId = openSessionId,
             ),
         )
 

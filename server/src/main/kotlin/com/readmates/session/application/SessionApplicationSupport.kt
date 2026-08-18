@@ -22,7 +22,9 @@ internal fun shortNameFor(displayName: String): String =
 
 class CurrentSessionNotOpenException : RuntimeException("No open current session")
 
-class OpenSessionAlreadyExistsException : RuntimeException("Open session already exists")
+class OpenSessionAlreadyExistsException(
+    val openSessionId: java.util.UUID? = null,
+) : RuntimeException("Open session already exists")
 
 class HostSessionNotFoundException : RuntimeException("Host session not found")
 

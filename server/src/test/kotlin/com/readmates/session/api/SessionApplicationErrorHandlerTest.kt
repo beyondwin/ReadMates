@@ -1,5 +1,6 @@
 package com.readmates.session.adapter.`in`.web
 
+import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -35,7 +36,7 @@ class SessionApplicationErrorHandlerTest {
     }
 
     @Test
-    fun `maps open conflict to JSON 409`() {
+    fun `maps remaining lifecycle conflicts to JSON 409`() {
         val response = SessionApplicationErrorHandler().handleConflict()
 
         assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
@@ -46,5 +47,44 @@ class SessionApplicationErrorHandlerTest {
                 status = 409,
             ),
         )
+    }
+
+    @Test
+    fun `maps open already exists to SESSION_OPEN_ALREADY_EXISTS with session id`() {
+        val openId = java.util.UUID.fromString("00000000-0000-0000-0000-000000000307")
+        val response =
+            SessionApplicationErrorHandler().handleOpenSessionExists(
+                OpenSessionAlreadyExistsException(openId),
+            )
+        assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(response.body).isEqualTo(
+            ApiErrorResponse(
+                code = "SESSION_OPEN_ALREADY_EXISTS",
+                message = "이미 진행 중인 세션이 있습니다. 그 세션을 마감하거나 예정으로 되돌린 뒤 다시 시도하세요.",
+                status = 409,
+                openSessionId = openId.toString(),
+            ),
+        )
+    }
+
+    @Test
+    fun `maps reopen not allowed to SESSION_REOPEN_NOT_ALLOWED`() {
+        val response = SessionApplicationErrorHandler().handleReopenNotAllowed()
+        assertThat(response.body?.code).isEqualTo("SESSION_REOPEN_NOT_ALLOWED")
+        assertThat(response.body?.message).isEqualTo("마감된 세션만 다시 열 수 있습니다.")
+    }
+
+    @Test
+    fun `maps unpublish not allowed to SESSION_UNPUBLISH_NOT_ALLOWED`() {
+        val response = SessionApplicationErrorHandler().handleUnpublishNotAllowed()
+        assertThat(response.body?.code).isEqualTo("SESSION_UNPUBLISH_NOT_ALLOWED")
+        assertThat(response.body?.message).isEqualTo("공개된 세션만 공개를 취소할 수 있습니다.")
+    }
+
+    @Test
+    fun `maps return to draft not allowed to SESSION_RETURN_TO_DRAFT_NOT_ALLOWED`() {
+        val response = SessionApplicationErrorHandler().handleReturnToDraftNotAllowed()
+        assertThat(response.body?.code).isEqualTo("SESSION_RETURN_TO_DRAFT_NOT_ALLOWED")
+        assertThat(response.body?.message).isEqualTo("진행 중인 세션만 예정으로 되돌릴 수 있습니다.")
     }
 }

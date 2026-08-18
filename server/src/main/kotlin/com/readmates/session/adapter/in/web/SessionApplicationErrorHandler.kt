@@ -9,6 +9,9 @@ import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublishNotAllowedException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
+import com.readmates.session.application.HostSessionReopenNotAllowedException
+import com.readmates.session.application.HostSessionReturnToDraftNotAllowedException
+import com.readmates.session.application.HostSessionUnpublishNotAllowedException
 import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidQuestionSetException
@@ -48,9 +51,41 @@ class SessionApplicationErrorHandler {
             message = "세션 공개 범위가 현재 세션 상태와 맞지 않습니다.",
         )
 
+    @ExceptionHandler(OpenSessionAlreadyExistsException::class)
+    fun handleOpenSessionExists(ex: OpenSessionAlreadyExistsException): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_OPEN_ALREADY_EXISTS",
+            message = "이미 진행 중인 세션이 있습니다. 그 세션을 마감하거나 예정으로 되돌린 뒤 다시 시도하세요.",
+            openSessionId = ex.openSessionId?.toString(),
+        )
+
+    @ExceptionHandler(HostSessionReopenNotAllowedException::class)
+    fun handleReopenNotAllowed(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_REOPEN_NOT_ALLOWED",
+            message = "마감된 세션만 다시 열 수 있습니다.",
+        )
+
+    @ExceptionHandler(HostSessionUnpublishNotAllowedException::class)
+    fun handleUnpublishNotAllowed(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_UNPUBLISH_NOT_ALLOWED",
+            message = "공개된 세션만 공개를 취소할 수 있습니다.",
+        )
+
+    @ExceptionHandler(HostSessionReturnToDraftNotAllowedException::class)
+    fun handleReturnToDraftNotAllowed(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_RETURN_TO_DRAFT_NOT_ALLOWED",
+            message = "진행 중인 세션만 예정으로 되돌릴 수 있습니다.",
+        )
+
     @ExceptionHandler(
         CurrentSessionNotOpenException::class,
-        OpenSessionAlreadyExistsException::class,
         HostSessionDeletionNotAllowedException::class,
         HostSessionOpenNotAllowedException::class,
         HostSessionCloseNotAllowedException::class,
