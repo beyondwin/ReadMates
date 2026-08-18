@@ -14,4 +14,10 @@ interface HostSessionLifecyclePort {
     fun close(command: HostSessionIdCommand): HostSessionTransitionResult
 
     fun publish(command: HostSessionIdCommand): HostSessionTransitionResult
+
+    fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult
+
+    fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult
+
+    fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult
 }

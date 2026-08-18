@@ -616,6 +616,42 @@ class HostSessionServicesTest {
         }
     }
 
+    @Test
+    fun `changed reverse transitions evict cache and log states`() {
+        val port = RecordingHostSessionPorts()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val command = HostSessionIdCommand(host, sessionId)
+        captureHostSessionLogs().use { logs ->
+            assertThat(service.reopen(command).state).isEqualTo("OPEN")
+            assertThat(service.unpublish(command).state).isEqualTo("CLOSED")
+            assertThat(service.returnToDraft(command).state).isEqualTo("DRAFT")
+            assertThat(invalidation.clubs).containsExactly(host.clubId, host.clubId, host.clubId)
+            assertThat(logs.events.map { it.argumentArray.toList() }).containsExactly(
+                listOf(host.clubId, sessionId, "CLOSED", "OPEN"),
+                listOf(host.clubId, sessionId, "PUBLISHED", "CLOSED"),
+                listOf(host.clubId, sessionId, "OPEN", "DRAFT"),
+            )
+        }
+    }
+
+    @Test
+    fun `noop reverse transitions do not evict cache`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                reopenChanged = false
+                unpublishChanged = false
+                returnToDraftChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val command = HostSessionIdCommand(host, sessionId)
+        service.reopen(command)
+        service.unpublish(command)
+        service.returnToDraft(command)
+        assertThat(invalidation.clubs).isEmpty()
+    }
+
     private fun hostSessionCommand() =
         HostSessionCommand(
             host = host,
@@ -663,10 +699,16 @@ class HostSessionServicesTest {
         var openCommand: HostSessionIdCommand? = null
         var closeCommand: HostSessionIdCommand? = null
         var publishCommand: HostSessionIdCommand? = null
+        var reopenCommand: HostSessionIdCommand? = null
+        var unpublishCommand: HostSessionIdCommand? = null
+        var returnToDraftCommand: HostSessionIdCommand? = null
         var upcomingMember: CurrentMember? = null
         var openChanged = true
         var closeChanged = true
         var publishChanged = true
+        var reopenChanged = true
+        var unpublishChanged = true
+        var returnToDraftChanged = true
         var openFailure: RuntimeException? = null
         var lifecycleStateWriteCount = 0
         var throwOnUpsertPublication = false
@@ -827,6 +869,39 @@ class HostSessionServicesTest {
             return HostSessionTransitionResult(
                 detail = hostSessionDetail(command.sessionId).copy(state = "PUBLISHED"),
                 changed = publishChanged,
+            )
+        }
+
+        override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult {
+            reopenCommand = command
+            if (reopenChanged) {
+                lifecycleStateWriteCount += 1
+            }
+            return HostSessionTransitionResult(
+                detail = hostSessionDetail(command.sessionId).copy(state = "OPEN"),
+                changed = reopenChanged,
+            )
+        }
+
+        override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult {
+            unpublishCommand = command
+            if (unpublishChanged) {
+                lifecycleStateWriteCount += 1
+            }
+            return HostSessionTransitionResult(
+                detail = hostSessionDetail(command.sessionId).copy(state = "CLOSED"),
+                changed = unpublishChanged,
+            )
+        }
+
+        override fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult {
+            returnToDraftCommand = command
+            if (returnToDraftChanged) {
+                lifecycleStateWriteCount += 1
+            }
+            return HostSessionTransitionResult(
+                detail = hostSessionDetail(command.sessionId).copy(state = "DRAFT"),
+                changed = returnToDraftChanged,
             )
         }
 

@@ -85,4 +85,10 @@ class JdbcHostSessionWriteAdapter(
     override fun close(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.close(command)
 
     override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.publish(command)
+
+    override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.reopen(command)
+
+    override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.unpublish(command)
+
+    override fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.returnToDraft(command)
 }

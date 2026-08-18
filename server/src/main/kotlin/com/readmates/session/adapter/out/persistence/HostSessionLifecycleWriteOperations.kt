@@ -94,6 +94,15 @@ internal class HostSessionLifecycleWriteOperations(
         return result(command, true)
     }
 
+    fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult =
+        throw UnsupportedOperationException("Task 4 implements persistence")
+
+    fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult =
+        throw UnsupportedOperationException("Task 4 implements persistence")
+
+    fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult =
+        throw UnsupportedOperationException("Task 4 implements persistence")
+
     private fun exposePublicPublication(command: HostSessionIdCommand) {
         jdbcTemplate.update(
             """

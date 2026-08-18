@@ -138,6 +138,57 @@ class HostSessionLifecycleService(
                 }
             }.detail
 
+    @Transactional
+    override fun reopen(command: HostSessionIdCommand) =
+        lifecyclePort
+            .reopen(command)
+            .also { result ->
+                if (result.changed) {
+                    logger.info(
+                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                        command.host.clubId,
+                        command.sessionId,
+                        "CLOSED",
+                        "OPEN",
+                    )
+                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                }
+            }.detail
+
+    @Transactional
+    override fun unpublish(command: HostSessionIdCommand) =
+        lifecyclePort
+            .unpublish(command)
+            .also { result ->
+                if (result.changed) {
+                    logger.info(
+                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                        command.host.clubId,
+                        command.sessionId,
+                        "PUBLISHED",
+                        "CLOSED",
+                    )
+                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                }
+            }.detail
+
+    @Transactional
+    override fun returnToDraft(command: HostSessionIdCommand) =
+        lifecyclePort
+            .returnToDraft(command)
+            .also { result ->
+                if (result.changed) {
+                    logger.info(
+                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                        command.host.clubId,
+                        command.sessionId,
+                        "OPEN",
+                        "DRAFT",
+                    )
+                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                }
+            }.detail
+
     override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.deletionPreview(command)
 
     @Transactional

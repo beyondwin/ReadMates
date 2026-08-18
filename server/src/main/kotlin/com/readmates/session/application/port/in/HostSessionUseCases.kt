@@ -27,6 +27,12 @@ interface HostSessionLifecycleUseCase {
 
     fun publish(command: HostSessionIdCommand): HostSessionDetailResponse
 
+    fun reopen(command: HostSessionIdCommand): HostSessionDetailResponse
+
+    fun unpublish(command: HostSessionIdCommand): HostSessionDetailResponse
+
+    fun returnToDraft(command: HostSessionIdCommand): HostSessionDetailResponse
+
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
 
     fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse
