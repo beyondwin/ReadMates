@@ -3,6 +3,9 @@ package com.readmates.session.adapter.out.persistence
 import com.readmates.session.application.HostSessionCloseNotAllowedException
 import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionPublishNotAllowedException
+import com.readmates.session.application.HostSessionReopenNotAllowedException
+import com.readmates.session.application.HostSessionReturnToDraftNotAllowedException
+import com.readmates.session.application.HostSessionUnpublishNotAllowedException
 import com.readmates.session.application.InvalidMembershipIdException
 import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
@@ -122,6 +125,27 @@ internal object HostSessionWritePolicy {
             HostSessionTransitionDecision.UNCHANGED
         } else {
             throw HostSessionPublishNotAllowedException()
+        }
+
+    fun reopenDecision(state: String): HostSessionTransitionDecision =
+        if (state == "OPEN") {
+            HostSessionTransitionDecision.UNCHANGED
+        } else {
+            throw HostSessionReopenNotAllowedException()
+        }
+
+    fun unpublishDecision(state: String): HostSessionTransitionDecision =
+        if (state == "CLOSED") {
+            HostSessionTransitionDecision.UNCHANGED
+        } else {
+            throw HostSessionUnpublishNotAllowedException()
+        }
+
+    fun returnToDraftDecision(state: String): HostSessionTransitionDecision =
+        if (state == "DRAFT") {
+            HostSessionTransitionDecision.UNCHANGED
+        } else {
+            throw HostSessionReturnToDraftNotAllowedException()
         }
 }
 

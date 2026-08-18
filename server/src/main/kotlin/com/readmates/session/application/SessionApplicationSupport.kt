@@ -45,6 +45,12 @@ class HostSessionPublishNotAllowedException :
         "Only closed sessions with member-visible publication can be published",
     )
 
+class HostSessionReopenNotAllowedException : RuntimeException("Only closed sessions can be reopened")
+
+class HostSessionUnpublishNotAllowedException : RuntimeException("Only published sessions can be unpublished")
+
+class HostSessionReturnToDraftNotAllowedException : RuntimeException("Only open sessions can return to draft")
+
 class InvalidMembershipIdException : RuntimeException("Invalid membership id")
 
 class InvalidSessionScheduleException : RuntimeException("Session end time must be after start time")
