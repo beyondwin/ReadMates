@@ -226,8 +226,6 @@ internal class HostSessionLifecycleWriteOperations(
             )
             values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE')
             on duplicate key update
-              rsvp_status = values(rsvp_status),
-              attendance_status = values(attendance_status),
               participation_status = values(participation_status),
               updated_at = utc_timestamp(6)
             """.trimIndent(),

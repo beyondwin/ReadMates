@@ -1705,6 +1705,7 @@ class HostSessionControllerDbTest(
 
         assertEquals("OPEN", findSessionState(sessionId))
         assertEquals(participantCount, participantCountForSession(sessionId))
+        assertEquals("GOING", participantRsvp(sessionId, membershipId))
     }
 
     @Test
