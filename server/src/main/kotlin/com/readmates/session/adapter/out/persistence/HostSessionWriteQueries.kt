@@ -69,6 +69,20 @@ internal class HostSessionWriteQueries(
             clubId.dbString(),
         ) ?: 0
 
+    fun findOpenSessionId(clubId: UUID): UUID? =
+        jdbcTemplate
+            .query(
+                """
+                select id
+                from sessions
+                where club_id = ?
+                  and state = 'OPEN'
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.uuid("id") },
+                clubId.dbString(),
+            ).firstOrNull()
+
     fun activeMembershipIds(clubId: UUID): List<UUID> =
         jdbcTemplate.query(
             """

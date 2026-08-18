@@ -24,7 +24,8 @@ internal class HostSessionLifecycleWriteOperations(
         queries.lockClub(command.host.clubId)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         if (policy.openDecision(state) == HostSessionTransitionDecision.UNCHANGED) return result(command, false)
-        if (queries.openSessionCount(command.host.clubId) > 0) throw OpenSessionAlreadyExistsException()
+        val openSessionId = queries.findOpenSessionId(command.host.clubId)
+        if (openSessionId != null) throw OpenSessionAlreadyExistsException(openSessionId)
         jdbcTemplate.update(
             """
             update sessions
@@ -94,14 +95,105 @@ internal class HostSessionLifecycleWriteOperations(
         return result(command, true)
     }
 
-    fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult =
-        throw UnsupportedOperationException("Task 4 implements persistence")
+    fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult {
+        requireHost(command.host)
+        queries.lockClub(command.host.clubId)
+        val openSessionId = queries.findOpenSessionId(command.host.clubId)
+        if (openSessionId != null && openSessionId != command.sessionId) {
+            throw OpenSessionAlreadyExistsException(openSessionId)
+        }
+        val reopenedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'OPEN',
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and state = 'CLOSED'
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            )
+        if (reopenedRows > 0) {
+            hidePublicPlacement(command)
+            return result(command, true)
+        }
+        val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        policy.reopenDecision(state)
+        return result(command, false)
+    }
 
-    fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult =
-        throw UnsupportedOperationException("Task 4 implements persistence")
+    fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult {
+        requireHost(command.host)
+        val unpublishedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'CLOSED',
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and state = 'PUBLISHED'
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            )
+        if (unpublishedRows > 0) return result(command, true)
+        val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        policy.unpublishDecision(state)
+        return result(command, false)
+    }
 
-    fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult =
-        throw UnsupportedOperationException("Task 4 implements persistence")
+    fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult {
+        requireHost(command.host)
+        queries.lockClub(command.host.clubId)
+        val returnedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'DRAFT',
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and state = 'OPEN'
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            )
+        if (returnedRows > 0) return result(command, true)
+        val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        policy.returnToDraftDecision(state)
+        return result(command, false)
+    }
+
+    private fun hidePublicPlacement(command: HostSessionIdCommand) {
+        jdbcTemplate.update(
+            """
+            update public_session_publications
+            set site_visibility = 'HIDDEN',
+                visibility = 'MEMBER',
+                is_public = false,
+                updated_at = utc_timestamp(6)
+            where session_id = ?
+              and club_id = ?
+              and site_visibility = 'PUBLIC_RECORD'
+            """.trimIndent(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+        jdbcTemplate.update(
+            """
+            update sessions
+            set visibility = case when visibility = 'PUBLIC' then 'MEMBER' else visibility end,
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+            """.trimIndent(),
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+    }
 
     private fun exposePublicPublication(command: HostSessionIdCommand) {
         jdbcTemplate.update(
