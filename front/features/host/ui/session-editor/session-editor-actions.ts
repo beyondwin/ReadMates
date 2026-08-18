@@ -23,6 +23,9 @@ export type HostSessionEditorActions = {
   deleteSession: (sessionId: string) => Promise<Response>;
   closeSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
   publishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
+  reopenSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
+  unpublishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
+  returnSessionToDraft: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
   updateAttendance: (
     sessionId: string,

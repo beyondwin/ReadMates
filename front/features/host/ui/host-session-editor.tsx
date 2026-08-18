@@ -30,10 +30,17 @@ import type {
   HostSessionEditorLocation,
   HostSessionEditorSection,
 } from "@/features/host/model/host-session-editor-navigation";
+import { hostSessionEditHref } from "@/features/host/model/host-dashboard-model";
 import {
   buildHostSessionEditorOverview,
   compactSessionLifecycleLabel,
 } from "@/features/host/model/host-session-editor-view-model";
+import {
+  lifecycleConfirmCopy,
+  reverseLifecycleAction,
+  type SessionLifecycleConfirmKind,
+} from "@/features/host/model/host-session-lifecycle-model";
+import { apiErrorFromResponse } from "@/features/host/hooks/session-lifecycle-api-error";
 import {
   buildSessionImportCommitResult,
   buildSessionImportRequest,
@@ -80,6 +87,7 @@ import {
 } from "./session-editor/session-history-panel";
 import type { SessionHistoryPanelItem } from "./session-editor/session-history-model";
 import { SessionEditorSectionNav } from "./session-editor/session-editor-section-nav";
+import { SessionLifecycleConfirmDialog } from "./session-editor/session-lifecycle-confirm-dialog";
 import { SessionOverviewSection } from "./session-editor/session-overview-section";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
@@ -291,6 +299,13 @@ function scopedHostRedirectHref(href: string) {
   return scopedAppLinkTarget(globalThis.location.pathname, href);
 }
 
+function scopedHostSessionEditHref(sessionId: string, clubSlug?: string) {
+  const href = hostSessionEditHref(sessionId);
+  return clubSlug
+    ? scopedAppLinkTarget(`/clubs/${encodeURIComponent(clubSlug)}/app`, href)
+    : scopedHostRedirectHref(href);
+}
+
 export default function HostSessionEditor({
   session,
   notificationDispatches = [],
@@ -354,6 +369,11 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [lifecycleSaveState, setLifecycleSaveState] = useState<"idle" | "saving" | "error">("idle");
+  const [lifecycleConfirm, setLifecycleConfirm] = useState<SessionLifecycleConfirmKind | null>(null);
+  const [lifecycleError, setLifecycleError] = useState<{
+    message: string;
+    openSessionHref: string | null;
+  } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [deletePreview, setDeletePreview] = useState<HostSessionDeletionPreviewResponse | null>(null);
@@ -426,6 +446,7 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   const deleteTriggerRef = useRef<HTMLButtonElement>(null);
   const deleteRestoreFocusRef = useRef<HTMLElement | null>(null);
+  const lifecycleRestoreFocusRef = useRef<HTMLElement | null>(null);
   const committedAttendanceStatusesRef = useRef<Record<string, AttendanceStatus>>(
     Object.fromEntries(
       (session?.attendees ?? []).map((a) => [a.membershipId, a.attendanceStatus]),
@@ -470,6 +491,7 @@ export default function HostSessionEditor({
     () => getDestructiveActionAvailability(displaySession),
     [displaySession],
   );
+  const reverseAction = displaySession ? reverseLifecycleAction(displaySession.state) : null;
   const overview = useMemo(
     () => buildHostSessionEditorOverview({
       isNewSession,
@@ -645,52 +667,73 @@ export default function HostSessionEditor({
     ],
   );
 
-  const closeSession = useCallback(async () => {
-    if (!session || lifecycleSaveState === "saving") {
+  const requestLifecycleConfirm = useCallback((kind: SessionLifecycleConfirmKind) => {
+    if (lifecycleSaveState === "saving") {
       return;
     }
 
-    setLifecycleSaveState("saving");
-    try {
-      const response = await actions.closeSession(session.sessionId);
+    lifecycleRestoreFocusRef.current = document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null;
+    setLifecycleError(null);
+    setLifecycleConfirm(kind);
+  }, [lifecycleSaveState]);
 
-      if (!response.ok) {
-        setLifecycleSaveState("error");
-        flash("세션 마감에 실패했습니다. 상태를 확인한 뒤 다시 시도해 주세요");
-        return;
-      }
-
-      const nextSession = await response.json();
-      dispatch({ type: "SESSION_LIFECYCLE_UPDATED", snapshot: nextSession });
-      setLifecycleSaveState("idle");
-      flash("세션을 마감했습니다.");
-    } catch {
-      setLifecycleSaveState("error");
-      flash("세션 마감에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요");
-    }
-  }, [session, lifecycleSaveState, actions, flash]);
-
-  const publishSessionFromOverview = useCallback(async () => {
-    if (!session || lifecycleSaveState === "saving") {
+  const closeLifecycleConfirm = useCallback(() => {
+    if (lifecycleSaveState === "saving") {
       return;
     }
 
+    setLifecycleConfirm(null);
+    setLifecycleError(null);
+    setLifecycleSaveState("idle");
+  }, [lifecycleSaveState]);
+
+  const confirmLifecycle = useCallback(async () => {
+    if (!session || !lifecycleConfirm || lifecycleSaveState === "saving") {
+      return;
+    }
+
+    const actionByKind = {
+      close: actions.closeSession,
+      publish: actions.publishSession,
+      reopen: actions.reopenSession,
+      unpublish: actions.unpublishSession,
+      "return-to-draft": actions.returnSessionToDraft,
+    } as const;
+    const copy = lifecycleConfirmCopy(lifecycleConfirm);
+
     setLifecycleSaveState("saving");
+    setLifecycleError(null);
+
     try {
-      const response = await actions.publishSession(session.sessionId);
+      const response = await actionByKind[lifecycleConfirm](session.sessionId);
+
       if (!response.ok) {
+        const error = await apiErrorFromResponse(response);
         setLifecycleSaveState("error");
-        flash("세션 공개에 실패했습니다. 적용된 기록과 세션 상태를 확인해 주세요");
+        setLifecycleError({
+          message: error.message,
+          openSessionHref: error.code === "SESSION_OPEN_ALREADY_EXISTS" && error.openSessionId
+            ? scopedHostSessionEditHref(error.openSessionId, clubSlug)
+            : null,
+        });
         return;
       }
+
       dispatch({ type: "SESSION_LIFECYCLE_UPDATED", snapshot: await response.json() });
       setLifecycleSaveState("idle");
-      flash("세션을 공개했습니다.");
+      setLifecycleConfirm(null);
+      setLifecycleError(null);
+      flash(copy.successFlash);
     } catch {
       setLifecycleSaveState("error");
-      flash("세션 공개에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요");
+      setLifecycleError({
+        message: "요청을 처리하지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요",
+        openSessionHref: null,
+      });
     }
-  }, [actions, flash, lifecycleSaveState, session]);
+  }, [actions, clubSlug, flash, lifecycleConfirm, lifecycleSaveState, session]);
 
   const updateAttendance = useCallback(
     async (membershipId: string, attendanceStatus: AttendanceStatus) => {
@@ -994,8 +1037,10 @@ export default function HostSessionEditor({
                   overview={overview}
                   sessionState={sessionState}
                   onNextAction={changeLocation}
-                  onCloseSession={session ? closeSession : undefined}
-                  onPublishSession={session ? publishSessionFromOverview : undefined}
+                  onCloseSession={session ? () => requestLifecycleConfirm("close") : undefined}
+                  onPublishSession={session ? () => requestLifecycleConfirm("publish") : undefined}
+                  onReverseSession={reverseAction ? () => requestLifecycleConfirm(reverseAction.kind) : undefined}
+                  reverseLabel={reverseAction?.label}
                   lifecyclePending={lifecycleSaveState === "saving"}
                 />
                 {displaySession ? (
@@ -1197,6 +1242,18 @@ export default function HostSessionEditor({
           restoreFocusRef={deleteRestoreFocusRef}
           onClose={closeDeleteModal}
           onConfirm={confirmDeleteSession}
+        />
+      ) : null}
+
+      {lifecycleConfirm ? (
+        <SessionLifecycleConfirmDialog
+          copy={lifecycleConfirmCopy(lifecycleConfirm)}
+          errorMessage={lifecycleError?.message ?? null}
+          openSessionHref={lifecycleError?.openSessionHref ?? null}
+          submitting={lifecycleSaveState === "saving"}
+          restoreFocusRef={lifecycleRestoreFocusRef}
+          onClose={closeLifecycleConfirm}
+          onConfirm={() => void confirmLifecycle()}
         />
       ) : null}
 

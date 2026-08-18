@@ -57,6 +57,9 @@ import {
   useCreateHostSessionMutation,
   useDeleteHostSessionMutation,
   usePublishHostSessionMutation,
+  useReopenHostSessionMutation,
+  useReturnHostSessionToDraftMutation,
+  useUnpublishHostSessionMutation,
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
 } from "@/features/host/queries/host-session-queries";
@@ -248,6 +251,9 @@ function useHostSessionEditorActions(
   const { mutateAsync: deleteSession } = useDeleteHostSessionMutation(context);
   const { mutateAsync: closeSession } = useCloseHostSessionMutation(context);
   const { mutateAsync: publishSession } = usePublishHostSessionMutation(context);
+  const { mutateAsync: reopenSession } = useReopenHostSessionMutation(context);
+  const { mutateAsync: unpublishSession } = useUnpublishHostSessionMutation(context);
+  const { mutateAsync: returnSessionToDraft } = useReturnHostSessionToDraftMutation(context);
   const { mutateAsync: updateAttendance } = useUpdateHostSessionAttendanceMutation(context);
   const { mutateAsync: commitImport } = useCommitHostSessionImportMutation(context);
 
@@ -257,6 +263,9 @@ function useHostSessionEditorActions(
     deleteSession: (sessionId) => deleteSession(sessionId),
     closeSession: (sessionId) => closeSession(sessionId),
     publishSession: (sessionId) => publishSession(sessionId),
+    reopenSession: (sessionId) => reopenSession(sessionId),
+    unpublishSession: (sessionId) => unpublishSession(sessionId),
+    returnSessionToDraft: (sessionId) => returnSessionToDraft(sessionId),
     saveSession: (sessionId, request) =>
       sessionId === null
         ? createSession(request)
@@ -278,6 +287,9 @@ function useHostSessionEditorActions(
     publishSession,
     queryClient,
     onSessionRecordsChanged,
+    reopenSession,
+    returnSessionToDraft,
+    unpublishSession,
     updateAttendance,
     updateSession,
   ]);

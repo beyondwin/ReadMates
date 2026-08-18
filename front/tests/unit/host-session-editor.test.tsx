@@ -45,6 +45,7 @@ import type {
   SessionImportRequest,
   SessionImportPreviewResponse,
 } from "@/features/host/api/host-contracts";
+import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lifecycle-model";
 import {
   hostSessionDetailContractFixture,
 } from "./api-contract-fixtures";
@@ -79,6 +80,18 @@ const hostSessionEditorTestActions = {
     }) as Promise<JsonResponse<HostSessionDetailResponse>>,
   publishSession: (sessionId) =>
     fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/publish`, {
+      method: "POST",
+    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
+  reopenSession: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/reopen`, {
+      method: "POST",
+    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
+  unpublishSession: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/unpublish`, {
+      method: "POST",
+    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
+  returnSessionToDraft: (sessionId) =>
+    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/return-to-draft`, {
       method: "POST",
     }) as Promise<JsonResponse<HostSessionDetailResponse>>,
   saveSession: (sessionId, request) =>
@@ -1463,11 +1476,194 @@ describe("HostSessionEditor", () => {
 
     expect(screen.getByText("모임이 끝났다면 세션을 마감한 뒤 기록을 정리하세요.")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.click(within(screen.getByRole("dialog", { name: "세션 마감" })).getByRole("button", { name: "세션 마감" }));
 
     expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
     expect(await screen.findByRole("group", { name: /No\.07 · 지난 회차 · 비공개/ })).toBeVisible();
     expect(screen.getByText("모임은 마감되었습니다. 기록 작업대에서 초안을 검토한 뒤 세션을 공개할 수 있습니다.")).toBeVisible();
     expect(screen.getByRole("button", { name: "세션 공개" })).toBeEnabled();
+  });
+
+  it("opens a confirm dialog for 세션 마감 without calling closeSession", async () => {
+    const user = userEvent.setup();
+    const closeSession = vi.fn();
+
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        actions={{ ...hostSessionEditorTestActions, closeSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+
+    expect(screen.getByRole("dialog", { name: "세션 마감" })).toBeVisible();
+    expect(closeSession).not.toHaveBeenCalled();
+  });
+
+  it("does not close a session when the confirm dialog is cancelled or dismissed", async () => {
+    const user = userEvent.setup();
+    const closeSession = vi.fn();
+
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        actions={{ ...hostSessionEditorTestActions, closeSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(screen.queryByRole("dialog", { name: "세션 마감" })).not.toBeInTheDocument();
+    expect(closeSession).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.keyboard("{Escape}");
+
+    expect(screen.queryByRole("dialog", { name: "세션 마감" })).not.toBeInTheDocument();
+    expect(closeSession).not.toHaveBeenCalled();
+  });
+
+  it("closes a session only after the confirm dialog is confirmed", async () => {
+    const user = userEvent.setup();
+    const closeSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...openSession, state: "CLOSED" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        actions={{ ...hostSessionEditorTestActions, closeSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    expect(closeSession).not.toHaveBeenCalled();
+
+    await user.click(within(screen.getByRole("dialog", { name: "세션 마감" })).getByRole("button", { name: "세션 마감" }));
+
+    expect(closeSession).toHaveBeenCalledTimes(1);
+    expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
+  });
+
+  it("reopens a closed session after confirming 마감 취소", async () => {
+    const user = userEvent.setup();
+    const closedSession = { ...session, state: "CLOSED" as const };
+    const reopenSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...closedSession, state: "OPEN" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={closedSession}
+        actions={{ ...hostSessionEditorTestActions, reopenSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "마감 취소" }));
+    expect(reopenSession).not.toHaveBeenCalled();
+
+    await user.click(within(screen.getByRole("dialog", { name: "마감 취소" })).getByRole("button", { name: "마감 취소" }));
+
+    expect(reopenSession).toHaveBeenCalledTimes(1);
+    expect(reopenSession).toHaveBeenCalledWith(closedSession.sessionId);
+  });
+
+  it("keeps the dialog open and links to the other open session on SESSION_OPEN_ALREADY_EXISTS", async () => {
+    const user = userEvent.setup();
+    const closedSession = { ...session, state: "CLOSED" as const };
+    const openSessionId = "00000000-0000-0000-0000-000000000307";
+    const reopenSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({
+          code: "SESSION_OPEN_ALREADY_EXISTS",
+          message: openAlreadyExistsMessage(),
+          status: 409,
+          openSessionId,
+        }), {
+          status: 409,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={closedSession}
+        clubSlug="club-a"
+        actions={{ ...hostSessionEditorTestActions, reopenSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "마감 취소" }));
+    await user.click(within(screen.getByRole("dialog", { name: "마감 취소" })).getByRole("button", { name: "마감 취소" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "마감 취소" });
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(openAlreadyExistsMessage());
+    expect(within(dialog).getByRole("link", { name: "진행 중인 세션 열기" })).toHaveAttribute(
+      "href",
+      `/clubs/club-a/app/host/sessions/${openSessionId}/edit`,
+    );
+    expect(reopenSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("unpublishes a published session after confirming 공개 취소", async () => {
+    const user = userEvent.setup();
+    const publishedSession = { ...session, state: "PUBLISHED" as const };
+    const unpublishSession = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...publishedSession, state: "CLOSED" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={publishedSession}
+        actions={{ ...hostSessionEditorTestActions, unpublishSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "공개 취소" }));
+    expect(unpublishSession).not.toHaveBeenCalled();
+
+    await user.click(within(screen.getByRole("dialog", { name: "공개 취소" })).getByRole("button", { name: "공개 취소" }));
+
+    expect(unpublishSession).toHaveBeenCalledTimes(1);
+    expect(unpublishSession).toHaveBeenCalledWith(publishedSession.sessionId);
+  });
+
+  it("returns an open session to draft after confirming 예정으로 되돌리기", async () => {
+    const user = userEvent.setup();
+    const returnSessionToDraft = vi.fn(
+      async () =>
+        new Response(JSON.stringify({ ...openSession, state: "DRAFT" }), {
+          status: 200,
+        }) as JsonResponse<HostSessionDetailResponse>,
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        actions={{ ...hostSessionEditorTestActions, returnSessionToDraft }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "예정으로 되돌리기" }));
+    expect(returnSessionToDraft).not.toHaveBeenCalled();
+
+    await user.click(
+      within(screen.getByRole("dialog", { name: "예정으로 되돌리기" })).getByRole("button", { name: "예정으로 되돌리기" }),
+    );
+
+    expect(returnSessionToDraft).toHaveBeenCalledTimes(1);
+    expect(returnSessionToDraft).toHaveBeenCalledWith(openSession.sessionId);
   });
 
   it("publishes the applied record through the session publish action", async () => {
@@ -1503,6 +1699,7 @@ describe("HostSessionEditor", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "세션 공개" }));
+    await user.click(within(screen.getByRole("dialog", { name: "세션 공개" })).getByRole("button", { name: "세션 공개" }));
 
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
     expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
