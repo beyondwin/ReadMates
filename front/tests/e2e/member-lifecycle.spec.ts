@@ -24,6 +24,7 @@ async function createOpenSessionThroughUi(page: Page) {
   await page.getByRole("button", { name: "세션 문서 저장" }).click();
 
   await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
+  const editUrl = page.url();
   await page.goto("/app/host");
   await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const openResponse = page.waitForResponse(
@@ -35,6 +36,7 @@ async function createOpenSessionThroughUi(page: Page) {
 
   await expect(page).toHaveURL(/\/app\/session\/current/);
   await expect(page.getByRole("heading", { level: 1, name: lifecycleBookTitle })).toBeVisible();
+  return editUrl;
 }
 
 test.beforeEach(() => {
@@ -43,6 +45,33 @@ test.beforeEach(() => {
 
 test.afterEach(() => {
   resetLifecycleState();
+});
+
+test("host confirms before closing a session from the editor overview", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  const editUrl = await createOpenSessionThroughUi(page);
+
+  await page.goto(editUrl);
+  await page.getByRole("tab", { name: "개요" }).click();
+  await expect(page.getByRole("button", { name: "세션 마감" })).toBeVisible();
+
+  await page.getByRole("button", { name: "세션 마감" }).click();
+  const dialog = page.getByRole("dialog", { name: "세션 마감" });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "취소" }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole("button", { name: "세션 마감" })).toBeVisible();
+
+  await page.getByRole("button", { name: "세션 마감" }).click();
+  const closeResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/bff/api/host/sessions/") &&
+      response.url().includes("/close") &&
+      response.status() === 200,
+  );
+  await page.getByRole("dialog", { name: "세션 마감" }).getByRole("button", { name: "세션 마감" }).click();
+  await closeResponse;
+  await expect(page.getByRole("button", { name: "마감 취소" })).toBeVisible();
 });
 
 test("host suspends member and member cannot save current session activity", async ({ context, page }) => {

@@ -1663,7 +1663,7 @@
   flex-wrap: wrap;
   gap: 8px;
 }
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .rm-host-session-editor__lifecycle-actions {
     flex-direction: column;
     align-items: stretch;

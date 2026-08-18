@@ -131,7 +131,7 @@ POST /api/host/sessions/{sessionId}/return-to-draft
 
 - 같은 클럽에 다른 `OPEN`이 있으면 거절한다. 응답에 그 세션 id를 넣는다.
 - `site_visibility = PUBLIC_RECORD`이면 같은 트랜잭션에서 `HIDDEN`으로 내리고 compatibility `is_public = false`를 dual-write한다. 요약·하이라이트·한줄평·publication row는 남긴다.
-- 참석자·RSVP·질문·서평 row는 다시 만들지 않고 그대로 둔다. `/open`의 `createActiveParticipants`는 호출하지 않는다. 그 insert는 기존 참석자의 RSVP를 초기화하므로 `reopen`에 재사용하지 않는다. 마감 이후 새로 활성화된 멤버는 자동으로 넣지 않고, 호스트가 기존 참석자 추가 흐름으로 넣는다.
+- 참석자·RSVP·질문·서평 row는 다시 만들지 않고 그대로 둔다. `/open`의 `createActiveParticipants`는 호출하지 않는다. 그 insert는 마감 이후 새로 활성화된 멤버까지 넣으므로 `reopen`에 재사용하지 않는다. 마감 이후 새로 활성화된 멤버는 자동으로 넣지 않고, 호스트가 기존 참석자 추가 흐름으로 넣는다. `/open`의 duplicate-key 갱신은 기존 RSVP·출석을 유지한다.
 - 이 세션이 현재 세션이 된다. 멤버 RSVP/질문/서평 쓰기가 다시 열린다.
 - 아카이브/게스트 archive의 `CLOSED|PUBLISHED` 목록에서 빠진다.
 - 공개 사이트는 원래 `PUBLISHED + PUBLIC_RECORD`만 보여 주므로 `reopen`만으로도 사이트에 나오지 않는다. `HIDDEN` 전환은 `OPEN + PUBLIC_RECORD` invariant를 지키기 위한 것이다.

@@ -53,6 +53,16 @@ describe("SessionLifecycleConfirmDialog", () => {
     expect(onConfirm).not.toHaveBeenCalled();
   });
 
+  it("calls onClose from the cancel button without confirming", async () => {
+    const user = userEvent.setup();
+    const { onConfirm, onClose } = renderDialog();
+
+    await user.click(screen.getByRole("button", { name: "취소" }));
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it("disables confirm and cancel while submitting and ignores Escape", async () => {
     const user = userEvent.setup();
     const { onConfirm, onClose } = renderDialog({ submitting: true });
@@ -102,6 +112,26 @@ describe("SessionLifecycleConfirmDialog", () => {
     unmount();
     expect(trigger).toHaveFocus();
     expect(restoreFocusRef.current).toBeNull();
+  });
+
+  it("includes the recovery link in the tab cycle", async () => {
+    const user = userEvent.setup();
+    renderDialog({
+      errorMessage: openAlreadyExistsMessage(),
+      openSessionHref: "/app/host/sessions/session-open/edit",
+    });
+
+    const cancel = screen.getByRole("button", { name: "취소" });
+    const confirm = screen.getByRole("button", { name: copy.confirmLabel });
+    const link = screen.getByRole("link", { name: "진행 중인 세션 열기" });
+    expect(cancel).toHaveFocus();
+
+    await user.tab();
+    expect(confirm).toHaveFocus();
+    await user.tab();
+    expect(link).toHaveFocus();
+    await user.tab();
+    expect(cancel).toHaveFocus();
   });
 });
 

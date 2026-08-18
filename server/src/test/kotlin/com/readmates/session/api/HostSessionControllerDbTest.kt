@@ -183,15 +183,20 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
       '00000000-0000-0000-0000-000000019201',
       '00000000-0000-0000-0000-000000019211',
       '00000000-0000-0000-0000-000000019212',
-      '00000000-0000-0000-0000-000000019213'
+      '00000000-0000-0000-0000-000000019213',
+      '00000000-0000-0000-0000-000000019214'
     );
     delete from users
-    where id = '00000000-0000-0000-0000-000000019101'
+    where id in (
+      '00000000-0000-0000-0000-000000019101',
+      '00000000-0000-0000-0000-000000019114'
+    )
        or email in (
          'outside.host@example.com',
          'suspended.create@example.com',
          'left.create@example.com',
-         'inactive.create@example.com'
+         'inactive.create@example.com',
+         'later.active@example.com'
        );
     delete from clubs
     where id = '00000000-0000-0000-0000-000000019001'
@@ -1087,7 +1092,7 @@ class HostSessionControllerDbTest(
                 jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
                 jsonPath("$.status") { value(409) }
                 jsonPath("$.traceId") { isNotEmpty() }
-                jsonPath("$.length()") { value(5) }
+                jsonPath("$.length()") { value(4) }
             }
         assertEquals(beforeOpenAttempt, lifecycleDbEvidence(sessionId))
     }
@@ -1112,7 +1117,7 @@ class HostSessionControllerDbTest(
                 jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
                 jsonPath("$.status") { value(409) }
                 jsonPath("$.traceId") { isNotEmpty() }
-                jsonPath("$.length()") { value(5) }
+                jsonPath("$.length()") { value(4) }
             }
         assertEquals(beforeOpenAttempt, lifecycleDbEvidence(sessionId))
     }
@@ -1521,8 +1526,44 @@ class HostSessionControllerDbTest(
         assertEquals("OPEN", findSessionState(sessionId))
         assertEquals(1, countRows("public_session_publications", "session_id = '$sessionId'"))
         assertEquals("HIDDEN", publicationSiteVisibility(sessionId))
+        assertEquals("MEMBER", publicationVisibility(sessionId))
         assertEquals("0", publicationIsPublic(sessionId))
+        assertEquals("MEMBER", sessionVisibility(sessionId))
         assertEquals(publicSummary, findPublicationSummary(sessionId))
+    }
+
+    @Test
+    fun `host reopen does not add members activated after close`() {
+        val sessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+        val participantCount = participantCountForSession(sessionId)
+        val laterMembershipId = insertActiveMemberAfterClose()
+        assertEquals(false, participantExists(sessionId, laterMembershipId))
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        assertEquals(participantCount, participantCountForSession(sessionId))
+        assertEquals(false, participantExists(sessionId, laterMembershipId))
     }
 
     @Test
@@ -2564,6 +2605,45 @@ class HostSessionControllerDbTest(
         ) ?: error("membership for $email did not exist")
 
     private fun participantCountForSession(id: String) = countRows("session_participants", "session_id = '$id'")
+
+    private fun participantExists(
+        sessionId: String,
+        membershipId: String,
+    ) = countRows(
+        "session_participants",
+        "session_id = '$sessionId' and membership_id = '$membershipId'",
+    ) > 0
+
+    private fun insertActiveMemberAfterClose(): String {
+        jdbcTemplate.update(
+            """
+            insert into users (id, email, name, short_name, auth_provider)
+            values (
+              '00000000-0000-0000-0000-000000019114',
+              'later.active@example.com',
+              '마감 이후 활성',
+              '이후',
+              'PASSWORD'
+            )
+            """.trimIndent(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (
+              '00000000-0000-0000-0000-000000019214',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000019114',
+              'MEMBER',
+              'ACTIVE',
+              utc_timestamp(6),
+              '이후',
+              'mushroom-green-book'
+            )
+            """.trimIndent(),
+        )
+        return "00000000-0000-0000-0000-000000019214"
+    }
 
     private fun participantRsvp(
         sessionId: String,

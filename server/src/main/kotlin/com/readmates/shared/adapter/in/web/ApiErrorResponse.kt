@@ -1,5 +1,6 @@
 package com.readmates.shared.adapter.`in`.web
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.readmates.shared.observability.RequestIdFilter
 import org.slf4j.MDC
 import org.springframework.http.HttpStatus
@@ -10,6 +11,7 @@ data class ApiErrorResponse(
     val message: String,
     val status: Int,
     val traceId: String? = null,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
     val openSessionId: String? = null,
 )
 
