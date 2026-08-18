@@ -1,12 +1,12 @@
 import type {
   AttendanceStatus,
   HostSessionDeletionPreviewResponse,
-  HostSessionDetailResponse,
   SessionImportCommitResponse,
   SessionImportPreviewResponse,
   SessionImportRequest,
 } from "@/features/host/model/host-view-types";
 import type { HostSessionRequest } from "@/features/host/model/host-session-editor-model";
+import type { HostSessionLifecycleResult } from "@/features/host/model/host-session-lifecycle-model";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -21,11 +21,11 @@ export type JsonResponse<T> = Response & { json(): Promise<T> };
 export type HostSessionEditorActions = {
   loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
   deleteSession: (sessionId: string) => Promise<Response>;
-  closeSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
-  publishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
-  reopenSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
-  unpublishSession: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
-  returnSessionToDraft: (sessionId: string) => Promise<JsonResponse<HostSessionDetailResponse>>;
+  closeSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
+  publishSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
+  reopenSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
+  unpublishSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
+  returnSessionToDraft: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
   updateAttendance: (
     sessionId: string,

@@ -1794,6 +1794,83 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `reopen of missing session returns 404 even when another session is open`() {
+        val openSessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$openSessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009778/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("SESSION_NOT_FOUND") }
+            }
+
+        assertEquals("OPEN", findSessionState(openSessionId))
+    }
+
+    @Test
+    fun `reopen of other club session returns 404 even when current club has open session`() {
+        val openSessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$openSessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+        createOutsideClubSession(state = "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000019777/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("SESSION_NOT_FOUND") }
+            }
+
+        assertEquals("OPEN", findSessionState(openSessionId))
+        assertEquals("CLOSED", findOutsideClubSessionState())
+    }
+
+    @Test
+    fun `reopen of published session is not allowed even when another session is open`() {
+        val openSessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$openSessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+
+        val publishedSessionId = createDraftSessionEight()
+        updateSessionState(publishedSessionId, "CLOSED")
+        updateSessionVisibility(publishedSessionId, "MEMBER")
+        updateSessionState(publishedSessionId, "PUBLISHED")
+
+        mockMvc
+            .post("/api/host/sessions/$publishedSessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
+            }
+
+        assertEquals("OPEN", findSessionState(openSessionId))
+        assertEquals("PUBLISHED", findSessionState(publishedSessionId))
+    }
+
+    @Test
     fun `host reopen is idempotent for already open session`() {
         val sessionId = createDraftSessionSeven()
         mockMvc
@@ -3300,6 +3377,17 @@ class HostSessionControllerDbTest(
             String::class.java,
             sessionId,
         ) ?: error("session $sessionId did not exist")
+
+    private fun findOutsideClubSessionState(): String =
+        jdbcTemplate.queryForObject(
+            """
+            select state
+            from sessions
+            where id = '00000000-0000-0000-0000-000000019777'
+              and club_id = '00000000-0000-0000-0000-000000019001'
+            """.trimIndent(),
+            String::class.java,
+        ) ?: error("outside club session did not exist")
 
     private fun findPublicationRow(sessionId: String = "00000000-0000-0000-0000-000000009777"): Map<String, Any?> =
         jdbcTemplate.queryForMap(

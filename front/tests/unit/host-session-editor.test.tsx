@@ -59,8 +59,6 @@ const restoreReturnsPromise: RestoreReturnsPromise = true;
 
 const jsonHeaders = () => new Headers({ "Content-Type": "application/json" });
 
-type JsonResponse<T> = Response & { json(): Promise<T> };
-
 const hostSessionEditorTestActions = {
   loadDeletionPreview: (sessionId) =>
     fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
@@ -74,26 +72,11 @@ const hostSessionEditorTestActions = {
       headers: jsonHeaders(),
       cache: "no-store",
     }),
-  closeSession: (sessionId) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/close`, {
-      method: "POST",
-    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
-  publishSession: (sessionId) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/publish`, {
-      method: "POST",
-    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
-  reopenSession: (sessionId) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/reopen`, {
-      method: "POST",
-    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
-  unpublishSession: (sessionId) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/unpublish`, {
-      method: "POST",
-    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
-  returnSessionToDraft: (sessionId) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/return-to-draft`, {
-      method: "POST",
-    }) as Promise<JsonResponse<HostSessionDetailResponse>>,
+  closeSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
+  publishSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
+  reopenSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
+  unpublishSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
+  returnSessionToDraft: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   saveSession: (sessionId, request) =>
     fetch(
       sessionId === null
@@ -1460,12 +1443,7 @@ describe("HostSessionEditor", () => {
   it("lets hosts close an open session from the editor", async () => {
     const user = userEvent.setup();
     const closedSession = { ...openSession, state: "CLOSED" as const };
-    const closeSession = vi.fn(
-      async () =>
-        new Response(JSON.stringify(closedSession), {
-          status: 200,
-        }) as JsonResponse<HostSessionDetailResponse>,
-    );
+    const closeSession = vi.fn(async () => ({ ok: true as const, session: closedSession }));
 
     render(
       <HostSessionEditorForTest
@@ -1528,10 +1506,7 @@ describe("HostSessionEditor", () => {
   it("closes a session only after the confirm dialog is confirmed", async () => {
     const user = userEvent.setup();
     const closeSession = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ...openSession, state: "CLOSED" }), {
-          status: 200,
-        }) as JsonResponse<HostSessionDetailResponse>,
+      async () => ({ ok: true as const, session: { ...openSession, state: "CLOSED" as const } }),
     );
 
     render(
@@ -1554,10 +1529,7 @@ describe("HostSessionEditor", () => {
     const user = userEvent.setup();
     const closedSession = { ...session, state: "CLOSED" as const };
     const reopenSession = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ...closedSession, state: "OPEN" }), {
-          status: 200,
-        }) as JsonResponse<HostSessionDetailResponse>,
+      async () => ({ ok: true as const, session: { ...closedSession, state: "OPEN" as const } }),
     );
 
     render(
@@ -1581,15 +1553,11 @@ describe("HostSessionEditor", () => {
     const closedSession = { ...session, state: "CLOSED" as const };
     const openSessionId = "00000000-0000-0000-0000-000000000307";
     const reopenSession = vi.fn(
-      async () =>
-        new Response(JSON.stringify({
-          code: "SESSION_OPEN_ALREADY_EXISTS",
-          message: openAlreadyExistsMessage(),
-          status: 409,
-          openSessionId,
-        }), {
-          status: 409,
-        }) as JsonResponse<HostSessionDetailResponse>,
+      async () => ({
+        ok: false as const,
+        message: openAlreadyExistsMessage(),
+        openSessionId,
+      }),
     );
 
     render(
@@ -1617,10 +1585,7 @@ describe("HostSessionEditor", () => {
     const user = userEvent.setup();
     const publishedSession = { ...session, state: "PUBLISHED" as const };
     const unpublishSession = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ...publishedSession, state: "CLOSED" }), {
-          status: 200,
-        }) as JsonResponse<HostSessionDetailResponse>,
+      async () => ({ ok: true as const, session: { ...publishedSession, state: "CLOSED" as const } }),
     );
 
     render(
@@ -1642,10 +1607,7 @@ describe("HostSessionEditor", () => {
   it("returns an open session to draft after confirming 예정으로 되돌리기", async () => {
     const user = userEvent.setup();
     const returnSessionToDraft = vi.fn(
-      async () =>
-        new Response(JSON.stringify({ ...openSession, state: "DRAFT" }), {
-          status: 200,
-        }) as JsonResponse<HostSessionDetailResponse>,
+      async () => ({ ok: true as const, session: { ...openSession, state: "DRAFT" as const } }),
     );
 
     render(
@@ -1670,17 +1632,17 @@ describe("HostSessionEditor", () => {
     const user = userEvent.setup();
     const closedSession = { ...session, state: "CLOSED" as const, publication: null };
     const publishSession = vi.fn(
-      async () =>
-        new Response(JSON.stringify({
+      async () => ({
+        ok: true as const,
+        session: {
           ...closedSession,
-          state: "PUBLISHED",
+          state: "PUBLISHED" as const,
           publication: {
             publicSummary: "현재 적용본 요약입니다.",
-            visibility: "MEMBER",
+            visibility: "MEMBER" as const,
           },
-        }), {
-          status: 200,
-        }) as JsonResponse<HostSessionDetailResponse>,
+        },
+      }),
     );
     const workflow = recordWorkflow("MEMBER");
     workflow.editor.liveRevision = 3;

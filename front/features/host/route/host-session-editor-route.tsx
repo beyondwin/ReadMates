@@ -67,6 +67,7 @@ import {
   hostSessionEditorPreviewActions,
   type HostSessionEditorRouteData,
 } from "./host-session-editor-data";
+import { hostSessionLifecycleResultFromResponse } from "./host-session-lifecycle-result";
 import {
   HostNotificationComposerController,
   type HostNotificationComposerRequest,
@@ -257,15 +258,26 @@ function useHostSessionEditorActions(
   const { mutateAsync: updateAttendance } = useUpdateHostSessionAttendanceMutation(context);
   const { mutateAsync: commitImport } = useCommitHostSessionImportMutation(context);
 
+  const runLifecycle = useCallback(async (
+    mutate: (sessionId: string) => Promise<Response>,
+    sessionId: string,
+  ) => {
+    const result = await hostSessionLifecycleResultFromResponse(await mutate(sessionId));
+    if (result.ok) {
+      await onSessionRecordsChanged?.(sessionId);
+    }
+    return result;
+  }, [onSessionRecordsChanged]);
+
   return useMemo<HostSessionEditorActions>(() => ({
     loadDeletionPreview: (sessionId) =>
       queryClient.fetchQuery(hostSessionDeletionPreviewQuery(sessionId, context)),
     deleteSession: (sessionId) => deleteSession(sessionId),
-    closeSession: (sessionId) => closeSession(sessionId),
-    publishSession: (sessionId) => publishSession(sessionId),
-    reopenSession: (sessionId) => reopenSession(sessionId),
-    unpublishSession: (sessionId) => unpublishSession(sessionId),
-    returnSessionToDraft: (sessionId) => returnSessionToDraft(sessionId),
+    closeSession: (sessionId) => runLifecycle(closeSession, sessionId),
+    publishSession: (sessionId) => runLifecycle(publishSession, sessionId),
+    reopenSession: (sessionId) => runLifecycle(reopenSession, sessionId),
+    unpublishSession: (sessionId) => runLifecycle(unpublishSession, sessionId),
+    returnSessionToDraft: (sessionId) => runLifecycle(returnSessionToDraft, sessionId),
     saveSession: (sessionId, request) =>
       sessionId === null
         ? createSession(request)
@@ -289,6 +301,7 @@ function useHostSessionEditorActions(
     onSessionRecordsChanged,
     reopenSession,
     returnSessionToDraft,
+    runLifecycle,
     unpublishSession,
     updateAttendance,
     updateSession,

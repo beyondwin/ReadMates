@@ -9,17 +9,16 @@ import org.junit.jupiter.api.assertThrows
 
 class HostSessionWritePolicyTest {
     @Test
-    fun `reopen is unchanged when already OPEN and rejected otherwise except via CAS`() {
+    fun `reopen is unchanged when already OPEN and changed only from CLOSED`() {
         assertThat(reopenDecision("OPEN"))
             .isEqualTo(HostSessionTransitionDecision.UNCHANGED)
+        assertThat(reopenDecision("CLOSED"))
+            .isEqualTo(HostSessionTransitionDecision.CHANGED)
         assertThrows<HostSessionReopenNotAllowedException> {
             reopenDecision("PUBLISHED")
         }
         assertThrows<HostSessionReopenNotAllowedException> {
             reopenDecision("DRAFT")
-        }
-        assertThrows<HostSessionReopenNotAllowedException> {
-            reopenDecision("CLOSED")
         }
     }
 

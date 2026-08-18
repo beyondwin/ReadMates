@@ -47,12 +47,24 @@ describe("host notifications UI boundary", () => {
     const uiRoot = resolve(repoRoot, "features/host/ui");
     const files = collectUiFiles(uiRoot);
     const violations: string[] = [];
+    const hookImport = /from\s+["'](@\/features\/host\/hooks\/[^"']+|(\.\.\/)+hooks\/[^"']+)["']/;
     for (const absolutePath of files) {
       const source = readFileSync(absolutePath, "utf8");
       const rel = toPosixRelative(absolutePath);
       for (const pattern of FORBIDDEN) {
         if (pattern.test(source)) {
           violations.push(`${rel} matches ${pattern}`);
+        }
+      }
+      const hookMatch = source.match(hookImport);
+      if (hookMatch) {
+        const specifier = hookMatch[1];
+        const hookPath = specifier.startsWith("@/")
+          ? resolve(repoRoot, specifier.slice(2))
+          : resolve(absolutePath, "..", specifier);
+        const hookSource = readFileSync(`${hookPath}.ts`, "utf8");
+        if (/from\s+["']@\/shared\/api(?:\/[^"']+)?["']/.test(hookSource)) {
+          violations.push(`${rel} reaches shared/api through ${specifier}`);
         }
       }
     }

@@ -40,7 +40,6 @@ import {
   reverseLifecycleAction,
   type SessionLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
-import { apiErrorFromResponse } from "@/features/host/hooks/session-lifecycle-api-error";
 import {
   buildSessionImportCommitResult,
   buildSessionImportRequest,
@@ -707,21 +706,20 @@ export default function HostSessionEditor({
     setLifecycleError(null);
 
     try {
-      const response = await actionByKind[lifecycleConfirm](session.sessionId);
+      const result = await actionByKind[lifecycleConfirm](session.sessionId);
 
-      if (!response.ok) {
-        const error = await apiErrorFromResponse(response);
+      if (!result.ok) {
         setLifecycleSaveState("error");
         setLifecycleError({
-          message: error.message,
-          openSessionHref: error.code === "SESSION_OPEN_ALREADY_EXISTS" && error.openSessionId
-            ? scopedHostSessionEditHref(error.openSessionId, clubSlug)
+          message: result.message,
+          openSessionHref: result.openSessionId
+            ? scopedHostSessionEditHref(result.openSessionId, clubSlug)
             : null,
         });
         return;
       }
 
-      dispatch({ type: "SESSION_LIFECYCLE_UPDATED", snapshot: await response.json() });
+      dispatch({ type: "SESSION_LIFECYCLE_UPDATED", snapshot: result.session });
       setLifecycleSaveState("idle");
       setLifecycleConfirm(null);
       setLifecycleError(null);

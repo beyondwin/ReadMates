@@ -129,10 +129,10 @@ internal object HostSessionWritePolicy {
 }
 
 internal fun reopenDecision(state: String): HostSessionTransitionDecision =
-    if (state == "OPEN") {
-        HostSessionTransitionDecision.UNCHANGED
-    } else {
-        throw HostSessionReopenNotAllowedException()
+    when (state) {
+        "OPEN" -> HostSessionTransitionDecision.UNCHANGED
+        "CLOSED" -> HostSessionTransitionDecision.CHANGED
+        else -> throw HostSessionReopenNotAllowedException()
     }
 
 internal fun unpublishDecision(state: String): HostSessionTransitionDecision =

@@ -1304,6 +1304,12 @@ private fun assertHostSessionWriteBoundaries() {
             )
         },
         { assertTrue(hostSessionSuppressionViolations().isEmpty(), "Split units hide complexity with suppressions") },
+        {
+            assertTrue(
+                hostSessionInboundSuppressionViolations().isEmpty(),
+                "Host session inbound adapters hide complexity with TooManyFunctions suppressions",
+            )
+        },
     )
 }
 
@@ -1359,6 +1365,19 @@ private fun hostSessionSuppressionViolations(): List<String> {
             .map { rule -> "$fileName suppresses $rule" }
     }
 }
+
+private fun hostSessionInboundWebRoot(): Path =
+    architectureProjectRoot().resolve("server/src/main/kotlin/com/readmates/session/adapter/in/web")
+
+private fun hostSessionInboundSuppressionViolations(): List<String> =
+    Files.list(hostSessionInboundWebRoot()).use { paths ->
+        paths
+            .filter { path -> path.name.endsWith("Controller.kt") }
+            .map { path -> path.name to path.readText() }
+            .filter { (_, source) -> Regex("""@Suppress\([^)]*"TooManyFunctions"""").containsMatchIn(source) }
+            .map { (name) -> name }
+            .toList()
+    }
 
 private data class KotlinSourceFixture(
     val name: String,

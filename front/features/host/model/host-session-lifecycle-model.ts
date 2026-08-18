@@ -1,4 +1,9 @@
 import type { HostSessionState } from "./host-session-editor-model";
+import type { HostSessionDetailResponse } from "./host-view-types";
+
+export type HostSessionLifecycleResult =
+  | { ok: true; session: HostSessionDetailResponse }
+  | { ok: false; message: string; openSessionId: string | null };
 
 export type SessionLifecycleConfirmKind =
   | "close"
