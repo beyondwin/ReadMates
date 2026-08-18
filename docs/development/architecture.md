@@ -366,17 +366,19 @@ ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정
 | 상태 | 의미 | 주요 전환 |
 | --- | --- | --- |
 | `DRAFT` | 예정 세션입니다. `GUEST_READABLE`이면 scoped 게스트 앱과 로그인된 reader의 예정 목록에 보입니다. Public site record가 될 수는 없습니다. | `/api/host/sessions/{sessionId}/open`으로 `OPEN` 전환 |
-| `OPEN` | 현재 참여 세션입니다. RSVP, 읽은 분량, 질문, 서평, 참석 확정이 이 상태를 기준으로 동작합니다. | `/api/host/sessions/{sessionId}/close`로 `CLOSED` 전환 |
-| `CLOSED` | 모임은 끝났지만 기록은 아직 최종 발행 전입니다. `GUEST_READABLE`이면 게스트·멤버 archive에서 읽을 수 있지만 notes와 공개 사이트에는 아직 나오지 않습니다. | 공개 요약과 허용된 exposure를 저장한 뒤 `/api/host/sessions/{sessionId}/publish`로 `PUBLISHED` 전환 |
-| `PUBLISHED` | 기록 발행이 완료된 세션입니다. `GUEST_READABLE`은 게스트·멤버 notes/archive를 열고, `PUBLIC_RECORD`가 추가된 경우에만 공개 사이트에도 배치됩니다. | 되돌림 API는 없습니다. |
+| `OPEN` | 현재 참여 세션입니다. RSVP, 읽은 분량, 질문, 서평, 참석 확정이 이 상태를 기준으로 동작합니다. | `/api/host/sessions/{sessionId}/close`로 `CLOSED` 전환, `/api/host/sessions/{sessionId}/return-to-draft`로 `DRAFT` 환원 |
+| `CLOSED` | 모임은 끝났지만 기록은 아직 최종 발행 전입니다. `GUEST_READABLE`이면 게스트·멤버 archive에서 읽을 수 있지만 notes와 공개 사이트에는 아직 나오지 않습니다. | 공개 요약과 허용된 exposure를 저장한 뒤 `/api/host/sessions/{sessionId}/publish`로 `PUBLISHED` 전환, `/api/host/sessions/{sessionId}/reopen`으로 `OPEN` 복원 |
+| `PUBLISHED` | 기록 발행이 완료된 세션입니다. `GUEST_READABLE`은 게스트·멤버 notes/archive를 열고, `PUBLIC_RECORD`가 추가된 경우에만 공개 사이트에도 배치됩니다. | `/api/host/sessions/{sessionId}/unpublish`로 `CLOSED` 전환 |
 
 Canonical source of truth는 `access_scope`와 `site_visibility`입니다. V45는 기존 `sessions.visibility in (MEMBER, PUBLIC)`을 `GUEST_READABLE`로 backfill하고, 기존 공개 publication 중 허용된 lifecycle만 `PUBLIC_RECORD`로 backfill합니다. 한 릴리즈의 rolling deploy와 rollback을 위해 `sessions.visibility`, `public_session_publications.visibility`, `is_public`을 유지하며 모든 새 host write가 같은 transaction에서 dual-write합니다. Mapping은 `HOST_ONLY + HIDDEN -> HOST_ONLY/MEMBER/false`, `GUEST_READABLE + HIDDEN -> MEMBER/MEMBER/false`, `GUEST_READABLE + PUBLIC_RECORD -> PUBLIC/PUBLIC/true`입니다. `HOST_ONLY + PUBLIC_RECORD`와 `DRAFT/OPEN + PUBLIC_RECORD`는 거절합니다. 구 `{visibility}` request도 이 호환 기간에만 받으며, 다음 릴리즈에서 old frontend 사용이 없음을 확인한 뒤 request parser와 compatibility column read/write를 별도 migration으로 제거합니다. V45 column을 이번 rollout에서 즉시 제거하거나 legacy 값만 source of truth로 되돌리지 않습니다.
 
-호스트는 `/api/host/sessions/{sessionId}/open`으로 `DRAFT` 세션 하나를 현재 세션으로 시작합니다. 같은 클럽에 이미 `OPEN` 세션이 있으면 다른 draft를 동시에 열 수 없습니다. 이미 열린 세션에 대한 open 요청은 같은 세션 detail을 반환하고, `CLOSED`나 `PUBLISHED` 세션을 현재 세션으로 되돌리지는 않습니다.
+호스트는 `/api/host/sessions/{sessionId}/open`으로 `DRAFT` 세션 하나를 현재 세션으로 시작합니다. 같은 클럽에 이미 `OPEN` 세션이 있으면 다른 draft를 동시에 열 수 없습니다. 이미 열린 세션에 대한 open 요청은 같은 세션 detail을 반환하고, `CLOSED`나 `PUBLISHED` 세션을 현재 세션으로 되돌리지는 않습니다. `CLOSED`를 다시 열려면 `/reopen`을 사용합니다. `/open`은 빠진 활성 멤버만 참석자로 추가하고 기존 RSVP·출석은 유지합니다.
 
 호스트는 `/api/host/sessions/{sessionId}/close`로 `OPEN` 세션을 닫습니다. 이미 `CLOSED`인 세션에 대한 close 요청은 같은 detail을 반환하지만, `DRAFT`나 `PUBLISHED` 세션은 닫을 수 없습니다. 닫기 SQL은 `state='OPEN'` 조건이 맞을 때만 `CLOSED`로 바꾸므로, 다른 트랜잭션이 먼저 `PUBLISHED`로 바꾼 상태를 덮어쓰지 않습니다.
 
 호스트는 `/api/host/sessions/{sessionId}/publish`로 `CLOSED` 세션을 발행합니다. 발행은 같은 club의 publication row가 있고, canonical `access_scope=GUEST_READABLE`이며, `public_summary`가 비어 있지 않을 때만 허용됩니다. `HOST_ONLY`, `DRAFT`, `OPEN`, publication row가 없는 `CLOSED` 세션은 발행할 수 없습니다. `site_visibility=PUBLIC_RECORD`면 compatibility `is_public`과 `published_at`도 함께 맞춥니다.
+
+호스트는 `/api/host/sessions/{sessionId}/unpublish`, `/reopen`, `/return-to-draft`로 한 단계씩만 되돌릴 수 있습니다. `/unpublish`는 `PUBLISHED`를 `CLOSED`로 바꾸고 publication row와 `site_visibility`는 유지합니다. 공개 사이트는 `PUBLISHED + PUBLIC_RECORD`만 반환하므로 목록에서 내려갑니다. `/reopen`은 `CLOSED`를 `OPEN`으로 복원하고, `PUBLIC_RECORD`면 같은 트랜잭션에서 `HIDDEN`으로 내립니다. 참석자 row는 다시 만들지 않습니다. 같은 클럽에 다른 `OPEN`이 있으면 `/reopen`과 `/open` 모두 거절합니다. `/return-to-draft`는 `OPEN`을 `DRAFT`로 환원합니다. 세 명령 모두 기록·참석·알림 데이터를 삭제하지 않고, 기대 상태에서만 바꾸므로 다른 트랜잭션이 먼저 옮긴 상태를 덮어쓰지 않습니다.
 
 호스트 앱은 `/clubs/:slug/app/host/sessions/:sessionId/closing`에서 회차별 클로징 상태를 보여줍니다. 이 화면은 세션 종료, 기록 패키지, 피드백 문서, 멤버 알림, 공개 기록 노출을 하나의 host-safe read model로 묶고, member/public 표면에는 권한에 맞는 진입과 공개 가능한 기록만 노출합니다. 서버의 `sessionclosing` slice는 새 영속 상태나 DB migration 없이 기존 세션·공개 기록·피드백 문서·알림 outbox/inbox 데이터를 읽어 checklist, next action, Host/Member/Public surface 상태, evidence ledger를 계산합니다.
 
