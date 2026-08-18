@@ -118,6 +118,89 @@ describe("SessionOverviewSection", () => {
     expect(screen.queryByRole("button", { name: "세션 마감" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "세션 공개" })).not.toBeInTheDocument();
   });
+
+  it("offers close and reverse for an open session", () => {
+    renderOverview({
+      sessionState: "OPEN",
+      onCloseSession: vi.fn(),
+      reverseLabel: "예정으로 되돌리기",
+      onReverseSession: vi.fn(),
+    });
+
+    expect(screen.getByRole("button", { name: "세션 마감" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "예정으로 되돌리기" })).toHaveClass(
+      "btn",
+      "btn-ghost",
+      "btn-sm",
+    );
+    expect(lifecycleActions()).toHaveClass("rm-host-session-editor__lifecycle-actions");
+  });
+
+  it("offers publish, records, and reverse for a closed session", () => {
+    renderOverview({
+      sessionState: "CLOSED",
+      onPublishSession: vi.fn(),
+      reverseLabel: "마감 취소",
+      onReverseSession: vi.fn(),
+    });
+
+    expect(screen.getByRole("button", { name: "세션 공개" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "기록 작업대" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "마감 취소" })).toBeInTheDocument();
+  });
+
+  it("offers only unpublish for a published session", () => {
+    renderOverview({
+      sessionState: "PUBLISHED",
+      reverseLabel: "공개 취소",
+      onReverseSession: vi.fn(),
+    });
+
+    expect(screen.getByRole("button", { name: "공개 취소" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "세션 마감" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "세션 공개" })).not.toBeInTheDocument();
+  });
+
+  it("does not offer reverse or close for a draft session", () => {
+    renderOverview({ sessionState: "DRAFT" });
+
+    expect(screen.queryByRole("button", { name: "세션 마감" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "예정으로 되돌리기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "마감 취소" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "공개 취소" })).not.toBeInTheDocument();
+  });
+
+  it("calls onReverseSession once from the reverse action", async () => {
+    const user = userEvent.setup();
+    const onReverseSession = vi.fn();
+    renderOverview({
+      sessionState: "OPEN",
+      onCloseSession: vi.fn(),
+      reverseLabel: "예정으로 되돌리기",
+      onReverseSession,
+    });
+
+    await user.click(screen.getByRole("button", { name: "예정으로 되돌리기" }));
+
+    expect(onReverseSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("still calls onCloseSession from the close action", async () => {
+    const user = userEvent.setup();
+    const onCloseSession = vi.fn();
+    const onReverseSession = vi.fn();
+    renderOverview({
+      sessionState: "OPEN",
+      onCloseSession,
+      reverseLabel: "예정으로 되돌리기",
+      onReverseSession,
+    });
+
+    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+
+    expect(onCloseSession).toHaveBeenCalledTimes(1);
+    expect(onReverseSession).not.toHaveBeenCalled();
+  });
 });
 
 function renderOverview({
@@ -126,12 +209,16 @@ function renderOverview({
   onNextAction = vi.fn(),
   onCloseSession,
   onPublishSession,
+  onReverseSession,
+  reverseLabel,
 }: {
   overview?: HostSessionEditorOverview;
   sessionState?: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
   onNextAction?: (target: HostSessionEditorOverview["nextAction"]["target"]) => void;
   onCloseSession?: () => void | Promise<void>;
   onPublishSession?: () => void | Promise<void>;
+  onReverseSession?: () => void;
+  reverseLabel?: string;
 } = {}) {
   return render(
     <>
@@ -142,9 +229,17 @@ function renderOverview({
         onNextAction={onNextAction}
         onCloseSession={onCloseSession}
         onPublishSession={onPublishSession}
+        onReverseSession={onReverseSession}
+        reverseLabel={reverseLabel}
         lifecyclePending={false}
       />
     </>,
+  );
+}
+
+function lifecycleActions() {
+  return screen.getByRole("button", { name: "세션 마감" }).closest(
+    ".rm-host-session-editor__lifecycle-actions",
   );
 }
 

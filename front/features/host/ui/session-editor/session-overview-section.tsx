@@ -12,6 +12,8 @@ export function SessionOverviewSection({
   onNextAction,
   onCloseSession,
   onPublishSession,
+  onReverseSession,
+  reverseLabel,
   lifecyclePending,
 }: {
   overview: HostSessionEditorOverview;
@@ -19,6 +21,8 @@ export function SessionOverviewSection({
   onNextAction: (target: HostSessionEditorLocation) => void;
   onCloseSession?: () => void | Promise<void>;
   onPublishSession?: () => void | Promise<void>;
+  onReverseSession?: () => void;
+  reverseLabel?: string;
   lifecyclePending: boolean;
 }): JSX.Element {
   const lifecycle = lifecyclePresentation(sessionState);
@@ -100,7 +104,7 @@ export function SessionOverviewSection({
               {lifecycle.description}
             </p>
           </div>
-          <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          <div className="rm-host-session-editor__lifecycle-actions">
             {sessionState === "OPEN" && onCloseSession ? (
               <button
                 type="button"
@@ -128,6 +132,16 @@ export function SessionOverviewSection({
                 onClick={() => void onPublishSession()}
               >
                 세션 공개
+              </button>
+            ) : null}
+            {reverseLabel && onReverseSession ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={lifecyclePending}
+                onClick={onReverseSession}
+              >
+                {reverseLabel}
               </button>
             ) : null}
           </div>
