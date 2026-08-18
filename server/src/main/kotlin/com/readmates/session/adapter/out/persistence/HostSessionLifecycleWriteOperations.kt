@@ -120,7 +120,7 @@ internal class HostSessionLifecycleWriteOperations(
             return result(command, true)
         }
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        policy.reopenDecision(state)
+        reopenDecision(state)
         return result(command, false)
     }
 
@@ -141,7 +141,7 @@ internal class HostSessionLifecycleWriteOperations(
             )
         if (unpublishedRows > 0) return result(command, true)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        policy.unpublishDecision(state)
+        unpublishDecision(state)
         return result(command, false)
     }
 
@@ -163,7 +163,7 @@ internal class HostSessionLifecycleWriteOperations(
             )
         if (returnedRows > 0) return result(command, true)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        policy.returnToDraftDecision(state)
+        returnToDraftDecision(state)
         return result(command, false)
     }
 

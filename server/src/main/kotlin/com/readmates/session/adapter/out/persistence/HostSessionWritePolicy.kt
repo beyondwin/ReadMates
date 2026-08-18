@@ -126,28 +126,28 @@ internal object HostSessionWritePolicy {
         } else {
             throw HostSessionPublishNotAllowedException()
         }
-
-    fun reopenDecision(state: String): HostSessionTransitionDecision =
-        if (state == "OPEN") {
-            HostSessionTransitionDecision.UNCHANGED
-        } else {
-            throw HostSessionReopenNotAllowedException()
-        }
-
-    fun unpublishDecision(state: String): HostSessionTransitionDecision =
-        if (state == "CLOSED") {
-            HostSessionTransitionDecision.UNCHANGED
-        } else {
-            throw HostSessionUnpublishNotAllowedException()
-        }
-
-    fun returnToDraftDecision(state: String): HostSessionTransitionDecision =
-        if (state == "DRAFT") {
-            HostSessionTransitionDecision.UNCHANGED
-        } else {
-            throw HostSessionReturnToDraftNotAllowedException()
-        }
 }
+
+internal fun reopenDecision(state: String): HostSessionTransitionDecision =
+    if (state == "OPEN") {
+        HostSessionTransitionDecision.UNCHANGED
+    } else {
+        throw HostSessionReopenNotAllowedException()
+    }
+
+internal fun unpublishDecision(state: String): HostSessionTransitionDecision =
+    if (state == "CLOSED") {
+        HostSessionTransitionDecision.UNCHANGED
+    } else {
+        throw HostSessionUnpublishNotAllowedException()
+    }
+
+internal fun returnToDraftDecision(state: String): HostSessionTransitionDecision =
+    if (state == "DRAFT") {
+        HostSessionTransitionDecision.UNCHANGED
+    } else {
+        throw HostSessionReturnToDraftNotAllowedException()
+    }
 
 private fun parseTime(value: String): LocalTime = LocalTime.parse(value)
 

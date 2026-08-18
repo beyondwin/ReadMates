@@ -63,6 +63,7 @@ data class HostSessionAccessScopeRequest(
 
 @RestController
 @RequestMapping("/api/host/sessions")
+@Suppress("TooManyFunctions")
 class HostSessionController(
     private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
     private val hostSessionQueryUseCase: HostSessionQueryUseCase,

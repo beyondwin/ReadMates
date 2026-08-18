@@ -10,46 +10,46 @@ import org.junit.jupiter.api.assertThrows
 class HostSessionWritePolicyTest {
     @Test
     fun `reopen is unchanged when already OPEN and rejected otherwise except via CAS`() {
-        assertThat(HostSessionWritePolicy.reopenDecision("OPEN"))
+        assertThat(reopenDecision("OPEN"))
             .isEqualTo(HostSessionTransitionDecision.UNCHANGED)
         assertThrows<HostSessionReopenNotAllowedException> {
-            HostSessionWritePolicy.reopenDecision("PUBLISHED")
+            reopenDecision("PUBLISHED")
         }
         assertThrows<HostSessionReopenNotAllowedException> {
-            HostSessionWritePolicy.reopenDecision("DRAFT")
+            reopenDecision("DRAFT")
         }
         assertThrows<HostSessionReopenNotAllowedException> {
-            HostSessionWritePolicy.reopenDecision("CLOSED")
+            reopenDecision("CLOSED")
         }
     }
 
     @Test
     fun `unpublish is unchanged when already CLOSED`() {
-        assertThat(HostSessionWritePolicy.unpublishDecision("CLOSED"))
+        assertThat(unpublishDecision("CLOSED"))
             .isEqualTo(HostSessionTransitionDecision.UNCHANGED)
         assertThrows<HostSessionUnpublishNotAllowedException> {
-            HostSessionWritePolicy.unpublishDecision("OPEN")
+            unpublishDecision("OPEN")
         }
         assertThrows<HostSessionUnpublishNotAllowedException> {
-            HostSessionWritePolicy.unpublishDecision("DRAFT")
+            unpublishDecision("DRAFT")
         }
         assertThrows<HostSessionUnpublishNotAllowedException> {
-            HostSessionWritePolicy.unpublishDecision("PUBLISHED")
+            unpublishDecision("PUBLISHED")
         }
     }
 
     @Test
     fun `return to draft is unchanged when already DRAFT`() {
-        assertThat(HostSessionWritePolicy.returnToDraftDecision("DRAFT"))
+        assertThat(returnToDraftDecision("DRAFT"))
             .isEqualTo(HostSessionTransitionDecision.UNCHANGED)
         assertThrows<HostSessionReturnToDraftNotAllowedException> {
-            HostSessionWritePolicy.returnToDraftDecision("CLOSED")
+            returnToDraftDecision("CLOSED")
         }
         assertThrows<HostSessionReturnToDraftNotAllowedException> {
-            HostSessionWritePolicy.returnToDraftDecision("PUBLISHED")
+            returnToDraftDecision("PUBLISHED")
         }
         assertThrows<HostSessionReturnToDraftNotAllowedException> {
-            HostSessionWritePolicy.returnToDraftDecision("OPEN")
+            returnToDraftDecision("OPEN")
         }
     }
 }

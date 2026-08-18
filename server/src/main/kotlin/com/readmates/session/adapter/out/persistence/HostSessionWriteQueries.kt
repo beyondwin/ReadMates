@@ -57,18 +57,6 @@ internal class HostSessionWriteQueries(
         sessionId: UUID,
     ) = hostSessionQueries.findHostSessionAfterHostCheck(jdbcTemplate, member, sessionId)
 
-    fun openSessionCount(clubId: UUID): Int =
-        jdbcTemplate.queryForObject(
-            """
-            select count(*)
-            from sessions
-            where club_id = ?
-              and state = 'OPEN'
-            """.trimIndent(),
-            Int::class.java,
-            clubId.dbString(),
-        ) ?: 0
-
     fun findOpenSessionId(clubId: UUID): UUID? =
         jdbcTemplate
             .query(

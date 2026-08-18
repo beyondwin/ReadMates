@@ -2563,8 +2563,7 @@ class HostSessionControllerDbTest(
             email,
         ) ?: error("membership for $email did not exist")
 
-    private fun participantCountForSession(sessionId: String): Int =
-        countRows("session_participants", "session_id = '$sessionId'")
+    private fun participantCountForSession(id: String) = countRows("session_participants", "session_id = '$id'")
 
     private fun participantRsvp(
         sessionId: String,
