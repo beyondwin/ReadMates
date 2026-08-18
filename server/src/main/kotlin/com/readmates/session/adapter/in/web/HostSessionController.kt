@@ -141,6 +141,24 @@ class HostSessionController(
         @PathVariable sessionId: String,
     ) = hostSessionLifecycleUseCase.publish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
 
+    @PostMapping("/{sessionId}/reopen")
+    fun reopen(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+    ) = hostSessionLifecycleUseCase.reopen(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+
+    @PostMapping("/{sessionId}/unpublish")
+    fun unpublish(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+    ) = hostSessionLifecycleUseCase.unpublish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+
+    @PostMapping("/{sessionId}/return-to-draft")
+    fun returnToDraft(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+    ) = hostSessionLifecycleUseCase.returnToDraft(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,

@@ -1087,7 +1087,7 @@ class HostSessionControllerDbTest(
                 jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
                 jsonPath("$.status") { value(409) }
                 jsonPath("$.traceId") { isNotEmpty() }
-                jsonPath("$.length()") { value(4) }
+                jsonPath("$.length()") { value(5) }
             }
         assertEquals(beforeOpenAttempt, lifecycleDbEvidence(sessionId))
     }
@@ -1112,7 +1112,7 @@ class HostSessionControllerDbTest(
                 jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
                 jsonPath("$.status") { value(409) }
                 jsonPath("$.traceId") { isNotEmpty() }
-                jsonPath("$.length()") { value(4) }
+                jsonPath("$.length()") { value(5) }
             }
         assertEquals(beforeOpenAttempt, lifecycleDbEvidence(sessionId))
     }
@@ -1442,7 +1442,372 @@ class HostSessionControllerDbTest(
                 with(csrf())
             }.andExpect {
                 status { isConflict() }
+                jsonPath("$.code") { value("SESSION_OPEN_ALREADY_EXISTS") }
+                jsonPath("$.openSessionId") { value(firstSessionId) }
             }
+    }
+
+    @Test
+    fun `host reopens a closed session`() {
+        val sessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(sessionId) }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        assertEquals("OPEN", findSessionState(sessionId))
+        mockMvc
+            .get("/api/sessions/current") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.currentSession.sessionId") { value(sessionId) }
+            }
+    }
+
+    @Test
+    fun `host reopen hides PUBLIC_RECORD and keeps publication summary`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+        val publicSummary = "다시 열기 후에도 남는 공개 요약입니다."
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "$publicSummary",
+                      "visibility": "PUBLIC"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.siteVisibility") { value("PUBLIC_RECORD") }
+            }
+        assertEquals("PUBLIC_RECORD", publicationSiteVisibility(sessionId))
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        assertEquals("OPEN", findSessionState(sessionId))
+        assertEquals(1, countRows("public_session_publications", "session_id = '$sessionId'"))
+        assertEquals("HIDDEN", publicationSiteVisibility(sessionId))
+        assertEquals("0", publicationIsPublic(sessionId))
+        assertEquals(publicSummary, findPublicationSummary(sessionId))
+    }
+
+    @Test
+    fun `host cannot reopen when another session is open`() {
+        val openSessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$openSessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+
+        val closedSessionId = createDraftSessionEight()
+        updateSessionState(closedSessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$closedSessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_OPEN_ALREADY_EXISTS") }
+                jsonPath("$.openSessionId") { value(openSessionId) }
+            }
+
+        assertEquals("CLOSED", findSessionState(closedSessionId))
+        assertEquals("OPEN", findSessionState(openSessionId))
+    }
+
+    @Test
+    fun `host cannot reopen a published session`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+        updateSessionVisibility(sessionId, "MEMBER")
+        updateSessionState(sessionId, "PUBLISHED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
+            }
+
+        assertEquals("PUBLISHED", findSessionState(sessionId))
+    }
+
+    @Test
+    fun `host unpublishes a published session`() {
+        val sessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "publicSummary": "공개 취소 후 남는 기록 요약입니다.",
+                      "visibility": "PUBLIC"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("PUBLISHED") }
+            }
+        mockMvc.get("/api/public/sessions/$sessionId").andExpect {
+            status { isOk() }
+            jsonPath("$.sessionId") { value(sessionId) }
+        }
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/unpublish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+        assertEquals(1, countRows("public_session_publications", "session_id = '$sessionId'"))
+        mockMvc.get("/api/public/sessions/$sessionId").andExpect {
+            status { isNotFound() }
+        }
+    }
+
+    @Test
+    fun `host cannot unpublish an open session`() {
+        val sessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/unpublish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_UNPUBLISH_NOT_ALLOWED") }
+            }
+
+        assertEquals("OPEN", findSessionState(sessionId))
+    }
+
+    @Test
+    fun `host returns an open session to draft and keeps participants`() {
+        val sessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+        val membershipId = membershipIdByEmail("member1@example.com")
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set rsvp_status = 'GOING'
+            where session_id = ?
+              and membership_id = ?
+            """.trimIndent(),
+            sessionId,
+            membershipId,
+        )
+        val participantCount = participantCountForSession(sessionId)
+        assertEquals(6, participantCount)
+        assertEquals("GOING", participantRsvp(sessionId, membershipId))
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/return-to-draft") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("DRAFT") }
+            }
+
+        assertEquals("DRAFT", findSessionState(sessionId))
+        assertEquals(participantCount, participantCountForSession(sessionId))
+        assertEquals("GOING", participantRsvp(sessionId, membershipId))
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        assertEquals("OPEN", findSessionState(sessionId))
+        assertEquals(participantCount, participantCountForSession(sessionId))
+    }
+
+    @Test
+    fun `host cannot return a closed session to draft`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/return-to-draft") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RETURN_TO_DRAFT_NOT_ALLOWED") }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+    }
+
+    @Test
+    fun `member cannot reopen`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("member5@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isForbidden() }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+    }
+
+    @Test
+    fun `reopen of missing session`() {
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009778/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isNotFound() }
+            }
+    }
+
+    @Test
+    fun `host reopen is idempotent for already open session`() {
+        val sessionId = createDraftSessionSeven()
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+            }
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(sessionId) }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        assertEquals("OPEN", findSessionState(sessionId))
+    }
+
+    @Test
+    fun `host unpublish is idempotent for already closed session`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/unpublish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(sessionId) }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+    }
+
+    @Test
+    fun `host return to draft is idempotent for already draft session`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/return-to-draft") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(sessionId) }
+                jsonPath("$.state") { value("DRAFT") }
+            }
+
+        assertEquals("DRAFT", findSessionState(sessionId))
     }
 
     @Test
@@ -2183,6 +2548,49 @@ class HostSessionControllerDbTest(
             membershipId,
         )
     }
+
+    private fun membershipIdByEmail(email: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select memberships.id
+            from memberships
+            join users on users.id = memberships.user_id
+            where memberships.club_id = '00000000-0000-0000-0000-000000000001'
+              and users.email = ?
+            """.trimIndent(),
+            String::class.java,
+            email,
+        ) ?: error("membership for $email did not exist")
+
+    private fun participantCountForSession(sessionId: String): Int =
+        countRows("session_participants", "session_id = '$sessionId'")
+
+    private fun participantRsvp(
+        sessionId: String,
+        membershipId: String,
+    ): String =
+        jdbcTemplate.queryForObject(
+            """
+            select rsvp_status
+            from session_participants
+            where session_id = ?
+              and membership_id = ?
+            """.trimIndent(),
+            String::class.java,
+            sessionId,
+            membershipId,
+        ) ?: error("participant $membershipId in $sessionId did not exist")
+
+    private fun findPublicationSummary(sessionId: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select public_summary
+            from public_session_publications
+            where session_id = ?
+            """.trimIndent(),
+            String::class.java,
+            sessionId,
+        ) ?: error("publication $sessionId did not exist")
 
     private fun participantCountForSessionNumber(number: Int): Int =
         jdbcTemplate.queryForObject(

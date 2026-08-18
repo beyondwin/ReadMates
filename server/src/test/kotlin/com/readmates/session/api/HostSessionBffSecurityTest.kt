@@ -233,6 +233,79 @@ class HostSessionBffSecurityTest(
             }
     }
 
+    @Test
+    fun `host reopen bff request reaches controller without spring csrf token`() {
+        createClosedSession()
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009888/reopen") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        assertEquals(
+            "OPEN",
+            jdbcTemplate.queryForObject(
+                "select state from sessions where id = '00000000-0000-0000-0000-000000009888'",
+                String::class.java,
+            ),
+        )
+    }
+
+    @Test
+    fun `host unpublish bff request reaches controller without spring csrf token`() {
+        createPublishedSession()
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009888/unpublish") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+
+        assertEquals(
+            "CLOSED",
+            jdbcTemplate.queryForObject(
+                "select state from sessions where id = '00000000-0000-0000-0000-000000009888'",
+                String::class.java,
+            ),
+        )
+    }
+
+    @Test
+    fun `host return to draft bff request reaches controller without spring csrf token`() {
+        createOpenSession()
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009888/return-to-draft") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.state") { value("DRAFT") }
+            }
+
+        assertEquals(
+            "DRAFT",
+            jdbcTemplate.queryForObject(
+                "select state from sessions where id = '00000000-0000-0000-0000-000000009888'",
+                String::class.java,
+            ),
+        )
+        assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
+    }
+
     private fun createDraftSession() {
         createSession(state = "DRAFT", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
     }
@@ -246,6 +319,38 @@ class HostSessionBffSecurityTest(
             from memberships
             where memberships.club_id = '00000000-0000-0000-0000-000000000001'
               and memberships.status = 'ACTIVE'
+            """.trimIndent(),
+        )
+    }
+
+    private fun createClosedSession() {
+        createSession(state = "CLOSED", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
+    }
+
+    private fun createPublishedSession() {
+        createSession(state = "PUBLISHED", visibility = "PUBLIC", accessScope = "GUEST_READABLE")
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id,
+              club_id,
+              session_id,
+              public_summary,
+              is_public,
+              visibility,
+              site_visibility,
+              published_at
+            )
+            values (
+              uuid(),
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000009888',
+              'BFF 공개 취소 테스트 요약입니다.',
+              true,
+              'PUBLIC',
+              'PUBLIC_RECORD',
+              utc_timestamp(6)
+            )
             """.trimIndent(),
         )
     }
