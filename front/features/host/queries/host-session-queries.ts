@@ -14,10 +14,13 @@ import {
   fetchManualNotificationDispatches,
   openHostSession,
   publishHostSession,
+  reopenHostSession,
+  returnHostSessionToDraft,
   saveHostSessionAttendance,
   saveHostSessionAccessScope,
   saveHostSessionPublication,
   saveHostSessionVisibility,
+  unpublishHostSession,
   updateHostSession,
 } from "@/features/host/api/host-api";
 import type {
@@ -274,6 +277,33 @@ export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: string) => publishHostSession(sessionId),
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
+  });
+}
+
+export function useReopenHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => reopenHostSession(sessionId),
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
+  });
+}
+
+export function useUnpublishHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => unpublishHostSession(sessionId),
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
+  });
+}
+
+export function useReturnHostSessionToDraftMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => returnHostSessionToDraft(sessionId),
     onSuccess: (response, sessionId) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });

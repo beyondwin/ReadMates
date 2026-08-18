@@ -339,6 +339,24 @@ export function publishHostSession(sessionId: string) {
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
+export function reopenHostSession(sessionId: string) {
+  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/reopen`, {
+    method: "POST",
+  }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+}
+
+export function unpublishHostSession(sessionId: string) {
+  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/unpublish`, {
+    method: "POST",
+  }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+}
+
+export function returnHostSessionToDraft(sessionId: string) {
+  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/return-to-draft`, {
+    method: "POST",
+  }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+}
+
 export function previewHostSessionImport(sessionId: string, request: SessionImportRequest) {
   return readmatesFetch<SessionImportPreviewResponse>(
     `/api/host/sessions/${encodeURIComponent(sessionId)}/session-import/preview`,

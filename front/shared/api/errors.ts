@@ -2,6 +2,7 @@ export type ReadmatesApiErrorBody = {
   code: string;
   message: string;
   status: number;
+  openSessionId?: string;
 };
 
 type ReadmatesProblemDetailBody = {
@@ -107,6 +108,9 @@ async function parseApiErrorBody(response: Response): Promise<ReadmatesApiErrorB
       message: parsed.message,
       status: response.status,
       fallback: false,
+      ...(typeof parsed.openSessionId === "string" && parsed.openSessionId.length > 0
+        ? { openSessionId: parsed.openSessionId }
+        : {}),
     };
   } catch {
     return fallbackApiErrorBody(response.status);
@@ -117,6 +121,7 @@ export class ReadmatesApiError extends Error {
   readonly status: number;
   readonly code: string;
   readonly fallback: boolean;
+  readonly openSessionId: string | null;
   readonly traceId: string | null;
   readonly metadata: ReadmatesApiErrorMetadata;
   readonly response: Response;
@@ -127,6 +132,9 @@ export class ReadmatesApiError extends Error {
     this.status = response.status;
     this.code = body.code;
     this.fallback = body.fallback;
+    this.openSessionId = typeof body.openSessionId === "string" && body.openSessionId.length > 0
+      ? body.openSessionId
+      : null;
     this.traceId = response.headers.get("X-Readmates-Request-Id");
     this.metadata = {
       status: response.status,

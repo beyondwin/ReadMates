@@ -12,9 +12,12 @@ vi.mock("@/features/host/api/host-api", () => ({
   deleteHostSession: vi.fn(),
   openHostSession: vi.fn(),
   publishHostSession: vi.fn(),
+  reopenHostSession: vi.fn(),
+  returnHostSessionToDraft: vi.fn(),
   saveHostSessionAttendance: vi.fn(),
   saveHostSessionPublication: vi.fn(),
   saveHostSessionVisibility: vi.fn(),
+  unpublishHostSession: vi.fn(),
   updateHostSession: vi.fn(),
 }));
 
@@ -25,9 +28,12 @@ import {
   deleteHostSession,
   openHostSession,
   publishHostSession,
+  reopenHostSession,
+  returnHostSessionToDraft,
   saveHostSessionAttendance,
   saveHostSessionPublication,
   saveHostSessionVisibility,
+  unpublishHostSession,
   updateHostSession,
 } from "@/features/host/api/host-api";
 import {
@@ -38,8 +44,11 @@ import {
   useDeleteHostSessionMutation,
   useOpenHostSessionMutation,
   usePublishHostSessionMutation,
+  useReopenHostSessionMutation,
+  useReturnHostSessionToDraftMutation,
   useSaveHostSessionPublicationMutation,
   useSaveHostSessionVisibilityMutation,
+  useUnpublishHostSessionMutation,
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
 } from "./host-session-queries";
@@ -180,6 +189,9 @@ beforeEach(() => {
   vi.mocked(openHostSession).mockReset();
   vi.mocked(closeHostSession).mockReset();
   vi.mocked(publishHostSession).mockReset();
+  vi.mocked(reopenHostSession).mockReset();
+  vi.mocked(unpublishHostSession).mockReset();
+  vi.mocked(returnHostSessionToDraft).mockReset();
   vi.mocked(saveHostSessionVisibility).mockReset();
   vi.mocked(saveHostSessionPublication).mockReset();
   vi.mocked(saveHostSessionAttendance).mockReset();
@@ -289,6 +301,9 @@ describe("host session mutation hooks", () => {
     ["open", useOpenHostSessionMutation, openHostSession, false],
     ["close", useCloseHostSessionMutation, closeHostSession, true],
     ["publish", usePublishHostSessionMutation, publishHostSession, true],
+    ["reopen", useReopenHostSessionMutation, reopenHostSession, true],
+    ["unpublish", useUnpublishHostSessionMutation, unpublishHostSession, true],
+    ["return-to-draft", useReturnHostSessionToDraftMutation, returnHostSessionToDraft, true],
   ] as const)("invalidates session surfaces after %s", async (_name, hook, apiFn, expectsManualDispatches) => {
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();

@@ -26,7 +26,9 @@ import {
   previewManualNotification,
   processHostNotifications,
   publishHostSession,
+  reopenHostSession,
   restoreHostNotification,
+  returnHostSessionToDraft,
   retryHostNotification,
   revokeHostInvitation,
   saveHostSessionAttendance,
@@ -37,6 +39,7 @@ import {
   submitHostMemberLifecycle,
   submitHostMemberProfile,
   submitHostViewerAction,
+  unpublishHostSession,
   updateHostSession,
   updateHostNotificationPolicy,
 } from "./host-api";
@@ -230,6 +233,9 @@ describe("host api wrappers", () => {
     await openHostSession(sessionId);
     await closeHostSession(sessionId);
     await publishHostSession(sessionId);
+    await reopenHostSession(sessionId);
+    await unpublishHostSession(sessionId);
+    await returnHostSessionToDraft(sessionId);
     await commitHostSessionImport(sessionId, { payload: "{}" });
     await submitHostMemberLifecycle(membershipId, "/current-session/remove", { currentSessionPolicy: "NEXT_SESSION" });
     await submitHostViewerAction(membershipId, "activate");
@@ -261,6 +267,9 @@ describe("host api wrappers", () => {
       ["POST", "/api/bff/api/host/sessions/session%207/open"],
       ["POST", "/api/bff/api/host/sessions/session%207/close"],
       ["POST", "/api/bff/api/host/sessions/session%207/publish"],
+      ["POST", "/api/bff/api/host/sessions/session%207/reopen"],
+      ["POST", "/api/bff/api/host/sessions/session%207/unpublish"],
+      ["POST", "/api/bff/api/host/sessions/session%207/return-to-draft"],
       ["POST", "/api/bff/api/host/sessions/session%207/session-import/commit"],
       ["POST", "/api/bff/api/host/members/member%2F7/current-session/remove"],
       ["POST", "/api/bff/api/host/members/member%2F7/activate"],
@@ -271,8 +280,8 @@ describe("host api wrappers", () => {
     ]);
     expect(calls[1].body).toBe(JSON.stringify({ sessionReminderEnabled: true }));
     expect(calls[2].body).toBe(JSON.stringify({ templateKey: "SESSION_REMINDER", sessionId }));
-    expect(calls[18].body).toBe(JSON.stringify({ currentSessionPolicy: "NEXT_SESSION" }));
-    expect(calls[20].body).toBe(JSON.stringify({ displayName: "Alice" }));
+    expect(calls[21].body).toBe(JSON.stringify({ currentSessionPolicy: "NEXT_SESSION" }));
+    expect(calls[23].body).toBe(JSON.stringify({ displayName: "Alice" }));
   });
 
   it("parses visibility responses and returns the composer result", async () => {
