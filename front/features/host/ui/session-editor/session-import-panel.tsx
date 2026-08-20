@@ -1,4 +1,4 @@
-import { type ChangeEvent, type CSSProperties, type DragEvent, useRef } from "react";
+import { type ChangeEvent, type CSSProperties, type DragEvent, useId, useRef } from "react";
 import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
@@ -32,6 +32,7 @@ export function SessionImportPanelBody({
   onSetGuestReadable,
 }: SessionImportPanelBodyProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputId = useId();
   const review = preview ? buildSessionImportReview(preview, recordVisibility) : null;
   const canCommit = Boolean(sessionId) && status === "ready" && review?.canCommit === true;
   const hostOnlyBlocked = recordVisibility === "HOST_ONLY";
@@ -72,7 +73,7 @@ export function SessionImportPanelBody({
       </div>
       <label
         className="rm-session-import-drop"
-        htmlFor="session-import-json-file"
+        htmlFor={fileInputId}
         onDragOver={(event) => {
           event.preventDefault();
         }}
@@ -95,7 +96,7 @@ export function SessionImportPanelBody({
         </span>
         <input
           ref={fileInputRef}
-          id="session-import-json-file"
+          id={fileInputId}
           className="rm-sr-only"
           type="file"
           accept="application/json,.json"
@@ -121,7 +122,7 @@ export function SessionImportPanelBody({
         </button>
       ) : null}
       <button className="btn btn-primary" type="button" disabled={!canCommit} onClick={onCommit}>
-        {status === "committing" ? "작성 중에 넣는 중" : "초안으로 가져오기"}
+        {status === "committing" ? "작성 중에 넣는 중" : "작성 중에 넣기"}
       </button>
       <div className="tiny">현재 선택한 게스트 접근: {compatibilityExposureLabel[recordVisibility]}</div>
     </div>
@@ -133,7 +134,7 @@ function SessionImportReviewCard({ review, summary }: { review: SessionImportRev
     <section
       className="surface-quiet"
       role="region"
-      aria-label="세션 기록 미리보기"
+      aria-label="정리본 미리보기"
       style={{ padding: 16, minWidth: 0, overflowWrap: "anywhere" }}
     >
       <div className="row-between" style={{ gap: 12, alignItems: "flex-start", flexWrap: "wrap" }}>

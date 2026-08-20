@@ -70,7 +70,7 @@ describe("session import model", () => {
     expect(review.canCommit).toBe(true);
     expect(review.statusLabel).toBe("저장 가능");
     expect(review.statusTone).toBe("success");
-    expect(review.sessionLabel).toBe("7회차 · Example Book · 2026-05-14");
+    expect(review.sessionLabel).toBe("7번째 · Example Book · 2026-05-14");
     expect(review.replacementItems).toEqual([
       "공개 요약 교체",
       "하이라이트 1개",

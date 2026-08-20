@@ -16,9 +16,9 @@ describe("SessionImportPanelBody", () => {
     const onCommit = vi.fn();
     renderPanel({ preview: preview({ valid: true }), onCommit });
 
-    const review = screen.getByRole("region", { name: "세션 기록 미리보기" });
+    const review = screen.getByRole("region", { name: "정리본 미리보기" });
     expect(within(review).getByText("저장 가능")).toBeInTheDocument();
-    expect(within(review).getByText("7회차 · E2E 책 · 2026-05-16")).toBeInTheDocument();
+    expect(within(review).getByText("7번째 · E2E 책 · 2026-05-16")).toBeInTheDocument();
     expect(within(review).getByText("공개 요약 교체")).toBeInTheDocument();
     expect(within(review).getByText("하이라이트 1개")).toBeInTheDocument();
     expect(within(review).getByText("한줄평 1개")).toBeInTheDocument();
@@ -27,7 +27,7 @@ describe("SessionImportPanelBody", () => {
     expect(within(review).getByText("피드백 문서 구조 확인 완료")).toBeInTheDocument();
     expect(screen.getByText("현재 선택한 게스트 접근: 게스트 공개")).toBeInTheDocument();
 
-    const button = screen.getByRole("button", { name: "초안으로 가져오기" });
+    const button = screen.getByRole("button", { name: "작성 중에 넣기" });
     expect(button).toBeEnabled();
     fireEvent.click(button);
     expect(onCommit).toHaveBeenCalledTimes(1);
@@ -42,12 +42,12 @@ describe("SessionImportPanelBody", () => {
       }),
     });
 
-    const review = screen.getByRole("region", { name: "세션 기록 미리보기" });
+    const review = screen.getByRole("region", { name: "정리본 미리보기" });
     expect(within(review).getByText("확인 필요")).toBeInTheDocument();
     expect(within(review).getByText("작성자 1개 확인 필요")).toBeInTheDocument();
     expect(within(review).getByText("긴 이름을 가진 외부 작성자")).toBeInTheDocument();
     expect(within(review).getByText("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeDisabled();
   });
 
   it("renders server issue messages but not issue codes or raw json", () => {
@@ -59,13 +59,13 @@ describe("SessionImportPanelBody", () => {
       }),
     });
 
-    const review = screen.getByRole("region", { name: "세션 기록 미리보기" });
+    const review = screen.getByRole("region", { name: "정리본 미리보기" });
     expect(within(review).getByText("피드백 문서 구조 확인 필요")).toBeInTheDocument();
     expect(within(review).getByText("피드백 문서 구조를 확인해 주세요.")).toBeInTheDocument();
     expect(within(review).getByText("피드백 문서 heading을 확인해 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("ADMIN_ROUTE")).toBeNull();
     expect(screen.queryByText("{\"")).toBeNull();
-    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeDisabled();
   });
 
   it.each(["idle", "previewing", "error"] as const)(
@@ -74,7 +74,7 @@ describe("SessionImportPanelBody", () => {
       const onCommit = vi.fn();
       renderPanel({ preview: preview({ valid: true }), status, onCommit });
 
-      const button = screen.getByRole("button", { name: "초안으로 가져오기" });
+      const button = screen.getByRole("button", { name: "작성 중에 넣기" });
       expect(button).toBeDisabled();
       fireEvent.click(button);
       expect(onCommit).not.toHaveBeenCalled();
@@ -96,10 +96,21 @@ describe("SessionImportPanelBody", () => {
       },
     });
 
-    expect(screen.getByRole("region", { name: "세션 기록 미리보기" }))
+    expect(screen.getByRole("region", { name: "정리본 미리보기" }))
       .toHaveStyle({ overflowWrap: "anywhere", minWidth: "0" });
     expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
     expect(screen.queryByText("초안 저장 완료")).not.toBeInTheDocument();
+  });
+
+  it("gives each mounted file input a unique id", () => {
+    renderPanel({ preview: preview({ valid: true }) });
+    renderPanel({ preview: preview({ valid: true }) });
+
+    const inputs = screen.getAllByLabelText("정리한 파일을 여기에 놓으세요");
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0]).toHaveAttribute("id");
+    expect(inputs[1]).toHaveAttribute("id");
+    expect(inputs[0].id).not.toBe(inputs[1].id);
   });
 });
 

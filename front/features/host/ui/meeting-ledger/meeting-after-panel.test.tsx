@@ -125,6 +125,9 @@ describe("MeetingAfterPanel", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
+    expect(screen.getByRole("region", { name: "정리본 미리보기" })).toBeInTheDocument();
+    expect(screen.queryByText(/회차/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/세션/)).not.toBeInTheDocument();
     expect(screen.getByText("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "멤버에게 보이기로 바꾸기" }));
     expect(onSetGuestReadable).toHaveBeenCalledTimes(1);
@@ -144,14 +147,6 @@ describe("MeetingAfterPanel", () => {
         recordVisibility="MEMBER"
         importPreview={importPreview}
         importStatus="ready"
-        importCommitResult={{
-          tone: "success",
-          title: "초안 저장 완료",
-          message: "가져온 기록을 작성 중에 넣었습니다.",
-          visibilityLabel: "게스트 공개",
-          items: ["공개 요약 초안 교체"],
-          nextAction: "반영 전 확인으로 이어집니다.",
-        }}
         applyReview={{
           open: true,
           preview: {

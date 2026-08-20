@@ -253,11 +253,13 @@ function buildSessionImportStatusTone(canCommit: boolean): SessionImportReview["
 }
 
 function buildSessionLabel(preview: SessionImportPreviewResponse): string {
-  const sessionNumber = preview.session.sessionNumber === null ? "회차 확인 필요" : `${preview.session.sessionNumber}회차`;
+  const meetingNumber = preview.session.sessionNumber === null
+    ? "모임 확인 필요"
+    : `${preview.session.sessionNumber}번째`;
   const bookTitle = preview.session.bookTitle ?? "책 제목 확인 필요";
   const meetingDate = preview.session.meetingDate ?? "날짜 확인 필요";
 
-  return `${sessionNumber} · ${bookTitle} · ${meetingDate}`;
+  return `${meetingNumber} · ${bookTitle} · ${meetingDate}`;
 }
 
 function buildSessionImportBlockingMessages(

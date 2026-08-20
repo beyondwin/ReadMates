@@ -120,6 +120,7 @@ const hostSessionEditorTestActions = {
     baseLiveRevision: 0,
     liveApplied: false,
   }),
+  saveSessionAccessScope: async () => undefined,
 } satisfies HostSessionEditorActions;
 
 type HostSessionEditorProps = Parameters<typeof HostSessionEditor>[0];
@@ -939,7 +940,7 @@ describe("HostSessionEditor", () => {
       expectedDraftRevision: 4,
     });
     expect(screen.getByText("Import summary.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeEnabled();
   });
 
   it("previews JSON with the shared draft visibility and revision", async () => {
@@ -965,7 +966,7 @@ describe("HostSessionEditor", () => {
       recordVisibility: "MEMBER",
       expectedDraftRevision: 4,
     });
-    expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeEnabled();
   });
 
   it.each([
@@ -1014,7 +1015,7 @@ describe("HostSessionEditor", () => {
         new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
       );
       await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
-      expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeEnabled();
 
       rerender(renderEditor(nextWorkflow));
 
@@ -1024,8 +1025,8 @@ describe("HostSessionEditor", () => {
         recordVisibility: nextVisibility,
         expectedDraftRevision: nextDraftRevision,
       });
-      expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
-      await user.click(screen.getByRole("button", { name: "초안으로 가져오기" }));
+      expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "작성 중에 넣기" }));
       expect(commitSessionImport).not.toHaveBeenCalled();
 
       resolveRepreview(
@@ -1035,7 +1036,7 @@ describe("HostSessionEditor", () => {
         ),
       );
       await waitFor(() => {
-        expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+        expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeEnabled();
       });
     },
   );
@@ -1063,7 +1064,7 @@ describe("HostSessionEditor", () => {
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
     await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
-    expect(screen.getByRole("region", { name: "세션 기록 미리보기" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "정리본 미리보기" })).toBeVisible();
 
     const failedWorkflow = recordWorkflow("MEMBER");
     failedWorkflow.expectedDraftRevision = 5;
@@ -1073,9 +1074,9 @@ describe("HostSessionEditor", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "가져온 JSON에서 수정할 항목이 있습니다.",
     );
-    expect.soft(screen.queryByRole("region", { name: "세션 기록 미리보기" }))
+    expect.soft(screen.queryByRole("region", { name: "정리본 미리보기" }))
       .not.toBeInTheDocument();
-    expect.soft(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeDisabled();
+    expect.soft(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeDisabled();
 
     const recoveredWorkflow = recordWorkflow("MEMBER");
     recoveredWorkflow.expectedDraftRevision = 6;
@@ -1083,14 +1084,14 @@ describe("HostSessionEditor", () => {
 
     await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(3));
     await waitFor(() => {
-      expect(screen.getByRole("button", { name: "초안으로 가져오기" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeEnabled();
     });
     expect(previewSessionImport.mock.calls[2]?.[1]).toMatchObject({
       recordVisibility: "MEMBER",
       expectedDraftRevision: 6,
     });
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "세션 기록 미리보기" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "정리본 미리보기" })).toBeVisible();
   });
 
   it("forwards apply-preview pending state to the sticky review action", () => {
@@ -1197,7 +1198,7 @@ describe("HostSessionEditor", () => {
       screen.getByLabelText("정리한 파일을 여기에 놓으세요"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
-    await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
+    await user.click(await screen.findByRole("button", { name: "작성 중에 넣기" }));
 
     await waitFor(() => expect(commitSessionImport).toHaveBeenCalledTimes(1));
     expect(workflow.onDraftCommitted).toHaveBeenCalledWith({
@@ -1206,6 +1207,32 @@ describe("HostSessionEditor", () => {
       baseLiveRevision: 0,
       liveApplied: false,
     });
+    expect(workflow.confirmation.onReview).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists GUEST_READABLE when wrap-up asks to change host-only access", async () => {
+    const user = userEvent.setup();
+    const saveSessionAccessScope = vi.fn().mockResolvedValue(undefined);
+    const workflow = recordWorkflow("HOST_ONLY");
+
+    render(
+      <HostSessionEditorForTest
+        session={{ ...session, state: "CLOSED", accessScope: "HOST_ONLY" }}
+        recordWorkflow={workflow}
+        actions={{ ...hostSessionEditorTestActions, saveSessionAccessScope }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
+    await user.click(screen.getByRole("button", { name: "멤버에게 보이기로 바꾸기" }));
+
+    expect(saveSessionAccessScope).toHaveBeenCalledTimes(1);
+    expect(saveSessionAccessScope).toHaveBeenCalledWith(session.sessionId, {
+      accessScope: "GUEST_READABLE",
+    });
+    expect(workflow.onSnapshotChange).toHaveBeenCalledWith(expect.objectContaining({
+      visibility: "MEMBER",
+    }));
   });
 
   it("waits for JSON draft refresh before returning to the focused common editor", async () => {
@@ -1237,7 +1264,7 @@ describe("HostSessionEditor", () => {
       screen.getByLabelText("정리한 파일을 여기에 놓으세요"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
-    await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
+    await user.click(await screen.findByRole("button", { name: "작성 중에 넣기" }));
 
     await waitFor(() => expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId));
     expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
@@ -1614,7 +1641,7 @@ describe("HostSessionEditor", () => {
 
     expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
     expect(await screen.findByRole("group", { name: /No\.07 · 지난 회차 · 비공개/ })).toBeVisible();
-    expect(screen.getByText("모임은 마감되었습니다. 기록 작업대에서 초안을 검토한 뒤 세션을 공개할 수 있습니다.")).toBeVisible();
+    expect(screen.getByText("모임을 마쳤습니다. 정리본을 올린 뒤 기록을 공개할 수 있습니다.")).toBeVisible();
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
     expect(screen.getByText("공개하려면 요약이 필요합니다")).toBeVisible();
   });

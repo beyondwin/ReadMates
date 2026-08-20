@@ -169,6 +169,10 @@ describe("SessionOverviewSection", () => {
       onReverseSession,
     });
 
+    expect(screen.getByText("모임을 마쳤습니다. 정리본을 올린 뒤 기록을 공개할 수 있습니다.")).toBeInTheDocument();
+    const overviewPanel = screen.getByRole("tabpanel", { name: "개요" });
+    expect(within(overviewPanel).queryByText(/기록 작업대/)).not.toBeInTheDocument();
+    expect(within(overviewPanel).queryByText(/세션/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "출석 수정" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "정리본 올리기" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
@@ -185,7 +189,7 @@ describe("SessionOverviewSection", () => {
   it("explains that a published session remains editable", () => {
     renderOverview({ sessionState: "PUBLISHED" });
 
-    expect(screen.getByText("공개된 세션입니다. 공개 후에도 기본 정보와 기록 초안을 수정할 수 있습니다."))
+    expect(screen.getByText("기록이 공개된 모임입니다. 공개 후에도 기본 정보와 작성 중 내용을 수정할 수 있습니다."))
       .toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "모임 마치기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "기록 공개" })).not.toBeInTheDocument();

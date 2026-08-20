@@ -65,6 +65,7 @@ import {
   useUnpublishHostSessionMutation,
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
+  useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
 import {
   hostSessionEditorPreviewActions,
@@ -261,6 +262,7 @@ function useHostSessionEditorActions(
   const { mutateAsync: returnSessionToDraft } = useReturnHostSessionToDraftMutation(context);
   const { mutateAsync: updateAttendance } = useUpdateHostSessionAttendanceMutation(context);
   const { mutateAsync: commitImport } = useCommitHostSessionImportMutation(context);
+  const { mutateAsync: saveAccessScope } = useSaveHostSessionAccessScopeMutation(context);
 
   const runLifecycle = useCallback(async (
     mutate: (sessionId: string) => Promise<Response>,
@@ -295,6 +297,7 @@ function useHostSessionEditorActions(
       await onSessionRecordsChanged?.(sessionId);
       return result;
     },
+    saveSessionAccessScope: (sessionId, request) => saveAccessScope({ sessionId, request }),
   }), [
     closeSession,
     commitImport,
@@ -307,6 +310,7 @@ function useHostSessionEditorActions(
     onSessionRecordsChanged,
     reopenSession,
     returnSessionToDraft,
+    saveAccessScope,
     runLifecycle,
     unpublishSession,
     updateAttendance,

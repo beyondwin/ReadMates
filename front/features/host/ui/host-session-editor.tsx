@@ -825,7 +825,10 @@ export default function HostSessionEditor({
       setSessionImportPreview(null);
       setSessionImportRequest(null);
       setSessionImportCommitResult(commitResult);
-      flash("가져온 세션 기록을 초안으로 저장했습니다");
+      flash("가져온 정리본을 작성 중에 넣었습니다");
+      if (recordWorkflow) {
+        await recordWorkflow.confirmation.onReview();
+      }
     } catch {
       setSessionImportStatus("error");
       setSessionImportError(sessionImportFailureMessage("commit-network"));
@@ -932,19 +935,22 @@ export default function HostSessionEditor({
                   importPreview={sessionImportContextStale ? null : sessionImportPreview}
                   importStatus={sessionImportContextStale ? "previewing" : sessionImportStatus}
                   importError={sessionImportContextStale ? null : sessionImportError}
-                  importCommitResult={sessionImportCommitResult}
                   onFileSelected={previewSessionImport}
                   onImportCommit={commitSessionImport}
-                  onSetGuestReadable={recordWorkflow
-                    ? () => recordWorkflow.onSnapshotChange({
-                      ...recordWorkflow.snapshot,
-                      visibility: compatibilityVisibilityForExposure(
-                        "GUEST_READABLE",
-                        session?.siteVisibility ?? "HIDDEN",
-                      ),
-                    })
+                  onSetGuestReadable={session && recordWorkflow
+                    ? async () => {
+                      await actions.saveSessionAccessScope(session.sessionId, {
+                        accessScope: "GUEST_READABLE",
+                      });
+                      recordWorkflow.onSnapshotChange({
+                        ...recordWorkflow.snapshot,
+                        visibility: compatibilityVisibilityForExposure(
+                          "GUEST_READABLE",
+                          session.siteVisibility ?? "HIDDEN",
+                        ),
+                      });
+                    }
                     : undefined}
-                  onReviewApply={recordWorkflow?.confirmation.onReview}
                   onConfirmApply={recordWorkflow ? () => void recordWorkflow.confirmation.onConfirm() : undefined}
                   onDismissApply={recordWorkflow?.confirmation.onCancel}
                 />

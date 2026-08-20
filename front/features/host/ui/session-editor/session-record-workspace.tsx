@@ -4,8 +4,6 @@ import {
   type JSX,
   type KeyboardEvent,
   useCallback,
-  useEffect,
-  useRef,
   useState,
 } from "react";
 import type { SessionState } from "@/shared/model/readmates-types";
@@ -209,7 +207,6 @@ export function SessionRecordWorkspace({
   const [visitedSources, setVisitedSources] = useState<Set<HostSessionDraftSource>>(
     () => new Set([source]),
   );
-  const handledImportCommitResult = useRef<SessionImportCommitResult | null>(null);
   const nextAction = nextActionPresentation(draft, reviewPending);
   const exposure = resolvedSessionExposure({
     state,
@@ -236,17 +233,6 @@ export function SessionRecordWorkspace({
     await actions.onAigenCommitted(result);
     returnToCommonEditor();
   }, [actions, returnToCommonEditor]);
-
-  useEffect(() => {
-    if (
-      !creation.importCommitResult
-      || handledImportCommitResult.current === creation.importCommitResult
-    ) {
-      return;
-    }
-    handledImportCommitResult.current = creation.importCommitResult;
-    void actions.onReviewDraft();
-  }, [actions, creation.importCommitResult]);
 
   return (
     <div

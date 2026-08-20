@@ -355,14 +355,14 @@ describe("SessionRecordWorkspace", () => {
     await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
     const aiWorkspace = screen.getByTestId("aigen-workspace");
     await user.click(screen.getByRole("tab", { name: "정리본 올리기" }));
-    const jsonReview = screen.getByRole("region", { name: "세션 기록 미리보기" });
+    const jsonReview = screen.getByRole("region", { name: "정리본 미리보기" });
     expect(aiWorkspace).not.toBeVisible();
 
     await user.click(screen.getByRole("tab", { name: "직접 작성" }));
     expect(screen.getByRole("textbox", { name: "공개 요약" }))
       .toHaveValue("source를 바꿔도 유지할 입력");
     await user.click(screen.getByRole("tab", { name: "정리본 올리기" }));
-    expect(screen.getByRole("region", { name: "세션 기록 미리보기" })).toBe(jsonReview);
+    expect(screen.getByRole("region", { name: "정리본 미리보기" })).toBe(jsonReview);
     await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
     expect(screen.getByTestId("aigen-workspace")).toBe(aiWorkspace);
   });
@@ -490,11 +490,9 @@ describe("SessionRecordWorkspace", () => {
     render(<Harness />);
     expect(screen.queryByLabelText(/Markdown/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText("피드백 파일 이름")).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "초안으로 가져오기" }));
+    await user.click(screen.getByRole("button", { name: "작성 중에 넣기" }));
 
-    await waitFor(() => {
-      expect(onReviewDraft).toHaveBeenCalledTimes(1);
-    });
+    expect(onReviewDraft).not.toHaveBeenCalled();
     expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("region", { name: "세션 기록 초안 저장 결과" }))
       .not.toBeInTheDocument();

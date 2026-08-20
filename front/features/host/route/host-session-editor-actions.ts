@@ -7,6 +7,7 @@ import type {
 } from "@/features/host/api/host-contracts";
 import type { HostSessionRequest } from "@/features/host/model/host-session-editor-model";
 import type { HostSessionLifecycleResult } from "@/features/host/model/host-session-lifecycle-model";
+import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 
 type JsonResponse<T> = Response & { json(): Promise<T> };
 
@@ -26,4 +27,8 @@ export type HostSessionEditorActions = {
   ) => Promise<Response>;
   previewSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportPreviewResponse>;
   commitSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportCommitResponse>;
+  saveSessionAccessScope: (
+    sessionId: string,
+    request: { accessScope: SessionAccessScope },
+  ) => Promise<unknown>;
 };

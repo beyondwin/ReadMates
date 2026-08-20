@@ -8,7 +8,6 @@ import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
 } from "../../model/host-view-types";
-import type { SessionImportCommitResult } from "../../model/session-import-model";
 import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import {
   MeetingAfterPanel,
@@ -32,14 +31,12 @@ export function SessionOverviewSection({
   importPreview = null,
   importStatus = "idle",
   importError = null,
-  importCommitResult = null,
   applyReview,
   onFileSelected,
   onImportCommit,
   onSetGuestReadable,
   onConfirmApply,
   onDismissApply,
-  onReviewApply,
 }: {
   overview: HostSessionEditorOverview;
   sessionState: HostSessionState | undefined;
@@ -57,14 +54,12 @@ export function SessionOverviewSection({
   importPreview?: SessionImportPreviewResponse | null;
   importStatus?: "idle" | "previewing" | "ready" | "committing" | "error";
   importError?: string | null;
-  importCommitResult?: SessionImportCommitResult | null;
   applyReview?: MeetingAfterPanelApplyReview;
   onFileSelected?: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportCommit?: () => void;
-  onSetGuestReadable?: () => void;
+  onSetGuestReadable?: () => void | Promise<void>;
   onConfirmApply?: () => void;
   onDismissApply?: () => void;
-  onReviewApply?: () => void;
 }): JSX.Element {
   const lifecycle = lifecyclePresentation(sessionState);
 
@@ -158,7 +153,6 @@ export function SessionOverviewSection({
               importPreview={importPreview}
               importStatus={importStatus}
               importError={importError}
-              importCommitResult={importCommitResult}
               applyReview={applyReview}
               onEditAttendance={() => onNextAction({ section: "attendance", source: "manual" })}
               onPublish={onPublishSession}
@@ -168,7 +162,6 @@ export function SessionOverviewSection({
               onSetGuestReadable={onSetGuestReadable}
               onConfirmApply={onConfirmApply}
               onDismissApply={onDismissApply}
-              onReviewApply={onReviewApply}
               onOpenAi={() => onNextAction({ section: "records", source: "ai" })}
             />
           ) : (
@@ -306,11 +299,11 @@ function lifecyclePresentation(state: HostSessionState | undefined) {
   if (state === "CLOSED") {
     return {
       label: "마감됨",
-      description: "모임은 마감되었습니다. 기록 작업대에서 초안을 검토한 뒤 세션을 공개할 수 있습니다.",
+      description: "모임을 마쳤습니다. 정리본을 올린 뒤 기록을 공개할 수 있습니다.",
     };
   }
   return {
     label: "공개됨",
-    description: "공개된 세션입니다. 공개 후에도 기본 정보와 기록 초안을 수정할 수 있습니다.",
+    description: "기록이 공개된 모임입니다. 공개 후에도 기본 정보와 작성 중 내용을 수정할 수 있습니다.",
   };
 }

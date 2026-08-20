@@ -1,10 +1,9 @@
-import { type ChangeEvent, type CSSProperties, useEffect, useId, useRef, useState } from "react";
+import { type ChangeEvent, type CSSProperties, useId, useState } from "react";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
 } from "@/features/host/model/host-view-types";
-import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import { SessionImportPanelBody } from "../session-editor/session-import-panel";
 import {
   SessionRecordApplyDialog,
@@ -29,17 +28,15 @@ export type MeetingAfterPanelProps = {
   importPreview?: SessionImportPreviewResponse | null;
   importStatus?: "idle" | "previewing" | "ready" | "committing" | "error";
   importError?: string | null;
-  importCommitResult?: SessionImportCommitResult | null;
   applyReview?: MeetingAfterPanelApplyReview;
   onEditAttendance?: () => void;
   onPublish?: () => void;
   onReverse?: () => void;
   onFileSelected?: (event: ChangeEvent<HTMLInputElement>) => void;
   onImportCommit?: () => void;
-  onSetGuestReadable?: () => void;
+  onSetGuestReadable?: () => void | Promise<void>;
   onConfirmApply?: () => void;
   onDismissApply?: () => void;
-  onReviewApply?: () => void;
   onOpenAi?: () => void;
 };
 
@@ -60,7 +57,6 @@ export function MeetingAfterPanel({
   importPreview = null,
   importStatus = "idle",
   importError = null,
-  importCommitResult = null,
   applyReview,
   onEditAttendance,
   onPublish,
@@ -70,12 +66,10 @@ export function MeetingAfterPanel({
   onSetGuestReadable,
   onConfirmApply,
   onDismissApply,
-  onReviewApply,
   onOpenAi,
 }: MeetingAfterPanelProps) {
   const [wrapUpOpen, setWrapUpOpen] = useState(false);
   const [otherMethodsOpen, setOtherMethodsOpen] = useState(false);
-  const handledCommitResult = useRef<SessionImportCommitResult | null>(null);
   const otherMethodsId = useId();
   const publishReasonId = useId();
   const canPublish = state === "CLOSED"
@@ -85,14 +79,6 @@ export function MeetingAfterPanel({
   const showPublish = state === "CLOSED";
   const publishBlocked = showPublish && !canPublish;
   const showOtherMethods = canUseAi && Boolean(onOpenAi);
-
-  useEffect(() => {
-    if (!importCommitResult || handledCommitResult.current === importCommitResult) {
-      return;
-    }
-    handledCommitResult.current = importCommitResult;
-    onReviewApply?.();
-  }, [importCommitResult, onReviewApply]);
 
   return (
     <section className="rm-meeting-after-panel stack" style={{ "--stack": "16px" } as CSSProperties}>

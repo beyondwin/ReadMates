@@ -7,6 +7,7 @@ import type {
 } from "@/features/host/model/host-view-types";
 import type { HostSessionRequest } from "@/features/host/model/host-session-editor-model";
 import type { HostSessionLifecycleResult } from "@/features/host/model/host-session-lifecycle-model";
+import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
 
@@ -34,4 +35,8 @@ export type HostSessionEditorActions = {
   ) => Promise<Response>;
   previewSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportPreviewResponse>;
   commitSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportCommitResponse>;
+  saveSessionAccessScope: (
+    sessionId: string,
+    request: { accessScope: SessionAccessScope },
+  ) => Promise<unknown>;
 };
