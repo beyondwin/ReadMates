@@ -33,15 +33,15 @@ async function loginHost(page: Page) {
 
 async function openRecordEditor(page: Page) {
   await page.goto(`${HOST_PATH}/sessions/${recordSessionId}`);
-  await expect(page.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel", { name: "개요" })).toBeVisible();
 }
 
-async function openEditorSection(page: Page, name: "기본 정보" | "출석" | "기록 작업대" | "변경 기록") {
-  const section = page.getByRole("tab", { name });
+async function openEditorSection(page: Page, name: "기본 정보" | "출석" | "기록" | "변경 기록") {
+  const section = page.getByRole("tab", { name, exact: true });
   await section.click();
   await expect(section).toHaveAttribute("aria-selected", "true");
 }
@@ -185,7 +185,7 @@ test("1. host finds and opens a past session at the default overview", async ({ 
   await page.getByRole("button", { name: "세션 문서 저장" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
   recordSessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
   expect(recordSessionId).not.toBe("");
 
@@ -283,7 +283,7 @@ where session_id = '${recordSessionId}';
 test("3. JSON import saves the shared draft while member and public live content stay unchanged", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
-  await openEditorSection(page, "기록 작업대");
+  await openEditorSection(page, "기록");
   const detail = await fetchHostSession(page, recordSessionId);
   const authors = readSessionImportAuthorNames(recordSessionId);
   expect(authors.length).toBeGreaterThanOrEqual(1);
@@ -361,7 +361,7 @@ test("4. stale draft requires an exact live metadata review before apply", async
   expect((await basicSave).ok()).toBe(true);
 
   await page.reload();
-  await openEditorSection(page, "기록 작업대");
+  await openEditorSection(page, "기록");
   await expect(page.getByText(/세션 기본 정보 또는 현재 적용본이 변경되어/)).toBeVisible();
   const reviewButton = page.getByRole("button", { name: "반영 전 확인" });
   await expect(reviewButton).toBeDisabled();
@@ -398,7 +398,7 @@ test("4. stale draft requires an exact live metadata review before apply", async
 test("5. apply then composer skip creates a revision without a notification event", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
-  await openEditorSection(page, "기록 작업대");
+  await openEditorSection(page, "기록");
   const before = await readSessionRecordRevisionCount(recordSessionId);
   await waitForDraftSaved(page);
   await reviewAndApply(page);
@@ -416,7 +416,7 @@ test("5. apply then composer skip creates a revision without a notification even
 test("6. apply then composer confirm creates exactly one session-record event", async ({ page }) => {
   await loginHost(page);
   await openRecordEditor(page);
-  await openEditorSection(page, "기록 작업대");
+  await openEditorSection(page, "기록");
   const before = await readSessionRecordRevisionCount(recordSessionId);
   await page.getByLabel("공개 요약").fill(UPDATED_SUMMARY);
   await waitForDraftSaved(page);
@@ -510,7 +510,7 @@ where id = '${recordSessionId}';
   const overviewPanel = page.locator(".rm-host-session-editor__overview");
   await expect(overviewPanel).toHaveCSS("padding-left", "14px");
   await expect(overviewPanel).toHaveCSS("padding-right", "14px");
-  await openEditorSection(page, "기록 작업대");
+  await openEditorSection(page, "기록");
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
   await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
   const refreshDraft = page.getByRole("button", { name: "최신 정보 확인 완료" });
@@ -583,7 +583,7 @@ where id = '${recordSessionId}';
     fullPage: true,
   });
   expect(overviewScreenshot.byteLength).toBeGreaterThan(10_000);
-  await openEditorSection(page, "기록 작업대");
+  await openEditorSection(page, "기록");
   await page.getByRole("button", { name: "반영 전 확인" }).click();
   await expect(dialog).toBeVisible();
   const wideMobileBox = await sheet.boundingBox();

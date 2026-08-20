@@ -30,7 +30,7 @@ async function createOpenSessionThroughUi(page: Page) {
   await page.getByRole("button", { name: "세션 문서 저장" }).click();
 
   await expectCanonicalMeetingUrl(page);
-  await expect(page.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
   const meetingUrl = page.url();
   await page.getByRole("button", { name: "멤버에게 열기" }).click();
   const dialog = page.getByRole("dialog", { name: "멤버에게 열기" });

@@ -20,11 +20,11 @@ describe("SessionEditorSectionNav", () => {
       "개요",
       "기본 정보",
       "출석",
-      "기록 작업대",
+      "기록",
       "변경 기록",
     ]);
     expect(Array.from(container.querySelectorAll("[data-desktop-label]"), (label) => label.textContent))
-      .toEqual(["개요", "기본 정보", "출석", "기록 작업대", "변경 기록"]);
+      .toEqual(["개요", "기본 정보", "출석", "기록", "변경 기록"]);
     expect(Array.from(container.querySelectorAll("[data-mobile-label]"), (label) => label.textContent))
       .toEqual(["개요", "기본", "출석", "기록", "변경"]);
     expect(tablist).toHaveClass("rm-host-session-editor__section-nav");
@@ -47,7 +47,7 @@ describe("SessionEditorSectionNav", () => {
       <SessionEditorSectionNav activeSection="overview" onSectionChange={onSectionChange} />,
     );
 
-    await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
+    await user.click(screen.getByRole("tab", { name: /^기록$/ }));
 
     expect(onSectionChange).toHaveBeenCalledWith("records");
   });
@@ -98,7 +98,7 @@ describe("Panel", () => {
         </Panel>
         <Panel
           eyebrow="기록"
-          title="기록 작업대"
+          title="기록"
           section="records"
           panelId="host-editor-panel-records"
           activeSection="overview"

@@ -365,6 +365,33 @@ class HostSessionServicesTest {
     }
 
     @Test
+    fun `create guest readable draft attaches next-book composer`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionDraftCommandService(port)
+
+        val result = service.create(hostSessionCommand().copy(accessScope = SessionAccessScope.GUEST_READABLE))
+
+        assertThat(result.accessScope).isEqualTo(SessionAccessScope.GUEST_READABLE)
+        assertThat(result.visibility).isEqualTo(SessionRecordVisibility.MEMBER)
+        assertThat(result.composer).isNotNull()
+        assertThat(result.composer?.eventType).isEqualTo(NotificationEventType.NEXT_BOOK_PUBLISHED)
+        assertThat(result.composer?.sessionId.toString()).isEqualTo(result.sessionId)
+        assertThat(result.composer?.contentRevision).isNotBlank()
+        assertThat(port.calls).containsExactly("create:7회차")
+    }
+
+    @Test
+    fun `create host-only draft does not attach composer`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionDraftCommandService(port)
+
+        val result = service.create(hostSessionCommand())
+
+        assertThat(result.accessScope).isEqualTo(SessionAccessScope.HOST_ONLY)
+        assertThat(result.composer).isNull()
+    }
+
+    @Test
     fun `basic update audit records allowlisted field names without credential values`() {
         val port = RecordingHostSessionPorts()
         val before = basicAuditSnapshot()
@@ -780,7 +807,13 @@ class HostSessionServicesTest {
                 meetingUrl = command.meetingUrl,
                 meetingPasscode = command.meetingPasscode,
                 state = "OPEN",
-                visibility = SessionRecordVisibility.HOST_ONLY,
+                visibility =
+                    if (command.accessScope == SessionAccessScope.GUEST_READABLE) {
+                        SessionRecordVisibility.MEMBER
+                    } else {
+                        SessionRecordVisibility.HOST_ONLY
+                    },
+                accessScope = command.accessScope ?: SessionAccessScope.HOST_ONLY,
             ).also { calls += "create:${command.title}" }
 
         override fun loadBasicSnapshot(

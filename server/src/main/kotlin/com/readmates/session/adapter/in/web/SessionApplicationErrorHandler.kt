@@ -56,7 +56,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_OPEN_ALREADY_EXISTS",
-            message = "이미 진행 중인 세션이 있습니다. 그 세션을 마감하거나 예정으로 되돌린 뒤 다시 시도하세요.",
+            message = "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
             openSessionId = ex.openSessionId?.toString(),
         )
 

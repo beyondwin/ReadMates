@@ -95,7 +95,7 @@ describe("SessionLifecycleConfirmDialog", () => {
     });
 
     expect(screen.getByRole("alert")).toHaveTextContent(openAlreadyExistsMessage());
-    expect(screen.getByRole("link", { name: "진행 중인 세션 열기" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "진행 중인 모임 열기" })).toHaveAttribute(
       "href",
       "/app/host/sessions/session-open/edit",
     );
@@ -132,7 +132,7 @@ describe("SessionLifecycleConfirmDialog", () => {
 
     const cancel = screen.getByRole("button", { name: "취소" });
     const confirm = screen.getByRole("button", { name: copy.confirmLabel });
-    const link = screen.getByRole("link", { name: "진행 중인 세션 열기" });
+    const link = screen.getByRole("link", { name: "진행 중인 모임 열기" });
     expect(cancel).toHaveFocus();
 
     await user.tab();

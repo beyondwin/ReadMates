@@ -9,6 +9,7 @@ import com.readmates.session.application.port.out.HostSessionVisibilityUpdateRes
 import com.readmates.session.application.requireHost
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
+import com.readmates.session.domain.SessionExposure
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcOffsetDateTime
@@ -26,10 +27,11 @@ internal class HostSessionDraftWriteOperations(
         requireHost(host)
         val sessionId = UUID.randomUUID()
         val values = policy.normalizeCreate(command)
+        val exposure = createExposure(command)
         queries.lockClub(host.clubId)
         val nextNumber = queries.nextSessionNumber(host.clubId)
-        insertDraft(sessionId, nextNumber, command, values)
-        return createdResponse(sessionId, nextNumber, command, values)
+        insertDraft(sessionId, nextNumber, command, values, exposure)
+        return createdResponse(sessionId, nextNumber, command, values, exposure)
     }
 
     fun update(command: UpdateHostSessionCommand) =
@@ -88,7 +90,9 @@ internal class HostSessionDraftWriteOperations(
         nextNumber: Int,
         command: HostSessionCommand,
         values: NormalizedHostSessionWrite,
+        exposure: SessionExposure,
     ) {
+        val compatibility = policy.compatibility(exposure, "DRAFT")
         jdbcTemplate.update(
             """
             insert into sessions (
@@ -114,8 +118,8 @@ internal class HostSessionDraftWriteOperations(
             values.meetingPasscode,
             values.questionDeadlineAt,
             "DRAFT",
-            SessionRecordVisibility.HOST_ONLY.name,
-            SessionAccessScope.HOST_ONLY.name,
+            compatibility.sessionVisibility,
+            exposure.accessScope.name,
         )
     }
 
@@ -164,24 +168,34 @@ internal class HostSessionDraftWriteOperations(
         nextNumber: Int,
         command: HostSessionCommand,
         values: NormalizedHostSessionWrite,
-    ) = CreatedSessionResponse(
-        sessionId = sessionId.toString(),
-        sessionNumber = nextNumber,
-        title = command.title,
-        bookTitle = command.bookTitle,
-        bookAuthor = command.bookAuthor,
-        bookLink = values.bookLink,
-        bookImageUrl = values.bookImageUrl,
-        date = values.sessionDate.toString(),
-        startTime = values.startTime.toString(),
-        endTime = values.endTime.toString(),
-        questionDeadlineAt = values.questionDeadlineAt.toUtcOffsetDateTime().toString(),
-        locationLabel = values.locationLabel,
-        meetingUrl = values.meetingUrl,
-        meetingPasscode = values.meetingPasscode,
-        state = "DRAFT",
-        visibility = SessionRecordVisibility.HOST_ONLY,
-        accessScope = SessionAccessScope.HOST_ONLY,
-        siteVisibility = PublicSiteVisibility.HIDDEN,
-    )
+        exposure: SessionExposure,
+    ): CreatedSessionResponse {
+        val compatibility = policy.compatibility(exposure, "DRAFT")
+        return CreatedSessionResponse(
+            sessionId = sessionId.toString(),
+            sessionNumber = nextNumber,
+            title = command.title,
+            bookTitle = command.bookTitle,
+            bookAuthor = command.bookAuthor,
+            bookLink = values.bookLink,
+            bookImageUrl = values.bookImageUrl,
+            date = values.sessionDate.toString(),
+            startTime = values.startTime.toString(),
+            endTime = values.endTime.toString(),
+            questionDeadlineAt = values.questionDeadlineAt.toUtcOffsetDateTime().toString(),
+            locationLabel = values.locationLabel,
+            meetingUrl = values.meetingUrl,
+            meetingPasscode = values.meetingPasscode,
+            state = "DRAFT",
+            visibility = SessionRecordVisibility.valueOf(compatibility.sessionVisibility),
+            accessScope = exposure.accessScope,
+            siteVisibility = exposure.siteVisibility,
+        )
+    }
+
+    private fun createExposure(command: HostSessionCommand) =
+        SessionExposure(
+            accessScope = command.accessScope ?: SessionAccessScope.HOST_ONLY,
+            siteVisibility = PublicSiteVisibility.HIDDEN,
+        )
 }

@@ -63,7 +63,22 @@ describe("MeetingAfterPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
-    expect(screen.getByText("공개하려면 요약이 필요합니다")).toBeInTheDocument();
+    expect(screen.getByText("공개하려면 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
+    expect(screen.queryByText("공개하려면 요약이 필요합니다")).not.toBeInTheDocument();
+  });
+
+  it("keeps the HOST_ONLY reason when the summary is also empty", () => {
+    render(
+      <MeetingAfterPanel
+        state="CLOSED"
+        summary=""
+        accessScope="HOST_ONLY"
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
+    expect(screen.getByText("공개하려면 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
+    expect(screen.queryByText("공개하려면 요약이 필요합니다")).not.toBeInTheDocument();
   });
 
   it("opens the package drop zone from 정리본 올리기", async () => {

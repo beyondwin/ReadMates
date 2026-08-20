@@ -12,6 +12,28 @@ describe("frontend route observability patterns", () => {
         "/clubs/reading-sai/app/host/sessions/123e4567-e89b-12d3-a456-426614174000/edit",
       ),
     ).toBe("/clubs/:slug/app/host/sessions/:sessionId/edit");
+    expect(
+      normalizeFrontendRoutePattern(
+        "/clubs/reading-sai/app/host/sessions/123e4567-e89b-12d3-a456-426614174000/closing",
+      ),
+    ).toBe("/clubs/:slug/app/host/sessions/:sessionId/closing");
+    expect(
+      normalizeFrontendRoutePattern(
+        "/app/host/sessions/123e4567-e89b-12d3-a456-426614174000",
+      ),
+    ).toBe("/app/host/sessions/:sessionId");
+    expect(
+      normalizeFrontendRoutePattern(
+        "/clubs/reading-sai/app/host/sessions/123e4567-e89b-12d3-a456-426614174000",
+      ),
+    ).toBe("/clubs/:slug/app/host/sessions/:sessionId");
+    expect(
+      normalizeFrontendRoutePattern(
+        "/app/host/sessions/123e4567-e89b-12d3-a456-426614174000/edit",
+      ),
+    ).toBe("/app/host/sessions/:sessionId/edit");
+    expect(normalizeFrontendRoutePattern("/app/host/sessions/123e4567-e89b-12d3-a456-426614174000"))
+      .not.toContain("123e4567-e89b-12d3-a456-426614174000");
     expect(normalizeFrontendRoutePattern("/admin/clubs/123e4567-e89b-12d3-a456-426614174000")).toBe(
       "/admin/clubs/:clubId",
     );

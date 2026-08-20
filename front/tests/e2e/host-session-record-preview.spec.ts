@@ -281,7 +281,7 @@ async function expectMobileEditorChrome(page: Page): Promise<void> {
   const sectionNav = page.getByRole("tablist", { name: "호스트 편집 섹션" });
   const sectionTabs = sectionNav.getByRole("tab");
   await expect(sectionTabs).toHaveCount(5);
-  await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
   const sectionNavMetrics = await sectionNav.evaluate((element) => ({
@@ -367,8 +367,8 @@ test("host captures public-safe session record preview evidence on desktop and m
     `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?section=records&source=json`,
   );
   await expectCanonicalRecordsJsonUrl(page);
-  await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: /정리본|기록 작업대/ })).toBeVisible();
+  await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("heading", { name: /정리본/ })).toBeVisible();
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible({ timeout: 15000 });
   const previewPost = page.waitForResponse(
     (response) =>
@@ -427,7 +427,7 @@ test("host captures public-safe session record preview evidence on desktop and m
 
   await page.setViewportSize({ width: 390, height: 844 });
   await dismissApplyReviewIfOpen(page, 1_000);
-  const recordsTab = page.getByRole("tab", { name: "기록 작업대" });
+  const recordsTab = page.getByRole("tab", { name: "기록", exact: true });
   await expect(recordsTab).toBeVisible();
   if ((await recordsTab.getAttribute("aria-selected")) !== "true") {
     await recordsTab.click();
@@ -497,7 +497,7 @@ test("legacy records=json URL canonicalizes once and opens the JSON source", asy
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?records=json`);
 
   await expectCanonicalRecordsJsonUrl(page);
-  await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible();
 });

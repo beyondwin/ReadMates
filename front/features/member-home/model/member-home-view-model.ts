@@ -187,7 +187,7 @@ export function getMemberHomeNextReadingAction({
     return {
       state,
       label: READING_LOOP_LABELS[state],
-      message: isViewer ? "다음 세션이 열리면 읽기 전용으로 확인할 수 있어요." : "호스트가 세션을 열면 준비를 시작합니다.",
+      message: isViewer ? "다음 모임이 열리면 읽기 전용으로 확인할 수 있어요." : "호스트가 모임을 열면 준비를 시작합니다.",
       href: null,
       ctaLabel: null,
       pace: null,

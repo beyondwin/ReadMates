@@ -40,7 +40,18 @@ export type MeetingAfterPanelProps = {
   onOpenAi?: () => void;
 };
 
-const PUBLISH_REASON = "공개하려면 요약이 필요합니다";
+const SUMMARY_PUBLISH_REASON = "공개하려면 요약이 필요합니다";
+const HOST_ONLY_PUBLISH_REASON = "공개하려면 멤버에게 보이기로 바꿔 주세요.";
+
+function publishBlockedReason(accessScope: SessionAccessScope, summary: string) {
+  if (accessScope === "HOST_ONLY") {
+    return HOST_ONLY_PUBLISH_REASON;
+  }
+  if (summary.trim().length === 0) {
+    return SUMMARY_PUBLISH_REASON;
+  }
+  return null;
+}
 
 function ignoreFileSelected() {}
 function ignoreCommit() {}
@@ -77,7 +88,9 @@ export function MeetingAfterPanel({
     && accessScope === "GUEST_READABLE"
     && summary.trim().length > 0;
   const showPublish = state === "CLOSED";
-  const publishBlocked = showPublish && !canPublish;
+  const blockedReason = showPublish && !canPublish
+    ? publishBlockedReason(accessScope, summary)
+    : null;
   const showOtherMethods = canUseAi && Boolean(onOpenAi);
 
   return (
@@ -105,16 +118,16 @@ export function MeetingAfterPanel({
             type="button"
             className="btn btn-primary btn-sm"
             disabled={lifecyclePending || !canPublish}
-            aria-describedby={publishBlocked ? publishReasonId : undefined}
+            aria-describedby={blockedReason ? publishReasonId : undefined}
             onClick={() => onPublish?.()}
           >
             기록 공개
           </button>
         ) : null}
       </div>
-      {publishBlocked ? (
+      {blockedReason ? (
         <p id={publishReasonId} className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-          {PUBLISH_REASON}
+          {blockedReason}
         </p>
       ) : null}
       {reverseLabel && onReverse ? (

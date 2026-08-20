@@ -339,7 +339,7 @@ export default function HostSessionEditor({
     returnTarget,
     readmatesReturnState,
   );
-  const editorTitle = isNewSession ? "세션 문서 만들기" : "세션 문서 편집";
+  const editorTitle = isNewSession ? "세션 문서 만들기" : null;
   const basicSaveLabel = saveState === "saving"
     ? "기본 정보를 저장하는 중"
     : isNewSession
@@ -411,12 +411,12 @@ export default function HostSessionEditor({
 
   const deletionErrorMessage = (status?: number) => {
     if (status === 404) {
-      return "세션을 찾을 수 없습니다.";
+      return "모임을 찾을 수 없습니다.";
     }
     if (status === 409) {
-      return "이미 닫히거나 공개된 세션은 삭제할 수 없습니다.";
+      return "이미 닫히거나 공개된 모임은 삭제할 수 없습니다.";
     }
-    return "세션 삭제에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
+    return "모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
   };
 
   const closeDeleteModal = useCallback(() => {
@@ -857,10 +857,14 @@ export default function HostSessionEditor({
                 {returnTarget.label}
               </LinkComponent>
             ) : null}
-            <div className="eyebrow">세션 운영 문서</div>
-            <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-              {editorTitle}
-            </h1>
+            {editorTitle ? (
+              <>
+                <div className="eyebrow">세션 운영 문서</div>
+                <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
+                  {editorTitle}
+                </h1>
+              </>
+            ) : null}
             <div
               className="desktop-only rm-host-session-editor__desktop-metadata"
               role="group"
@@ -1113,7 +1117,7 @@ export default function HostSessionEditor({
                     />
                 ) : (
                   <div className="surface-quiet small" style={{ padding: 18 }}>
-                    기본 정보를 저장한 뒤 기록 작업대를 사용할 수 있습니다.
+                    기본 정보를 저장한 뒤 기록을 작성할 수 있습니다.
                   </div>
                 )}
               </div>

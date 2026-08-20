@@ -503,8 +503,8 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={currentOpenSession} recordWorkflow={workflow} />);
 
-    expect(screen.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
-    expect(screen.getByText("세션 운영 문서")).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "세션 문서 편집" })).not.toBeInTheDocument();
+    expect(screen.queryByText("세션 운영 문서")).not.toBeInTheDocument();
     expect(screen.queryByText("세션 운영 문서 · No.7")).not.toBeInTheDocument();
     const desktopMetadata = screen.getByRole("group", { name: "데스크톱 세션 상태" });
     expect(within(desktopMetadata).getByRole("group", {
@@ -562,7 +562,7 @@ describe("HostSessionEditor", () => {
     const overview = screen.getByRole("tab", { name: "개요" });
     const basic = screen.getByRole("tab", { name: "기본 정보" });
     const attendance = screen.getByRole("tab", { name: "출석" });
-    const records = screen.getByRole("tab", { name: "기록 작업대" });
+    const records = screen.getByRole("tab", { name: /^기록$/ });
     const history = screen.getByRole("tab", { name: "변경 기록" });
 
     expect(segments).toHaveAttribute("role", "tablist");
@@ -570,7 +570,7 @@ describe("HostSessionEditor", () => {
       "개요",
       "기본 정보",
       "출석",
-      "기록 작업대",
+      "기록",
       "변경 기록",
     ]);
     expect(overview).toHaveAttribute("aria-selected", "true");
@@ -631,7 +631,7 @@ describe("HostSessionEditor", () => {
     await user.clear(screen.getByLabelText("세션 제목"));
     await user.type(screen.getByLabelText("세션 제목"), "수정 중인 세션 제목");
 
-    await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
+    await user.click(screen.getByRole("tab", { name: /^기록$/ }));
     await user.clear(screen.getByLabelText("공개 요약"));
     await user.type(screen.getByLabelText("공개 요약"), "수정 중인 공개 요약");
 
@@ -639,7 +639,7 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("tab", { name: "기본 정보" }));
     expect(screen.getByLabelText("세션 제목")).toHaveValue("수정 중인 세션 제목");
 
-    await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
+    await user.click(screen.getByRole("tab", { name: /^기록$/ }));
     expect(screen.getByLabelText("공개 요약")).toHaveValue("수정 중인 공개 요약");
   });
 
@@ -662,7 +662,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
+    await user.click(screen.getByRole("tab", { name: /^기록$/ }));
     await user.click(screen.getByLabelText("한줄평 1 · 테스트 멤버"));
     await user.keyboard("{Enter}");
 
@@ -1616,7 +1616,7 @@ describe("HostSessionEditor", () => {
     const dialog = await screen.findByRole("dialog", { name: "멤버에게 열기" });
     expect(dialog).toBeVisible();
     expect(within(dialog).getByRole("alert")).toHaveTextContent(openAlreadyExistsMessage());
-    expect(within(dialog).getByRole("link", { name: "진행 중인 세션 열기" })).toHaveAttribute(
+    expect(within(dialog).getByRole("link", { name: "진행 중인 모임 열기" })).toHaveAttribute(
       "href",
       `/clubs/club-a/app/host/sessions/${openSessionId}`,
     );
@@ -1635,7 +1635,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByText("모임이 끝났다면 세션을 마감한 뒤 기록을 정리하세요.")).toBeVisible();
+    expect(screen.getByText("모임이 끝났다면 모임을 마친 뒤 기록을 정리하세요.")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "모임 마치기" }));
     await user.click(within(screen.getByRole("dialog", { name: "모임 마치기" })).getByRole("button", { name: "모임 마치기" }));
 
@@ -1762,7 +1762,7 @@ describe("HostSessionEditor", () => {
     const dialog = await screen.findByRole("dialog", { name: "다시 진행 중으로" });
     expect(dialog).toBeVisible();
     expect(within(dialog).getByRole("alert")).toHaveTextContent(openAlreadyExistsMessage());
-    expect(within(dialog).getByRole("link", { name: "진행 중인 세션 열기" })).toHaveAttribute(
+    expect(within(dialog).getByRole("link", { name: "진행 중인 모임 열기" })).toHaveAttribute(
       "href",
       `/clubs/club-a/app/host/sessions/${openSessionId}`,
     );
@@ -1865,7 +1865,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByText("기본 정보를 저장한 뒤 기록 작업대를 사용할 수 있습니다.")).toBeVisible();
+    expect(screen.getByText("기본 정보를 저장한 뒤 기록을 작성할 수 있습니다.")).toBeVisible();
     expect(screen.queryByRole("heading", { name: "기록 공개 범위" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "저장" })).not.toBeInTheDocument();
   });
@@ -2147,7 +2147,7 @@ describe("HostSessionEditor", () => {
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
     expect(dialog).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7/deletion-preview", expect.objectContaining({
@@ -2164,7 +2164,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByText("7개")).toBeInTheDocument();
     expect(screen.queryByText(retiredPersonalFeedbackReportLabel)).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7", expect.objectContaining({
@@ -2204,8 +2204,8 @@ describe("HostSessionEditor", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
-    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
-    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/new");
@@ -2229,12 +2229,12 @@ describe("HostSessionEditor", () => {
     const trigger = screen.getByRole("button", { name: "세션 삭제" });
     await user.click(trigger);
 
-    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
     const cancelButton = within(dialog).getByRole("button", { name: "취소" });
     await waitFor(() => expect(cancelButton).toHaveFocus());
 
     await screen.findByText("참석 대상");
-    const confirmButton = within(dialog).getByRole("button", { name: "세션 삭제" });
+    const confirmButton = within(dialog).getByRole("button", { name: "목록에서 지우기" });
     expect(confirmButton).toBeEnabled();
 
     await user.tab();
@@ -2246,7 +2246,7 @@ describe("HostSessionEditor", () => {
 
     await user.keyboard("{Escape}");
 
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "이 세션을 삭제할까요?" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "이 모임을 목록에서 지울까요?" })).not.toBeInTheDocument());
     expect(trigger).toHaveFocus();
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7", expect.objectContaining({
@@ -2300,7 +2300,7 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "목록에서 지우기" }));
     expect(confirmSpy).not.toHaveBeenCalled();
 
-    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
     expect(dialog).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -2312,7 +2312,7 @@ describe("HostSessionEditor", () => {
       ),
     );
 
-    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -2352,9 +2352,9 @@ describe("HostSessionEditor", () => {
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
 
-    expect(await screen.findByText("이미 닫히거나 공개된 세션은 삭제할 수 없습니다.")).toBeInTheDocument();
-    const dialog = screen.getByRole("dialog", { name: "이 세션을 삭제할까요?" });
-    expect(within(dialog).getByRole("button", { name: "세션 삭제" })).toBeDisabled();
+    expect(await screen.findByText("이미 닫히거나 공개된 모임은 삭제할 수 없습니다.")).toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    expect(within(dialog).getByRole("button", { name: "목록에서 지우기" })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -2378,10 +2378,10 @@ describe("HostSessionEditor", () => {
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
     await screen.findByText("참석 대상");
-    const dialog = screen.getByRole("dialog", { name: "이 세션을 삭제할까요?" });
-    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+    const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
 
-    expect(await screen.findByText("세션 삭제에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
+    expect(await screen.findByText("모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
     expect(dialog).toBeInTheDocument();
   });
 
@@ -2553,7 +2553,7 @@ describe("HostSessionEditor", () => {
       const aiWorkspace = screen.getByTestId("aigen-tab");
       await user.click(screen.getByRole("tab", { name: "기본 정보" }));
       expect(aiWorkspace).not.toBeVisible();
-      await user.click(screen.getByRole("tab", { name: "기록 작업대" }));
+      await user.click(screen.getByRole("tab", { name: /^기록$/ }));
 
       expect(screen.getByTestId("aigen-tab")).toBe(aiWorkspace);
       expect(aiWorkspace).not.toBeVisible();

@@ -27,7 +27,7 @@ const sectionItems: readonly {
   },
   {
     key: "records",
-    desktopLabel: "기록 작업대",
+    desktopLabel: "기록",
     mobileLabel: "기록",
     panelIds: [
       "host-editor-record-source-panel-manual",

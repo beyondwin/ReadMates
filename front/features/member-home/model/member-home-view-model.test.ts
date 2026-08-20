@@ -204,7 +204,7 @@ describe("member-home view model", () => {
     expect(getMemberHomeNextReadingAction({ session: null, isViewer: false, canWrite: true })).toEqual({
       state: "NO_SESSION",
       label: "세션 대기",
-      message: "호스트가 세션을 열면 준비를 시작합니다.",
+      message: "호스트가 모임을 열면 준비를 시작합니다.",
       href: null,
       ctaLabel: null,
       pace: null,

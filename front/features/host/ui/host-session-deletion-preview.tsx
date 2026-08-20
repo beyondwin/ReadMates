@@ -112,10 +112,10 @@ export function HostSessionDeletionPreviewDialog({
         style={{ width: "min(460px, 100%)", padding: "24px" }}
       >
         <h2 id="delete-session-title" style={{ margin: 0 }}>
-          이 세션을 삭제할까요?
+          이 모임을 목록에서 지울까요?
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 18px" }}>
-          삭제하면 이 회차와 준비 기록이 모두 제거됩니다. 멤버 계정과 멤버십은 삭제되지 않습니다.
+          삭제하면 이 모임과 준비 기록이 모두 제거됩니다. 멤버 계정과 멤버십은 삭제되지 않습니다.
         </p>
 
         {previewLoading ? (
@@ -134,7 +134,7 @@ export function HostSessionDeletionPreviewDialog({
 
         {preview && !preview.canDelete ? (
           <p className="small" role="alert" style={{ color: "var(--danger)", margin: "18px 0 0" }}>
-            닫히거나 공개된 세션은 삭제할 수 없습니다. 기록 보존을 위해 위험 작업이 잠겨 있습니다.
+            닫히거나 공개된 모임은 삭제할 수 없습니다. 기록 보존을 위해 위험 작업이 잠겨 있습니다.
           </p>
         ) : null}
 
@@ -159,7 +159,7 @@ export function HostSessionDeletionPreviewDialog({
             onClick={onConfirm}
             style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
           >
-            세션 삭제
+            목록에서 지우기
           </button>
         </div>
       </div>
@@ -178,7 +178,7 @@ function DeletionPreviewCounts({ preview }: { preview: HostSessionDeletionPrevie
     ["하이라이트", `${preview.counts.highlights}개`],
     ["공개 요약", `${preview.counts.publications}개`],
     ["레거시 개인 피드백", `${preview.counts.feedbackReports}개`],
-    ["회차 피드백 문서", `${preview.counts.feedbackDocuments}개`],
+    ["모임 피드백 문서", `${preview.counts.feedbackDocuments}개`],
   ];
 
   return (

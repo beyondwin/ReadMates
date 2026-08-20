@@ -71,7 +71,7 @@ export function PrepCard({
     return (
       <article className="rm-reading-desk rm-prep-card rm-prep-card--empty" style={{ padding: "36px", position: "relative" }}>
         <p className="eyebrow" style={{ margin: 0 }}>
-          현재 세션 작업대
+          현재 모임 작업대
         </p>
         <EmptyCurrentMeeting
           upcomingSessions={upcomingSessions}

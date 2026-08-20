@@ -829,11 +829,12 @@ describe("MemberHome", () => {
     const desktop = getDesktopView(container);
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
+    expect(desktop.getByText("현재 모임 작업대")).toBeInTheDocument();
     expect(desktop.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
     expect(desktop.getByText("다음 책이 등록되면 이곳에 책, 일정, 질문 마감, 준비 상태가 한 번에 표시됩니다.")).toBeInTheDocument();
     expect(desktop.getByText("지금 읽는 책")).toBeInTheDocument();
     expect(desktop.getByText("다음 책을 기다리는 중")).toBeInTheDocument();
-    expect(desktop.getByText("호스트가 세션을 열면 준비를 시작합니다.")).toBeInTheDocument();
+    expect(desktop.getByText("호스트가 모임을 열면 준비를 시작합니다.")).toBeInTheDocument();
     expect(desktop.getAllByText("아직 표시할 클럽 기록이 없습니다.").length).toBeGreaterThan(0);
     expect(desktop.queryByText("RSVP · 참석 명단")).not.toBeInTheDocument();
     expect(desktop.getByText("참석 현황 준비 중")).toBeInTheDocument();

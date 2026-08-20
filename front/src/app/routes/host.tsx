@@ -114,13 +114,13 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: "sessions/new",
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="세션 편집 화면을 불러오는 중" variant="host" />,
+      fallback: <ReadmatesRouteLoading label="새 모임 화면을 불러오는 중" variant="host" />,
       load: async () => ({ Component: (await import("@/src/app/host-routes/new-session-route-element")).NewHostSessionRouteElement }),
     }),
     scopedHostRoute({
       path: "sessions/:sessionId/closing",
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="세션 클로징 상태를 불러오는 중" variant="host" />,
+      fallback: <ReadmatesRouteLoading label="모임 후 화면을 불러오는 중" variant="host" />,
       load: async () => ({
         Component: (await import("@/src/app/host-routes/session-closing-route-element")).HostSessionClosingRouteElement,
       }),
@@ -140,7 +140,7 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: "sessions/:sessionId",
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+      fallback: <ReadmatesRouteLoading label="모임 장부를 불러오는 중" variant="host" />,
       load: async () => {
         const [{ MeetingRouteElement: Component }, { hostSessionEditorLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/meeting-route-element"),
@@ -152,7 +152,7 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: "sessions/:sessionId/edit",
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+      fallback: <ReadmatesRouteLoading label="모임 장부를 불러오는 중" variant="host" />,
       load: async () => ({
         Component: (await import("@/src/app/host-routes/edit-session-route-element")).EditHostSessionRouteElement,
       }),
@@ -241,7 +241,7 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: "sessions/new",
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 편집 화면을 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="새 모임 화면을 불러오는 중" variant="host" />,
       lazy: async () => {
         const { NewHostSessionRouteElement } = await import("@/src/app/host-routes/new-session-route-element");
         return { Component: NewHostSessionRouteElement };
@@ -250,7 +250,7 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: "sessions/:sessionId/closing",
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 클로징 상태를 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 후 화면을 불러오는 중" variant="host" />,
       lazy: async () => {
         const { HostSessionClosingRouteElement } = await import("@/src/app/host-routes/session-closing-route-element");
         return { Component: HostSessionClosingRouteElement };
@@ -277,7 +277,7 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: "sessions/:sessionId",
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 장부를 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ MeetingRouteElement }, { hostSessionEditorLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/meeting-route-element"),
@@ -289,7 +289,7 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: "sessions/:sessionId/edit",
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 장부를 불러오는 중" variant="host" />,
       lazy: async () => {
         const { EditHostSessionRouteElement } = await import("@/src/app/host-routes/edit-session-route-element");
         return { Component: EditHostSessionRouteElement };

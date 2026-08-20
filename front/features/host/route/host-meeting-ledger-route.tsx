@@ -1,7 +1,11 @@
 import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import type { HostSessionDetailResponse, HostSessionListItem } from "@/features/host/api/host-contracts";
+import type {
+  CreatedSessionResponse,
+  HostSessionDetailResponse,
+  HostSessionListItem,
+} from "@/features/host/api/host-contracts";
 import {
   meetingListItemsFromHostSources,
   type MeetingListItemSource,
@@ -163,19 +167,19 @@ export function HostMeetingLedgerRoute({
   }, [openFirstPublicationComposer, saveAccessScope]);
 
   const handleCreateUpcomingSession = useCallback(async (input: UpcomingBookCreateInput) => {
-    const response = await createSession(buildHostSessionRequest(upcomingBookCreateFormValues(input)));
+    const response = await createSession(buildHostSessionRequest(
+      upcomingBookCreateFormValues(input),
+      undefined,
+      { accessScope: input.accessScope },
+    ));
     if (!response.ok) {
       throw new Error("create-upcoming-failed");
     }
-    if (input.accessScope === "GUEST_READABLE") {
-      const created = await response.json() as { sessionId: string };
-      const result = await saveAccessScope({
-        sessionId: created.sessionId,
-        request: { accessScope: "GUEST_READABLE" },
-      });
-      openFirstPublicationComposer(result.composer);
+    const created = await response.json() as CreatedSessionResponse;
+    if (created.composer) {
+      openFirstPublicationComposer(created.composer);
     }
-  }, [createSession, openFirstPublicationComposer, saveAccessScope]);
+  }, [createSession, openFirstPublicationComposer]);
 
   return (
     <>

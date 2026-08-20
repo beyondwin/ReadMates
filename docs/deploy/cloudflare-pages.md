@@ -147,7 +147,7 @@ READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
 - `/oauth2/authorization/google`은 Google 또는 Spring OAuth 흐름으로 redirect됩니다.
 - `/.well-known/readmates-domain-check.json`은 ReadMates Cloudflare Pages marker를 반환합니다.
 - `/api/bff/api/public/clubs/<club-slug>`은 해당 club의 공개 가능한 정보만 반환해야 합니다.
-- deep route와 legacy route인 `/clubs/<club-slug>/app/session/current`, `/clubs/<club-slug>/app/host`, `/clubs/<club-slug>/app/host/sessions/new`, `/clubs/<club-slug>/app/host/sessions/<session-id>/edit`, `/clubs/<club-slug>/app/host/members`, `/clubs/<club-slug>/invite/<token>`, `/invite/<token>`, `/reset-password/<token>`, `/app`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
+- deep route와 legacy route인 `/clubs/<club-slug>/app/session/current`, `/clubs/<club-slug>/app/host`, `/clubs/<club-slug>/app/host/sessions/new`, `/clubs/<club-slug>/app/host/sessions/<session-id>`, `/clubs/<club-slug>/app/host/sessions/<session-id>/edit`, `/clubs/<club-slug>/app/host/members`, `/clubs/<club-slug>/invite/<token>`, `/invite/<token>`, `/reset-password/<token>`, `/app`은 Cloudflare 404가 아니라 SPA fallback으로 진입해야 합니다.
 
 ## Registered Club Host 운영
 
@@ -167,7 +167,7 @@ curl smoke 외에 사용자 흐름까지 확인할 때 사용하는 체크리스
 4. 정식 멤버는 로그인 후 `/app`으로 들어가는지 확인합니다.
 5. 초대 없이 들어온 새 Google 사용자는 로그인 성공 후 `/app`으로 redirect되고, 둘러보기 멤버 안내와 읽기 전용 멤버 화면을 볼 수 있는지 확인합니다. `/app/pending`은 둘러보기 멤버 안내용 호환 route로 남아 있어 직접 열어도 동작해야 합니다.
 6. 호스트가 `/app/host/members`에서 둘러보기 멤버를 정식 멤버로 전환하고 멤버 표시 이름을 수정할 수 있는지 확인합니다.
-7. 호스트가 `/app/host/sessions/new`에서 `DRAFT` 예정 세션을 만들고, `/app/host/sessions/:sessionId/edit`에서 공개 범위를 `MEMBER` 또는 `PUBLIC`으로 바꾼 뒤 현재 세션으로 시작할 수 있는지 확인합니다.
+7. 호스트가 `/app/host/sessions/new`에서 `DRAFT` 예정 모임을 만들고, `/app/host/sessions/:sessionId`에서 멤버에게 보이기를 바꾼 뒤 멤버에게 열 수 있는지 확인합니다.
 8. 호스트가 진행 중인 `OPEN` 세션을 `CLOSED`로 닫고, 공개 요약을 저장한 뒤 `PUBLISHED` 기록으로 발행할 수 있는지 확인합니다.
 9. 정식 멤버가 `/app`을 reload해도 멤버 route에 접근할 수 있고, 멤버 공개 예정 세션이 있으면 홈에서 볼 수 있는지 확인합니다.
 10. 둘러보기 멤버가 피드백 문서 route에 접근할 수 없는지 확인합니다.

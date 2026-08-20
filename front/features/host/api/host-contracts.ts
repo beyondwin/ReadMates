@@ -704,6 +704,7 @@ export type HostSessionRequest = {
   startTime?: string | null;
   endTime?: string | null;
   questionDeadlineAt?: string | null;
+  accessScope?: SessionAccessScope;
 };
 
 export type CreatedSessionResponse = {
@@ -723,6 +724,8 @@ export type CreatedSessionResponse = {
   questionDeadlineAt: string;
   state: SessionState;
   visibility: SessionRecordVisibility;
+  accessScope?: SessionAccessScope;
+  composer?: HostNotificationComposerContext | null;
 };
 
 export type HostAttendanceUpdate = {

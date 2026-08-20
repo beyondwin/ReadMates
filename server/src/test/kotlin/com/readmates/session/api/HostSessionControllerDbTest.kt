@@ -282,6 +282,45 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host creates draft with guest readable access scope in one post`() {
+        val response =
+            mockMvc
+                .post("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "title": "8회차 · 다음 책",
+                          "bookTitle": "다음 책",
+                          "bookAuthor": "다음 저자",
+                          "date": "2026-06-11",
+                          "accessScope": "GUEST_READABLE"
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isCreated() }
+                    jsonPath("$.state") { value("DRAFT") }
+                    jsonPath("$.accessScope") { value("GUEST_READABLE") }
+                    jsonPath("$.visibility") { value("MEMBER") }
+                    jsonPath("$.composer.eventType") { value("NEXT_BOOK_PUBLISHED") }
+                    jsonPath("$.composer.sessionId") { exists() }
+                    jsonPath("$.composer.contentRevision") { exists() }
+                }.andReturn()
+        val sessionId =
+            """"sessionId"\s*:\s*"([^"]+)""""
+                .toRegex()
+                .find(response.response.contentAsString)
+                ?.groupValues
+                ?.get(1)
+                ?: error("created session response did not include a sessionId")
+
+        assertEquals("GUEST_READABLE", sessionAccessScope(sessionId))
+        assertEquals("MEMBER", sessionVisibility(sessionId))
+    }
+
+    @Test
     fun `host draft defaults schedule deadline and optional meeting fields`() {
         val response =
             mockMvc

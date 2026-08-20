@@ -348,6 +348,7 @@ describe("HostMeetingLedgerRoute", () => {
       startTime: "20:00",
       endTime: "22:00",
       locationLabel: "온라인",
+      accessScope: "HOST_ONLY",
     }));
     expect(routeMocks.openSession).not.toHaveBeenCalled();
     expect(routeMocks.saveAccessScope).not.toHaveBeenCalled();
@@ -355,7 +356,7 @@ describe("HostMeetingLedgerRoute", () => {
     expect(screen.getByText("editor body")).toBeInTheDocument();
   });
 
-  it("saves member visibility after creating a visible next book and stays on this meeting", async () => {
+  it("creates a visible next book with accessScope on one POST and stays on this meeting", async () => {
     const user = userEvent.setup();
     routeMocks.hostSessions = {
       items: [{
@@ -377,11 +378,12 @@ describe("HostMeetingLedgerRoute", () => {
     await user.click(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" }));
     await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
 
-    expect(routeMocks.createSession).toHaveBeenCalled();
-    expect(routeMocks.saveAccessScope).toHaveBeenCalledWith({
-      sessionId: "draft-new",
-      request: { accessScope: "GUEST_READABLE" },
-    });
+    expect(routeMocks.createSession).toHaveBeenCalledWith(expect.objectContaining({
+      title: "다음 책",
+      bookTitle: "다음 책",
+      accessScope: "GUEST_READABLE",
+    }));
+    expect(routeMocks.saveAccessScope).not.toHaveBeenCalled();
     expect(routeMocks.openSession).not.toHaveBeenCalled();
     expect(screen.getByTestId("meeting-path")).toHaveTextContent("/app/host/sessions/open-1");
     expect(screen.queryByRole("dialog", { name: "알림 보내기" })).not.toBeInTheDocument();
@@ -389,14 +391,16 @@ describe("HostMeetingLedgerRoute", () => {
 
   it("opens the first-publication composer when listing a visible next book", async () => {
     const user = userEvent.setup();
-    routeMocks.saveAccessScope.mockResolvedValue({
-      session: {},
-      composer: {
+    routeMocks.createSession.mockResolvedValue(
+      new Response(JSON.stringify({
         sessionId: "draft-new",
-        eventType: "NEXT_BOOK_PUBLISHED",
-        contentRevision: "rev-create",
-      },
-    });
+        composer: {
+          sessionId: "draft-new",
+          eventType: "NEXT_BOOK_PUBLISHED",
+          contentRevision: "rev-create",
+        },
+      }), { status: 201 }),
+    );
     routeMocks.hostSessions = {
       items: [{
         sessionId: "open-1",
@@ -417,10 +421,10 @@ describe("HostMeetingLedgerRoute", () => {
     await user.click(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" }));
     await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
 
-    expect(routeMocks.saveAccessScope).toHaveBeenCalledWith({
-      sessionId: "draft-new",
-      request: { accessScope: "GUEST_READABLE" },
-    });
+    expect(routeMocks.createSession).toHaveBeenCalledWith(expect.objectContaining({
+      accessScope: "GUEST_READABLE",
+    }));
+    expect(routeMocks.saveAccessScope).not.toHaveBeenCalled();
     const dialog = screen.getByRole("dialog", { name: "알림 보내기" });
     expect(dialog).toHaveTextContent("FIRST_PUBLICATION");
     expect(dialog).toHaveTextContent("draft-new");

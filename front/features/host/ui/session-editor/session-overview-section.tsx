@@ -110,7 +110,7 @@ export function SessionOverviewSection({
               </p>
             ) : (
               <p className="small" style={{ margin: "8px 0 0", color: "var(--text-2)" }}>
-                기록 작업대에서 첫 초안을 시작할 수 있습니다.
+                기록에서 첫 초안을 시작할 수 있습니다.
               </p>
             )}
           </div>
@@ -286,20 +286,20 @@ function draftToneClassName(tone: HostSessionEditorOverview["draft"]["tone"]) {
 function lifecyclePresentation(state: HostSessionState | undefined) {
   if (!state) {
     return {
-      label: "세션 저장 전",
-      description: "기본 정보를 저장하면 세션 상태를 관리할 수 있습니다.",
+      label: "모임 저장 전",
+      description: "기본 정보를 저장하면 모임 상태를 관리할 수 있습니다.",
     };
   }
   if (state === "DRAFT") {
     return {
       label: "예정",
-      description: "세션을 열기 전입니다. 기본 정보와 기록 초안을 준비할 수 있습니다.",
+      description: "모임을 열기 전입니다. 기본 정보와 기록 초안을 준비할 수 있습니다.",
     };
   }
   if (state === "OPEN") {
     return {
       label: "진행 중",
-      description: "모임이 끝났다면 세션을 마감한 뒤 기록을 정리하세요.",
+      description: "모임이 끝났다면 모임을 마친 뒤 기록을 정리하세요.",
     };
   }
   if (state === "CLOSED") {

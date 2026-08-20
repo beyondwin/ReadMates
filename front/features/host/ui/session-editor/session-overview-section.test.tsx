@@ -112,6 +112,7 @@ describe("SessionOverviewSection", () => {
     const onOpenSession = vi.fn();
     renderOverview({ sessionState: "DRAFT", onOpenSession, onDeleteDraft });
 
+    expect(screen.getByText("모임을 열기 전입니다. 기본 정보와 기록 초안을 준비할 수 있습니다.")).toBeInTheDocument();
     expect(lifecycleActionNames()).toEqual(["멤버에게 열기", "목록에서 지우기"]);
     const deleteButton = screen.getByRole("button", { name: "목록에서 지우기" });
     expect(deleteButton).toHaveClass("btn", "btn-ghost", "btn-sm");
@@ -136,7 +137,7 @@ describe("SessionOverviewSection", () => {
       onReverseSession,
     });
 
-    expect(screen.getByText("모임이 끝났다면 세션을 마감한 뒤 기록을 정리하세요.")).toBeInTheDocument();
+    expect(screen.getByText("모임이 끝났다면 모임을 마친 뒤 기록을 정리하세요.")).toBeInTheDocument();
     expect(lifecycleActionNames()).toEqual(["모임 마치기", "모임 전으로 되돌리기"]);
     expect(screen.getByRole("button", { name: "모임 마치기" })).toHaveClass("btn", "btn-primary", "btn-sm");
     expect(screen.getByRole("button", { name: "모임 전으로 되돌리기" })).toHaveClass(

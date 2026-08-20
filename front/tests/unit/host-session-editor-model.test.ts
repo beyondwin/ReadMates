@@ -164,6 +164,13 @@ describe("host session editor model", () => {
     expect(questionDeadlineLabelFromSessionDate("2026-02-31")).toBe("");
     expect(questionDeadlineLabelForForm(session, "not-a-date")).toBe("");
     expect(buildHostSessionRequest(invalidValues)).toEqual(invalidValues);
+    expect(
+      buildHostSessionRequest(formValues, undefined, { accessScope: "GUEST_READABLE" }),
+    ).toEqual({
+      ...formValues,
+      questionDeadlineAt: "2026-05-19T23:59:00+09:00",
+      accessScope: "GUEST_READABLE",
+    });
     expect(getDestructiveActionAvailability({ state: "CLOSED" })).toEqual({
       canDelete: false,
       guidance: "닫히거나 공개된 세션은 삭제할 수 없습니다.",

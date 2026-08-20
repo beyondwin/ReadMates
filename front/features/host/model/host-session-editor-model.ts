@@ -1,4 +1,4 @@
-import { compatibilityExposureLabel } from "./session-exposure-model";
+import { compatibilityExposureLabel, type SessionAccessScope } from "./session-exposure-model";
 
 export type HostSessionAttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type HostSessionState = "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
@@ -32,6 +32,7 @@ export type HostSessionRequest = {
   startTime?: string | null;
   endTime?: string | null;
   questionDeadlineAt?: string | null;
+  accessScope?: SessionAccessScope;
 };
 
 export type HostSessionEditorSession = {
@@ -202,6 +203,7 @@ function normalizeOptionalField(value: string) {
 export function buildHostSessionRequest(
   values: HostSessionFormValues,
   existingSession?: Pick<HostSessionEditorSession, "date">,
+  options?: { accessScope?: SessionAccessScope },
 ): HostSessionRequest {
   const questionDeadlineAt = questionDeadlineIsoFromSessionDate(
     values.date,
@@ -221,6 +223,7 @@ export function buildHostSessionRequest(
     startTime: values.startTime,
     ...(!existingSession && values.endTime ? { endTime: values.endTime } : {}),
     ...((!existingSession || values.date !== existingSession.date) && questionDeadlineAt ? { questionDeadlineAt } : {}),
+    ...(options?.accessScope ? { accessScope: options.accessScope } : {}),
   };
 }
 

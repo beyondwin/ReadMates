@@ -206,20 +206,24 @@ function useDraftRouteNavigationGuard(shouldBlock: boolean) {
 function HostSessionEditorQueryState({
   status,
   onRetry,
+  hideTitle = false,
 }: {
   status: "loading" | "error";
   onRetry?: () => void;
+  hideTitle?: boolean;
 }) {
   return (
     <main className="rm-host-session-editor">
-      <section className="page-header-compact">
-        <div className="container">
-          <div className="eyebrow">세션 운영 문서</div>
-          <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-            세션 문서 편집
-          </h1>
-        </div>
-      </section>
+      {hideTitle ? null : (
+        <section className="page-header-compact">
+          <div className="container">
+            <div className="eyebrow">세션 운영 문서</div>
+            <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
+              세션 문서 편집
+            </h1>
+          </div>
+        </section>
+      )}
       <section>
         <div className="container">
           {status === "loading" ? (
@@ -409,6 +413,7 @@ export function EditHostSessionRoute({
       return (
         <HostSessionEditorQueryState
           status="error"
+          hideTitle
           onRetry={() => {
             void Promise.all([
               sessionQuery.refetch(),
@@ -418,7 +423,7 @@ export function EditHostSessionRoute({
         />
       );
     }
-    return <HostSessionEditorQueryState status="loading" />;
+    return <HostSessionEditorQueryState status="loading" hideTitle />;
   }
 
   return (

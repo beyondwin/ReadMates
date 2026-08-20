@@ -234,7 +234,7 @@ async function waitForDraftSaved(page: Page) {
 }
 
 async function openRecordWorkspace(page: Page) {
-  const tab = page.getByRole("tab", { name: "기록 작업대" });
+  const tab = page.getByRole("tab", { name: "기록", exact: true });
   await tab.click();
   await expect(tab).toHaveAttribute("aria-selected", "true");
 }
@@ -346,7 +346,7 @@ test("draft commits stay silent and final apply composes without automatic dispa
   await page.getByRole("button", { name: "세션 문서 저장" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
   const sessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
   expect(sessionId).not.toBe("");
   const detail = await fetchHostSession(page, sessionId);

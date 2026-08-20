@@ -133,7 +133,7 @@ export function SessionLifecycleConfirmDialog({
         {openSessionHref ? (
           <p className="small" style={{ margin: "0 0 18px" }}>
             <a ref={openSessionLinkRef} href={openSessionHref}>
-              진행 중인 세션 열기
+              진행 중인 모임 열기
             </a>
           </p>
         ) : null}

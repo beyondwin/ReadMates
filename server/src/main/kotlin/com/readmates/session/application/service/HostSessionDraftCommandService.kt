@@ -1,13 +1,19 @@
 package com.readmates.session.application.service
 
+import com.readmates.notification.application.model.ManualNotificationContentRevision
+import com.readmates.notification.domain.NotificationEventType
+import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.port.`in`.HostSessionDraftUseCase
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.session.domain.SessionAccessScope
+import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 class HostSessionDraftCommandService(
@@ -16,8 +22,11 @@ class HostSessionDraftCommandService(
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
 ) : HostSessionDraftUseCase {
     @Transactional
-    override fun create(command: HostSessionCommand) =
-        draftPort.create(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
+    override fun create(command: HostSessionCommand): CreatedSessionResponse {
+        val created = draftPort.create(command)
+        cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+        return attachFirstPublicationComposer(command, created)
+    }
 
     @Transactional
     override fun update(command: UpdateHostSessionCommand) =
@@ -31,6 +40,28 @@ class HostSessionDraftCommandService(
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
             }
         }
+}
+
+private fun attachFirstPublicationComposer(
+    command: HostSessionCommand,
+    created: CreatedSessionResponse,
+): CreatedSessionResponse {
+    if (command.accessScope != SessionAccessScope.GUEST_READABLE) {
+        return created
+    }
+    val sessionId = UUID.fromString(created.sessionId)
+    return created.copy(
+        composer = HostNotificationComposerContext(
+            sessionId = sessionId,
+            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+            contentRevision = ManualNotificationContentRevision.nextBook(
+                sessionId,
+                created.sessionNumber,
+                created.bookTitle,
+                created.visibility.name,
+            ),
+        ),
+    )
 }
 
 private fun changedBasicFields(

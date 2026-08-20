@@ -20,6 +20,7 @@ data class HostSessionCommand(
     val locationLabel: String?,
     val meetingUrl: String?,
     val meetingPasscode: String?,
+    val accessScope: SessionAccessScope? = null,
 )
 
 data class HostSessionIdCommand(

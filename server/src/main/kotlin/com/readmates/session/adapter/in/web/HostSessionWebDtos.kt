@@ -1,6 +1,7 @@
 package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
@@ -22,6 +23,7 @@ data class HostSessionRequest(
     @field:Size(max = 255) val locationLabel: String? = null,
     @field:Size(max = 1000) val meetingUrl: String? = null,
     @field:Size(max = 255) val meetingPasscode: String? = null,
+    val accessScope: SessionAccessScope? = null,
 ) {
     @AssertTrue(message = "date must be a valid ISO calendar date")
     fun isValidCalendarDate(): Boolean =
@@ -71,6 +73,7 @@ data class HostSessionRequest(
             locationLabel = locationLabel,
             meetingUrl = meetingUrl,
             meetingPasscode = meetingPasscode,
+            accessScope = accessScope,
         )
 }
 

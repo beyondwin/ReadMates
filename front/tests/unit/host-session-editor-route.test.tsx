@@ -257,7 +257,7 @@ describe("EditHostSessionRoute query actions", () => {
     vi.mocked(reopenHostSession).mockResolvedValue(
       new Response(JSON.stringify({
         code: "SESSION_OPEN_ALREADY_EXISTS",
-        message: "이미 진행 중인 세션이 있습니다. 그 세션을 마감하거나 예정으로 되돌린 뒤 다시 시도하세요.",
+        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
         status: 409,
         openSessionId: "00000000-0000-0000-0000-000000000307",
       }), { status: 409 }) as never,
@@ -279,7 +279,7 @@ describe("EditHostSessionRoute query actions", () => {
     const status = screen.getByRole("status");
     expect(status).toHaveTextContent("세션 기록 편집 정보를 불러오는 중입니다.");
     expect(status.closest("main")).toHaveClass("rm-host-session-editor");
-    expect(screen.getByRole("heading", { name: "세션 문서 편집" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "세션 문서 편집" })).not.toBeInTheDocument();
     expect(routeUnitMocks.capturedProps).toBeNull();
   });
 

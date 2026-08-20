@@ -113,6 +113,7 @@ data class CreatedSessionResponse(
     val visibility: SessionRecordVisibility,
     val accessScope: SessionAccessScope = SessionAccessScope.HOST_ONLY,
     val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
+    val composer: HostNotificationComposerContext? = null,
 )
 
 data class HostSessionDetailResponse(
