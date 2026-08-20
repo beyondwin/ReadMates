@@ -6,6 +6,7 @@ export type HostSessionLifecycleResult =
   | { ok: false; message: string; openSessionId: string | null };
 
 export type SessionLifecycleConfirmKind =
+  | "open"
   | "close"
   | "publish"
   | "reopen"
@@ -26,26 +27,33 @@ type ReverseLifecycleAction = {
 };
 
 const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleConfirmCopy> = {
+  open: {
+    kind: "open",
+    title: "멤버에게 열기",
+    body: "멤버 참석과 질문이 시작됩니다.",
+    confirmLabel: "멤버에게 열기",
+    successFlash: "모임을 열었습니다.",
+  },
   close: {
     kind: "close",
-    title: "세션 마감",
-    body: "멤버 RSVP·질문·서평이 멈추고 현재 세션에서 내려갑니다. 기록은 남습니다.",
-    confirmLabel: "세션 마감",
-    successFlash: "세션을 마감했습니다.",
+    title: "모임 마치기",
+    body: "모임을 마치면 참석과 질문이 멈춥니다. 기록은 남습니다.",
+    confirmLabel: "모임 마치기",
+    successFlash: "모임을 마쳤습니다.",
   },
   publish: {
     kind: "publish",
-    title: "세션 공개",
+    title: "기록 공개",
     body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
-    confirmLabel: "세션 공개",
-    successFlash: "세션을 공개했습니다.",
+    confirmLabel: "기록 공개",
+    successFlash: "기록을 공개했습니다.",
   },
   reopen: {
     kind: "reopen",
-    title: "마감 취소",
+    title: "다시 진행 중으로",
     body: "다시 진행 중이 됩니다. 공개 사이트 배치는 숨깁니다. 기록은 남습니다.",
-    confirmLabel: "마감 취소",
-    successFlash: "마감을 취소했습니다. 세션이 다시 진행 중입니다.",
+    confirmLabel: "다시 진행 중으로",
+    successFlash: "다시 진행 중으로 바꿨습니다.",
   },
   unpublish: {
     kind: "unpublish",
@@ -56,19 +64,19 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
   },
   "return-to-draft": {
     kind: "return-to-draft",
-    title: "예정으로 되돌리기",
-    body: "현재 세션이 아닙니다. 참석·질문은 남습니다.",
-    confirmLabel: "예정으로 되돌리기",
-    successFlash: "진행을 취소했습니다. 세션이 예정 상태로 돌아갔습니다.",
+    title: "모임 전으로 되돌리기",
+    body: "모임 전 상태가 됩니다. 참석·질문은 남습니다.",
+    confirmLabel: "모임 전으로 되돌리기",
+    successFlash: "모임 전으로 되돌렸습니다.",
   },
 };
 
 export function reverseLifecycleAction(state: HostSessionState): ReverseLifecycleAction | null {
   if (state === "OPEN") {
-    return { kind: "return-to-draft", label: "예정으로 되돌리기" };
+    return { kind: "return-to-draft", label: "모임 전으로 되돌리기" };
   }
   if (state === "CLOSED") {
-    return { kind: "reopen", label: "마감 취소" };
+    return { kind: "reopen", label: "다시 진행 중으로" };
   }
   if (state === "PUBLISHED") {
     return { kind: "unpublish", label: "공개 취소" };
@@ -81,5 +89,5 @@ export function lifecycleConfirmCopy(kind: SessionLifecycleConfirmKind): Session
 }
 
 export function openAlreadyExistsMessage(): string {
-  return "이미 진행 중인 세션이 있습니다. 그 세션을 마감하거나 예정으로 되돌린 뒤 다시 시도하세요.";
+  return "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.";
 }

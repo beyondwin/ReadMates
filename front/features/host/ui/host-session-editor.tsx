@@ -693,6 +693,10 @@ export default function HostSessionEditor({
       return;
     }
 
+    if (lifecycleConfirm === "open") {
+      return;
+    }
+
     const actionByKind = {
       close: actions.closeSession,
       publish: actions.publishSession,
