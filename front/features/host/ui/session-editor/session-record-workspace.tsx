@@ -81,13 +81,13 @@ export type SessionRecordWorkspaceProps = {
 const recordSources = [
   { key: "manual", label: "직접 작성" },
   { key: "ai", label: "AI로 생성" },
-  { key: "json", label: "외부 JSON" },
+  { key: "json", label: "정리본 올리기" },
 ] as const satisfies readonly { key: HostSessionDraftSource; label: string }[];
 
 const draftSourceLabels: Record<HostSessionRecordDraft["source"], string> = {
   MANUAL: "직접 작성",
   AI_GENERATED: "AI로 생성",
-  JSON_IMPORT: "외부 JSON",
+  JSON_IMPORT: "정리본",
   RESTORED: "과거 버전에서 생성",
 };
 
@@ -134,7 +134,7 @@ function nextActionPresentation(
     return { guidance: "초안을 먼저 만들어 주세요", reviewEnabled: false };
   }
   if (reviewPending) {
-    return { guidance: "반영 검토 준비 중", reviewEnabled: false };
+    return { guidance: "반영 전 확인 준비 중", reviewEnabled: false };
   }
   if (draft.saveState === "saving") {
     return { guidance: "저장 중", reviewEnabled: false };
@@ -204,6 +204,7 @@ export function SessionRecordWorkspace({
   actions,
 }: SessionRecordWorkspaceProps): JSX.Element {
   const canUseAi = Boolean(creation.sessionId) && Boolean(creation.clubSlug);
+  const wrapUpFirstView = source === "json";
   const rovingSource = source === "ai" && !canUseAi ? "manual" : source;
   const [visitedSources, setVisitedSources] = useState<Set<HostSessionDraftSource>>(
     () => new Set([source]),
@@ -244,8 +245,8 @@ export function SessionRecordWorkspace({
       return;
     }
     handledImportCommitResult.current = creation.importCommitResult;
-    returnToCommonEditor();
-  }, [creation.importCommitResult, returnToCommonEditor]);
+    void actions.onReviewDraft();
+  }, [actions, creation.importCommitResult]);
 
   return (
     <div
@@ -253,8 +254,8 @@ export function SessionRecordWorkspace({
       style={{ "--stack": "20px", padding: 24, minWidth: 0 } as CSSProperties}
     >
       <header>
-        <div className="eyebrow">세션 기록</div>
-        <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>기록 작업대</h2>
+        <div className="eyebrow">모임 기록</div>
+        <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>정리본</h2>
       </header>
 
       <div
@@ -273,7 +274,7 @@ export function SessionRecordWorkspace({
           style={{ padding: 16, minWidth: 0, overflowWrap: "anywhere" }}
         >
           <h3 id="session-record-workspace-applied" className="eyebrow" style={{ margin: 0 }}>
-            현재 적용본
+            멤버에게 보이는 기록
           </h3>
           <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             {liveRevision > 0 ? <span className="badge">버전 {liveRevision}</span> : null}
@@ -313,7 +314,7 @@ export function SessionRecordWorkspace({
           }}
         >
           <h3 id="session-record-workspace-draft" className="eyebrow" style={{ margin: 0 }}>
-            작업 중인 초안
+            작성 중
           </h3>
           <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
             <span className="badge badge-dot">
@@ -362,7 +363,7 @@ export function SessionRecordWorkspace({
 
       <section aria-labelledby="session-record-creation-title" className="stack" style={{ "--stack": "12px" } as CSSProperties}>
         <div>
-          <div className="eyebrow">초안 만들기</div>
+          <div className="eyebrow">작성 중</div>
           <h3 id="session-record-creation-title" className="h4 editorial" style={{ margin: "4px 0 0" }}>
             시작 방법을 선택하세요
           </h3>
@@ -448,26 +449,28 @@ export function SessionRecordWorkspace({
           )}
         </aside>
 
-        <div className="rm-session-record-workspace__draft-editor" style={{ minWidth: 0 }}>
-                  <SessionRecordDraftPanelBody
-                    snapshot={draft.snapshot}
-                    state={state}
-            saveState={draft.saveState}
-            validationIssues={draft.validationIssues}
-            draftLiveBaseStale={draft.liveBaseStale}
-            onSnapshotChange={actions.onSnapshotChange}
-            onReloadDraft={actions.onReloadDraft}
-            onCopyInput={actions.onCopyInput}
-            onRebaseDraft={actions.onRebaseDraft}
-            rebasePending={draft.rebasePending}
-            rebaseError={draft.rebaseError}
-          />
-        </div>
+        {wrapUpFirstView ? null : (
+          <div className="rm-session-record-workspace__draft-editor" style={{ minWidth: 0 }}>
+            <SessionRecordDraftPanelBody
+              snapshot={draft.snapshot}
+              state={state}
+              saveState={draft.saveState}
+              validationIssues={draft.validationIssues}
+              draftLiveBaseStale={draft.liveBaseStale}
+              onSnapshotChange={actions.onSnapshotChange}
+              onReloadDraft={actions.onReloadDraft}
+              onCopyInput={actions.onCopyInput}
+              onRebaseDraft={actions.onRebaseDraft}
+              rebasePending={draft.rebasePending}
+              rebaseError={draft.rebaseError}
+            />
+          </div>
+        )}
       </div>
 
       <section
         role="region"
-        aria-label="반영 검토 작업"
+        aria-label="반영 전 확인"
         className="rm-session-record-workspace__sticky-action surface"
         style={{
           position: "sticky",
@@ -488,7 +491,7 @@ export function SessionRecordWorkspace({
           disabled={!nextAction.reviewEnabled}
           onClick={() => void actions.onReviewDraft()}
         >
-          반영 검토
+          반영 전 확인
         </button>
       </section>
     </div>

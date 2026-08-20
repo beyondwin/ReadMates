@@ -1,11 +1,19 @@
-import type { CSSProperties, JSX, ReactNode } from "react";
+import type { ChangeEvent, CSSProperties, JSX, ReactNode } from "react";
 import type { HostSessionState } from "../../model/host-session-editor-model";
 import type { HostSessionEditorLocation } from "../../model/host-session-editor-navigation";
 import type { HostSessionEditorOverview } from "../../model/host-session-editor-view-model";
 import { lifecycleConfirmCopy } from "../../model/host-session-lifecycle-model";
+import type { SessionAccessScope } from "../../model/session-exposure-model";
+import type {
+  SessionImportPreviewResponse,
+  SessionRecordVisibility,
+} from "../../model/host-view-types";
+import type { SessionImportCommitResult } from "../../model/session-import-model";
 import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
-
-const wrapUpTarget: HostSessionEditorLocation = { section: "records", source: "json" };
+import {
+  MeetingAfterPanel,
+  type MeetingAfterPanelApplyReview,
+} from "../meeting-ledger/meeting-after-panel";
 
 export function SessionOverviewSection({
   overview,
@@ -18,6 +26,20 @@ export function SessionOverviewSection({
   reverseLabel,
   onDeleteDraft,
   lifecyclePending,
+  accessScope = "HOST_ONLY",
+  sessionId,
+  recordVisibility = "HOST_ONLY",
+  importPreview = null,
+  importStatus = "idle",
+  importError = null,
+  importCommitResult = null,
+  applyReview,
+  onFileSelected,
+  onImportCommit,
+  onSetGuestReadable,
+  onConfirmApply,
+  onDismissApply,
+  onReviewApply,
 }: {
   overview: HostSessionEditorOverview;
   sessionState: HostSessionState | undefined;
@@ -29,6 +51,20 @@ export function SessionOverviewSection({
   reverseLabel?: string;
   onDeleteDraft?: (event: { currentTarget: EventTarget | null }) => void;
   lifecyclePending: boolean;
+  accessScope?: SessionAccessScope;
+  sessionId?: string;
+  recordVisibility?: SessionRecordVisibility;
+  importPreview?: SessionImportPreviewResponse | null;
+  importStatus?: "idle" | "previewing" | "ready" | "committing" | "error";
+  importError?: string | null;
+  importCommitResult?: SessionImportCommitResult | null;
+  applyReview?: MeetingAfterPanelApplyReview;
+  onFileSelected?: (event: ChangeEvent<HTMLInputElement>) => void;
+  onImportCommit?: () => void;
+  onSetGuestReadable?: () => void;
+  onConfirmApply?: () => void;
+  onDismissApply?: () => void;
+  onReviewApply?: () => void;
 }): JSX.Element {
   const lifecycle = lifecyclePresentation(sessionState);
 
@@ -109,69 +145,77 @@ export function SessionOverviewSection({
               {lifecycle.description}
             </p>
           </div>
-          <div className="rm-host-session-editor__lifecycle-actions">
-            {sessionState === "DRAFT" && onOpenSession ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={lifecyclePending}
-                onClick={onOpenSession}
-              >
-                {lifecycleConfirmCopy("open").confirmLabel}
-              </button>
-            ) : null}
-            {sessionState === "DRAFT" && onDeleteDraft ? (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                disabled={lifecyclePending}
-                onClick={onDeleteDraft}
-                style={{ color: "var(--danger)" }}
-              >
-                목록에서 지우기
-              </button>
-            ) : null}
-            {sessionState === "OPEN" && onCloseSession ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={lifecyclePending}
-                onClick={() => void onCloseSession()}
-              >
-                {lifecycleConfirmCopy("close").confirmLabel}
-              </button>
-            ) : null}
-            {sessionState === "CLOSED" ? (
-              <button
-                type="button"
-                className="btn btn-quiet btn-sm"
-                disabled={lifecyclePending}
-                onClick={() => onNextAction(wrapUpTarget)}
-              >
-                정리본 올리기
-              </button>
-            ) : null}
-            {sessionState === "CLOSED" && onPublishSession ? (
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                disabled={lifecyclePending}
-                onClick={() => void onPublishSession()}
-              >
-                {lifecycleConfirmCopy("publish").confirmLabel}
-              </button>
-            ) : null}
-            {reverseLabel && onReverseSession ? (
-              <button
-                type="button"
-                className="btn btn-ghost btn-sm"
-                disabled={lifecyclePending}
-                onClick={onReverseSession}
-              >
-                {reverseLabel}
-              </button>
-            ) : null}
-          </div>
+          {sessionState === "CLOSED" || sessionState === "PUBLISHED" ? (
+            <MeetingAfterPanel
+              state={sessionState}
+              summary={overview.applied.exists ? overview.applied.summary : ""}
+              accessScope={accessScope}
+              sessionId={sessionId}
+              recordVisibility={recordVisibility}
+              lifecyclePending={lifecyclePending}
+              reverseLabel={reverseLabel}
+              canUseAi={Boolean(sessionId)}
+              importPreview={importPreview}
+              importStatus={importStatus}
+              importError={importError}
+              importCommitResult={importCommitResult}
+              applyReview={applyReview}
+              onEditAttendance={() => onNextAction({ section: "attendance", source: "manual" })}
+              onPublish={onPublishSession}
+              onReverse={onReverseSession}
+              onFileSelected={onFileSelected}
+              onImportCommit={onImportCommit}
+              onSetGuestReadable={onSetGuestReadable}
+              onConfirmApply={onConfirmApply}
+              onDismissApply={onDismissApply}
+              onReviewApply={onReviewApply}
+              onOpenAi={() => onNextAction({ section: "records", source: "ai" })}
+            />
+          ) : (
+            <div className="rm-host-session-editor__lifecycle-actions">
+              {sessionState === "DRAFT" && onOpenSession ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={lifecyclePending}
+                  onClick={onOpenSession}
+                >
+                  {lifecycleConfirmCopy("open").confirmLabel}
+                </button>
+              ) : null}
+              {sessionState === "DRAFT" && onDeleteDraft ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={lifecyclePending}
+                  onClick={onDeleteDraft}
+                  style={{ color: "var(--danger)" }}
+                >
+                  목록에서 지우기
+                </button>
+              ) : null}
+              {sessionState === "OPEN" && onCloseSession ? (
+                <button
+                  type="button"
+                  className="btn btn-primary btn-sm"
+                  disabled={lifecyclePending}
+                  onClick={() => void onCloseSession()}
+                >
+                  {lifecycleConfirmCopy("close").confirmLabel}
+                </button>
+              ) : null}
+              {reverseLabel && onReverseSession ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={lifecyclePending}
+                  onClick={onReverseSession}
+                >
+                  {reverseLabel}
+                </button>
+              ) : null}
+            </div>
+          )}
         </div>
 
         <div

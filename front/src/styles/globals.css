@@ -3028,6 +3028,36 @@ a.rm-recent-record__destination:hover {
   padding-bottom: 38px;
 }
 
+.rm-meeting-ledger__stage--after {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 24px 36px;
+  align-items: start;
+  padding: 0 0 38px;
+}
+
+.rm-meeting-ledger__this,
+.rm-meeting-ledger__next {
+  min-width: 0;
+}
+
+.rm-upcoming-book-list--compact .rm-upcoming-book-list__items {
+  max-height: 280px;
+  overflow: auto;
+}
+
+@media (max-width: 768px) {
+  .rm-meeting-ledger__stage--after {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  .rm-meeting-ledger__stage--after.rm-meeting-ledger__stage--no-next .rm-meeting-ledger__next {
+    order: -1;
+  }
+}
+
 .rm-upcoming-book-list {
   padding: 10px 0 38px;
 }

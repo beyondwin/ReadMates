@@ -22,6 +22,7 @@ export type UpcomingBookListProps = {
   pending?: boolean;
   defaultAccessScope?: SessionAccessScope;
   scheduleDefaults?: HostSessionScheduleDefaults | null;
+  compact?: boolean;
 };
 
 function blankForm(accessScope: SessionAccessScope): HostScheduleFormValues {
@@ -45,6 +46,7 @@ export function UpcomingBookList({
   pending = false,
   defaultAccessScope = DEFAULT_UPCOMING_ACCESS_SCOPE,
   scheduleDefaults = null,
+  compact = false,
 }: UpcomingBookListProps) {
   const headingId = useId();
   const titleId = useId();
@@ -108,7 +110,10 @@ export function UpcomingBookList({
   }
 
   return (
-    <section className="rm-upcoming-book-list" aria-labelledby={headingId}>
+    <section
+      className={`rm-upcoming-book-list${compact ? " rm-upcoming-book-list--compact" : ""}`}
+      aria-labelledby={headingId}
+    >
       <div className="container">
         <div className="rm-upcoming-book-list__header">
           <p className="eyebrow" style={{ margin: 0 }}>다음</p>

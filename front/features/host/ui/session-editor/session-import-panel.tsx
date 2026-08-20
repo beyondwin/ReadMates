@@ -1,4 +1,4 @@
-import type { ChangeEvent, CSSProperties } from "react";
+import { type ChangeEvent, type CSSProperties, type DragEvent, useRef } from "react";
 import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
@@ -18,6 +18,7 @@ export type SessionImportPanelBodyProps = {
   error: string | null;
   onFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
   onCommit: () => void;
+  onSetGuestReadable?: () => void;
 };
 
 export function SessionImportPanelBody({
@@ -28,28 +29,84 @@ export function SessionImportPanelBody({
   error,
   onFileSelected,
   onCommit,
+  onSetGuestReadable,
 }: SessionImportPanelBodyProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const review = preview ? buildSessionImportReview(preview, recordVisibility) : null;
   const canCommit = Boolean(sessionId) && status === "ready" && review?.canCommit === true;
+  const hostOnlyBlocked = recordVisibility === "HOST_ONLY";
+  const busy = status === "previewing" || status === "committing";
+
+  const assignDroppedFile = (file: File) => {
+    const input = fileInputRef.current;
+    if (!input || !sessionId || busy) {
+      return;
+    }
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input.files = transfer.files;
+    } catch {
+      Object.defineProperty(input, "files", { configurable: true, value: [file] });
+    }
+    onFileSelected({
+      currentTarget: input,
+      target: input,
+    } as ChangeEvent<HTMLInputElement>);
+  };
+
+  const handleDrop = (event: DragEvent<HTMLElement>) => {
+    event.preventDefault();
+    const file = event.dataTransfer?.files?.[0];
+    if (file) {
+      assignDroppedFile(file);
+    }
+  };
 
   return (
     <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
       <div className="small" style={{ color: "var(--text-2)" }}>
-        {sessionId ? sessionImportReplacementWarning() : "세션을 만든 뒤 JSON 기록을 가져올 수 있습니다."}
+        {sessionId
+          ? sessionImportReplacementWarning()
+          : "모임을 만든 뒤 정리본을 올릴 수 있습니다."}
       </div>
-      <label className="field-label" htmlFor="session-import-json-file">
-        AI 결과 JSON 가져오기
+      <label
+        className="rm-session-import-drop"
+        htmlFor="session-import-json-file"
+        onDragOver={(event) => {
+          event.preventDefault();
+        }}
+        onDrop={handleDrop}
+        style={{
+          display: "grid",
+          gap: 10,
+          alignContent: "center",
+          justifyItems: "start",
+          minHeight: 128,
+          padding: 18,
+          border: "1px dashed var(--line)",
+          borderRadius: "var(--radius-md)",
+          background: "var(--bg-sub)",
+          color: "var(--text-2)",
+        }}
+      >
+        <span className="small" style={{ color: "var(--text)" }}>
+          정리한 파일을 여기에 놓으세요
+        </span>
+        <input
+          ref={fileInputRef}
+          id="session-import-json-file"
+          className="rm-sr-only"
+          type="file"
+          accept="application/json,.json"
+          aria-label="정리한 파일을 여기에 놓으세요"
+          disabled={!sessionId || busy}
+          onChange={onFileSelected}
+        />
       </label>
-      <input
-        id="session-import-json-file"
-        type="file"
-        accept="application/json,.json"
-        disabled={!sessionId || status === "previewing" || status === "committing"}
-        onChange={onFileSelected}
-      />
       {status === "previewing" ? (
         <div className="small" role="status">
-          가져온 JSON을 확인하고 있습니다.
+          올린 파일을 확인하고 있습니다.
         </div>
       ) : null}
       {error ? (
@@ -58,8 +115,13 @@ export function SessionImportPanelBody({
         </div>
       ) : null}
       {review && preview ? <SessionImportReviewCard review={review} summary={preview.publication.summary} /> : null}
+      {hostOnlyBlocked && onSetGuestReadable ? (
+        <button className="btn btn-quiet btn-sm" type="button" onClick={onSetGuestReadable}>
+          멤버에게 보이기로 바꾸기
+        </button>
+      ) : null}
       <button className="btn btn-primary" type="button" disabled={!canCommit} onClick={onCommit}>
-        {status === "committing" ? "초안으로 가져오는 중" : "초안으로 가져오기"}
+        {status === "committing" ? "작성 중에 넣는 중" : "초안으로 가져오기"}
       </button>
       <div className="tiny">현재 선택한 게스트 접근: {compatibilityExposureLabel[recordVisibility]}</div>
     </div>

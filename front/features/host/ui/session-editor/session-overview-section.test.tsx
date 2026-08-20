@@ -162,19 +162,24 @@ describe("SessionOverviewSection", () => {
     const onReverseSession = vi.fn();
     renderOverview({
       sessionState: "CLOSED",
+      accessScope: "GUEST_READABLE",
       onNextAction,
       onPublishSession,
       reverseLabel: "다시 진행 중으로",
       onReverseSession,
     });
 
-    expect(screen.getByText(/모임은 마감되었습니다/)).toHaveTextContent("기록 작업대");
-    expect(lifecycleActionNames()).toEqual(["정리본 올리기", "기록 공개", "다시 진행 중으로"]);
+    expect(screen.getByRole("button", { name: "출석 수정" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "정리본 올리기" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
-    expect(onNextAction).toHaveBeenCalledWith({ section: "records", source: "json" });
+    expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요")).toBeInTheDocument();
+    expect(onNextAction).not.toHaveBeenCalledWith({ section: "records", source: "json" });
     await user.click(screen.getByRole("button", { name: "기록 공개" }));
     expect(onPublishSession).toHaveBeenCalledTimes(1);
     expect(confirmSpy).not.toHaveBeenCalled();
+    await user.click(screen.getByRole("button", { name: "다시 진행 중으로" }));
+    expect(onReverseSession).toHaveBeenCalledTimes(1);
   });
 
   it("explains that a published session remains editable", () => {
@@ -193,7 +198,6 @@ describe("SessionOverviewSection", () => {
       onReverseSession: vi.fn(),
     });
 
-    expect(lifecycleActionNames()).toEqual(["공개 취소"]);
     expect(screen.getByRole("button", { name: "공개 취소" })).toHaveClass("btn", "btn-ghost", "btn-sm");
     expect(screen.queryByRole("button", { name: "모임 마치기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "기록 공개" })).not.toBeInTheDocument();
@@ -263,6 +267,7 @@ function renderOverview({
   reverseLabel,
   onDeleteDraft,
   lifecyclePending = false,
+  accessScope,
 }: {
   overview?: HostSessionEditorOverview;
   sessionState?: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
@@ -274,6 +279,7 @@ function renderOverview({
   reverseLabel?: string;
   onDeleteDraft?: (event: { currentTarget: EventTarget | null }) => void;
   lifecyclePending?: boolean;
+  accessScope?: "HOST_ONLY" | "GUEST_READABLE";
 } = {}) {
   return render(
     <>
@@ -289,6 +295,7 @@ function renderOverview({
         reverseLabel={reverseLabel}
         onDeleteDraft={onDeleteDraft}
         lifecyclePending={lifecyclePending}
+        accessScope={accessScope}
       />
     </>,
   );

@@ -4,6 +4,14 @@ import type { SessionImportPreviewResponse, SessionImportRecordPreview, SessionR
 import { SessionImportPanelBody } from "./session-import-panel";
 
 describe("SessionImportPanelBody", () => {
+  it("offers a drop zone for the wrap-up package", () => {
+    renderPanel({ preview: preview({ valid: true }) });
+
+    expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요")).toBeInTheDocument();
+    expect(screen.queryByText("AI 결과 JSON 가져오기")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Markdown/i)).not.toBeInTheDocument();
+  });
+
   it("renders a saveable preview review and calls commit", () => {
     const onCommit = vi.fn();
     renderPanel({ preview: preview({ valid: true }), onCommit });

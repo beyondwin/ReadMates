@@ -4,6 +4,7 @@ import {
   resolveViewedMeeting,
   type MeetingListItem,
 } from "@/features/host/model/host-meeting-ledger-model";
+import { draftsByDate } from "@/features/host/model/upcoming-book-list-model";
 import type { HostSessionScheduleDefaults } from "@/features/host/model/host-schedule-defaults-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 import type {
@@ -78,6 +79,19 @@ export function HostMeetingLedger({
   }
 
   const previousHref = previousRecordAttentionHref(active, items);
+  const showUpcoming = active.phase === "during" || active.phase === "after";
+  const hasNextBooks = draftsByDate(upcomingItems).length > 0;
+  const upcoming = showUpcoming ? (
+    <UpcomingBookList
+      items={upcomingItems}
+      onSaveAccessScope={onSaveUpcomingAccessScope}
+      onCreateSession={onCreateUpcomingSession}
+      pending={upcomingPending}
+      scheduleDefaults={scheduleDefaults}
+      defaultAccessScope={scheduleDefaults?.accessScope}
+      compact={active.phase === "after" && hasNextBooks}
+    />
+  ) : null;
 
   return (
     <div className="rm-meeting-ledger">
@@ -95,17 +109,19 @@ export function HostMeetingLedger({
           <MeetingPhaseRail activePhase={active.phase} />
         </div>
       </header>
-      {children}
-      {active.phase === "during" || active.phase === "after" ? (
-        <UpcomingBookList
-          items={upcomingItems}
-          onSaveAccessScope={onSaveUpcomingAccessScope}
-          onCreateSession={onCreateUpcomingSession}
-          pending={upcomingPending}
-          scheduleDefaults={scheduleDefaults}
-          defaultAccessScope={scheduleDefaults?.accessScope}
-        />
-      ) : null}
+      {active.phase === "after" ? (
+        <div
+          className={`rm-meeting-ledger__stage rm-meeting-ledger__stage--after${hasNextBooks ? "" : " rm-meeting-ledger__stage--no-next"}`}
+        >
+          <div className="rm-meeting-ledger__this">{children}</div>
+          <div className="rm-meeting-ledger__next">{upcoming}</div>
+        </div>
+      ) : (
+        <>
+          {children}
+          {upcoming}
+        </>
+      )}
     </div>
   );
 }

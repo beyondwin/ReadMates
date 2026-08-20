@@ -683,7 +683,7 @@ describe("HostSessionEditor", () => {
     const { rerender } = render(renderAt({ section: "basic", source: "manual" }));
 
     rerender(renderAt({ section: "records", source: "json" }));
-    const fileInput = screen.getByLabelText("AI 결과 JSON 가져오기", { selector: "input" });
+    const fileInput = screen.getByLabelText("정리한 파일을 여기에 놓으세요", { selector: "input" });
     const sourceFile = new File([sessionImportJson()], "controlled-source.json", {
       type: "application/json",
     });
@@ -692,7 +692,7 @@ describe("HostSessionEditor", () => {
 
     rerender(renderAt({ section: "history", source: "manual" }));
 
-    const keptAliveInput = screen.getByLabelText("AI 결과 JSON 가져오기", { selector: "input" });
+    const keptAliveInput = screen.getByLabelText("정리한 파일을 여기에 놓으세요", { selector: "input" });
     expect(keptAliveInput).toBe(fileInput);
     expect(keptAliveInput).not.toBeVisible();
     expect((keptAliveInput as HTMLInputElement).files?.[0]?.name).toBe("controlled-source.json");
@@ -830,9 +830,9 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      expect(screen.getByRole("region", { name: "현재 적용본" }))
+      expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" }))
         .toHaveTextContent("251126 1차.md");
-      expect(screen.getByRole("region", { name: "현재 적용본" }))
+      expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" }))
         .toHaveTextContent("업로드 완료");
       expect(screen.getByRole("link", { name: "피드백 문서 미리보기" }))
         .toHaveAttribute(
@@ -932,7 +932,7 @@ describe("HostSessionEditor", () => {
     );
 
     const file = new File([sessionImportJson()], "session-import.json", { type: "application/json" });
-    await user.upload(screen.getByLabelText("AI 결과 JSON 가져오기"), file);
+    await user.upload(screen.getByLabelText("정리한 파일을 여기에 놓으세요"), file);
 
     await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
     expect(previewSessionImport.mock.calls[0]?.[1]).toMatchObject({
@@ -956,7 +956,7 @@ describe("HostSessionEditor", () => {
     );
 
     await user.upload(
-      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      screen.getByLabelText("정리한 파일을 여기에 놓으세요"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
 
@@ -1010,7 +1010,7 @@ describe("HostSessionEditor", () => {
       const { rerender } = render(renderEditor(initialWorkflow));
 
       await user.upload(
-        screen.getByLabelText("AI 결과 JSON 가져오기"),
+        screen.getByLabelText("정리한 파일을 여기에 놓으세요"),
         new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
       );
       await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
@@ -1059,7 +1059,7 @@ describe("HostSessionEditor", () => {
     const { rerender } = render(renderEditor(initialWorkflow));
 
     await user.upload(
-      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      screen.getByLabelText("정리한 파일을 여기에 놓으세요"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
     await waitFor(() => expect(previewSessionImport).toHaveBeenCalledTimes(1));
@@ -1105,9 +1105,9 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("region", { name: "반영 검토 작업" }))
-      .toHaveTextContent("반영 검토 준비 중");
-    expect(screen.getByRole("button", { name: "반영 검토" })).toBeDisabled();
+    expect(screen.getByRole("region", { name: "반영 전 확인" }))
+      .toHaveTextContent("반영 전 확인 준비 중");
+    expect(screen.getByRole("button", { name: "반영 전 확인" })).toBeDisabled();
   });
 
   it("shows the approved version, visibility, and no-notification apply review", async () => {
@@ -1138,7 +1138,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    const dialog = screen.getByRole("dialog", { name: "새 버전으로 반영" });
+    const dialog = screen.getByRole("dialog", { name: "반영 전 확인" });
     expect(within(dialog).getByText("공개 요약")).toBeVisible();
     expect(within(dialog).getByText("피드백 문서")).toBeVisible();
     expect(within(dialog).getByText("현재 적용본 없음 → 버전 1")).toBeVisible();
@@ -1148,7 +1148,7 @@ describe("HostSessionEditor", () => {
     expect(dialog).not.toHaveTextContent(/revision|live|draft/i);
     expect(within(dialog).queryByRole("radio", { name: /알림/ })).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "새 버전으로 반영" }));
+    await user.click(within(dialog).getByRole("button", { name: "멤버에게 반영" }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
@@ -1161,13 +1161,13 @@ describe("HostSessionEditor", () => {
       render(<ApplyDialogDismissHarness onCancel={onCancel} onConfirm={onConfirm} />);
       const trigger = screen.getByRole("button", { name: "반영 대화상자 열기" });
       await user.click(trigger);
-      const dialog = screen.getByRole("dialog", { name: "새 버전으로 반영" });
+      const dialog = screen.getByRole("dialog", { name: "반영 전 확인" });
       expect(within(dialog).getByText("버전 2 → 버전 3")).toBeVisible();
 
       if (dismissal === "Escape") {
         await user.keyboard("{Escape}");
       } else if (dismissal === "cancel") {
-        await user.click(within(dialog).getByRole("button", { name: "취소" }));
+        await user.click(within(dialog).getByRole("button", { name: "나중" }));
       } else {
         fireEvent.mouseDown(dialog.parentElement as HTMLElement);
       }
@@ -1194,7 +1194,7 @@ describe("HostSessionEditor", () => {
     );
 
     await user.upload(
-      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      screen.getByLabelText("정리한 파일을 여기에 놓으세요"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
     await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
@@ -1234,19 +1234,20 @@ describe("HostSessionEditor", () => {
     );
 
     await user.upload(
-      screen.getByLabelText("AI 결과 JSON 가져오기"),
+      screen.getByLabelText("정리한 파일을 여기에 놓으세요"),
       new File([sessionImportJson()], "session-import.json", { type: "application/json" }),
     );
     await user.click(await screen.findByRole("button", { name: "초안으로 가져오기" }));
 
     await waitFor(() => expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId));
-    expect(screen.getByRole("tab", { name: "외부 JSON" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
     finishRefresh();
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "직접 작성" })).toHaveAttribute("aria-selected", "true");
+      expect(workflow.confirmation.onReview).toHaveBeenCalled();
     });
-    expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByLabelText(/Markdown/i)).not.toBeInTheDocument();
     expect(workflow.onDraftCommitted).toHaveBeenCalledWith({
       sessionId: session.sessionId,
       draftRevision: 2,
@@ -1254,7 +1255,7 @@ describe("HostSessionEditor", () => {
       liveApplied: false,
     });
     expect(screen.queryByRole("region", { name: "세션 기록 초안 저장 결과" })).not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "현재 적용본" })).not.toHaveTextContent("Import summary.");
+    expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" })).not.toHaveTextContent("Import summary.");
   });
 
   it("posts a new session through the BFF and redirects to the created session editor", async () => {
@@ -1614,7 +1615,8 @@ describe("HostSessionEditor", () => {
     expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
     expect(await screen.findByRole("group", { name: /No\.07 · 지난 회차 · 비공개/ })).toBeVisible();
     expect(screen.getByText("모임은 마감되었습니다. 기록 작업대에서 초안을 검토한 뒤 세션을 공개할 수 있습니다.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
+    expect(screen.getByText("공개하려면 요약이 필요합니다")).toBeVisible();
   });
 
   it("opens a confirm dialog for 모임 마치기 without calling closeSession", async () => {
@@ -2371,7 +2373,7 @@ describe("HostSessionEditor", () => {
       const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
       const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
-      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "정리본 올리기" });
 
       expect(manualTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-manual");
       expect(document.getElementById("host-editor-record-source-panel-manual")).not.toBeNull();
@@ -2405,7 +2407,7 @@ describe("HostSessionEditor", () => {
       const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
       const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
-      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "정리본 올리기" });
 
       expect(aiTab).toBeDisabled();
       expect(aiTab).toHaveAttribute("aria-selected", "true");
@@ -2435,7 +2437,7 @@ describe("HostSessionEditor", () => {
       const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
       const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
-      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "정리본 올리기" });
 
       expect(manualTab).toHaveAttribute("id", "host-editor-record-source-tab-manual");
       expect(manualTab).toHaveAttribute("aria-controls", "host-editor-record-source-panel-manual");
@@ -2462,7 +2464,7 @@ describe("HostSessionEditor", () => {
       const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
       const manualTab = within(sourceTabs).getByRole("tab", { name: "직접 작성" });
       const aiTab = within(sourceTabs).getByRole("tab", { name: "AI로 생성" });
-      const jsonTab = within(sourceTabs).getByRole("tab", { name: "외부 JSON" });
+      const jsonTab = within(sourceTabs).getByRole("tab", { name: "정리본 올리기" });
 
       manualTab.focus();
       await user.keyboard("{ArrowRight}");
@@ -2491,7 +2493,7 @@ describe("HostSessionEditor", () => {
 
       expect(screen.getByRole("tab", { name: "AI로 생성" })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByTestId("aigen-tab")).toBeVisible();
-      expect(screen.queryByLabelText("AI 결과 JSON 가져오기")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("정리한 파일을 여기에 놓으세요")).not.toBeInTheDocument();
     });
 
     it("keeps a visited AI source mounted but hidden after switching to JSON", async () => {
@@ -2504,9 +2506,9 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      await user.click(screen.getByRole("tab", { name: "외부 JSON" }));
+      await user.click(screen.getByRole("tab", { name: "정리본 올리기" }));
 
-      expect(screen.getByLabelText("AI 결과 JSON 가져오기")).toBeVisible();
+      expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요")).toBeVisible();
       expect(screen.getByTestId("aigen-tab")).not.toBeVisible();
     });
 
@@ -2541,8 +2543,8 @@ describe("HostSessionEditor", () => {
         />,
       );
 
-      expect(screen.getByRole("tab", { name: "외부 JSON" })).toHaveAttribute("aria-selected", "true");
-      expect(screen.getByLabelText("AI 결과 JSON 가져오기")).toBeVisible();
+      expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요")).toBeVisible();
       expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
     });
 
@@ -2559,7 +2561,7 @@ describe("HostSessionEditor", () => {
       await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
 
       expect(screen.getByTestId("aigen-tab")).toBeVisible();
-      expect(screen.getByLabelText("AI 결과 JSON 가져오기", { selector: "input" })).not.toBeVisible();
+      expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요", { selector: "input" })).not.toBeVisible();
     });
 
     it("waits for AI draft refresh before returning to the focused common editor without reloading", async () => {
@@ -2607,7 +2609,7 @@ describe("HostSessionEditor", () => {
         expect(screen.getByRole("tab", { name: "직접 작성" })).toHaveAttribute("aria-selected", "true");
       });
       expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveFocus();
-      expect(screen.getByRole("region", { name: "현재 적용본" }))
+      expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" }))
         .not.toHaveTextContent("공유 초안 요약");
       expect(screen.queryByRole("dialog", {
         name: "멤버에게 알림을 보낼까요?",
@@ -2624,7 +2626,7 @@ describe("HostSessionEditor", () => {
       );
 
       expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
-      expect(screen.queryByLabelText("AI 결과 JSON 가져오기")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("정리한 파일을 여기에 놓으세요")).not.toBeInTheDocument();
     });
   });
 });

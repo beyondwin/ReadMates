@@ -160,8 +160,8 @@ describe("SessionRecordWorkspace", () => {
   it("separates the current applied record, working draft, and next action without internal revision language", () => {
     render(<SessionRecordWorkspace {...props()} />);
 
-    const applied = screen.getByRole("region", { name: "현재 적용본" });
-    const draft = screen.getByRole("region", { name: "작업 중인 초안" });
+    const applied = screen.getByRole("region", { name: "멤버에게 보이는 기록" });
+    const draft = screen.getByRole("region", { name: "작성 중" });
     const next = screen.getByRole("region", { name: "다음 할 일" });
     const sourceTabs = screen.getByRole("tablist", { name: "초안 만들기" });
 
@@ -182,12 +182,13 @@ describe("SessionRecordWorkspace", () => {
     expect(within(draft).getByText(draftSnapshot.feedbackDocument.fileName)).toBeVisible();
     expect(within(next).queryByRole("button", { name: "반영 검토" })).not.toBeInTheDocument();
     expect(
-      within(screen.getByRole("region", { name: "반영 검토 작업" }))
-        .getByRole("button", { name: "반영 검토" }),
+      within(screen.getByRole("region", { name: "반영 전 확인" }))
+        .getByRole("button", { name: "반영 전 확인" }),
     ).toBeEnabled();
     expect(within(sourceTabs).getByRole("tab", { name: "직접 작성" })).toBeVisible();
     expect(within(sourceTabs).getByRole("tab", { name: "AI로 생성" })).toBeVisible();
-    expect(within(sourceTabs).getByRole("tab", { name: "외부 JSON" })).toBeVisible();
+    expect(within(sourceTabs).getByRole("tab", { name: "정리본 올리기" })).toBeVisible();
+    expect(within(sourceTabs).queryByRole("tab", { name: "외부 JSON" })).not.toBeInTheDocument();
     expect(screen.queryByText("버전 0")).not.toBeInTheDocument();
     expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
     expect(screen.queryByText("공개 기록 초안")).not.toBeInTheDocument();
@@ -220,8 +221,8 @@ describe("SessionRecordWorkspace", () => {
       />,
     );
 
-    expect(screen.getByRole("region", { name: "현재 적용본" })).toHaveTextContent("미등록");
-    expect(screen.getByRole("region", { name: "작업 중인 초안" })).toHaveTextContent(
+    expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" })).toHaveTextContent("미등록");
+    expect(screen.getByRole("region", { name: "작성 중" })).toHaveTextContent(
       "초안 문서 없음",
     );
     expect(screen.queryByRole("link", { name: "피드백 문서 미리보기" }))
@@ -231,39 +232,40 @@ describe("SessionRecordWorkspace", () => {
   it("keeps one compact primary review action in a bottom sticky action bar", () => {
     render(<SessionRecordWorkspace {...props()} />);
 
-    const stickyAction = screen.getByRole("region", { name: "반영 검토 작업" });
+    const stickyAction = screen.getByRole("region", { name: "반영 전 확인" });
     expect(stickyAction).toHaveClass("rm-session-record-workspace__sticky-action");
     expect(stickyAction).toHaveStyle({ position: "sticky", bottom: "8px" });
     expect(stickyAction).toHaveTextContent("저장된 초안을 반영 전에 검토해 주세요");
-    expect(screen.getAllByRole("button", { name: "반영 검토" })).toHaveLength(1);
-    expect(within(stickyAction).getByRole("button", { name: "반영 검토" })).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "반영 전 확인" })).toHaveLength(1);
+    expect(within(stickyAction).getByRole("button", { name: "반영 전 확인" })).toBeEnabled();
   });
 
   it.each([
     { width: 390, source: "ai" as const, sourceLabel: "AI로 생성" },
-    { width: 320, source: "json" as const, sourceLabel: "외부 JSON" },
+    { width: 320, source: "json" as const, sourceLabel: "정리본 올리기" },
   ])(
-    "orders status, $sourceLabel creation controls, creation panel, and common editor at $width px",
+    "orders status, $sourceLabel creation controls, and creation panel at $width px",
     ({ width, source, sourceLabel }) => {
       Object.defineProperty(window, "innerWidth", { configurable: true, value: width });
       window.dispatchEvent(new Event("resize"));
 
       render(<SessionRecordWorkspace {...props({ source })} />);
 
-      const appliedStatus = screen.getByRole("region", { name: "현재 적용본" });
+      const appliedStatus = screen.getByRole("region", { name: "멤버에게 보이는 기록" });
       const creationHeading = screen.getByRole("heading", { name: "시작 방법을 선택하세요" });
       const creationPanel = screen.getByRole("tabpanel", { name: sourceLabel });
-      const editor = screen.getByRole("region", { name: "공통 초안 편집기" });
       const follows = (earlier: Element, later: Element) =>
         Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);
 
       expect(follows(appliedStatus, creationHeading)).toBe(true);
       expect(follows(creationHeading, creationPanel)).toBe(true);
-      expect(follows(creationPanel, editor)).toBe(true);
       expect(creationPanel).toHaveClass("rm-session-record-workspace__creation-panel");
-      expect(editor.parentElement).toHaveClass("rm-session-record-workspace__draft-editor");
-      expect(document.querySelectorAll(".rm-session-record-workspace__creation-panel"))
-        .toHaveLength(1);
+      if (source === "json") {
+        expect(screen.queryByLabelText(/Markdown/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole("region", { name: "공통 초안 편집기" })).not.toBeInTheDocument();
+      } else {
+        expect(screen.getByRole("region", { name: "공통 초안 편집기" })).toBeInTheDocument();
+      }
     },
   );
 
@@ -278,14 +280,14 @@ describe("SessionRecordWorkspace", () => {
     });
     const { rerender } = render(<SessionRecordWorkspace {...ready} />);
 
-    await user.click(screen.getByRole("button", { name: "반영 검토" }));
+    await user.click(screen.getByRole("button", { name: "반영 전 확인" }));
     expect(onReviewDraft).toHaveBeenCalledTimes(1);
 
     rerender(<SessionRecordWorkspace {...ready} reviewPending />);
-    expect(screen.getByRole("region", { name: "반영 검토 작업" }))
-      .toHaveTextContent("반영 검토 준비 중");
-    expect(screen.getByRole("button", { name: "반영 검토" })).toBeDisabled();
-    await user.click(screen.getByRole("button", { name: "반영 검토" }));
+    expect(screen.getByRole("region", { name: "반영 전 확인" }))
+      .toHaveTextContent("반영 전 확인 준비 중");
+    expect(screen.getByRole("button", { name: "반영 전 확인" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "반영 전 확인" }));
     expect(onReviewDraft).toHaveBeenCalledTimes(1);
   });
 
@@ -352,14 +354,14 @@ describe("SessionRecordWorkspace", () => {
 
     await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
     const aiWorkspace = screen.getByTestId("aigen-workspace");
-    await user.click(screen.getByRole("tab", { name: "외부 JSON" }));
+    await user.click(screen.getByRole("tab", { name: "정리본 올리기" }));
     const jsonReview = screen.getByRole("region", { name: "세션 기록 미리보기" });
     expect(aiWorkspace).not.toBeVisible();
 
     await user.click(screen.getByRole("tab", { name: "직접 작성" }));
     expect(screen.getByRole("textbox", { name: "공개 요약" }))
       .toHaveValue("source를 바꿔도 유지할 입력");
-    await user.click(screen.getByRole("tab", { name: "외부 JSON" }));
+    await user.click(screen.getByRole("tab", { name: "정리본 올리기" }));
     expect(screen.getByRole("region", { name: "세션 기록 미리보기" })).toBe(jsonReview);
     await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
     expect(screen.getByTestId("aigen-workspace")).toBe(aiWorkspace);
@@ -399,7 +401,7 @@ describe("SessionRecordWorkspace", () => {
     );
 
     expect(screen.getByRole("region", { name: "다음 할 일" })).toHaveTextContent(guidance);
-    expect(screen.getByRole("button", { name: "반영 검토" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "반영 전 확인" })).toBeDisabled();
   });
 
   it("links the first validation error and enables review only after a valid saved draft", () => {
@@ -413,11 +415,11 @@ describe("SessionRecordWorkspace", () => {
 
     expect(screen.getByRole("link", { name: "첫 오류 확인" }))
       .toHaveAttribute("href", "#session-record-summary");
-    expect(screen.getByRole("button", { name: "반영 검토" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "반영 전 확인" })).toBeDisabled();
 
     rerender(<SessionRecordWorkspace {...props()} />);
     expect(screen.queryByRole("link", { name: "첫 오류 확인" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "반영 검토" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "반영 전 확인" })).toBeEnabled();
   });
 
   it("waits for an AI draft refresh before returning to the common editor without changing the applied preview", async () => {
@@ -455,12 +457,13 @@ describe("SessionRecordWorkspace", () => {
       expect(screen.getByRole("tab", { name: "직접 작성" })).toHaveAttribute("aria-selected", "true");
     });
     expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveFocus();
-    expect(screen.getByRole("region", { name: "현재 적용본" }))
+    expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" }))
       .toHaveTextContent("현재 멤버 화면에 적용된 요약");
   });
 
-  it("returns a committed JSON draft to the focused common editor instead of showing a second result artifact", async () => {
+  it("opens apply review after a committed package instead of showing filename and Markdown fields", async () => {
     const user = userEvent.setup();
+    const onReviewDraft = vi.fn();
 
     function Harness() {
       const [source, setSource] = useState<HostSessionDraftSource>("json");
@@ -476,6 +479,7 @@ describe("SessionRecordWorkspace", () => {
             },
             actions: {
               ...props().actions,
+              onReviewDraft,
               onImportCommit: () => setCommitResult(importCommitResult),
             },
           })}
@@ -484,15 +488,17 @@ describe("SessionRecordWorkspace", () => {
     }
 
     render(<Harness />);
+    expect(screen.queryByLabelText(/Markdown/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("피드백 파일 이름")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "초안으로 가져오기" }));
 
     await waitFor(() => {
-      expect(screen.getByRole("tab", { name: "직접 작성" })).toHaveAttribute("aria-selected", "true");
+      expect(onReviewDraft).toHaveBeenCalledTimes(1);
     });
-    expect(screen.getByRole("textbox", { name: "공개 요약" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("region", { name: "세션 기록 초안 저장 결과" }))
       .not.toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "현재 적용본" }))
+    expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" }))
       .toHaveTextContent("현재 멤버 화면에 적용된 요약");
   });
 });

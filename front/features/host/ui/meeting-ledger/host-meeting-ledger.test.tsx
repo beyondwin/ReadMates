@@ -114,6 +114,55 @@ describe("HostMeetingLedger", () => {
     expect(screen.getByRole("heading", { name: "다음에 읽을 책" })).toBeInTheDocument();
   });
 
+  it("lays out this-meeting wrap-up beside next books after the meeting", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[{ sessionId: "closed-1", state: "CLOSED", date: "2026-04-15" }]}
+          sessionId="closed-1"
+          upcomingItems={[
+            { sessionId: "draft-1", state: "DRAFT", date: "2026-06-11", bookTitle: "다음 책", accessScope: "HOST_ONLY" },
+          ]}
+          onSaveUpcomingAccessScope={vi.fn()}
+          onCreateUpcomingSession={vi.fn()}
+          LinkComponent={TestLink}
+        >
+          <p>이번 모임 정리</p>
+        </HostMeetingLedger>
+      </MemoryRouter>,
+    );
+
+    const stage = document.querySelector(".rm-meeting-ledger__stage--after");
+    expect(stage).toBeTruthy();
+    expect(stage).not.toHaveClass("rm-meeting-ledger__stage--no-next");
+    expect(screen.getByText("이번 모임 정리")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "다음에 읽을 책" })).toBeInTheDocument();
+    expect(document.querySelector(".rm-upcoming-book-list")).toHaveClass("rm-upcoming-book-list--compact");
+  });
+
+  it("puts 모임 하나 더 above wrap-up on the empty-next after-phase layout", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[{ sessionId: "closed-1", state: "CLOSED", date: "2026-04-15" }]}
+          sessionId="closed-1"
+          upcomingItems={[]}
+          onSaveUpcomingAccessScope={vi.fn()}
+          onCreateUpcomingSession={vi.fn()}
+          LinkComponent={TestLink}
+        >
+          <p>이번 모임 정리</p>
+        </HostMeetingLedger>
+      </MemoryRouter>,
+    );
+
+    expect(document.querySelector(".rm-meeting-ledger__stage--after")).toHaveClass(
+      "rm-meeting-ledger__stage--no-next",
+    );
+    expect(screen.getByRole("button", { name: "모임 하나 더" })).toBeInTheDocument();
+    expect(document.querySelector(".rm-upcoming-book-list")).not.toHaveClass("rm-upcoming-book-list--compact");
+  });
+
   it("hides the upcoming book list before the meeting", () => {
     render(
       <MemoryRouter>
