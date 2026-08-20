@@ -328,8 +328,31 @@ async function dismissApplyReviewIfOpen(page: Page, timeout = 5_000): Promise<vo
   }
 }
 
+async function expectCanonicalRecordsJsonUrl(page: Page): Promise<void> {
+  await expect(page).toHaveURL(
+    new RegExp(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}\\?section=records&source=json$`),
+  );
+  expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
+  expect(new URL(page.url()).searchParams.get("records")).toBeNull();
+}
+
 async function expectSavedManualDraftPublicSafe(page: Page, timeout = 5_000): Promise<void> {
   await dismissApplyReviewIfOpen(page, timeout);
+  const sourceTabs = page.getByRole("tablist", { name: "초안 만들기" });
+  const manualTab = sourceTabs.getByRole("tab", { name: "직접 작성" });
+  await expect(manualTab).toBeVisible();
+  if ((await manualTab.getAttribute("aria-selected")) !== "true") {
+    await manualTab.click();
+  }
+  await expect(manualTab).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "공통 초안 편집기" })).toBeVisible();
+  const draft = page.getByRole("region", { name: "작성 중" });
+  await expect(draft).toContainText("작성 방식 · 정리본");
+  await expect(draft.getByText(LONG_FEEDBACK_FILE)).toBeVisible();
+  await expect(page.getByLabel("공개 요약")).toHaveValue("공개 가능한 세션 요약입니다.");
+  expect(await page.getByLabel("피드백 Markdown 본문").inputValue()).toContain(LONG_PUBLIC_URL);
+  await expect(page.getByRole("region", { name: "멤버에게 보이는 기록" }))
+    .not.toContainText("공개 가능한 세션 요약입니다.");
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("private.example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
@@ -343,7 +366,7 @@ test("host captures public-safe session record preview evidence on desktop and m
   await page.goto(
     `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?section=records&source=json`,
   );
-  await expect(page).toHaveURL(/[?&](section=records&source=json|records=json)/);
+  await expectCanonicalRecordsJsonUrl(page);
   await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: /정리본|기록 작업대/ })).toBeVisible();
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible({ timeout: 15000 });
@@ -473,7 +496,7 @@ test("legacy records=json URL canonicalizes once and opens the JSON source", asy
 
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?records=json`);
 
-  await expect(page).toHaveURL(/[?&](section=records&source=json|records=json)/);
+  await expectCanonicalRecordsJsonUrl(page);
   await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible();

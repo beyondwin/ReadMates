@@ -137,6 +137,20 @@ export function HostMeetingLedgerRoute({
     [sessionsQuery.data],
   );
 
+  const openFirstPublicationComposer = useCallback((
+    composer: Pick<HostNotificationComposerRequest, "sessionId" | "eventType" | "contentRevision"> | null | undefined,
+  ) => {
+    if (!composer) {
+      return;
+    }
+    setComposerRequest({
+      sessionId: composer.sessionId,
+      eventType: composer.eventType,
+      contentRevision: composer.contentRevision,
+      origin: "FIRST_PUBLICATION",
+    });
+  }, []);
+
   const handleSaveUpcomingAccessScope = useCallback(async (input: {
     sessionId: string;
     accessScope: SessionAccessScope;
@@ -145,15 +159,8 @@ export function HostMeetingLedgerRoute({
       sessionId: input.sessionId,
       request: { accessScope: input.accessScope },
     });
-    if (result.composer) {
-      setComposerRequest({
-        sessionId: result.composer.sessionId,
-        eventType: result.composer.eventType,
-        contentRevision: result.composer.contentRevision,
-        origin: "FIRST_PUBLICATION",
-      });
-    }
-  }, [saveAccessScope]);
+    openFirstPublicationComposer(result.composer);
+  }, [openFirstPublicationComposer, saveAccessScope]);
 
   const handleCreateUpcomingSession = useCallback(async (input: UpcomingBookCreateInput) => {
     const response = await createSession(buildHostSessionRequest(upcomingBookCreateFormValues(input)));
@@ -161,13 +168,14 @@ export function HostMeetingLedgerRoute({
       throw new Error("create-upcoming-failed");
     }
     if (input.accessScope === "GUEST_READABLE") {
-      const created = await response.json();
-      await saveAccessScope({
+      const created = await response.json() as { sessionId: string };
+      const result = await saveAccessScope({
         sessionId: created.sessionId,
         request: { accessScope: "GUEST_READABLE" },
       });
+      openFirstPublicationComposer(result.composer);
     }
-  }, [createSession, saveAccessScope]);
+  }, [createSession, openFirstPublicationComposer, saveAccessScope]);
 
   return (
     <>

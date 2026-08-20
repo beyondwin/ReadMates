@@ -67,6 +67,23 @@ vi.mock("@/features/host/queries/host-session-record-queries", () => ({
   hostSessionRecordLedgerQuery: () => ({ testData: routeMocks.recordAttention }),
 }));
 
+vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
+  HostNotificationComposerController: ({
+    request,
+    onClose,
+  }: {
+    request: { sessionId: string; eventType: string; contentRevision: string; origin: string } | null;
+    onClose: () => void;
+  }) => (request ? (
+    <div role="dialog" aria-label="알림 보내기">
+      <p>{request.origin}</p>
+      <p>{request.sessionId}</p>
+      <p>{request.eventType}</p>
+      <button type="button" onClick={onClose}>이번에는 보내지 않기</button>
+    </div>
+  ) : null),
+}));
+
 import { HostMeetingLedgerRoute } from "./host-meeting-ledger-route";
 
 function PathProbe() {
@@ -258,6 +275,48 @@ describe("HostMeetingLedgerRoute", () => {
       sessionId: "draft-1",
       request: { accessScope: "GUEST_READABLE" },
     });
+    expect(screen.queryByRole("dialog", { name: "알림 보내기" })).not.toBeInTheDocument();
+  });
+
+  it("opens the first-publication composer when switching a next book to member-visible", async () => {
+    const user = userEvent.setup();
+    routeMocks.saveAccessScope.mockResolvedValue({
+      session: {},
+      composer: {
+        sessionId: "draft-1",
+        eventType: "NEXT_BOOK_PUBLISHED",
+        contentRevision: "rev-switch",
+      },
+    });
+    routeMocks.hostSessions = {
+      items: [
+        {
+          sessionId: "open-1",
+          state: "OPEN",
+          date: "2026-04-15",
+          bookTitle: "Now",
+          accessScope: "GUEST_READABLE",
+          recordStatus: "NOT_STARTED",
+        },
+        {
+          sessionId: "draft-1",
+          state: "DRAFT",
+          date: "2026-06-11",
+          bookTitle: "다음 책",
+          accessScope: "HOST_ONLY",
+          recordStatus: "NOT_STARTED",
+        },
+      ],
+      nextCursor: null,
+    };
+    renderMeetingSurface("open-1");
+
+    await user.click(screen.getByRole("switch", { name: "다음 책 멤버에게 보이기" }));
+
+    const dialog = screen.getByRole("dialog", { name: "알림 보내기" });
+    expect(dialog).toHaveTextContent("FIRST_PUBLICATION");
+    expect(dialog).toHaveTextContent("draft-1");
+    expect(dialog).toHaveTextContent("NEXT_BOOK_PUBLISHED");
   });
 
   it("adds another meeting without opening it or leaving the current URL", async () => {
@@ -324,6 +383,48 @@ describe("HostMeetingLedgerRoute", () => {
       request: { accessScope: "GUEST_READABLE" },
     });
     expect(routeMocks.openSession).not.toHaveBeenCalled();
+    expect(screen.getByTestId("meeting-path")).toHaveTextContent("/app/host/sessions/open-1");
+    expect(screen.queryByRole("dialog", { name: "알림 보내기" })).not.toBeInTheDocument();
+  });
+
+  it("opens the first-publication composer when listing a visible next book", async () => {
+    const user = userEvent.setup();
+    routeMocks.saveAccessScope.mockResolvedValue({
+      session: {},
+      composer: {
+        sessionId: "draft-new",
+        eventType: "NEXT_BOOK_PUBLISHED",
+        contentRevision: "rev-create",
+      },
+    });
+    routeMocks.hostSessions = {
+      items: [{
+        sessionId: "open-1",
+        state: "OPEN",
+        date: "2026-04-15",
+        bookTitle: "Now",
+        accessScope: "GUEST_READABLE",
+        recordStatus: "NOT_STARTED",
+      }],
+      nextCursor: null,
+    };
+    renderMeetingSurface("open-1");
+
+    await user.click(screen.getByRole("button", { name: "모임 하나 더" }));
+    await user.type(screen.getByLabelText("책 제목"), "다음 책");
+    await user.type(screen.getByLabelText("저자"), "다음 저자");
+    await user.type(screen.getByLabelText("모임 날짜"), "2026-06-11");
+    await user.click(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" }));
+    await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
+
+    expect(routeMocks.saveAccessScope).toHaveBeenCalledWith({
+      sessionId: "draft-new",
+      request: { accessScope: "GUEST_READABLE" },
+    });
+    const dialog = screen.getByRole("dialog", { name: "알림 보내기" });
+    expect(dialog).toHaveTextContent("FIRST_PUBLICATION");
+    expect(dialog).toHaveTextContent("draft-new");
+    expect(dialog).toHaveTextContent("NEXT_BOOK_PUBLISHED");
     expect(screen.getByTestId("meeting-path")).toHaveTextContent("/app/host/sessions/open-1");
   });
 

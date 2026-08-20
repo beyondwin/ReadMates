@@ -408,7 +408,9 @@ test("5. apply then composer skip creates a revision without a notification even
   await expect.poll(() => readSessionRecordRevisionCount(recordSessionId)).toBeGreaterThan(before);
   expect(await readNotificationEventCount(recordSessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
   expect(await readNotificationEventCount(recordSessionId, "SESSION_RECORD_UPDATED")).toBe(0);
-  await expect(page.getByText(RECORD_SUMMARY).first()).toBeVisible();
+  await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "현재 적용본" })).toContainText(RECORD_SUMMARY);
+  await expect(page.getByRole("region", { name: "작업 중인 초안" })).toContainText("준비된 초안이 없습니다");
 });
 
 test("6. apply then composer confirm creates exactly one session-record event", async ({ page }) => {
@@ -425,7 +427,9 @@ test("6. apply then composer confirm creates exactly one session-record event", 
   await page.getByRole("button", { name: "발송 확인" }).click();
   expect(await readHostActionDecision(recordSessionId)).toBeNull();
   await expect.poll(() => readNotificationEventCount(recordSessionId, "SESSION_RECORD_UPDATED")).toBe(1);
-  await expect(page.getByText(UPDATED_SUMMARY).first()).toBeVisible();
+  await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("region", { name: "현재 적용본" })).toContainText(UPDATED_SUMMARY);
+  await expect(page.getByRole("region", { name: "작업 중인 초안" })).toContainText("준비된 초안이 없습니다");
 });
 
 test("7. restoring an immutable version creates a draft without changing the applied version", async ({ page }, testInfo) => {
@@ -459,8 +463,9 @@ test("7. restoring an immutable version creates a draft without changing the app
   expect((await restoreResponse).ok()).toBe(true);
   await waitForDraftSaved(page);
   expect(await readSessionRecordRevisionCount(recordSessionId)).toBe(before);
-  await expect(page.locator("body")).toContainText(UPDATED_SUMMARY);
-  await expect(page.locator("body")).toContainText("과거 버전에서 생성");
+  await openEditorSection(page, "개요");
+  await expect(page.getByRole("region", { name: "현재 적용본" })).toContainText(UPDATED_SUMMARY);
+  await expect(page.getByRole("region", { name: "작업 중인 초안" })).toContainText("작성 방식 · 과거 버전에서 생성");
 });
 
 test("8. 320px host record navigation and confirmation sheet remain accessible", async ({ page }, testInfo) => {
