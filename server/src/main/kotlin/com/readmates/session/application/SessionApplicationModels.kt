@@ -197,6 +197,18 @@ data class HostSessionListQuery(
     val needsAttention: Boolean? = null,
 )
 
+data class HostSessionScheduleDefaults(
+    val startTime: String,
+    val endTime: String,
+    val locationLabel: String,
+    val meetingUrl: String?,
+    val meetingPasscode: String?,
+    val accessScope: SessionAccessScope,
+    val suggestedDate: String?,
+    val questionDeadlineOffsetDays: Long,
+    val hints: List<String>,
+)
+
 data class HostSessionVisibilityUpdateResult(
     val session: HostSessionDetailResponse,
     val composer: HostNotificationComposerContext?,

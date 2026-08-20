@@ -8,6 +8,7 @@ import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.ConfirmAttendanceCommand
@@ -48,6 +49,8 @@ interface HostSessionQueryUseCase {
     ): HostSessionListPage
 
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
+
+    fun scheduleDefaults(host: CurrentMember): HostSessionScheduleDefaults
 }
 
 interface HostSessionDraftUseCase {

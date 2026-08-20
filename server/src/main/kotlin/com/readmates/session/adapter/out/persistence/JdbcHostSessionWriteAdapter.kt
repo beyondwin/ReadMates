@@ -35,6 +35,7 @@ class JdbcHostSessionWriteAdapter(
     HostSessionAttendancePort,
     HostSessionPublicationPort {
     private val queries = HostSessionQueries()
+    private val scheduleDefaultsQueries = HostSessionScheduleDefaultsQueries()
     private val writeQueries = HostSessionWriteQueries(jdbcTemplate, queries)
     private val writePolicy = HostSessionWritePolicy
     private val draftWrites = HostSessionDraftWriteOperations(jdbcTemplate, writeQueries, writePolicy)
@@ -51,6 +52,8 @@ class JdbcHostSessionWriteAdapter(
     ): HostSessionListPage = queries.list(jdbcTemplate, host, pageRequest, query)
 
     override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> = queries.upcoming(jdbcTemplate, member)
+
+    override fun scheduleDefaults(host: CurrentMember) = scheduleDefaultsQueries.load(jdbcTemplate, host)
 
     override fun detail(command: HostSessionIdCommand) = queries.findHostSession(jdbcTemplate, command.host, command.sessionId)
 

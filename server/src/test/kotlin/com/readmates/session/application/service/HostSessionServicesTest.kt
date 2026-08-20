@@ -25,6 +25,7 @@ import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.HostSessionOpenNotAllowedException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
+import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
@@ -49,6 +50,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
@@ -320,6 +322,29 @@ class HostSessionServicesTest {
         service.upcoming(host)
 
         assertEquals(host, port.upcomingMember)
+    }
+
+    @Test
+    fun `schedule defaults requires host and delegates to query port`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionQueryService(port)
+
+        val result = service.scheduleDefaults(host)
+
+        assertEquals(host, port.scheduleDefaultsHost)
+        assertEquals("20:00", result.startTime)
+        assertEquals("22:00", result.endTime)
+    }
+
+    @Test
+    fun `schedule defaults rejects non-host`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionQueryService(port)
+
+        assertThrows(AccessDeniedException::class.java) {
+            service.scheduleDefaults(host.copy(role = MembershipRole.MEMBER))
+        }
+        assertEquals(null, port.scheduleDefaultsHost)
     }
 
     @Test
@@ -703,6 +728,7 @@ class HostSessionServicesTest {
         var unpublishCommand: HostSessionIdCommand? = null
         var returnToDraftCommand: HostSessionIdCommand? = null
         var upcomingMember: CurrentMember? = null
+        var scheduleDefaultsHost: CurrentMember? = null
         var openChanged = true
         var closeChanged = true
         var publishChanged = true
@@ -951,6 +977,21 @@ class HostSessionServicesTest {
         override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> {
             upcomingMember = member
             return emptyList()
+        }
+
+        override fun scheduleDefaults(host: CurrentMember): HostSessionScheduleDefaults {
+            scheduleDefaultsHost = host
+            return HostSessionScheduleDefaults(
+                startTime = "20:00",
+                endTime = "22:00",
+                locationLabel = "온라인",
+                meetingUrl = null,
+                meetingPasscode = null,
+                accessScope = SessionAccessScope.HOST_ONLY,
+                suggestedDate = null,
+                questionDeadlineOffsetDays = 1,
+                hints = emptyList(),
+            )
         }
 
         private fun hostSessionDetail(sessionId: UUID) =

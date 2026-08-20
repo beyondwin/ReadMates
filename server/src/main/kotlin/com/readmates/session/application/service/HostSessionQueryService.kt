@@ -1,11 +1,13 @@
 package com.readmates.session.application.service
 
 import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.port.`in`.GetHostDashboardUseCase
 import com.readmates.session.application.port.`in`.HostSessionQueryUseCase
 import com.readmates.session.application.port.`in`.ListUpcomingSessionsUseCase
 import com.readmates.session.application.port.out.HostSessionQueryPort
+import com.readmates.session.application.requireHost
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
@@ -27,4 +29,9 @@ class HostSessionQueryService(
     override fun dashboard(host: CurrentMember) = queryPort.dashboard(host)
 
     override fun upcoming(member: CurrentMember) = queryPort.upcoming(member)
+
+    override fun scheduleDefaults(host: CurrentMember): HostSessionScheduleDefaults {
+        requireHost(host)
+        return queryPort.scheduleDefaults(host)
+    }
 }

@@ -34,6 +34,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.time.LocalDate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
@@ -185,19 +186,22 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
       '00000000-0000-0000-0000-000000019211',
       '00000000-0000-0000-0000-000000019212',
       '00000000-0000-0000-0000-000000019213',
-      '00000000-0000-0000-0000-000000019214'
+      '00000000-0000-0000-0000-000000019214',
+      '00000000-0000-0000-0000-000000019216'
     );
     delete from users
     where id in (
       '00000000-0000-0000-0000-000000019101',
-      '00000000-0000-0000-0000-000000019114'
+      '00000000-0000-0000-0000-000000019114',
+      '00000000-0000-0000-0000-000000019116'
     )
        or email in (
          'outside.host@example.com',
          'suspended.create@example.com',
          'left.create@example.com',
          'inactive.create@example.com',
-         'later.active@example.com'
+         'later.active@example.com',
+         'schedule.defaults.viewer@example.com'
        );
     delete from clubs
     where id = '00000000-0000-0000-0000-000000019001'
@@ -411,6 +415,127 @@ class HostSessionControllerDbTest(
                 ),
             )
         }
+    }
+
+    @Test
+    fun `host schedule defaults come from this club and are not parsed as a session id`() {
+        createOutsideClubSession()
+        jdbcTemplate.update(
+            """
+            update sessions
+            set start_time = '10:00:00',
+                end_time = '12:00:00',
+                location_label = '다른 클럽 장소',
+                meeting_url = 'https://meet.example.com/outside-club',
+                meeting_passcode = 'outside-club-passcode',
+                access_scope = 'HOST_ONLY'
+            where id = '00000000-0000-0000-0000-000000019777'
+            """.trimIndent(),
+        )
+
+        val response =
+            mockMvc
+                .get("/api/host/sessions/schedule-defaults") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.startTime") { value("19:30") }
+                    jsonPath("$.endTime") { value("21:30") }
+                    jsonPath("$.locationLabel") { value("온라인") }
+                    jsonPath("$.accessScope") { value("GUEST_READABLE") }
+                    jsonPath("$.suggestedDate") { value("2026-05-13") }
+                    jsonPath("$.questionDeadlineOffsetDays") { value(1) }
+                    jsonPath("$.hints[0]") { value("이전 모임과 같은 시간으로 넣었습니다.") }
+                    jsonPath("$.meetingUrl") { doesNotExist() }
+                    jsonPath("$.meetingPasscode") { doesNotExist() }
+                    jsonPath("$.bookTitle") { doesNotExist() }
+                    jsonPath("$.bookAuthor") { doesNotExist() }
+                }.andReturn()
+                .response
+                .contentAsString
+
+        assertThat(response).doesNotContain("10:00")
+        assertThat(response).doesNotContain("outside-club-passcode")
+        assertThat(response).doesNotContain("팩트풀니스")
+        assertThat(response).contains("\"startTime\"")
+        assertThat(response).contains("\"endTime\"")
+        assertThat(response).contains("\"locationLabel\"")
+        assertThat(response).contains("\"accessScope\"")
+        assertThat(response).contains("\"suggestedDate\"")
+        assertThat(response).contains("\"questionDeadlineOffsetDays\"")
+        assertThat(response).contains("\"hints\"")
+    }
+
+    @Test
+    fun `member and viewer cannot read schedule defaults`() {
+        seedScheduleDefaultsViewer()
+
+        mockMvc
+            .get("/api/host/sessions/schedule-defaults") {
+                with(user("member5@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
+
+        mockMvc
+            .get("/api/host/sessions/schedule-defaults") {
+                with(user("schedule.defaults.viewer@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
+    }
+
+    @Test
+    fun `host schedule defaults copy meeting passcode from the latest url row`() {
+        insertHostScheduleSample(
+            number = 7,
+            date = "2026-05-13",
+            startTime = "19:30:00",
+            endTime = "21:30:00",
+            meetingUrl = "https://meet.example.com/host-latest",
+            meetingPasscode = "host-form-pass",
+        )
+
+        mockMvc
+            .get("/api/host/sessions/schedule-defaults") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.meetingUrl") { value("https://meet.example.com/host-latest") }
+                jsonPath("$.meetingPasscode") { value("host-form-pass") }
+            }
+    }
+
+    @Test
+    fun `host schedule defaults use at most the last ten meetings`() {
+        insertHostScheduleSample(
+            number = 7,
+            date = "2026-06-01",
+            startTime = "23:00:00",
+            endTime = "23:45:00",
+            locationLabel = "11번째 장소",
+        )
+        (8..17).forEach { number ->
+            insertHostScheduleSample(
+                number = number,
+                date = LocalDate.parse("2026-06-01").plusWeeks((number - 7).toLong()).toString(),
+                startTime = "10:00:00",
+                endTime = "12:00:00",
+                locationLabel = "최근 장소",
+                accessScope = "HOST_ONLY",
+            )
+        }
+
+        mockMvc
+            .get("/api/host/sessions/schedule-defaults") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.startTime") { value("10:00") }
+                jsonPath("$.endTime") { value("12:00") }
+                jsonPath("$.locationLabel") { value("최근 장소") }
+                jsonPath("$.accessScope") { value("HOST_ONLY") }
+            }
     }
 
     @Test
@@ -2933,6 +3058,99 @@ class HostSessionControllerDbTest(
             from memberships
             where memberships.club_id = '00000000-0000-0000-0000-000000000001'
               and memberships.status = 'ACTIVE'
+            """.trimIndent(),
+        )
+    }
+
+    private fun insertHostScheduleSample(
+        number: Int,
+        date: String,
+        startTime: String,
+        endTime: String,
+        locationLabel: String = "온라인",
+        meetingUrl: String? = null,
+        meetingPasscode: String? = null,
+        accessScope: String = "GUEST_READABLE",
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              meeting_url,
+              meeting_passcode,
+              question_deadline_at,
+              state,
+              visibility,
+              access_scope
+            )
+            values (
+              ?,
+              '00000000-0000-0000-0000-000000000001',
+              ?,
+              ?,
+              '스케줄 기본값 책',
+              '테스트 저자',
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              ?,
+              'DRAFT',
+              'HOST_ONLY',
+              ?
+            )
+            """.trimIndent(),
+            "00000000-0000-0000-0000-${number.toString().padStart(12, '0')}",
+            number,
+            "${number}회차 · 스케줄 기본값 책",
+            date,
+            startTime,
+            endTime,
+            locationLabel,
+            meetingUrl,
+            meetingPasscode,
+            "${LocalDate.parse(date).minusDays(1)} 14:59:00",
+            accessScope,
+        )
+    }
+
+    private fun seedScheduleDefaultsViewer() {
+        jdbcTemplate.update(
+            """
+            insert into users (id, email, name, short_name, auth_provider)
+            values (
+              '00000000-0000-0000-0000-000000019116',
+              'schedule.defaults.viewer@example.com',
+              '스케줄 뷰어',
+              '뷰어',
+              'PASSWORD'
+            )
+            """.trimIndent(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (
+              '00000000-0000-0000-0000-000000019216',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000019116',
+              'MEMBER',
+              'VIEWER',
+              utc_timestamp(6),
+              '뷰어',
+              'cloud-green-book'
+            )
             """.trimIndent(),
         )
     }
