@@ -45,7 +45,7 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
         { limit: EDITOR_HISTORY_PAGE_LIMIT },
         context,
       )),
-      client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)),
+      client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)).catch(() => null),
       client.fetchQuery(hostSessionRecordLedgerQuery({
         needsAttention: true,
         page: { limit: 3 },
