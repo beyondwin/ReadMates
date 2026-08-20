@@ -3004,6 +3004,60 @@ a.rm-recent-record__destination:hover {
   color: var(--text-2);
 }
 
+.rm-meeting-ledger {
+  padding-bottom: 48px;
+}
+
+.rm-meeting-ledger__empty {
+  padding: 34px;
+}
+
+.rm-meeting-ledger__attention {
+  margin: 0 0 14px;
+}
+
+.rm-meeting-ledger__attention a {
+  color: var(--text);
+  font-size: var(--type-size-supporting);
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rm-meeting-ledger__body {
+  padding-bottom: 38px;
+}
+
+.rm-meeting-phase-rail {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.rm-meeting-phase-rail > li {
+  flex: 1 1 0;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 6px 12px;
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  font-weight: 650;
+  overflow-wrap: anywhere;
+  border-bottom: 2px solid transparent;
+}
+
+.rm-meeting-phase-rail > li[aria-current="step"] {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
 .rm-host-dashboard-ledger {
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));

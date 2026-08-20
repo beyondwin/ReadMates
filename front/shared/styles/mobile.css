@@ -371,6 +371,12 @@
     padding-left: var(--m-page-x);
     padding-right: var(--m-page-x);
   }
+
+  .rm-meeting-phase-rail {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+  }
 }
 
 .rm-current-session-empty-header {

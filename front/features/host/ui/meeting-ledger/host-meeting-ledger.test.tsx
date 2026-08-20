@@ -1,0 +1,62 @@
+import { render, screen } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { MemoryRouter } from "react-router";
+import { describe, expect, it } from "vitest";
+import { HostMeetingLedger } from "./host-meeting-ledger";
+import type { MeetingListItem } from "@/features/host/model/host-meeting-ledger-model";
+
+function TestLink({
+  to,
+  children,
+}: {
+  to: string | { pathname?: string };
+  children: ReactNode;
+}) {
+  return <a href={typeof to === "string" ? to : ""}>{children}</a>;
+}
+
+function renderLedger(items: MeetingListItem[]) {
+  return render(
+    <MemoryRouter>
+      <HostMeetingLedger items={items} LinkComponent={TestLink} />
+    </MemoryRouter>,
+  );
+}
+
+describe("HostMeetingLedger", () => {
+  it("asks the host to create the first meeting when none exist", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[]}
+          LinkComponent={({ to, children }) => <a href={typeof to === "string" ? to : ""}>{children}</a>}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "첫 모임 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
+  });
+
+  it("marks 진행 중 as the current phase for an open meeting", () => {
+    renderLedger([
+      { sessionId: "open-1", state: "OPEN", date: "2026-04-15" },
+    ]);
+
+    expect(screen.getByRole("listitem", { name: "진행 중" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("listitem", { name: "모임 전" })).not.toHaveAttribute("aria-current");
+    expect(screen.getByRole("listitem", { name: "모임 후" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("links to the previous meeting when a closed incomplete record remains and the active meeting is a draft", () => {
+    renderLedger([
+      { sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" },
+      { sessionId: "closed-1", state: "CLOSED", date: "2026-04-15", recordStatus: "NOT_STARTED" },
+    ]);
+
+    expect(screen.getByRole("listitem", { name: "모임 전" })).toHaveAttribute("aria-current", "step");
+    expect(screen.getByRole("link", { name: "이전 모임 기록 남음" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/closed-1",
+    );
+  });
+});
