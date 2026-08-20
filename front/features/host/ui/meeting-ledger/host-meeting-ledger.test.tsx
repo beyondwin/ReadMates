@@ -59,4 +59,22 @@ describe("HostMeetingLedger", () => {
       "/app/host/sessions/closed-1",
     );
   });
+
+  it("keeps 모임 후 when the viewed meeting is the closed record, not the later draft", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[
+            { sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" },
+            { sessionId: "closed-1", state: "CLOSED", date: "2026-04-15", recordStatus: "NOT_STARTED" },
+          ]}
+          sessionId="closed-1"
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("listitem", { name: "모임 후" })).toHaveAttribute("aria-current", "step");
+    expect(screen.queryByRole("link", { name: "이전 모임 기록 남음" })).not.toBeInTheDocument();
+  });
 });

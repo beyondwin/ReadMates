@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  meetingListItemsFromHostSources,
   meetingPhaseFromState,
   previousRecordAttentionHref,
   resolveActiveMeeting,
+  resolveViewedMeeting,
   type MeetingListItem,
 } from "./host-meeting-ledger-model";
 
@@ -51,6 +53,34 @@ describe("resolveActiveMeeting", () => {
 
   it("returns null when the club has no meetings", () => {
     expect(resolveActiveMeeting([])).toBeNull();
+  });
+});
+
+describe("resolveViewedMeeting", () => {
+  it("pins the requested meeting even when home would pick a draft", () => {
+    expect(resolveViewedMeeting([
+      item({ sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" }),
+      item({ sessionId: "closed-1", state: "CLOSED", date: "2026-04-15" }),
+    ], "closed-1")).toEqual({ sessionId: "closed-1", phase: "after" });
+  });
+
+  it("falls back to the active meeting when no session is pinned", () => {
+    expect(resolveViewedMeeting([
+      item({ sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" }),
+      item({ sessionId: "open-1", state: "OPEN", date: "2026-04-15" }),
+    ])).toEqual({ sessionId: "open-1", phase: "during" });
+  });
+});
+
+describe("meetingListItemsFromHostSources", () => {
+  it("adds a closed needs-attention meeting that the list page omitted", () => {
+    expect(meetingListItemsFromHostSources(
+      [item({ sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" })],
+      [item({ sessionId: "closed-1", state: "CLOSED", date: "2026-04-15", recordStatus: "NOT_STARTED" })],
+    )).toEqual([
+      item({ sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" }),
+      item({ sessionId: "closed-1", state: "CLOSED", date: "2026-04-15", recordStatus: "NOT_STARTED" }),
+    ]);
   });
 });
 

@@ -42,3 +42,57 @@ export function previousRecordAttentionHref(
 export function hostMeetingHref(sessionId: string) {
   return `/app/host/sessions/${encodeURIComponent(sessionId)}`;
 }
+
+export type MeetingListItemSource = {
+  sessionId: string;
+  state: MeetingListItem["state"];
+  date: string;
+  recordStatus?: MeetingListItem["recordStatus"];
+};
+
+export function meetingListItemsFromHostSources(
+  sessions: readonly MeetingListItemSource[],
+  attention?: readonly MeetingListItemSource[] | null,
+  current?: { sessionId: string; date: string } | null,
+): MeetingListItem[] {
+  const items = new Map<string, MeetingListItem>();
+
+  const add = (item: MeetingListItemSource) => {
+    const existing = items.get(item.sessionId);
+    items.set(item.sessionId, {
+      sessionId: item.sessionId,
+      state: existing?.state ?? item.state,
+      date: existing?.date ?? item.date,
+      recordStatus: existing?.recordStatus ?? item.recordStatus,
+    });
+  };
+
+  for (const session of sessions) {
+    add(session);
+  }
+  for (const item of attention ?? []) {
+    add(item);
+  }
+  if (current && !items.has(current.sessionId)) {
+    add({
+      sessionId: current.sessionId,
+      state: "OPEN",
+      date: current.date,
+    });
+  }
+
+  return [...items.values()];
+}
+
+export function resolveViewedMeeting(
+  items: readonly MeetingListItem[],
+  sessionId?: string | null,
+): { sessionId: string; phase: MeetingPhase } | null {
+  if (sessionId) {
+    const pinned = items.find((item) => item.sessionId === sessionId);
+    return pinned
+      ? { sessionId: pinned.sessionId, phase: meetingPhaseFromState(pinned.state) }
+      : null;
+  }
+  return resolveActiveMeeting(items);
+}

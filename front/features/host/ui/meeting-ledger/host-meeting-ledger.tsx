@@ -1,7 +1,7 @@
 import type { ComponentType, ReactNode } from "react";
 import {
   previousRecordAttentionHref,
-  resolveActiveMeeting,
+  resolveViewedMeeting,
   type MeetingListItem,
 } from "@/features/host/model/host-meeting-ledger-model";
 import { MeetingPhaseRail } from "./meeting-phase-rail";
@@ -22,16 +22,22 @@ function DefaultLink({ to, children, ...props }: HostMeetingLedgerLinkProps) {
 
 export function HostMeetingLedger({
   items,
+  sessionId,
   LinkComponent = DefaultLink,
   children,
 }: {
   items: readonly MeetingListItem[];
+  sessionId?: string;
   LinkComponent?: HostMeetingLedgerLinkComponent;
   children?: ReactNode;
 }) {
-  const active = resolveActiveMeeting(items);
+  const active = resolveViewedMeeting(items, sessionId);
 
   if (!active) {
+    if (sessionId) {
+      return children ?? null;
+    }
+
     return (
       <main>
         <section className="page-header-compact">
@@ -54,7 +60,7 @@ export function HostMeetingLedger({
   const previousHref = previousRecordAttentionHref(active, items);
 
   return (
-    <main className="rm-meeting-ledger">
+    <div className="rm-meeting-ledger">
       <header className="page-header-compact">
         <div className="container">
           {previousHref ? (
@@ -69,7 +75,7 @@ export function HostMeetingLedger({
           <MeetingPhaseRail activePhase={active.phase} />
         </div>
       </header>
-      {children ? <div className="container rm-meeting-ledger__body">{children}</div> : null}
-    </main>
+      {children}
+    </div>
   );
 }

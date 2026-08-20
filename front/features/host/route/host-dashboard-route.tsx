@@ -4,15 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
-import type {
-  CurrentSessionResponse,
-  HostSessionListItem,
-  HostSessionRecordLedgerPage,
-} from "@/features/host/api/host-contracts";
 import {
   hostMeetingHref,
+  meetingListItemsFromHostSources,
   resolveActiveMeeting,
-  type MeetingListItem,
 } from "@/features/host/model/host-meeting-ledger-model";
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
@@ -30,53 +25,6 @@ import type { HostDashboardRouteData } from "./host-dashboard-data";
 
 function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
-}
-
-function meetingListItemsFromHostHome(
-  sessions: readonly HostSessionListItem[],
-  current: CurrentSessionResponse | undefined,
-  attention: HostSessionRecordLedgerPage | undefined | null,
-): MeetingListItem[] {
-  const items = new Map<string, MeetingListItem>();
-
-  const add = (item: MeetingListItem) => {
-    const existing = items.get(item.sessionId);
-    items.set(item.sessionId, {
-      sessionId: item.sessionId,
-      state: existing?.state ?? item.state,
-      date: existing?.date ?? item.date,
-      recordStatus: existing?.recordStatus ?? item.recordStatus,
-    });
-  };
-
-  for (const session of sessions) {
-    add({
-      sessionId: session.sessionId,
-      state: session.state,
-      date: session.date,
-      recordStatus: session.recordStatus,
-    });
-  }
-
-  for (const item of attention?.items ?? []) {
-    add({
-      sessionId: item.sessionId,
-      state: item.state,
-      date: item.date,
-      recordStatus: item.recordStatus,
-    });
-  }
-
-  const currentSession = current?.currentSession;
-  if (currentSession && !items.has(currentSession.sessionId)) {
-    add({
-      sessionId: currentSession.sessionId,
-      state: "OPEN",
-      date: currentSession.date,
-    });
-  }
-
-  return [...items.values()];
 }
 
 export function HostDashboardRoute({
@@ -99,10 +47,10 @@ export function HostDashboardRoute({
   }, context));
 
   const items = useMemo(
-    () => meetingListItemsFromHostHome(
+    () => meetingListItemsFromHostSources(
       sessionsQuery.data?.items ?? loaderData.hostSessions.items,
-      currentQuery.data ?? loaderData.current,
-      recordAttentionQuery.data ?? loaderData.recordAttention,
+      (recordAttentionQuery.data ?? loaderData.recordAttention)?.items,
+      (currentQuery.data ?? loaderData.current).currentSession,
     ),
     [currentQuery.data, loaderData, recordAttentionQuery.data, sessionsQuery.data],
   );

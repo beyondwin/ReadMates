@@ -3,12 +3,15 @@ import type { LoaderFunctionArgs } from "react-router";
 import { previewHostSessionImport } from "@/features/host/api/host-api";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
 import {
+  DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostSessionDetailQuery,
+  hostSessionListQuery,
   hostSessionManualDispatchesQuery,
 } from "@/features/host/queries/host-session-queries";
 import {
   hostSessionRecordEditorQuery,
   hostSessionRecordHistoryQuery,
+  hostSessionRecordLedgerQuery,
 } from "@/features/host/queries/host-session-record-queries";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
@@ -42,6 +45,11 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
         { limit: EDITOR_HISTORY_PAGE_LIMIT },
         context,
       )),
+      client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)),
+      client.fetchQuery(hostSessionRecordLedgerQuery({
+        needsAttention: true,
+        page: { limit: 3 },
+      }, context)).catch(() => null),
     ]);
 
     return { sessionId: params.sessionId };
