@@ -162,5 +162,13 @@ describe("host session editor model", () => {
       canDelete: false,
       guidance: "닫히거나 공개된 세션은 삭제할 수 없습니다.",
     });
+    expect(getDestructiveActionAvailability({ state: "DRAFT" })).toEqual({
+      canDelete: true,
+      guidance: "목록에서 지웁니다. 되돌릴 수 없습니다.",
+    });
+    expect(getDestructiveActionAvailability({ state: "PUBLISHED" })).toEqual({
+      canDelete: false,
+      guidance: "닫히거나 공개된 세션은 삭제할 수 없습니다.",
+    });
   });
 });

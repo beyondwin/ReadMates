@@ -2141,6 +2141,73 @@ describe("HostSessionEditor", () => {
     render(<HostSessionEditorForTest />);
 
     expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "목록에서 지우기" })).not.toBeInTheDocument();
+  });
+
+  it("lets hosts remove a draft from the list after the deletion preview dialog", async () => {
+    const location = { href: "", pathname: "/app/host/sessions/draft-session-7" };
+    const draftSession = {
+      ...session,
+      sessionId: "draft-session-7",
+      sessionNumber: 7,
+      title: "7회차 모임 · 테스트 책",
+      bookTitle: "테스트 책",
+      state: "DRAFT" as const,
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          ...deletionPreview,
+          sessionId: "draft-session-7",
+          state: "DRAFT",
+        }),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          sessionId: "draft-session-7",
+          sessionNumber: 7,
+          deleted: true,
+          counts: deletionPreview.counts,
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const user = userEvent.setup();
+
+    render(<HostSessionEditorForTest session={draftSession} />);
+
+    await user.click(screen.getByRole("button", { name: "목록에서 지우기" }));
+    expect(confirmSpy).not.toHaveBeenCalled();
+
+    const dialog = await screen.findByRole("dialog", { name: "이 세션을 삭제할까요?" });
+    expect(dialog).toBeInTheDocument();
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/bff/api/host/sessions/draft-session-7/deletion-preview",
+        expect.objectContaining({
+          cache: "no-store",
+          method: "GET",
+        }),
+      ),
+    );
+
+    await user.click(within(dialog).getByRole("button", { name: "세션 삭제" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/bff/api/host/sessions/draft-session-7",
+        expect.objectContaining({
+          cache: "no-store",
+          method: "DELETE",
+        }),
+      ),
+    );
+    expect(location.href).toBe("/app/host");
+    confirmSpy.mockRestore();
   });
 
   it("disables delete action for non-open sessions", () => {

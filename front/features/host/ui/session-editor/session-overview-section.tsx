@@ -16,6 +16,7 @@ export function SessionOverviewSection({
   onPublishSession,
   onReverseSession,
   reverseLabel,
+  onDeleteDraft,
   lifecyclePending,
 }: {
   overview: HostSessionEditorOverview;
@@ -26,6 +27,7 @@ export function SessionOverviewSection({
   onPublishSession?: () => void | Promise<void>;
   onReverseSession?: () => void;
   reverseLabel?: string;
+  onDeleteDraft?: (event: { currentTarget: EventTarget | null }) => void;
   lifecyclePending: boolean;
 }): JSX.Element {
   const lifecycle = lifecyclePresentation(sessionState);
@@ -116,6 +118,17 @@ export function SessionOverviewSection({
                 onClick={onOpenSession}
               >
                 {lifecycleConfirmCopy("open").confirmLabel}
+              </button>
+            ) : null}
+            {sessionState === "DRAFT" && onDeleteDraft ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                disabled={lifecyclePending}
+                onClick={onDeleteDraft}
+                style={{ color: "var(--danger)" }}
+              >
+                목록에서 지우기
               </button>
             ) : null}
             {sessionState === "OPEN" && onCloseSession ? (

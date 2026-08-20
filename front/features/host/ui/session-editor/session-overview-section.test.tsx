@@ -105,6 +105,25 @@ describe("SessionOverviewSection", () => {
     expect(screen.queryByRole("button", { name: "기록 공개" })).not.toBeInTheDocument();
   });
 
+  it("offers 목록에서 지우기 for a draft meeting without using window.confirm", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const onDeleteDraft = vi.fn();
+    const onOpenSession = vi.fn();
+    renderOverview({ sessionState: "DRAFT", onOpenSession, onDeleteDraft });
+
+    expect(lifecycleActionNames()).toEqual(["멤버에게 열기", "목록에서 지우기"]);
+    const deleteButton = screen.getByRole("button", { name: "목록에서 지우기" });
+    expect(deleteButton).toHaveClass("btn", "btn-ghost", "btn-sm");
+    expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
+
+    await user.click(deleteButton);
+
+    expect(onDeleteDraft).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(onOpenSession).not.toHaveBeenCalled();
+  });
+
   it("offers close and reverse for an open session without treating visibility as a lifecycle action", async () => {
     const user = userEvent.setup();
     const confirmSpy = vi.spyOn(window, "confirm");
@@ -224,10 +243,12 @@ describe("SessionOverviewSection", () => {
     renderOverview({
       sessionState: "DRAFT",
       onOpenSession: vi.fn(),
+      onDeleteDraft: vi.fn(),
       lifecyclePending: true,
     });
 
     expect(screen.getByRole("button", { name: "멤버에게 열기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "목록에서 지우기" })).toBeDisabled();
   });
 });
 
@@ -240,6 +261,7 @@ function renderOverview({
   onPublishSession,
   onReverseSession,
   reverseLabel,
+  onDeleteDraft,
   lifecyclePending = false,
 }: {
   overview?: HostSessionEditorOverview;
@@ -250,6 +272,7 @@ function renderOverview({
   onPublishSession?: () => void | Promise<void>;
   onReverseSession?: () => void;
   reverseLabel?: string;
+  onDeleteDraft?: (event: { currentTarget: EventTarget | null }) => void;
   lifecyclePending?: boolean;
 } = {}) {
   return render(
@@ -264,6 +287,7 @@ function renderOverview({
         onPublishSession={onPublishSession}
         onReverseSession={onReverseSession}
         reverseLabel={reverseLabel}
+        onDeleteDraft={onDeleteDraft}
         lifecyclePending={lifecyclePending}
       />
     </>,

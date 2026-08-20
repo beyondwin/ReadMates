@@ -32,7 +32,7 @@ class HostSessionDeletionQueries(
     ): HostSessionDeletionPreviewResponse {
         requireHost(member)
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = false)
-        requireOpenDeletionTarget(target)
+        requireDeletableTarget(target)
         val hasDurableHistory = hasDurableHistory(jdbcTemplate, member.clubId, sessionId)
 
         return HostSessionDeletionPreviewResponse(
@@ -52,7 +52,7 @@ class HostSessionDeletionQueries(
     ): HostSessionDeletionResponse {
         requireHost(member)
         val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = true)
-        requireOpenDeletionTarget(target)
+        requireDeletableTarget(target)
         if (hasDurableHistory(jdbcTemplate, member.clubId, sessionId)) {
             throw HostSessionDeletionHistoryExistsException()
         }
@@ -66,7 +66,7 @@ class HostSessionDeletionQueries(
                 delete from sessions
                 where id = ?
                   and club_id = ?
-                  and state = 'OPEN'
+                  and state in ('OPEN', 'DRAFT')
                 """.trimIndent(),
                 sessionId.dbString(),
                 member.clubId.dbString(),
@@ -112,8 +112,8 @@ class HostSessionDeletionQueries(
             ).firstOrNull() ?: throw HostSessionNotFoundException()
     }
 
-    private fun requireOpenDeletionTarget(target: HostSessionDeletionTarget) {
-        if (target.state != "OPEN") {
+    private fun requireDeletableTarget(target: HostSessionDeletionTarget) {
+        if (target.state != "OPEN" && target.state != "DRAFT") {
             throw HostSessionDeletionNotAllowedException()
         }
     }

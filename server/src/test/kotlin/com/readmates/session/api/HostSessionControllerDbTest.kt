@@ -27,6 +27,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -2303,6 +2304,35 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host can delete draft session without durable history`() {
+        val sessionId = createSession(state = "DRAFT", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
+        mockMvc
+            .get("/api/host/sessions/$sessionId/deletion-preview") { withHost() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("DRAFT") }
+                jsonPath("$.canDelete") { value(true) }
+            }
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") { withHost() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.deleted") { value(true) }
+            }
+    }
+
+    @Test
+    fun `host cannot delete draft session with record revision history`() {
+        val sessionId = createDraftWithRevision()
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") { withHost() }
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_DELETE_HISTORY_EXISTS") }
+            }
+    }
+
+    @Test
     fun `member cannot preview or delete host session`() {
         createSessionSeven()
 
@@ -2557,6 +2587,49 @@ class HostSessionControllerDbTest(
             accountName = "김호스트",
             role = MembershipRole.HOST,
         )
+
+    private fun MockHttpServletRequestDsl.withHost() {
+        with(user("host@example.com"))
+        with(csrf())
+    }
+
+    private fun createSession(
+        state: String,
+        visibility: String,
+        accessScope: String,
+    ): String {
+        val sessionId = createDraftSession("7회차 · 테스트 책", "테스트 책", "2026-05-20")
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = ?, visibility = ?, access_scope = ?
+            where id = ?
+            """.trimIndent(),
+            state,
+            visibility,
+            accessScope,
+            sessionId,
+        )
+        return sessionId
+    }
+
+    private fun createDraftWithRevision(): String {
+        val sessionId = createSession(state = "DRAFT", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
+        jdbcTemplate.update(
+            """
+            insert into session_record_revisions (
+              id, session_id, club_id, version, source, snapshot_json, snapshot_sha256,
+              applied_by_membership_id
+            ) values (?, ?, ?, 1, 'BASELINE', '{}', ?, ?)
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009911",
+            sessionId,
+            "00000000-0000-0000-0000-000000000001",
+            "a".repeat(64),
+            "00000000-0000-0000-0000-000000000201",
+        )
+        return sessionId
+    }
 
     private fun createDraftSessionSeven(): String = createDraftSession("7회차 · 테스트 책", "테스트 책", "2026-05-20")
 

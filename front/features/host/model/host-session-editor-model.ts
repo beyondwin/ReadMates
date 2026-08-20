@@ -278,12 +278,15 @@ export function initialFeedbackDocumentStatus(
 export function getDestructiveActionAvailability(
   session?: Pick<HostSessionEditorSession, "state"> | null,
 ): HostSessionDestructiveActionAvailability {
-  const canDelete = session?.state === "OPEN";
+  const state = session?.state;
+  const canDelete = state === "OPEN" || state === "DRAFT";
 
   return {
     canDelete,
-    guidance: canDelete
-      ? "세션과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다."
-      : "닫히거나 공개된 세션은 삭제할 수 없습니다.",
+    guidance: state === "DRAFT"
+      ? "목록에서 지웁니다. 되돌릴 수 없습니다."
+      : canDelete
+        ? "세션과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다."
+        : "닫히거나 공개된 세션은 삭제할 수 없습니다.",
   };
 }

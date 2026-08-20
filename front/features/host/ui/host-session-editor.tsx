@@ -555,12 +555,13 @@ export default function HostSessionEditor({
     setDeleteModalOpen(false);
   }, [deleteSubmitting]);
 
-  const openDeleteModal = useCallback(async () => {
+  const openDeleteModal = useCallback(async (event?: { currentTarget: EventTarget | null }) => {
     if (!session || !destructiveActionAvailability.canDelete) {
       return;
     }
 
-    deleteRestoreFocusRef.current = deleteTriggerRef.current;
+    const trigger = event?.currentTarget;
+    deleteRestoreFocusRef.current = trigger instanceof HTMLElement ? trigger : deleteTriggerRef.current;
     setDeleteModalOpen(true);
     setDeletePreview(null);
     setDeleteError(null);
@@ -598,13 +599,14 @@ export default function HostSessionEditor({
         return;
       }
 
-      globalThis.location.href = scopedHostRedirectHref("/app/host/sessions/new");
+      const deletedDraft = (displaySession?.state ?? session.state) === "DRAFT";
+      globalThis.location.href = scopedHostRedirectHref(deletedDraft ? "/app/host" : "/app/host/sessions/new");
     } catch {
       setDeleteError(deletionErrorMessage());
     } finally {
       setDeleteSubmitting(false);
     }
-  }, [session, deletePreview, deleteSubmitting, actions]);
+  }, [actions, deletePreview, deleteSubmitting, displaySession?.state, session]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -1041,6 +1043,11 @@ export default function HostSessionEditor({
                   onPublishSession={session ? () => requestLifecycleConfirm("publish") : undefined}
                   onReverseSession={reverseAction ? () => requestLifecycleConfirm(reverseAction.kind) : undefined}
                   reverseLabel={reverseAction?.label}
+                  onDeleteDraft={
+                    displaySession?.state === "DRAFT" && destructiveActionAvailability.canDelete
+                      ? openDeleteModal
+                      : undefined
+                  }
                   lifecyclePending={lifecycleSaveState === "saving"}
                 />
                 {displaySession ? (
@@ -1117,7 +1124,7 @@ export default function HostSessionEditor({
                             ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
                             : "책, 일정, 장소와 접속 정보만 저장합니다."}
                     </div>
-                    {session ? (
+                    {session && displaySession?.state !== "DRAFT" ? (
                       <section className="surface" aria-labelledby="host-session-danger-title" style={{ padding: "22px" }}>
                         <div className="eyebrow" id="host-session-danger-title" style={{ marginBottom: "10px" }}>
                           위험 작업
