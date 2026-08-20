@@ -2,7 +2,6 @@ import type { HostSessionDetailResponse } from "@/features/host/model/host-view-
 import type { AttendanceStatus } from "@/shared/model/readmates-types";
 import {
   applyScheduleDefaults,
-  BUILTIN_SCHEDULE_DEFAULTS,
   type HostSessionScheduleDefaults,
 } from "@/features/host/model/host-schedule-defaults-model";
 import {
@@ -208,21 +207,14 @@ export type HostSessionEditorInit = {
   scheduleDefaults?: HostSessionScheduleDefaults | null;
 };
 
-const EMPTY_SCHEDULE_DEFAULTS: HostSessionScheduleDefaults = {
-  ...BUILTIN_SCHEDULE_DEFAULTS,
-  startTime: "",
-  endTime: "",
-  locationLabel: "",
-  suggestedDate: null,
-};
-
 export function initialHostSessionEditorState(
   init: HostSessionEditorInit,
 ): HostSessionEditorFormState {
   const session = init.session;
   const values = hydrateHostSessionFormValues(session);
-  const prefillMode = !session && init.scheduleDefaults !== undefined;
-  const applied = prefillMode
+  const resolvedDefaults = init.scheduleDefaults ?? null;
+  const prefillMode = !session && resolvedDefaults !== null;
+  const applied = prefillMode && resolvedDefaults
     ? applyScheduleDefaults({
       bookTitle: values.bookTitle,
       bookAuthor: values.bookAuthor,
@@ -232,7 +224,7 @@ export function initialHostSessionEditorState(
       locationLabel: "",
       meetingUrl: "",
       meetingPasscode: "",
-    }, init.scheduleDefaults ?? EMPTY_SCHEDULE_DEFAULTS)
+    }, resolvedDefaults)
     : null;
 
   return {

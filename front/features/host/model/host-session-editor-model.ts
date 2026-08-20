@@ -219,7 +219,7 @@ export function buildHostSessionRequest(
     meetingPasscode: normalizeOptionalField(values.meetingPasscode),
     date: values.date,
     startTime: values.startTime,
-    ...(values.endTime ? { endTime: values.endTime } : {}),
+    ...(!existingSession && values.endTime ? { endTime: values.endTime } : {}),
     ...((!existingSession || values.date !== existingSession.date) && questionDeadlineAt ? { questionDeadlineAt } : {}),
   };
 }

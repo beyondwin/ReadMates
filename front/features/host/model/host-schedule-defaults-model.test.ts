@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   applyScheduleDefaults,
   BUILTIN_SCHEDULE_DEFAULTS,
+  resolvedScheduleDefaults,
   scheduleTimeHint,
 } from "./host-schedule-defaults-model";
 
@@ -116,5 +117,8 @@ describe("builtin schedule defaults", () => {
     });
     expect(scheduleTimeHint(clubDefaults)).toBe("이전 모임과 같은 시간으로 넣었습니다.");
     expect(scheduleTimeHint(BUILTIN_SCHEDULE_DEFAULTS)).toBeNull();
+    expect(resolvedScheduleDefaults(null)).toEqual(BUILTIN_SCHEDULE_DEFAULTS);
+    expect(resolvedScheduleDefaults(undefined)).toEqual(BUILTIN_SCHEDULE_DEFAULTS);
+    expect(resolvedScheduleDefaults(clubDefaults)).toEqual(clubDefaults);
   });
 });

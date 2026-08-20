@@ -65,3 +65,9 @@ export function applyScheduleDefaults<T extends object>(
 export function scheduleTimeHint(defaults: Pick<HostSessionScheduleDefaults, "hints">): string | null {
   return defaults.hints[0] ?? null;
 }
+
+export function resolvedScheduleDefaults(
+  data: HostSessionScheduleDefaults | null | undefined,
+): HostSessionScheduleDefaults {
+  return data ?? BUILTIN_SCHEDULE_DEFAULTS;
+}

@@ -1,3 +1,5 @@
+import { defaultHostSessionFormValues, type HostSessionFormValues } from "./host-session-editor-model";
+import { BUILTIN_SCHEDULE_DEFAULTS } from "./host-schedule-defaults-model";
 import type { SessionAccessScope } from "./session-exposure-model";
 
 export type UpcomingBookListItem = {
@@ -34,4 +36,24 @@ export function draftsByDate(
 
 export function memberVisibilityLabel(accessScope: SessionAccessScope): string {
   return accessScope === "GUEST_READABLE" ? "멤버에게 보이기" : "호스트만";
+}
+
+export function upcomingBookCreateFormValues(input: UpcomingBookCreateInput): HostSessionFormValues {
+  const fallback = defaultHostSessionFormValues();
+  const startTime = input.startTime.trim() || fallback.startTime;
+  const locationLabel = input.locationLabel.trim() || fallback.locationLabel;
+  const endTime = input.endTime.trim() || BUILTIN_SCHEDULE_DEFAULTS.endTime;
+  return {
+    ...fallback,
+    title: input.bookTitle,
+    bookTitle: input.bookTitle,
+    bookAuthor: input.bookAuthor,
+    date: input.date || fallback.date,
+    startTime,
+    endTime,
+    locationLabel,
+    meetingUrl: input.meetingUrl,
+    meetingPasscode: input.meetingPasscode,
+    questionDeadlineOffsetDays: input.questionDeadlineOffsetDays,
+  };
 }

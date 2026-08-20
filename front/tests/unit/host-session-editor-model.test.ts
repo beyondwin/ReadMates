@@ -145,6 +145,12 @@ describe("host session editor model", () => {
       ...formValues,
       questionDeadlineAt: "2026-05-19T23:59:00+09:00",
     });
+    expect(buildHostSessionRequest({ ...formValues, endTime: "21:30" })).toEqual({
+      ...formValues,
+      endTime: "21:30",
+      questionDeadlineAt: "2026-05-19T23:59:00+09:00",
+    });
+    expect(buildHostSessionRequest({ ...formValues, endTime: "21:30" }, { date: "2026-05-20" })).toEqual(formValues);
   });
 
   it("handles invalid schedule values without creating a deadline", () => {

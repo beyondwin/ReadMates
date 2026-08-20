@@ -354,7 +354,13 @@ describe("HostSessionEditor", () => {
       ...values,
       questionDeadlineAt: "2026-05-19T23:59:00+09:00",
     });
+    expect(buildHostSessionRequest({ ...values, endTime: "21:30" })).toEqual({
+      ...values,
+      endTime: "21:30",
+      questionDeadlineAt: "2026-05-19T23:59:00+09:00",
+    });
     expect(buildHostSessionRequest(values, { date: "2026-05-20" })).toEqual(values);
+    expect(buildHostSessionRequest({ ...values, endTime: "21:30" }, { date: "2026-05-20" })).toEqual(values);
     expect(buildHostSessionRequest(values, { date: "2026-05-13" })).toEqual({
       ...values,
       questionDeadlineAt: "2026-05-19T23:59:00+09:00",
@@ -411,6 +417,60 @@ describe("HostSessionEditor", () => {
     expect(screen.getByLabelText("Passcode · 선택")).toHaveValue("room-code");
     expect(screen.getByText("이전 모임과 같은 시간으로 넣었습니다.")).toBeInTheDocument();
     expect(screen.queryByText("GUEST_READABLE")).not.toBeInTheDocument();
+  });
+
+  it("includes prefilled endTime only when creating a new meeting", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ sessionId: "created-session-8" }),
+    });
+    const location = { href: "" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+    const user = userEvent.setup();
+
+    render(
+      <HostSessionEditorForTest
+        session={null}
+        initialLocation={{ section: "basic", source: "manual" }}
+        scheduleDefaults={{
+          startTime: "19:30",
+          endTime: "21:30",
+          locationLabel: "온라인",
+          meetingUrl: null,
+          meetingPasscode: null,
+          accessScope: "HOST_ONLY",
+          suggestedDate: "2026-06-11",
+          questionDeadlineOffsetDays: 1,
+          hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+        }}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
+    await user.type(screen.getByLabelText("책 제목"), "새 책");
+    await user.type(screen.getByLabelText("저자"), "새 저자");
+    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+
+    await waitFor(() =>
+      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          title: "7회차 모임 · 새 책",
+          bookTitle: "새 책",
+          bookAuthor: "새 저자",
+          bookLink: "",
+          bookImageUrl: "",
+          locationLabel: "온라인",
+          meetingUrl: "",
+          meetingPasscode: "",
+          date: "2026-06-11",
+          startTime: "19:30",
+          endTime: "21:30",
+          questionDeadlineAt: "2026-06-10T23:59:00+09:00",
+        }),
+      })),
+    );
   });
 
   it("shows helpful hints for the new-session title and book fields", () => {
@@ -1365,7 +1425,6 @@ describe("HostSessionEditor", () => {
           meetingPasscode: "fact",
           date: "2025-11-26",
           startTime: "19:15",
-          endTime: "22:00",
         }),
       })),
     );
@@ -1428,7 +1487,6 @@ describe("HostSessionEditor", () => {
           meetingPasscode: "",
           date: "2025-11-26",
           startTime: "20:00",
-          endTime: "22:00",
         }),
       })),
     );

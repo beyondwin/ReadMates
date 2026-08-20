@@ -643,7 +643,7 @@ export default function HostSessionEditor({
         meetingPasscode,
         date,
         startTime: time,
-        endTime,
+        ...(isNewSession ? { endTime } : {}),
         questionDeadlineOffsetDays,
       }, session ?? undefined);
       try {

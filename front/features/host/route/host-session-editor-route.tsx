@@ -340,6 +340,12 @@ export function NewHostSessionRoute({
   );
   const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
+  if (scheduleDefaultsQuery.isPending) {
+    return <HostSessionEditorQueryState status="loading" />;
+  }
+  const scheduleDefaults = scheduleDefaultsQuery.isError
+    ? BUILTIN_SCHEDULE_DEFAULTS
+    : (scheduleDefaultsQuery.data ?? BUILTIN_SCHEDULE_DEFAULTS);
   return (
     <HostSessionEditor
       returnTarget={returnTarget}
@@ -350,9 +356,7 @@ export function NewHostSessionRoute({
       readmatesReturnState={readmatesReturnState}
       onSessionRecordsChanged={handleSessionRecordsChanged}
       navigation={navigation}
-      scheduleDefaults={scheduleDefaultsQuery.isError
-        ? BUILTIN_SCHEDULE_DEFAULTS
-        : (scheduleDefaultsQuery.data ?? null)}
+      scheduleDefaults={scheduleDefaults}
     />
   );
 }

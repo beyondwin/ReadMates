@@ -35,6 +35,7 @@ vi.mock("@tanstack/react-query", () => ({
   useQuery: (query: { testData?: unknown }) => ({
     data: query.testData,
     isError: false,
+    isPending: false,
   }),
 }));
 

@@ -2,19 +2,20 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { HostSessionDetailResponse, HostSessionListItem } from "@/features/host/api/host-contracts";
-import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import {
   meetingListItemsFromHostSources,
   type MeetingListItemSource,
 } from "@/features/host/model/host-meeting-ledger-model";
 import {
-  buildHostSessionRequest,
-  defaultHostSessionFormValues,
-} from "@/features/host/model/host-session-editor-model";
+  BUILTIN_SCHEDULE_DEFAULTS,
+  resolvedScheduleDefaults,
+} from "@/features/host/model/host-schedule-defaults-model";
+import { buildHostSessionRequest } from "@/features/host/model/host-session-editor-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
-import type {
-  UpcomingBookCreateInput,
-  UpcomingBookListItem,
+import {
+  upcomingBookCreateFormValues,
+  type UpcomingBookCreateInput,
+  type UpcomingBookListItem,
 } from "@/features/host/model/upcoming-book-list-model";
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
@@ -102,7 +103,7 @@ export function HostMeetingLedgerRoute({
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
   const scheduleDefaults = scheduleDefaultsQuery.isError
     ? BUILTIN_SCHEDULE_DEFAULTS
-    : (scheduleDefaultsQuery.data ?? null);
+    : resolvedScheduleDefaults(scheduleDefaultsQuery.data);
 
   const items = useMemo(() => {
     const sessions = (sessionsQuery.data?.items ?? [])
@@ -140,19 +141,7 @@ export function HostMeetingLedgerRoute({
   }, [saveAccessScope]);
 
   const handleCreateUpcomingSession = useCallback(async (input: UpcomingBookCreateInput) => {
-    const response = await createSession(buildHostSessionRequest({
-      ...defaultHostSessionFormValues(),
-      title: input.bookTitle,
-      bookTitle: input.bookTitle,
-      bookAuthor: input.bookAuthor,
-      date: input.date,
-      startTime: input.startTime,
-      endTime: input.endTime,
-      locationLabel: input.locationLabel,
-      meetingUrl: input.meetingUrl,
-      meetingPasscode: input.meetingPasscode,
-      questionDeadlineOffsetDays: input.questionDeadlineOffsetDays,
-    }));
+    const response = await createSession(buildHostSessionRequest(upcomingBookCreateFormValues(input)));
     if (!response.ok) {
       throw new Error("create-upcoming-failed");
     }
