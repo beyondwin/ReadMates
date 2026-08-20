@@ -1161,7 +1161,7 @@ describe("HostDashboard", () => {
     expect(visibilityButton).toBeInTheDocument();
     expect(editLink).toHaveClass("btn-primary");
     expect(actionGroup?.querySelectorAll(".btn-primary")).toHaveLength(1);
-    expect(editLink).toHaveAttribute("href", "/app/host/sessions/session-8/edit");
+    expect(editLink).toHaveAttribute("href", "/app/host/sessions/session-8");
   });
 
   it("does not double the top rule on the first desktop upcoming session row", () => {
@@ -1351,7 +1351,7 @@ describe("HostDashboard", () => {
     );
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
-    const currentEditHref = "/app/host/sessions/session-7/edit";
+    const currentEditHref = "/app/host/sessions/session-7";
 
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
@@ -1468,7 +1468,7 @@ describe("HostDashboard", () => {
     expect(mobile.getByText("2026.05.20 · 20:00 · 온라인")).toBeInTheDocument();
     expect(within(mobileSessionCard).getByRole("link", { name: "세션 문서 열기" })).toHaveAttribute(
       "href",
-      "/app/host/sessions/session-7/edit",
+      "/app/host/sessions/session-7",
     );
     expect(current.currentSession?.myCheckin).not.toHaveProperty("note");
     expect(current.currentSession?.board).not.toHaveProperty("checkins");
@@ -1536,10 +1536,10 @@ describe("HostDashboard", () => {
     expect(desktop.queryByText("김호스트")).not.toBeInTheDocument();
     expect(desktop.queryByText("안멤버1")).not.toBeInTheDocument();
     expect(desktop.queryByText("읽는 중")).not.toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", "/app/host/sessions/session-7");
     expect(desktop.queryByRole("link", { name: "공개 요약 편집" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "피드백 문서 등록" })).not.toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", "/app/host/sessions/session-7/edit");
+    expect(desktop.getByRole("link", { name: "참석 확정 마감" })).toHaveAttribute("href", "/app/host/sessions/session-7");
     expect(mobile.getByText("운영 도구").closest("details")).not.toHaveAttribute("open");
     expect(desktop.getAllByText("3").length).toBeGreaterThan(0);
   });
@@ -1577,7 +1577,7 @@ describe("HostDashboard", () => {
     const { container } = render(<HostDashboardForTest current={encodedCurrent} data={dashboard} />);
     const desktop = getDesktopView(container);
     const mobile = getMobileView(container);
-    const expectedHref = "/app/host/sessions/session%2F7%3Fdraft%3Dtrue/edit";
+    const expectedHref = "/app/host/sessions/session%2F7%3Fdraft%3Dtrue";
 
     expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute("href", expectedHref);
     expect(

@@ -286,7 +286,7 @@ describe("HostDashboard", () => {
     const openLink = within(card).getByRole("link", { name: "세션 문서 열기" });
     expect(openLink).toHaveAttribute(
       "href",
-      "/app/host/sessions/session-9/edit",
+      "/app/host/sessions/session-9",
     );
     expect(openLink).toHaveClass(
       "rm-host-dashboard-mobile__session-cta",

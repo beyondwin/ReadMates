@@ -1580,7 +1580,7 @@ describe("HostSessionEditor", () => {
     expect(within(dialog).getByRole("alert")).toHaveTextContent(openAlreadyExistsMessage());
     expect(within(dialog).getByRole("link", { name: "진행 중인 세션 열기" })).toHaveAttribute(
       "href",
-      `/clubs/club-a/app/host/sessions/${openSessionId}/edit`,
+      `/clubs/club-a/app/host/sessions/${openSessionId}`,
     );
     expect(reopenSession).toHaveBeenCalledTimes(1);
   });

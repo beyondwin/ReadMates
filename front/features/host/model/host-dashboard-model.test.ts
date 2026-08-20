@@ -6,10 +6,17 @@ import {
   getHostDashboardNextOperationAction,
   getHostDashboardPriorityItems,
   getHostUpcomingSessionTiming,
+  hostSessionEditHref,
   type HostDashboardCurrentSession,
   type HostDashboardData,
   type MissingCurrentSessionMembersSummary,
 } from "./host-dashboard-model";
+
+describe("hostSessionEditHref", () => {
+  it("returns the canonical meeting URL without /edit", () => {
+    expect(hostSessionEditHref("abc")).toBe("/app/host/sessions/abc");
+  });
+});
 
 describe("getHostUpcomingSessionTiming", () => {
   const now = new Date(2026, 7, 1, 12, 0, 0);
@@ -170,7 +177,7 @@ describe("getHostDashboardPriorityItems", () => {
         id: "stable",
         count: 0,
         tone: "ok",
-        href: "/app/host/sessions/session-7/edit",
+        href: "/app/host/sessions/session-7",
       },
     ]);
   });

@@ -52,27 +52,27 @@ describe("host session editor navigation", () => {
   it.each([
     [
       "preserves unrelated parameters and hash while writing records AI",
-      "https://readmates.test/app/host/sessions/session-1/edit?returnTo=%2Fapp%2Fhost&from=dashboard#audit",
+      "https://readmates.test/app/host/sessions/session-1?returnTo=%2Fapp%2Fhost&from=dashboard#audit",
       { section: "records", source: "ai" },
-      "/app/host/sessions/session-1/edit?returnTo=%2Fapp%2Fhost&from=dashboard&section=records&source=ai#audit",
+      "/app/host/sessions/session-1?returnTo=%2Fapp%2Fhost&from=dashboard&section=records&source=ai#audit",
     ],
     [
       "removes section and source for overview",
-      "https://readmates.test/app/host/sessions/session-1/edit?returnTo=%2Fapp%2Fhost&section=records&source=ai&aigen=1&records=json#audit",
+      "https://readmates.test/app/host/sessions/session-1?returnTo=%2Fapp%2Fhost&section=records&source=ai&aigen=1&records=json#audit",
       { section: "overview", source: "manual" },
-      "/app/host/sessions/session-1/edit?returnTo=%2Fapp%2Fhost#audit",
+      "/app/host/sessions/session-1?returnTo=%2Fapp%2Fhost#audit",
     ],
     [
       "removes source for records manual",
-      new URL("https://readmates.test/app/host/sessions/session-1/edit?from=closing&section=records&source=ai#audit"),
+      new URL("https://readmates.test/app/host/sessions/session-1?from=closing&section=records&source=ai#audit"),
       { section: "records", source: "manual" },
-      "/app/host/sessions/session-1/edit?from=closing&section=records#audit",
+      "/app/host/sessions/session-1?from=closing&section=records#audit",
     ],
     [
       "does not retain a source outside records",
-      "https://readmates.test/app/host/sessions/session-1/edit?from=dashboard&aigen=1",
+      "https://readmates.test/app/host/sessions/session-1?from=dashboard&aigen=1",
       { section: "basic", source: "ai" },
-      "/app/host/sessions/session-1/edit?from=dashboard&section=basic",
+      "/app/host/sessions/session-1?from=dashboard&section=basic",
     ],
   ] satisfies Array<[string, string | URL, HostSessionEditorLocation, string]>)(
     "%s",

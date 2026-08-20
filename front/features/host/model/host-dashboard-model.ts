@@ -6,6 +6,7 @@ import {
 } from "@/shared/model/reading-loop";
 import type { HostNotificationSummary } from "@/features/host/model/host-view-types";
 import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
+import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 
 export type HostDashboardRsvpStatus = "NO_RESPONSE" | "GOING" | "DECLINED" | "MAYBE";
 export type HostDashboardAlertTone = "warn" | "default" | "accent" | "ok";
@@ -127,7 +128,7 @@ export const HOST_DASHBOARD_REMINDER_UNAVAILABLE_REASON =
 const questionLimitPerMember = 5;
 
 export function hostSessionEditHref(sessionId: string) {
-  return `/app/host/sessions/${encodeURIComponent(sessionId)}/edit`;
+  return hostMeetingHref(sessionId);
 }
 
 export function nonNegativeDashboardCount(value: number) {
