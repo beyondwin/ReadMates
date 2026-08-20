@@ -50,6 +50,10 @@ import {
   hostSessionEditorReducer,
   initialHostSessionEditorState,
 } from "@/features/host/model/host-session-editor-form-state";
+import {
+  scheduleTimeHint,
+  type HostSessionScheduleDefaults,
+} from "@/features/host/model/host-schedule-defaults-model";
 import type { BasicSessionField } from "@/features/host/model/host-session-editor-form-state";
 import { SessionIdentity } from "@/shared/ui/session-identity";
 import {
@@ -317,6 +321,7 @@ export default function HostSessionEditor({
   onSessionRecordsChanged,
   recordWorkflow,
   navigation,
+  scheduleDefaults,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -332,6 +337,7 @@ export default function HostSessionEditor({
     location: HostSessionEditorLocation;
     onChange: (next: HostSessionEditorLocation) => void;
   };
+  scheduleDefaults?: HostSessionScheduleDefaults | null;
 }) {
   if (session && !recordWorkflow) {
     throw new Error("recordWorkflow is required for persisted sessions");
@@ -342,7 +348,7 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   const [formState, dispatch] = useReducer(
     hostSessionEditorReducer,
-    session,
+    { session, scheduleDefaults },
     initialHostSessionEditorState,
   );
 
@@ -354,9 +360,11 @@ export default function HostSessionEditor({
     bookImageUrl,
     date,
     time,
+    endTime,
     locationLabel,
     meetingUrl,
     meetingPasscode,
+    questionDeadlineOffsetDays,
     sessionState,
     displaySessionSnapshot,
     attendanceStatuses,
@@ -456,7 +464,9 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   // Derived values
   // ---------------------------------------------------------------------------
-  const deadline = questionDeadlineLabelForForm(session, date);
+  const deadline = questionDeadlineLabelForForm(session, date, questionDeadlineOffsetDays);
+  const isNewSession = session === null || session === undefined;
+  const timeHint = isNewSession ? scheduleTimeHint(scheduleDefaults ?? { hints: [] }) : null;
   const sessionImportVisibility = recordWorkflow?.snapshot.visibility ?? "HOST_ONLY";
   const sessionImportExpectedDraftRevision = recordWorkflow?.expectedDraftRevision ?? null;
   const sessionImportContextStale = Boolean(
@@ -473,7 +483,6 @@ export default function HostSessionEditor({
     returnTarget,
     readmatesReturnState,
   );
-  const isNewSession = session === null || session === undefined;
   const editorTitle = isNewSession ? "세션 문서 만들기" : "세션 문서 편집";
   const basicSaveLabel = saveState === "saving"
     ? "기본 정보를 저장하는 중"
@@ -513,6 +522,13 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   // Stable dispatch helpers
   // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!isNewSession || !scheduleDefaults) {
+      return;
+    }
+    dispatch({ type: "APPLY_SCHEDULE_DEFAULTS", defaults: scheduleDefaults });
+  }, [isNewSession, scheduleDefaults]);
+
   const setField = useCallback((key: BasicSessionField, value: string) => {
     dispatch({ type: "SET_FIELD", key, value });
   }, []);
@@ -627,6 +643,8 @@ export default function HostSessionEditor({
         meetingPasscode,
         date,
         startTime: time,
+        endTime,
+        questionDeadlineOffsetDays,
       }, session ?? undefined);
       try {
         const response = await actions.saveSession(session?.sessionId ?? null, payload);
@@ -661,6 +679,8 @@ export default function HostSessionEditor({
       meetingPasscode,
       date,
       time,
+      endTime,
+      questionDeadlineOffsetDays,
       session,
       isNewSession,
       actions,
@@ -1083,6 +1103,7 @@ export default function HostSessionEditor({
                     date={date}
                     time={time}
                     deadline={deadline}
+                    timeHint={timeHint}
                     locationLabel={locationLabel}
                     meetingUrl={meetingUrl}
                     meetingPasscode={meetingPasscode}

@@ -4,6 +4,7 @@ import {
   resolveViewedMeeting,
   type MeetingListItem,
 } from "@/features/host/model/host-meeting-ledger-model";
+import type { HostSessionScheduleDefaults } from "@/features/host/model/host-schedule-defaults-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 import type {
   UpcomingBookCreateInput,
@@ -38,6 +39,7 @@ export function HostMeetingLedger({
   onSaveUpcomingAccessScope = ignoreUpcomingAccessScope,
   onCreateUpcomingSession = ignoreUpcomingCreate,
   upcomingPending = false,
+  scheduleDefaults = null,
 }: {
   items: readonly MeetingListItem[];
   sessionId?: string;
@@ -47,6 +49,7 @@ export function HostMeetingLedger({
   onSaveUpcomingAccessScope?: (input: { sessionId: string; accessScope: SessionAccessScope }) => void | Promise<void>;
   onCreateUpcomingSession?: (input: UpcomingBookCreateInput) => void | Promise<void>;
   upcomingPending?: boolean;
+  scheduleDefaults?: HostSessionScheduleDefaults | null;
 }) {
   const active = resolveViewedMeeting(items, sessionId);
 
@@ -99,6 +102,8 @@ export function HostMeetingLedger({
           onSaveAccessScope={onSaveUpcomingAccessScope}
           onCreateSession={onCreateUpcomingSession}
           pending={upcomingPending}
+          scheduleDefaults={scheduleDefaults}
+          defaultAccessScope={scheduleDefaults?.accessScope}
         />
       ) : null}
     </div>

@@ -18,6 +18,17 @@ const routeMocks = vi.hoisted(() => ({
   createSession: vi.fn(),
   saveAccessScope: vi.fn(),
   openSession: vi.fn(),
+  scheduleDefaults: {
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "온라인",
+    meetingUrl: null as string | null,
+    meetingPasscode: null as string | null,
+    accessScope: "HOST_ONLY" as const,
+    suggestedDate: null as string | null,
+    questionDeadlineOffsetDays: 1,
+    hints: [] as string[],
+  },
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -43,6 +54,7 @@ vi.mock("@/features/host/queries/host-session-queries", () => ({
     mutateAsync: routeMocks.openSession,
     isPending: false,
   }),
+  hostSessionScheduleDefaultsQuery: () => ({ testData: routeMocks.scheduleDefaults }),
 }));
 
 vi.mock("@/features/host/queries/host-session-record-queries", () => ({
@@ -268,6 +280,9 @@ describe("HostMeetingLedgerRoute", () => {
       bookTitle: "다음 책",
       bookAuthor: "다음 저자",
       date: "2026-06-11",
+      startTime: "20:00",
+      endTime: "22:00",
+      locationLabel: "온라인",
     }));
     expect(routeMocks.openSession).not.toHaveBeenCalled();
     expect(routeMocks.saveAccessScope).not.toHaveBeenCalled();

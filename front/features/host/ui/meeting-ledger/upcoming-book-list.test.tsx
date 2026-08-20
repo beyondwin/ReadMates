@@ -92,6 +92,7 @@ describe("UpcomingBookList", () => {
     expect(screen.getByLabelText("책 제목")).toBeInTheDocument();
     expect(screen.getByLabelText("저자")).toBeInTheDocument();
     expect(screen.getByLabelText("모임 날짜")).toBeInTheDocument();
+    expect(screen.getByLabelText("시작 시간")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" })).not.toBeChecked();
   });
 
@@ -117,7 +118,13 @@ describe("UpcomingBookList", () => {
       bookTitle: "다음 책",
       bookAuthor: "다음 저자",
       date: "2026-08-13",
+      startTime: "",
+      endTime: "",
+      locationLabel: "",
+      meetingUrl: "",
+      meetingPasscode: "",
       accessScope: "HOST_ONLY",
+      questionDeadlineOffsetDays: 1,
     });
     expect(onOpenSession).not.toHaveBeenCalled();
   });
@@ -144,8 +151,61 @@ describe("UpcomingBookList", () => {
       bookTitle: "다음 책",
       bookAuthor: "다음 저자",
       date: "2026-08-13",
+      startTime: "",
+      endTime: "",
+      locationLabel: "",
+      meetingUrl: "",
+      meetingPasscode: "",
       accessScope: "GUEST_READABLE",
+      questionDeadlineOffsetDays: 1,
     });
     expect(screen.queryByText("GUEST_READABLE")).not.toBeInTheDocument();
+  });
+
+  it("prefills time from schedule defaults, keeps a typed title, and defaults visibility", async () => {
+    const user = userEvent.setup();
+    const onCreateSession = vi.fn();
+    render(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={vi.fn()}
+        onCreateSession={onCreateSession}
+        scheduleDefaults={{
+          startTime: "19:30",
+          endTime: "21:30",
+          locationLabel: "온라인",
+          meetingUrl: "https://meet.example.com/club",
+          meetingPasscode: "room-code",
+          accessScope: "GUEST_READABLE",
+          suggestedDate: "2026-06-11",
+          questionDeadlineOffsetDays: 1,
+          hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "모임 하나 더" }));
+    expect(screen.getByLabelText("시작 시간")).toHaveValue("19:30");
+    expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-06-11");
+    expect(screen.getByText("이전 모임과 같은 시간으로 넣었습니다.")).toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" })).toBeChecked();
+    expect(screen.queryByDisplayValue("room-code")).not.toBeInTheDocument();
+
+    await user.type(screen.getByLabelText("책 제목"), "새 책");
+    await user.type(screen.getByLabelText("저자"), "새 저자");
+    await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
+
+    expect(onCreateSession).toHaveBeenCalledWith({
+      bookTitle: "새 책",
+      bookAuthor: "새 저자",
+      date: "2026-06-11",
+      startTime: "19:30",
+      endTime: "21:30",
+      locationLabel: "온라인",
+      meetingUrl: "https://meet.example.com/club",
+      meetingPasscode: "room-code",
+      accessScope: "GUEST_READABLE",
+      questionDeadlineOffsetDays: 1,
+    });
   });
 });

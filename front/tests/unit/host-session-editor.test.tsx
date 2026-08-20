@@ -385,6 +385,34 @@ describe("HostSessionEditor", () => {
     ]);
   });
 
+  it("prefills a new meeting from schedule defaults and shows the time hint", () => {
+    render(
+      <HostSessionEditorForTest
+        session={null}
+        initialLocation={{ section: "basic", source: "manual" }}
+        scheduleDefaults={{
+          startTime: "19:30",
+          endTime: "21:30",
+          locationLabel: "온라인",
+          meetingUrl: "https://meet.example.com/club",
+          meetingPasscode: "room-code",
+          accessScope: "GUEST_READABLE",
+          suggestedDate: "2026-06-11",
+          questionDeadlineOffsetDays: 1,
+          hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("시작 시간")).toHaveValue("19:30");
+    expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-06-11");
+    expect(screen.getByLabelText("장소")).toHaveValue("온라인");
+    expect(screen.getByLabelText("미팅 URL")).toHaveValue("https://meet.example.com/club");
+    expect(screen.getByLabelText("Passcode · 선택")).toHaveValue("room-code");
+    expect(screen.getByText("이전 모임과 같은 시간으로 넣었습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("GUEST_READABLE")).not.toBeInTheDocument();
+  });
+
   it("shows helpful hints for the new-session title and book fields", () => {
     render(
       <HostSessionEditorForTest
@@ -1337,6 +1365,7 @@ describe("HostSessionEditor", () => {
           meetingPasscode: "fact",
           date: "2025-11-26",
           startTime: "19:15",
+          endTime: "22:00",
         }),
       })),
     );
@@ -1399,6 +1428,7 @@ describe("HostSessionEditor", () => {
           meetingPasscode: "",
           date: "2025-11-26",
           startTime: "20:00",
+          endTime: "22:00",
         }),
       })),
     );

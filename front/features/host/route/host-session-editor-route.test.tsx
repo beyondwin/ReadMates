@@ -122,6 +122,20 @@ vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) =
   useUnpublishHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useUpdateHostSessionAttendanceMutation: () => ({ mutateAsync: vi.fn() }),
   useUpdateHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
+  hostSessionScheduleDefaultsQuery: () => ({
+    queryKey: ["host", "sessions", "scheduleDefaults"],
+    queryFn: async () => ({
+      startTime: "20:00",
+      endTime: "22:00",
+      locationLabel: "온라인",
+      meetingUrl: null,
+      meetingPasscode: null,
+      accessScope: "HOST_ONLY",
+      suggestedDate: null,
+      questionDeadlineOffsetDays: 1,
+      hints: [],
+    }),
+  }),
 }));
 
 vi.mock("@/features/host/route/host-notification-composer-controller", () => ({

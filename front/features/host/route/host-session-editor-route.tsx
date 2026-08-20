@@ -44,11 +44,13 @@ import {
   useRestoreHostSessionRevisionToDraftMutation,
   useSaveHostSessionRecordDraftMutation,
 } from "@/features/host/queries/host-session-record-queries";
+import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import { useSessionRecordDraftController } from "@/features/host/hooks/use-session-record-draft-controller";
 import {
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
   hostSessionKeys,
+  hostSessionScheduleDefaultsQuery,
   invalidateHostSessionManualDispatches,
   invalidateHostSessionRecordSurfaces,
   hostSessionManualDispatchesQuery,
@@ -337,6 +339,7 @@ export function NewHostSessionRoute({
     [clubSlug, context, onSessionRecordsChanged, queryClient],
   );
   const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
+  const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
   return (
     <HostSessionEditor
       returnTarget={returnTarget}
@@ -347,6 +350,9 @@ export function NewHostSessionRoute({
       readmatesReturnState={readmatesReturnState}
       onSessionRecordsChanged={handleSessionRecordsChanged}
       navigation={navigation}
+      scheduleDefaults={scheduleDefaultsQuery.isError
+        ? BUILTIN_SCHEDULE_DEFAULTS
+        : (scheduleDefaultsQuery.data ?? null)}
     />
   );
 }

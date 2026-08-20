@@ -27,6 +27,7 @@ import type {
   HostSessionListPage,
   HostSessionPublicationRequest,
   HostSessionRequest,
+  HostSessionScheduleDefaults,
   HostSessionVisibilityRequest,
   HostSessionVisibilityUpdateResult,
   ManualNotificationConfirmRequest,
@@ -229,6 +230,14 @@ export function fetchHostNotificationTestMailAudit(context?: ReadmatesApiContext
 
 export function fetchHostSessions(context?: ReadmatesApiContext, page?: PageRequest) {
   return readmatesFetch<HostSessionListPage>(`/api/host/sessions${pagingSearchParams(page)}`, undefined, context);
+}
+
+export function fetchHostSessionScheduleDefaults(context?: ReadmatesApiContext) {
+  return readmatesFetch<HostSessionScheduleDefaults>(
+    "/api/host/sessions/schedule-defaults",
+    undefined,
+    context,
+  );
 }
 
 export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApiContext) {

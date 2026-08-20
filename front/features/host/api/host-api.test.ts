@@ -17,6 +17,7 @@ import {
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
   fetchHostSessions,
+  fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
   listHostInvitationsResponse,
@@ -177,6 +178,7 @@ describe("host api wrappers", () => {
     });
     await fetchHostNotificationTestMailAudit(context, { limit: 3 });
     await fetchHostSessions(context, { limit: 50 });
+    await fetchHostSessionScheduleDefaults(context);
     await fetchHostMembers(context, { limit: 25, cursor: "m2" });
 
     const urls = fetchMock.mock.calls.map(([url]) => url);
@@ -192,6 +194,7 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/notifications/manual/dispatches?sessionId=session+7&eventType=SESSION_REMINDER&limit=5&cursor=c1&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/test-mail/audit?limit=3&clubSlug=reading-sai",
       "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai",
+      "/api/bff/api/host/sessions/schedule-defaults?clubSlug=reading-sai",
       "/api/bff/api/host/members?limit=25&cursor=m2&clubSlug=reading-sai",
     ]);
   });

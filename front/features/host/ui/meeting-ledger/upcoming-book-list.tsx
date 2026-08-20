@@ -1,4 +1,10 @@
-import { type FormEvent, useId, useState } from "react";
+import { type FormEvent, useId, useMemo, useState } from "react";
+import {
+  applyScheduleDefaults,
+  scheduleTimeHint,
+  type HostScheduleFormValues,
+  type HostSessionScheduleDefaults,
+} from "@/features/host/model/host-schedule-defaults-model";
 import {
   DEFAULT_UPCOMING_ACCESS_SCOPE,
   draftsByDate,
@@ -15,20 +21,19 @@ export type UpcomingBookListProps = {
   onCreateSession: (input: UpcomingBookCreateInput) => void | Promise<void>;
   pending?: boolean;
   defaultAccessScope?: SessionAccessScope;
+  scheduleDefaults?: HostSessionScheduleDefaults | null;
 };
 
-type CreateFormState = {
-  bookTitle: string;
-  bookAuthor: string;
-  date: string;
-  accessScope: SessionAccessScope;
-};
-
-function emptyCreateForm(accessScope: SessionAccessScope): CreateFormState {
+function blankForm(accessScope: SessionAccessScope): HostScheduleFormValues {
   return {
     bookTitle: "",
     bookAuthor: "",
     date: "",
+    startTime: "",
+    endTime: "",
+    locationLabel: "",
+    meetingUrl: "",
+    meetingPasscode: "",
     accessScope,
   };
 }
@@ -39,20 +44,34 @@ export function UpcomingBookList({
   onCreateSession,
   pending = false,
   defaultAccessScope = DEFAULT_UPCOMING_ACCESS_SCOPE,
+  scheduleDefaults = null,
 }: UpcomingBookListProps) {
   const headingId = useId();
   const titleId = useId();
   const authorId = useId();
   const dateId = useId();
+  const timeId = useId();
   const visibilityId = useId();
   const drafts = draftsByDate(items);
   const [expanded, setExpanded] = useState(false);
-  const [form, setForm] = useState<CreateFormState>(() => emptyCreateForm(defaultAccessScope));
+  const [accessScopeTouched, setAccessScopeTouched] = useState(false);
+  const [draft, setDraft] = useState<HostScheduleFormValues>(() => blankForm(defaultAccessScope));
   const [error, setError] = useState<string | null>(null);
+  const timeHint = scheduleDefaults ? scheduleTimeHint(scheduleDefaults) : null;
+  const form = useMemo(() => {
+    if (!scheduleDefaults) {
+      return draft;
+    }
+    return {
+      ...applyScheduleDefaults(draft, scheduleDefaults),
+      accessScope: accessScopeTouched ? draft.accessScope : scheduleDefaults.accessScope,
+    };
+  }, [accessScopeTouched, draft, scheduleDefaults]);
 
   function expandForm() {
     setError(null);
-    setForm(emptyCreateForm(defaultAccessScope));
+    setAccessScopeTouched(false);
+    setDraft(blankForm(scheduleDefaults?.accessScope ?? defaultAccessScope));
     setExpanded((open) => !open);
   }
 
@@ -72,10 +91,17 @@ export function UpcomingBookList({
         bookTitle,
         bookAuthor,
         date: form.date,
+        startTime: form.startTime,
+        endTime: form.endTime,
+        locationLabel: form.locationLabel,
+        meetingUrl: form.meetingUrl,
+        meetingPasscode: form.meetingPasscode,
         accessScope: form.accessScope,
+        questionDeadlineOffsetDays: scheduleDefaults?.questionDeadlineOffsetDays ?? 1,
       });
       setExpanded(false);
-      setForm(emptyCreateForm(defaultAccessScope));
+      setAccessScopeTouched(false);
+      setDraft(blankForm(scheduleDefaults?.accessScope ?? defaultAccessScope));
     } catch {
       setError("모임을 넣지 못했습니다.");
     }
@@ -152,7 +178,7 @@ export function UpcomingBookList({
                     required
                     autoComplete="off"
                     disabled={pending}
-                    onChange={(event) => setForm((current) => ({ ...current, bookTitle: event.target.value }))}
+                    onChange={(event) => setDraft((current) => ({ ...current, bookTitle: event.target.value }))}
                   />
                 </div>
                 <div>
@@ -164,21 +190,39 @@ export function UpcomingBookList({
                     required
                     autoComplete="off"
                     disabled={pending}
-                    onChange={(event) => setForm((current) => ({ ...current, bookAuthor: event.target.value }))}
+                    onChange={(event) => setDraft((current) => ({ ...current, bookAuthor: event.target.value }))}
                   />
                 </div>
               </div>
-              <div>
-                <label className="label" htmlFor={dateId}>모임 날짜</label>
-                <input
-                  id={dateId}
-                  className="input"
-                  type="date"
-                  value={form.date}
-                  required
-                  disabled={pending}
-                  onChange={(event) => setForm((current) => ({ ...current, date: event.target.value }))}
-                />
+              <div className="grid-2">
+                <div>
+                  <label className="label" htmlFor={dateId}>모임 날짜</label>
+                  <input
+                    id={dateId}
+                    className="input"
+                    type="date"
+                    value={form.date}
+                    required
+                    disabled={pending}
+                    onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor={timeId}>시작 시간</label>
+                  <input
+                    id={timeId}
+                    className="input"
+                    type="time"
+                    value={form.startTime}
+                    disabled={pending}
+                    onChange={(event) => setDraft((current) => ({ ...current, startTime: event.target.value }))}
+                  />
+                  {timeHint ? (
+                    <p className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
+                      {timeHint}
+                    </p>
+                  ) : null}
+                </div>
               </div>
               <label className="rm-upcoming-book-list__visibility" htmlFor={visibilityId}>
                 <span>멤버에게 보이기</span>
@@ -192,7 +236,8 @@ export function UpcomingBookList({
                     disabled={pending}
                     onChange={(event) => {
                       const checked = event.currentTarget.checked;
-                      setForm((current) => ({
+                      setAccessScopeTouched(true);
+                      setDraft((current) => ({
                         ...current,
                         accessScope: checked ? "GUEST_READABLE" : "HOST_ONLY",
                       }));

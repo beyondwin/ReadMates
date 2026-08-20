@@ -15,6 +15,8 @@ export type HostSessionFormValues = {
   meetingPasscode: string;
   date: string;
   startTime: string;
+  endTime?: string;
+  questionDeadlineOffsetDays?: number;
 };
 
 export type HostSessionRequest = {
@@ -138,17 +140,17 @@ function datePartsFromSessionDate(value: string) {
   return { year, month, day };
 }
 
-function questionDeadlineDateFromSessionDate(value: string) {
+function questionDeadlineDateFromSessionDate(value: string, offsetDays = 1) {
   const dateParts = datePartsFromSessionDate(value);
   if (!dateParts) {
     return null;
   }
 
-  return new Date(Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day - 1, 23, 59));
+  return new Date(Date.UTC(dateParts.year, dateParts.month - 1, dateParts.day - offsetDays, 23, 59));
 }
 
-export function questionDeadlineIsoFromSessionDate(value: string) {
-  const deadlineDate = questionDeadlineDateFromSessionDate(value);
+export function questionDeadlineIsoFromSessionDate(value: string, offsetDays = 1) {
+  const deadlineDate = questionDeadlineDateFromSessionDate(value, offsetDays);
   if (!deadlineDate) {
     return null;
   }
@@ -169,8 +171,8 @@ function questionDeadlineLabelFromDate(deadlineDate: Date) {
   return `${month}-${day} ${hour}:${minute}까지`;
 }
 
-export function questionDeadlineLabelFromSessionDate(value: string) {
-  const deadlineDate = questionDeadlineDateFromSessionDate(value);
+export function questionDeadlineLabelFromSessionDate(value: string, offsetDays = 1) {
+  const deadlineDate = questionDeadlineDateFromSessionDate(value, offsetDays);
   return deadlineDate ? questionDeadlineLabelFromDate(deadlineDate) : "";
 }
 
@@ -186,10 +188,11 @@ export function questionDeadlineLabelFromIso(value: string) {
 export function questionDeadlineLabelForForm(
   session: Pick<HostSessionEditorSession, "date" | "questionDeadlineAt"> | null | undefined,
   date: string,
+  offsetDays = 1,
 ) {
   return session?.questionDeadlineAt && date === session.date
     ? questionDeadlineLabelFromIso(session.questionDeadlineAt)
-    : questionDeadlineLabelFromSessionDate(date);
+    : questionDeadlineLabelFromSessionDate(date, offsetDays);
 }
 
 function normalizeOptionalField(value: string) {
@@ -200,7 +203,10 @@ export function buildHostSessionRequest(
   values: HostSessionFormValues,
   existingSession?: Pick<HostSessionEditorSession, "date">,
 ): HostSessionRequest {
-  const questionDeadlineAt = questionDeadlineIsoFromSessionDate(values.date);
+  const questionDeadlineAt = questionDeadlineIsoFromSessionDate(
+    values.date,
+    values.questionDeadlineOffsetDays ?? 1,
+  );
 
   return {
     title: values.title,
@@ -213,6 +219,7 @@ export function buildHostSessionRequest(
     meetingPasscode: normalizeOptionalField(values.meetingPasscode),
     date: values.date,
     startTime: values.startTime,
+    ...(values.endTime ? { endTime: values.endTime } : {}),
     ...((!existingSession || values.date !== existingSession.date) && questionDeadlineAt ? { questionDeadlineAt } : {}),
   };
 }

@@ -11,6 +11,7 @@ import {
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
   fetchHostSessions,
+  fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
   openHostSession,
   publishHostSession,
@@ -32,6 +33,7 @@ import type {
   HostSessionListPage,
   HostSessionPublicationRequest,
   HostSessionRequest,
+  HostSessionScheduleDefaults,
   HostSessionVisibilityRequest,
   HostSessionAccessScopeRequest,
   HostSessionVisibilityUpdateResult,
@@ -45,6 +47,7 @@ import {
   normalizePageRequest,
   pageFromNormalizedPageRequest,
 } from "@/shared/query/cursor-pagination";
+import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
@@ -93,6 +96,8 @@ export const hostSessionKeys = {
     [...hostSessionKeys.scope(context), "manualDispatches"] as const,
   manualDispatches: (request?: HostSessionManualDispatchesQueryRequest, context?: ReadmatesApiContext) =>
     [...hostSessionKeys.manualDispatchesRoot(context), normalizeManualDispatchesRequest(request)] as const,
+  scheduleDefaults: (context?: ReadmatesApiContext) =>
+    [...hostSessionKeys.scope(context), "scheduleDefaults"] as const,
 } as const;
 
 export function hostCurrentSessionQuery(context?: ReadmatesApiContext) {
@@ -106,6 +111,20 @@ export function hostDashboardQuery(context?: ReadmatesApiContext) {
   return queryOptions<HostDashboardResponse>({
     queryKey: hostSessionKeys.dashboard(context),
     queryFn: () => fetchHostDashboard(context),
+  });
+}
+
+export function hostSessionScheduleDefaultsQuery(context?: ReadmatesApiContext) {
+  return queryOptions<HostSessionScheduleDefaults>({
+    queryKey: hostSessionKeys.scheduleDefaults(context),
+    queryFn: async () => {
+      try {
+        return await fetchHostSessionScheduleDefaults(context);
+      } catch {
+        return BUILTIN_SCHEDULE_DEFAULTS;
+      }
+    },
+    retry: false,
   });
 }
 

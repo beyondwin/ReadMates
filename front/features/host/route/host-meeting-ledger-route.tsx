@@ -2,6 +2,7 @@ import { useCallback, useMemo, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { HostSessionDetailResponse, HostSessionListItem } from "@/features/host/api/host-contracts";
+import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import {
   meetingListItemsFromHostSources,
   type MeetingListItemSource,
@@ -19,6 +20,7 @@ import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostSessionDetailQuery,
   hostSessionListQuery,
+  hostSessionScheduleDefaultsQuery,
   useCreateHostSessionMutation,
   useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
@@ -97,6 +99,10 @@ export function HostMeetingLedgerRoute({
   });
   const { mutateAsync: createSession, isPending: creatingSession } = useCreateHostSessionMutation(context);
   const { mutateAsync: saveAccessScope, isPending: savingAccessScope } = useSaveHostSessionAccessScopeMutation(context);
+  const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
+  const scheduleDefaults = scheduleDefaultsQuery.isError
+    ? BUILTIN_SCHEDULE_DEFAULTS
+    : (scheduleDefaultsQuery.data ?? null);
 
   const items = useMemo(() => {
     const sessions = (sessionsQuery.data?.items ?? [])
@@ -140,6 +146,12 @@ export function HostMeetingLedgerRoute({
       bookTitle: input.bookTitle,
       bookAuthor: input.bookAuthor,
       date: input.date,
+      startTime: input.startTime,
+      endTime: input.endTime,
+      locationLabel: input.locationLabel,
+      meetingUrl: input.meetingUrl,
+      meetingPasscode: input.meetingPasscode,
+      questionDeadlineOffsetDays: input.questionDeadlineOffsetDays,
     }));
     if (!response.ok) {
       throw new Error("create-upcoming-failed");
@@ -162,6 +174,7 @@ export function HostMeetingLedgerRoute({
       onSaveUpcomingAccessScope={handleSaveUpcomingAccessScope}
       onCreateUpcomingSession={handleCreateUpcomingSession}
       upcomingPending={creatingSession || savingAccessScope}
+      scheduleDefaults={scheduleDefaults}
     >
       {children}
     </HostMeetingLedger>

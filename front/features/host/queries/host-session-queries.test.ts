@@ -6,6 +6,7 @@ vi.mock("@/features/host/api/host-api", () => ({
   fetchHostSessions: vi.fn(),
   fetchHostSessionDetail: vi.fn(),
   fetchHostSessionDeletionPreview: vi.fn(),
+  fetchHostSessionScheduleDefaults: vi.fn(),
   fetchManualNotificationDispatches: vi.fn(),
 }));
 
@@ -15,6 +16,7 @@ import {
   fetchHostSessions,
   fetchHostSessionDetail,
   fetchHostSessionDeletionPreview,
+  fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
 } from "@/features/host/api/host-api";
 import {
@@ -24,6 +26,7 @@ import {
   hostSessionDetailQuery,
   hostSessionKeys,
   hostSessionListQuery,
+  hostSessionScheduleDefaultsQuery,
   hostSessionManualDispatchesQuery,
   invalidateHostCurrentSession,
   invalidateHostSessionDashboard,
@@ -64,6 +67,13 @@ describe("host session query keys", () => {
       "scope",
       "reading-sai",
       "current",
+    ]);
+    expect(hostSessionKeys.scheduleDefaults({ clubSlug: "reading-sai" })).toEqual([
+      "host",
+      "sessions",
+      "scope",
+      "reading-sai",
+      "scheduleDefaults",
     ]);
   });
 
@@ -121,6 +131,17 @@ describe("host session query keys", () => {
     });
     vi.mocked(fetchHostSessionDeletionPreview).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     vi.mocked(fetchManualNotificationDispatches).mockResolvedValue({ items: [], nextCursor: null });
+    vi.mocked(fetchHostSessionScheduleDefaults).mockResolvedValue({
+      startTime: "19:30",
+      endTime: "21:30",
+      locationLabel: "온라인",
+      meetingUrl: null,
+      meetingPasscode: null,
+      accessScope: "HOST_ONLY",
+      suggestedDate: "2026-06-11",
+      questionDeadlineOffsetDays: 1,
+      hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+    });
 
     await runQuery(hostCurrentSessionQuery({ clubSlug: "reading-sai" }));
     await runQuery(hostDashboardQuery({ clubSlug: "reading-sai" }));
@@ -131,6 +152,7 @@ describe("host session query keys", () => {
       { sessionId: "session-7", page: { limit: 20 } },
       { clubSlug: "reading-sai" },
     ));
+    await runQuery(hostSessionScheduleDefaultsQuery({ clubSlug: "reading-sai" }));
 
     expect(fetchHostCurrentSession).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
     expect(fetchHostDashboard).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
@@ -141,6 +163,20 @@ describe("host session query keys", () => {
       { clubSlug: "reading-sai" },
       { sessionId: "session-7", page: { limit: 20 } },
     );
+    expect(fetchHostSessionScheduleDefaults).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
+  });
+
+  it("returns built-in evening online defaults when schedule-defaults fetch fails", async () => {
+    vi.mocked(fetchHostSessionScheduleDefaults).mockRejectedValue(new Error("defaults-unavailable"));
+
+    await expect(runQuery(hostSessionScheduleDefaultsQuery({ clubSlug: "reading-sai" }))).resolves.toMatchObject({
+      startTime: "20:00",
+      endTime: "22:00",
+      locationLabel: "온라인",
+      accessScope: "HOST_ONLY",
+      suggestedDate: null,
+      hints: [],
+    });
   });
 
   it("does not retain deletion preview results between fetches", () => {

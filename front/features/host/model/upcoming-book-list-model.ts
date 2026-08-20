@@ -12,7 +12,13 @@ export type UpcomingBookCreateInput = {
   bookTitle: string;
   bookAuthor: string;
   date: string;
+  startTime: string;
+  endTime: string;
+  locationLabel: string;
+  meetingUrl: string;
+  meetingPasscode: string;
   accessScope: SessionAccessScope;
+  questionDeadlineOffsetDays: number;
 };
 
 export const DEFAULT_UPCOMING_ACCESS_SCOPE: SessionAccessScope = "HOST_ONLY";

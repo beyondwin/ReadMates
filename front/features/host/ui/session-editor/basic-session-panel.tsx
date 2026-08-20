@@ -13,6 +13,7 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
   date,
   time,
   deadline,
+  timeHint,
   locationLabel,
   meetingUrl,
   meetingPasscode,
@@ -36,6 +37,7 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
   date: string;
   time: string;
   deadline: string;
+  timeHint?: string | null;
   locationLabel: string;
   meetingUrl: string;
   meetingPasscode: string;
@@ -165,6 +167,11 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
               value={time}
               onChange={(event) => onTimeChange(event.target.value)}
             />
+            {timeHint ? (
+              <p className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
+                {timeHint}
+              </p>
+            ) : null}
           </div>
           <div>
             <label className="label" htmlFor="question-deadline">

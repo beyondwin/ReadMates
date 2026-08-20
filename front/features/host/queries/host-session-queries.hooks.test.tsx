@@ -19,6 +19,7 @@ vi.mock("@/features/host/api/host-api", () => ({
   saveHostSessionVisibility: vi.fn(),
   unpublishHostSession: vi.fn(),
   updateHostSession: vi.fn(),
+  fetchHostSessionScheduleDefaults: vi.fn(),
 }));
 
 import {
