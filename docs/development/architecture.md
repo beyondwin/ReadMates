@@ -14,7 +14,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 | 클럽 게스트 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records` | 로그인하지 않은 게스트 | `ACTIVE + PUBLIC` 클럽에서 `GUEST_READABLE` 현재·예정 세션과 기록을 읽습니다. 개인 화면은 preview, 설정·알림·피드백은 정식 멤버 안내, 호스트 route는 거절합니다. 공개 사이트의 `PUBLIC_RECORD` 배치와는 별도 표면입니다. |
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records`, `/clubs/:slug/app/me/settings`, `/clubs/:slug/app/notifications`, `/clubs/:slug/app/notifications/settings`, 등록된 club host의 `/app/**` | 둘러보기 멤버(`VIEWER`), 정식 멤버, 호스트 | 현재 세션 확인, 게스트 공개 예정 세션 확인, 둘러보기 멤버 승인 안내, 정식 멤버의 RSVP·읽은 분량·질문·서평, 아카이브, 참석 회차 피드백 문서, 개인 기록과 계정·멤버십 정보, 알림 설정과 알림함을 제공합니다. |
-| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId/edit`, `/clubs/:slug/app/host/sessions/:sessionId/closing`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | 전용 세션 기록 장부에서 과거/예정 회차 검색, 예정 세션 생성/수정, 공개 범위 설정, 현재 세션 시작, 참석 확정, 진행 세션 닫기, staged 기록 초안 검토·적용·revision 복원, AI 생성 또는 외부 JSON을 공통 초안으로 가져오기, 회차별 클로징 상태 확인, 초대 관리, 멤버 상태와 표시 이름 관리, 알림 발송 운영 |
+| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | `/app/host`는 지금 다루는 모임의 모임 전·진행 중·모임 후 장부입니다. 모임 canonical 경로는 `/sessions/:sessionId`이고 `/edit`와 `/closing`은 그 경로로 redirect합니다. 다음 책 여러 권 미리 넣기, 공개 범위 설정, 멤버에게 열기, 참석 확정, 모임 마치기, `정리본 올리기`로 staged 초안 가져오기·검토·적용·revision 복원, 기록 공개, 과거 모임 검색, 초대 관리, 멤버 상태와 표시 이름 관리, 알림 발송 운영 |
 | 플랫폼 관리 | `/admin`, `/admin/today`, `/admin/health`, `/admin/notifications`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/support`, `/admin/ai-ops`, `/admin/audit`, `/admin/analytics` | platform admin | `/admin/today`의 내구 운영 케이스 ledger에서 클럽 공개 readiness·domain·첫 호스트, 알림 실패, AI job 이상, 회차 마감 위험을 우선순위 queue와 inspector로 확인하고 acknowledge·snooze·엄격한 resolve 검증을 수행합니다. 그 밖에 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인, 운영 health와 알림 outbox/delivery 상태 확인, 클럽 운영 readiness 집계, 제한된 support access grant 관리, AI job 운영 조회와 강제 취소, 통합 감사 ledger 조회를 수행합니다. `/admin/analytics`는 활성 멤버, 세션 완료율, RSVP 응답률, AI 비용/세션, 알림 도달률을 7/30/90일 window와 series/benchmark로 보여주는 aggregate-only 운영 분석 표면입니다. 세션/멤버/알림 발송 같은 클럽 내부 운영은 기본적으로 호스트 앱 책임이고, platform admin 표면은 aggregate/read-only 진단과 감사 가능한 복구 작업만 다룹니다. |
 
 ## 프런트엔드 route-first 경계
@@ -357,6 +357,8 @@ ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅
 
 ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정 `DRAFT` 세션을 함께 다룹니다. 호스트가 새 세션을 만들면 기본 상태는 `DRAFT`, canonical app access는 `HOST_ONLY`, public-site placement는 `HIDDEN`입니다. 앱 열람과 공개 사이트 배치는 서로 독립된 두 축입니다.
 
+호스트 홈 `/app/host`는 지금 다루는 한 모임의 운영 장부입니다. 운영자가 보는 단계는 모임 전(`DRAFT`), 진행 중(`OPEN`), 모임 후(`CLOSED` 또는 `PUBLISHED`)이며, 서버 상태 이름은 `DRAFT`/`OPEN`/`CLOSED`/`PUBLISHED`를 유지합니다. 모임 화면 canonical 경로는 `/clubs/:slug/app/host/sessions/:sessionId`(등록 host의 `/app/host/sessions/:sessionId`)이고, `/edit`와 `/closing`은 그 경로로 redirect합니다. 새 모임 폼은 `GET /api/host/sessions/schedule-defaults`가 최근 최대 10모임의 반복 일정 값(시간·장소·접속 정보·질문 마감 오프셋·`accessScope`)을 채우며, 책 제목은 채우지 않습니다.
+
 - `sessions.access_scope`: `HOST_ONLY | GUEST_READABLE`. `GUEST_READABLE`은 익명 게스트 앱, `VIEWER`, 정식 멤버와 호스트의 공통 읽기 후보입니다.
 - `public_session_publications.site_visibility`: `HIDDEN | PUBLIC_RECORD`. `PUBLIC_RECORD`는 `CLOSED` 또는 `PUBLISHED`에서만 저장할 수 있고, 실제 공개 사이트 query는 `PUBLISHED + PUBLIC_RECORD`만 반환합니다.
 - 호스트는 `/api/host/sessions/{sessionId}/access-scope`로 app access를, publication request의 `siteVisibility`로 public-site placement를 저장합니다. 호스트 목록·상세 응답은 `accessScope`, `siteVisibility`와 rolling-deploy용 legacy `visibility`를 함께 반환합니다.
@@ -380,7 +382,9 @@ Canonical source of truth는 `access_scope`와 `site_visibility`입니다. V45�
 
 호스트는 `/api/host/sessions/{sessionId}/unpublish`, `/reopen`, `/return-to-draft`로 한 단계씩만 되돌릴 수 있습니다. `/unpublish`는 `PUBLISHED`를 `CLOSED`로 바꾸고 publication row와 `site_visibility`는 유지합니다. 공개 사이트는 `PUBLISHED + PUBLIC_RECORD`만 반환하므로 목록에서 내려갑니다. `/reopen`은 `CLOSED`를 `OPEN`으로 복원하고, `PUBLIC_RECORD`면 같은 트랜잭션에서 `HIDDEN`으로 내립니다. 참석자 row는 다시 만들지 않습니다. 같은 클럽에 다른 `OPEN`이 있으면 `/reopen`과 `/open` 모두 거절합니다. `/reopen`은 대상 세션 존재와 클럽 소유를 먼저 확인하고, 실제 `CLOSED → OPEN` 후보일 때만 다른 `OPEN` 충돌을 검사합니다. 없거나 다른 클럽의 세션은 `404 SESSION_NOT_FOUND`이고, `PUBLISHED`/`DRAFT`는 `409 SESSION_REOPEN_NOT_ALLOWED`입니다. `/return-to-draft`는 `OPEN`을 `DRAFT`로 환원합니다. 세 명령 모두 기록·참석·알림 데이터를 삭제하지 않고, 기대 상태에서만 바꾸므로 다른 트랜잭션이 먼저 옮긴 상태를 덮어쓰지 않습니다.
 
-호스트 앱은 `/clubs/:slug/app/host/sessions/:sessionId/closing`에서 회차별 클로징 상태를 보여줍니다. 이 화면은 세션 종료, 기록 패키지, 피드백 문서, 멤버 알림, 공개 기록 노출을 하나의 host-safe read model로 묶고, member/public 표면에는 권한에 맞는 진입과 공개 가능한 기록만 노출합니다. 서버의 `sessionclosing` slice는 새 영속 상태나 DB migration 없이 기존 세션·공개 기록·피드백 문서·알림 outbox/inbox 데이터를 읽어 checklist, next action, Host/Member/Public surface 상태, evidence ledger를 계산합니다.
+호스트는 기록 revision이나 알림 결정 이력이 없는 `DRAFT`를 `DELETE /api/host/sessions/{sessionId}`로 지울 수 있으며, 이 삭제는 내구 이력을 남기지 않습니다. 같은 내구 이력 조건의 `OPEN` 삭제도 유지합니다. `CLOSED`와 `PUBLISHED`는 삭제할 수 없습니다.
+
+호스트 앱의 `/edit`와 `/closing`은 모임 canonical 경로 `/clubs/:slug/app/host/sessions/:sessionId`로 redirect합니다. 모임 후 단계는 같은 장부에서 출석 수정, `정리본 올리기`, 기록 공개를 다룹니다. 서버의 `sessionclosing` slice는 새 영속 상태나 DB migration 없이 기존 세션·공개 기록·피드백 문서·알림 outbox/inbox 데이터를 읽어 checklist, next action, Host/Member/Public surface 상태, evidence ledger를 계산합니다.
 
 로그인 audience의 멤버 홈은 `/api/sessions/upcoming`, 익명 audience의 scoped guest app은 `/api/public/clubs/{slug}/browse/sessions/upcoming`을 사용합니다. 두 경로 모두 `DRAFT + GUEST_READABLE`인 같은 클럽 세션을 반환하며 public-site placement를 요구하지 않습니다. 공개 클럽에 `OPEN + GUEST_READABLE` current session이 없으면 guest current API는 `404`가 아니라 `{currentSession:null}`을 반환해 정상 empty state를 표시하고, 존재하지 않거나 비공개·비활성인 클럽만 `404`로 숨깁니다. `GUEST`와 `VIEWER`는 읽을 수 있지만 RSVP/체크인/질문/서평 쓰기와 `/api/host/**` 운영 도구는 사용할 수 없습니다.
 
@@ -481,7 +485,7 @@ Readable response for active full member or host
 
 ## 세션 기록 JSON 가져오기
 
-호스트는 앱 밖에서 정리한 세션 기록 JSON을 `/app/host/sessions/:sessionId/edit`의 `기록 작업대`에서 `초안 만들기` → `외부 JSON`으로 불러올 수 있습니다. 이 기능은 production 앱에서 AI API를 호출하지 않습니다. 앱은 최종 JSON만 preview/commit API로 전달하고, commit 뒤에는 공통 작업 중 초안에서 직접 작성·AI 결과와 같은 방식으로 검토합니다.
+호스트는 앱 밖에서 정리한 세션 기록 JSON을 모임 화면 `/app/host/sessions/:sessionId`의 `정리본 올리기`로 불러올 수 있습니다. 이 기능은 production 앱에서 AI API를 호출하지 않습니다. 앱은 최종 JSON만 preview/commit API로 전달하고, commit 뒤에는 공통 작업 중 초안에서 직접 작성·AI 결과와 같은 방식으로 검토합니다.
 
 ```text
 External transcript/AI workflow
