@@ -2,14 +2,16 @@ import type { CSSProperties, JSX, ReactNode } from "react";
 import type { HostSessionState } from "../../model/host-session-editor-model";
 import type { HostSessionEditorLocation } from "../../model/host-session-editor-navigation";
 import type { HostSessionEditorOverview } from "../../model/host-session-editor-view-model";
+import { lifecycleConfirmCopy } from "../../model/host-session-lifecycle-model";
 import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 
-const recordsTarget: HostSessionEditorLocation = { section: "records", source: "manual" };
+const wrapUpTarget: HostSessionEditorLocation = { section: "records", source: "json" };
 
 export function SessionOverviewSection({
   overview,
   sessionState,
   onNextAction,
+  onOpenSession,
   onCloseSession,
   onPublishSession,
   onReverseSession,
@@ -19,6 +21,7 @@ export function SessionOverviewSection({
   overview: HostSessionEditorOverview;
   sessionState: HostSessionState | undefined;
   onNextAction: (target: HostSessionEditorLocation) => void;
+  onOpenSession?: () => void;
   onCloseSession?: () => void | Promise<void>;
   onPublishSession?: () => void | Promise<void>;
   onReverseSession?: () => void;
@@ -105,23 +108,34 @@ export function SessionOverviewSection({
             </p>
           </div>
           <div className="rm-host-session-editor__lifecycle-actions">
+            {sessionState === "DRAFT" && onOpenSession ? (
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                disabled={lifecyclePending}
+                onClick={onOpenSession}
+              >
+                {lifecycleConfirmCopy("open").confirmLabel}
+              </button>
+            ) : null}
             {sessionState === "OPEN" && onCloseSession ? (
               <button
                 type="button"
-                className="btn btn-quiet btn-sm"
+                className="btn btn-primary btn-sm"
                 disabled={lifecyclePending}
                 onClick={() => void onCloseSession()}
               >
-                세션 마감
+                {lifecycleConfirmCopy("close").confirmLabel}
               </button>
             ) : null}
             {sessionState === "CLOSED" ? (
               <button
                 type="button"
                 className="btn btn-quiet btn-sm"
-                onClick={() => onNextAction(recordsTarget)}
+                disabled={lifecyclePending}
+                onClick={() => onNextAction(wrapUpTarget)}
               >
-                기록 작업대
+                정리본 올리기
               </button>
             ) : null}
             {sessionState === "CLOSED" && onPublishSession ? (
@@ -131,7 +145,7 @@ export function SessionOverviewSection({
                 disabled={lifecyclePending}
                 onClick={() => void onPublishSession()}
               >
-                세션 공개
+                {lifecycleConfirmCopy("publish").confirmLabel}
               </button>
             ) : null}
             {reverseLabel && onReverseSession ? (

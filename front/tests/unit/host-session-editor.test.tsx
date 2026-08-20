@@ -72,6 +72,7 @@ const hostSessionEditorTestActions = {
       headers: jsonHeaders(),
       cache: "no-store",
     }),
+  openSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   closeSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   publishSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   reopenSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
@@ -1440,6 +1441,72 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
   });
 
+  it("lets hosts open a draft meeting after confirming 멤버에게 열기", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const draftSession = { ...session, state: "DRAFT" as const };
+    const openHostSession = vi.fn(
+      async () => ({ ok: true as const, session: { ...draftSession, state: "OPEN" as const } }),
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={draftSession}
+        actions={{ ...hostSessionEditorTestActions, openSession: openHostSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "멤버에게 열기" }));
+    expect(openHostSession).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole("dialog", { name: "멤버에게 열기" })).toBeVisible();
+    expect(screen.getByText("멤버 참석과 질문이 시작됩니다.")).toBeVisible();
+
+    await user.click(
+      within(screen.getByRole("dialog", { name: "멤버에게 열기" })).getByRole("button", { name: "멤버에게 열기" }),
+    );
+
+    expect(openHostSession).toHaveBeenCalledTimes(1);
+    expect(openHostSession).toHaveBeenCalledWith(draftSession.sessionId);
+    expect(await screen.findByRole("status")).toHaveTextContent("모임을 열었습니다.");
+    confirmSpy.mockRestore();
+  });
+
+  it("keeps the open dialog and links to the other open meeting on SESSION_OPEN_ALREADY_EXISTS", async () => {
+    const user = userEvent.setup();
+    const draftSession = { ...session, state: "DRAFT" as const };
+    const openSessionId = "00000000-0000-0000-0000-000000000307";
+    const openHostSession = vi.fn(
+      async () => ({
+        ok: false as const,
+        message: openAlreadyExistsMessage(),
+        openSessionId,
+      }),
+    );
+
+    render(
+      <HostSessionEditorForTest
+        session={draftSession}
+        clubSlug="club-a"
+        actions={{ ...hostSessionEditorTestActions, openSession: openHostSession }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "멤버에게 열기" }));
+    await user.click(
+      within(screen.getByRole("dialog", { name: "멤버에게 열기" })).getByRole("button", { name: "멤버에게 열기" }),
+    );
+
+    const dialog = await screen.findByRole("dialog", { name: "멤버에게 열기" });
+    expect(dialog).toBeVisible();
+    expect(within(dialog).getByRole("alert")).toHaveTextContent(openAlreadyExistsMessage());
+    expect(within(dialog).getByRole("link", { name: "진행 중인 세션 열기" })).toHaveAttribute(
+      "href",
+      `/clubs/club-a/app/host/sessions/${openSessionId}`,
+    );
+    expect(openHostSession).toHaveBeenCalledTimes(1);
+  });
+
   it("lets hosts close an open session from the editor", async () => {
     const user = userEvent.setup();
     const closedSession = { ...openSession, state: "CLOSED" as const };
@@ -1453,13 +1520,13 @@ describe("HostSessionEditor", () => {
     );
 
     expect(screen.getByText("모임이 끝났다면 세션을 마감한 뒤 기록을 정리하세요.")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
     await user.click(within(screen.getByRole("dialog", { name: "모임 마치기" })).getByRole("button", { name: "모임 마치기" }));
 
     expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
     expect(await screen.findByRole("group", { name: /No\.07 · 지난 회차 · 비공개/ })).toBeVisible();
     expect(screen.getByText("모임은 마감되었습니다. 기록 작업대에서 초안을 검토한 뒤 세션을 공개할 수 있습니다.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "세션 공개" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
   });
 
   it("opens a confirm dialog for 모임 마치기 without calling closeSession", async () => {
@@ -1473,7 +1540,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
 
     expect(screen.getByRole("dialog", { name: "모임 마치기" })).toBeVisible();
     expect(closeSession).not.toHaveBeenCalled();
@@ -1490,13 +1557,13 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
     await user.click(screen.getByRole("button", { name: "취소" }));
 
     expect(screen.queryByRole("dialog", { name: "모임 마치기" })).not.toBeInTheDocument();
     expect(closeSession).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("dialog", { name: "모임 마치기" })).not.toBeInTheDocument();
@@ -1516,7 +1583,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
     expect(closeSession).not.toHaveBeenCalled();
 
     await user.click(within(screen.getByRole("dialog", { name: "모임 마치기" })).getByRole("button", { name: "모임 마치기" }));
@@ -1666,7 +1733,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 공개" }));
+    await user.click(screen.getByRole("button", { name: "기록 공개" }));
     await user.click(within(screen.getByRole("dialog", { name: "기록 공개" })).getByRole("button", { name: "기록 공개" }));
 
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);

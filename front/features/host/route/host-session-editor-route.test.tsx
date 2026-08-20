@@ -10,6 +10,7 @@ const routeMocks = vi.hoisted(() => ({
   rebase: vi.fn(),
   restore: vi.fn(),
   commitImport: vi.fn(),
+  openSession: vi.fn(),
   invalidateHostNotifications: vi.fn(),
   invalidateRecordSurfaces: vi.fn(),
   preview: vi.fn(),
@@ -114,6 +115,7 @@ vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) =
   useCommitHostSessionImportMutation: () => ({ mutateAsync: routeMocks.commitImport }),
   useCreateHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useDeleteHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
+  useOpenHostSessionMutation: () => ({ mutateAsync: routeMocks.openSession }),
   usePublishHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useReopenHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useReturnHostSessionToDraftMutation: () => ({ mutateAsync: vi.fn() }),
@@ -324,6 +326,7 @@ describe("EditHostSessionRecordWorkflow", () => {
     routeMocks.rebase.mockReset();
     routeMocks.restore.mockReset();
     routeMocks.commitImport.mockReset();
+    routeMocks.openSession.mockReset();
     routeMocks.invalidateHostNotifications.mockReset();
     routeMocks.invalidateRecordSurfaces.mockReset();
     routeMocks.preview.mockReset();
@@ -829,6 +832,65 @@ describe("EditHostSessionRecordWorkflow", () => {
       source: "manual",
     });
     expect(routeMocks.apply).not.toHaveBeenCalled();
+  });
+
+  it("opens a meeting through the existing lifecycle mutation mapper", async () => {
+    const opened = { sessionId: "session-1", state: "OPEN" };
+    routeMocks.openSession.mockResolvedValue(
+      new Response(JSON.stringify(opened), { status: 200 }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      })}>
+        <MemoryRouter>
+          <NewHostSessionRoute onSessionRecordsChanged={vi.fn()} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const actions = routeMocks.capturedProps?.actions as {
+      openSession: (sessionId: string) => Promise<{ ok: boolean; session?: unknown; openSessionId?: string | null }>;
+    };
+
+    await expect(actions.openSession("session-1")).resolves.toEqual({
+      ok: true,
+      session: opened,
+    });
+    expect(routeMocks.openSession).toHaveBeenCalledWith("session-1");
+  });
+
+  it("keeps SESSION_OPEN_ALREADY_EXISTS on the open action for the confirm dialog", async () => {
+    const openSessionId = "00000000-0000-0000-0000-000000000307";
+    routeMocks.openSession.mockResolvedValue(
+      new Response(JSON.stringify({
+        code: "SESSION_OPEN_ALREADY_EXISTS",
+        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+        status: 409,
+        openSessionId,
+      }), { status: 409 }),
+    );
+    render(
+      <QueryClientProvider client={new QueryClient({
+        defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+      })}>
+        <MemoryRouter>
+          <NewHostSessionRoute onSessionRecordsChanged={vi.fn()} />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+    const actions = routeMocks.capturedProps?.actions as {
+      openSession: (sessionId: string) => Promise<{
+        ok: boolean;
+        message?: string;
+        openSessionId?: string | null;
+      }>;
+    };
+
+    await expect(actions.openSession("session-draft")).resolves.toEqual({
+      ok: false,
+      message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+      openSessionId,
+    });
   });
 
   it("keeps JSON import invalidation on record surfaces without opening or invalidating notifications", async () => {

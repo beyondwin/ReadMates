@@ -9,6 +9,7 @@ import {
 import { SessionLifecycleConfirmDialog } from "./session-lifecycle-confirm-dialog";
 
 const copy = lifecycleConfirmCopy("reopen");
+const openCopy = lifecycleConfirmCopy("open");
 
 afterEach(() => {
   document.body.replaceChildren();
@@ -27,6 +28,14 @@ describe("SessionLifecycleConfirmDialog", () => {
     );
     expect(screen.getByText(copy.body)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "취소" })).toHaveFocus();
+  });
+
+  it("labels the dialog from open copy", () => {
+    renderDialog({ copy: openCopy });
+
+    expect(screen.getByRole("dialog", { name: "멤버에게 열기" })).toBeVisible();
+    expect(screen.getByText("멤버 참석과 질문이 시작됩니다.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "멤버에게 열기" })).toHaveClass("btn", "btn-primary", "btn-sm");
   });
 
   it("calls onConfirm from the primary confirm button", async () => {
@@ -136,6 +145,7 @@ describe("SessionLifecycleConfirmDialog", () => {
 });
 
 function renderDialog({
+  copy: dialogCopy = copy,
   errorMessage = null,
   openSessionHref = null,
   submitting = false,
@@ -143,6 +153,7 @@ function renderDialog({
   onClose = vi.fn(),
   onConfirm = vi.fn(),
 }: {
+  copy?: typeof copy;
   errorMessage?: string | null;
   openSessionHref?: string | null;
   submitting?: boolean;
@@ -152,7 +163,7 @@ function renderDialog({
 } = {}) {
   const view = render(
     <SessionLifecycleConfirmDialog
-      copy={copy}
+      copy={dialogCopy}
       errorMessage={errorMessage}
       openSessionHref={openSessionHref}
       submitting={submitting}

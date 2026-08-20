@@ -56,6 +56,7 @@ import {
   useCommitHostSessionImportMutation,
   useCreateHostSessionMutation,
   useDeleteHostSessionMutation,
+  useOpenHostSessionMutation,
   usePublishHostSessionMutation,
   useReopenHostSessionMutation,
   useReturnHostSessionToDraftMutation,
@@ -250,6 +251,7 @@ function useHostSessionEditorActions(
   const { mutateAsync: createSession } = useCreateHostSessionMutation(context);
   const { mutateAsync: updateSession } = useUpdateHostSessionMutation(context);
   const { mutateAsync: deleteSession } = useDeleteHostSessionMutation(context);
+  const { mutateAsync: openSession } = useOpenHostSessionMutation(context);
   const { mutateAsync: closeSession } = useCloseHostSessionMutation(context);
   const { mutateAsync: publishSession } = usePublishHostSessionMutation(context);
   const { mutateAsync: reopenSession } = useReopenHostSessionMutation(context);
@@ -273,6 +275,7 @@ function useHostSessionEditorActions(
     loadDeletionPreview: (sessionId) =>
       queryClient.fetchQuery(hostSessionDeletionPreviewQuery(sessionId, context)),
     deleteSession: (sessionId) => deleteSession(sessionId),
+    openSession: (sessionId) => runLifecycle(openSession, sessionId),
     closeSession: (sessionId) => runLifecycle(closeSession, sessionId),
     publishSession: (sessionId) => runLifecycle(publishSession, sessionId),
     reopenSession: (sessionId) => runLifecycle(reopenSession, sessionId),
@@ -296,6 +299,7 @@ function useHostSessionEditorActions(
     context,
     createSession,
     deleteSession,
+    openSession,
     publishSession,
     queryClient,
     onSessionRecordsChanged,

@@ -26,6 +26,7 @@ vi.mock("@/features/host/api/host-api", async (importOriginal) => {
     ...actual,
     closeHostSession: vi.fn(),
     commitHostSessionImport: vi.fn(),
+    openHostSession: vi.fn(),
     publishHostSession: vi.fn(),
     reopenHostSession: vi.fn(),
     returnHostSessionToDraft: vi.fn(),
@@ -55,6 +56,7 @@ vi.mock("@/features/host/ui/host-session-editor", () => ({
   default: (props: {
     actions: {
       commitSessionImport: (sessionId: string, request: never) => Promise<unknown>;
+      openSession: (sessionId: string) => Promise<unknown>;
       closeSession: (sessionId: string) => Promise<unknown>;
       publishSession: (sessionId: string) => Promise<unknown>;
       reopenSession: (sessionId: string) => Promise<unknown>;
@@ -81,6 +83,9 @@ vi.mock("@/features/host/ui/host-session-editor", () => ({
         >
           commit import
         </button>
+        <button type="button" onClick={() => void props.actions.openSession("session-7")}>
+          open session
+        </button>
         <button type="button" onClick={() => void props.actions.closeSession("session-7")}>
           close session
         </button>
@@ -104,6 +109,7 @@ vi.mock("@/features/host/ui/host-session-editor", () => ({
 import {
   closeHostSession,
   commitHostSessionImport,
+  openHostSession,
   publishHostSession,
   reopenHostSession,
   returnHostSessionToDraft,
@@ -183,6 +189,7 @@ describe("EditHostSessionRoute query actions", () => {
       liveApplied: false,
     });
     for (const apiFn of [
+      openHostSession,
       closeHostSession,
       publishHostSession,
       reopenHostSession,
@@ -220,6 +227,7 @@ describe("EditHostSessionRoute query actions", () => {
   });
 
   it.each([
+    ["open", "open session", openHostSession],
     ["close", "close session", closeHostSession],
     ["publish", "publish session", publishHostSession],
     ["reopen", "reopen session", reopenHostSession],

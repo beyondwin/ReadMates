@@ -13,6 +13,7 @@ type JsonResponse<T> = Response & { json(): Promise<T> };
 export type HostSessionEditorActions = {
   loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
   deleteSession: (sessionId: string) => Promise<Response>;
+  openSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   closeSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   publishSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   reopenSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;

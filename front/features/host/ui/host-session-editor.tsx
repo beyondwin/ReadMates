@@ -693,11 +693,8 @@ export default function HostSessionEditor({
       return;
     }
 
-    if (lifecycleConfirm === "open") {
-      return;
-    }
-
     const actionByKind = {
+      open: actions.openSession,
       close: actions.closeSession,
       publish: actions.publishSession,
       reopen: actions.reopenSession,
@@ -1039,6 +1036,7 @@ export default function HostSessionEditor({
                   overview={overview}
                   sessionState={sessionState}
                   onNextAction={changeLocation}
+                  onOpenSession={session ? () => requestLifecycleConfirm("open") : undefined}
                   onCloseSession={session ? () => requestLifecycleConfirm("close") : undefined}
                   onPublishSession={session ? () => requestLifecycleConfirm("publish") : undefined}
                   onReverseSession={reverseAction ? () => requestLifecycleConfirm(reverseAction.kind) : undefined}

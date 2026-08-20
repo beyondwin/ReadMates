@@ -1,9 +1,13 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostSessionEditorOverview } from "../../model/host-session-editor-view-model";
 import { SessionEditorSectionNav } from "./session-editor-section-nav";
 import { SessionOverviewSection } from "./session-overview-section";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe("SessionOverviewSection", () => {
   it("is the tabpanel controlled by the actual overview navigation tab", () => {
@@ -82,32 +86,76 @@ describe("SessionOverviewSection", () => {
     expect(onNextAction).toHaveBeenCalledWith({ section: "records", source: "manual" });
   });
 
-  it("offers session closing for an open session without treating visibility as a lifecycle action", async () => {
+  it("asks to open a draft meeting after confirm", async () => {
     const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm");
+    const onOpenSession = vi.fn();
+    renderOverview({ sessionState: "DRAFT", onOpenSession });
+
+    const openButton = screen.getByRole("button", { name: "멤버에게 열기" });
+    expect(openButton).toBeEnabled();
+    expect(openButton).toHaveClass("btn", "btn-primary", "btn-sm");
+
+    await user.click(openButton);
+
+    expect(onOpenSession).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: "모임 마치기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "모임 전으로 되돌리기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "기록 공개" })).not.toBeInTheDocument();
+  });
+
+  it("offers close and reverse for an open session without treating visibility as a lifecycle action", async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm");
     const onCloseSession = vi.fn().mockResolvedValue(undefined);
-    renderOverview({ sessionState: "OPEN", onCloseSession });
+    const onReverseSession = vi.fn();
+    renderOverview({
+      sessionState: "OPEN",
+      onCloseSession,
+      reverseLabel: "모임 전으로 되돌리기",
+      onReverseSession,
+    });
 
     expect(screen.getByText("모임이 끝났다면 세션을 마감한 뒤 기록을 정리하세요.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    expect(lifecycleActionNames()).toEqual(["모임 마치기", "모임 전으로 되돌리기"]);
+    expect(screen.getByRole("button", { name: "모임 마치기" })).toHaveClass("btn", "btn-primary", "btn-sm");
+    expect(screen.getByRole("button", { name: "모임 전으로 되돌리기" })).toHaveClass(
+      "btn",
+      "btn-ghost",
+      "btn-sm",
+    );
+    expect(lifecycleActions("모임 마치기")).toHaveClass("rm-host-session-editor__lifecycle-actions");
+
+    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
+
     expect(onCloseSession).toHaveBeenCalledTimes(1);
+    expect(onReverseSession).not.toHaveBeenCalled();
+    expect(confirmSpy).not.toHaveBeenCalled();
     expect(screen.queryByRole("button", { name: /게스트 공개/ })).not.toBeInTheDocument();
   });
 
-  it("guides a closed session through the record workbench before session publication", async () => {
+  it("guides a closed session through wrap-up upload before record publication", async () => {
     const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm");
     const onNextAction = vi.fn();
     const onPublishSession = vi.fn().mockResolvedValue(undefined);
+    const onReverseSession = vi.fn();
     renderOverview({
       sessionState: "CLOSED",
       onNextAction,
       onPublishSession,
+      reverseLabel: "다시 진행 중으로",
+      onReverseSession,
     });
 
     expect(screen.getByText(/모임은 마감되었습니다/)).toHaveTextContent("기록 작업대");
-    await user.click(screen.getByRole("button", { name: "기록 작업대" }));
-    expect(onNextAction).toHaveBeenCalledWith({ section: "records", source: "manual" });
-    await user.click(screen.getByRole("button", { name: "세션 공개" }));
+    expect(lifecycleActionNames()).toEqual(["정리본 올리기", "기록 공개", "다시 진행 중으로"]);
+    await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
+    expect(onNextAction).toHaveBeenCalledWith({ section: "records", source: "json" });
+    await user.click(screen.getByRole("button", { name: "기록 공개" }));
     expect(onPublishSession).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
   it("explains that a published session remains editable", () => {
@@ -115,38 +163,8 @@ describe("SessionOverviewSection", () => {
 
     expect(screen.getByText("공개된 세션입니다. 공개 후에도 기본 정보와 기록 초안을 수정할 수 있습니다."))
       .toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "세션 마감" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "세션 공개" })).not.toBeInTheDocument();
-  });
-
-  it("offers close and reverse for an open session", () => {
-    renderOverview({
-      sessionState: "OPEN",
-      onCloseSession: vi.fn(),
-      reverseLabel: "예정으로 되돌리기",
-      onReverseSession: vi.fn(),
-    });
-
-    expect(screen.getByRole("button", { name: "세션 마감" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "예정으로 되돌리기" })).toHaveClass(
-      "btn",
-      "btn-ghost",
-      "btn-sm",
-    );
-    expect(lifecycleActions()).toHaveClass("rm-host-session-editor__lifecycle-actions");
-  });
-
-  it("offers publish, records, and reverse for a closed session", () => {
-    renderOverview({
-      sessionState: "CLOSED",
-      onPublishSession: vi.fn(),
-      reverseLabel: "마감 취소",
-      onReverseSession: vi.fn(),
-    });
-
-    expect(screen.getByRole("button", { name: "세션 공개" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "기록 작업대" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "마감 취소" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "모임 마치기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "기록 공개" })).not.toBeInTheDocument();
   });
 
   it("offers only unpublish for a published session", () => {
@@ -156,50 +174,60 @@ describe("SessionOverviewSection", () => {
       onReverseSession: vi.fn(),
     });
 
-    expect(screen.getByRole("button", { name: "공개 취소" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "세션 마감" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "세션 공개" })).not.toBeInTheDocument();
+    expect(lifecycleActionNames()).toEqual(["공개 취소"]);
+    expect(screen.getByRole("button", { name: "공개 취소" })).toHaveClass("btn", "btn-ghost", "btn-sm");
+    expect(screen.queryByRole("button", { name: "모임 마치기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "기록 공개" })).not.toBeInTheDocument();
   });
 
-  it("does not offer reverse or close for a draft session", () => {
+  it("does not offer reverse or close without an open callback on a draft session", () => {
     renderOverview({ sessionState: "DRAFT" });
 
-    expect(screen.queryByRole("button", { name: "세션 마감" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "예정으로 되돌리기" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "마감 취소" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "멤버에게 열기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "모임 마치기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "모임 전으로 되돌리기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "다시 진행 중으로" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "공개 취소" })).not.toBeInTheDocument();
   });
 
   it("calls onReverseSession once from the reverse action", async () => {
     const user = userEvent.setup();
+    const confirmSpy = vi.spyOn(window, "confirm");
     const onReverseSession = vi.fn();
     renderOverview({
       sessionState: "OPEN",
       onCloseSession: vi.fn(),
-      reverseLabel: "예정으로 되돌리기",
+      reverseLabel: "모임 전으로 되돌리기",
       onReverseSession,
     });
 
-    await user.click(screen.getByRole("button", { name: "예정으로 되돌리기" }));
+    await user.click(screen.getByRole("button", { name: "모임 전으로 되돌리기" }));
 
     expect(onReverseSession).toHaveBeenCalledTimes(1);
+    expect(confirmSpy).not.toHaveBeenCalled();
   });
 
-  it("still calls onCloseSession from the close action", async () => {
-    const user = userEvent.setup();
-    const onCloseSession = vi.fn();
-    const onReverseSession = vi.fn();
+  it("disables forward and reverse actions while lifecycle work is pending", () => {
     renderOverview({
       sessionState: "OPEN",
-      onCloseSession,
-      reverseLabel: "예정으로 되돌리기",
-      onReverseSession,
+      onCloseSession: vi.fn(),
+      reverseLabel: "모임 전으로 되돌리기",
+      onReverseSession: vi.fn(),
+      lifecyclePending: true,
     });
 
-    await user.click(screen.getByRole("button", { name: "세션 마감" }));
+    expect(screen.getByRole("button", { name: "모임 마치기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "모임 전으로 되돌리기" })).toBeDisabled();
+  });
 
-    expect(onCloseSession).toHaveBeenCalledTimes(1);
-    expect(onReverseSession).not.toHaveBeenCalled();
+  it("disables opening a draft while lifecycle work is pending", () => {
+    renderOverview({
+      sessionState: "DRAFT",
+      onOpenSession: vi.fn(),
+      lifecyclePending: true,
+    });
+
+    expect(screen.getByRole("button", { name: "멤버에게 열기" })).toBeDisabled();
   });
 });
 
@@ -207,18 +235,22 @@ function renderOverview({
   overview = overviewFixture(),
   sessionState = "OPEN",
   onNextAction = vi.fn(),
+  onOpenSession,
   onCloseSession,
   onPublishSession,
   onReverseSession,
   reverseLabel,
+  lifecyclePending = false,
 }: {
   overview?: HostSessionEditorOverview;
   sessionState?: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
   onNextAction?: (target: HostSessionEditorOverview["nextAction"]["target"]) => void;
+  onOpenSession?: () => void;
   onCloseSession?: () => void | Promise<void>;
   onPublishSession?: () => void | Promise<void>;
   onReverseSession?: () => void;
   reverseLabel?: string;
+  lifecyclePending?: boolean;
 } = {}) {
   return render(
     <>
@@ -227,20 +259,31 @@ function renderOverview({
         overview={overview}
         sessionState={sessionState}
         onNextAction={onNextAction}
+        onOpenSession={onOpenSession}
         onCloseSession={onCloseSession}
         onPublishSession={onPublishSession}
         onReverseSession={onReverseSession}
         reverseLabel={reverseLabel}
-        lifecyclePending={false}
+        lifecyclePending={lifecyclePending}
       />
     </>,
   );
 }
 
-function lifecycleActions() {
-  return screen.getByRole("button", { name: "세션 마감" }).closest(
+function lifecycleActions(buttonName: string) {
+  return screen.getByRole("button", { name: buttonName }).closest(
     ".rm-host-session-editor__lifecycle-actions",
   );
+}
+
+function lifecycleActionNames() {
+  const container = document.querySelector(".rm-host-session-editor__lifecycle-actions");
+  if (!(container instanceof HTMLElement)) {
+    return [];
+  }
+  return within(container)
+    .getAllByRole("button")
+    .map((button) => button.textContent?.trim() ?? "");
 }
 
 function overviewFixture(
