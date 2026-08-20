@@ -84,11 +84,66 @@ export async function routeHostEditorShell(page: Page, clubSlug: string): Promis
     });
   });
 
+  await page.route("**/api/bff/api/host/sessions/schedule-defaults**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        startTime: "20:00",
+        endTime: "22:00",
+        locationLabel: "온라인",
+        meetingUrl: null,
+        meetingPasscode: null,
+        accessScope: "HOST_ONLY",
+        suggestedDate: null,
+        questionDeadlineOffsetDays: 1,
+        hints: [],
+      }),
+    });
+  });
+
+  await page.route("**/api/bff/api/host/sessions**", async (route) => {
+    const pathname = new URL(route.request().url()).pathname;
+    if (pathname !== "/api/bff/api/host/sessions") {
+      await route.fallback();
+      return;
+    }
+    const url = new URL(route.request().url());
+    if (url.searchParams.has("needsAttention")) {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify({
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ items: [], nextCursor: null }),
+    });
+  });
+
   await page.route("**/api/bff/api/host/notifications/manual/dispatches**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ items: [], nextCursor: null }),
+    });
+  });
+
+  await page.route("**/api/bff/api/host/sessions/*/record-apply-preview**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        eventType: "SESSION_RECORD_UPDATED",
+        expectedDraftHash: "e2e-draft-hash",
+      }),
     });
   });
 

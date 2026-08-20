@@ -93,7 +93,7 @@ test("expired job (poll 404) surfaces an error and lets the host start over", as
     },
   );
 
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
 
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",

@@ -131,7 +131,7 @@ test("regenerate summary: modal payload uses UPPER_SNAKE item and updates PREVIE
     },
   );
 
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
 
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",

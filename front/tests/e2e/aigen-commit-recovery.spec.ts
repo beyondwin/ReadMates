@@ -41,7 +41,7 @@ test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing conten
     });
   });
 
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
   await expect(page.getByText("COMMIT_RETRY")).toBeVisible();
   await page.getByRole("button", { name: "Commit 재시도" }).click();
   await expect(page.getByText("커밋 확인 중")).toBeVisible();

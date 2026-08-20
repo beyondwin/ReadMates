@@ -509,9 +509,9 @@ test("session editor disables manual templates that do not match automatic predi
   createFeedbackDocumentFixture(feedbackSessionId);
 
   await loginWithGoogleFixture(page, "host@example.com");
-  await page.goto(`/clubs/reading-sai/app/host/sessions/${openSessionId}/edit`);
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${openSessionId}`);
   await expect(page.getByRole("button", { name: /다음 책 공개/ })).toBeDisabled();
 
-  await page.goto(`/clubs/reading-sai/app/host/sessions/${feedbackSessionId}/edit`);
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${feedbackSessionId}`);
   await expect(page.getByRole("button", { name: /피드백 문서 등록/ })).toBeDisabled();
 });

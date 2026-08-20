@@ -102,10 +102,10 @@ test("JSON-upload and AI-generate modes coexist and toggle via URL query params"
   });
 
   // 1) A bare editor URL opens the overview instead of choosing an import tool.
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`);
   await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel(/대본 파일/)).toHaveCount(0);
-  await expect(page.getByLabel("AI 결과 JSON 가져오기")).toHaveCount(0);
+  await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toHaveCount(0);
 
   // 2) The record workspace defaults to manual editing and owns one shared draft.
   await page.getByRole("tab", { name: "기록 작업대" }).click();
@@ -128,26 +128,28 @@ test("JSON-upload and AI-generate modes coexist and toggle via URL query params"
   await page.getByRole("tab", { name: "AI로 생성" }).click();
   await expect(page).toHaveURL(/\?section=records&source=ai$/);
   await expect(page.getByLabel(/대본 파일/)).toBeVisible({ timeout: 5000 });
-  await expect(page.getByLabel("AI 결과 JSON 가져오기")).toHaveCount(0);
+  await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toHaveCount(0);
   await expect(page.getByLabel("공개 요약")).toHaveValue("도구를 바꿔도 유지되는 공유 초안");
 
-  await page.getByRole("tab", { name: "외부 JSON" }).click();
+  await page.getByRole("tab", { name: "정리본 올리기" }).click();
   await expect(page).toHaveURL(/\?section=records&source=json$/);
-  await expect(page.getByLabel("AI 결과 JSON 가져오기")).toBeVisible({ timeout: 5000 });
+  await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible({ timeout: 5000 });
   await expect(page.getByLabel(/대본 파일/)).toBeHidden();
+  await page.getByRole("tab", { name: "직접 작성" }).click();
   await expect(page.getByLabel("공개 요약")).toHaveValue("도구를 바꿔도 유지되는 공유 초안");
 
   // 4) Legacy deep links canonicalize once and converge on that same draft.
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
   await expect(page).toHaveURL(/\?section=records&source=ai$/);
   await expect(page.getByRole("tab", { name: "AI로 생성" }))
     .toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("공개 요약")).toHaveValue("도구를 바꿔도 유지되는 공유 초안");
 
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?records=json`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?records=json`);
   await expect(page).toHaveURL(/\?section=records&source=json$/);
-  await expect(page.getByRole("tab", { name: "외부 JSON" }))
+  await expect(page.getByRole("tab", { name: "정리본 올리기" }))
     .toHaveAttribute("aria-selected", "true");
-  await expect(page.getByLabel("AI 결과 JSON 가져오기")).toBeVisible();
+  await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible();
+  await page.getByRole("tab", { name: "직접 작성" }).click();
   await expect(page.getByLabel("공개 요약")).toHaveValue("도구를 바꿔도 유지되는 공유 초안");
 });

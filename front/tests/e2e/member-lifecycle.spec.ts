@@ -1,10 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
-import { loginWithGoogleFixture, resetE2eState, setMembershipStatus } from "./readmates-e2e-db";
+import { hostMeetingUrlPattern, loginWithGoogleFixture, resetE2eState, setMembershipStatus } from "./readmates-e2e-db";
 
 test.describe.configure({ mode: "serial" });
 
 const lifecycleMemberEmail = "member5@example.com";
 const lifecycleBookTitle = "생명주기 테스트 책";
+const hostMeetingPath = hostMeetingUrlPattern;
 
 function resetLifecycleState() {
   resetE2eState({
@@ -12,6 +13,11 @@ function resetLifecycleState() {
     googleLoginEmails: ["host@example.com", lifecycleMemberEmail],
   });
   setMembershipStatus(lifecycleMemberEmail, "ACTIVE");
+}
+
+async function expectCanonicalMeetingUrl(page: Page) {
+  await expect(page).toHaveURL(hostMeetingPath);
+  expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
 }
 
 async function createOpenSessionThroughUi(page: Page) {
@@ -23,20 +29,22 @@ async function createOpenSessionThroughUi(page: Page) {
   await page.getByLabel("모임 날짜").fill("2026-05-20");
   await page.getByRole("button", { name: "세션 문서 저장" }).click();
 
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
-  const editUrl = page.url();
-  await page.goto("/app/host");
-  await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
+  await expectCanonicalMeetingUrl(page);
+  await expect(page.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
+  const meetingUrl = page.url();
+  await page.getByRole("button", { name: "멤버에게 열기" }).click();
+  const dialog = page.getByRole("dialog", { name: "멤버에게 열기" });
+  await expect(dialog).toBeVisible();
   const openResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/sessions/") && response.url().includes("/open") && response.status() === 200,
   );
-  await page.getByRole("button", { name: new RegExp(`현재로 시작 · ${lifecycleBookTitle}`) }).click();
+  await dialog.getByRole("button", { name: "멤버에게 열기" }).click();
   await openResponse;
   await page.goto("/app/session/current");
 
   await expect(page).toHaveURL(/\/app\/session\/current/);
   await expect(page.getByRole("heading", { level: 1, name: lifecycleBookTitle })).toBeVisible();
-  return editUrl;
+  return meetingUrl;
 }
 
 test.beforeEach(() => {
@@ -49,29 +57,30 @@ test.afterEach(() => {
 
 test("host confirms before closing a session from the editor overview", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
-  const editUrl = await createOpenSessionThroughUi(page);
+  const meetingUrl = await createOpenSessionThroughUi(page);
 
-  await page.goto(editUrl);
+  await page.goto(meetingUrl);
   await page.getByRole("tab", { name: "개요" }).click();
-  await expect(page.getByRole("button", { name: "세션 마감" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "모임 마치기" })).toBeVisible();
 
-  await page.getByRole("button", { name: "세션 마감" }).click();
-  const dialog = page.getByRole("dialog", { name: "세션 마감" });
+  await page.getByRole("button", { name: "모임 마치기" }).click();
+  const dialog = page.getByRole("dialog", { name: "모임 마치기" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("button", { name: "세션 마감" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "모임 마치기" })).toBeVisible();
 
-  await page.getByRole("button", { name: "세션 마감" }).click();
+  await page.getByRole("button", { name: "모임 마치기" }).click();
   const closeResponse = page.waitForResponse(
     (response) =>
       response.url().includes("/api/bff/api/host/sessions/") &&
       response.url().includes("/close") &&
       response.status() === 200,
   );
-  await page.getByRole("dialog", { name: "세션 마감" }).getByRole("button", { name: "세션 마감" }).click();
+  await page.getByRole("dialog", { name: "모임 마치기" }).getByRole("button", { name: "모임 마치기" }).click();
   await closeResponse;
-  await expect(page.getByRole("button", { name: "마감 취소" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "다시 진행 중으로" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /모임을 마쳤습니다/ })).toBeVisible();
 });
 
 test("host suspends member and member cannot save current session activity", async ({ context, page }) => {

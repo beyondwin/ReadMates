@@ -38,7 +38,7 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
   });
 
   await page.goto(
-    `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?section=records&source=ai`,
+    `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?section=records&source=ai`,
   );
   await expect(page.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tab", { name: "AI로 생성" })).toHaveAttribute("aria-selected", "true");

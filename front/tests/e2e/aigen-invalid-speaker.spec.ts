@@ -57,7 +57,7 @@ test("unknown speaker is corrected before a job exists and explicit resubmit sta
     await route.fallback();
   });
 
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt",
     mimeType: "text/plain",

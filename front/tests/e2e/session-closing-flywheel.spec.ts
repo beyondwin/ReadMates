@@ -1,5 +1,5 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
-import { fulfillHostAuth, routeHostEditorShell } from "./aigen-test-fixtures";
+import { fulfillHostAuth, hostSessionDetailResponse, routeHostEditorShell } from "./aigen-test-fixtures";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
 const CLUB_SLUG = "club-a";
@@ -11,6 +11,58 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 async function routeHostClosing(page: Page): Promise<void> {
   await routeHostEditorShell(page, CLUB_SLUG);
   await page.route("**/api/bff/api/auth/me**", async (route) => fulfillHostAuth(route, CLUB_SLUG));
+  await page.route("**/api/bff/api/host/sessions/schedule-defaults**", async (route) => {
+    await json(route, 200, {
+      startTime: "20:00",
+      endTime: "22:00",
+      locationLabel: "온라인",
+      meetingUrl: null,
+      meetingPasscode: null,
+      accessScope: "HOST_ONLY",
+      suggestedDate: null,
+      questionDeadlineOffsetDays: 1,
+      hints: [],
+    });
+  });
+  await page.route("**/api/bff/api/host/sessions**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.pathname !== "/api/bff/api/host/sessions") {
+      await route.fallback();
+      return;
+    }
+    if (url.searchParams.has("needsAttention")) {
+      await json(route, 200, {
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      });
+      return;
+    }
+    await json(route, 200, {
+      items: [{
+        sessionId: SESSION_ID,
+        sessionNumber: 7,
+        title: "E2E 책",
+        bookTitle: "E2E 책",
+        bookAuthor: "E2E 저자",
+        date: "2026-06-18",
+        state: "PUBLISHED",
+        recordStatus: "COMPLETE",
+      }],
+      nextCursor: null,
+    });
+  });
+  await page.route((url) => {
+    const pathname = new URL(url).pathname;
+    return pathname === `/api/bff/api/host/sessions/${SESSION_ID}`;
+  }, async (route) => {
+    await json(route, 200, {
+      ...hostSessionDetailResponse(SESSION_ID),
+      state: "PUBLISHED",
+      date: "2026-06-18",
+      publication: { publicSummary: "공개 가능한 요약입니다.", visibility: "PUBLIC" },
+    });
+  });
   await page.route(`**/api/bff/api/host/sessions/${SESSION_ID}/closing-status**`, async (route) => {
     await json(route, 200, {
       schema: "host.session_closing_status.v1",
@@ -24,9 +76,9 @@ async function routeHostClosing(page: Page): Promise<void> {
       },
       overall: { state: "PUBLISHED", label: "발행 완료", primaryAction: "REVIEW_PUBLIC_PAGE" },
       checklist: [
-        { id: "SESSION_CLOSED", state: "DONE", label: "세션 종료", detail: "닫힘", href: `/app/host/sessions/${SESSION_ID}/edit` },
-        { id: "RECORD_PACKAGE_SAVED", state: "DONE", label: "기록 패키지 저장", detail: "저장됨", href: `/app/host/sessions/${SESSION_ID}/edit?records=json` },
-        { id: "FEEDBACK_DOCUMENT_READY", state: "DONE", label: "피드백 문서 준비", detail: "준비됨", href: `/app/host/sessions/${SESSION_ID}/edit?records=json` },
+        { id: "SESSION_CLOSED", state: "DONE", label: "세션 종료", detail: "닫힘", href: `/app/host/sessions/${SESSION_ID}` },
+        { id: "RECORD_PACKAGE_SAVED", state: "DONE", label: "기록 패키지 저장", detail: "저장됨", href: `/app/host/sessions/${SESSION_ID}?section=records&source=json` },
+        { id: "FEEDBACK_DOCUMENT_READY", state: "DONE", label: "피드백 문서 준비", detail: "준비됨", href: `/app/host/sessions/${SESSION_ID}?section=records&source=json` },
         { id: "MEMBER_NOTIFICATION_SENT", state: "DONE", label: "멤버 알림 발송", detail: "발송됨", href: "/app/host/notifications" },
         { id: "PUBLIC_RECORD_VISIBLE", state: "DONE", label: "공개 기록 노출", detail: "노출됨", href: `/clubs/${CLUB_SLUG}/sessions/${SESSION_ID}` },
         { id: "PUBLIC_SHOWCASE_READY", state: "DONE", label: "공개 쇼케이스 확인", detail: "확인 가능", href: `/clubs/${CLUB_SLUG}/sessions/${SESSION_ID}` },
@@ -207,29 +259,12 @@ async function routePublicRecords(page: Page): Promise<void> {
 
 test("session closing flywheel links host member and public surfaces", async ({ page }, testInfo) => {
   await routeHostClosing(page);
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/closing`);
-  await expect(page.getByRole("heading", { name: "No.07 · E2E 책" })).toBeVisible();
-  await expect(page.getByText("발행 완료")).toBeVisible();
-  await expect(page.getByText("이번 회차 다음 조치")).toBeVisible();
-  await expect(page.getByLabel("이번 회차 다음 조치").getByRole("link", { name: "공개 기록 확인" })).toHaveAttribute(
-    "href",
-    `/clubs/${CLUB_SLUG}/sessions/${SESSION_ID}`,
-  );
-  await expect(page.getByText("공개 표면에 발행된 기록이 의도대로 보이는지 최종 확인합니다.")).toBeVisible();
-  await expect(page.getByText("마감 단계")).toBeVisible();
-  await expect(page.getByText("호스트 문서 / 멤버 회고 / 공개 기록")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "호스트 문서" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "멤버 회고" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "공개 기록" })).toBeVisible();
-  const surfaceStatus = page.getByLabel("호스트 멤버 공개 표면 상태");
-  await expect(surfaceStatus.getByRole("link", { name: "호스트 문서 확인" })).toHaveAttribute(
-    "href",
-    `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit`,
-  );
-  await expect(surfaceStatus.getByRole("link", { name: "멤버 회고 확인" })).toHaveAttribute("href", `/clubs/${CLUB_SLUG}/app/sessions/${SESSION_ID}`);
-  await expect(surfaceStatus.getByRole("link", { name: "공개 기록 확인" })).toHaveAttribute("href", `/clubs/${CLUB_SLUG}/sessions/${SESSION_ID}`);
-  await expect(page.getByText("마감 증거")).toBeVisible();
-  await expect(page.getByText("최근 멤버 알림")).toBeVisible();
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`);
+  await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`));
+  expect(new URL(page.url()).pathname).not.toMatch(/\/(edit|closing)\/?$/);
+  await expect(page.getByRole("heading", { name: /지금 다루는 모임/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: "정리본 올리기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "모임 하나 더" })).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
   const screenshot = await page.screenshot({ path: testInfo.outputPath("session-closing-board.png"), fullPage: true });

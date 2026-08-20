@@ -805,6 +805,13 @@ where club_id = ${sqlString(clubId)}
 `;
 }
 
+export const hostMeetingUrlPattern = /\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/;
+
+export function isCanonicalHostMeetingPath(pathname: string) {
+  return /\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+$/.test(pathname)
+    && !pathname.endsWith("/edit");
+}
+
 type E2eResetOptions = {
   googleLoginEmails?: string[];
   invitedEmails?: string[];

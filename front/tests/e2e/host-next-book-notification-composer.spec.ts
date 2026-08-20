@@ -25,29 +25,38 @@ async function createDraftAndPublishNextBook(
 ) {
   const bookTitle = `Next Book Composer ${suffix}`;
   await loginWithGoogleFixture(page, "host@example.com");
-  await page.goto(`${HOST_PATH}/sessions/new`);
-  await page.getByRole("tab", { name: "기본 정보" }).click();
-  await page.getByLabel("세션 제목").fill(`Next Book Composer Session ${suffix}`);
+  await page.goto(HOST_PATH);
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
+  expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
+
+  await page.getByRole("button", { name: "모임 하나 더" }).click();
   await page.getByLabel("책 제목").fill(bookTitle);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-08-20");
-  await page.getByRole("button", { name: "세션 문서 저장" }).click();
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/edit/);
-  const sessionId = new URL(page.url()).pathname.split("/").at(-2) ?? "";
-  expect(sessionId).not.toBe("");
+  const newMeetingVisibility = page.getByRole("switch", { name: "새 모임 멤버에게 보이기" });
+  if (await newMeetingVisibility.isChecked()) {
+    await newMeetingVisibility.click({ force: true });
+  }
+  const created = page.waitForResponse(
+    (response) =>
+      response.request().method() === "POST"
+      && /\/api\/bff\/api\/host\/sessions\/?(?:\?|$)/.test(response.url()),
+  );
+  await page.getByRole("button", { name: "목록에 넣기" }).click();
+  expect((await created).ok()).toBe(true);
+  await expect(page.getByText(bookTitle)).toBeVisible();
 
-  await page.goto(HOST_PATH);
-  await page.locator("main.rm-host-dashboard-desktop details.rm-host-flow > summary").click();
   const visibilityResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "PATCH"
-      && response.url().includes(`/host/sessions/${sessionId}/access-scope`),
+      && response.url().includes("/host/sessions/")
+      && response.url().includes("/access-scope"),
   );
-  await page.getByRole("button", {
-    name: new RegExp(`${bookTitle} 게스트 접근을 게스트 공개로 변경`),
-  }).click();
+  await page.getByRole("switch", { name: `${bookTitle} 멤버에게 보이기` }).click({ force: true });
   const saved = await visibilityResponse;
   expect(saved.status(), await saved.text()).toBe(200);
+  const sessionId = new URL(saved.url()).pathname.split("/").at(-2) ?? "";
+  expect(sessionId).not.toBe("");
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
 
   expect(await readNotificationEventCount(sessionId, "NEXT_BOOK_PUBLISHED")).toBe(0);

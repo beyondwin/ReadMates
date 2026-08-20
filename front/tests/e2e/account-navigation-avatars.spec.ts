@@ -275,6 +275,19 @@ async function routeSyntheticApp(
         currentSessionMissingMembers: [],
       });
     }
+    if (path.endsWith("/api/host/sessions/schedule-defaults")) {
+      return json(route, {
+        startTime: "20:00",
+        endTime: "22:00",
+        locationLabel: "온라인",
+        meetingUrl: null,
+        meetingPasscode: null,
+        accessScope: "HOST_ONLY",
+        suggestedDate: null,
+        questionDeadlineOffsetDays: 1,
+        hints: [],
+      });
+    }
     if (path.endsWith("/api/host/sessions")) return json(route, { items: [], nextCursor: null });
     if (path.endsWith("/api/host/notifications/summary")) {
       return json(route, { pending: 0, failed: 0, dead: 0, sentLast24h: 0, latestFailures: [] });
@@ -770,7 +783,7 @@ test("member roster and host attendance/member artwork stay frame-free at mobile
     await page.screenshot({ path: testInfo.outputPath(`${width}-current-session-roster.png`), fullPage: true });
 
     resetImageNetwork(imageEvidence);
-    await page.goto(`${APP_BASE}/host/sessions/session-avatar-roster/edit?section=attendance`);
+    await page.goto(`${APP_BASE}/host/sessions/session-avatar-roster?section=attendance`);
     await expect(page.getByRole("heading", { name: "출석 확정 명단" })).toBeVisible();
     await expect(page.getByRole("button", { name: "김책가방 참석" })).toBeVisible();
     await expectAvatarRoleSize(

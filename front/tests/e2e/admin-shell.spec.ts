@@ -198,7 +198,10 @@ test.describe("/admin shell", () => {
     await page.getByRole("button", { name: "내 공간" }).click();
     await page.getByRole("link", { name: "읽는사이 호스트 공간" }).click();
 
-    await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host$/);
-    await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
+    await expect.poll(() => new URL(page.url()).pathname).toMatch(
+      /\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/,
+    );
+    expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
+    await expect(page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ })).toBeVisible();
   });
 });

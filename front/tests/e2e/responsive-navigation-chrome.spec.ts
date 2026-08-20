@@ -256,7 +256,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(tabs).toBeVisible();
   await expect(tabs.getByRole("link")).toHaveText(hostMobileTabs);
   await expect(tabs.getByRole("link", { name: "오늘" })).toHaveAttribute("href", baselineClubHostPath);
-  await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("href", /\/app\/host\/sessions\/(.+\/edit|new)$/);
+  await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("href", /\/app\/host\/sessions\/([^/]+\/edit|[^/]+|new)$/);
   await expect(tabs.getByRole("link", { name: "멤버" })).toHaveAttribute("href", `${baselineClubHostPath}/members`);
   await expect(tabs.getByRole("link", { name: "기록" })).toHaveAttribute("href", `${baselineClubHostPath}/sessions`);
   await expect(tabs.getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
@@ -273,14 +273,15 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(firstLedgerAction).toBeVisible();
   await expectPracticalTapTarget(firstLedgerAction);
   await firstLedgerAction.click();
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/.+\/edit/);
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/?$/);
+  expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   const editorSections = page.getByRole("tablist", { name: "호스트 편집 섹션" });
   await expect(editorSections.getByRole("tab")).toHaveCount(5);
   await expect(editorSections.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("tabpanel", { name: "개요" })).toBeVisible();
   await editorSections.getByRole("tab", { name: "기록 작업대" }).click();
   await expect(editorSections.getByRole("tab", { name: "기록 작업대" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: "기록 작업대" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /정리본|기록 작업대/ })).toBeVisible();
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
   await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -356,15 +357,13 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
   await expect(page.locator(".rm-archive-mobile").getByText("No.01 · 2025.11.26")).toBeVisible();
 
   await page.goto("/app/host");
-  await expect(page).toHaveURL(/\/app\/host$/);
-  await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
-  await page.getByRole("link", { name: /세션 문서 편집|세션 문서 만들기/ }).first().click();
-  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host\/sessions\/(.+\/edit|new)$/);
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
+  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
   await expect(page.getByRole("banner").getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
 
   await page.getByRole("banner").getByRole("link", { name: "뒤로" }).click();
-  await expect(page).toHaveURL(/\/app\/host$/);
-  await expect(page.getByRole("heading", { name: "모임 운영" })).toBeVisible();
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
+  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
 });
 
 test("member space preserves a profile-first layout from desktop to narrow mobile", async ({ page }) => {

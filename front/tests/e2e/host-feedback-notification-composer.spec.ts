@@ -208,7 +208,26 @@ async function installAiDraftRoutes(page: Page, sessionId: string, sessionNumber
   );
 }
 
+async function dismissBlockingDialogs(page: Page) {
+  const applyDialog = page.getByRole("dialog", { name: "반영 전 확인" });
+  await applyDialog.waitFor({ state: "visible", timeout: 2_000 }).catch(() => undefined);
+  if (await applyDialog.isVisible()) {
+    await applyDialog.getByRole("button", { name: "닫기" }).click();
+    await expect(applyDialog).toBeHidden();
+  }
+  const notify = page.getByRole("dialog", { name: "알림 보내기" });
+  if (await notify.isVisible()) {
+    await notify.getByRole("button", { name: "이번에는 보내지 않기" }).click();
+    await expect(notify).toBeHidden();
+  }
+}
+
 async function waitForDraftSaved(page: Page) {
+  await dismissBlockingDialogs(page);
+  const sourceTabs = page.getByRole("tablist", { name: "초안 만들기" });
+  if (await sourceTabs.getByRole("tab", { name: "직접 작성" }).isVisible()) {
+    await sourceTabs.getByRole("tab", { name: "직접 작성" }).click();
+  }
   await expect(
     page.getByRole("region", { name: "공통 초안 편집기" }).getByRole("status"),
   ).toHaveText("저장됨", { timeout: 15_000 });
@@ -226,13 +245,13 @@ async function reviewAndApply(page: Page, sessionId: string) {
       response.request().method() === "POST"
       && response.url().includes(`/host/sessions/${sessionId}/record-apply-preview`),
   );
-  await page.getByRole("button", { name: "반영 검토" }).click();
+  await page.getByRole("button", { name: "반영 전 확인" }).click();
   const preview = await previewResponse;
   expect(preview.status(), await preview.text()).toBe(200);
-  const dialog = page.getByRole("dialog", { name: "새 버전으로 반영" });
+  const dialog = page.getByRole("dialog", { name: "반영 전 확인" });
   await expect(dialog).toBeVisible();
   await expect(dialog.getByRole("radio", { name: /알림/ })).toHaveCount(0);
-  await expect(dialog.getByRole("button", { name: "새 버전으로 반영" })).toBeEnabled();
+  await expect(dialog.getByRole("button", { name: "멤버에게 반영" })).toBeEnabled();
   return dialog;
 }
 
@@ -325,8 +344,10 @@ test("draft commits stay silent and final apply composes without automatic dispa
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-08-20");
   await page.getByRole("button", { name: "세션 문서 저장" }).click();
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/edit/);
-  const sessionId = new URL(page.url()).pathname.split("/").at(-2) ?? "";
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
+  expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
+  await expect(page.getByRole("heading", { name: "세션 문서 편집" })).toBeVisible();
+  const sessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
   expect(sessionId).not.toBe("");
   const detail = await fetchHostSession(page, sessionId);
 
@@ -364,13 +385,14 @@ set state = 'CLOSED',
 where id = ${sqlValue(sessionId)};
 `);
 
-  await page.goto(`${HOST_PATH}/sessions/${sessionId}/edit?section=records&source=json`);
+  await page.goto(`${HOST_PATH}/sessions/${sessionId}?section=records&source=json`);
   await expect(page).toHaveURL(/\?section=records&source=json$/);
   const authors = activeParticipantNames(sessionId);
   expect(authors.length).toBeGreaterThanOrEqual(1);
   const firstAuthor = authors[0]!;
   const secondAuthor = authors[1] ?? firstAuthor;
 
+  await page.getByRole("tab", { name: "직접 작성" }).click();
   const initialDraftSave = page.waitForResponse(
     (response) =>
       response.request().method() === "PATCH"
@@ -381,7 +403,8 @@ where id = ${sqlValue(sessionId)};
   expect(initialDraft.status(), await initialDraft.text()).toBe(200);
   await waitForDraftSaved(page);
 
-  await page.locator("#session-import-json-file").setInputFiles({
+  await page.getByRole("tab", { name: "정리본 올리기" }).click();
+  await page.getByLabel("정리한 파일을 여기에 놓으세요").setInputFiles({
     name: "session-record-draft.json",
     mimeType: "application/json",
     buffer: Buffer.from(JSON.stringify({
@@ -400,20 +423,19 @@ where id = ${sqlValue(sessionId)};
       },
     })),
   });
-  await expect(page.getByRole("region", { name: "세션 기록 미리보기" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "정리본 미리보기" })).toBeVisible();
   const importResponse = page.waitForResponse(
     (response) =>
       response.request().method() === "POST"
       && response.url().includes(`/host/sessions/${sessionId}/session-import/commit`),
   );
-  await page.getByRole("button", { name: "초안으로 가져오기" }).click();
+  await page.getByRole("button", { name: "작성 중에 넣기" }).click();
   const imported = await importResponse;
   expect(imported.status(), await imported.text()).toBe(200);
-  await expect(page.getByRole("tab", { name: "직접 작성" }))
-    .toHaveAttribute("aria-selected", "true");
+  await page.getByRole("tablist", { name: "초안 만들기" }).getByRole("tab", { name: "직접 작성" }).click();
   await waitForDraftSaved(page);
-  await expect(page.getByRole("region", { name: "작업 중인 초안" }))
-    .toContainText("작성 방식 · 외부 JSON");
+  await expect(page.getByRole("region", { name: "작성 중" }))
+    .toContainText("정리본");
   await expect(page.getByLabel("공개 요약")).toHaveValue(IMPORT_SUMMARY);
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(await readNotificationEventCount(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
@@ -458,11 +480,11 @@ where id = ${sqlValue(sessionId)};
   });
 
   const applyDialog = await reviewAndApply(page, sessionId);
-  await applyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
+  await applyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
   await expect(page.getByText(/처리 결과를 확인하지 못했습니다/)).toBeVisible();
   const revisionsAfterLostResponse = await readSessionRecordRevisionCount(sessionId);
   expect(revisionsAfterLostResponse).toBeGreaterThan(revisionsBeforeApply);
-  await applyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
+  await applyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
   expect(applyRequestIds).toHaveLength(2);
   expect(new Set(applyRequestIds).size).toBe(1);
@@ -479,7 +501,7 @@ where id = ${sqlValue(sessionId)};
   await page.getByLabel("공개 요약").fill(UPDATED_SUMMARY);
   await waitForDraftSaved(page);
   const secondApplyDialog = await reviewAndApply(page, sessionId);
-  await secondApplyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
+  await secondApplyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
   expect(applyRequestIds.at(-1)).not.toBe(applyRequestIds[0]);
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
@@ -535,7 +557,7 @@ where id = '${stalePreviewPayload.previewId}';
   await page.getByLabel("공개 요약").fill(FINAL_SUMMARY);
   await waitForDraftSaved(page);
   const finalApplyDialog = await reviewAndApply(page, sessionId);
-  await finalApplyDialog.getByRole("button", { name: "새 버전으로 반영" }).click();
+  await finalApplyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
 
   const freshPreviewResponse = page.waitForResponse(

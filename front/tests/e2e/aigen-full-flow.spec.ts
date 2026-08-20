@@ -154,7 +154,7 @@ test("AI generation full flow: upload → poll → preview → commit", async ({
   );
 
   // ── Navigate ──
-  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}/edit?aigen=1`);
+  await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?aigen=1`);
 
   // Upload a small file
   const fileChooser = page.getByLabel(/대본 파일/);
