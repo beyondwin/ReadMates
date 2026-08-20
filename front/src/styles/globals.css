@@ -3028,6 +3028,137 @@ a.rm-recent-record__destination:hover {
   padding-bottom: 38px;
 }
 
+.rm-upcoming-book-list {
+  padding: 10px 0 38px;
+}
+
+.rm-upcoming-book-list__header {
+  margin: 0 0 16px;
+}
+
+.rm-upcoming-book-list__items {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.rm-upcoming-book-list__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  min-height: 52px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.rm-upcoming-book-list__copy {
+  min-width: min(100%, 220px);
+  flex: 1 1 180px;
+}
+
+.rm-upcoming-book-list__visibility {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  color: var(--text-2);
+  font-size: var(--type-size-supporting);
+}
+
+.rm-upcoming-book-list__switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  width: 48px;
+  height: 44px;
+  flex: 0 0 auto;
+}
+
+.rm-upcoming-book-list__switch input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.rm-upcoming-book-list__track {
+  height: 28px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--bg-sub);
+  transition: background-color var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-upcoming-book-list__thumb {
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 3px;
+  border-radius: 50%;
+  background: var(--text-3);
+  transition: transform var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-upcoming-book-list__switch input:checked + .rm-upcoming-book-list__track {
+  border-color: var(--accent);
+  background: color-mix(in oklch, var(--accent) 28%, var(--bg-sub));
+}
+
+.rm-upcoming-book-list__switch input:checked + .rm-upcoming-book-list__track .rm-upcoming-book-list__thumb {
+  transform: translateX(20px);
+  background: var(--accent);
+}
+
+.rm-upcoming-book-list__switch input:focus-visible + .rm-upcoming-book-list__track {
+  outline: 3px solid color-mix(in oklch, var(--accent) 28%, transparent);
+  outline-offset: 3px;
+}
+
+.rm-upcoming-book-list__switch input:disabled {
+  cursor: not-allowed;
+}
+
+.rm-upcoming-book-list__switch input:disabled + .rm-upcoming-book-list__track {
+  opacity: 0.56;
+}
+
+.rm-upcoming-book-list__footer {
+  margin-top: 18px;
+}
+
+.rm-upcoming-book-list__form {
+  display: grid;
+  gap: 14px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line-soft);
+}
+
+@media (max-width: 768px) {
+  .rm-upcoming-book-list__row {
+    align-items: flex-start;
+  }
+
+  .rm-upcoming-book-list__visibility {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rm-upcoming-book-list__track,
+  .rm-upcoming-book-list__thumb {
+    transition: none;
+  }
+}
+
 .rm-meeting-phase-rail {
   display: flex;
   flex-wrap: nowrap;

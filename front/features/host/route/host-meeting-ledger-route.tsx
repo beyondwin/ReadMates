@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import type { HostSessionDetailResponse, HostSessionListItem } from "@/features/host/api/host-contracts";
@@ -7,9 +7,20 @@ import {
   type MeetingListItemSource,
 } from "@/features/host/model/host-meeting-ledger-model";
 import {
+  buildHostSessionRequest,
+  defaultHostSessionFormValues,
+} from "@/features/host/model/host-session-editor-model";
+import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
+import type {
+  UpcomingBookCreateInput,
+  UpcomingBookListItem,
+} from "@/features/host/model/upcoming-book-list-model";
+import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostSessionDetailQuery,
   hostSessionListQuery,
+  useCreateHostSessionMutation,
+  useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
 import {
@@ -51,6 +62,21 @@ function detailToMeetingSource(detail: HostSessionDetailResponse): MeetingListIt
   };
 }
 
+function toUpcomingBookItem(
+  item: Pick<HostSessionListItem, "sessionId" | "state" | "date" | "bookTitle" | "accessScope">,
+): UpcomingBookListItem | null {
+  if (!isMeetingState(item.state)) {
+    return null;
+  }
+  return {
+    sessionId: item.sessionId,
+    state: item.state,
+    date: item.date,
+    bookTitle: item.bookTitle,
+    accessScope: item.accessScope ?? "HOST_ONLY",
+  };
+}
+
 export function HostMeetingLedgerRoute({
   children,
   LinkComponent,
@@ -69,6 +95,8 @@ export function HostMeetingLedgerRoute({
     ...hostSessionDetailQuery(sessionId ?? "", context),
     enabled: Boolean(sessionId),
   });
+  const { mutateAsync: createSession, isPending: creatingSession } = useCreateHostSessionMutation(context);
+  const { mutateAsync: saveAccessScope, isPending: savingAccessScope } = useSaveHostSessionAccessScopeMutation(context);
 
   const items = useMemo(() => {
     const sessions = (sessionsQuery.data?.items ?? [])
@@ -87,11 +115,53 @@ export function HostMeetingLedgerRoute({
     );
   }, [detailQuery.data, recordAttentionQuery.data, sessionsQuery.data]);
 
+  const upcomingItems = useMemo(
+    () =>
+      (sessionsQuery.data?.items ?? [])
+        .map(toUpcomingBookItem)
+        .filter((item): item is UpcomingBookListItem => item !== null),
+    [sessionsQuery.data],
+  );
+
+  const handleSaveUpcomingAccessScope = useCallback(async (input: {
+    sessionId: string;
+    accessScope: SessionAccessScope;
+  }) => {
+    await saveAccessScope({
+      sessionId: input.sessionId,
+      request: { accessScope: input.accessScope },
+    });
+  }, [saveAccessScope]);
+
+  const handleCreateUpcomingSession = useCallback(async (input: UpcomingBookCreateInput) => {
+    const response = await createSession(buildHostSessionRequest({
+      ...defaultHostSessionFormValues(),
+      title: input.bookTitle,
+      bookTitle: input.bookTitle,
+      bookAuthor: input.bookAuthor,
+      date: input.date,
+    }));
+    if (!response.ok) {
+      throw new Error("create-upcoming-failed");
+    }
+    if (input.accessScope === "GUEST_READABLE") {
+      const created = await response.json();
+      await saveAccessScope({
+        sessionId: created.sessionId,
+        request: { accessScope: "GUEST_READABLE" },
+      });
+    }
+  }, [createSession, saveAccessScope]);
+
   return (
     <HostMeetingLedger
       items={items}
       sessionId={sessionId}
       LinkComponent={LinkComponent}
+      upcomingItems={upcomingItems}
+      onSaveUpcomingAccessScope={handleSaveUpcomingAccessScope}
+      onCreateUpcomingSession={handleCreateUpcomingSession}
+      upcomingPending={creatingSession || savingAccessScope}
     >
       {children}
     </HostMeetingLedger>

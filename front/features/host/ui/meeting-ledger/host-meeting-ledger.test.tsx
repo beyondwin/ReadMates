@@ -1,9 +1,10 @@
 import { render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { HostMeetingLedger } from "./host-meeting-ledger";
 import type { MeetingListItem } from "@/features/host/model/host-meeting-ledger-model";
+import type { UpcomingBookListItem } from "@/features/host/model/upcoming-book-list-model";
 
 function TestLink({
   to,
@@ -76,5 +77,59 @@ describe("HostMeetingLedger", () => {
 
     expect(screen.getByRole("listitem", { name: "모임 후" })).toHaveAttribute("aria-current", "step");
     expect(screen.queryByRole("link", { name: "이전 모임 기록 남음" })).not.toBeInTheDocument();
+  });
+
+  it("shows the upcoming book list during and after the meeting", () => {
+    const upcomingItems: UpcomingBookListItem[] = [
+      { sessionId: "draft-1", state: "DRAFT", date: "2026-06-11", bookTitle: "다음 책", accessScope: "HOST_ONLY" },
+    ];
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[{ sessionId: "open-1", state: "OPEN", date: "2026-04-15" }]}
+          upcomingItems={upcomingItems}
+          onSaveUpcomingAccessScope={vi.fn()}
+          onCreateUpcomingSession={vi.fn()}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "다음에 읽을 책" })).toBeInTheDocument();
+    expect(screen.getByText("다음 책")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "모임 하나 더" })).toBeInTheDocument();
+
+    rerender(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[{ sessionId: "closed-1", state: "CLOSED", date: "2026-04-15" }]}
+          sessionId="closed-1"
+          upcomingItems={upcomingItems}
+          onSaveUpcomingAccessScope={vi.fn()}
+          onCreateUpcomingSession={vi.fn()}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+    expect(screen.getByRole("heading", { name: "다음에 읽을 책" })).toBeInTheDocument();
+  });
+
+  it("hides the upcoming book list before the meeting", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[{ sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" }]}
+          upcomingItems={[
+            { sessionId: "draft-1", state: "DRAFT", date: "2026-06-11", bookTitle: "준비 중", accessScope: "HOST_ONLY" },
+          ]}
+          onSaveUpcomingAccessScope={vi.fn()}
+          onCreateUpcomingSession={vi.fn()}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("heading", { name: "다음에 읽을 책" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "모임 하나 더" })).not.toBeInTheDocument();
   });
 });

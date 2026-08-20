@@ -4,7 +4,13 @@ import {
   resolveViewedMeeting,
   type MeetingListItem,
 } from "@/features/host/model/host-meeting-ledger-model";
+import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
+import type {
+  UpcomingBookCreateInput,
+  UpcomingBookListItem,
+} from "@/features/host/model/upcoming-book-list-model";
 import { MeetingPhaseRail } from "./meeting-phase-rail";
+import { UpcomingBookList } from "./upcoming-book-list";
 
 const NEW_MEETING_HREF = "/app/host/sessions/new";
 
@@ -20,16 +26,27 @@ function DefaultLink({ to, children, ...props }: HostMeetingLedgerLinkProps) {
   return <a {...props} href={to}>{children}</a>;
 }
 
+function ignoreUpcomingAccessScope() {}
+function ignoreUpcomingCreate() {}
+
 export function HostMeetingLedger({
   items,
   sessionId,
   LinkComponent = DefaultLink,
   children,
+  upcomingItems = [],
+  onSaveUpcomingAccessScope = ignoreUpcomingAccessScope,
+  onCreateUpcomingSession = ignoreUpcomingCreate,
+  upcomingPending = false,
 }: {
   items: readonly MeetingListItem[];
   sessionId?: string;
   LinkComponent?: HostMeetingLedgerLinkComponent;
   children?: ReactNode;
+  upcomingItems?: readonly UpcomingBookListItem[];
+  onSaveUpcomingAccessScope?: (input: { sessionId: string; accessScope: SessionAccessScope }) => void | Promise<void>;
+  onCreateUpcomingSession?: (input: UpcomingBookCreateInput) => void | Promise<void>;
+  upcomingPending?: boolean;
 }) {
   const active = resolveViewedMeeting(items, sessionId);
 
@@ -76,6 +93,14 @@ export function HostMeetingLedger({
         </div>
       </header>
       {children}
+      {active.phase === "during" || active.phase === "after" ? (
+        <UpcomingBookList
+          items={upcomingItems}
+          onSaveAccessScope={onSaveUpcomingAccessScope}
+          onCreateSession={onCreateUpcomingSession}
+          pending={upcomingPending}
+        />
+      ) : null}
     </div>
   );
 }
