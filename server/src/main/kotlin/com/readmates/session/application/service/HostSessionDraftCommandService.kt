@@ -51,16 +51,18 @@ private fun attachFirstPublicationComposer(
     }
     val sessionId = UUID.fromString(created.sessionId)
     return created.copy(
-        composer = HostNotificationComposerContext(
-            sessionId = sessionId,
-            eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-            contentRevision = ManualNotificationContentRevision.nextBook(
-                sessionId,
-                created.sessionNumber,
-                created.bookTitle,
-                created.visibility.name,
+        composer =
+            HostNotificationComposerContext(
+                sessionId = sessionId,
+                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                contentRevision =
+                    ManualNotificationContentRevision.nextBook(
+                        sessionId,
+                        created.sessionNumber,
+                        created.bookTitle,
+                        created.visibility.name,
+                    ),
             ),
-        ),
     )
 }
 
