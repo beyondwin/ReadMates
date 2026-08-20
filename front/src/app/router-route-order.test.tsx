@@ -109,18 +109,31 @@ describe("router route order", () => {
     const hostPaths = [
       { pathname: "/app/host/sessions", routeId: "app-host" },
       { pathname: "/app/host/sessions/new", routeId: "app-host" },
+      { pathname: "/app/host/sessions/session-7", routeId: "app-host" },
       { pathname: "/app/host/sessions/session-7/edit", routeId: "app-host" },
       { pathname: "/app/host/sessions/session-7/closing", routeId: "app-host" },
+      { pathname: "/app/host/sessions/session-7/feedback-document", routeId: "app-host" },
       { pathname: "/clubs/reading-sai/app/host/sessions", routeId: "club-app-host" },
       { pathname: "/clubs/reading-sai/app/host/sessions/new", routeId: "club-app-host" },
+      { pathname: "/clubs/reading-sai/app/host/sessions/session-7", routeId: "club-app-host" },
       { pathname: "/clubs/reading-sai/app/host/sessions/session-7/edit", routeId: "club-app-host" },
       { pathname: "/clubs/reading-sai/app/host/sessions/session-7/closing", routeId: "club-app-host" },
+      { pathname: "/clubs/reading-sai/app/host/sessions/session-7/feedback-document", routeId: "club-app-host" },
     ];
 
     for (const { pathname, routeId } of hostPaths) {
       expect(routeIdsFor(pathname)).toEqual(expect.arrayContaining([routeId]));
       expect(routePathsFor(pathname)).not.toEqual(expect.arrayContaining(["*"]));
     }
+
+    expect(routePathsFor("/app/host/sessions/new")).toContain("sessions/new");
+    expect(routePathsFor("/app/host/sessions/session-7")).toContain("sessions/:sessionId");
+    expect(routePathsFor("/app/host/sessions/session-7/edit")).toContain("sessions/:sessionId/edit");
+    expect(routePathsFor("/app/host/sessions/session-7/closing")).toContain("sessions/:sessionId/closing");
+    expect(routePathsFor("/app/host/sessions/session-7/feedback-document")).toContain("sessions/:sessionId/feedback-document");
+    expect(routePathsFor("/clubs/reading-sai/app/host/sessions/new")).toContain("sessions/new");
+    expect(routePathsFor("/clubs/reading-sai/app/host/sessions/session-7")).toContain("sessions/:sessionId");
+    expect(routePathsFor("/clubs/reading-sai/app/host/sessions/session-7/edit")).toContain("sessions/:sessionId/edit");
   });
 
   it("keeps public unknown routes on the public not-found branch", () => {

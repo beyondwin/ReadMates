@@ -1,5 +1,9 @@
-import { HostSessionClosingRoute } from "@/features/host/route/host-session-closing-route";
+import { Navigate, useLocation } from "react-router";
+import { canonicalMeetingPath } from "./meeting-redirects";
 
 export function HostSessionClosingRouteElement() {
-  return <HostSessionClosingRoute />;
+  const location = useLocation();
+  return (
+    <Navigate replace to={canonicalMeetingPath(location.pathname, location.search)} state={location.state} />
+  );
 }

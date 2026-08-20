@@ -1,21 +1,9 @@
-import { useLocation } from "react-router";
-import { EditHostSessionRoute } from "@/features/host/route/host-session-editor-route";
-import { useSessionRecordsChangedInvalidation } from "@/src/app/host-route-invalidation";
-import { hostDashboardReturnTarget, readmatesReturnState, readReadmatesReturnTarget } from "@/src/app/route-continuity";
-import { Link } from "@/src/app/router-link";
+import { Navigate, useLocation } from "react-router";
+import { canonicalMeetingPath } from "./meeting-redirects";
 
 export function EditHostSessionRouteElement() {
   const location = useLocation();
-  const returnTarget = readReadmatesReturnTarget(location.state, hostDashboardReturnTarget);
-  const onSessionRecordsChanged = useSessionRecordsChangedInvalidation();
-
   return (
-    <EditHostSessionRoute
-      returnTarget={returnTarget}
-      LinkComponent={Link}
-      hostDashboardReturnTarget={hostDashboardReturnTarget}
-      readmatesReturnState={readmatesReturnState}
-      onSessionRecordsChanged={onSessionRecordsChanged}
-    />
+    <Navigate replace to={canonicalMeetingPath(location.pathname, location.search)} state={location.state} />
   );
 }

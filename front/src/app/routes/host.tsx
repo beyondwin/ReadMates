@@ -121,13 +121,9 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       path: "sessions/:sessionId/closing",
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="세션 클로징 상태를 불러오는 중" variant="host" />,
-      load: async () => {
-        const [{ HostSessionClosingRouteElement: Component }, { hostSessionClosingLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/session-closing-route-element"),
-          import("@/features/host/route/host-session-closing-data"),
-        ]);
-        return { Component, loader: hostSessionClosingLoaderFactory(queryClient) };
-      },
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/session-closing-route-element")).HostSessionClosingRouteElement,
+      }),
     }),
     scopedHostRoute({
       path: "sessions/:sessionId/feedback-document",
@@ -142,16 +138,24 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       },
     }),
     scopedHostRoute({
-      path: "sessions/:sessionId/edit",
+      path: "sessions/:sessionId",
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
       load: async () => {
-        const [{ EditHostSessionRouteElement: Component }, { hostSessionEditorLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/edit-session-route-element"),
+        const [{ MeetingRouteElement: Component }, { hostSessionEditorLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/meeting-route-element"),
           import("@/features/host/route/host-session-editor-data"),
         ]);
         return { Component, loader: hostSessionEditorLoaderFactory(queryClient) };
       },
+    }),
+    scopedHostRoute({
+      path: "sessions/:sessionId/edit",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+      load: async () => ({
+        Component: (await import("@/src/app/host-routes/edit-session-route-element")).EditHostSessionRouteElement,
+      }),
     }),
     { path: "*", element: <NotFoundRoute variant="host" /> },
   ];
@@ -248,11 +252,8 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 클로징 상태를 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ HostSessionClosingRouteElement }, { hostSessionClosingLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/session-closing-route-element"),
-          import("@/features/host/route/host-session-closing-data"),
-        ]);
-        return { Component: HostSessionClosingRouteElement, loader: hostSessionClosingLoaderFactory(queryClient) };
+        const { HostSessionClosingRouteElement } = await import("@/src/app/host-routes/session-closing-route-element");
+        return { Component: HostSessionClosingRouteElement };
       },
     },
     {
@@ -274,15 +275,24 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       },
     },
     {
+      path: "sessions/:sessionId",
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const [{ MeetingRouteElement }, { hostSessionEditorLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/meeting-route-element"),
+          import("@/features/host/route/host-session-editor-data"),
+        ]);
+        return { Component: MeetingRouteElement, loader: hostSessionEditorLoaderFactory(queryClient) };
+      },
+    },
+    {
       path: "sessions/:sessionId/edit",
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="세션 문서 정보를 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ EditHostSessionRouteElement }, { hostSessionEditorLoaderFactory }] = await Promise.all([
-          import("@/src/app/host-routes/edit-session-route-element"),
-          import("@/features/host/route/host-session-editor-data"),
-        ]);
-        return { Component: EditHostSessionRouteElement, loader: hostSessionEditorLoaderFactory(queryClient) };
+        const { EditHostSessionRouteElement } = await import("@/src/app/host-routes/edit-session-route-element");
+        return { Component: EditHostSessionRouteElement };
       },
     },
     {
