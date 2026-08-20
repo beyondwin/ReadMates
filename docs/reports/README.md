@@ -14,6 +14,7 @@
 
 | 작성일 | 파일 | 내용 |
 | --- | --- | --- |
+| 2026-08-21 | [`2026-08-21-host-meeting-operating-ledger-residual-risk.md`](2026-08-21-host-meeting-operating-ledger-residual-risk.md) | 모임 운영 장부 `main` 머지 후 남은 카피·검증·배포 순서 리스크 snapshot |
 | 2026-08-03 | [`2026-08-03-release-readiness-v2.md`](2026-08-03-release-readiness-v2.md) | v2.0.0–v2.2.0 릴리스 검토·배포 증거 snapshot; 현재 절차는 development checklist를 사용 |
 | 2026-07-11 | [`2026-07-11-release-readiness-history.md`](2026-07-11-release-readiness-history.md) | 2026-07-11 이전 release-readiness closeout evidence snapshot; 현재 절차는 development checklist를 사용 |
 | 2026-05-08 | [`2026-05-08-improvements-v1.md`](2026-05-08-improvements-v1.md) | v1.5.2 기준 1차 개선 분석 (보안 history, 거대 파일 분해, CI 가드) |
