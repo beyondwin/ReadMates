@@ -104,7 +104,7 @@ function hostLinks({
     currentSessionStatus !== "ready"
       ? null
       : currentSessionId
-          ? `/app/host/sessions/${currentSessionId}/edit`
+          ? `/app/host/sessions/${currentSessionId}`
           : "/app/host/sessions/new";
   const retry =
     onRetryCurrentSession && (currentSessionStatus === "error" || currentSessionStatus === "retrying")
@@ -134,7 +134,8 @@ function hostLinks({
             : "세션 불러오는 중",
       retry,
       current: (pathname) =>
-        pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
+        pathname === "/app/host/sessions/new"
+        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname),
     },
     {
       key: "host-members",

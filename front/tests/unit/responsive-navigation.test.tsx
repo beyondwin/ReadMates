@@ -137,7 +137,7 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getByRole("link", { name: "오늘" })).toHaveAttribute("href", "/app/host");
     expect(within(nav).getByRole("link", { name: "세션" })).toHaveAttribute(
       "href",
-      "/app/host/sessions/session-6/edit",
+      "/app/host/sessions/session-6",
     );
     expect(within(nav).getByRole("link", { name: "멤버" })).toHaveAttribute("href", "/app/host/members");
     expect(within(nav).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/host/sessions");
@@ -456,7 +456,7 @@ describe("MobileHeader route titles and actions", () => {
     expect(within(tabs).getByRole("link", { name: "오늘" })).toHaveAttribute("href", "/clubs/reading-sai/app/host");
     expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
       "href",
-      "/clubs/reading-sai/app/host/sessions/session-6/edit",
+      "/clubs/reading-sai/app/host/sessions/session-6",
     );
     expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/clubs/reading-sai/app/host/sessions");
     expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
@@ -632,7 +632,7 @@ describe("MobileTabBar app tabs", () => {
     expect(within(tabs).getByRole("link", { name: "오늘" })).toHaveAttribute("href", "/app/host");
     expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
       "href",
-      "/app/host/sessions/session-6/edit",
+      "/app/host/sessions/session-6",
     );
     expect(within(tabs).getByRole("link", { name: "멤버" })).toHaveAttribute("href", "/app/host/members");
     expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/host/sessions");
@@ -650,6 +650,14 @@ describe("MobileTabBar app tabs", () => {
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getByRole("link", { name: "오늘" })).not.toHaveAttribute("aria-current");
     expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("marks host session active on the canonical meeting path", () => {
+    renderAt("/app/host/sessions/session-6", <MobileTabBar variant="host" currentSessionId="session-6" />);
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "기록" })).not.toHaveAttribute("aria-current");
   });
 
   it("marks the host member tab active on invitation and member routes", () => {

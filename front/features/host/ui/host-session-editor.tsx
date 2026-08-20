@@ -509,7 +509,7 @@ export default function HostSessionEditor({
           setSaveState("saved");
           if (isNewSession) {
             const created = (await response.json()) as { sessionId: string };
-            globalThis.location.href = scopedHostRedirectHref(`/app/host/sessions/${encodeURIComponent(created.sessionId)}/edit`);
+            globalThis.location.href = scopedHostSessionEditHref(created.sessionId, clubSlug);
             return;
           }
 
@@ -540,6 +540,7 @@ export default function HostSessionEditor({
       session,
       isNewSession,
       actions,
+      clubSlug,
       flash,
     ],
   );

@@ -169,6 +169,7 @@ describe("SessionOverviewSection", () => {
       onReverseSession,
     });
 
+    expect(screen.getByRole("heading", { name: /모임을 마쳤습니다/ })).toBeInTheDocument();
     expect(screen.getByText("모임을 마쳤습니다. 정리본을 올린 뒤 기록을 공개할 수 있습니다.")).toBeInTheDocument();
     const overviewPanel = screen.getByRole("tabpanel", { name: "개요" });
     expect(within(overviewPanel).queryByText(/기록 작업대/)).not.toBeInTheDocument();

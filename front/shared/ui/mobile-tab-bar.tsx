@@ -126,7 +126,7 @@ function hostTabs({
     currentSessionStatus !== "ready"
       ? null
       : currentSessionId
-          ? `/app/host/sessions/${currentSessionId}/edit`
+          ? `/app/host/sessions/${currentSessionId}`
           : "/app/host/sessions/new";
   const retry =
     onRetryCurrentSession && (currentSessionStatus === "error" || currentSessionStatus === "retrying")
@@ -162,7 +162,9 @@ function hostTabs({
             : "세션 불러오는 중",
       retry,
       icon: "edit",
-      current: (pathname) => pathname === "/app/host/sessions/new" || /^\/app\/host\/sessions\/[^/]+\/edit$/.test(pathname),
+      current: (pathname) =>
+        pathname === "/app/host/sessions/new"
+        || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname),
     },
     {
       key: "host-members",

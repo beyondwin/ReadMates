@@ -802,7 +802,12 @@ describe("MemberHome", () => {
         view={guestMemberHomeReadView({
           current: { currentSession: null },
           upcoming: {
-            items: upcomingSessions.map(({ visibility: _visibility, locationLabel: _locationLabel, ...session }) => session),
+            items: upcomingSessions.map((session) => {
+              const { visibility, locationLabel, ...item } = session;
+              void visibility;
+              void locationLabel;
+              return item;
+            }),
             nextCursor: null,
           },
           recentNotes: { items: [], nextCursor: null },

@@ -217,7 +217,7 @@ describe("AppRouteLayout host session navigation", () => {
       initialSessionId: null,
       nextSessionId: "session-7",
       initialHref: "/app/host/sessions/new",
-      nextHref: "/app/host/sessions/session-7/edit",
+      nextHref: "/app/host/sessions/session-7",
       mutationPath: "/api/bff/api/host/sessions/session-7/open",
       mutationMethod: "POST",
     },
@@ -225,7 +225,7 @@ describe("AppRouteLayout host session navigation", () => {
       operation: "close" as const,
       initialSessionId: "session-7",
       nextSessionId: null,
-      initialHref: "/app/host/sessions/session-7/edit",
+      initialHref: "/app/host/sessions/session-7",
       nextHref: "/app/host/sessions/new",
       mutationPath: "/api/bff/api/host/sessions/session-7/close",
       mutationMethod: "POST",
@@ -234,7 +234,7 @@ describe("AppRouteLayout host session navigation", () => {
       operation: "delete" as const,
       initialSessionId: "session-7",
       nextSessionId: null,
-      initialHref: "/app/host/sessions/session-7/edit",
+      initialHref: "/app/host/sessions/session-7",
       nextHref: "/app/host/sessions/new",
       mutationPath: "/api/bff/api/host/sessions/session-7",
       mutationMethod: "DELETE",
@@ -337,7 +337,7 @@ describe("AppRouteLayout host session navigation", () => {
       await retryRequest.promise;
     });
 
-    await waitFor(() => expectSessionLinks("/app/host/sessions/session-9/edit"));
+    await waitFor(() => expectSessionLinks("/app/host/sessions/session-9"));
     expect(currentRequest).toBe(2);
   });
 });

@@ -7,6 +7,7 @@ import {
   type HostSessionLedgerFilters,
   type HostSessionLedgerItem,
 } from "@/features/host/model/host-session-ledger-model";
+import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
@@ -39,7 +40,7 @@ function DefaultLink({ to, children, ...props }: LedgerLinkProps) {
 }
 
 function sessionRecordHref(sessionId: string) {
-  return `/app/host/sessions/${encodeURIComponent(sessionId)}/edit`;
+  return hostMeetingHref(sessionId);
 }
 
 function stateLabel(state: HostSessionLedgerItem["state"]) {

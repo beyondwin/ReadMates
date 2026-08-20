@@ -490,7 +490,7 @@ describe("SPA AppRouteLayout", () => {
     });
     expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
       "href",
-      "/app/host/sessions/session-6/edit",
+      "/app/host/sessions/session-6",
     );
     expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/host/sessions");
   });
@@ -610,7 +610,7 @@ describe("SPA AppRouteLayout", () => {
     await waitFor(() => {
       expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
         "href",
-        "/app/host/sessions/session-6/edit",
+        "/app/host/sessions/session-6",
       );
     });
   });

@@ -1330,7 +1330,7 @@ describe("HostSessionEditor", () => {
         }),
       })),
     );
-    expect(location.href).toBe("/app/host/sessions/created-session-8/edit");
+    expect(location.href).toBe("/app/host/sessions/created-session-8");
   });
 
   it("posts custom book and meeting fields from the new-session editor", async () => {
@@ -1383,7 +1383,7 @@ describe("HostSessionEditor", () => {
         }),
       })),
     );
-    expect(location.href).toBe("/app/host/sessions/created-session-8/edit");
+    expect(location.href).toBe("/app/host/sessions/created-session-8");
   });
 
   it("keeps new-session save redirects inside the scoped host route", async () => {
@@ -1411,7 +1411,7 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
-    expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/created-session-8/edit");
+    expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/created-session-8");
   });
 
   it("patches the existing session with the persisted non-default start time when editing", async () => {

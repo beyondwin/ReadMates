@@ -11,7 +11,7 @@ export function feedbackPreviewStateForSession(
   }
 
   return readmatesReturnState({
-    href: `/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`,
+    href: `/app/host/sessions/${encodeURIComponent(session.sessionId)}`,
     label: "세션 문서로",
     state: readmatesReturnState(returnTarget),
   });

@@ -136,9 +136,15 @@ export function SessionOverviewSection({
             <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
               <span className="badge badge-dot">{lifecycle.label}</span>
             </div>
-            <p className="small" style={{ margin: "10px 0 0", color: "var(--text-2)" }}>
-              {lifecycle.description}
-            </p>
+            {sessionState === "CLOSED" ? (
+              <h3 className="h3 editorial" style={{ margin: "10px 0 0" }}>
+                {lifecycle.description}
+              </h3>
+            ) : (
+              <p className="small" style={{ margin: "10px 0 0", color: "var(--text-2)" }}>
+                {lifecycle.description}
+              </p>
+            )}
           </div>
           {sessionState === "CLOSED" || sessionState === "PUBLISHED" ? (
             <MeetingAfterPanel

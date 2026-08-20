@@ -1,6 +1,6 @@
-import { useCallback, useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, useState, type ReactNode } from "react";
 import { useParams } from "react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { HostSessionDetailResponse, HostSessionListItem } from "@/features/host/api/host-contracts";
 import {
   meetingListItemsFromHostSources,
@@ -22,9 +22,14 @@ import {
   hostSessionDetailQuery,
   hostSessionListQuery,
   hostSessionScheduleDefaultsQuery,
+  invalidateHostSessionManualDispatches,
   useCreateHostSessionMutation,
   useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
+import {
+  HostNotificationComposerController,
+  type HostNotificationComposerRequest,
+} from "@/features/host/route/host-notification-composer-controller";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
 import {
   HostMeetingLedger,
@@ -98,8 +103,10 @@ export function HostMeetingLedgerRoute({
     ...hostSessionDetailQuery(sessionId ?? "", context),
     enabled: Boolean(sessionId),
   });
+  const queryClient = useQueryClient();
   const { mutateAsync: createSession, isPending: creatingSession } = useCreateHostSessionMutation(context);
   const { mutateAsync: saveAccessScope, isPending: savingAccessScope } = useSaveHostSessionAccessScopeMutation(context);
+  const [composerRequest, setComposerRequest] = useState<HostNotificationComposerRequest | null>(null);
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
   const scheduleDefaults = scheduleDefaultsQuery.isError
     ? BUILTIN_SCHEDULE_DEFAULTS
@@ -134,10 +141,18 @@ export function HostMeetingLedgerRoute({
     sessionId: string;
     accessScope: SessionAccessScope;
   }) => {
-    await saveAccessScope({
+    const result = await saveAccessScope({
       sessionId: input.sessionId,
       request: { accessScope: input.accessScope },
     });
+    if (result.composer) {
+      setComposerRequest({
+        sessionId: result.composer.sessionId,
+        eventType: result.composer.eventType,
+        contentRevision: result.composer.contentRevision,
+        origin: "FIRST_PUBLICATION",
+      });
+    }
   }, [saveAccessScope]);
 
   const handleCreateUpcomingSession = useCallback(async (input: UpcomingBookCreateInput) => {
@@ -155,17 +170,27 @@ export function HostMeetingLedgerRoute({
   }, [createSession, saveAccessScope]);
 
   return (
-    <HostMeetingLedger
-      items={items}
-      sessionId={sessionId}
-      LinkComponent={LinkComponent}
-      upcomingItems={upcomingItems}
-      onSaveUpcomingAccessScope={handleSaveUpcomingAccessScope}
-      onCreateUpcomingSession={handleCreateUpcomingSession}
-      upcomingPending={creatingSession || savingAccessScope}
-      scheduleDefaults={scheduleDefaults}
-    >
-      {children}
-    </HostMeetingLedger>
+    <>
+      <HostMeetingLedger
+        items={items}
+        sessionId={sessionId}
+        LinkComponent={LinkComponent}
+        upcomingItems={upcomingItems}
+        onSaveUpcomingAccessScope={handleSaveUpcomingAccessScope}
+        onCreateUpcomingSession={handleCreateUpcomingSession}
+        upcomingPending={creatingSession || savingAccessScope}
+        scheduleDefaults={scheduleDefaults}
+      >
+        {children}
+      </HostMeetingLedger>
+      <HostNotificationComposerController
+        request={composerRequest}
+        context={context}
+        onClose={() => setComposerRequest(null)}
+        onConfirmed={() => {
+          void invalidateHostSessionManualDispatches(queryClient, context);
+        }}
+      />
+    </>
   );
 }

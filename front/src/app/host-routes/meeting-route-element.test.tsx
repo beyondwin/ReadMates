@@ -21,6 +21,10 @@ vi.mock("@tanstack/react-query", () => ({
     data: query.enabled === false ? undefined : query.testData,
     isError: false,
   }),
+  useQueryClient: () => ({
+    removeQueries: vi.fn(),
+    invalidateQueries: vi.fn(),
+  }),
 }));
 
 vi.mock("@/features/host/route/host-session-editor-route", () => ({
@@ -45,6 +49,32 @@ vi.mock("@/features/host/queries/host-session-queries", () => ({
   DEFAULT_HOST_SESSION_LIST_LIMIT: 50,
   hostSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
   hostSessionDetailQuery: () => ({ testData: undefined }),
+  invalidateHostSessionManualDispatches: vi.fn(),
+  useCreateHostSessionMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useSaveHostSessionAccessScopeMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  useOpenHostSessionMutation: () => ({
+    mutateAsync: vi.fn(),
+    isPending: false,
+  }),
+  hostSessionScheduleDefaultsQuery: () => ({
+    testData: {
+      startTime: "20:00",
+      endTime: "22:00",
+      locationLabel: "온라인",
+      meetingUrl: null,
+      meetingPasscode: null,
+      accessScope: "HOST_ONLY",
+      suggestedDate: null,
+      questionDeadlineOffsetDays: 1,
+      hints: [],
+    },
+  }),
 }));
 
 vi.mock("@/features/host/queries/host-session-record-queries", () => ({
