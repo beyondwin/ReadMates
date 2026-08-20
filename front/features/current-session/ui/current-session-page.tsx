@@ -109,17 +109,17 @@ export function CurrentSessionEmpty({
         <div className="container">
           <div className="rm-empty-state" style={{ padding: "34px" }}>
             <p className="eyebrow" style={{ margin: 0 }}>
-              세션 준비
+              모임 준비
             </p>
             <h1 className="h1 editorial" style={{ margin: "8px 0 4px" }}>
-              아직 열린 세션이 없습니다
+              아직 열린 모임이 없습니다
             </h1>
             <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-              새 세션이 등록되면 참석 여부, 읽기 진행률, 질문 작성이 열립니다.
+              새 모임이 등록되면 참석 여부, 읽기 진행률, 질문 작성이 열립니다.
             </p>
             {auth?.role === "HOST" ? (
               <InternalLink href="/app/host/sessions/new" className="btn btn-primary" style={{ marginTop: "18px" }}>
-                세션 문서 만들기
+                첫 모임 만들기
               </InternalLink>
             ) : null}
           </div>

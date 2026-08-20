@@ -190,7 +190,7 @@ test("guest note session links keep public route continuity without opening a co
 test("public club without an open guest session renders the normal empty state", async ({ page }) => {
   await page.goto(`${emptyClubAppBase}/session/current`);
 
-  await expect(page.getByRole("heading", { name: "아직 열린 세션이 없습니다" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeVisible();
   await expect(page.getByText("페이지를 불러오지 못했습니다")).toHaveCount(0);
 });
 

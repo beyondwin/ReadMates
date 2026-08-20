@@ -773,6 +773,50 @@ describe("MemberHome", () => {
     expect(desktop.queryByRole("link", { name: /아카이브 보기/ })).not.toBeInTheDocument();
   });
 
+  it("shows upcoming books when there is no open meeting", () => {
+    const { container } = render(
+      <MemberHome
+        auth={auth}
+        current={{ currentSession: null }}
+        noteFeedItems={[]}
+        upcomingSessions={upcomingSessions}
+      />,
+    );
+    const desktop = getDesktopView(container);
+    const emptyDesk = container.querySelector(".rm-prep-card--empty") as HTMLElement;
+    const emptyMobile = container.querySelector(".rm-member-session-card--empty") as HTMLElement;
+
+    expect(screen.queryAllByRole("heading", { name: "아직 열린 세션이 없습니다" })).toHaveLength(0);
+    expect(screen.queryAllByRole("heading", { name: "아직 열린 모임이 없습니다" })).toHaveLength(0);
+    expect(within(emptyDesk).getByRole("heading", { name: "다음 모임" })).toBeInTheDocument();
+    expect(within(emptyDesk).getByText("다음 달 책")).toBeInTheDocument();
+    expect(within(emptyMobile).getByText("다음 달 책")).toBeInTheDocument();
+    expect(desktop.getByText(/참석과 질문은 호스트가 모임을 열면 시작/)).toBeInTheDocument();
+    expect(desktop.queryByRole("link", { name: /RSVP/ })).not.toBeInTheDocument();
+    expect(within(emptyDesk).queryByRole("link", { name: /참석|질문/ })).not.toBeInTheDocument();
+  });
+
+  it("shows upcoming books on guest home when there is no open meeting", () => {
+    const { container } = render(
+      <MemberHome
+        view={guestMemberHomeReadView({
+          current: { currentSession: null },
+          upcoming: {
+            items: upcomingSessions.map(({ visibility: _visibility, locationLabel: _locationLabel, ...session }) => session),
+            nextCursor: null,
+          },
+          recentNotes: { items: [], nextCursor: null },
+        })}
+      />,
+    );
+    const emptyDesk = container.querySelector(".rm-prep-card--empty") as HTMLElement;
+
+    expect(screen.queryAllByRole("heading", { name: "아직 열린 세션이 없습니다" })).toHaveLength(0);
+    expect(within(emptyDesk).getByText("다음 달 책")).toBeInTheDocument();
+    expect(screen.getAllByText(/참석과 질문은 호스트가 모임을 열면 시작/).length).toBeGreaterThan(0);
+    expect(within(emptyDesk).queryByRole("link", { name: /RSVP|참석|질문/ })).not.toBeInTheDocument();
+  });
+
   it("shows practical empty states when there is no current session", () => {
     const { container } = render(
       <MemberHome auth={auth} current={{ currentSession: null }} noteFeedItems={[]} upcomingSessions={[]} />,
@@ -780,7 +824,7 @@ describe("MemberHome", () => {
     const desktop = getDesktopView(container);
     const mobile = within(container.querySelector(".rm-member-home-mobile") as HTMLElement);
 
-    expect(desktop.getByText("아직 열린 세션이 없습니다")).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
     expect(desktop.getByText("다음 책이 등록되면 이곳에 책, 일정, 질문 마감, 준비 상태가 한 번에 표시됩니다.")).toBeInTheDocument();
     expect(desktop.getByText("지금 읽는 책")).toBeInTheDocument();
     expect(desktop.getByText("다음 책을 기다리는 중")).toBeInTheDocument();
@@ -822,7 +866,7 @@ describe("MemberHome", () => {
     );
     const desktop = getDesktopView(container);
 
-    expect(desktop.getByRole("link", { name: "세션 문서 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(desktop.getByRole("link", { name: "첫 모임 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
   });
 
   it("visually marks members who RSVP as attending in the roster summary", () => {

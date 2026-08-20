@@ -1,3 +1,4 @@
+import { EmptyCurrentMeeting, type EmptyCurrentUpcomingBook } from "@/features/member-home/ui/member-home-current-session";
 import { Link, PlainMemberHomeLink, type MemberHomeLinkComponent } from "@/features/member-home/ui/member-home-link";
 import type { CurrentSessionReadPageData } from "@/shared/model/current-session-read-view";
 import { safeExternalHttpsUrl } from "@/shared/security/safe-external-url";
@@ -55,6 +56,7 @@ export function PrepCard({
   isViewer = false,
   canWrite = true,
   canViewPersonalState = true,
+  upcomingSessions = [],
   LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
@@ -62,6 +64,7 @@ export function PrepCard({
   isViewer?: boolean;
   canWrite?: boolean;
   canViewPersonalState?: boolean;
+  upcomingSessions?: readonly EmptyCurrentUpcomingBook[];
   LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (session === null) {
@@ -70,22 +73,16 @@ export function PrepCard({
         <p className="eyebrow" style={{ margin: 0 }}>
           현재 세션 작업대
         </p>
-        <h2 className="editorial" style={{ fontSize: "30px", lineHeight: 1.2, margin: "12px 0 6px" }}>
-          아직 열린 세션이 없습니다
-        </h2>
-        <p className="body" style={{ color: "var(--text-2)", margin: 0 }}>
-          다음 책이 등록되면 이곳에 책, 일정, 질문 마감, 준비 상태가 한 번에 표시됩니다.
-        </p>
-        {isHost ? (
-          <Link
-            to="/app/host/sessions/new"
-            className="btn btn-primary"
-            style={{ marginTop: "22px" }}
-            LinkComponent={LinkComponent}
-          >
-            세션 문서 만들기
-          </Link>
-        ) : null}
+        <EmptyCurrentMeeting
+          upcomingSessions={upcomingSessions}
+          isHost={isHost}
+          emptyDescription="다음 책이 등록되면 이곳에 책, 일정, 질문 마감, 준비 상태가 한 번에 표시됩니다."
+          titleClassName="editorial"
+          titleStyle={{ fontSize: "30px", lineHeight: 1.2, margin: "12px 0 6px" }}
+          descriptionClassName="body"
+          ctaStyle={{ marginTop: "22px" }}
+          LinkComponent={LinkComponent}
+        />
       </article>
     );
   }

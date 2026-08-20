@@ -359,9 +359,10 @@ describe("CurrentSession", () => {
   it("shows the empty state when there is no current session", () => {
     render(<CurrentSession data={{ currentSession: null }} />);
 
-    expect(screen.getByText("아직 열린 세션이 없습니다")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "아직 열린 세션이 없습니다" })).not.toBeInTheDocument();
     expect(
-      screen.getByText("새 세션이 등록되면 참석 여부, 읽기 진행률, 질문 작성이 열립니다."),
+      screen.getByText("새 모임이 등록되면 참석 여부, 읽기 진행률, 질문 작성이 열립니다."),
     ).toBeInTheDocument();
     expect(screen.queryByText(/6회차는 종료되었습니다/)).not.toBeInTheDocument();
   });
@@ -369,11 +370,12 @@ describe("CurrentSession", () => {
   it("shows the no-session create action only for hosts", () => {
     const { rerender } = render(<CurrentSession auth={activeMemberAuthFixture} data={{ currentSession: null }} />);
 
+    expect(screen.queryByRole("link", { name: "첫 모임 만들기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "세션 문서 만들기" })).not.toBeInTheDocument();
 
     rerender(<CurrentSession auth={{ ...activeMemberAuthFixture, role: "HOST" }} data={{ currentSession: null }} />);
 
-    expect(screen.getByRole("link", { name: "세션 문서 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(screen.getByRole("link", { name: "첫 모임 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
   });
 
   it("shows RSVP, check-in, and question sections", () => {

@@ -107,6 +107,7 @@ export default function MemberHome({
                   isViewer={isViewer}
                   canWrite={canWrite}
                   canViewPersonalState={capabilities.canViewPersonalState}
+                  upcomingSessions={upcomingSessions}
                   LinkComponent={LinkComponent}
                 />
               )}
@@ -274,6 +275,7 @@ function MobileMemberHome({
             isViewer={isViewer}
             canWrite={canWrite}
             canViewPersonalState={canViewPersonalState}
+            upcomingSessions={upcomingSessions}
             LinkComponent={LinkComponent}
           />
         )}

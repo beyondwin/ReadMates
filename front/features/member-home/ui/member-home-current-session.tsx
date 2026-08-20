@@ -190,12 +190,75 @@ export function MobileIcon({ name, size = 18, style }: { name: MobileIconName; s
   );
 }
 
+export type EmptyCurrentUpcomingBook = {
+  sessionId: string;
+  bookTitle: string;
+  bookAuthor: string;
+  date: string;
+  locationLabel?: string | null;
+};
+
+export function EmptyCurrentMeeting({
+  upcomingSessions = [],
+  isHost = false,
+  emptyDescription,
+  Title = "h2",
+  titleClassName,
+  titleStyle,
+  descriptionClassName = "small",
+  ctaStyle,
+  LinkComponent = PlainMemberHomeLink,
+}: {
+  upcomingSessions?: readonly EmptyCurrentUpcomingBook[];
+  isHost?: boolean;
+  emptyDescription: string;
+  Title?: "h1" | "h2";
+  titleClassName?: string;
+  titleStyle?: CSSProperties;
+  descriptionClassName?: string;
+  ctaStyle?: CSSProperties;
+  LinkComponent?: MemberHomeLinkComponent;
+}) {
+  const hasUpcoming = upcomingSessions.length > 0;
+
+  return (
+    <>
+      <Title className={titleClassName} style={titleStyle}>
+        {hasUpcoming ? "다음 모임" : "아직 열린 모임이 없습니다"}
+      </Title>
+      {hasUpcoming ? (
+        <ul className="stack" style={{ listStyle: "none", padding: 0, margin: "12px 0", "--stack": "12px" } as CSSProperties}>
+          {upcomingSessions.slice(0, 4).map((session) => (
+            <li key={session.sessionId}>
+              <div className="body editorial">{session.bookTitle}</div>
+              <div className="tiny" style={{ color: "var(--text-3)", marginTop: 3 }}>
+                {session.bookAuthor}
+                {session.date ? ` · ${session.date}` : ""}
+                {session.locationLabel ? ` · ${session.locationLabel}` : ""}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <p className={descriptionClassName} style={{ color: "var(--text-2)", margin: 0 }}>
+        {hasUpcoming ? "참석과 질문은 호스트가 모임을 열면 시작됩니다." : emptyDescription}
+      </p>
+      {isHost && !hasUpcoming ? (
+        <Link to="/app/host/sessions/new" className="btn btn-primary" style={ctaStyle} LinkComponent={LinkComponent}>
+          첫 모임 만들기
+        </Link>
+      ) : null}
+    </>
+  );
+}
+
 export function MobileCurrentSessionCard({
   session,
   isHost,
   isViewer = false,
   canWrite = true,
   canViewPersonalState = true,
+  upcomingSessions = [],
   LinkComponent = PlainMemberHomeLink,
 }: {
   session: CurrentSession | null;
@@ -203,28 +266,22 @@ export function MobileCurrentSessionCard({
   isViewer?: boolean;
   canWrite?: boolean;
   canViewPersonalState?: boolean;
+  upcomingSessions?: readonly EmptyCurrentUpcomingBook[];
   LinkComponent?: MemberHomeLinkComponent;
 }) {
   if (!session) {
     return (
       <article className="m-card rm-member-session-card rm-member-session-card--empty">
         <div className="eyebrow">다음 모임</div>
-        <h2 className="h3 editorial" style={{ margin: "8px 0 6px" }}>
-          아직 열린 세션이 없습니다
-        </h2>
-        <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-          호스트가 다음 세션을 등록하면 RSVP와 질문 작성이 열립니다.
-        </p>
-        {isHost ? (
-          <Link
-            to="/app/host/sessions/new"
-            className="btn btn-primary"
-            style={{ marginTop: 16, width: "100%" }}
-            LinkComponent={LinkComponent}
-          >
-            세션 문서 만들기
-          </Link>
-        ) : null}
+        <EmptyCurrentMeeting
+          upcomingSessions={upcomingSessions}
+          isHost={isHost}
+          emptyDescription="호스트가 다음 모임을 등록하면 참석과 질문 작성이 열립니다."
+          titleClassName="h3 editorial"
+          titleStyle={{ margin: "8px 0 6px" }}
+          ctaStyle={{ marginTop: 16, width: "100%" }}
+          LinkComponent={LinkComponent}
+        />
       </article>
     );
   }

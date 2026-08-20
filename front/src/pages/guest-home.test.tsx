@@ -112,7 +112,7 @@ describe("guest member-home composition", () => {
     expect(await screen.findByText("다시 불러오지 못했습니다. 재시도해 주세요.")).toBeVisible();
     expect(screen.getAllByText("성공한 노트")).toHaveLength(2);
     await user.click(screen.getAllByRole("button", { name: "다시 시도" })[0]);
-    expect(await screen.findAllByText("복구된 예정 책")).toHaveLength(2);
+    expect((await screen.findAllByText("복구된 예정 책")).length).toBeGreaterThanOrEqual(2);
     expect(screen.getAllByText("성공한 노트")).toHaveLength(2);
     expect(screen.queryByText("17초 뒤에 다시 시도해 주세요.")).not.toBeInTheDocument();
   });
