@@ -132,6 +132,44 @@ class HostActionNotificationGateServiceTest {
     }
 
     @Test
+    fun `complete locks the parent session before the preview row`() {
+        val preview = storedPreview()
+        port.previews[preview.id] = preview
+        port.currentCounts = preview.counts
+        val prepared = service.prepare(HOST, decisionCommand(preview.id, NotificationDecision.SKIP))
+        port.calls.clear()
+
+        service.complete(
+            CompleteHostActionDecisionCommand(
+                prepared = prepared,
+                liveRevision = 3,
+                eventId = null,
+            ),
+        )
+
+        assertThat(port.calls.take(3)).containsExactly(
+            "lockSession:${prepared.clubId}:${prepared.sessionId}",
+            "lockPreview:${preview.id}",
+            "completeDecision:${preview.id}",
+        )
+    }
+
+    @Test
+    fun `prepare locks the parent session before the preview row`() {
+        val preview = storedPreview()
+        port.previews[preview.id] = preview
+        port.currentCounts = preview.counts
+        port.calls.clear()
+
+        service.prepare(HOST, decisionCommand(preview.id, NotificationDecision.SKIP))
+
+        assertThat(port.calls.take(2)).containsExactly(
+            "lockSession:${HOST.clubId}:$SESSION_ID",
+            "lockPreview:${preview.id}",
+        )
+    }
+
+    @Test
     fun `completed preview returns the stored decision idempotently`() {
         val preview = storedPreview()
         port.previews[preview.id] = preview
@@ -246,6 +284,7 @@ private class FakeHostActionNotificationPort : HostActionNotificationPort {
     val previews = mutableMapOf<UUID, HostActionNotificationPreviewRecord>()
     private val decisions = mutableMapOf<UUID, StoredHostActionDecision>()
     var insertCount = 0
+    val calls = mutableListOf<String>()
 
     override fun countTargets(
         clubId: UUID,
@@ -259,14 +298,23 @@ private class FakeHostActionNotificationPort : HostActionNotificationPort {
         return record.id
     }
 
+    override fun lockSession(
+        clubId: UUID,
+        sessionId: UUID,
+    ) {
+        calls += "lockSession:$clubId:$sessionId"
+    }
+
     override fun lockPreview(
         previewId: UUID,
         clubId: UUID,
         hostMembershipId: UUID,
-    ): HostActionNotificationPreviewRecord? =
-        previews[previewId]?.takeIf {
+    ): HostActionNotificationPreviewRecord? {
+        calls += "lockPreview:$previewId"
+        return previews[previewId]?.takeIf {
             it.clubId == clubId && it.hostMembershipId == hostMembershipId
         }
+    }
 
     override fun findDecision(previewId: UUID): StoredHostActionDecision? = decisions[previewId]
 
@@ -277,6 +325,7 @@ private class FakeHostActionNotificationPort : HostActionNotificationPort {
         eventId: UUID?,
         now: OffsetDateTime,
     ): StoredHostActionDecision {
+        calls += "completeDecision:${preview.id}"
         decisions[preview.id]?.let { return it }
         insertCount += 1
         val stored =

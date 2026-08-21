@@ -47,6 +47,11 @@ interface HostActionNotificationPort {
 
     fun insertPreview(record: HostActionNotificationPreviewRecord): UUID
 
+    fun lockSession(
+        clubId: UUID,
+        sessionId: UUID,
+    )
+
     fun lockPreview(
         previewId: UUID,
         clubId: UUID,

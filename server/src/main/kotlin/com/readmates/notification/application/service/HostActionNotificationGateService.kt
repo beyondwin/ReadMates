@@ -62,6 +62,8 @@ class HostActionNotificationGateService(
         host: CurrentMember,
         command: HostActionDecisionCommand,
     ): PreparedHostActionDecision {
+        // Session-first: deletion locks the session row before deleting previews.
+        port.lockSession(host.clubId, command.sessionId)
         val preview =
             port.lockPreview(command.previewId, host.clubId, host.membershipId)
                 ?: fail(HostActionNotificationError.PREVIEW_NOT_FOUND)
@@ -101,6 +103,8 @@ class HostActionNotificationGateService(
         if ((command.prepared.decision == NotificationDecision.SEND) != (command.eventId != null)) {
             fail(HostActionNotificationError.INVALID_DECISION)
         }
+        // Session-first: deletion locks the session row before deleting previews.
+        port.lockSession(command.prepared.clubId, command.prepared.sessionId)
         val preview =
             port.lockPreview(
                 command.prepared.previewId,

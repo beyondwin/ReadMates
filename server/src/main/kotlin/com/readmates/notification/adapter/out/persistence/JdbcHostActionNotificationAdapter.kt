@@ -103,6 +103,13 @@ class JdbcHostActionNotificationAdapter(
         return record.id
     }
 
+    override fun lockSession(
+        clubId: UUID,
+        sessionId: UUID,
+    ) {
+        sessionGuard.lockExisting(clubId, sessionId)
+    }
+
     override fun lockPreview(
         previewId: UUID,
         clubId: UUID,
