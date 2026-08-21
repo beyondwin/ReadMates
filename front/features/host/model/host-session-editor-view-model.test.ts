@@ -205,6 +205,16 @@ describe("host session editor view model", () => {
 
     expect(hasAppliedSessionRecord({ liveRevision: 0, liveSnapshot: legacySnapshot })).toBe(true);
     expect(hasAppliedSessionRecord({ liveRevision: 0, liveSnapshot: null })).toBe(false);
+    expect(hasAppliedSessionRecord({
+      liveRevision: 0,
+      liveSnapshot: {
+        ...snapshot,
+        publicationSummary: "",
+        highlights: [],
+        oneLineReviews: [],
+        feedbackDocument: { fileName: "feedback.md", title: "", markdown: "" },
+      },
+    })).toBe(false);
     expect(buildHostSessionEditorOverview(legacyInput).nextAction.kind).toBe("UP_TO_DATE");
     expect(buildHostSessionEditorOverview(legacyInput).applied).toEqual({
       exists: true,

@@ -156,6 +156,22 @@ describe("buildHostSessionWorkspace", () => {
     });
   });
 
+  it("publishes a CLOSED applied record even after the draft is consumed", () => {
+    expect(
+      buildHostSessionWorkspace({
+        ...baseInput,
+        state: "CLOSED",
+        hasRecordDraft: false,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      }),
+    ).toMatchObject({
+      statusLabel: "기록 정리 중",
+      primaryAction: { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" },
+      publicationReady: true,
+    });
+  });
+
   it("publishes when CLOSED is ready", () => {
     expect(
       buildHostSessionWorkspace({

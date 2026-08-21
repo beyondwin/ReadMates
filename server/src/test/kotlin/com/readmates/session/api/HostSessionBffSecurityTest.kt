@@ -24,11 +24,40 @@ import java.util.stream.Stream
 
 private const val CLEANUP_BFF_DELETE_SESSION_SQL = """
     delete from public_session_publications
-    where session_id = '00000000-0000-0000-0000-000000009888';
+    where session_id in (
+      '00000000-0000-0000-0000-000000009888',
+      '00000000-0000-0000-0000-00000000b888'
+    );
+    delete from host_session_change_audit
+    where session_id in (
+      '00000000-0000-0000-0000-000000009888',
+      '00000000-0000-0000-0000-00000000b888'
+    );
+    delete from host_session_lifecycle_audit
+    where session_id in (
+      '00000000-0000-0000-0000-000000009888',
+      '00000000-0000-0000-0000-00000000b888'
+    );
     delete from session_participants
-    where session_id = '00000000-0000-0000-0000-000000009888';
+    where session_id in (
+      '00000000-0000-0000-0000-000000009888',
+      '00000000-0000-0000-0000-00000000b888'
+    );
     delete from sessions
-    where id = '00000000-0000-0000-0000-000000009888';
+    where id in (
+      '00000000-0000-0000-0000-000000009888',
+      '00000000-0000-0000-0000-00000000b888'
+    );
+    delete from memberships
+    where id in (
+      '00000000-0000-0000-0000-000000009216',
+      '00000000-0000-0000-0000-00000000b201'
+    );
+    delete from users
+    where id in (
+      '00000000-0000-0000-0000-000000009116',
+      '00000000-0000-0000-0000-00000000b101'
+    );
 """
 
 @SpringBootTest(
@@ -111,6 +140,61 @@ class HostSessionBffSecurityTest(
 
         assertEquals(1, countRows("sessions", "id = '00000000-0000-0000-0000-000000009888' and deleted_at is not null"))
         assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
+    }
+
+    @ParameterizedTest
+    @MethodSource("recoveryAndTrashMutationCases")
+    fun `trusted host bff reaches recovery and trash mutations without csrf`(case: RecordMutationCase) {
+        val request =
+            request(case.method, case.path)
+                .with(user("host@example.com"))
+                .header("X-Readmates-Bff-Secret", "test-bff-secret")
+                .header("Origin", "http://localhost:3000")
+        case.body?.let {
+            request
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(it)
+        }
+
+        mockMvc.perform(request).andExpect(status().isNotFound)
+    }
+
+    @Test
+    fun `recovery and trash mutations reject viewer member and other club`() {
+        createViewerMembership()
+        createDraftSession()
+        val changeId = patchTitle("BFF 복원 대상 제목")
+        createOutsideClubSession()
+
+        fun restoreChange(
+            username: String,
+            sessionId: String = SESSION_ID,
+            targetChangeId: String = changeId,
+        ) = request(
+            HttpMethod.POST,
+            "/api/host/sessions/$sessionId/changes/$targetChangeId/restore",
+        ).with(user(username))
+            .header("X-Readmates-Bff-Secret", "test-bff-secret")
+            .header("Origin", "http://localhost:3000")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"expectedCurrentHash":"${"a".repeat(64)}"}""")
+
+        fun restoreSession(
+            username: String,
+            sessionId: String = SESSION_ID,
+        ) = request(HttpMethod.POST, "/api/host/sessions/$sessionId/restore")
+            .with(user(username))
+            .header("X-Readmates-Bff-Secret", "test-bff-secret")
+            .header("Origin", "http://localhost:3000")
+
+        mockMvc.perform(restoreChange("recovery.viewer@example.com")).andExpect(status().isForbidden)
+        mockMvc.perform(restoreSession("recovery.viewer@example.com")).andExpect(status().isForbidden)
+        mockMvc.perform(restoreChange("member5@example.com")).andExpect(status().isForbidden)
+        mockMvc.perform(restoreSession("member5@example.com")).andExpect(status().isForbidden)
+        mockMvc.perform(restoreChange("host@example.com", OUTSIDE_SESSION_ID, OUTSIDE_CHANGE_ID))
+            .andExpect(status().isNotFound)
+        mockMvc.perform(restoreSession("host@example.com", OUTSIDE_SESSION_ID))
+            .andExpect(status().isNotFound)
     }
 
     @Test
@@ -334,6 +418,124 @@ class HostSessionBffSecurityTest(
         createSession(state = "DRAFT", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
     }
 
+    private fun patchTitle(title: String): String =
+        mockMvc
+            .patch("/api/host/sessions/$SESSION_ID") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "title": "$title",
+                      "bookTitle": "BFF 삭제 테스트 책",
+                      "bookAuthor": "BFF 삭제 테스트 저자",
+                      "date": "2026-07-01",
+                      "locationLabel": "온라인"
+                    }
+                    """.trimIndent()
+            }.andExpect { status { isOk() } }
+            .andReturn()
+            .response
+            .contentAsString
+            .let { body ->
+                """"changeId"\s*:\s*"([^"]+)""""
+                    .toRegex()
+                    .find(body)
+                    ?.groupValues
+                    ?.get(1)
+                    ?: error("changeReceipt.changeId was missing")
+            }
+
+    private fun createViewerMembership() {
+        jdbcTemplate.update(
+            """
+            insert into users (id, email, name, short_name, auth_provider)
+            values (?, 'recovery.viewer@example.com', '복원 뷰어', '뷰어', 'PASSWORD')
+            """.trimIndent(),
+            VIEWER_USER_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'MEMBER', 'VIEWER', utc_timestamp(6), '뷰어', 'cloud-green-book')
+            """.trimIndent(),
+            VIEWER_MEMBERSHIP_ID,
+            CLUB_ID,
+            VIEWER_USER_ID,
+        )
+    }
+
+    private fun createOutsideClubSession() {
+        jdbcTemplate.update(
+            """
+            insert into users (id, email, name, short_name, auth_provider)
+            values (?, 'recovery.outside@example.test', 'Outside Recovery Host', 'Outside', 'PASSWORD')
+            """.trimIndent(),
+            OUTSIDE_USER_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'Outside', 'globe-notebook')
+            """.trimIndent(),
+            OUTSIDE_MEMBERSHIP_ID,
+            OUTSIDE_CLUB_ID,
+            OUTSIDE_USER_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id,
+              club_id,
+              number,
+              title,
+              book_title,
+              book_author,
+              session_date,
+              start_time,
+              end_time,
+              location_label,
+              question_deadline_at,
+              state,
+              visibility,
+              access_scope
+            )
+            values (
+              ?,
+              ?,
+              188,
+              '188회차 · 다른 클럽 휴지통',
+              '다른 클럽 책',
+              '다른 클럽 저자',
+              '2026-07-01',
+              '20:00:00',
+              '22:00:00',
+              '온라인',
+              '2026-06-30 14:59:00',
+              'DRAFT',
+              'HOST_ONLY',
+              'HOST_ONLY'
+            )
+            """.trimIndent(),
+            OUTSIDE_SESSION_ID,
+            OUTSIDE_CLUB_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_session_change_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              changed_fields_json, before_snapshot_json, after_snapshot_json
+            ) values (?, ?, ?, ?, 'BASIC_INFO_UPDATED', '["title"]', '{"title":"a"}', '{"title":"b"}')
+            """.trimIndent(),
+            OUTSIDE_CHANGE_ID,
+            OUTSIDE_CLUB_ID,
+            OUTSIDE_SESSION_ID,
+            OUTSIDE_MEMBERSHIP_ID,
+        )
+    }
+
     private fun createOpenSession() {
         createSession(state = "OPEN", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
         jdbcTemplate.update(
@@ -463,6 +665,15 @@ class HostSessionBffSecurityTest(
         ) ?: 0
 
     private companion object {
+        private const val SESSION_ID = "00000000-0000-0000-0000-000000009888"
+        private const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
+        private const val VIEWER_USER_ID = "00000000-0000-0000-0000-000000009116"
+        private const val VIEWER_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000009216"
+        private const val OUTSIDE_CLUB_ID = "00000000-0000-0000-0000-000000000002"
+        private const val OUTSIDE_USER_ID = "00000000-0000-0000-0000-00000000b101"
+        private const val OUTSIDE_MEMBERSHIP_ID = "00000000-0000-0000-0000-00000000b201"
+        private const val OUTSIDE_SESSION_ID = "00000000-0000-0000-0000-00000000b888"
+        private const val OUTSIDE_CHANGE_ID = "00000000-0000-0000-0000-00000000b401"
         private const val RECORD_DRAFT_BODY =
             """
             {
@@ -529,6 +740,22 @@ class HostSessionBffSecurityTest(
                     "/api/host/sessions/00000000-0000-0000-0000-000000009998/revisions/" +
                         "00000000-0000-0000-0000-000000007998/restore-to-draft",
                     """{"expectedDraftRevision":null}""",
+                ),
+            )
+
+        @JvmStatic
+        fun recoveryAndTrashMutationCases(): Stream<RecordMutationCase> =
+            Stream.of(
+                RecordMutationCase(
+                    HttpMethod.POST,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/changes/" +
+                        "00000000-0000-0000-0000-000000007998/restore",
+                    """{"expectedCurrentHash":"${"a".repeat(64)}"}""",
+                ),
+                RecordMutationCase(
+                    HttpMethod.POST,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/restore",
+                    null,
                 ),
             )
     }

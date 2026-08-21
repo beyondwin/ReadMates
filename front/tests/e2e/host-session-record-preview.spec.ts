@@ -282,7 +282,8 @@ async function expectMobileEditorChrome(page: Page): Promise<void> {
   const sectionTabs = sectionNav.getByRole("tab");
   await expect(sectionTabs).toHaveCount(5);
   await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
   const sectionNavMetrics = await sectionNav.evaluate((element) => ({
     clientWidth: element.clientWidth,

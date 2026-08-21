@@ -106,6 +106,138 @@ describe("Cloudflare BFF function", () => {
     expect((init.headers as Headers).get("X-Readmates-Client-Contract")).toBe("v2");
   });
 
+  it.each([
+    {
+      name: "change restore",
+      url: "https://readmates.pages.dev/api/bff/api/host/sessions/s-1/changes/c-1/restore",
+      path: ["api", "host", "sessions", "s-1", "changes", "c-1", "restore"],
+      upstream: "https://api.example.com/api/host/sessions/s-1/changes/c-1/restore",
+      body: JSON.stringify({ expectedCurrentHash: "a".repeat(64) }),
+    },
+    {
+      name: "session restore",
+      url: "https://readmates.pages.dev/api/bff/api/host/sessions/s-1/restore",
+      path: ["api", "host", "sessions", "s-1", "restore"],
+      upstream: "https://api.example.com/api/host/sessions/s-1/restore",
+      body: "{}",
+    },
+  ])("requires exact origin and v2 client contract for POST $name then forwards generically", async (caseItem) => {
+    const missingOriginFetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", missingOriginFetch);
+    const missingOrigin = await onRequest(
+      context(
+        new Request(caseItem.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Readmates-Client-Contract": "v2",
+          },
+          body: caseItem.body,
+        }),
+        { path: caseItem.path },
+      ),
+    );
+    await expectApiErrorBody(missingOrigin, { status: 403, code: "PERMISSION_DENIED" });
+    expect(missingOriginFetch).not.toHaveBeenCalled();
+
+    const crossOriginFetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", crossOriginFetch);
+    const crossOrigin = await onRequest(
+      context(
+        new Request(caseItem.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://attacker.example",
+            "X-Readmates-Client-Contract": "v2",
+          },
+          body: caseItem.body,
+        }),
+        { path: caseItem.path },
+      ),
+    );
+    await expectApiErrorBody(crossOrigin, { status: 403, code: "PERMISSION_DENIED" });
+    expect(crossOriginFetch).not.toHaveBeenCalled();
+
+    const missingContractFetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", missingContractFetch);
+    const missingContract = await onRequest(
+      context(
+        new Request(caseItem.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://readmates.pages.dev",
+          },
+          body: caseItem.body,
+        }),
+        { path: caseItem.path },
+      ),
+    );
+    await expectApiErrorBody(missingContract, {
+      status: 409,
+      code: "HOST_CLIENT_UPGRADE_REQUIRED",
+    });
+    expect(missingContractFetch).not.toHaveBeenCalled();
+
+    const mismatchedContractFetch = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", mismatchedContractFetch);
+    const mismatchedContract = await onRequest(
+      context(
+        new Request(caseItem.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://readmates.pages.dev",
+            "X-Readmates-Client-Contract": "attacker-version",
+          },
+          body: caseItem.body,
+        }),
+        { path: caseItem.path },
+      ),
+    );
+    await expectApiErrorBody(mismatchedContract, {
+      status: 409,
+      code: "HOST_CLIENT_UPGRADE_REQUIRED",
+    });
+    expect(mismatchedContractFetch).not.toHaveBeenCalled();
+
+    let forwardedInit: RequestInit | undefined;
+    const validFetch = vi.fn(async (_input, init) => {
+      forwardedInit = init;
+      return new Response("{}", { status: 200 });
+    });
+    vi.stubGlobal("fetch", validFetch);
+    const valid = await onRequest(
+      context(
+        new Request(caseItem.url, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Origin: "https://readmates.pages.dev",
+            "X-Readmates-Client-Contract": "v2",
+          },
+          body: caseItem.body,
+        }),
+        { path: caseItem.path },
+      ),
+    );
+
+    expect(valid.status).toBe(200);
+    expect(validFetch).toHaveBeenCalledWith(
+      caseItem.upstream,
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.any(Headers),
+        redirect: "manual",
+      }),
+    );
+    const forwardedHeaders = forwardedInit?.headers as Headers;
+    expect(forwardedHeaders.get("Origin")).toBe("https://readmates.pages.dev");
+    expect(forwardedHeaders.get("X-Readmates-Client-Contract")).toBe("v2");
+    expect(forwardedHeaders.get("X-Readmates-Bff-Secret")).toBe("secret");
+  });
+
   it("rejects a missing or mismatched browser client contract before upstream", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

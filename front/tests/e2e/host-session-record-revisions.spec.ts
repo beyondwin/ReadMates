@@ -507,12 +507,11 @@ where id = '${recordSessionId}';
   );
   expect(metadataLines).toBe(1);
 
-  const overviewPanel = page.locator(".rm-host-session-editor__overview");
-  await expect(overviewPanel).toHaveCSS("padding-left", "14px");
-  await expect(overviewPanel).toHaveCSS("padding-right", "14px");
+  const overviewPanel = page.locator(".rm-host-session-workspace__focus");
+  await expect(overviewPanel).toBeVisible();
   await openEditorSection(page, "기록");
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
-  await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   const refreshDraft = page.getByRole("button", { name: "최신 정보 확인 완료" });
   await expect(refreshDraft).toBeVisible();
   const refreshResponse = page.waitForResponse(

@@ -115,7 +115,6 @@ export function hasAppliedSessionRecord({
       || liveSnapshot.oneLineReviews.length
       || liveSnapshot.feedbackDocument.title.trim()
       || liveSnapshot.feedbackDocument.markdown.trim()
-      || liveSnapshot.feedbackDocument.fileName.trim(),
   );
 }
 

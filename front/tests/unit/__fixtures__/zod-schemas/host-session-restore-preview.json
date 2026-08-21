@@ -1,0 +1,17 @@
+{
+  "sessionId": "00000000-0000-0000-0000-00000000c301",
+  "changeId": "00000000-0000-0000-0000-00000000c101",
+  "kind": "BASIC_INFO",
+  "items": [
+    {
+      "field": "title",
+      "subjectId": null,
+      "currentValue": "복원 후 제목",
+      "targetValue": "복원 전 제목",
+      "sensitive": false
+    }
+  ],
+  "expectedCurrentHash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "canRestore": true,
+  "blockedReason": null
+}

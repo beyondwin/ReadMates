@@ -28,11 +28,16 @@ import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
+import org.springframework.test.web.servlet.patch
+import org.springframework.test.web.servlet.post
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.ObjectMapper
 import java.nio.file.Paths
@@ -99,6 +104,83 @@ class FrontendZodSchemaContractTest
                     .response.contentAsString
 
             assertJsonShapeMatches(response, "host-session-detail.json")
+        }
+
+        @Test
+        @Sql(
+            statements = [CLEANUP_CONTRACT_RECOVERY_SQL],
+            executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+        )
+        @Sql(
+            statements = [CLEANUP_CONTRACT_RECOVERY_SQL],
+            executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+        )
+        fun `host mutation responses accept optional receipt recovery and trash fields`() {
+            val sessionId = createDraftSession("88회차 · 계약 복원 책")
+            val patched =
+                mockMvc
+                    .patch("/api/host/sessions/$sessionId") {
+                        with(user("host@example.com"))
+                        with(csrf())
+                        contentType = MediaType.APPLICATION_JSON
+                        content = sessionJson("88회차 · 계약 복원 제목")
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            val patchedNode = objectMapper.readTree(patched)
+            assertJsonShapeAcceptsOptionalFields(
+                actualJson = patched,
+                fixtureFileName = "host-session-detail.json",
+            )
+            assertJsonShapeAcceptsOptionalFields(
+                actual = patchedNode.get("changeReceipt"),
+                expected = readFixture("host-session-change-receipt.json"),
+                path = "$.changeReceipt",
+                fixtureFileName = "host-session-change-receipt.json",
+            )
+
+            val changeId = patchedNode.get("changeReceipt").get("changeId").asString()
+            val preview =
+                mockMvc
+                    .get("/api/host/sessions/$sessionId/changes/$changeId/restore-preview") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeAcceptsOptionalFields(preview, "host-session-restore-preview.json")
+
+            val history =
+                mockMvc
+                    .get("/api/host/sessions/$sessionId/history") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeAcceptsOptionalFields(history, "host-session-history-recovery.json")
+
+            mockMvc
+                .delete("/api/host/sessions/$sessionId") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                }.andExpect { status { isOk() } }
+
+            val trashDetail =
+                mockMvc
+                    .get("/api/host/sessions/$sessionId/trash") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeAcceptsOptionalFields(trashDetail, "host-session-trash-item.json")
+
+            val trashPage =
+                mockMvc
+                    .get("/api/host/sessions/trash") {
+                        with(user("host@example.com"))
+                    }.andExpect { status { isOk() } }
+                    .andReturn()
+                    .response.contentAsString
+            assertJsonShapeAcceptsOptionalFields(trashPage, "host-session-trash-page.json")
         }
 
         @Test
@@ -463,6 +545,37 @@ class FrontendZodSchemaContractTest
                 .hasMessageContaining("field")
         }
 
+        private fun createDraftSession(title: String): String {
+            val response =
+                mockMvc
+                    .post("/api/host/sessions") {
+                        with(user("host@example.com"))
+                        with(csrf())
+                        contentType = MediaType.APPLICATION_JSON
+                        content = sessionJson(title)
+                    }.andExpect {
+                        status { isCreated() }
+                    }.andReturn()
+                    .response.contentAsString
+            return """"sessionId"\s*:\s*"([^"]+)""""
+                .toRegex()
+                .find(response)
+                ?.groupValues
+                ?.get(1)
+                ?: error("created session response did not include a sessionId")
+        }
+
+        private fun sessionJson(title: String): String =
+            """
+            {
+              "title": "$title",
+              "bookTitle": "계약 복원 책",
+              "bookAuthor": "계약 복원 저자",
+              "date": "2026-07-20",
+              "locationLabel": "온라인"
+            }
+            """.trimIndent()
+
         private fun sessionCookieForUser(userId: String): Cookie {
             val issuedSession =
                 authSessionService.issueSession(
@@ -474,10 +587,7 @@ class FrontendZodSchemaContractTest
             return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
         }
 
-        private fun assertJsonShapeMatches(
-            actualJson: String,
-            fixtureFileName: String,
-        ) {
+        private fun readFixture(fixtureFileName: String): JsonNode {
             val fixtureFile = zodFixturesDir.resolve(fixtureFileName).toFile()
             check(fixtureFile.exists()) {
                 "Frontend zod schema fixture file not found: ${fixtureFile.absolutePath}. " +
@@ -485,9 +595,15 @@ class FrontendZodSchemaContractTest
                     "then ensure 'readmates.frontend.zod.fixtures.dir' points to " +
                     "front/tests/unit/__fixtures__/zod-schemas."
             }
+            return objectMapper.readTree(fixtureFile)
+        }
 
+        private fun assertJsonShapeMatches(
+            actualJson: String,
+            fixtureFileName: String,
+        ) {
             val actual: JsonNode = objectMapper.readTree(actualJson)
-            val expected: JsonNode = objectMapper.readTree(fixtureFile)
+            val expected: JsonNode = readFixture(fixtureFileName)
 
             assertJsonShapeMatches(
                 actual = actual,
@@ -495,6 +611,69 @@ class FrontendZodSchemaContractTest
                 path = "$",
                 fixtureFileName = fixtureFileName,
             )
+        }
+
+        private fun assertJsonShapeAcceptsOptionalFields(
+            actualJson: String,
+            fixtureFileName: String,
+        ) {
+            assertJsonShapeAcceptsOptionalFields(
+                actual = objectMapper.readTree(actualJson),
+                expected = readFixture(fixtureFileName),
+                path = "$",
+                fixtureFileName = fixtureFileName,
+            )
+        }
+
+        private fun assertJsonShapeAcceptsOptionalFields(
+            actual: JsonNode?,
+            expected: JsonNode,
+            path: String,
+            fixtureFileName: String,
+        ) {
+            if (expected.isNull) {
+                return
+            }
+            if (expected.isObject) {
+                assertThat(actual?.isObject)
+                    .describedAs("JSON node at '$path' from '$fixtureFileName' must be an object")
+                    .isTrue()
+                expected.propertyNames().sorted().forEach { key ->
+                    val expectedChild = expected.get(key)
+                    if (expectedChild.isNull && actual?.get(key) == null) {
+                        return@forEach
+                    }
+                    assertJsonShapeAcceptsOptionalFields(
+                        actual = actual!!.get(key),
+                        expected = expectedChild,
+                        path = "$path.$key",
+                        fixtureFileName = fixtureFileName,
+                    )
+                }
+                return
+            }
+            if (expected.isArray) {
+                assertThat(actual?.isArray)
+                    .describedAs("JSON node at '$path' from '$fixtureFileName' must be an array")
+                    .isTrue()
+                if (!expected.isEmpty) {
+                    assertThat(actual!!.isEmpty)
+                        .describedAs(
+                            "JSON array at '$path' from '$fixtureFileName' " +
+                                "must contain at least one representative item",
+                        ).isFalse()
+                    assertJsonShapeAcceptsOptionalFields(
+                        actual = actual.get(0),
+                        expected = expected.get(0),
+                        path = "$path[0]",
+                        fixtureFileName = fixtureFileName,
+                    )
+                }
+                return
+            }
+            assertThat(actual == null || actual.isMissingNode)
+                .describedAs("JSON node at '$path' from '$fixtureFileName' must be present")
+                .isFalse()
         }
 
         private fun assertJsonShapeMatches(
@@ -574,6 +753,34 @@ class FrontendZodSchemaContractTest
         private companion object {
             private const val OWNER_USER_ID = "00000000-0000-0000-0000-000000000901"
             private const val MEMBER_USER_ID = "00000000-0000-0000-0000-000000000106"
+
+            private const val CLEANUP_CONTRACT_RECOVERY_SQL = """
+                delete from host_session_change_audit
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and session_id in (
+                    select id from sessions
+                    where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+                  );
+                delete from host_session_lifecycle_audit
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and session_id in (
+                    select id from sessions
+                    where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+                  );
+                delete from session_record_drafts
+                where club_id = '00000000-0000-0000-0000-000000000001'
+                  and session_id in (
+                    select id from sessions
+                    where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+                  );
+                delete from session_participants
+                where session_id in (
+                  select id from sessions
+                  where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+                );
+                delete from sessions
+                where club_id = '00000000-0000-0000-0000-000000000001' and number > 7;
+            """
 
             private const val CLEANUP_CONTRACT_GUEST_ARCHIVE_SQL = """
                 delete from long_reviews

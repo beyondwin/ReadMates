@@ -21,6 +21,67 @@ mkdirSync(fixturesDir, { recursive: true });
 // ---------------------------------------------------------------------------
 // HostSessionDetailResponseSchema top-level keys
 // ---------------------------------------------------------------------------
+const hostSessionChangeReceipt = {
+  changeId: "00000000-0000-0000-0000-00000000c101",
+  kind: "BASIC_INFO",
+  undoAvailable: true,
+};
+
+const hostSessionRestorePreview = {
+  sessionId: "00000000-0000-0000-0000-00000000c301",
+  changeId: "00000000-0000-0000-0000-00000000c101",
+  kind: "BASIC_INFO",
+  items: [
+    {
+      field: "title",
+      subjectId: null,
+      currentValue: "복원 후 제목",
+      targetValue: "복원 전 제목",
+      sensitive: false,
+    },
+  ],
+  expectedCurrentHash: "a".repeat(64),
+  canRestore: true,
+  blockedReason: null,
+};
+
+const hostSessionHistoryRecovery = {
+  items: [
+    {
+      id: "00000000-0000-0000-0000-00000000c401",
+      type: "BASIC_INFO_UPDATED",
+      createdAt: "2026-08-01T00:00:00Z",
+      actorMembershipId: "00000000-0000-0000-0000-000000000201",
+      changedFields: ["title"],
+      attendanceTransitions: [],
+      revisionId: null,
+      revisionVersion: null,
+      revisionSource: null,
+      restoredFromRevisionId: null,
+      notificationEventId: null,
+      recovery: {
+        action: "RESTORE_CHANGE",
+        availability: "AVAILABLE",
+      },
+    },
+  ],
+  nextCursor: null,
+};
+
+const hostSessionTrashItem = {
+  sessionId: "00000000-0000-0000-0000-00000000c501",
+  sessionNumber: 88,
+  title: "88회차 · 휴지통 계약",
+  state: "DRAFT",
+  deletedAt: "2026-08-01T00:00:00Z",
+  purgeAfter: "2026-08-08T00:00:00Z",
+};
+
+const hostSessionTrashPage = {
+  items: [hostSessionTrashItem],
+  nextCursor: null,
+};
+
 const hostSessionDetail = {
   sessionId: "00000000-0000-0000-0000-000000000301",
   sessionNumber: 1,
@@ -311,6 +372,11 @@ function write(filename: string, data: unknown): void {
 }
 
 write("host-session-detail.json", hostSessionDetail);
+write("host-session-change-receipt.json", hostSessionChangeReceipt);
+write("host-session-restore-preview.json", hostSessionRestorePreview);
+write("host-session-history-recovery.json", hostSessionHistoryRecovery);
+write("host-session-trash-item.json", hostSessionTrashItem);
+write("host-session-trash-page.json", hostSessionTrashPage);
 write("host-notification-delivery-list.json", hostNotificationDeliveryList);
 write("host-invitation-list.json", hostInvitationList);
 write("admin-analytics-overview.json", adminAnalyticsOverview);

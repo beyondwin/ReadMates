@@ -1,0 +1,22 @@
+{
+  "items": [
+    {
+      "id": "00000000-0000-0000-0000-00000000c401",
+      "type": "BASIC_INFO_UPDATED",
+      "createdAt": "2026-08-01T00:00:00Z",
+      "actorMembershipId": "00000000-0000-0000-0000-000000000201",
+      "changedFields": ["title"],
+      "attendanceTransitions": [],
+      "revisionId": null,
+      "revisionVersion": null,
+      "revisionSource": null,
+      "restoredFromRevisionId": null,
+      "notificationEventId": null,
+      "recovery": {
+        "action": "RESTORE_CHANGE",
+        "availability": "AVAILABLE"
+      }
+    }
+  ],
+  "nextCursor": null
+}

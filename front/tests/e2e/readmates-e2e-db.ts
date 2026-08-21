@@ -760,6 +760,14 @@ where session_id in (
     and number >= 7
 );
 
+delete from host_session_lifecycle_audit
+where club_id = ${sqlString(clubId)}
+  and session_id in (
+    select id from sessions
+    where club_id = ${sqlString(clubId)}
+      and number >= 7
+  );
+
 delete from sessions
 where club_id = ${sqlString(clubId)}
   and number >= 7;
@@ -1052,6 +1060,90 @@ where notification_event_outbox.club_id = ${sqlString(clubId)}
   and notification_event_outbox.dedupe_key like 'manual:%'
   and notification_deliveries.channel = 'IN_APP'
   and sessions.number >= 7;
+`);
+}
+
+export function createHostSessionFixture({
+  number = 80,
+  bookTitle = "포커스 워크스페이스 책",
+  state = "DRAFT",
+  date = "2026-07-20",
+  accessScope = "HOST_ONLY",
+  withParticipants = false,
+}: {
+  number?: number;
+  bookTitle?: string;
+  state?: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
+  date?: string;
+  accessScope?: "HOST_ONLY" | "GUEST_READABLE";
+  withParticipants?: boolean;
+} = {}) {
+  const sessionId = randomUUID();
+  const visibility = accessScope === "GUEST_READABLE" ? "MEMBER" : "HOST_ONLY";
+
+  runMysql(`
+insert into sessions (
+  id,
+  club_id,
+  number,
+  title,
+  book_title,
+  book_author,
+  book_translator,
+  book_link,
+  book_image_url,
+  session_date,
+  start_time,
+  end_time,
+  location_label,
+  meeting_url,
+  meeting_passcode,
+  question_deadline_at,
+  state,
+  visibility,
+  access_scope
+)
+values (
+  ${sqlString(sessionId)},
+  ${sqlString(clubId)},
+  ${number},
+  ${sqlString(`${number}회차 모임 · ${bookTitle}`)},
+  ${sqlString(bookTitle)},
+  '테스트 저자',
+  null,
+  null,
+  null,
+  ${sqlString(date)},
+  '20:00:00',
+  '22:00:00',
+  '온라인',
+  null,
+  null,
+  timestampadd(day, 14, utc_timestamp(6)),
+  ${sqlString(state)},
+  ${sqlString(visibility)},
+  ${sqlString(accessScope)}
+);
+`);
+
+  if (withParticipants) {
+    runMysql(`
+insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
+select uuid(), memberships.club_id, ${sqlString(sessionId)}, memberships.id, 'NO_RESPONSE', 'UNKNOWN'
+from memberships
+where memberships.club_id = ${sqlString(clubId)}
+  and memberships.status = 'ACTIVE';
+`);
+  }
+
+  return sessionId;
+}
+
+export function expireHostSessionTrash(sessionId: string) {
+  runMysql(`
+update sessions
+set purge_after = timestampadd(day, -1, utc_timestamp(6))
+where id = ${sqlString(sessionId)};
 `);
 }
 

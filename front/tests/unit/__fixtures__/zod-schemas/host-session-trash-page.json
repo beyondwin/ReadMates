@@ -1,0 +1,13 @@
+{
+  "items": [
+    {
+      "sessionId": "00000000-0000-0000-0000-00000000c501",
+      "sessionNumber": 88,
+      "title": "88회차 · 휴지통 계약",
+      "state": "DRAFT",
+      "deletedAt": "2026-08-01T00:00:00Z",
+      "purgeAfter": "2026-08-08T00:00:00Z"
+    }
+  ],
+  "nextCursor": null
+}

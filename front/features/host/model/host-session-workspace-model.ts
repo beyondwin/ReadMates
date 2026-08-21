@@ -97,16 +97,20 @@ function resolveOpenAction(
 function resolveClosedAction(
   input: HostSessionWorkspaceInput,
 ): HostSessionWorkspaceView["primaryAction"] {
+  if (
+    input.hasAppliedRecord
+    && !input.recordDraftStale
+    && input.recordValidationIssueCount === 0
+  ) {
+    return { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" };
+  }
   if (!input.hasRecordDraft) {
     return { kind: "UPLOAD_RECORD", label: "정리본 올리기", panel: "records" };
   }
   if (input.recordDraftStale || input.recordValidationIssueCount > 0) {
     return { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" };
   }
-  if (!input.hasAppliedRecord) {
-    return { kind: "REVIEW_RECORD", label: "기록에 반영", panel: "records" };
-  }
-  return { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" };
+  return { kind: "REVIEW_RECORD", label: "기록에 반영", panel: "records" };
 }
 
 function progressFor(

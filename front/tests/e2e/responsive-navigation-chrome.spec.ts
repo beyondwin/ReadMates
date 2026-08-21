@@ -284,7 +284,8 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(editorSections.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByRole("heading", { name: /정리본/ })).toBeVisible();
   await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
-  await expect(page.locator(".rm-host-session-editor__aside:visible")).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await tabs.getByRole("link", { name: "기록" }).click();
