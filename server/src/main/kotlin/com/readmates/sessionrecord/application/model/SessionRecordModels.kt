@@ -253,6 +253,12 @@ data class HostSessionHistoryAttendanceTransition(
     val to: String,
 )
 
+data class HostSessionHistoryRecovery(
+    val action: String,
+    val availability: String,
+    val blockedReason: String? = null,
+)
+
 data class HostSessionHistoryItem(
     val id: UUID,
     val type: HostSessionHistoryType,
@@ -269,6 +275,7 @@ data class HostSessionHistoryItem(
     val toState: String? = null,
     val reasonCode: String? = null,
     val reasonNote: String? = null,
+    val recovery: HostSessionHistoryRecovery? = null,
 )
 
 data class HostSessionHistoryCursor(

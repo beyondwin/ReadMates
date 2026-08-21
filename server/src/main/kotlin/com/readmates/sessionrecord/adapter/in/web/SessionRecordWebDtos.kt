@@ -11,6 +11,7 @@ import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.HostSessionHistoryAttendanceTransition
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
+import com.readmates.sessionrecord.application.model.HostSessionHistoryRecovery
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
 import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
@@ -221,6 +222,15 @@ data class HostSessionHistoryItemResponse(
     val reasonCode: String? = null,
     @field:JsonInclude(JsonInclude.Include.NON_NULL)
     val reasonNote: String? = null,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val recovery: HostSessionHistoryRecoveryResponse? = null,
+)
+
+data class HostSessionHistoryRecoveryResponse(
+    val action: String,
+    val availability: String,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val blockedReason: String? = null,
 )
 
 data class HostSessionHistoryAttendanceTransitionResponse(
@@ -307,10 +317,14 @@ private fun HostSessionHistoryItem.toResponse() =
         toState = toState,
         reasonCode = reasonCode,
         reasonNote = reasonNote,
+        recovery = recovery?.toResponse(),
     )
 
 private fun HostSessionHistoryAttendanceTransition.toResponse() =
     HostSessionHistoryAttendanceTransitionResponse(membershipId.toString(), from, to)
+
+private fun HostSessionHistoryRecovery.toResponse() =
+    HostSessionHistoryRecoveryResponse(action, availability, blockedReason)
 
 private fun parseRecordUuid(value: String): UUID =
     runCatching { UUID.fromString(value) }

@@ -1,6 +1,7 @@
 package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.CurrentSessionNotOpenException
+import com.readmates.session.application.HostSessionChangeNotRestorableException
 import com.readmates.session.application.HostSessionCloseNotAllowedException
 import com.readmates.session.application.HostSessionDeletionNotAllowedException
 import com.readmates.session.application.HostSessionNotFoundException
@@ -9,6 +10,7 @@ import com.readmates.session.application.HostSessionParticipantNotFoundException
 import com.readmates.session.application.HostSessionPublishNotAllowedException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionReopenNotAllowedException
+import com.readmates.session.application.HostSessionRestoreStaleException
 import com.readmates.session.application.HostSessionReturnToDraftNotAllowedException
 import com.readmates.session.application.HostSessionUnpublishNotAllowedException
 import com.readmates.session.application.InvalidHostSessionCursorException
@@ -155,5 +157,21 @@ class SessionApplicationErrorHandler {
             status = HttpStatus.BAD_REQUEST,
             code = "LIFECYCLE_REASON_INVALID",
             message = "수명주기 되돌리기 사유가 올바르지 않습니다.",
+        )
+
+    @ExceptionHandler(HostSessionChangeNotRestorableException::class)
+    fun handleChangeNotRestorable(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "HOST_SESSION_CHANGE_NOT_RESTORABLE",
+            message = "이 변경은 지금 복원할 수 없습니다.",
+        )
+
+    @ExceptionHandler(HostSessionRestoreStaleException::class)
+    fun handleRestoreStale(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "HOST_SESSION_RESTORE_STALE",
+            message = "모임이 바뀌었습니다. 최신 값을 확인한 뒤 다시 복원하세요.",
         )
 }

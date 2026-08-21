@@ -4,6 +4,7 @@ import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.sessionrecord.application.model.HostSessionHistoryCursor
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
+import com.readmates.sessionrecord.application.model.HostSessionHistoryRecovery
 import com.readmates.sessionrecord.application.model.HostSessionHistoryType
 import com.readmates.sessionrecord.application.model.InvalidHostSessionHistoryCursorException
 import com.readmates.sessionrecord.application.port.out.HostSessionHistoryPort
@@ -178,6 +179,36 @@ class HostSessionHistoryQueryServiceTest {
         assertThat(historyPort.cursors).isEmpty()
     }
 
+    @Test
+    fun `passes recovery metadata through without inferring it from history type`() {
+        val sameTime = OffsetDateTime.parse("2026-07-23T10:00:00Z")
+        val unavailable =
+            HostSessionHistoryRecovery("RESTORE_CHANGE", "UNAVAILABLE", "SNAPSHOT_UNAVAILABLE")
+        val recordDraft = HostSessionHistoryRecovery("RESTORE_RECORD_DRAFT", "AVAILABLE")
+        historyPort.audit =
+            listOf(
+                item(
+                    "00000000-0000-0000-0000-000000000011",
+                    HostSessionHistoryType.BASIC_INFO_UPDATED,
+                    sameTime,
+                    recovery = unavailable,
+                ),
+            )
+        historyPort.revisions =
+            listOf(
+                item(
+                    "00000000-0000-0000-0000-000000000012",
+                    HostSessionHistoryType.RECORD_REVISION_APPLIED,
+                    sameTime,
+                    recovery = recordDraft,
+                ),
+            )
+
+        val page = service.history(host(), SESSION_ID, PageRequest(limit = 10, cursor = emptyMap()))
+
+        assertThat(page.items.map { it.recovery }).containsExactly(recordDraft, unavailable)
+    }
+
     private fun item(
         id: String,
         type: HostSessionHistoryType,
@@ -186,6 +217,7 @@ class HostSessionHistoryQueryServiceTest {
         toState: String? = null,
         reasonCode: String? = null,
         reasonNote: String? = null,
+        recovery: HostSessionHistoryRecovery? = null,
     ) = HostSessionHistoryItem(
         id = UUID.fromString(id),
         type = type,
@@ -195,6 +227,7 @@ class HostSessionHistoryQueryServiceTest {
         toState = toState,
         reasonCode = reasonCode,
         reasonNote = reasonNote,
+        recovery = recovery,
     )
 
     private fun host() =

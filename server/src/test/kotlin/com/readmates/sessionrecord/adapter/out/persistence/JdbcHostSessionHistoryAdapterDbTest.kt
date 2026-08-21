@@ -2,6 +2,7 @@ package com.readmates.sessionrecord.adapter.out.persistence
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.sessionrecord.application.model.HostSessionHistoryRecovery
 import com.readmates.sessionrecord.application.model.HostSessionHistoryType
 import com.readmates.sessionrecord.application.service.HostSessionHistoryQueryService
 import com.readmates.shared.paging.CursorCodec
@@ -145,6 +146,37 @@ class JdbcHostSessionHistoryAdapterDbTest(
         assertThat(page.items.single().toState).isNull()
         assertThat(page.items.single().reasonCode).isEqualTo("EMPTY_SESSION_DELETED")
         assertThat(page.items.single().reasonNote).isNull()
+    }
+
+    @Test
+    fun `exposes recovery metadata from snapshots revisions and current lifecycle state`() {
+        insertFirstClubHistory()
+        insertLifecycleHistory()
+        insertSnapshotAudit()
+        insertPublishedLifecycle()
+        insertRestoredRevision()
+
+        val page = historyService.history(host(), SESSION_ID, PageRequest(limit = 20, cursor = emptyMap()))
+        val byId = page.items.associateBy { it.id }
+
+        assertThat(byId.getValue(SAME_TIME_AUDIT_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("RESTORE_CHANGE", "UNAVAILABLE", "SNAPSHOT_UNAVAILABLE"),
+        )
+        assertThat(byId.getValue(SNAPSHOT_AUDIT_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("RESTORE_CHANGE", "AVAILABLE"),
+        )
+        assertThat(byId.getValue(APPLIED_REVISION_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("RESTORE_RECORD_DRAFT", "AVAILABLE"),
+        )
+        assertThat(byId.getValue(RESTORED_REVISION_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("RESTORE_RECORD_DRAFT", "AVAILABLE"),
+        )
+        assertThat(byId.getValue(LIFECYCLE_OPENED_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("REVERSE_LIFECYCLE", "UNAVAILABLE", "LIFECYCLE_INVERSE_NOT_VALID"),
+        )
+        assertThat(byId.getValue(LIFECYCLE_PUBLISHED_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("REVERSE_LIFECYCLE", "AVAILABLE"),
+        )
     }
 
     @Test
@@ -380,6 +412,61 @@ class JdbcHostSessionHistoryAdapterDbTest(
         )
     }
 
+    private fun insertSnapshotAudit() {
+        val snapshot =
+            """
+            {"title":"1회차","bookTitle":"팩트풀니스","bookAuthor":"한스 로슬링","bookLink":null,
+             "bookImageUrl":null,"date":"2025-11-26","startTime":"19:30","endTime":"21:30",
+             "questionDeadlineAt":"2025-11-25T14:59Z","locationLabel":"온라인","meetingUrl":null,"meetingPasscode":null}
+            """.trimIndent().replace("\n", "")
+        jdbcTemplate.update(
+            """
+            insert into host_session_change_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              changed_fields_json, before_snapshot_json, after_snapshot_json, created_at
+            ) values (?, ?, ?, ?, 'BASIC_INFO_UPDATED', '["title"]', ?, ?, '2026-07-23 11:00:00.000000')
+            """.trimIndent(),
+            SNAPSHOT_AUDIT_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            snapshot,
+            snapshot,
+        )
+    }
+
+    private fun insertPublishedLifecycle() {
+        jdbcTemplate.update(
+            """
+            insert into host_session_lifecycle_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              from_state, to_state, reason_code, reason_note, request_id, created_at
+            ) values (?, ?, ?, ?, 'PUBLISHED', 'CLOSED', 'PUBLISHED', null, null, 'history-publish', '2026-07-23 11:00:00.000000')
+            """.trimIndent(),
+            LIFECYCLE_PUBLISHED_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+        )
+    }
+
+    private fun insertRestoredRevision() {
+        jdbcTemplate.update(
+            """
+            insert into session_record_revisions (
+              id, session_id, club_id, version, source, snapshot_json, snapshot_sha256,
+              restored_from_revision_id, applied_by_membership_id, applied_at
+            ) values (?, ?, ?, 3, 'RESTORED', '{}', ?, ?, ?, '2026-07-23 11:00:00.000000')
+            """.trimIndent(),
+            RESTORED_REVISION_ID.toString(),
+            SESSION_ID.toString(),
+            CLUB_ID.toString(),
+            "c".repeat(64),
+            APPLIED_REVISION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+        )
+    }
+
     private fun host() =
         CurrentMember(
             userId = HOST_USER_ID,
@@ -403,6 +490,8 @@ class JdbcHostSessionHistoryAdapterDbTest(
         val APPLIED_REVISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098002")
         val SAME_TIME_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098003")
         val OLDER_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098004")
+        val SNAPSHOT_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098005")
+        val RESTORED_REVISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098006")
         val OUTSIDE_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098101")
         val OUTSIDE_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098201")
         val OUTSIDE_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098301")
@@ -416,6 +505,7 @@ class JdbcHostSessionHistoryAdapterDbTest(
         val LIFECYCLE_OPENED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098802")
         val LIFECYCLE_DELETED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098803")
         val OUTSIDE_LIFECYCLE_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098804")
+        val LIFECYCLE_PUBLISHED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098805")
         val DELETED_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098901")
         const val HISTORY_TIMESTAMP = "2026-07-23 10:00:00.000000"
         const val PREVIEW_EXPIRY = "2026-07-23 10:05:00.000000"
@@ -442,13 +532,16 @@ private const val CLEANUP_HISTORY_TEST_FIXTURES = """
       '00000000-0000-0000-0000-000000098801',
       '00000000-0000-0000-0000-000000098802',
       '00000000-0000-0000-0000-000000098803',
-      '00000000-0000-0000-0000-000000098804'
+      '00000000-0000-0000-0000-000000098804',
+      '00000000-0000-0000-0000-000000098805'
     );
     delete from host_session_change_audit where id in (
       '00000000-0000-0000-0000-000000098003',
       '00000000-0000-0000-0000-000000098004',
+      '00000000-0000-0000-0000-000000098005',
       '00000000-0000-0000-0000-000000098401'
     );
+    delete from session_record_revisions where id = '00000000-0000-0000-0000-000000098006';
     delete from session_record_revisions where id in (
       '00000000-0000-0000-0000-000000098001',
       '00000000-0000-0000-0000-000000098002'

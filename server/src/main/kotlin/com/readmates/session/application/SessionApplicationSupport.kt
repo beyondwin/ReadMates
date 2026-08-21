@@ -59,3 +59,9 @@ class InvalidQuestionSetException : RuntimeException("Questions must include up 
 class InvalidSessionExposureException : RuntimeException("Session exposure is invalid for its lifecycle state")
 
 class InvalidHostSessionCursorException : RuntimeException("Invalid host session cursor")
+
+class HostSessionChangeNotRestorableException(
+    val blockedReason: String,
+) : RuntimeException("Host session change is not restorable")
+
+class HostSessionRestoreStaleException : RuntimeException("Host session restore is stale")

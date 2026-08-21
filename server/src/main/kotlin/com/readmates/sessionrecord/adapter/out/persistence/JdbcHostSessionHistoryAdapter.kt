@@ -3,6 +3,7 @@ package com.readmates.sessionrecord.adapter.out.persistence
 import com.readmates.sessionrecord.application.model.HostSessionHistoryAttendanceTransition
 import com.readmates.sessionrecord.application.model.HostSessionHistoryCursor
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
+import com.readmates.sessionrecord.application.model.HostSessionHistoryRecovery
 import com.readmates.sessionrecord.application.model.HostSessionHistoryType
 import com.readmates.sessionrecord.application.model.SessionRecordSource
 import com.readmates.sessionrecord.application.port.out.HostSessionHistoryPort
@@ -31,6 +32,7 @@ class JdbcHostSessionHistoryAdapter(
         queryHistory(
             """
             select id, action_type, changed_fields_json, actor_membership_id, created_at,
+                   before_snapshot_json, after_snapshot_json,
                    case action_type when 'ATTENDANCE_UPDATED' then 20 else 10 end as type_sort
             from host_session_change_audit
             where club_id = ? and session_id = ?
@@ -90,6 +92,12 @@ class JdbcHostSessionHistoryAdapter(
             """
             select id, action_type, from_state, to_state, reason_code, reason_note,
                    actor_membership_id, created_at,
+                   (
+                     select state
+                     from sessions
+                     where sessions.id = host_session_lifecycle_audit.session_id
+                       and sessions.club_id = host_session_lifecycle_audit.club_id
+                   ) as current_state,
                    case action_type
                      when 'OPENED' then 70
                      when 'CLOSED' then 80
@@ -156,6 +164,9 @@ class JdbcHostSessionHistoryAdapter(
 private fun ResultSet.toAuditHistory(objectMapper: ObjectMapper): HostSessionHistoryItem {
     val type = HostSessionHistoryType.valueOf(getString("action_type"))
     val json = getString("changed_fields_json")
+    val completeSnapshots =
+        !getString("before_snapshot_json").isNullOrBlank() &&
+            !getString("after_snapshot_json").isNullOrBlank()
     return HostSessionHistoryItem(
         id = UUID.fromString(getString("id")),
         type = type,
@@ -175,6 +186,7 @@ private fun ResultSet.toAuditHistory(objectMapper: ObjectMapper): HostSessionHis
             } else {
                 emptyList()
             },
+        recovery = restoreChangeRecovery(completeSnapshots),
     )
 }
 
@@ -194,6 +206,7 @@ private fun ResultSet.toRevisionHistory(): HostSessionHistoryItem {
         revisionVersion = getLong("version"),
         revisionSource = source,
         restoredFromRevisionId = getString("restored_from_revision_id")?.let(UUID::fromString),
+        recovery = HostSessionHistoryRecovery(action = "RESTORE_RECORD_DRAFT", availability = "AVAILABLE"),
     )
 }
 
@@ -210,20 +223,24 @@ private fun ResultSet.toNotificationHistory(): HostSessionHistoryItem {
         createdAt = utcOffsetDateTime("created_at"),
         actorMembershipId = UUID.fromString(getString("host_membership_id")),
         notificationEventId = getString("event_id")?.let(UUID::fromString),
+        recovery = HostSessionHistoryRecovery(action = "NONE", availability = "UNAVAILABLE"),
     )
 }
 
-private fun ResultSet.toLifecycleHistory(): HostSessionHistoryItem =
-    HostSessionHistoryItem(
+private fun ResultSet.toLifecycleHistory(): HostSessionHistoryItem {
+    val actionType = getString("action_type")
+    return HostSessionHistoryItem(
         id = UUID.fromString(getString("id")),
-        type = lifecycleHistoryType(getString("action_type")),
+        type = lifecycleHistoryType(actionType),
         createdAt = utcOffsetDateTime("created_at"),
         actorMembershipId = UUID.fromString(getString("actor_membership_id")),
         fromState = getString("from_state"),
         toState = getString("to_state"),
         reasonCode = getString("reason_code"),
         reasonNote = getString("reason_note"),
+        recovery = reverseLifecycleRecovery(actionType, getString("current_state")),
     )
+}
 
 private fun lifecycleHistoryType(actionType: String): HostSessionHistoryType =
     when (actionType) {
@@ -235,6 +252,37 @@ private fun lifecycleHistoryType(actionType: String): HostSessionHistoryType =
         "RETURNED_TO_DRAFT" -> HostSessionHistoryType.SESSION_RETURNED_TO_DRAFT
         "DELETED" -> HostSessionHistoryType.SESSION_DELETED
         else -> error("Unsupported lifecycle history action")
+    }
+
+private fun restoreChangeRecovery(completeSnapshots: Boolean) =
+    HostSessionHistoryRecovery(
+        action = "RESTORE_CHANGE",
+        availability = if (completeSnapshots) "AVAILABLE" else "UNAVAILABLE",
+        blockedReason = if (completeSnapshots) null else "SNAPSHOT_UNAVAILABLE",
+    )
+
+private fun reverseLifecycleRecovery(
+    actionType: String,
+    currentState: String?,
+): HostSessionHistoryRecovery {
+    val available = currentState != null && lifecycleInverseValid(actionType, currentState)
+    return HostSessionHistoryRecovery(
+        action = "REVERSE_LIFECYCLE",
+        availability = if (available) "AVAILABLE" else "UNAVAILABLE",
+        blockedReason = if (available) null else "LIFECYCLE_INVERSE_NOT_VALID",
+    )
+}
+
+private fun lifecycleInverseValid(
+    actionType: String,
+    currentState: String,
+): Boolean =
+    when (actionType) {
+        "OPENED", "REOPENED" -> currentState == "OPEN"
+        "CLOSED", "UNPUBLISHED" -> currentState == "CLOSED"
+        "PUBLISHED" -> currentState == "PUBLISHED"
+        "RETURNED_TO_DRAFT" -> currentState == "DRAFT"
+        else -> false
     }
 
 private data class AuditTransitionJson(
