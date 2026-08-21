@@ -2,7 +2,6 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { HostSessionEditorOverview } from "../../model/host-session-editor-view-model";
-import { SessionEditorSectionNav } from "./session-editor-section-nav";
 import { SessionOverviewSection } from "./session-overview-section";
 
 afterEach(() => {
@@ -10,18 +9,17 @@ afterEach(() => {
 });
 
 describe("SessionOverviewSection", () => {
-  it("is the tabpanel controlled by the actual overview navigation tab", () => {
+  it("presents applied, draft, and next-action headings without page tab semantics", () => {
     renderOverview();
 
-    const overviewTab = screen.getByRole("tab", { name: "개요" });
-    const ledger = screen.getByRole("tabpanel", { name: "개요" });
-    expect(overviewTab).toHaveAttribute("aria-controls", "host-editor-panel-overview");
-    expect(ledger).toHaveAttribute("id", "host-editor-panel-overview");
-    expect(ledger).toHaveAttribute("aria-labelledby", "host-editor-tab-overview");
-    expect(within(ledger).getByRole("heading", { name: "현재 적용본" })).toBeInTheDocument();
-    expect(within(ledger).getByRole("heading", { name: "작업 중인 초안" })).toBeInTheDocument();
-    expect(within(ledger).getByRole("heading", { name: "다음 할 일" })).toBeInTheDocument();
-    expect(ledger.querySelectorAll(".surface")).toHaveLength(0);
+    const ledger = document.getElementById("host-editor-panel-overview");
+    expect(ledger).not.toBeNull();
+    expect(ledger).not.toHaveAttribute("role", "tabpanel");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(within(ledger as HTMLElement).getByRole("heading", { name: "현재 적용본" })).toBeInTheDocument();
+    expect(within(ledger as HTMLElement).getByRole("heading", { name: "작업 중인 초안" })).toBeInTheDocument();
+    expect(within(ledger as HTMLElement).getByRole("heading", { name: "다음 할 일" })).toBeInTheDocument();
+    expect(ledger?.querySelectorAll(".surface")).toHaveLength(0);
   });
 
   it("does not invent version zero and presents record visibility as separate metadata", () => {
@@ -174,9 +172,10 @@ describe("SessionOverviewSection", () => {
 
     expect(screen.getByRole("heading", { name: /모임을 마쳤습니다/ })).toBeInTheDocument();
     expect(screen.getByText("모임을 마쳤습니다. 정리본을 올린 뒤 기록을 공개할 수 있습니다.")).toBeInTheDocument();
-    const overviewPanel = screen.getByRole("tabpanel", { name: "개요" });
-    expect(within(overviewPanel).queryByText(/기록 작업대/)).not.toBeInTheDocument();
-    expect(within(overviewPanel).queryByText(/세션/)).not.toBeInTheDocument();
+    const overviewPanel = document.getElementById("host-editor-panel-overview");
+    expect(overviewPanel).not.toBeNull();
+    expect(within(overviewPanel as HTMLElement).queryByText(/기록 작업대/)).not.toBeInTheDocument();
+    expect(within(overviewPanel as HTMLElement).queryByText(/세션/)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "출석 수정" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "정리본 올리기" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
@@ -290,22 +289,19 @@ function renderOverview({
   accessScope?: "HOST_ONLY" | "GUEST_READABLE";
 } = {}) {
   return render(
-    <>
-      <SessionEditorSectionNav activeSection="overview" onSectionChange={() => {}} />
-      <SessionOverviewSection
-        overview={overview}
-        sessionState={sessionState}
-        onNextAction={onNextAction}
-        onOpenSession={onOpenSession}
-        onCloseSession={onCloseSession}
-        onPublishSession={onPublishSession}
-        onReverseSession={onReverseSession}
-        reverseLabel={reverseLabel}
-        onDeleteDraft={onDeleteDraft}
-        lifecyclePending={lifecyclePending}
-        accessScope={accessScope}
-      />
-    </>,
+    <SessionOverviewSection
+      overview={overview}
+      sessionState={sessionState}
+      onNextAction={onNextAction}
+      onOpenSession={onOpenSession}
+      onCloseSession={onCloseSession}
+      onPublishSession={onPublishSession}
+      onReverseSession={onReverseSession}
+      reverseLabel={reverseLabel}
+      onDeleteDraft={onDeleteDraft}
+      lifecyclePending={lifecyclePending}
+      accessScope={accessScope}
+    />,
   );
 }
 

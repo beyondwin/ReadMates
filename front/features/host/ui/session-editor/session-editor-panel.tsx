@@ -7,7 +7,6 @@ type PanelProps = {
   children: ReactNode;
   tone?: "warn";
   panelId: string;
-  labelledBy?: string;
   section: HostSessionEditorSection;
   activeSection: HostSessionEditorSection;
 };
@@ -26,8 +25,6 @@ export function Panel(props: PanelProps): JSX.Element {
   return (
     <section
       id={panelId}
-      role="tabpanel"
-      aria-labelledby={props.labelledBy ?? `host-editor-tab-${props.section}`}
       hidden={!isActive}
       className={`surface rm-host-session-editor__section ${isActive ? "is-active is-mobile-active" : "is-inactive"}`}
       data-editor-section={props.section}

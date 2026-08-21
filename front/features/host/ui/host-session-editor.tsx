@@ -94,7 +94,6 @@ import {
   SessionHistoryPanel,
 } from "./session-editor/session-history-panel";
 import type { SessionHistoryPanelItem } from "./session-editor/session-history-model";
-import { SessionEditorSectionNav } from "./session-editor/session-editor-section-nav";
 import { SessionLifecycleConfirmDialog } from "./session-editor/session-lifecycle-confirm-dialog";
 import { SessionOverviewSection } from "./session-editor/session-overview-section";
 import {
@@ -309,13 +308,6 @@ export default function HostSessionEditor({
     }
     navigation.onChange(next);
   }, [navigation]);
-
-  const changeSection = useCallback((section: HostSessionEditorSection) => {
-    changeLocation({
-      section,
-      source: section === "records" ? activeSource : "manual",
-    });
-  }, [activeSource, changeLocation]);
 
   const changeSource = useCallback((source: HostSessionDraftSource) => {
     changeLocation({ section: "records", source });
@@ -977,11 +969,6 @@ export default function HostSessionEditor({
 
       <section className="rm-host-session-editor__content">
         <div className="container">
-          <SessionEditorSectionNav
-            activeSection={activeSection}
-            onSectionChange={changeSection}
-          />
-
           <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
             {visitedSections.has("overview") ? (
               <div hidden={activeSection !== "overview"}>

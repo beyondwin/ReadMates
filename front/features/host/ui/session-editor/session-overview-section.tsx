@@ -66,8 +66,6 @@ export function SessionOverviewSection({
   return (
     <section
       id="host-editor-panel-overview"
-      role="tabpanel"
-      aria-labelledby="host-editor-tab-overview"
       className="surface rm-host-session-editor__overview"
       style={{ padding: 0, overflow: "hidden" }}
     >
