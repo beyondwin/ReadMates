@@ -1,3 +1,4 @@
+import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
 import type { PagedResponse } from "@/shared/model/paging";
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type {
@@ -5,6 +6,7 @@ import type {
   SessionAccessScope,
 } from "./session-exposure-model";
 
+export type { HostSessionChangeReceipt };
 export type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 export type { AttendanceStatus } from "@/shared/model/readmates-types";
 
@@ -418,6 +420,13 @@ export type HostSessionDetailResponse = {
     participationStatus?: SessionParticipationStatus;
   }>;
   feedbackDocument: FeedbackDocumentStatus;
+  changeReceipt?: HostSessionChangeReceipt | null;
+};
+
+export type HostAttendanceResponse = {
+  sessionId: string;
+  count: number;
+  changeReceipt?: HostSessionChangeReceipt | null;
 };
 
 export type HostSessionDeletionCounts = {

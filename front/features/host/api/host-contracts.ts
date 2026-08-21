@@ -2,6 +2,11 @@ import { z } from "zod";
 import type { HostClubOperationsSnapshot } from "@/shared/model/club-operations";
 import type { AttendanceStatus, RsvpStatus, SessionState } from "@/shared/model/readmates-types";
 import type { PagedResponse } from "@/shared/model/paging";
+import type { HostSessionChangeReceipt } from "./host-session-recovery-contracts";
+import {
+  HostAttendanceResponseSchema,
+  HostSessionChangeReceiptSchema,
+} from "./host-session-recovery-contracts";
 import type {
   HostNotificationComposerContext,
   SessionRecordStatus,
@@ -635,6 +640,7 @@ export type HostSessionDetailResponse = {
     participationStatus?: SessionParticipationStatus;
   }>;
   feedbackDocument: FeedbackDocumentStatus;
+  changeReceipt?: HostSessionChangeReceipt | null;
 };
 
 export type HostSessionDeletionCounts = {
@@ -721,6 +727,12 @@ export type HostAttendanceUpdate = {
   attendanceStatus: AttendanceStatus;
 };
 
+export type HostAttendanceResponse = {
+  sessionId: string;
+  count: number;
+  changeReceipt?: HostSessionChangeReceipt | null;
+};
+
 export type HostClubOperationsResponse = HostClubOperationsSnapshot;
 
 // ---------------------------------------------------------------------------
@@ -771,6 +783,7 @@ export const HostSessionDetailResponseSchema = z.object({
         fileName: z.string().nullable(),
         uploadedAt: z.string().nullable(),
       }),
+      changeReceipt: HostSessionChangeReceiptSchema.nullable().optional(),
     });
 
 export const HostMemberListItemSchema = z.object({
@@ -907,6 +920,10 @@ export function parseHostSessionDetailResponse(value: unknown): HostSessionDetai
     return HostSessionDetailResponseSchema.parse(value) as HostSessionDetailResponse;
   }
   return value as HostSessionDetailResponse;
+}
+
+export function parseHostAttendanceResponse(value: unknown): HostAttendanceResponse {
+  return HostAttendanceResponseSchema.parse(value) as HostAttendanceResponse;
 }
 
 export function parseHostMemberListPage(value: unknown): HostMemberListPage {

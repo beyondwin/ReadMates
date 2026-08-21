@@ -1,5 +1,6 @@
 import type {
   AttendanceStatus,
+  HostAttendanceResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
   SessionImportCommitResponse,
@@ -34,7 +35,7 @@ export type HostSessionEditorActions = {
   updateAttendance: (
     sessionId: string,
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
-  ) => Promise<Response>;
+  ) => Promise<HostAttendanceResponse>;
   previewSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportPreviewResponse>;
   commitSessionImport: (sessionId: string, request: SessionImportRequest) => Promise<SessionImportCommitResponse>;
   saveSessionAccessScope: (

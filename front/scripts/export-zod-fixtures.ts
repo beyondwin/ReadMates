@@ -47,6 +47,7 @@ const hostSessionDetail = {
     fileName: null,
     uploadedAt: null,
   },
+  changeReceipt: null,
 };
 
 // ---------------------------------------------------------------------------

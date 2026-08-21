@@ -9,6 +9,7 @@ import type { CurrentSessionResponse } from "@/shared/model/current-session-cont
 import type {
   CreatedSessionResponse,
   CreateHostInvitationRequest,
+  HostAttendanceResponse,
   HostAttendanceUpdate,
   HostClubOperationsResponse,
   HostInvitationListPage,
@@ -54,6 +55,7 @@ import type {
 } from "./host-contracts";
 import {
   HostSessionVisibilityUpdateResponseSchema,
+  parseHostAttendanceResponse,
   parseHostSessionDetailResponse,
   parseHostMemberListPage,
   parseHostNotificationDeliveryListResponse,
@@ -290,12 +292,20 @@ export function deleteHostSession(sessionId: string): Promise<HostSessionDeletio
   });
 }
 
-export function saveHostSessionAttendance(sessionId: string, attendance: HostAttendanceUpdate[]) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
+export async function saveHostSessionAttendance(
+  sessionId: string,
+  attendance: HostAttendanceUpdate[],
+  context?: ReadmatesApiContext,
+): Promise<HostAttendanceResponse> {
+  const response = await readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(attendance),
-  });
+  }, context);
+  if (!response.ok) {
+    throw await apiErrorFromResponse(response);
+  }
+  return parseHostAttendanceResponse(await response.json());
 }
 
 export function saveHostSessionPublication(sessionId: string, request: HostSessionPublicationRequest) {

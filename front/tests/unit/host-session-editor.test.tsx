@@ -108,13 +108,21 @@ const hostSessionEditorTestActions = {
         cache: "no-store",
       },
     ),
-  updateAttendance: (sessionId, attendance) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
+  updateAttendance: async (sessionId, attendance) => {
+    const response = await fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
       method: "POST",
       headers: jsonHeaders(),
       body: JSON.stringify(attendance),
       cache: "no-store",
-    }),
+    });
+    if (!response.ok) {
+      throw new Error("출석 저장에 실패했습니다.");
+    }
+    if (typeof response.json === "function") {
+      return response.json();
+    }
+    return { sessionId, count: attendance.length };
+  },
   previewSessionImport: async (_sessionId, request: SessionImportRequest) => ({
     valid: true,
     session: { sessionNumber: request.session.number, bookTitle: request.session.bookTitle, meetingDate: request.session.meetingDate },
@@ -717,7 +725,7 @@ describe("HostSessionEditor", () => {
   it("keeps attendance writes independent from the basic form submit", async () => {
     const user = userEvent.setup();
     const saveSession = vi.fn(hostSessionEditorTestActions.saveSession);
-    const updateAttendance = vi.fn(async () => ({ ok: true }) as Response);
+    const updateAttendance = vi.fn(async () => ({ sessionId: session.sessionId, count: 1 }));
 
     render(
       <HostSessionEditorForTest

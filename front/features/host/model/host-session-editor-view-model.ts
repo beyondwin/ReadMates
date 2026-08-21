@@ -1,3 +1,8 @@
+import type {
+  HostSessionChangeKind,
+  HostSessionHistoryRecovery,
+  HostSessionRestoreItem,
+} from "@/features/host/api/host-session-recovery-contracts";
 import { lifecycleReasonLabel } from "./host-session-lifecycle-model";
 import {
   recordVisibilityLabel,
@@ -49,6 +54,7 @@ export type HostSessionHistoryItem = {
   toState?: string | null;
   reasonCode?: string | null;
   reasonNote?: string | null;
+  recovery?: HostSessionHistoryRecovery | null;
 };
 
 export type HostSessionEditorNextActionKind =
@@ -177,6 +183,13 @@ export function buildHostSessionEditorOverview(input: HostSessionEditorOverviewI
   };
 }
 
+export type HostSessionHistoryRecoveryView = {
+  action: HostSessionHistoryRecovery["action"] | null;
+  available: boolean;
+  buttonLabel: string | null;
+  explanation: string | null;
+};
+
 export type HostSessionHistoryItemView = {
   title: string;
   versionLabel: string | null;
@@ -184,11 +197,108 @@ export type HostSessionHistoryItemView = {
   sourceLabel: string | null;
   canCreateDraft: boolean;
   reasonNote: string | null;
+  recovery: HostSessionHistoryRecoveryView;
 };
+
+export type HostSessionRestorePreviewItemView = {
+  label: string;
+  currentValue: string | null;
+  targetValue: string | null;
+  sensitive: boolean;
+};
+
+const restoreFieldLabels: Record<string, string> = {
+  title: "세션 제목",
+  bookTitle: "책 제목",
+  bookAuthor: "저자",
+  bookLink: "책 링크",
+  bookImageUrl: "책 이미지",
+  date: "날짜",
+  startTime: "시작 시간",
+  endTime: "종료 시간",
+  questionDeadlineAt: "질문 마감",
+  locationLabel: "장소",
+  meetingUrl: "미팅 URL",
+  meetingPasscode: "Passcode",
+  attendanceStatus: "출석",
+};
+
+const attendanceValueLabels: Record<string, string> = {
+  UNKNOWN: "미확인",
+  ATTENDED: "참석",
+  ABSENT: "불참",
+};
+
+const undoDescriptions: Record<HostSessionChangeKind, string> = {
+  BASIC_INFO: "모임 정보를 저장했습니다.",
+  ATTENDANCE: "출석을 바꿨습니다.",
+  LIFECYCLE: "모임 상태를 바꿨습니다.",
+};
+
+const restoreBlockedExplanations: Record<string, string> = {
+  SNAPSHOT_UNAVAILABLE: "이 변경은 복원할 기록이 없어 바로 되돌릴 수 없습니다.",
+  LIFECYCLE_INVERSE_NOT_VALID: "현재 상태에서는 바로 되돌릴 수 없습니다.",
+  PARTICIPANT_NOT_ACTIVE: "참석자가 바뀌어 바로 되돌릴 수 없습니다.",
+  ALREADY_RESTORED: "이미 되돌린 변경입니다.",
+};
+
+const recoveryButtonLabels: Record<HostSessionHistoryRecovery["action"], string | null> = {
+  RESTORE_CHANGE: "이 변경 되돌리기",
+  RESTORE_RECORD_DRAFT: "이 버전으로 초안 만들기",
+  REVERSE_LIFECYCLE: "이 상태 되돌리기",
+  NONE: null,
+};
+
+export function hostSessionChangeUndoDescription(kind: HostSessionChangeKind): string {
+  return undoDescriptions[kind];
+}
+
+export function hostSessionRestoreBlockedExplanation(blockedReason: string | null | undefined): string {
+  if (!blockedReason) {
+    return "지금은 바로 되돌릴 수 없습니다.";
+  }
+  return restoreBlockedExplanations[blockedReason] ?? "지금은 바로 되돌릴 수 없습니다.";
+}
+
+export function hostSessionRestoreStaleExplanation(): string {
+  return "그 사이 다른 변경이 있습니다. 변경 내역에서 다시 확인하세요.";
+}
+
+export function buildHostSessionRestorePreviewItemView(
+  item: HostSessionRestoreItem,
+): HostSessionRestorePreviewItemView {
+  return {
+    label: restoreFieldLabels[item.field] ?? "변경 항목",
+    currentValue: item.sensitive ? null : displayRestoreValue(item.field, item.currentValue),
+    targetValue: item.sensitive ? null : displayRestoreValue(item.field, item.targetValue),
+    sensitive: item.sensitive,
+  };
+}
+
+export function buildHostSessionHistoryRecoveryView(
+  recovery: HostSessionHistoryRecovery | null | undefined,
+): HostSessionHistoryRecoveryView {
+  if (!recovery) {
+    return {
+      action: null,
+      available: false,
+      buttonLabel: null,
+      explanation: null,
+    };
+  }
+  const available = recovery.availability === "AVAILABLE";
+  return {
+    action: recovery.action,
+    available,
+    buttonLabel: available ? recoveryButtonLabels[recovery.action] : null,
+    explanation: available ? null : hostSessionRestoreBlockedExplanation(recovery.blockedReason),
+  };
+}
 
 export function buildHostSessionHistoryItemView(item: HostSessionHistoryItem): HostSessionHistoryItemView {
   const reasonLabel = lifecycleReasonLabel(item.reasonCode);
   const stateTransition = lifecycleStateTransitionLabel(item.fromState, item.toState);
+  const recovery = buildHostSessionHistoryRecoveryView(item.recovery);
   return {
     title: historyTypeLabels[item.type],
     versionLabel: item.revisionVersion && item.revisionVersion > 0 ? `버전 ${item.revisionVersion}` : null,
@@ -198,11 +308,20 @@ export function buildHostSessionHistoryItemView(item: HostSessionHistoryItem): H
       ...reasonLabel ? [reasonLabel] : [],
     ],
     sourceLabel: item.revisionSource ? historySourceLabels[item.revisionSource] : null,
-    canCreateDraft: item.revisionId !== null
-      && item.revisionVersion !== null
-      && item.revisionVersion > 0,
+    canCreateDraft: recovery.action === "RESTORE_RECORD_DRAFT" && recovery.available,
     reasonNote: item.reasonNote ?? null,
+    recovery,
   };
+}
+
+function displayRestoreValue(field: string, value: string | null | undefined): string | null {
+  if (value == null) {
+    return null;
+  }
+  if (field === "attendanceStatus") {
+    return attendanceValueLabels[value] ?? value;
+  }
+  return value;
 }
 
 function lifecycleStateTransitionLabel(fromState: string | null | undefined, toState: string | null | undefined): string | null {

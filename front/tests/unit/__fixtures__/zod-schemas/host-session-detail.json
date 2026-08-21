@@ -23,5 +23,6 @@
     "uploaded": false,
     "fileName": null,
     "uploadedAt": null
-  }
+  },
+  "changeReceipt": null
 }

@@ -101,6 +101,10 @@ import {
   type HostSessionRecordApplyReview,
 } from "./session-editor/session-record-apply-dialog";
 import { HostSessionWorkspace } from "./session-workspace/host-session-workspace";
+import type {
+  WorkspacePendingUndo,
+  WorkspaceUndoConfirm,
+} from "./session-workspace/workspace-undo-bar";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
 export type { HostSessionRecordApplyReview } from "./session-editor/session-record-apply-dialog";
@@ -150,6 +154,8 @@ type HostSessionRecordWorkflow = {
     expectedDraftRevision: number | null;
   }) => Promise<void>;
   onRestoreCompleted?: () => void;
+  onRestoreChange?: (changeId: string) => void | Promise<void>;
+  onReverseLifecycle?: () => void;
 };
 
 const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
@@ -208,6 +214,8 @@ export default function HostSessionEditor({
   navigation,
   scheduleDefaults,
   scheduleDefaultsLoadState,
+  pendingUndo = null,
+  undoConfirm = null,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -225,6 +233,8 @@ export default function HostSessionEditor({
   };
   scheduleDefaults?: HostSessionScheduleDefaults | null;
   scheduleDefaultsLoadState?: HostScheduleDefaultsLoadState;
+  pendingUndo?: WorkspacePendingUndo | null;
+  undoConfirm?: WorkspaceUndoConfirm | null;
 }) {
   const resolvedScheduleDefaults = scheduleDefaultsLoadState?.defaults ?? scheduleDefaults ?? null;
   if (session && !recordWorkflow) {
@@ -763,19 +773,13 @@ export default function HostSessionEditor({
         };
 
         try {
-          const response = await actions.updateAttendance(session.sessionId, [{ membershipId, attendanceStatus: status }]);
+          await actions.updateAttendance(session.sessionId, [{ membershipId, attendanceStatus: status }]);
 
-          writeSucceeded = response.ok;
+          writeSucceeded = true;
+          committedAttendanceStatusesRef.current[membershipId] = status;
 
-          if (response.ok) {
-            committedAttendanceStatusesRef.current[membershipId] = status;
-
-            if (currentWriteState.queuedStatus === null || currentWriteState.queuedStatus === status) {
-              currentWriteState.queuedStatus = null;
-            }
-          } else if (currentWriteState.queuedStatus === null) {
-            rollbackToCommittedStatus();
-            flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
+          if (currentWriteState.queuedStatus === null || currentWriteState.queuedStatus === status) {
+            currentWriteState.queuedStatus = null;
           }
         } catch {
           if (currentWriteState.queuedStatus === null) {
@@ -1062,7 +1066,8 @@ export default function HostSessionEditor({
             : null
         }
         error={lifecycleError ? { message: lifecycleError.message, onRetry: retryLifecycle } : null}
-        pendingUndo={null}
+        pendingUndo={pendingUndo}
+        undoConfirm={undoConfirm}
         draftSaveLabel={overview.draft.exists ? overview.draft.statusLabel : null}
         descriptionOverride={
           sessionState === "OPEN" && date && todayIsoDate() > date
@@ -1274,6 +1279,11 @@ export default function HostSessionEditor({
               restoring={recordWorkflow?.restoring ?? false}
               onRestore={recordWorkflow?.onRestore ?? (async () => undefined)}
               onRestoreCompleted={recordWorkflow?.onRestoreCompleted ?? (() => undefined)}
+              onRestoreChange={recordWorkflow?.onRestoreChange}
+              onReverseLifecycle={
+                recordWorkflow?.onReverseLifecycle
+                  ?? (reverseAction ? () => requestLifecycleConfirm(reverseAction.kind) : undefined)
+              }
             />
           ) : (
             <div className="surface-quiet small" style={{ padding: 14 }}>아직 변경 기록이 없습니다</div>

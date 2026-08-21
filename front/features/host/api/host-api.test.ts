@@ -107,7 +107,9 @@ function stubFetch() {
     Promise.resolve(jsonResponse(
       url.includes("/visibility") || url.includes("/access-scope")
         ? { session: hostSessionDetail(), composer: null }
-        : { items: [], nextCursor: null },
+        : url.includes("/attendance")
+          ? { sessionId: "session-7", count: 0 }
+          : { items: [], nextCursor: null },
     )));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;

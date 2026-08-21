@@ -2,8 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   buildHostSessionEditorOverview,
   buildHostSessionHistoryItemView,
+  buildHostSessionRestorePreviewItemView,
   compactSessionLifecycleLabel,
   hasAppliedSessionRecord,
+  hostSessionChangeUndoDescription,
+  hostSessionRestoreBlockedExplanation,
+  hostSessionRestoreStaleExplanation,
 } from "./host-session-editor-view-model";
 
 const snapshot = {
@@ -261,18 +265,96 @@ describe("host session editor view model", () => {
       versionLabel: "버전 3",
       detailItems: ["공개 요약", "공개 범위", "하이라이트", "한줄평", "피드백 문서"],
       sourceLabel: "AI로 생성",
-      canCreateDraft: true,
+      canCreateDraft: false,
       reasonNote: null,
+      recovery: {
+        action: null,
+        available: false,
+        buttonLabel: null,
+        explanation: null,
+      },
     });
   });
 
-  it("allows creating a draft from a restored version with a persisted identifier", () => {
+  it("allows creating a draft only from server recovery metadata", () => {
     expect(buildHostSessionHistoryItemView({
       type: "RECORD_REVISION_RESTORED",
       changedFields: [],
       revisionId: "revision-3",
       revisionVersion: 3,
       revisionSource: "RESTORED",
+      recovery: { action: "RESTORE_RECORD_DRAFT", availability: "AVAILABLE" },
     }).canCreateDraft).toBe(true);
+    expect(buildHostSessionHistoryItemView({
+      type: "RECORD_REVISION_APPLIED",
+      changedFields: [],
+      revisionId: "revision-3",
+      revisionVersion: 3,
+      revisionSource: "MANUAL",
+    }).canCreateDraft).toBe(false);
+  });
+
+  it("uses server recovery availability instead of history type", () => {
+    expect(buildHostSessionHistoryItemView({
+      type: "BASIC_INFO_UPDATED",
+      changedFields: ["title"],
+      revisionId: null,
+      revisionVersion: null,
+      revisionSource: null,
+      recovery: {
+        action: "RESTORE_CHANGE",
+        availability: "UNAVAILABLE",
+        blockedReason: "SNAPSHOT_UNAVAILABLE",
+      },
+    }).recovery).toEqual({
+      action: "RESTORE_CHANGE",
+      available: false,
+      buttonLabel: null,
+      explanation: "이 변경은 복원할 기록이 없어 바로 되돌릴 수 없습니다.",
+    });
+    expect(buildHostSessionHistoryItemView({
+      type: "SESSION_OPENED",
+      changedFields: [],
+      revisionId: null,
+      revisionVersion: null,
+      revisionSource: null,
+      recovery: { action: "REVERSE_LIFECYCLE", availability: "AVAILABLE" },
+    }).recovery).toEqual({
+      action: "REVERSE_LIFECYCLE",
+      available: true,
+      buttonLabel: "이 상태 되돌리기",
+      explanation: null,
+    });
+  });
+
+  it("describes undo receipts and redacted restore preview items", () => {
+    expect(hostSessionChangeUndoDescription("BASIC_INFO")).toBe("모임 정보를 저장했습니다.");
+    expect(hostSessionChangeUndoDescription("ATTENDANCE")).toBe("출석을 바꿨습니다.");
+    expect(hostSessionRestoreStaleExplanation()).toBe("그 사이 다른 변경이 있습니다. 변경 내역에서 다시 확인하세요.");
+    expect(hostSessionRestoreBlockedExplanation("SNAPSHOT_UNAVAILABLE"))
+      .toBe("이 변경은 복원할 기록이 없어 바로 되돌릴 수 없습니다.");
+    expect(buildHostSessionRestorePreviewItemView({
+      field: "meetingUrl",
+      currentValue: null,
+      targetValue: null,
+      sensitive: true,
+    })).toEqual({
+      label: "미팅 URL",
+      currentValue: null,
+      targetValue: null,
+      sensitive: true,
+    });
+    expect(buildHostSessionRestorePreviewItemView({
+      field: "attendanceStatus",
+      subjectId: "membership-1",
+      currentValue: "ATTENDED",
+      targetValue: "UNKNOWN",
+      sensitive: false,
+    })).toEqual({
+      label: "출석",
+      currentValue: "참석",
+      targetValue: "미확인",
+      sensitive: false,
+    });
   });
 });

@@ -427,7 +427,10 @@ describe("host session mutation hooks", () => {
   });
 
   it("invalidates detail and current session after attendance update", async () => {
-    vi.mocked(saveHostSessionAttendance).mockResolvedValue(new Response("{}", { status: 200 }) as never);
+    vi.mocked(saveHostSessionAttendance).mockResolvedValue({
+      sessionId: "session-7",
+      count: 1,
+    } as never);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useUpdateHostSessionAttendanceMutation(context), { wrapper: Wrapper });
@@ -441,7 +444,7 @@ describe("host session mutation hooks", () => {
 
     expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", [
       { membershipId: "member-1", attendanceStatus: "ATTENDED" },
-    ]);
+    ], context);
     expectInvalidated(client, [entries.detail, entries.current]);
     expectFresh(client, [
       entries.closingStatus,

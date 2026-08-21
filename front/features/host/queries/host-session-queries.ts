@@ -440,14 +440,12 @@ export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiCon
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ sessionId, attendance }: { sessionId: string; attendance: HostAttendanceUpdate[] }) =>
-      saveHostSessionAttendance(sessionId, attendance),
-    onSuccess: (response, variables) =>
-      invalidateOk(response, () =>
-        Promise.all([
-          invalidateHostSessionDetail(client, variables.sessionId, context),
-          invalidateHostCurrentSession(client, context),
-        ]),
-      ),
+      saveHostSessionAttendance(sessionId, attendance, context),
+    onSuccess: (_result, variables) =>
+      Promise.all([
+        invalidateHostSessionDetail(client, variables.sessionId, context),
+        invalidateHostCurrentSession(client, context),
+      ]),
   });
 }
 

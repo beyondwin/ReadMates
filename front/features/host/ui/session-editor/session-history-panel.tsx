@@ -14,6 +14,8 @@ export function SessionHistoryPanel({
   onLoadMore,
   onRestore,
   onRestoreCompleted,
+  onRestoreChange,
+  onReverseLifecycle,
 }: {
   items: SessionHistoryPanelItem[];
   expectedDraftRevision: number | null;
@@ -26,6 +28,8 @@ export function SessionHistoryPanel({
     expectedDraftRevision: number | null;
   }) => Promise<void>;
   onRestoreCompleted: () => void;
+  onRestoreChange?: (changeId: string) => void | Promise<void>;
+  onReverseLifecycle?: () => void;
 }) {
   const [pending, setPending] = useState<SessionHistoryPanelItem | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -113,8 +117,32 @@ export function SessionHistoryPanel({
                         setPending(item);
                       }}
                     >
-                      이 버전으로 초안 만들기
+                      {view.recovery.buttonLabel}
                     </button>
+                  ) : view.recovery.available && view.recovery.action === "RESTORE_CHANGE" && onRestoreChange ? (
+                    <button
+                      className="btn btn-quiet btn-sm"
+                      type="button"
+                      disabled={restoring}
+                      onClick={() => {
+                        void onRestoreChange(item.id);
+                      }}
+                    >
+                      {view.recovery.buttonLabel}
+                    </button>
+                  ) : view.recovery.available && view.recovery.action === "REVERSE_LIFECYCLE" && onReverseLifecycle ? (
+                    <button
+                      className="btn btn-quiet btn-sm"
+                      type="button"
+                      disabled={restoring}
+                      onClick={onReverseLifecycle}
+                    >
+                      {view.recovery.buttonLabel}
+                    </button>
+                  ) : view.recovery.explanation ? (
+                    <p className="tiny" style={{ margin: 0, color: "var(--text-2)" }}>
+                      {view.recovery.explanation}
+                    </p>
                   ) : null}
                 </div>
               </article>

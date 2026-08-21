@@ -1,6 +1,8 @@
 import { z } from "zod";
 import type { SessionState } from "@/shared/model/readmates-types";
 import type { PageRequest, PagedResponse } from "@/shared/model/paging";
+import type { HostSessionHistoryRecovery } from "./host-session-recovery-contracts";
+import { HostSessionHistoryRecoverySchema } from "./host-session-recovery-contracts";
 
 export type NotificationDecision = "SEND" | "SKIP";
 export type SessionRecordStatus = "NOT_STARTED" | "INCOMPLETE" | "COMPLETE";
@@ -147,6 +149,7 @@ export type HostSessionHistoryItem = {
   toState?: string | null;
   reasonCode?: string | null;
   reasonNote?: string | null;
+  recovery?: HostSessionHistoryRecovery | null;
 };
 
 export type HostSessionHistoryPage = PagedResponse<HostSessionHistoryItem>;
@@ -279,6 +282,7 @@ export const HostSessionHistoryPageResponseSchema = z.object({
     toState: z.string().nullable().optional(),
     reasonCode: z.string().nullable().optional(),
     reasonNote: z.string().nullable().optional(),
+    recovery: HostSessionHistoryRecoverySchema.nullable().optional(),
   })),
   nextCursor: nullableString,
 });

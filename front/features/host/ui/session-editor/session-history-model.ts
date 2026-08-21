@@ -1,3 +1,4 @@
+import type { HostSessionHistoryRecovery } from "@/features/host/api/host-session-recovery-contracts";
 import type { HostSessionHistoryItem } from "@/features/host/model/host-session-editor-view-model";
 
 export type SessionHistoryPanelItem = {
@@ -16,6 +17,7 @@ export type SessionHistoryPanelItem = {
   toState?: string | null;
   reasonCode?: string | null;
   reasonNote?: string | null;
+  recovery?: HostSessionHistoryRecovery | null;
 };
 
 export function appendUniqueSessionHistory<T extends { id: string }>(

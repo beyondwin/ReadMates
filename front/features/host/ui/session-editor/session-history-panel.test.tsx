@@ -58,6 +58,7 @@ describe("SessionHistoryPanel", () => {
           revisionSource: "MANUAL",
           restoredFromRevisionId: null,
           notificationEventId: null,
+          recovery: { action: "RESTORE_RECORD_DRAFT", availability: "AVAILABLE" },
         }]}
         expectedDraftRevision={4}
         restoring={false}
@@ -237,6 +238,90 @@ describe("SessionHistoryPanel", () => {
     expect(screen.queryByRole("button", { name: "이 버전으로 초안 만들기" })).not.toBeInTheDocument();
   });
 
+  it("restores a change from server recovery metadata after confirmation", async () => {
+    const user = userEvent.setup();
+    const onRestoreChange = vi.fn();
+    render(
+      <SessionHistoryPanel
+        items={[{
+          ...historyItem(),
+          id: "change-1",
+          type: "BASIC_INFO_UPDATED",
+          revisionId: null,
+          revisionVersion: null,
+          revisionSource: null,
+          recovery: { action: "RESTORE_CHANGE", availability: "AVAILABLE" },
+        }]}
+        expectedDraftRevision={4}
+        restoring={false}
+        onRestore={vi.fn()}
+        onRestoreCompleted={vi.fn()}
+        onRestoreChange={onRestoreChange}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "이 변경 되돌리기" }));
+    expect(onRestoreChange).toHaveBeenCalledWith("change-1");
+    expect(screen.queryByRole("button", { name: "이 버전으로 초안 만들기" })).not.toBeInTheDocument();
+  });
+
+  it("opens the existing reverse lifecycle path from recovery metadata", async () => {
+    const user = userEvent.setup();
+    const onReverseLifecycle = vi.fn();
+    render(
+      <SessionHistoryPanel
+        items={[{
+          ...historyItem(),
+          id: "history-opened",
+          type: "SESSION_OPENED",
+          revisionId: null,
+          revisionVersion: null,
+          revisionSource: null,
+          fromState: "DRAFT",
+          toState: "OPEN",
+          recovery: { action: "REVERSE_LIFECYCLE", availability: "AVAILABLE" },
+        }]}
+        expectedDraftRevision={null}
+        restoring={false}
+        onRestore={vi.fn()}
+        onRestoreCompleted={vi.fn()}
+        onReverseLifecycle={onReverseLifecycle}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "이 상태 되돌리기" }));
+    expect(onReverseLifecycle).toHaveBeenCalledTimes(1);
+  });
+
+  it("renders a disabled explanation instead of a restore button when recovery is unavailable", () => {
+    render(
+      <SessionHistoryPanel
+        items={[{
+          ...historyItem(),
+          id: "history-legacy",
+          type: "BASIC_INFO_UPDATED",
+          revisionId: null,
+          revisionVersion: null,
+          revisionSource: null,
+          recovery: {
+            action: "RESTORE_CHANGE",
+            availability: "UNAVAILABLE",
+            blockedReason: "SNAPSHOT_UNAVAILABLE",
+          },
+        }]}
+        expectedDraftRevision={null}
+        restoring={false}
+        onRestore={vi.fn()}
+        onRestoreCompleted={vi.fn()}
+        onRestoreChange={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("이 변경은 복원할 기록이 없어 바로 되돌릴 수 없습니다.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "이 변경 되돌리기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이 버전으로 초안 만들기" })).not.toBeInTheDocument();
+  });
+
   it("renders a retained deleted lifecycle row in an audit-capable history list", () => {
     render(
       <SessionHistoryPanel
@@ -285,5 +370,9 @@ function historyItem() {
     toState: null,
     reasonCode: null,
     reasonNote: null,
+    recovery: {
+      action: "RESTORE_RECORD_DRAFT" as const,
+      availability: "AVAILABLE" as const,
+    },
   };
 }

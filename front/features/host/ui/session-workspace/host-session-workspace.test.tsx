@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -327,6 +327,69 @@ describe("HostSessionWorkspace", () => {
       />,
     );
     expect(screen.queryByRole("button", { name: "되돌리기" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the undo bar with an inline explanation and a 변경 내역 action", async () => {
+    const user = userEvent.setup();
+    const onOpenHistory = vi.fn();
+    render(
+      <WorkspaceHarness
+        view={viewFor({ ...baseInput, state: "OPEN" })}
+        pendingUndo={{
+          description: "모임 정보를 저장했습니다.",
+          error: "그 사이 다른 변경이 있습니다. 변경 내역에서 다시 확인하세요.",
+          onUndo: vi.fn(),
+          onOpenHistory,
+          onDismiss: vi.fn(),
+        }}
+      />,
+    );
+
+    const status = screen.getByRole("status");
+    expect(status).toHaveTextContent("모임 정보를 저장했습니다.");
+    expect(screen.getByRole("alert")).toHaveTextContent("그 사이 다른 변경이 있습니다");
+    await user.click(within(status).getByRole("button", { name: "변경 내역" }));
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "되돌리기" })).toBeVisible();
+  });
+
+  it("confirms a restore preview, redacts sensitive values, and restores trigger focus", async () => {
+    const user = userEvent.setup();
+    const onConfirm = vi.fn();
+    function UndoConfirmHarness() {
+      const [confirm, setConfirm] = useState<HostSessionWorkspaceProps["undoConfirm"]>({
+        items: [
+          { label: "세션 제목", currentValue: "새 제목", targetValue: "이전 제목", sensitive: false },
+          { label: "미팅 URL", currentValue: null, targetValue: null, sensitive: true },
+        ],
+        submitting: false,
+        onConfirm,
+        onCancel: () => setConfirm(null),
+      });
+      return (
+        <WorkspaceHarness
+          view={viewFor({ ...baseInput, state: "OPEN" })}
+          pendingUndo={{
+            description: "모임 정보를 저장했습니다.",
+            onUndo: vi.fn(),
+            onOpenHistory: vi.fn(),
+            onDismiss: vi.fn(),
+          }}
+          undoConfirm={confirm}
+        />
+      );
+    }
+    render(<UndoConfirmHarness />);
+
+    const trigger = within(screen.getByRole("status")).getByRole("button", { name: "되돌리기" });
+    const dialog = screen.getByRole("dialog", { name: "이 변경을 되돌릴까요?" });
+    expect(dialog).toHaveTextContent("세션 제목: 새 제목 → 이전 제목");
+    expect(dialog).toHaveTextContent("미팅 URL: 미리보기에 표시하지 않습니다");
+    expect(screen.getByRole("button", { name: "취소" })).toHaveFocus();
+
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "이 변경을 되돌릴까요?" })).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 
   it("pins the overlay sheet as a bottom sheet and the mobile CTA as a footer", async () => {
