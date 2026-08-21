@@ -110,7 +110,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await page.getByLabel("책 제목").fill("E2E 예정 책");
   await page.getByLabel("저자").fill("E2E 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  const visibilitySwitch = page.getByRole("switch", { name: "새 모임 멤버에게 보이기" });
+  const visibilitySwitch = page.getByRole("switch", { name: "새 모임 게스트와 멤버에게 보이기" });
   if (!(await visibilitySwitch.isChecked())) {
     await visibilitySwitch.check();
   }

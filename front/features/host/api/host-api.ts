@@ -275,16 +275,21 @@ export function updateHostSession(sessionId: string, request: HostSessionRequest
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
-export function fetchHostSessionDeletionPreview(sessionId: string, context?: ReadmatesApiContext) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
-    method: "GET",
-  }, context) as Promise<Response & { json(): Promise<HostSessionDeletionPreviewResponse> }>;
+export function fetchHostSessionDeletionPreview(
+  sessionId: string,
+  context?: ReadmatesApiContext,
+): Promise<HostSessionDeletionPreviewResponse> {
+  return readmatesFetch<HostSessionDeletionPreviewResponse>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`,
+    undefined,
+    context,
+  );
 }
 
-export function deleteHostSession(sessionId: string) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}`, {
+export function deleteHostSession(sessionId: string): Promise<HostSessionDeletionResponse> {
+  return readmatesFetch<HostSessionDeletionResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, {
     method: "DELETE",
-  }) as Promise<Response & { json(): Promise<HostSessionDeletionResponse> }>;
+  });
 }
 
 export function saveHostSessionAttendance(sessionId: string, attendance: HostAttendanceUpdate[]) {

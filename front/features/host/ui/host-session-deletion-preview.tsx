@@ -1,4 +1,3 @@
-
 import {
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
@@ -6,7 +5,10 @@ import {
   useEffect,
   useRef,
 } from "react";
-import type { HostSessionDeletionPreviewResponse } from "@/features/host/model/host-view-types";
+import {
+  labeledHostSessionDeletionBlockers,
+  type HostSessionDeletionPreviewResponse,
+} from "@/features/host/model/host-view-types";
 
 type HostSessionDeletionPreviewDialogProps = {
   preview: HostSessionDeletionPreviewResponse | null;
@@ -16,6 +18,7 @@ type HostSessionDeletionPreviewDialogProps = {
   restoreFocusRef: MutableRefObject<HTMLElement | null>;
   onClose: () => void;
   onConfirm: () => void;
+  onRefreshPreview?: () => void;
 };
 
 export function HostSessionDeletionPreviewDialog({
@@ -26,10 +29,14 @@ export function HostSessionDeletionPreviewDialog({
   restoreFocusRef,
   onClose,
   onConfirm,
+  onRefreshPreview,
 }: HostSessionDeletionPreviewDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const refreshButtonRef = useRef<HTMLButtonElement>(null);
+  const blockerItems = labeledHostSessionDeletionBlockers(preview?.blockers);
+  const blockerKey = blockerItems.map((blocker) => `${blocker.code}:${blocker.count}`).join(",");
 
   useEffect(() => {
     const focusTarget = cancelButtonRef.current ?? confirmButtonRef.current ?? dialogRef.current;
@@ -40,6 +47,16 @@ export function HostSessionDeletionPreviewDialog({
       restoreFocusRef.current = null;
     };
   }, [restoreFocusRef]);
+
+  useEffect(() => {
+    if (!blockerKey) {
+      return;
+    }
+    const active = document.activeElement;
+    if (active instanceof HTMLButtonElement && active.disabled) {
+      refreshButtonRef.current?.focus();
+    }
+  }, [blockerKey]);
 
   const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape") {
@@ -54,9 +71,11 @@ export function HostSessionDeletionPreviewDialog({
       return;
     }
 
-    const focusableButtons = [cancelButtonRef.current, confirmButtonRef.current].filter(
-      (button): button is HTMLButtonElement => Boolean(button && !button.disabled),
-    );
+    const focusableButtons = [
+      refreshButtonRef.current,
+      cancelButtonRef.current,
+      confirmButtonRef.current,
+    ].filter((button): button is HTMLButtonElement => Boolean(button && !button.disabled));
 
     if (focusableButtons.length === 0) {
       event.preventDefault();
@@ -119,24 +138,43 @@ export function HostSessionDeletionPreviewDialog({
         </p>
 
         {previewLoading ? (
-          <p className="small" style={{ margin: "0 0 18px" }}>
+          <p className="small" role="status" style={{ margin: "0 0 18px" }}>
             삭제할 데이터를 확인하고 있습니다.
           </p>
         ) : null}
 
-        {error ? (
-          <p className="small" style={{ color: "var(--danger)", margin: "0 0 18px" }}>
+        {blockerItems.length > 0 ? (
+          <div className="surface-quiet stack" role="alert" style={{ padding: 14, marginBottom: 18, "--stack": "10px" } as CSSProperties}>
+            {error ? <p className="small" style={{ margin: 0 }}>{error}</p> : null}
+            <p className="small" style={{ margin: 0 }}>
+              이 모임은 아래 이력이 있어 삭제할 수 없습니다.
+            </p>
+            <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
+              {blockerItems.map((blocker) => (
+                <li key={blocker.code}>{`${blocker.label} ${blocker.count}개`}</li>
+              ))}
+            </ul>
+            {onRefreshPreview ? (
+              <div>
+                <button
+                  ref={refreshButtonRef}
+                  type="button"
+                  className="btn btn-quiet btn-sm"
+                  disabled={previewLoading || submitting}
+                  onClick={onRefreshPreview}
+                >
+                  다시 확인
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : error ? (
+          <p className="small" role="alert" style={{ color: "var(--danger)", margin: "0 0 18px" }}>
             {error}
           </p>
         ) : null}
 
         {preview ? <DeletionPreviewCounts preview={preview} /> : null}
-
-        {preview && !preview.canDelete ? (
-          <p className="small" role="alert" style={{ color: "var(--danger)", margin: "18px 0 0" }}>
-            닫히거나 공개된 모임은 삭제할 수 없습니다. 기록 보존을 위해 위험 작업이 잠겨 있습니다.
-          </p>
-        ) : null}
 
         <div
           className="actions"

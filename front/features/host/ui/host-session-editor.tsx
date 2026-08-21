@@ -9,13 +9,15 @@ import {
   useRef,
   useState,
 } from "react";
-import type {
-  AttendanceStatus,
-  HostSessionDeletionPreviewResponse,
-  HostSessionDetailResponse,
-  ManualNotificationDispatchListItem,
-  SessionImportPreviewResponse,
-  SessionImportRequest,
+import {
+  hostSessionDeletionFailure,
+  type AttendanceStatus,
+  type HostSessionDeletionBlocker,
+  type HostSessionDeletionPreviewResponse,
+  type HostSessionDetailResponse,
+  type ManualNotificationDispatchListItem,
+  type SessionImportPreviewResponse,
+  type SessionImportRequest,
 } from "@/features/host/model/host-view-types";
 import {
   buildHostSessionRequest,
@@ -421,16 +423,6 @@ export default function HostSessionEditor({
     window.setTimeout(() => setToast(null), 1600);
   }, []);
 
-  const deletionErrorMessage = (status?: number) => {
-    if (status === 404) {
-      return "모임을 찾을 수 없습니다.";
-    }
-    if (status === 409) {
-      return "이미 닫히거나 공개된 모임은 삭제할 수 없습니다.";
-    }
-    return "모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
-  };
-
   const closeDeleteModal = useCallback(() => {
     if (deleteSubmitting) {
       return;
@@ -438,6 +430,58 @@ export default function HostSessionEditor({
 
     setDeleteModalOpen(false);
   }, [deleteSubmitting]);
+
+  const applyDeletionBlockers = useCallback((
+    current: HostSessionDeletionPreviewResponse | null,
+    blockers: readonly HostSessionDeletionBlocker[],
+  ): HostSessionDeletionPreviewResponse | null => {
+    if (!session) {
+      return current;
+    }
+    if (current) {
+      return { ...current, canDelete: false, blockers: [...blockers] };
+    }
+    return {
+      sessionId: session.sessionId,
+      sessionNumber: session.sessionNumber,
+      title: session.title,
+      state: session.state,
+      canDelete: false,
+      counts: {
+        participants: 0,
+        rsvpResponses: 0,
+        questions: 0,
+        checkins: 0,
+        oneLineReviews: 0,
+        longReviews: 0,
+        highlights: 0,
+        publications: 0,
+        feedbackReports: 0,
+        feedbackDocuments: 0,
+      },
+      blockers: [...blockers],
+    };
+  }, [session]);
+
+  const loadDeletionPreviewIntoDialog = useCallback(async () => {
+    if (!session) {
+      return;
+    }
+    setDeletePreviewLoading(true);
+    setDeleteError(null);
+    try {
+      const preview = await actions.loadDeletionPreview(session.sessionId);
+      setDeletePreview(preview);
+    } catch (error) {
+      const failure = hostSessionDeletionFailure(error);
+      if (failure.code === "SESSION_DELETE_BLOCKED" || failure.blockers.length > 0) {
+        setDeletePreview((current) => applyDeletionBlockers(current, failure.blockers));
+      }
+      setDeleteError(failure.message);
+    } finally {
+      setDeletePreviewLoading(false);
+    }
+  }, [actions, applyDeletionBlockers, session]);
 
   const openDeleteModal = useCallback(async (event?: { currentTarget: EventTarget | null }) => {
     if (!session || !destructiveActionAvailability.canDelete) {
@@ -450,22 +494,8 @@ export default function HostSessionEditor({
     setDeletePreview(null);
     setDeleteError(null);
     setDeletePreviewLoading(true);
-
-    try {
-      const response = await actions.loadDeletionPreview(session.sessionId);
-
-      if (!response.ok) {
-        setDeleteError(deletionErrorMessage(response.status));
-        return;
-      }
-
-      setDeletePreview((await response.json()) as HostSessionDeletionPreviewResponse);
-    } catch {
-      setDeleteError(deletionErrorMessage());
-    } finally {
-      setDeletePreviewLoading(false);
-    }
-  }, [session, destructiveActionAvailability.canDelete, actions]);
+    await loadDeletionPreviewIntoDialog();
+  }, [destructiveActionAvailability.canDelete, loadDeletionPreviewIntoDialog, session]);
 
   const confirmDeleteSession = useCallback(async () => {
     if (!session || !deletePreview || deleteSubmitting) {
@@ -476,21 +506,20 @@ export default function HostSessionEditor({
     setDeleteSubmitting(true);
 
     try {
-      const response = await actions.deleteSession(session.sessionId);
-
-      if (!response.ok) {
-        setDeleteError(deletionErrorMessage(response.status));
-        return;
-      }
+      await actions.deleteSession(session.sessionId);
 
       const deletedDraft = (displaySession?.state ?? session.state) === "DRAFT";
       globalThis.location.href = scopedHostRedirectHref(deletedDraft ? "/app/host" : "/app/host/sessions/new");
-    } catch {
-      setDeleteError(deletionErrorMessage());
+    } catch (error) {
+      const failure = hostSessionDeletionFailure(error);
+      if (failure.code === "SESSION_DELETE_BLOCKED" || failure.blockers.length > 0) {
+        setDeletePreview((current) => applyDeletionBlockers(current, failure.blockers));
+      }
+      setDeleteError(failure.message);
     } finally {
       setDeleteSubmitting(false);
     }
-  }, [actions, deletePreview, deleteSubmitting, displaySession?.state, session]);
+  }, [actions, applyDeletionBlockers, deletePreview, deleteSubmitting, displaySession, session]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -1186,6 +1215,7 @@ export default function HostSessionEditor({
           restoreFocusRef={deleteRestoreFocusRef}
           onClose={closeDeleteModal}
           onConfirm={confirmDeleteSession}
+          onRefreshPreview={() => void loadDeletionPreviewIntoDialog()}
         />
       ) : null}
 

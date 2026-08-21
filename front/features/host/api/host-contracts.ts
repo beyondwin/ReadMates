@@ -663,6 +663,11 @@ export type HostSessionDeletionCounts = {
   feedbackDocuments: number;
 };
 
+export type HostSessionDeletionBlocker = {
+  code: string;
+  count: number;
+};
+
 export type HostSessionDeletionPreviewResponse = {
   sessionId: string;
   sessionNumber: number;
@@ -670,6 +675,7 @@ export type HostSessionDeletionPreviewResponse = {
   state: SessionState;
   canDelete: boolean;
   counts: HostSessionDeletionCounts;
+  blockers?: ReadonlyArray<HostSessionDeletionBlocker>;
 };
 
 export type HostSessionDeletionResponse = {

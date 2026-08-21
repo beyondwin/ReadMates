@@ -262,22 +262,38 @@ describe("host session mutation hooks", () => {
     expectFresh(client, [entries.manualDispatches, entries.otherClubDetail]);
   });
 
-  it("does not remove detail or invalidate when delete returns a non-ok response", async () => {
-    vi.mocked(deleteHostSession).mockResolvedValue(new Response("conflict", { status: 409 }) as never);
+  it("does not remove detail or invalidate when delete fails", async () => {
+    vi.mocked(deleteHostSession).mockRejectedValue(new Error("conflict"));
     const { client, Wrapper } = createWrapper();
     seedSurfaces(client);
     const before = cacheState(client);
     const { result } = renderHook(() => useDeleteHostSessionMutation(context), { wrapper: Wrapper });
 
-    await act(async () => {
+    await expect(act(async () => {
       await result.current.mutateAsync("session-7");
-    });
+    })).rejects.toThrow("conflict");
 
     expect(cacheState(client)).toEqual(before);
   });
 
   it("removes deleted detail cache and invalidates dependent surfaces after delete", async () => {
-    vi.mocked(deleteHostSession).mockResolvedValue(new Response("{}", { status: 200 }) as never);
+    vi.mocked(deleteHostSession).mockResolvedValue({
+      sessionId: "session-7",
+      sessionNumber: 7,
+      deleted: true,
+      counts: {
+        participants: 0,
+        rsvpResponses: 0,
+        questions: 0,
+        checkins: 0,
+        oneLineReviews: 0,
+        longReviews: 0,
+        highlights: 0,
+        publications: 0,
+        feedbackReports: 0,
+        feedbackDocuments: 0,
+      },
+    });
     const { client, Wrapper } = createWrapper();
     const { entries, keys } = seedSurfaces(client);
     const { result } = renderHook(() => useDeleteHostSessionMutation(context), { wrapper: Wrapper });

@@ -803,7 +803,7 @@ describe("HostDashboard", () => {
     const desktopUpcomingRow = desktop.getByText("다음 책").closest(".row-between");
     expect(desktopUpcomingRow).not.toBeNull();
     expect(within(desktopUpcomingRow as HTMLElement).getByText("게스트 접근")).toBeInTheDocument();
-    expect(within(desktopUpcomingRow as HTMLElement).getByText("호스트 전용")).toBeInTheDocument();
+    expect(within(desktopUpcomingRow as HTMLElement).getByText("호스트만 보기")).toBeInTheDocument();
     expect(within(desktopUpcomingRow as HTMLElement).getByRole("button", { name: /게스트 공개/ })).toHaveTextContent("게스트 공개");
     expect(desktop.getByRole("button", { name: /현재로 시작/ })).toBeInTheDocument();
     expect(mobile.getByRole("heading", { name: "예정 세션", exact: true })).toBeInTheDocument();
@@ -812,7 +812,7 @@ describe("HostDashboard", () => {
     const mobileUpcomingCard = mobile.getByText("다음 책").closest(".m-card-quiet");
     expect(mobileUpcomingCard).not.toBeNull();
     expect(within(mobileUpcomingCard as HTMLElement).getByText("게스트 접근")).toBeInTheDocument();
-    expect(within(mobileUpcomingCard as HTMLElement).getByText("호스트 전용")).toBeInTheDocument();
+    expect(within(mobileUpcomingCard as HTMLElement).getByText("호스트만 보기")).toBeInTheDocument();
     expect(within(mobileUpcomingCard as HTMLElement).getByRole("button", { name: /게스트 공개/ })).toHaveTextContent("게스트 공개");
   });
 

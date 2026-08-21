@@ -15,12 +15,17 @@ export const compatibilityExposureLabel = {
   PUBLIC: "게스트 공개 · 공개 기록에 게시",
 } as const satisfies Record<CompatibilitySessionVisibility, string>;
 
+export const sessionAccessScopeCopy: Record<SessionAccessScope, { label: string; helper: string }> = {
+  HOST_ONLY: { label: "호스트만 보기", helper: "게스트와 멤버 화면에는 표시하지 않습니다." },
+  GUEST_READABLE: { label: "게스트와 멤버에게 보이기", helper: "초대된 클럽의 게스트와 로그인 멤버가 읽을 수 있습니다." },
+};
+
 export function sessionExposureCopy(
   accessScope: SessionAccessScope,
   siteVisibility: PublicSiteVisibility,
 ) {
   return {
-    accessLabel: accessScope === "HOST_ONLY" ? "호스트 전용" : "게스트 공개",
+    accessLabel: sessionAccessScopeCopy[accessScope].label,
     siteLabel: siteVisibility === "PUBLIC_RECORD" ? "공개 기록에 게시" : "공개 기록에 게시 안 함",
   };
 }

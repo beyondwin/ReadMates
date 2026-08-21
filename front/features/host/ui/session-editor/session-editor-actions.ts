@@ -1,6 +1,7 @@
 import type {
   AttendanceStatus,
   HostSessionDeletionPreviewResponse,
+  HostSessionDeletionResponse,
   SessionImportCommitResponse,
   SessionImportPreviewResponse,
   SessionImportRequest,
@@ -17,11 +18,9 @@ export type AttendanceWriteState = {
   queuedStatus: AttendanceStatus | null;
 };
 
-export type JsonResponse<T> = Response & { json(): Promise<T> };
-
 export type HostSessionEditorActions = {
-  loadDeletionPreview: (sessionId: string) => Promise<JsonResponse<HostSessionDeletionPreviewResponse>>;
-  deleteSession: (sessionId: string) => Promise<Response>;
+  loadDeletionPreview: (sessionId: string) => Promise<HostSessionDeletionPreviewResponse>;
+  deleteSession: (sessionId: string) => Promise<HostSessionDeletionResponse>;
   openSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   closeSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   publishSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;

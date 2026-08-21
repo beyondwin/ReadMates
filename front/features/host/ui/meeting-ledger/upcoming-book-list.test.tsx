@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
@@ -33,13 +33,15 @@ describe("UpcomingBookList", () => {
     expect(screen.getByText("2026.06.11")).toBeInTheDocument();
     expect(screen.getByText("2026.07.09")).toBeInTheDocument();
 
-    expect(screen.getByRole("switch", { name: "A 멤버에게 보이기" })).toBeChecked();
-    expect(screen.getByRole("switch", { name: "B 멤버에게 보이기" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "A 게스트와 멤버에게 보이기" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "B 게스트와 멤버에게 보이기" })).not.toBeChecked();
     expect(screen.queryByText("GUEST_READABLE")).not.toBeInTheDocument();
     expect(screen.queryByText("HOST_ONLY")).not.toBeInTheDocument();
+    expect(screen.queryByText("멤버에게 보이기")).not.toBeInTheDocument();
+    expect(screen.queryByText("게스트 공개")).not.toBeInTheDocument();
   });
 
-  it("saves GUEST_READABLE when 멤버에게 보이기 is turned on", async () => {
+  it("saves GUEST_READABLE when 게스트와 멤버에게 보이기 is turned on", async () => {
     const user = userEvent.setup();
     const onSaveAccessScope = vi.fn();
     render(
@@ -50,7 +52,7 @@ describe("UpcomingBookList", () => {
       />,
     );
 
-    await user.click(screen.getByRole("switch", { name: "B 멤버에게 보이기" }));
+    await user.click(screen.getByRole("switch", { name: "B 게스트와 멤버에게 보이기" }));
 
     expect(onSaveAccessScope).toHaveBeenCalledWith({
       sessionId: "b",
@@ -58,7 +60,7 @@ describe("UpcomingBookList", () => {
     });
   });
 
-  it("saves HOST_ONLY when 멤버에게 보이기 is turned off", async () => {
+  it("saves HOST_ONLY when 게스트와 멤버에게 보이기 is turned off", async () => {
     const user = userEvent.setup();
     const onSaveAccessScope = vi.fn();
     render(
@@ -69,7 +71,7 @@ describe("UpcomingBookList", () => {
       />,
     );
 
-    await user.click(screen.getByRole("switch", { name: "A 멤버에게 보이기" }));
+    await user.click(screen.getByRole("switch", { name: "A 게스트와 멤버에게 보이기" }));
 
     expect(onSaveAccessScope).toHaveBeenCalledWith({
       sessionId: "a",
@@ -94,7 +96,7 @@ describe("UpcomingBookList", () => {
     expect(screen.getByLabelText("저자")).toBeInTheDocument();
     expect(screen.getByLabelText("모임 날짜")).toBeInTheDocument();
     expect(screen.getByLabelText("시작 시간")).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" })).not.toBeChecked();
+    expect(screen.getByRole("switch", { name: "새 모임 게스트와 멤버에게 보이기" })).not.toBeChecked();
   });
 
   it("creates a draft without opening it and defaults to 호스트만", async () => {
@@ -145,7 +147,7 @@ describe("UpcomingBookList", () => {
     await user.type(screen.getByLabelText("책 제목"), "다음 책");
     await user.type(screen.getByLabelText("저자"), "다음 저자");
     await user.type(screen.getByLabelText("모임 날짜"), "2026-08-13");
-    await user.click(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" }));
+    await user.click(screen.getByRole("switch", { name: "새 모임 게스트와 멤버에게 보이기" }));
     await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
 
     expect(onCreateSession).toHaveBeenCalledWith({
@@ -193,7 +195,7 @@ describe("UpcomingBookList", () => {
     expect(screen.getByLabelText("시작 시간")).toHaveValue("19:30");
     expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-06-11");
     expect(screen.getByText("이전 모임과 같은 시간으로 넣었습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" })).toBeChecked();
+    expect(screen.getByRole("switch", { name: "새 모임 게스트와 멤버에게 보이기" })).toBeChecked();
     expect(screen.queryByDisplayValue("room-code-2048")).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("책 제목"), "새 책");
@@ -351,5 +353,79 @@ describe("UpcomingBookList", () => {
     await user.click(retry);
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(screen.getByRole("button", { name: "모임 하나 더" })).toBeEnabled();
+  });
+
+  it("disables only the pending row and keeps the old server value until save succeeds", async () => {
+    const user = userEvent.setup();
+    let resolveSave!: () => void;
+    const onSaveAccessScope = vi.fn(
+      () => new Promise<void>((resolve) => {
+        resolveSave = resolve;
+      }),
+    );
+    render(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={onSaveAccessScope}
+        onCreateSession={vi.fn()}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "다음에 읽을 책" });
+    const rows = within(list).getAllByRole("listitem");
+    const rowB = rows[1];
+    const switchA = screen.getByRole("switch", { name: "A 게스트와 멤버에게 보이기" });
+    const switchB = screen.getByRole("switch", { name: "B 게스트와 멤버에게 보이기" });
+
+    await user.click(switchB);
+
+    expect(switchB).toBeDisabled();
+    expect(switchB).not.toBeChecked();
+    expect(switchA).toBeEnabled();
+    expect(switchA).toBeChecked();
+    expect(within(rowB).getByRole("status")).toHaveTextContent("접근 범위를 저장하는 중입니다.");
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+
+    resolveSave();
+    await waitFor(() => expect(switchB).toBeEnabled());
+    expect(switchB).not.toBeChecked();
+    expect(onSaveAccessScope).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps the old server value, announces a row alert, and retries after a failed save", async () => {
+    const user = userEvent.setup();
+    const onSaveAccessScope = vi.fn()
+      .mockRejectedValueOnce(new Error("save failed"))
+      .mockResolvedValueOnce(undefined);
+    render(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={onSaveAccessScope}
+        onCreateSession={vi.fn()}
+      />,
+    );
+
+    const list = screen.getByRole("list", { name: "다음에 읽을 책" });
+    const switchB = screen.getByRole("switch", { name: "B 게스트와 멤버에게 보이기" });
+    await user.click(switchB);
+
+    const rowB = within(list).getAllByRole("listitem")[1];
+    const alert = await within(rowB).findByRole("alert");
+    expect(alert).toHaveTextContent("접근 범위를 저장하지 못했습니다. 기존 값은 유지됩니다.");
+    expect(switchB).not.toBeChecked();
+    expect(switchB).toBeEnabled();
+    expect(screen.getByRole("switch", { name: "A 게스트와 멤버에게 보이기" })).toBeEnabled();
+
+    const retry = within(rowB).getByRole("button", { name: "다시 시도" });
+    await waitFor(() => expect(retry).toHaveFocus());
+    await user.click(retry);
+
+    await waitFor(() => expect(onSaveAccessScope).toHaveBeenCalledTimes(2));
+    expect(onSaveAccessScope).toHaveBeenLastCalledWith({
+      sessionId: "b",
+      accessScope: "GUEST_READABLE",
+    });
+    await waitFor(() => expect(within(rowB).queryByRole("alert")).not.toBeInTheDocument());
+    expect(switchB).not.toBeChecked();
   });
 });

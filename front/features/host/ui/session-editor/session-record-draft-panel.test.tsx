@@ -141,8 +141,8 @@ describe("SessionRecordDraftPanelBody", () => {
 
     render(<Harness />);
 
-    const hostOnly = screen.getByRole("radio", { name: "호스트 전용" }) as HTMLInputElement;
-    const guestReadable = screen.getByRole("radio", { name: "게스트 공개" }) as HTMLInputElement;
+    const hostOnly = screen.getByRole("radio", { name: "호스트만 보기" }) as HTMLInputElement;
+    const guestReadable = screen.getByRole("radio", { name: "게스트와 멤버에게 보이기" }) as HTMLInputElement;
     const publicRecord = screen.getByRole("checkbox", { name: "공개 기록에 게시" }) as HTMLInputElement;
     expect(hostOnly.checked).toBe(true);
     expect(publicRecord.checked).toBe(false);

@@ -372,7 +372,7 @@ describe("HostDashboard", () => {
     expect(screen.queryByRole("dialog", {
       name: "반영 방법을 선택해 주세요",
     })).not.toBeInTheDocument();
-    expect(screen.getAllByText("게스트 공개").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("게스트와 멤버에게 보이기").length).toBeGreaterThan(0);
   });
 
   it("does not reflect visibility when the save fails", async () => {
@@ -397,7 +397,7 @@ describe("HostDashboard", () => {
     expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent(
       "게스트 접근을 저장하지 못했습니다. 기존 접근 범위는 유지됩니다. 다시 시도해 주세요.",
     );
-    expect(screen.getAllByText("호스트 전용").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("호스트만 보기").length).toBeGreaterThan(0);
   });
 
   it("keeps the previous session state and names the failed start operation", async () => {

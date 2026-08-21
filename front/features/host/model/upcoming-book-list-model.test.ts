@@ -17,8 +17,8 @@ describe("draftsByDate", () => {
 
 describe("memberVisibilityLabel", () => {
   it("uses member-facing visibility copy", () => {
-    expect(memberVisibilityLabel("GUEST_READABLE")).toBe("멤버에게 보이기");
-    expect(memberVisibilityLabel("HOST_ONLY")).toBe("호스트만");
+    expect(memberVisibilityLabel("GUEST_READABLE")).toBe("게스트와 멤버에게 보이기");
+    expect(memberVisibilityLabel("HOST_ONLY")).toBe("호스트만 보기");
   });
 });
 

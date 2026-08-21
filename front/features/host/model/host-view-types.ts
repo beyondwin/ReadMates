@@ -446,6 +446,28 @@ export type HostSessionDeletionCounts = {
   feedbackDocuments: number;
 };
 
+export type HostSessionDeletionBlockerCode =
+  | "RECORD_REVISION_EXISTS"
+  | "NOTIFICATION_DECISION_EXISTS"
+  | "MANUAL_DISPATCH_EXISTS"
+  | "NOTIFICATION_EVENT_EXISTS"
+  | "NOTIFICATION_DELIVERY_EXISTS"
+  | "MEMBER_NOTIFICATION_EXISTS";
+
+export type HostSessionDeletionBlocker = {
+  code: string;
+  count: number;
+};
+
+export const hostSessionDeletionBlockerLabels: Record<HostSessionDeletionBlockerCode, string> = {
+  RECORD_REVISION_EXISTS: "적용된 기록 버전",
+  NOTIFICATION_DECISION_EXISTS: "알림 확인 결정",
+  MANUAL_DISPATCH_EXISTS: "수동 알림 발송",
+  NOTIFICATION_EVENT_EXISTS: "알림 이벤트",
+  NOTIFICATION_DELIVERY_EXISTS: "알림 전달 기록",
+  MEMBER_NOTIFICATION_EXISTS: "멤버 알림",
+};
+
 export type HostSessionDeletionPreviewResponse = {
   sessionId: string;
   sessionNumber: number;
@@ -453,7 +475,72 @@ export type HostSessionDeletionPreviewResponse = {
   state: SessionState;
   canDelete: boolean;
   counts: HostSessionDeletionCounts;
+  blockers?: ReadonlyArray<HostSessionDeletionBlocker>;
 };
+
+export type HostSessionDeletionResponse = {
+  sessionId: string;
+  sessionNumber: number;
+  deleted: true;
+  counts: HostSessionDeletionCounts;
+};
+
+export function readHostSessionDeletionBlockers(value: unknown): HostSessionDeletionBlocker[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  const blockers: HostSessionDeletionBlocker[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const code = (entry as { code?: unknown }).code;
+    const count = (entry as { count?: unknown }).count;
+    if (typeof code !== "string" || code.length === 0) {
+      continue;
+    }
+    if (typeof count !== "number" || !Number.isInteger(count) || count < 1) {
+      continue;
+    }
+    blockers.push({ code, count });
+  }
+  return blockers;
+}
+
+export function labeledHostSessionDeletionBlockers(
+  blockers: ReadonlyArray<HostSessionDeletionBlocker> | undefined,
+): Array<{ code: string; count: number; label: string }> {
+  return readHostSessionDeletionBlockers(blockers).flatMap((blocker) => {
+    const label = hostSessionDeletionBlockerLabels[blocker.code as HostSessionDeletionBlockerCode];
+    return label ? [{ code: blocker.code, count: blocker.count, label }] : [];
+  });
+}
+
+export function hostSessionDeletionFailure(error: unknown): {
+  code: string | null;
+  message: string;
+  status: number | null;
+  blockers: HostSessionDeletionBlocker[];
+} {
+  const fallbackMessage = "모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
+  if (!error || typeof error !== "object") {
+    return { code: null, message: fallbackMessage, status: null, blockers: [] };
+  }
+  const record = error as { code?: unknown; message?: unknown; status?: unknown; blockers?: unknown };
+  const status = typeof record.status === "number" ? record.status : null;
+  const code = typeof record.code === "string" ? record.code : null;
+  const message = typeof record.message === "string" && record.message.trim()
+    ? record.message
+    : status === 404
+      ? "모임을 찾을 수 없습니다."
+      : fallbackMessage;
+  return {
+    code,
+    message,
+    status,
+    blockers: readHostSessionDeletionBlockers(record.blockers),
+  };
+}
 
 export type {
   HostSessionAutomaticScheduleDefaults,

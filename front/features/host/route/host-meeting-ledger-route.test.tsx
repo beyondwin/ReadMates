@@ -272,7 +272,7 @@ describe("HostMeetingLedgerRoute", () => {
     expect(screen.queryByText("GUEST_READABLE")).not.toBeInTheDocument();
     expect(screen.queryByText("HOST_ONLY")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("switch", { name: "다음 책 멤버에게 보이기" }));
+    await user.click(screen.getByRole("switch", { name: "다음 책 게스트와 멤버에게 보이기" }));
 
     expect(routeMocks.saveAccessScope).toHaveBeenCalledWith({
       sessionId: "draft-1",
@@ -314,7 +314,7 @@ describe("HostMeetingLedgerRoute", () => {
     };
     renderMeetingSurface("open-1");
 
-    await user.click(screen.getByRole("switch", { name: "다음 책 멤버에게 보이기" }));
+    await user.click(screen.getByRole("switch", { name: "다음 책 게스트와 멤버에게 보이기" }));
 
     const dialog = screen.getByRole("dialog", { name: "알림 보내기" });
     expect(dialog).toHaveTextContent("FIRST_PUBLICATION");
@@ -378,7 +378,7 @@ describe("HostMeetingLedgerRoute", () => {
     await user.type(screen.getByLabelText("책 제목"), "다음 책");
     await user.type(screen.getByLabelText("저자"), "다음 저자");
     await user.type(screen.getByLabelText("모임 날짜"), "2026-06-11");
-    await user.click(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" }));
+    await user.click(screen.getByRole("switch", { name: "새 모임 게스트와 멤버에게 보이기" }));
     await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
 
     expect(routeMocks.createSession).toHaveBeenCalledWith(expect.objectContaining({
@@ -421,7 +421,7 @@ describe("HostMeetingLedgerRoute", () => {
     await user.type(screen.getByLabelText("책 제목"), "다음 책");
     await user.type(screen.getByLabelText("저자"), "다음 저자");
     await user.type(screen.getByLabelText("모임 날짜"), "2026-06-11");
-    await user.click(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" }));
+    await user.click(screen.getByRole("switch", { name: "새 모임 게스트와 멤버에게 보이기" }));
     await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
 
     expect(routeMocks.createSession).toHaveBeenCalledWith(expect.objectContaining({

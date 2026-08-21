@@ -3,13 +3,25 @@ import {
   buildSessionAccessScopeRequest,
   buildSessionPublicationRequest,
   resolvedSessionExposure,
+  sessionAccessScopeCopy,
   sessionExposureCopy,
 } from "./session-exposure-model";
 
 describe("session exposure model", () => {
-  it("separates guest access from public-record placement", () => {
+  it("uses approved access-scope copy for HOST_ONLY and GUEST_READABLE", () => {
+    expect(sessionAccessScopeCopy).toEqual({
+      HOST_ONLY: {
+        label: "호스트만 보기",
+        helper: "게스트와 멤버 화면에는 표시하지 않습니다.",
+      },
+      GUEST_READABLE: {
+        label: "게스트와 멤버에게 보이기",
+        helper: "초대된 클럽의 게스트와 로그인 멤버가 읽을 수 있습니다.",
+      },
+    });
+    expect(sessionExposureCopy("HOST_ONLY", "HIDDEN").accessLabel).toBe("호스트만 보기");
     expect(sessionExposureCopy("GUEST_READABLE", "HIDDEN")).toEqual({
-      accessLabel: "게스트 공개",
+      accessLabel: "게스트와 멤버에게 보이기",
       siteLabel: "공개 기록에 게시 안 함",
     });
     expect(sessionExposureCopy("GUEST_READABLE", "PUBLIC_RECORD").siteLabel).toBe("공개 기록에 게시");

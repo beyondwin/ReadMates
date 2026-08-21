@@ -310,16 +310,15 @@ export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (sessionId: string) => deleteHostSession(sessionId),
-    onSuccess: (response, sessionId) =>
-      invalidateOk(response, async () => {
-        client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
-        await Promise.all([
-          invalidateHostSessionLists(client, context),
-          invalidateHostSessionDashboard(client, context),
-          invalidateHostCurrentSession(client, context),
-          invalidateHostSessionManualDispatches(client, context),
-        ]);
-      }),
+    onSuccess: async (_result, sessionId) => {
+      client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
+      await Promise.all([
+        invalidateHostSessionLists(client, context),
+        invalidateHostSessionDashboard(client, context),
+        invalidateHostCurrentSession(client, context),
+        invalidateHostSessionManualDispatches(client, context),
+      ]);
+    },
   });
 }
 

@@ -1,6 +1,6 @@
 import { defaultHostSessionFormValues, type HostSessionFormValues } from "./host-session-editor-model";
 import { BUILTIN_SCHEDULE_DEFAULTS } from "./host-schedule-defaults-model";
-import type { SessionAccessScope } from "./session-exposure-model";
+import { sessionAccessScopeCopy, type SessionAccessScope } from "./session-exposure-model";
 
 export type UpcomingBookListItem = {
   sessionId: string;
@@ -35,7 +35,7 @@ export function draftsByDate(
 }
 
 export function memberVisibilityLabel(accessScope: SessionAccessScope): string {
-  return accessScope === "GUEST_READABLE" ? "멤버에게 보이기" : "호스트만";
+  return sessionAccessScopeCopy[accessScope].label;
 }
 
 export function upcomingBookCreateFormValues(input: UpcomingBookCreateInput): HostSessionFormValues {

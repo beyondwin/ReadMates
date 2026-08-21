@@ -133,7 +133,26 @@ describe("host session query keys", () => {
       attendees: [],
       feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
     });
-    vi.mocked(fetchHostSessionDeletionPreview).mockResolvedValue(new Response("{}", { status: 200 }) as never);
+    vi.mocked(fetchHostSessionDeletionPreview).mockResolvedValue({
+      sessionId: "session-7",
+      sessionNumber: 7,
+      title: "7회차 모임",
+      state: "OPEN",
+      canDelete: true,
+      counts: {
+        participants: 0,
+        rsvpResponses: 0,
+        questions: 0,
+        checkins: 0,
+        oneLineReviews: 0,
+        longReviews: 0,
+        highlights: 0,
+        publications: 0,
+        feedbackReports: 0,
+        feedbackDocuments: 0,
+      },
+      blockers: [],
+    });
     vi.mocked(fetchManualNotificationDispatches).mockResolvedValue({ items: [], nextCursor: null });
     vi.mocked(fetchHostSessionScheduleDefaults).mockResolvedValue({
       automatic: {

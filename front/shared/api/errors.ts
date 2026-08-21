@@ -1,8 +1,14 @@
+export type ReadmatesApiErrorBlocker = {
+  code: string;
+  count: number;
+};
+
 export type ReadmatesApiErrorBody = {
   code: string;
   message: string;
   status: number;
   openSessionId?: string;
+  blockers?: ReadonlyArray<ReadmatesApiErrorBlocker>;
 };
 
 type ReadmatesProblemDetailBody = {
@@ -66,6 +72,29 @@ function isProblemDetailBody(value: unknown): value is ReadmatesProblemDetailBod
   );
 }
 
+function parseApiErrorBlockers(value: unknown): ReadmatesApiErrorBlocker[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  const blockers: ReadmatesApiErrorBlocker[] = [];
+  for (const entry of value) {
+    if (!entry || typeof entry !== "object") {
+      continue;
+    }
+    const code = (entry as { code?: unknown }).code;
+    const count = (entry as { count?: unknown }).count;
+    if (typeof code !== "string" || code.length === 0) {
+      continue;
+    }
+    if (typeof count !== "number" || !Number.isInteger(count) || count < 1) {
+      continue;
+    }
+    blockers.push({ code, count });
+  }
+  return blockers;
+}
+
 function problemDetailMessage(body: ReadmatesProblemDetailBody) {
   if (typeof body.detail === "string" && body.detail.trim()) {
     return body.detail;
@@ -108,6 +137,7 @@ async function parseApiErrorBody(response: Response): Promise<ReadmatesApiErrorB
       message: parsed.message,
       status: response.status,
       fallback: false,
+      blockers: parseApiErrorBlockers((parsed as { blockers?: unknown }).blockers),
       ...(typeof parsed.openSessionId === "string" && parsed.openSessionId.length > 0
         ? { openSessionId: parsed.openSessionId }
         : {}),
@@ -122,6 +152,7 @@ export class ReadmatesApiError extends Error {
   readonly code: string;
   readonly fallback: boolean;
   readonly openSessionId: string | null;
+  readonly blockers: ReadonlyArray<ReadmatesApiErrorBlocker>;
   readonly traceId: string | null;
   readonly metadata: ReadmatesApiErrorMetadata;
   readonly response: Response;
@@ -135,6 +166,7 @@ export class ReadmatesApiError extends Error {
     this.openSessionId = typeof body.openSessionId === "string" && body.openSessionId.length > 0
       ? body.openSessionId
       : null;
+    this.blockers = body.blockers ?? [];
     this.traceId = response.headers.get("X-Readmates-Request-Id");
     this.metadata = {
       status: response.status,

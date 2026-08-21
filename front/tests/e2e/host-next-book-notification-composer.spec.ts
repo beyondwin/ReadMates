@@ -33,7 +33,7 @@ async function createDraftAndPublishNextBook(
   await page.getByLabel("책 제목").fill(bookTitle);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-08-20");
-  const newMeetingVisibility = page.getByRole("switch", { name: "새 모임 멤버에게 보이기" });
+  const newMeetingVisibility = page.getByRole("switch", { name: "새 모임 게스트와 멤버에게 보이기" });
   if (await newMeetingVisibility.isChecked()) {
     await newMeetingVisibility.click({ force: true });
   }
@@ -52,7 +52,7 @@ async function createDraftAndPublishNextBook(
       && response.url().includes("/host/sessions/")
       && response.url().includes("/access-scope"),
   );
-  await page.getByRole("switch", { name: `${bookTitle} 멤버에게 보이기` }).click({ force: true });
+  await page.getByRole("switch", { name: `${bookTitle} 게스트와 멤버에게 보이기` }).click({ force: true });
   const saved = await visibilityResponse;
   expect(saved.status(), await saved.text()).toBe(200);
   const sessionId = new URL(saved.url()).pathname.split("/").at(-2) ?? "";

@@ -59,19 +59,37 @@ const restoreReturnsPromise: RestoreReturnsPromise = true;
 
 const jsonHeaders = () => new Headers({ "Content-Type": "application/json" });
 
+async function readJsonOrThrow<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    throw Object.assign(
+      new Error(
+        response.status === 404
+          ? "모임을 찾을 수 없습니다."
+          : "모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+      ),
+      { status: response.status },
+    );
+  }
+  return response.json() as Promise<T>;
+}
+
 const hostSessionEditorTestActions = {
-  loadDeletionPreview: (sessionId) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
-      method: "GET",
-      headers: jsonHeaders(),
-      cache: "no-store",
-    }) as Promise<Response & { json(): Promise<HostSessionDeletionPreviewResponse> }>,
-  deleteSession: (sessionId) =>
-    fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`, {
-      method: "DELETE",
-      headers: jsonHeaders(),
-      cache: "no-store",
-    }),
+  loadDeletionPreview: async (sessionId) =>
+    readJsonOrThrow<HostSessionDeletionPreviewResponse>(
+      await fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`, {
+        method: "GET",
+        headers: jsonHeaders(),
+        cache: "no-store",
+      }),
+    ),
+  deleteSession: async (sessionId) =>
+    readJsonOrThrow(
+      await fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`, {
+        method: "DELETE",
+        headers: jsonHeaders(),
+        cache: "no-store",
+      }),
+    ),
   openSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   closeSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   publishSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
@@ -2357,7 +2375,7 @@ describe("HostSessionEditor", () => {
 
     await user.click(screen.getByRole("button", { name: "세션 삭제" }));
 
-    expect(await screen.findByText("이미 닫히거나 공개된 모임은 삭제할 수 없습니다.")).toBeInTheDocument();
+    expect(await screen.findByText("모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
     const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
     expect(within(dialog).getByRole("button", { name: "목록에서 지우기" })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
