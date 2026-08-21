@@ -34,7 +34,7 @@ vi.mock("@/features/host/aigen/ui/AiGenerateTab", () => ({
 }));
 
 import HostSessionEditor from "@/features/host/ui/host-session-editor";
-import type { HostSessionEditorLocation } from "@/features/host/model/host-session-editor-navigation";
+import type { HostSessionWorkspaceLocation } from "@/features/host/model/host-session-workspace-navigation";
 import {
   buildHostSessionRequest,
   defaultSessionDateFrom,
@@ -152,14 +152,14 @@ type HostSessionEditorProps = Parameters<typeof HostSessionEditor>[0];
 function HostSessionEditorForTest({
   actions,
   navigation,
-  initialLocation = { section: "overview", source: "manual" },
+  initialLocation = { panel: "focus", source: "manual" },
   recordWorkflow: workflow,
   session: testSession,
   ...props
 }: Omit<HostSessionEditorProps, "actions" | "navigation"> & {
   actions?: HostSessionEditorActions;
   navigation?: HostSessionEditorProps["navigation"];
-  initialLocation?: HostSessionEditorLocation;
+  initialLocation?: HostSessionWorkspaceLocation;
 }) {
   const [location, setLocation] = useState(initialLocation);
   const [defaultWorkflow, setDefaultWorkflow] = useState(
@@ -396,31 +396,27 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={null}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
     expect(screen.getByRole("heading", { name: "세션 문서 만들기" })).toBeVisible();
     expect(screen.queryByRole("link", { name: "운영으로" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "세션 문서 저장" })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "세션 문서 저장" }).length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
     const bookAndSessionPanel = screen.getByRole("heading", { name: "읽을 책" }).closest("section");
     expect(bookAndSessionPanel).not.toBeNull();
     expect(within(bookAndSessionPanel as HTMLElement).getByText("도서 정보")).toBeVisible();
     expect(screen.queryByText("세션 문서 편집")).not.toBeInTheDocument();
-    const mobileMetadata = screen.getByRole("group", { name: "모바일 세션 상태" });
-    expect(Array.from(mobileMetadata.children, (item) => item.textContent)).toEqual([
-      "새 예정 세션",
-      "호스트 전용",
-      "초안 준비됨",
-    ]);
+    expect(screen.getByText("모임 작성 중")).toBeVisible();
+    expect(screen.queryByText("새 예정 세션")).not.toBeInTheDocument();
   });
 
   it("prefills a new meeting from schedule defaults and shows the time hint", () => {
     render(
       <HostSessionEditorForTest
         session={null}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
         scheduleDefaults={{
           automatic: {
             startTime: "19:30",
@@ -461,7 +457,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={null}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
         scheduleDefaults={{
           automatic: {
             startTime: "19:30",
@@ -480,7 +476,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
     await user.type(screen.getByLabelText("책 제목"), "새 책");
     await user.type(screen.getByLabelText("저자"), "새 저자");
-    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
@@ -507,7 +503,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={null}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -535,27 +531,13 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("heading", { name: "세션 문서 편집" })).not.toBeInTheDocument();
     expect(screen.queryByText("세션 운영 문서")).not.toBeInTheDocument();
     expect(screen.queryByText("세션 운영 문서 · No.7")).not.toBeInTheDocument();
-    const desktopMetadata = screen.getByRole("group", { name: "데스크톱 세션 상태" });
-    expect(within(desktopMetadata).getByRole("group", {
-      name: "No.07 · 이번 세션 · 준비 중 · D-18",
-    })).toBeVisible();
-    expect(within(desktopMetadata).getByText("No.07")).toHaveClass("rm-session-identity__number");
-    expect(within(desktopMetadata).getByText("준비 중")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
-    expect(within(desktopMetadata).getByText("D-18")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
-    expect(within(desktopMetadata).getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
-
-    const mobileMetadata = screen.getByRole("group", { name: "모바일 세션 상태" });
-    expect(within(mobileMetadata).getByText("No.07")).toBeInTheDocument();
-    expect(within(mobileMetadata).getByText("준비 중")).toBeInTheDocument();
-    expect(within(mobileMetadata).getAllByText("호스트 전용")).toHaveLength(1);
-    expect(within(mobileMetadata).getByText("초안 준비됨")).toBeInTheDocument();
-    expect(within(mobileMetadata).queryByText("이번 세션")).not.toBeInTheDocument();
-    expect(within(mobileMetadata).queryByText("D-18")).not.toBeInTheDocument();
-    expect(screen.queryByText("문서 있음")).not.toBeInTheDocument();
-    expect(screen.queryByText("No.07 · D-18")).not.toBeInTheDocument();
-    expect(screen.getByText("현재 적용본")).toBeVisible();
-    expect(screen.getByText("작업 중인 초안")).toBeVisible();
-    expect(screen.getByText("다음 할 일")).toBeVisible();
+    expect(screen.getByText("No.7")).toBeVisible();
+    expect(screen.getByText("멤버와 준비 중")).toBeVisible();
+    expect(screen.queryByText("준비 중", { exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByText("이번 세션")).not.toBeInTheDocument();
+    expect(screen.queryByText("D-18")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+    expect(screen.getByRole("list", { name: "진행 상황" })).toBeVisible();
   });
 
   it("fails fast when a persisted session is rendered without its record workflow", () => {
@@ -564,88 +546,43 @@ describe("HostSessionEditor", () => {
         session={session}
         actions={hostSessionEditorTestActions}
         navigation={{
-          location: { section: "overview", source: "manual" },
+          location: { panel: "focus", source: "manual" },
           onChange: vi.fn(),
         }}
       />,
     )).toThrow("recordWorkflow is required for persisted sessions");
   });
 
-  it("shows only the overview by default without a global save action", () => {
+  it("shows the focus deck by default without a global save action or page tabs", () => {
     render(<HostSessionEditorForTest session={session} />);
 
-    expect(screen.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByText("현재 적용본")).toBeVisible();
-    expect(screen.getByText("작업 중인 초안")).toBeVisible();
-    expect(screen.getByText("다음 할 일")).toBeVisible();
+    expect(screen.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+    expect(screen.getByText("기록 정리 중")).toBeVisible();
+    expect(screen.queryByRole("tablist", { name: "호스트 편집 섹션" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "변경 사항 저장" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("세션 제목")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("기록 요약")).not.toBeInTheDocument();
   });
 
-  it("switches the desktop and mobile editor through five section contexts", async () => {
+  it("opens support panels from header and progress without a page tablist", async () => {
     const user = userEvent.setup();
     render(<HostSessionEditorForTest session={session} />);
 
-    const segments = screen.getByRole("tablist", { name: "호스트 편집 섹션" });
-    const overview = screen.getByRole("tab", { name: "개요" });
-    const basic = screen.getByRole("tab", { name: "기본 정보" });
-    const attendance = screen.getByRole("tab", { name: "출석" });
-    const records = screen.getByRole("tab", { name: /^기록$/ });
-    const history = screen.getByRole("tab", { name: "변경 기록" });
-
-    expect(segments).toHaveAttribute("role", "tablist");
-    expect(Array.from(segments.querySelectorAll('[role="tab"]')).map((button) => button.getAttribute("aria-label"))).toEqual([
-      "개요",
-      "기본 정보",
-      "출석",
-      "기록",
-      "변경 기록",
-    ]);
-    expect(overview).toHaveAttribute("aria-selected", "true");
+    expect(screen.queryByRole("tablist", { name: "호스트 편집 섹션" })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("세션 제목")).not.toBeInTheDocument();
 
-    await user.click(basic);
-    expect(basic).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByLabelText("세션 제목")).toBeVisible();
-    await user.click(records);
-    expect(records).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("button", { name: "모임 정보" }));
+    expect(await screen.findByLabelText("세션 제목")).toBeVisible();
+
+    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
     expect(screen.getByLabelText("공개 요약")).toBeVisible();
     expect(screen.getByLabelText("세션 제목")).not.toBeVisible();
 
-    await user.click(attendance);
-    expect(attendance).toHaveAttribute("aria-selected", "true");
+    await user.click(within(screen.getByRole("listitem", { name: /출석/ })).getByRole("button"));
     expect(screen.getByRole("heading", { name: "출석 확정 명단" })).toBeVisible();
 
-    await user.click(history);
-    expect(history).toHaveAttribute("aria-selected", "true");
+    await user.click(screen.getByRole("button", { name: "변경 내역" }));
     expect(screen.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
-  });
-
-  it("supports keyboard selection in the five-section editor tablist", async () => {
-    const user = userEvent.setup();
-    render(<HostSessionEditorForTest session={session} />);
-
-    const overview = screen.getByRole("tab", { name: "개요" });
-    const basic = screen.getByRole("tab", { name: "기본 정보" });
-    const history = screen.getByRole("tab", { name: "변경 기록" });
-
-    overview.focus();
-    await user.keyboard("{ArrowRight}");
-    await waitFor(() => expect(basic).toHaveFocus());
-    expect(basic).toHaveAttribute("aria-selected", "true");
-
-    await user.keyboard("{End}");
-    await waitFor(() => expect(history).toHaveFocus());
-    expect(history).toHaveAttribute("aria-selected", "true");
-
-    await user.keyboard("{Home}");
-    await waitFor(() => expect(overview).toHaveFocus());
-    expect(overview).toHaveAttribute("aria-selected", "true");
-
-    await user.keyboard("{ArrowLeft}");
-    await waitFor(() => expect(history).toHaveFocus());
-    expect(history).toHaveAttribute("aria-selected", "true");
   });
 
   it("keeps basic and records edits when visiting other sections", async () => {
@@ -653,22 +590,22 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
     await user.clear(screen.getByLabelText("세션 제목"));
     await user.type(screen.getByLabelText("세션 제목"), "수정 중인 세션 제목");
 
-    await user.click(screen.getByRole("tab", { name: /^기록$/ }));
+    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
     await user.clear(screen.getByLabelText("공개 요약"));
     await user.type(screen.getByLabelText("공개 요약"), "수정 중인 공개 요약");
 
-    await user.click(screen.getByRole("tab", { name: "변경 기록" }));
-    await user.click(screen.getByRole("tab", { name: "기본 정보" }));
+    await user.click(screen.getByRole("button", { name: "변경 내역" }));
+    await user.click(screen.getByRole("button", { name: "모임 정보" }));
     expect(screen.getByLabelText("세션 제목")).toHaveValue("수정 중인 세션 제목");
 
-    await user.click(screen.getByRole("tab", { name: /^기록$/ }));
+    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
     expect(screen.getByLabelText("공개 요약")).toHaveValue("수정 중인 공개 요약");
   });
 
@@ -685,13 +622,13 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
         actions={{ ...hostSessionEditorTestActions, saveSession }}
         recordWorkflow={workflow}
       />,
     );
 
-    await user.click(screen.getByRole("tab", { name: /^기록$/ }));
+    await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
     await user.click(screen.getByLabelText("한줄평 1 · 테스트 멤버"));
     await user.keyboard("{Enter}");
 
@@ -701,7 +638,7 @@ describe("HostSessionEditor", () => {
   it("keeps externally activated record source state mounted after another controlled location arrives", () => {
     const onChange = vi.fn();
     const workflow = recordWorkflow("MEMBER");
-    const renderAt = (location: HostSessionEditorLocation) => (
+    const renderAt = (location: HostSessionWorkspaceLocation) => (
       <HostSessionEditor
         session={session}
         clubSlug="club-a"
@@ -710,9 +647,9 @@ describe("HostSessionEditor", () => {
         recordWorkflow={workflow}
       />
     );
-    const { rerender } = render(renderAt({ section: "basic", source: "manual" }));
+    const { rerender } = render(renderAt({ panel: "basic", source: "manual" }));
 
-    rerender(renderAt({ section: "records", source: "json" }));
+    rerender(renderAt({ panel: "records", source: "json" }));
     const fileInput = screen.getByLabelText("정리한 파일을 여기에 놓으세요", { selector: "input" });
     const sourceFile = new File([sessionImportJson()], "controlled-source.json", {
       type: "application/json",
@@ -720,7 +657,7 @@ describe("HostSessionEditor", () => {
     fireEvent.change(fileInput, { target: { files: [sourceFile] } });
     expect((fileInput as HTMLInputElement).files?.[0]?.name).toBe("controlled-source.json");
 
-    rerender(renderAt({ section: "history", source: "manual" }));
+    rerender(renderAt({ panel: "history", source: "manual" }));
 
     const keptAliveInput = screen.getByLabelText("정리한 파일을 여기에 놓으세요", { selector: "input" });
     expect(keptAliveInput).toBe(fileInput);
@@ -735,7 +672,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
         actions={{ ...hostSessionEditorTestActions, saveSession }}
       />,
     );
@@ -757,7 +694,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
         actions={{ ...hostSessionEditorTestActions, saveSession, updateAttendance }}
       />,
     );
@@ -777,20 +714,18 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByText("저장 안내")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "기본 정보" }));
+    await user.click(screen.getByRole("button", { name: "모임 정보" }));
     expect(screen.getByRole("button", { name: "세션 삭제" })).toBeVisible();
-    expect(screen.queryByText("알림 발송")).not.toBeVisible();
     expect(screen.queryByText("운영 순서")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("tab", { name: "출석" }));
+    await user.click(within(screen.getByRole("listitem", { name: /출석/ })).getByRole("button"));
     expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
-    expect(screen.queryByText("알림 발송")).not.toBeVisible();
   });
 
   it("shows a new-session empty message instead of static attendance and feedback document controls", () => {
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
       />,
     );
 
@@ -807,7 +742,7 @@ describe("HostSessionEditor", () => {
     vi.setSystemTime(new Date(2026, 3, 21, 12));
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
     vi.useRealTimers();
@@ -832,7 +767,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
       />,
     );
 
@@ -855,7 +790,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={{ ...session, state }}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "json" }}
+          initialLocation={{ panel: "records", source: "json" }}
           recordWorkflow={workflow}
         />,
       );
@@ -914,7 +849,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -932,7 +867,7 @@ describe("HostSessionEditor", () => {
   it("shows existing-session empty states when attendees are empty and no feedback document is uploaded", () => {
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
         session={{
           ...session,
           attendees: [],
@@ -956,7 +891,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "records", source: "json" }}
+        initialLocation={{ panel: "records", source: "json" }}
         actions={{ ...hostSessionEditorTestActions, previewSessionImport }}
       />,
     );
@@ -979,7 +914,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={{ ...session, publication: null }}
-        initialLocation={{ section: "records", source: "json" }}
+        initialLocation={{ panel: "records", source: "json" }}
         recordWorkflow={recordWorkflow("MEMBER")}
         actions={{ ...hostSessionEditorTestActions, previewSessionImport }}
       />,
@@ -1028,7 +963,7 @@ describe("HostSessionEditor", () => {
       const renderEditor = (workflow: NonNullable<HostSessionEditorProps["recordWorkflow"]>) => (
         <HostSessionEditorForTest
           session={session}
-          initialLocation={{ section: "records", source: "json" }}
+          initialLocation={{ panel: "records", source: "json" }}
           recordWorkflow={workflow}
           actions={{
             ...hostSessionEditorTestActions,
@@ -1081,7 +1016,7 @@ describe("HostSessionEditor", () => {
     const renderEditor = (workflow: NonNullable<HostSessionEditorProps["recordWorkflow"]>) => (
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "records", source: "json" }}
+        initialLocation={{ panel: "records", source: "json" }}
         recordWorkflow={workflow}
         actions={{ ...hostSessionEditorTestActions, previewSessionImport }}
       />
@@ -1130,7 +1065,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "records", source: "manual" }}
+        initialLocation={{ panel: "records", source: "manual" }}
         recordWorkflow={workflow}
       />,
     );
@@ -1217,7 +1152,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "records", source: "json" }}
+        initialLocation={{ panel: "records", source: "json" }}
         actions={{ ...hostSessionEditorTestActions, commitSessionImport }}
         recordWorkflow={workflow}
       />,
@@ -1247,12 +1182,12 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={{ ...session, state: "CLOSED", accessScope: "HOST_ONLY" }}
+        initialLocation={{ panel: "records", source: "json" }}
         recordWorkflow={workflow}
         actions={{ ...hostSessionEditorTestActions, saveSessionAccessScope }}
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
     await user.click(screen.getByRole("button", { name: "게스트와 멤버에게 보이기로 바꾸기" }));
 
     expect(saveSessionAccessScope).toHaveBeenCalledTimes(1);
@@ -1282,7 +1217,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "records", source: "json" }}
+        initialLocation={{ panel: "records", source: "json" }}
         actions={{ ...hostSessionEditorTestActions, commitSessionImport }}
         onSessionRecordsChanged={onSessionRecordsChanged}
         recordWorkflow={workflow}
@@ -1296,13 +1231,13 @@ describe("HostSessionEditor", () => {
     await user.click(await screen.findByRole("button", { name: "작성 중에 넣기" }));
 
     await waitFor(() => expect(onSessionRecordsChanged).toHaveBeenCalledWith(session.sessionId));
-    expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요")).toBeVisible();
     finishRefresh();
 
     await waitFor(() => {
       expect(workflow.confirmation.onReview).toHaveBeenCalled();
     });
-    expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요")).toBeVisible();
     expect(screen.queryByLabelText(/Markdown/i)).not.toBeInTheDocument();
     expect(workflow.onDraftCommitted).toHaveBeenCalledWith({
       sessionId: session.sessionId,
@@ -1326,7 +1261,7 @@ describe("HostSessionEditor", () => {
 
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -1338,7 +1273,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("모임 날짜"), "2026-05-20");
     await user.clear(screen.getByLabelText("시작 시간"));
     await user.type(screen.getByLabelText("시작 시간"), "19:30");
-    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
@@ -1374,7 +1309,7 @@ describe("HostSessionEditor", () => {
 
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -1391,7 +1326,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("장소"), "성수 스터디룸");
     await user.type(screen.getByLabelText("미팅 URL"), "https://meet.google.com/readmates-custom");
     await user.type(screen.getByLabelText("Passcode · 선택"), "custom");
-    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions", expect.objectContaining({
@@ -1427,7 +1362,7 @@ describe("HostSessionEditor", () => {
 
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -1437,7 +1372,7 @@ describe("HostSessionEditor", () => {
     await user.type(screen.getByLabelText("저자"), "새 저자");
     await user.clear(screen.getByLabelText("모임 날짜"));
     await user.type(screen.getByLabelText("모임 날짜"), "2026-05-20");
-    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());
     expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/created-session-8");
@@ -1457,7 +1392,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={editedSession}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -1501,7 +1436,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -1521,7 +1456,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -1553,7 +1488,7 @@ describe("HostSessionEditor", () => {
   it("does not label closed public-visibility records as published before lifecycle publish", () => {
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
         session={{
           ...session,
           state: "CLOSED",
@@ -1565,8 +1500,8 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 비공개/ })).toBeVisible();
-    expect(screen.queryByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).not.toBeInTheDocument();
+    expect(screen.getByText("기록 정리 중")).toBeVisible();
+    expect(screen.queryByText("공개 완료")).not.toBeInTheDocument();
   });
 
   it("labels published member-visibility records as published in the session identity", () => {
@@ -1583,7 +1518,8 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
+    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(screen.queryByText("기록 정리 중")).not.toBeInTheDocument();
   });
 
   it("lets hosts open a draft meeting after confirming 멤버에게 열기", async () => {
@@ -1601,7 +1537,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "멤버에게 열기" }));
+    await user.click(screen.getAllByRole("button", { name: "멤버와 준비 시작" })[0]!);
     expect(openHostSession).not.toHaveBeenCalled();
     expect(confirmSpy).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog", { name: "멤버에게 열기" })).toBeVisible();
@@ -1637,7 +1573,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "멤버에게 열기" }));
+    await user.click(screen.getAllByRole("button", { name: "멤버와 준비 시작" })[0]!);
     await user.click(
       within(screen.getByRole("dialog", { name: "멤버에게 열기" })).getByRole("button", { name: "멤버에게 열기" }),
     );
@@ -1664,15 +1600,12 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByText("모임이 끝났다면 모임을 마친 뒤 기록을 정리하세요.")).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
+    await user.click(screen.getAllByRole("button", { name: "모임 마치기" })[0]!);
     await user.click(within(screen.getByRole("dialog", { name: "모임 마치기" })).getByRole("button", { name: "모임 마치기" }));
 
     expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
-    expect(await screen.findByRole("group", { name: /No\.07 · 지난 회차 · 비공개/ })).toBeVisible();
-    expect(screen.getByText("모임을 마쳤습니다. 정리본을 올린 뒤 기록을 공개할 수 있습니다.")).toBeVisible();
-    expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
-    expect(screen.getByText("공개하려면 요약이 필요합니다")).toBeVisible();
+    expect(await screen.findByText("기록 정리 중")).toBeVisible();
+    expect(screen.getAllByRole("button", { name: /정리본 올리기|기록에 반영|반영 전 확인|기록 공개/ }).length).toBeGreaterThan(0);
   });
 
   it("opens a confirm dialog for 모임 마치기 without calling closeSession", async () => {
@@ -1686,7 +1619,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
+    await user.click(screen.getAllByRole("button", { name: "모임 마치기" })[0]!);
 
     expect(screen.getByRole("dialog", { name: "모임 마치기" })).toBeVisible();
     expect(closeSession).not.toHaveBeenCalled();
@@ -1703,13 +1636,13 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
+    await user.click(screen.getAllByRole("button", { name: "모임 마치기" })[0]!);
     await user.click(screen.getByRole("button", { name: "취소" }));
 
     expect(screen.queryByRole("dialog", { name: "모임 마치기" })).not.toBeInTheDocument();
     expect(closeSession).not.toHaveBeenCalled();
 
-    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
+    await user.click(screen.getAllByRole("button", { name: "모임 마치기" })[0]!);
     await user.keyboard("{Escape}");
 
     expect(screen.queryByRole("dialog", { name: "모임 마치기" })).not.toBeInTheDocument();
@@ -1729,7 +1662,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "모임 마치기" }));
+    await user.click(screen.getAllByRole("button", { name: "모임 마치기" })[0]!);
     expect(closeSession).not.toHaveBeenCalled();
 
     await user.click(within(screen.getByRole("dialog", { name: "모임 마치기" })).getByRole("button", { name: "모임 마치기" }));
@@ -1877,18 +1810,18 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "기록 공개" }));
+    await user.click(screen.getAllByRole("button", { name: "기록 공개" })[0]!);
     await user.click(within(screen.getByRole("dialog", { name: "기록 공개" })).getByRole("button", { name: "기록 공개" }));
 
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
-    expect(await screen.findByRole("group", { name: /No\.01 · 지난 회차 · 공개/ })).toBeVisible();
+    expect(await screen.findByText("공개 완료")).toBeVisible();
     expect(await screen.findByRole("status")).toHaveTextContent("기록을 공개했습니다.");
   });
 
   it("disables publication actions for unsaved new sessions and explains why", () => {
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "records", source: "manual" }}
+        initialLocation={{ panel: "records", source: "manual" }}
       />,
     );
 
@@ -1905,7 +1838,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
       />,
     );
 
@@ -1928,7 +1861,7 @@ describe("HostSessionEditor", () => {
   it("shows removed participants in a separate collapsed attendance section", () => {
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
         session={{
           ...session,
           attendees: [
@@ -1963,7 +1896,7 @@ describe("HostSessionEditor", () => {
 
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
         session={{
           ...session,
           attendees: session.attendees.map((attendee) =>
@@ -2019,7 +1952,7 @@ describe("HostSessionEditor", () => {
 
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
         session={{
           ...session,
           attendees: session.attendees.map((attendee) =>
@@ -2074,7 +2007,7 @@ describe("HostSessionEditor", () => {
 
     render(
       <HostSessionEditorForTest
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
         session={{
           ...session,
           attendees: session.attendees.map((attendee) =>
@@ -2126,7 +2059,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "attendance", source: "manual" }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
       />,
     );
 
@@ -2168,7 +2101,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={openSession}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -2226,7 +2159,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={openSession}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -2249,7 +2182,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={openSession}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -2274,7 +2207,7 @@ describe("HostSessionEditor", () => {
     await user.keyboard("{Escape}");
 
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "이 모임을 목록에서 지울까요?" })).not.toBeInTheDocument());
-    expect(trigger).toHaveFocus();
+    await waitFor(() => expect(trigger).toHaveFocus());
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7", expect.objectContaining({
       method: "DELETE",
@@ -2324,7 +2257,8 @@ describe("HostSessionEditor", () => {
 
     render(<HostSessionEditorForTest session={draftSession} />);
 
-    await user.click(screen.getByRole("button", { name: "목록에서 지우기" }));
+    await user.click(screen.getByRole("button", { name: "모임 정보" }));
+    await user.click(await screen.findByRole("button", { name: "세션 삭제" }));
     expect(confirmSpy).not.toHaveBeenCalled();
 
     const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
@@ -2358,7 +2292,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={session}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -2373,7 +2307,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={openSession}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -2399,7 +2333,7 @@ describe("HostSessionEditor", () => {
     render(
       <HostSessionEditorForTest
         session={openSession}
-        initialLocation={{ section: "basic", source: "manual" }}
+        initialLocation={{ panel: "basic", source: "manual" }}
       />,
     );
 
@@ -2419,7 +2353,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "manual" }}
+          initialLocation={{ panel: "records", source: "manual" }}
           recordWorkflow={recordWorkflow("MEMBER")}
         />,
       );
@@ -2453,7 +2387,7 @@ describe("HostSessionEditor", () => {
       render(
         <HostSessionEditorForTest
           session={session}
-          initialLocation={{ section: "records", source: "ai" }}
+          initialLocation={{ panel: "records", source: "ai" }}
           recordWorkflow={recordWorkflow("MEMBER")}
         />,
       );
@@ -2483,7 +2417,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "manual" }}
+          initialLocation={{ panel: "records", source: "manual" }}
           recordWorkflow={recordWorkflow("MEMBER")}
         />,
       );
@@ -2510,7 +2444,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "manual" }}
+          initialLocation={{ panel: "records", source: "manual" }}
           recordWorkflow={recordWorkflow("MEMBER")}
         />,
       );
@@ -2541,7 +2475,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "ai" }}
+          initialLocation={{ panel: "records", source: "ai" }}
         />,
       );
 
@@ -2556,7 +2490,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "ai" }}
+          initialLocation={{ panel: "records", source: "ai" }}
         />,
       );
 
@@ -2572,15 +2506,15 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "ai" }}
+          initialLocation={{ panel: "records", source: "ai" }}
           recordWorkflow={recordWorkflow("MEMBER")}
         />,
       );
 
       const aiWorkspace = screen.getByTestId("aigen-tab");
-      await user.click(screen.getByRole("tab", { name: "기본 정보" }));
+      await user.click(screen.getByRole("button", { name: "모임 정보" }));
       expect(aiWorkspace).not.toBeVisible();
-      await user.click(screen.getByRole("tab", { name: /^기록$/ }));
+      await user.click(within(screen.getByRole("listitem", { name: /기록/ })).getByRole("button"));
 
       expect(screen.getByTestId("aigen-tab")).toBe(aiWorkspace);
       expect(aiWorkspace).not.toBeVisible();
@@ -2593,11 +2527,11 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "json" }}
+          initialLocation={{ panel: "records", source: "json" }}
         />,
       );
 
-      expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
+      expect(screen.getByText("다른 방법")).toBeVisible();
       expect(screen.getByLabelText("정리한 파일을 여기에 놓으세요")).toBeVisible();
       expect(screen.queryByTestId("aigen-tab")).not.toBeInTheDocument();
     });
@@ -2608,10 +2542,11 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "json" }}
+          initialLocation={{ panel: "records", source: "json" }}
         />,
       );
 
+      await user.click(screen.getByText("다른 방법"));
       await user.click(screen.getByRole("tab", { name: "AI로 생성" }));
 
       expect(screen.getByTestId("aigen-tab")).toBeVisible();
@@ -2642,7 +2577,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={session}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "ai" }}
+          initialLocation={{ panel: "records", source: "ai" }}
           onSessionRecordsChanged={onSessionRecordsChanged}
           recordWorkflow={workflow}
         />,
@@ -2675,7 +2610,7 @@ describe("HostSessionEditor", () => {
         <HostSessionEditorForTest
           session={null}
           clubSlug="club-a"
-          initialLocation={{ section: "records", source: "ai" }}
+          initialLocation={{ panel: "records", source: "ai" }}
         />,
       );
 

@@ -29,14 +29,15 @@ import {
 } from "@/features/host/model/session-exposure-model";
 import type {
   HostSessionDraftSource,
-  HostSessionEditorLocation,
-  HostSessionEditorSection,
-} from "@/features/host/model/host-session-editor-navigation";
+  HostSessionWorkspaceLocation,
+  HostSessionWorkspacePanel,
+} from "@/features/host/model/host-session-workspace-navigation";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
   buildHostSessionEditorOverview,
-  compactSessionLifecycleLabel,
+  hasAppliedSessionRecord,
 } from "@/features/host/model/host-session-editor-view-model";
+import { buildHostSessionWorkspace } from "@/features/host/model/host-session-workspace-model";
 import {
   isReverseLifecycleKind,
   lifecycleConfirmCopy,
@@ -60,7 +61,6 @@ import {
   type HostSessionScheduleDefaults,
 } from "@/features/host/model/host-schedule-defaults-model";
 import type { BasicSessionField } from "@/features/host/model/host-session-editor-form-state";
-import { SessionIdentity } from "@/shared/ui/session-identity";
 import {
   readmatesReturnState as defaultReadmatesReturnState,
   type ReadmatesReturnState,
@@ -95,11 +95,11 @@ import {
 } from "./session-editor/session-history-panel";
 import type { SessionHistoryPanelItem } from "./session-editor/session-history-model";
 import { SessionLifecycleConfirmDialog } from "./session-editor/session-lifecycle-confirm-dialog";
-import { SessionOverviewSection } from "./session-editor/session-overview-section";
 import {
   SessionRecordApplyDialog,
   type HostSessionRecordApplyReview,
 } from "./session-editor/session-record-apply-dialog";
+import { HostSessionWorkspace } from "./session-workspace/host-session-workspace";
 
 export type { HostSessionEditorLinkComponent } from "./session-editor/session-editor-links";
 export type { HostSessionRecordApplyReview } from "./session-editor/session-record-apply-dialog";
@@ -219,8 +219,8 @@ export default function HostSessionEditor({
   onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>;
   recordWorkflow?: HostSessionRecordWorkflow;
   navigation: {
-    location: HostSessionEditorLocation;
-    onChange: (next: HostSessionEditorLocation) => void;
+    location: HostSessionWorkspaceLocation;
+    onChange: (next: HostSessionWorkspaceLocation) => void;
   };
   scheduleDefaults?: HostSessionScheduleDefaults | null;
   scheduleDefaultsLoadState?: HostScheduleDefaultsLoadState;
@@ -279,29 +279,29 @@ export default function HostSessionEditor({
   const [sessionImportCommitResult, setSessionImportCommitResult] = useState<SessionImportCommitResult | null>(null);
   const [sessionImportStatus, setSessionImportStatus] = useState<"idle" | "previewing" | "ready" | "committing" | "error">("idle");
   const [sessionImportError, setSessionImportError] = useState<string | null>(null);
-  const [visitedSections, setVisitedSections] = useState<Set<HostSessionEditorSection>>(
-    () => new Set([navigation.location.section]),
+  const [visitedPanels, setVisitedPanels] = useState<Set<HostSessionWorkspacePanel>>(
+    () => new Set([navigation.location.panel]),
   );
   const [visitedSources, setVisitedSources] = useState<Set<HostSessionDraftSource>>(
-    () => new Set(navigation.location.section === "records" ? [navigation.location.source] : []),
+    () => new Set(navigation.location.panel === "records" ? [navigation.location.source] : []),
   );
 
   const sessionIdForAigen = session?.sessionId;
-  const activeSection = navigation.location.section;
+  const activePanel = navigation.location.panel;
   const activeSource = navigation.location.source;
 
-  if (!visitedSections.has(activeSection)) {
-    setVisitedSections((current) => new Set(current).add(activeSection));
+  if (!visitedPanels.has(activePanel)) {
+    setVisitedPanels((current) => new Set(current).add(activePanel));
   }
-  if (activeSection === "records" && !visitedSources.has(activeSource)) {
+  if (activePanel === "records" && !visitedSources.has(activeSource)) {
     setVisitedSources((current) => new Set(current).add(activeSource));
   }
 
-  const changeLocation = useCallback((next: HostSessionEditorLocation) => {
-    setVisitedSections((current) => current.has(next.section)
+  const changeLocation = useCallback((next: HostSessionWorkspaceLocation) => {
+    setVisitedPanels((current) => current.has(next.panel)
       ? current
-      : new Set(current).add(next.section));
-    if (next.section === "records") {
+      : new Set(current).add(next.panel));
+    if (next.panel === "records") {
       setVisitedSources((current) => current.has(next.source)
         ? current
         : new Set(current).add(next.source));
@@ -310,7 +310,7 @@ export default function HostSessionEditor({
   }, [navigation]);
 
   const changeSource = useCallback((source: HostSessionDraftSource) => {
-    changeLocation({ section: "records", source });
+    changeLocation({ panel: "records", source });
   }, [changeLocation]);
 
   const handleAigenCommitted = useCallback(async (result: AiGenerateCommitResult) => {
@@ -398,6 +398,48 @@ export default function HostSessionEditor({
     }),
     [isNewSession, recordWorkflow],
   );
+  const unknownAttendanceCount = (session?.attendees ?? []).filter((attendee) => (
+    attendanceStatuses[attendee.membershipId] ?? attendee.attendanceStatus
+  ) === "UNKNOWN").length;
+  const appliedRecord = hasAppliedSessionRecord({
+    liveRevision: recordWorkflow?.editor.liveRevision ?? 0,
+    liveSnapshot: recordWorkflow?.editor.liveSnapshot ?? null,
+  });
+  const workspaceView = useMemo(() => {
+    if (isNewSession) {
+      return buildHostSessionWorkspace({
+        state: "DRAFT",
+        meetingDate: date,
+        today: todayIsoDate(),
+        unknownAttendanceCount: 0,
+        hasRecordDraft: false,
+        recordDraftStale: false,
+        recordValidationIssueCount: 0,
+        hasAppliedRecord: false,
+        publicationReady: false,
+      });
+    }
+    return buildHostSessionWorkspace({
+      state: sessionState ?? "DRAFT",
+      meetingDate: date,
+      today: todayIsoDate(),
+      unknownAttendanceCount,
+      hasRecordDraft: Boolean(recordWorkflow?.editor.draft),
+      recordDraftStale: Boolean(recordWorkflow?.editor.draftLiveBaseStale),
+      recordValidationIssueCount: recordWorkflow?.editor.validationSummary.issues.length ?? 0,
+      hasAppliedRecord: appliedRecord,
+      publicationReady: appliedRecord
+        && !recordWorkflow?.editor.draftLiveBaseStale
+        && (recordWorkflow?.editor.validationSummary.issues.length ?? 0) === 0,
+    });
+  }, [
+    appliedRecord,
+    date,
+    isNewSession,
+    recordWorkflow,
+    sessionState,
+    unknownAttendanceCount,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Stable dispatch helpers
@@ -906,97 +948,285 @@ export default function HostSessionEditor({
     onSessionRecordsChanged,
   ]);
 
+  const displayedWorkspaceView = isNewSession
+    ? {
+        ...workspaceView,
+        primaryAction: {
+          kind: "SAVE_BASIC",
+          label: basicSaveLabel,
+          panel: "basic" as const,
+        },
+      }
+    : workspaceView;
+
+  const handlePrimaryAction = useCallback(() => {
+    const kind = displayedWorkspaceView.primaryAction.kind;
+    if (kind === "SAVE_BASIC") {
+      const form = document.getElementById("host-session-editor");
+      if (form instanceof HTMLFormElement) {
+        form.requestSubmit();
+      }
+      return;
+    }
+    if (kind === "OPEN_SESSION") {
+      requestLifecycleConfirm("open");
+      return;
+    }
+    if (kind === "REVIEW_MEMBER_INPUT") {
+      return;
+    }
+    if (kind === "CHECK_ATTENDANCE") {
+      changeLocation({ panel: "attendance", source: "manual" });
+      return;
+    }
+    if (kind === "FINISH_SESSION") {
+      requestLifecycleConfirm("close");
+      return;
+    }
+    if (kind === "UPLOAD_RECORD") {
+      changeLocation({ panel: "records", source: "json" });
+      return;
+    }
+    if (kind === "FIX_RECORD") {
+      changeLocation({ panel: "records", source: "manual" });
+      return;
+    }
+    if (kind === "REVIEW_RECORD") {
+      changeLocation({ panel: "records", source: "manual" });
+      void recordWorkflow?.confirmation.onReview();
+      return;
+    }
+    if (kind === "PUBLISH_RECORD") {
+      requestLifecycleConfirm("publish");
+    }
+  }, [changeLocation, displayedWorkspaceView.primaryAction.kind, recordWorkflow, requestLifecycleConfirm]);
+
+  const retryLifecycle = useCallback(() => {
+    if (lifecycleConfirm) {
+      void confirmLifecycle();
+      return;
+    }
+    const kind = displayedWorkspaceView.primaryAction.kind;
+    if (kind === "OPEN_SESSION") {
+      requestLifecycleConfirm("open");
+    } else if (kind === "FINISH_SESSION") {
+      requestLifecycleConfirm("close");
+    } else if (kind === "PUBLISH_RECORD") {
+      requestLifecycleConfirm("publish");
+    }
+  }, [confirmLifecycle, displayedWorkspaceView.primaryAction.kind, lifecycleConfirm, requestLifecycleConfirm]);
+
   return (
     <main className="rm-host-session-editor">
-      <section className="page-header-compact">
-        <div className="container">
-          <div>
-            {showReturnLink ? (
-              <LinkComponent to={returnTarget.href} state={returnTarget.state} className="btn btn-quiet btn-sm" style={{ marginBottom: 14 }}>
-                {returnTarget.label}
-              </LinkComponent>
-            ) : null}
-            {editorTitle ? (
-              <>
-                <div className="eyebrow">세션 운영 문서</div>
-                <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-                  {editorTitle}
-                </h1>
-              </>
-            ) : null}
-            <div
-              className="desktop-only rm-host-session-editor__desktop-metadata"
-              role="group"
-              aria-label="데스크톱 세션 상태"
+      <HostSessionWorkspace
+        view={displayedWorkspaceView}
+        header={{
+          returnHref: showReturnLink ? returnTarget.href : null,
+          returnLabel: showReturnLink ? returnTarget.label : null,
+          sessionNumber: displaySession?.sessionNumber ?? null,
+          title: editorTitle ?? displaySession?.title ?? displaySession?.bookTitle ?? "모임",
+          date: date || displaySession?.date || null,
+          time: time || displaySession?.startTime || null,
+          location: locationLabel || displaySession?.locationLabel || null,
+        }}
+        location={navigation.location}
+        onLocationChange={changeLocation}
+        onPrimaryAction={handlePrimaryAction}
+        primaryActionDisabled={
+          displayedWorkspaceView.primaryAction.kind === "SAVE_BASIC"
+            ? saveState === "saving"
+            : lifecycleSaveState === "saving"
+        }
+        publicRecordHref={
+          displaySession?.state === "PUBLISHED" && session
+            ? `/app/sessions/${encodeURIComponent(session.sessionId)}`
+            : null
+        }
+        reverseAction={
+          reverseAction
+            ? { label: reverseAction.label, onClick: () => requestLifecycleConfirm(reverseAction.kind) }
+            : null
+        }
+        onCreateRevision={
+          displaySession?.state === "PUBLISHED"
+            ? () => changeLocation({ panel: "records", source: "manual" })
+            : null
+        }
+        error={lifecycleError ? { message: lifecycleError.message, onRetry: retryLifecycle } : null}
+        pendingUndo={null}
+        draftSaveLabel={overview.draft.exists ? overview.draft.statusLabel : null}
+        descriptionOverride={
+          sessionState === "OPEN" && date && todayIsoDate() > date
+            ? "모임 날짜가 지났습니다. 모임을 마친 뒤 기록을 정리하세요."
+            : null
+        }
+        LinkComponent={LinkComponent}
+        focusContent={
+          displaySession ? (
+            <HostSessionNotificationActions
+              sessionId={displaySession.sessionId}
+              state={displaySession.state}
+              visibility={displaySession.visibility}
+              feedbackDocumentUploaded={displaySession.feedbackDocument.uploaded}
+              dispatches={notificationDispatches}
+              LinkComponent={LinkComponent}
+            />
+          ) : null
+        }
+        basicPanel={
+          visitedPanels.has("basic") || activePanel === "basic" ? (
+            <form
+              id="host-session-editor"
+              onSubmit={handleSubmit}
+              className="stack"
+              style={{ "--stack": "24px" } as CSSProperties}
             >
-              {displaySession ? (
-                <SessionIdentity
-                  sessionNumber={displaySession.sessionNumber}
-                  state={displaySession.state}
-                  date={displaySession.date}
-                  published={displaySession.state === "PUBLISHED"}
-                />
-              ) : (
-                <div className="rm-session-identity">
-                  <span className="rm-session-identity__chip">새 예정 세션</span>
+              <BasicSessionPanel
+                title={title}
+                bookTitle={bookTitle}
+                bookAuthor={bookAuthor}
+                bookLink={bookLink}
+                bookImageUrl={bookImageUrl}
+                date={date}
+                time={time}
+                deadline={deadline}
+                timeHint={timeHint}
+                locationLabel={locationLabel}
+                meetingUrl={meetingUrl}
+                meetingPasscode={meetingPasscode}
+                onTitleChange={onTitleChange}
+                onBookTitleChange={onBookTitleChange}
+                onBookAuthorChange={onBookAuthorChange}
+                onBookLinkChange={onBookLinkChange}
+                onBookImageUrlChange={onBookImageUrlChange}
+                onDateChange={onDateChange}
+                onTimeChange={onTimeChange}
+                onLocationLabelChange={onLocationLabelChange}
+                onMeetingUrlChange={onMeetingUrlChange}
+                onMeetingPasscodeChange={onMeetingPasscodeChange}
+                previousOnlineMeeting={isNewSession
+                  ? resolvedScheduleDefaults?.previousOnlineMeeting ?? null
+                  : null}
+                scheduleDefaultsStatus={isNewSession
+                  ? scheduleDefaultsLoadState?.status ?? "ready"
+                  : "ready"}
+                scheduleDefaultsWarning={isNewSession
+                  ? scheduleDefaultsLoadState?.warning ?? null
+                  : null}
+                onRetryScheduleDefaults={isNewSession
+                  ? scheduleDefaultsLoadState?.retry
+                  : undefined}
+                onAdoptPreviousOnlineMeeting={isNewSession
+                  ? onAdoptPreviousOnlineMeeting
+                  : undefined}
+              />
+              <div className="stack" style={{ "--stack": "16px" } as CSSProperties}>
+                <div className="row" style={{ justifyContent: "flex-end" }}>
+                  <button
+                    className="btn btn-primary"
+                    type="submit"
+                    disabled={saveState === "saving"}
+                    aria-describedby="host-session-basic-save-state"
+                  >
+                    {basicSaveLabel}
+                  </button>
                 </div>
-              )}
-              <div className="row rm-host-session-editor__record-status">
-                <span className="badge">{overview.applied.visibilityLabel}</span>
-                <span className="badge">{overview.draft.statusLabel}</span>
+                <div
+                  className="small"
+                  id="host-session-basic-save-state"
+                  role={saveState === "idle" ? undefined : saveState === "error" ? "alert" : "status"}
+                  style={{ color: saveState === "error" ? "var(--danger)" : "var(--text-3)", textAlign: "right" }}
+                >
+                  {saveState === "saving"
+                    ? "기본 정보를 저장하고 있습니다."
+                    : saveState === "saved"
+                      ? isNewSession
+                        ? "저장되었습니다. 세션 문서 편집 화면으로 이동합니다."
+                        : "저장되었습니다."
+                      : saveState === "error"
+                        ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
+                        : "책, 일정, 장소와 접속 정보만 저장합니다."}
+                </div>
+                {session ? (
+                  <section className="surface" aria-labelledby="host-session-danger-title" style={{ padding: "22px" }}>
+                    <div className="eyebrow" id="host-session-danger-title" style={{ marginBottom: "10px" }}>
+                      위험 작업
+                    </div>
+                    <button
+                      ref={deleteTriggerRef}
+                      className="btn btn-ghost btn-sm"
+                      type="button"
+                      disabled={!destructiveActionAvailability.canDelete}
+                      onClick={openDeleteModal}
+                      style={{ color: "var(--danger)" }}
+                    >
+                      세션 삭제
+                    </button>
+                    <div className="tiny" style={{ marginTop: "8px" }}>
+                      {destructiveActionAvailability.guidance}
+                    </div>
+                  </section>
+                ) : null}
               </div>
-            </div>
-
-            <div
-              className="mobile-only rm-host-session-editor__mobile-metadata"
-              role="group"
-              aria-label="모바일 세션 상태"
-            >
-              {displaySession?.sessionNumber ? (
-                <span className="rm-session-identity__chip">
-                  {`No.${String(displaySession.sessionNumber).padStart(2, "0")}`}
-                </span>
-              ) : null}
-              <span className="rm-session-identity__chip">
-                {compactSessionLifecycleLabel(displaySession?.state ?? null)}
-              </span>
-              <span className="rm-session-identity__chip">{overview.applied.visibilityLabel}</span>
-              <span className="rm-session-identity__chip">{overview.draft.statusLabel}</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="rm-host-session-editor__content">
-        <div className="container">
-          <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
-            {visitedSections.has("overview") ? (
-              <div hidden={activeSection !== "overview"}>
-                <SessionOverviewSection
-                  overview={overview}
-                  sessionState={sessionState}
-                  onNextAction={changeLocation}
-                  onOpenSession={session ? () => requestLifecycleConfirm("open") : undefined}
-                  onCloseSession={session ? () => requestLifecycleConfirm("close") : undefined}
-                  onPublishSession={session ? () => requestLifecycleConfirm("publish") : undefined}
-                  onReverseSession={reverseAction ? () => requestLifecycleConfirm(reverseAction.kind) : undefined}
-                  reverseLabel={reverseAction?.label}
-                  onDeleteDraft={
-                    displaySession?.state === "DRAFT" && destructiveActionAvailability.canDelete
-                      ? openDeleteModal
-                      : undefined
-                  }
-                  lifecyclePending={lifecycleSaveState === "saving"}
-                  accessScope={session?.accessScope
-                    ?? (session?.visibility === "HOST_ONLY" ? "HOST_ONLY" : "GUEST_READABLE")}
-                  sessionId={session?.sessionId}
-                  recordVisibility={sessionImportVisibility}
-                  importPreview={sessionImportContextStale ? null : sessionImportPreview}
-                  importStatus={sessionImportContextStale ? "previewing" : sessionImportStatus}
-                  importError={sessionImportContextStale ? null : sessionImportError}
-                  onFileSelected={previewSessionImport}
-                  onImportCommit={commitSessionImport}
-                  onSetGuestReadable={session && recordWorkflow
+            </form>
+          ) : null
+        }
+        attendancePanel={
+          visitedPanels.has("attendance") || activePanel === "attendance" ? (
+            <AttendancePanel
+              session={session}
+              attendanceStatuses={attendanceStatuses}
+              emptyMessage={emptyManagementMessage}
+              onUpdateAttendance={updateAttendance}
+            />
+          ) : null
+        }
+        recordsPanel={
+          visitedPanels.has("records") || activePanel === "records" ? (
+            session ? (
+              <SessionRecordWorkspace
+                state={session.state}
+                accessScope={session.accessScope}
+                siteVisibility={session.siteVisibility}
+                source={activeSource}
+                onSourceChange={changeSource}
+                liveRevision={recordWorkflow!.editor.liveRevision}
+                liveSnapshot={recordWorkflow!.editor.liveSnapshot}
+                draft={{
+                  snapshot: recordWorkflow!.snapshot,
+                  source: recordWorkflow!.editor.draft?.source ?? null,
+                  updatedAt: recordWorkflow!.editor.draft?.updatedAt ?? null,
+                  saveState: recordWorkflow!.saveState,
+                  validationIssues: recordWorkflow!.editor.validationSummary.issues,
+                  liveBaseStale: recordWorkflow!.editor.draftLiveBaseStale,
+                  rebasePending: recordWorkflow!.rebasePending,
+                  rebaseError: recordWorkflow!.rebaseError,
+                }}
+                reviewPending={recordWorkflow!.confirmation.submitting}
+                feedbackDocument={{
+                  ...feedbackDocumentForWorkspace,
+                  previewState: feedbackPreviewState,
+                  LinkComponent,
+                }}
+                creation={{
+                  sessionId: session.sessionId,
+                  clubSlug,
+                  expectedDraftRevision: recordWorkflow!.expectedDraftRevision,
+                  importPreview: sessionImportContextStale ? null : sessionImportPreview,
+                  importCommitResult: sessionImportCommitResult,
+                  importStatus: sessionImportContextStale ? "previewing" : sessionImportStatus,
+                  importError: sessionImportContextStale ? null : sessionImportError,
+                }}
+                actions={{
+                  onSnapshotChange: recordWorkflow!.onSnapshotChange,
+                  onReloadDraft: recordWorkflow!.onReloadDraft,
+                  onRebaseDraft: recordWorkflow!.onRebaseDraft,
+                  onCopyInput: recordWorkflow!.onCopyInput,
+                  onReviewDraft: recordWorkflow!.confirmation.onReview,
+                  onAigenCommitted: handleAigenCommitted,
+                  onImportFileSelected: previewSessionImport,
+                  onImportCommit: commitSessionImport,
+                  onSetGuestReadable: session && recordWorkflow
                     ? async () => {
                       await actions.saveSessionAccessScope(session.sessionId, {
                         accessScope: "GUEST_READABLE",
@@ -1009,215 +1239,43 @@ export default function HostSessionEditor({
                         ),
                       });
                     }
-                    : undefined}
-                  onConfirmApply={recordWorkflow ? () => void recordWorkflow.confirmation.onConfirm() : undefined}
-                  onDismissApply={recordWorkflow?.confirmation.onCancel}
-                />
-                {displaySession ? (
-                  <div style={{ marginTop: 20 }}>
-                    <HostSessionNotificationActions
-                      sessionId={displaySession.sessionId}
-                      state={displaySession.state}
-                      visibility={displaySession.visibility}
-                      feedbackDocumentUploaded={displaySession.feedbackDocument.uploaded}
-                      dispatches={notificationDispatches}
-                      LinkComponent={LinkComponent}
-                    />
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-
-            {visitedSections.has("basic") || activeSection === "basic" ? (
-              <form
-                id="host-session-editor"
-                onSubmit={handleSubmit}
-                hidden={activeSection !== "basic"}
-                className="stack"
-                style={{ "--stack": "24px" } as CSSProperties}
-              >
-                  <BasicSessionPanel
-                    activeSection={activeSection}
-                    title={title}
-                    bookTitle={bookTitle}
-                    bookAuthor={bookAuthor}
-                    bookLink={bookLink}
-                    bookImageUrl={bookImageUrl}
-                    date={date}
-                    time={time}
-                    deadline={deadline}
-                    timeHint={timeHint}
-                    locationLabel={locationLabel}
-                    meetingUrl={meetingUrl}
-                    meetingPasscode={meetingPasscode}
-                    onTitleChange={onTitleChange}
-                    onBookTitleChange={onBookTitleChange}
-                    onBookAuthorChange={onBookAuthorChange}
-                    onBookLinkChange={onBookLinkChange}
-                    onBookImageUrlChange={onBookImageUrlChange}
-                    onDateChange={onDateChange}
-                    onTimeChange={onTimeChange}
-                    onLocationLabelChange={onLocationLabelChange}
-                    onMeetingUrlChange={onMeetingUrlChange}
-                    onMeetingPasscodeChange={onMeetingPasscodeChange}
-                    previousOnlineMeeting={isNewSession
-                      ? resolvedScheduleDefaults?.previousOnlineMeeting ?? null
-                      : null}
-                    scheduleDefaultsStatus={isNewSession
-                      ? scheduleDefaultsLoadState?.status ?? "ready"
-                      : "ready"}
-                    scheduleDefaultsWarning={isNewSession
-                      ? scheduleDefaultsLoadState?.warning ?? null
-                      : null}
-                    onRetryScheduleDefaults={isNewSession
-                      ? scheduleDefaultsLoadState?.retry
-                      : undefined}
-                    onAdoptPreviousOnlineMeeting={isNewSession
-                      ? onAdoptPreviousOnlineMeeting
-                      : undefined}
-                  />
-                  <div hidden={activeSection !== "basic"} className="stack" style={{ "--stack": "16px" } as CSSProperties}>
-                    <div className="row" style={{ justifyContent: "flex-end" }}>
-                      <button
-                        className="btn btn-primary"
-                        type="submit"
-                        disabled={saveState === "saving"}
-                        aria-describedby="host-session-basic-save-state"
-                      >
-                        {basicSaveLabel}
-                      </button>
-                    </div>
-                    <div
-                      className="small"
-                      id="host-session-basic-save-state"
-                      role={saveState === "idle" ? undefined : saveState === "error" ? "alert" : "status"}
-                      style={{ color: saveState === "error" ? "var(--danger)" : "var(--text-3)", textAlign: "right" }}
-                    >
-                      {saveState === "saving"
-                        ? "기본 정보를 저장하고 있습니다."
-                        : saveState === "saved"
-                          ? isNewSession
-                            ? "저장되었습니다. 세션 문서 편집 화면으로 이동합니다."
-                            : "저장되었습니다."
-                          : saveState === "error"
-                            ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
-                            : "책, 일정, 장소와 접속 정보만 저장합니다."}
-                    </div>
-                    {session && displaySession?.state !== "DRAFT" ? (
-                      <section className="surface" aria-labelledby="host-session-danger-title" style={{ padding: "22px" }}>
-                        <div className="eyebrow" id="host-session-danger-title" style={{ marginBottom: "10px" }}>
-                          위험 작업
-                        </div>
-                        <button
-                          ref={deleteTriggerRef}
-                          className="btn btn-ghost btn-sm"
-                          type="button"
-                          disabled={!destructiveActionAvailability.canDelete}
-                          onClick={openDeleteModal}
-                          style={{ color: "var(--danger)" }}
-                        >
-                          세션 삭제
-                        </button>
-                        <div className="tiny" style={{ marginTop: "8px" }}>
-                          {destructiveActionAvailability.guidance}
-                        </div>
-                      </section>
-                    ) : null}
-                  </div>
-              </form>
-            ) : null}
-
-            {visitedSections.has("attendance") || activeSection === "attendance" ? (
-              <AttendancePanel
-                activeSection={activeSection}
-                session={session}
-                attendanceStatuses={attendanceStatuses}
-                emptyMessage={emptyManagementMessage}
-                onUpdateAttendance={updateAttendance}
+                    : undefined,
+                }}
               />
-            ) : null}
-
-            {visitedSections.has("records") || activeSection === "records" ? (
-              <div hidden={activeSection !== "records"} className="stack" style={{ "--stack": "18px" } as CSSProperties}>
-                {session ? (
-                  <SessionRecordWorkspace
-                      state={session.state}
-                      accessScope={session.accessScope}
-                      siteVisibility={session.siteVisibility}
-                      source={activeSource}
-                      onSourceChange={changeSource}
-                      liveRevision={recordWorkflow!.editor.liveRevision}
-                      liveSnapshot={recordWorkflow!.editor.liveSnapshot}
-                      draft={{
-                        snapshot: recordWorkflow!.snapshot,
-                        source: recordWorkflow!.editor.draft?.source ?? null,
-                        updatedAt: recordWorkflow!.editor.draft?.updatedAt ?? null,
-                        saveState: recordWorkflow!.saveState,
-                        validationIssues: recordWorkflow!.editor.validationSummary.issues,
-                        liveBaseStale: recordWorkflow!.editor.draftLiveBaseStale,
-                        rebasePending: recordWorkflow!.rebasePending,
-                        rebaseError: recordWorkflow!.rebaseError,
-                      }}
-                      reviewPending={recordWorkflow!.confirmation.submitting}
-                      feedbackDocument={{
-                        ...feedbackDocumentForWorkspace,
-                        previewState: feedbackPreviewState,
-                        LinkComponent,
-                      }}
-                      creation={{
-                        sessionId: session.sessionId,
-                        clubSlug,
-                        expectedDraftRevision: recordWorkflow!.expectedDraftRevision,
-                        importPreview: sessionImportContextStale ? null : sessionImportPreview,
-                        importCommitResult: sessionImportCommitResult,
-                        importStatus: sessionImportContextStale ? "previewing" : sessionImportStatus,
-                        importError: sessionImportContextStale ? null : sessionImportError,
-                      }}
-                      actions={{
-                        onSnapshotChange: recordWorkflow!.onSnapshotChange,
-                        onReloadDraft: recordWorkflow!.onReloadDraft,
-                        onRebaseDraft: recordWorkflow!.onRebaseDraft,
-                        onCopyInput: recordWorkflow!.onCopyInput,
-                        onReviewDraft: recordWorkflow!.confirmation.onReview,
-                        onAigenCommitted: handleAigenCommitted,
-                        onImportFileSelected: previewSessionImport,
-                        onImportCommit: commitSessionImport,
-                      }}
-                    />
-                ) : (
-                  <div className="surface-quiet small" style={{ padding: 18 }}>
-                    기본 정보를 저장한 뒤 기록을 작성할 수 있습니다.
-                  </div>
-                )}
+            ) : (
+              <div className="surface-quiet small" style={{ padding: 18 }}>
+                기본 정보를 저장한 뒤 기록을 작성할 수 있습니다.
               </div>
-            ) : null}
+            )
+          ) : null
+        }
+        historyPanel={
+          visitedPanels.has("history") || activePanel === "history" ? (
+            <SessionHistoryPanel
+              items={recordWorkflow?.history ?? []}
+              nextCursor={recordWorkflow?.historyNextCursor ?? null}
+              loadingMore={recordWorkflow?.historyLoadingMore ?? false}
+              onLoadMore={recordWorkflow?.onLoadMoreHistory}
+              expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
+              restoring={recordWorkflow?.restoring ?? false}
+              onRestore={recordWorkflow?.onRestore ?? (async () => undefined)}
+              onRestoreCompleted={recordWorkflow?.onRestoreCompleted ?? (() => undefined)}
+            />
+          ) : (
+            <div className="surface-quiet small" style={{ padding: 14 }}>아직 변경 기록이 없습니다</div>
+          )
+        }
+      />
 
-            {visitedSections.has("history") || activeSection === "history" ? (
-              <SessionHistoryPanel
-                activeSection={activeSection}
-                items={recordWorkflow?.history ?? []}
-                nextCursor={recordWorkflow?.historyNextCursor ?? null}
-                loadingMore={recordWorkflow?.historyLoadingMore ?? false}
-                onLoadMore={recordWorkflow?.onLoadMoreHistory}
-                expectedDraftRevision={recordWorkflow?.expectedDraftRevision ?? null}
-                restoring={recordWorkflow?.restoring ?? false}
-                onRestore={recordWorkflow?.onRestore ?? (async () => undefined)}
-                onRestoreCompleted={recordWorkflow?.onRestoreCompleted ?? (() => undefined)}
-              />
-            ) : null}
-
-            {recordWorkflow?.confirmation.message ? (
-              <div
-                className="surface-quiet small"
-                role={recordWorkflow.confirmation.message.kind}
-                style={{ padding: 14 }}
-              >
-                {recordWorkflow.confirmation.message.text}
-              </div>
-            ) : null}
-          </div>
+      {recordWorkflow?.confirmation.message ? (
+        <div
+          className="surface-quiet small"
+          role={recordWorkflow.confirmation.message.kind}
+          style={{ padding: 14 }}
+        >
+          {recordWorkflow.confirmation.message.text}
         </div>
-      </section>
+      ) : null}
 
       {deleteModalOpen ? (
         <HostSessionDeletionPreviewDialog
@@ -1261,6 +1319,14 @@ export default function HostSessionEditor({
       ) : null}
     </main>
   );
+}
+
+function todayIsoDate() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function readTextFile(file: File): Promise<string> {

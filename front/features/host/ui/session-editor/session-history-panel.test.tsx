@@ -11,7 +11,6 @@ describe("SessionHistoryPanel", () => {
   it("renders version history without opaque identifiers", () => {
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[
           historyItem(),
           {
@@ -47,7 +46,6 @@ describe("SessionHistoryPanel", () => {
     const onRestoreCompleted = vi.fn();
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[{
           id: "history-1",
           type: "RECORD_REVISION_APPLIED",
@@ -87,7 +85,6 @@ describe("SessionHistoryPanel", () => {
     const onRestore = vi.fn();
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[historyItem()]}
         expectedDraftRevision={4}
         restoring={false}
@@ -117,8 +114,7 @@ describe("SessionHistoryPanel", () => {
       const onRestore = vi.fn();
       render(
         <SessionHistoryPanel
-          activeSection="history"
-          items={[historyItem()]}
+            items={[historyItem()]}
           expectedDraftRevision={4}
           restoring={false}
           onRestore={onRestore}
@@ -143,7 +139,6 @@ describe("SessionHistoryPanel", () => {
   it("renders the approved empty history copy", () => {
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[]}
         expectedDraftRevision={null}
         restoring={false}
@@ -160,7 +155,6 @@ describe("SessionHistoryPanel", () => {
     const onRestoreCompleted = vi.fn();
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[historyItem()]}
         expectedDraftRevision={4}
         restoring={false}
@@ -182,7 +176,6 @@ describe("SessionHistoryPanel", () => {
     const onLoadMore = vi.fn().mockRejectedValue(new Error("offline"));
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[historyItem()]}
         expectedDraftRevision={4}
         restoring={false}
@@ -214,7 +207,6 @@ describe("SessionHistoryPanel", () => {
   it("renders reverse lifecycle history with the approved legacy reason and a text note", () => {
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[
           {
             ...historyItem(),
@@ -248,7 +240,6 @@ describe("SessionHistoryPanel", () => {
   it("renders a retained deleted lifecycle row in an audit-capable history list", () => {
     render(
       <SessionHistoryPanel
-        activeSection="history"
         items={[
           {
             ...historyItem(),

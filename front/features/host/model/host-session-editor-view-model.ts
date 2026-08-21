@@ -4,7 +4,7 @@ import {
   type HostSessionState,
   type SessionRecordVisibility,
 } from "./host-session-editor-model";
-import type { HostSessionEditorLocation } from "./host-session-editor-navigation";
+import type { HostSessionWorkspaceLocation } from "./host-session-workspace-navigation";
 import type { DraftSaveState } from "./host-session-record-editor-model";
 
 export type AppliedSessionRecordSource = "REVISION" | "LEGACY_SNAPSHOT";
@@ -80,7 +80,7 @@ export type HostSessionEditorOverview = {
   nextAction: {
     kind: HostSessionEditorNextActionKind;
     label: string;
-    target: HostSessionEditorLocation;
+    target: HostSessionWorkspaceLocation;
     enabled: boolean;
   };
 };
@@ -112,9 +112,9 @@ export function hasAppliedSessionRecord({
   );
 }
 
-const recordTarget: HostSessionEditorLocation = { section: "records", source: "manual" };
-const overviewTarget: HostSessionEditorLocation = { section: "overview", source: "manual" };
-const basicTarget: HostSessionEditorLocation = { section: "basic", source: "manual" };
+const recordTarget: HostSessionWorkspaceLocation = { panel: "records", source: "manual" };
+const overviewTarget: HostSessionWorkspaceLocation = { panel: "focus", source: "manual" };
+const basicTarget: HostSessionWorkspaceLocation = { panel: "basic", source: "manual" };
 
 const draftSourceLabels: Record<HostSessionRecordDraft["source"], string> = {
   MANUAL: "직접 작성",

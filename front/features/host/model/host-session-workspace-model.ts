@@ -138,7 +138,7 @@ function progressMarker(
   if (state === "PUBLISHED") return { doneThrough: 4 };
   if (actionKind === "REVIEW_MEMBER_INPUT") return { currentIndex: 1 };
   if (actionKind === "CHECK_ATTENDANCE") return { currentIndex: 2 };
-  if (actionKind === "FINISH_SESSION") return { doneThrough: 2 };
+  if (actionKind === "FINISH_SESSION") return { currentIndex: 2 };
   if (
     actionKind === "UPLOAD_RECORD"
     || actionKind === "FIX_RECORD"

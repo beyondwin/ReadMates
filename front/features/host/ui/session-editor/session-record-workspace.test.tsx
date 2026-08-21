@@ -4,7 +4,7 @@ import { useState } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
-import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
+import type { HostSessionDraftSource } from "@/features/host/model/host-session-workspace-navigation";
 import type { HostSessionEditorLinkComponent } from "./session-editor-links";
 import {
   SessionRecordWorkspace,
@@ -185,6 +185,7 @@ describe("SessionRecordWorkspace", () => {
       within(screen.getByRole("region", { name: "반영 전 확인" }))
         .getByRole("button", { name: "반영 전 확인" }),
     ).toBeEnabled();
+    expect(screen.getByText("다른 방법")).toBeVisible();
     expect(within(sourceTabs).getByRole("tab", { name: "직접 작성" })).toBeVisible();
     expect(within(sourceTabs).getByRole("tab", { name: "AI로 생성" })).toBeVisible();
     expect(within(sourceTabs).getByRole("tab", { name: "정리본 올리기" })).toBeVisible();
@@ -253,7 +254,7 @@ describe("SessionRecordWorkspace", () => {
       render(<SessionRecordWorkspace {...props({ source })} />);
 
       const appliedStatus = screen.getByRole("region", { name: "멤버에게 보이는 기록" });
-      const creationHeading = screen.getByRole("heading", { name: "시작 방법을 선택하세요" });
+      const creationHeading = screen.getByRole("heading", { name: /정리본을 올리거나 다른 방법으로 작성하세요|시작 방법을 선택하세요/ });
       const creationPanel = screen.getByRole("tabpanel", { name: sourceLabel });
       const follows = (earlier: Element, later: Element) =>
         Boolean(earlier.compareDocumentPosition(later) & Node.DOCUMENT_POSITION_FOLLOWING);

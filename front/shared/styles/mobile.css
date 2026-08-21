@@ -1622,31 +1622,6 @@
   gap: 8px;
   flex-wrap: wrap;
 }
-.rm-host-session-editor__section-nav {
-  display: flex;
-  width: 100%;
-  gap: 6px;
-  margin-bottom: 24px;
-  padding-bottom: 6px;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  scrollbar-width: thin;
-}
-.m-chip.rm-host-session-editor__section-tab {
-  min-height: 44px;
-  height: 44px;
-  flex: 0 0 auto;
-  padding: 0 15px;
-  border-color: var(--line);
-  background: transparent;
-  color: var(--text-2);
-}
-.m-chip.rm-host-session-editor__section-tab.is-on {
-  border-color: var(--text);
-  background: var(--text);
-  color: var(--bg);
-}
-.rm-host-session-editor__section-tab:focus-visible,
 .rm-session-record-workspace__sticky-action .btn:focus-visible,
 .rm-host-action-dialog-sheet .btn:focus {
   outline: 2px solid var(--focus-ring);
@@ -1757,37 +1732,6 @@
     line-height: 1.18;
     letter-spacing: 0;
   }
-  .rm-host-session-editor__segments,
-  .rm-host-session-editor__section-nav {
-    position: sticky;
-    top: var(--m-hdr-h);
-    z-index: 20;
-    margin-inline: calc(var(--m-page-x) * -1);
-    width: calc(100% + (var(--m-page-x) * 2));
-    padding: 8px var(--m-page-x) 10px !important;
-    background: color-mix(in oklch, var(--bg) 92%, transparent);
-    backdrop-filter: saturate(1.4) blur(12px);
-  }
-  .rm-host-session-editor__section-nav {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(max-content, 1fr));
-    gap: 4px;
-    margin-bottom: 16px;
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-  .rm-host-session-editor__section-nav::-webkit-scrollbar {
-    display: none;
-  }
-  .m-chip.rm-host-session-editor__section-tab {
-    width: 100%;
-    min-width: 44px;
-    padding-inline: 2px;
-    justify-content: center;
-    border-radius: var(--r-2);
-    text-align: center;
-    white-space: nowrap;
-  }
   .rm-host-session-editor__content {
     padding: 10px 0 calc(var(--m-nav-h) + 112px + var(--m-safe-bottom));
   }
@@ -1858,10 +1802,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rm-host-session-editor__section-nav {
-    scroll-behavior: auto;
-  }
-  .rm-host-session-editor__section-tab,
   .rm-session-record-workspace__sticky-action {
     transition: none !important;
   }

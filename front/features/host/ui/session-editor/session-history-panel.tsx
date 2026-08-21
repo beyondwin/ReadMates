@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState, type CSSProperties, type KeyboardEvent } from "react";
-import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import { buildHostSessionHistoryItemView } from "@/features/host/model/host-session-editor-view-model";
 import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
-import { Panel } from "./session-editor-panel";
 import type { SessionHistoryPanelItem } from "./session-history-model";
 
 export type { SessionHistoryPanelItem } from "./session-history-model";
 
 export function SessionHistoryPanel({
-  activeSection,
   items,
   expectedDraftRevision,
   restoring,
@@ -18,7 +15,6 @@ export function SessionHistoryPanel({
   onRestore,
   onRestoreCompleted,
 }: {
-  activeSection: HostSessionEditorSection;
   items: SessionHistoryPanelItem[];
   expectedDraftRevision: number | null;
   restoring: boolean;
@@ -70,13 +66,9 @@ export function SessionHistoryPanel({
 
   return (
     <>
-      <Panel
-        eyebrow="변경 기록"
-        title="버전과 작업 기록"
-        section="history"
-        panelId="host-editor-panel-history"
-        activeSection={activeSection}
-      >
+      <div id="host-editor-panel-history">
+        <div className="eyebrow">변경 기록</div>
+        <h2 className="h3 editorial" style={{ margin: "6px 0 14px" }}>버전과 작업 기록</h2>
         <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
           {items.length === 0 ? (
             <div className="surface-quiet small" style={{ padding: 14 }}>아직 변경 기록이 없습니다</div>
@@ -147,7 +139,7 @@ export function SessionHistoryPanel({
           ) : null}
           {loadMoreError ? <p role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>{loadMoreError}</p> : null}
         </div>
-      </Panel>
+      </div>
 
       {pending?.revisionId && pending.revisionVersion !== null ? (
         <div

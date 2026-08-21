@@ -55,7 +55,7 @@ describe("host session editor view model", () => {
       { isNewSession: true },
       "SAVE_BASIC",
       "기본 정보를 먼저 저장하세요",
-      { section: "basic", source: "manual" },
+      { panel: "basic", source: "manual" },
       true,
     ],
     [
@@ -63,7 +63,7 @@ describe("host session editor view model", () => {
       { draft: { ...draft }, draftSaveState: "error" as const },
       "RESOLVE_DRAFT_SAVE",
       "초안 저장 문제를 해결하세요",
-      { section: "records", source: "manual" },
+      { panel: "records", source: "manual" },
       true,
     ],
     [
@@ -71,7 +71,7 @@ describe("host session editor view model", () => {
       { draft: { ...draft }, draftLiveBaseStale: true },
       "RESOLVE_STALE_BASE",
       "최신 적용본을 확인하세요",
-      { section: "records", source: "manual" },
+      { panel: "records", source: "manual" },
       true,
     ],
     [
@@ -79,7 +79,7 @@ describe("host session editor view model", () => {
       { draft: { ...draft }, validationIssues: ["PUBLICATION_SUMMARY_REQUIRED"] },
       "FIX_VALIDATION",
       "확인이 필요한 항목을 수정하세요",
-      { section: "records", source: "manual" },
+      { panel: "records", source: "manual" },
       true,
     ],
     [
@@ -87,7 +87,7 @@ describe("host session editor view model", () => {
       { draft: { ...draft }, draftSaveState: "saved" as const },
       "REVIEW_DRAFT",
       "초안 내용을 검토하세요",
-      { section: "records", source: "manual" },
+      { panel: "records", source: "manual" },
       true,
     ],
     [
@@ -95,7 +95,7 @@ describe("host session editor view model", () => {
       { liveRevision: 0, liveSnapshot: null },
       "CREATE_DRAFT",
       "기록 초안을 만들어 보세요",
-      { section: "records", source: "manual" },
+      { panel: "records", source: "manual" },
       true,
     ],
     [
@@ -103,7 +103,7 @@ describe("host session editor view model", () => {
       {},
       "UP_TO_DATE",
       "현재 기록이 최신입니다",
-      { section: "overview", source: "manual" },
+      { panel: "focus", source: "manual" },
       false,
     ],
   ] as const)("%s", (_name, overrides, kind, label, target, enabled) => {

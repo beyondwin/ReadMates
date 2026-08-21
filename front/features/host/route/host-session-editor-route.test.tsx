@@ -216,8 +216,8 @@ import type {
   HostSessionRecordEditor,
 } from "@/features/host/api/host-session-record-contracts";
 import type {
-  HostSessionEditorLocation,
-} from "@/features/host/model/host-session-editor-navigation";
+  HostSessionWorkspaceLocation,
+} from "@/features/host/model/host-session-workspace-navigation";
 import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
 
 const snapshot = {
@@ -243,10 +243,10 @@ function renderWorkflow(
   editor: HostSessionRecordEditor = recordEditor,
   reloadRecordEditor: () => Promise<HostSessionRecordEditor | undefined> = vi.fn(),
   navigation: {
-    location: HostSessionEditorLocation;
-    onChange: (next: HostSessionEditorLocation) => void;
+    location: HostSessionWorkspaceLocation;
+    onChange: (next: HostSessionWorkspaceLocation) => void;
   } = {
-    location: { section: "overview", source: "manual" } as const,
+    location: { panel: "focus", source: "manual" } as const,
     onChange: vi.fn(),
   },
 ) {
@@ -301,11 +301,11 @@ function workflow() {
 function capturedNavigation() {
   return routeMocks.capturedProps?.navigation as {
     location: {
-      section: "overview" | "basic" | "attendance" | "records" | "history";
+      panel: "focus" | "basic" | "attendance" | "records" | "history";
       source: "manual" | "ai" | "json";
     };
     onChange: (next: {
-      section: "overview" | "basic" | "attendance" | "records" | "history";
+      panel: "focus" | "basic" | "attendance" | "records" | "history";
       source: "manual" | "ai" | "json";
     }) => void;
   };
@@ -796,7 +796,7 @@ describe("EditHostSessionRecordWorkflow", () => {
     "waits for the authoritative record editor after a %s commit before replacing the URL with records/manual",
     async (_label, source) => {
       const navigation = {
-        location: { section: "records", source } as const,
+        location: { panel: "records", source } as const,
         onChange: vi.fn(),
       };
       const order: string[] = [];
@@ -820,7 +820,7 @@ describe("EditHostSessionRecordWorkflow", () => {
 
       expect(order).toEqual(["adopt", "reload", "navigate"]);
       expect(navigation.onChange).toHaveBeenCalledWith({
-        section: "records",
+        panel: "records",
         source: "manual",
       });
     },
@@ -838,7 +838,7 @@ describe("EditHostSessionRecordWorkflow", () => {
     };
     routeMocks.restore.mockResolvedValue(restoredDraft);
     const navigation = {
-      location: { section: "history", source: "manual" } as const,
+      location: { panel: "history", source: "manual" } as const,
       onChange: vi.fn(),
     };
     renderWorkflow(recordEditor, routeMocks.reload, navigation);
@@ -855,7 +855,7 @@ describe("EditHostSessionRecordWorkflow", () => {
       draft: restoredDraft,
     }));
     expect(navigation.onChange).toHaveBeenCalledWith({
-      section: "records",
+      panel: "records",
       source: "manual",
     });
     expect(routeMocks.apply).not.toHaveBeenCalled();
@@ -972,7 +972,7 @@ describe("EditHostSessionRecordWorkflow", () => {
       },
     });
     const navigation = {
-      location: { section: "records", source: "manual" } as const,
+      location: { panel: "records", source: "manual" } as const,
       onChange: vi.fn(),
     };
     const { client } = renderWorkflow(recordEditor, routeMocks.reload, navigation);
@@ -1013,7 +1013,7 @@ describe("EditHostSessionRecordWorkflow", () => {
       queryKey: hostSessionKeys.detail("session-1", { clubSlug: "club-a" }),
     });
     expect(navigation.onChange).toHaveBeenCalledWith({
-      section: "overview",
+      panel: "focus",
       source: "manual",
     });
     expect(await screen.findByRole("dialog", {
@@ -1042,14 +1042,14 @@ describe("EditHostSessionRecordWorkflow", () => {
       expectedDraftHash: "a".repeat(64),
     });
     const navigation = {
-      location: { section: "records", source: "manual" } as const,
+      location: { panel: "records", source: "manual" } as const,
       onChange: vi.fn(),
     };
     renderWorkflow(recordEditor, routeMocks.reload, navigation);
 
     await act(async () => workflow().confirmation.onReview());
     act(() => workflow().confirmation.onCancel());
-    act(() => capturedNavigation().onChange({ section: "history", source: "manual" }));
+    act(() => capturedNavigation().onChange({ panel: "history", source: "manual" }));
 
     expect(routeMocks.apply).not.toHaveBeenCalled();
     expect(screen.queryByRole("dialog", {
@@ -1161,35 +1161,35 @@ describe("host session editor route navigation", () => {
     [
       "an absent query",
       "/app/host/sessions/new",
-      { section: "overview", source: "manual" },
+      { panel: "focus", source: "manual" },
       "",
       "POP",
     ],
     [
       "canonical AI records",
       "/app/host/sessions/new?section=records&source=ai",
-      { section: "records", source: "ai" },
+      { panel: "records", source: "ai" },
       "?section=records&source=ai",
       "POP",
     ],
     [
       "canonical JSON records",
       "/app/host/sessions/new?section=records&source=json",
-      { section: "records", source: "json" },
+      { panel: "records", source: "json" },
       "?section=records&source=json",
       "POP",
     ],
     [
       "legacy AI records",
       "/app/host/sessions/new?returnTo=%2Fapp%2Fhost&aigen=1#audit",
-      { section: "records", source: "ai" },
+      { panel: "records", source: "ai" },
       "?returnTo=%2Fapp%2Fhost&section=records&source=ai",
       "REPLACE",
     ],
     [
       "legacy JSON records",
       "/app/host/sessions/new?from=dashboard&records=json#audit",
-      { section: "records", source: "json" },
+      { panel: "records", source: "json" },
       "?from=dashboard&section=records&source=json",
       "REPLACE",
     ],
@@ -1213,7 +1213,7 @@ describe("host session editor route navigation", () => {
       "/app/host/sessions/new?returnTo=%2Fapp%2Fhost&from=dashboard&section=records&source=ai#audit",
     );
 
-    act(() => capturedNavigation().onChange({ section: "history", source: "manual" }));
+    act(() => capturedNavigation().onChange({ panel: "history", source: "manual" }));
 
     await waitFor(() => {
       expect(router.state.location.pathname).toBe("/app/host/sessions/new");

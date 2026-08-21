@@ -28,10 +28,10 @@ import type {
   ManualNotificationDispatchListItem,
 } from "@/features/host/api/host-contracts";
 import {
-  buildHostSessionEditorUrl,
-  parseHostSessionEditorLocation,
-  type HostSessionEditorLocation,
-} from "@/features/host/model/host-session-editor-navigation";
+  buildHostSessionWorkspaceUrl,
+  parseHostSessionWorkspaceLocation,
+  type HostSessionWorkspaceLocation,
+} from "@/features/host/model/host-session-workspace-navigation";
 import { hasAppliedSessionRecord } from "@/features/host/model/host-session-editor-view-model";
 import {
   hostNotificationKeys,
@@ -127,8 +127,8 @@ function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
 }
 
 function useHostSessionEditorLocation(): {
-  location: HostSessionEditorLocation;
-  replaceLocation: (next: HostSessionEditorLocation) => void;
+  location: HostSessionWorkspaceLocation;
+  replaceLocation: (next: HostSessionWorkspaceLocation) => void;
 } {
   const routerLocation = useLocation();
   const navigate = useNavigate();
@@ -137,11 +137,11 @@ function useHostSessionEditorLocation(): {
   const currentUrlRef = useRef(currentUrl);
   const canonicalizedSourceUrlRef = useRef<string | null>(null);
   const location = useMemo(
-    () => parseHostSessionEditorLocation(routerLocation.search),
+    () => parseHostSessionWorkspaceLocation(routerLocation.search),
     [routerLocation.search],
   );
-  const replaceLocation = useCallback((next: HostSessionEditorLocation) => {
-    const nextUrl = buildHostSessionEditorUrl(currentUrlRef.current, next);
+  const replaceLocation = useCallback((next: HostSessionWorkspaceLocation) => {
+    const nextUrl = buildHostSessionWorkspaceUrl(currentUrlRef.current, next);
     if (nextUrl === currentUrlRef.current) {
       return;
     }
@@ -153,7 +153,7 @@ function useHostSessionEditorLocation(): {
   }, [navigate, routerLocation.state]);
 
   useEffect(() => {
-    const canonicalUrl = buildHostSessionEditorUrl(currentUrl, location);
+    const canonicalUrl = buildHostSessionWorkspaceUrl(currentUrl, location);
     if (canonicalUrl === currentUrl) {
       currentUrlRef.current = currentUrl;
       canonicalizedSourceUrlRef.current = null;
@@ -495,7 +495,7 @@ export function EditHostSessionRecordWorkflow({
   readmatesReturnState,
   onSessionRecordsChanged,
   navigation = {
-    location: { section: "overview", source: "manual" },
+    location: { panel: "focus", source: "manual" },
     onChange: () => undefined,
   },
 }: {
@@ -514,8 +514,8 @@ export function EditHostSessionRecordWorkflow({
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
   onSessionRecordsChanged: (sessionId: string) => void | Promise<void>;
   navigation?: {
-    location: HostSessionEditorLocation;
-    onChange: (next: HostSessionEditorLocation) => void;
+    location: HostSessionWorkspaceLocation;
+    onChange: (next: HostSessionWorkspaceLocation) => void;
   };
 }) {
   const queryClient = useQueryClient();
@@ -580,7 +580,7 @@ export function EditHostSessionRecordWorkflow({
         queryKey: hostSessionKeys.detail(recordEditor.sessionId, context),
       }),
     ]);
-    navigation.onChange({ section: "overview", source: "manual" });
+    navigation.onChange({ panel: "focus", source: "manual" });
   }, [context, navigation, queryClient, recordEditor.sessionId, reloadAuthoritativeDraft]);
 
   const rebaseDraft = useCallback(async () => {
@@ -800,7 +800,7 @@ export function EditHostSessionRecordWorkflow({
             rebasedDraftRevisionRef.current = null;
             controller.adoptDraftRevision(draftRevision);
             await reloadAuthoritativeDraft();
-            navigation.onChange({ section: "records", source: "manual" });
+            navigation.onChange({ panel: "records", source: "manual" });
           },
           onLoadMoreHistory: async (cursor) => {
             setHistoryLoadingMore(true);
@@ -843,7 +843,7 @@ export function EditHostSessionRecordWorkflow({
             });
           },
           onRestoreCompleted: () => {
-            navigation.onChange({ section: "records", source: "manual" });
+            navigation.onChange({ panel: "records", source: "manual" });
           },
         }}
       />

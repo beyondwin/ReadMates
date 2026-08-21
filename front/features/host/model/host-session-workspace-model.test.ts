@@ -216,6 +216,24 @@ describe("buildHostSessionWorkspace", () => {
     expect(view.primaryAction.kind).not.toMatch(/CLOSE|PUBLISH|OPEN_SESSION/);
   });
 
+  it("marks attendance current while the finish CTA is shown", () => {
+    expect(
+      buildHostSessionWorkspace({
+        ...baseInput,
+        state: "OPEN",
+        meetingDate: "2026-08-21",
+        today: "2026-08-22",
+        unknownAttendanceCount: 0,
+      }).progress,
+    ).toEqual([
+      { id: "basic", label: "기본 정보", state: "done" },
+      { id: "members", label: "멤버 준비", state: "done" },
+      { id: "attendance", label: "출석", state: "current" },
+      { id: "records", label: "기록", state: "next" },
+      { id: "publish", label: "공개", state: "next" },
+    ]);
+  });
+
   it("exposes progress markers for the current focus step", () => {
     expect(
       buildHostSessionWorkspace({

@@ -2,8 +2,6 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
-import { buildHostSessionEditorOverview } from "@/features/host/model/host-session-editor-view-model";
-import { SessionOverviewSection } from "../session-editor/session-overview-section";
 import { MeetingAfterPanel } from "./meeting-after-panel";
 
 const importPreview: SessionImportPreviewResponse = {
@@ -31,30 +29,16 @@ const legacySnapshot = {
 
 describe("MeetingAfterPanel", () => {
   it("publishes from a legacy applied snapshot summary without a revision number", () => {
-    const overview = buildHostSessionEditorOverview({
-      isNewSession: false,
-      liveRevision: 0,
-      liveSnapshot: legacySnapshot,
-      lastAppliedAt: null,
-      draft: null,
-      draftSaveState: "idle",
-      draftLiveBaseStale: false,
-      validationIssues: [],
-    });
-
     render(
-      <SessionOverviewSection
-        overview={overview}
-        sessionState="CLOSED"
-        onNextAction={() => {}}
-        onPublishSession={() => {}}
-        lifecyclePending={false}
+      <MeetingAfterPanel
+        state="CLOSED"
+        summary={legacySnapshot.publicationSummary}
         accessScope="GUEST_READABLE"
+        onPublish={() => {}}
       />,
     );
 
     expect(screen.getByText(legacySnapshot.publicationSummary)).toBeInTheDocument();
-    expect(screen.getByText("이전 적용본")).toBeInTheDocument();
     expect(screen.queryByText("버전 0")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
   });

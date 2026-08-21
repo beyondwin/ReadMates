@@ -13,7 +13,7 @@ import {
   type PublicSiteVisibility,
   type SessionAccessScope,
 } from "@/features/host/model/session-exposure-model";
-import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
+import type { HostSessionDraftSource } from "@/features/host/model/host-session-workspace-navigation";
 import {
   hasAppliedSessionRecord,
   type HostSessionRecordDraft,
@@ -76,6 +76,7 @@ export type SessionRecordWorkspaceProps = {
     onAigenCommitted: (result: AiGenerateCommitResult) => void | Promise<void>;
     onImportFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
     onImportCommit: () => void;
+    onSetGuestReadable?: () => void | Promise<void>;
   };
 };
 
@@ -206,6 +207,7 @@ export function SessionRecordWorkspace({
 }: SessionRecordWorkspaceProps): JSX.Element {
   const canUseAi = Boolean(creation.sessionId) && Boolean(creation.clubSlug);
   const wrapUpFirstView = source === "json";
+  const closedWrapUp = state === "CLOSED";
   const rovingSource = source === "ai" && !canUseAi ? "manual" : source;
   const [visitedSources, setVisitedSources] = useState<Set<HostSessionDraftSource>>(
     () => new Set([source]),
@@ -236,6 +238,37 @@ export function SessionRecordWorkspace({
     await actions.onAigenCommitted(result);
     returnToCommonEditor();
   }, [actions, returnToCommonEditor]);
+
+  const sourceTabs = (
+    <div
+      className="row"
+      role="tablist"
+      aria-label="초안 만들기"
+      onKeyDown={(event) => handleSourceKeyDown(event, source, canUseAi, onSourceChange)}
+      style={{ gap: 8, flexWrap: "wrap" }}
+    >
+      {recordSources.map((item) => (
+        <button
+          key={item.key}
+          id={sourceTabId(item.key)}
+          type="button"
+          role="tab"
+          aria-selected={source === item.key}
+          aria-controls={
+            visitedSources.has(item.key) || source === item.key
+              ? sourcePanelId(item.key)
+              : undefined
+          }
+          tabIndex={rovingSource === item.key ? 0 : -1}
+          className={`btn btn-sm${source === item.key ? " btn-primary" : " btn-quiet"}`}
+          disabled={item.key === "ai" && !canUseAi}
+          onClick={() => onSourceChange(item.key)}
+        >
+          {item.label}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div
@@ -358,37 +391,15 @@ export function SessionRecordWorkspace({
         <div>
           <div className="eyebrow">작성 중</div>
           <h3 id="session-record-creation-title" className="h4 editorial" style={{ margin: "4px 0 0" }}>
-            시작 방법을 선택하세요
+            {closedWrapUp ? "정리본을 올리거나 다른 방법으로 작성하세요" : "시작 방법을 선택하세요"}
           </h3>
         </div>
-        <div
-          className="row"
-          role="tablist"
-          aria-label="초안 만들기"
-          onKeyDown={(event) => handleSourceKeyDown(event, source, canUseAi, onSourceChange)}
-          style={{ gap: 8, flexWrap: "wrap" }}
-        >
-          {recordSources.map((item) => (
-            <button
-              key={item.key}
-              id={sourceTabId(item.key)}
-              type="button"
-              role="tab"
-              aria-selected={source === item.key}
-              aria-controls={
-                visitedSources.has(item.key) || source === item.key
-                  ? sourcePanelId(item.key)
-                  : undefined
-              }
-              tabIndex={rovingSource === item.key ? 0 : -1}
-              className={`btn btn-sm${source === item.key ? " btn-primary" : " btn-quiet"}`}
-              disabled={item.key === "ai" && !canUseAi}
-              onClick={() => onSourceChange(item.key)}
-            >
-              {item.label}
-            </button>
-          ))}
-        </div>
+        {closedWrapUp ? (
+          <details className="rm-session-record-workspace__other-methods" open={source !== "json"}>
+            <summary>다른 방법</summary>
+            {sourceTabs}
+          </details>
+        ) : sourceTabs}
       </section>
 
       <div
@@ -436,6 +447,7 @@ export function SessionRecordWorkspace({
                   onAigenCommitted={handleAigenCommitted}
                   onFileSelected={actions.onImportFileSelected}
                   onCommit={actions.onImportCommit}
+                  onSetGuestReadable={actions.onSetGuestReadable}
                 />
               </div>
             ) : null

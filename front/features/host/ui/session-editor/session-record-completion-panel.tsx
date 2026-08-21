@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ChangeEvent, type JSX } from "react";
 import type { AiCommitResponse } from "@/features/host/aigen/api/aigen-contracts";
-import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
+import type { HostSessionDraftSource } from "@/features/host/model/host-session-workspace-navigation";
 import type {
   SessionImportPreviewResponse,
   SessionRecordVisibility,
@@ -28,6 +28,7 @@ type SessionRecordCompletionPanelProps = {
   onAigenCommitted: (result: AiGenerateCommitResult) => void | Promise<void>;
   onFileSelected: (event: ChangeEvent<HTMLInputElement>) => void;
   onCommit: () => void;
+  onSetGuestReadable?: () => void | Promise<void>;
 };
 
 export function SessionRecordCompletionPanel({
@@ -43,6 +44,7 @@ export function SessionRecordCompletionPanel({
   onAigenCommitted,
   onFileSelected,
   onCommit,
+  onSetGuestReadable,
 }: SessionRecordCompletionPanelProps): JSX.Element {
   if (mode === "ai") {
     if (!canUseAigen || !sessionId || !clubSlug) {
@@ -74,6 +76,7 @@ export function SessionRecordCompletionPanel({
       error={error}
       onFileSelected={onFileSelected}
       onCommit={onCommit}
+      onSetGuestReadable={onSetGuestReadable}
     />
   );
 }

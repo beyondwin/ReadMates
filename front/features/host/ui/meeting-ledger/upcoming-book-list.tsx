@@ -162,7 +162,7 @@ export function UpcomingBookList({
       className={`rm-upcoming-book-list${compact ? " rm-upcoming-book-list--compact" : ""}`}
       aria-labelledby={headingId}
     >
-      <div className="container">
+      <div className={compact ? undefined : "container"}>
         <div className="rm-upcoming-book-list__header">
           <p className="eyebrow" style={{ margin: 0 }}>다음</p>
           <h2 id={headingId} className="h3 editorial" style={{ margin: "8px 0 0" }}>

@@ -1,12 +1,9 @@
 import { memo, useRef, useState, type CSSProperties } from "react";
-import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
 import type { PreviousOnlineMeeting } from "@/features/host/model/host-schedule-defaults-model";
 import { BookCover } from "@/shared/ui/book-cover";
 import { PreviousOnlineMeetingDialog } from "./previous-online-meeting-dialog";
-import { Panel } from "./session-editor-panel";
 
 export const BasicSessionPanel = memo(function BasicSessionPanel({
-  activeSection,
   title,
   bookTitle,
   bookAuthor,
@@ -35,7 +32,6 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
   onRetryScheduleDefaults,
   onAdoptPreviousOnlineMeeting,
 }: {
-  activeSection: HostSessionEditorSection;
   title: string;
   bookTitle: string;
   bookAuthor: string;
@@ -69,13 +65,11 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
   const previousMeetingRestoreFocusRef = useRef<HTMLElement | null>(null);
   return (
     <>
-      <Panel
-        eyebrow="도서 정보"
-        title="읽을 책"
-        section="basic"
-        panelId="host-editor-panel-basic-info"
-        activeSection={activeSection}
-      >
+      <section id="host-editor-panel-basic-info" className="stack" style={{ "--stack": "14px" } as CSSProperties}>
+        <div>
+          <div className="eyebrow">도서 정보</div>
+          <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>읽을 책</h2>
+        </div>
         <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
           <div>
             <label className="label" htmlFor="session-title">
@@ -149,15 +143,13 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
             <BookCover title={bookTitle} author={bookAuthor} imageUrl={bookImageUrl} width={96} />
           </div>
         </div>
-      </Panel>
+      </section>
 
-      <Panel
-        eyebrow="일정 정보"
-        title="모임 일정과 접속 정보"
-        section="basic"
-        panelId="host-editor-panel-basic-schedule"
-        activeSection={activeSection}
-      >
+      <section id="host-editor-panel-basic-schedule" className="stack" style={{ "--stack": "14px" } as CSSProperties}>
+        <div>
+          <div className="eyebrow">일정 정보</div>
+          <h2 className="h3 editorial" style={{ margin: "6px 0 0" }}>모임 일정과 접속 정보</h2>
+        </div>
         <div className="grid-3">
           <div>
             <label className="label" htmlFor="session-date">
@@ -287,7 +279,7 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
             onAdopt={onAdoptPreviousOnlineMeeting}
           />
         ) : null}
-      </Panel>
+      </section>
     </>
   );
 });
