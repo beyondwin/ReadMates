@@ -3,6 +3,9 @@ package com.readmates.observability.application.service
 import com.readmates.observability.application.model.FrontendApiFailureEvent
 import com.readmates.observability.application.model.FrontendRouteLoadEvent
 import com.readmates.observability.application.model.FrontendRuntimeErrorEvent
+import com.readmates.observability.application.model.HostAttentionResultEvent
+import com.readmates.observability.application.model.HostOperationsCardLoadEvent
+import com.readmates.observability.application.model.HostScheduleDefaultsEvent
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -20,10 +23,18 @@ class FrontendObservabilityServiceTest {
                     FrontendRouteLoadEvent("/app", Duration.ofMillis(80), "LOAD", "success"),
                     FrontendRuntimeErrorEvent("/admin", "render", "REACT_ROUTE_ERROR", "error"),
                     FrontendApiFailureEvent("/clubs/:slug/app", "host-session", "5xx", "INTERNAL_ERROR"),
+                    HostScheduleDefaultsEvent("/app/host/sessions/new", "success"),
+                    HostOperationsCardLoadEvent(
+                        "/app/host/operations",
+                        "club_readiness",
+                        "error",
+                        Duration.ofMillis(40),
+                    ),
+                    HostAttentionResultEvent("/app/host/operations", 3),
                 ),
             )
 
-        assertThat(result.accepted).isEqualTo(3)
+        assertThat(result.accepted).isEqualTo(6)
         assertThat(result.dropped).isZero()
         assertThat(registry.find("readmates.frontend.route_load").timer()?.count()).isEqualTo(1)
         assertThat(
@@ -54,6 +65,18 @@ class FrontendObservabilityServiceTest {
                     "INTERNAL_ERROR",
                 ).count(),
         ).isEqualTo(1.0)
+        assertThat(registry.counter("host.schedule.defaults", "outcome", "success").count()).isEqualTo(1.0)
+        assertThat(
+            registry
+                .counter(
+                    "host.operations.card.load",
+                    "card",
+                    "club_readiness",
+                    "outcome",
+                    "error",
+                ).count(),
+        ).isEqualTo(1.0)
+        assertThat(registry.find("host.attention.result.size").summary()?.totalAmount()).isEqualTo(3.0)
     }
 
     @Test

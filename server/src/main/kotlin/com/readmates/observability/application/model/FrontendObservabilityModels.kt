@@ -27,6 +27,23 @@ data class FrontendApiFailureEvent(
     val errorCode: String,
 ) : FrontendObservabilityEvent
 
+data class HostScheduleDefaultsEvent(
+    override val routePattern: String,
+    val outcome: String,
+) : FrontendObservabilityEvent
+
+data class HostOperationsCardLoadEvent(
+    override val routePattern: String,
+    val card: String,
+    val outcome: String,
+    val duration: Duration,
+) : FrontendObservabilityEvent
+
+data class HostAttentionResultEvent(
+    override val routePattern: String,
+    val size: Int,
+) : FrontendObservabilityEvent
+
 data class FrontendObservabilityResult(
     val accepted: Int,
     val dropped: Int,

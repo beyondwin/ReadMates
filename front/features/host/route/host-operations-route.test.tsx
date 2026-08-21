@@ -22,6 +22,13 @@ vi.mock("@/features/host/aigen/api/aigen-api", () => ({
   putClubAiDefault: vi.fn(),
 }));
 
+const observabilityMocks = vi.hoisted(() => ({
+  recordHostOperationsCardLoad: vi.fn(),
+  recordHostAttentionResult: vi.fn(),
+}));
+
+vi.mock("@/shared/observability/frontend-observability", () => observabilityMocks);
+
 vi.mock("react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("react-router")>();
   return {
@@ -118,6 +125,8 @@ function createWrapper() {
 }
 
 beforeEach(() => {
+  observabilityMocks.recordHostOperationsCardLoad.mockReset();
+  observabilityMocks.recordHostAttentionResult.mockReset();
   mockedClubOperations.mockReset();
   mockedNotificationSummary.mockReset();
   mockedAttention.mockReset();
@@ -297,5 +306,48 @@ describe("HostOperationsRoute", () => {
     expect(retry).toHaveFocus();
     await user.keyboard("{Enter}");
     await waitFor(() => expect(mockedClubOperations).toHaveBeenCalledTimes(2));
+  });
+
+  it("records bounded card-load outcomes once each request settles", async () => {
+    mockedAttention.mockResolvedValue({
+      items: [attentionItem()],
+      nextCursor: null,
+      summary: { needsAttentionCount: 1, incompletePublishedCount: 0, draftCount: 0 },
+    });
+    mockedClubOperations.mockRejectedValue(new Error("ops down"));
+    const { Wrapper } = createWrapper();
+
+    render(
+      <Wrapper>
+        <HostOperationsRoute />
+      </Wrapper>,
+    );
+
+    await waitFor(() => {
+      const cards = observabilityMocks.recordHostOperationsCardLoad.mock.calls.map(
+        (call) => call[0].card,
+      );
+      expect(cards).toEqual(expect.arrayContaining([
+        "attention",
+        "ai_defaults",
+        "club_readiness",
+        "notifications",
+      ]));
+    });
+    expect(observabilityMocks.recordHostOperationsCardLoad).toHaveBeenCalledWith(
+      expect.objectContaining({ card: "attention", outcome: "success" }),
+    );
+    expect(observabilityMocks.recordHostOperationsCardLoad).toHaveBeenCalledWith(
+      expect.objectContaining({ card: "club_readiness", outcome: "error" }),
+    );
+    expect(observabilityMocks.recordHostOperationsCardLoad).toHaveBeenCalledWith(
+      expect.objectContaining({ card: "notifications", outcome: "success" }),
+    );
+    expect(observabilityMocks.recordHostAttentionResult).toHaveBeenCalledWith({ size: 1 });
+    expect(
+      observabilityMocks.recordHostOperationsCardLoad.mock.calls.every(
+        (call) => call[0].hasPasscode === undefined && call[0].clubId === undefined,
+      ),
+    ).toBe(true);
   });
 });

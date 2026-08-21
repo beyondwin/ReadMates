@@ -28,6 +28,7 @@ import { normalizeHostSessionLedgerRequest } from "@/features/host/api/host-sess
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import { normalizePageRequest } from "@/shared/query/cursor-pagination";
+import { recordHostAttentionResult } from "@/shared/observability/frontend-observability";
 import { invalidateHostSessionDashboard } from "./host-session-queries";
 
 function scopeKey(context?: ReadmatesApiContext) {
@@ -77,13 +78,17 @@ export function hostSessionRecordLedgerQuery(
 export function hostSessionRecordAttentionPagesQuery(context?: ReadmatesApiContext) {
   return infiniteQueryOptions({
     queryKey: hostSessionRecordKeys.attentionPages(context),
-    queryFn: ({ pageParam }) => fetchHostSessionRecordLedger({
-      needsAttention: true,
-      page: {
-        limit: HOST_OPERATIONS_ATTENTION_PAGE_LIMIT,
-        cursor: pageParam,
-      },
-    }, context),
+    queryFn: async ({ pageParam }) => {
+      const page = await fetchHostSessionRecordLedger({
+        needsAttention: true,
+        page: {
+          limit: HOST_OPERATIONS_ATTENTION_PAGE_LIMIT,
+          cursor: pageParam,
+        },
+      }, context);
+      recordHostAttentionResult({ size: page.items.length });
+      return page;
+    },
     initialPageParam: null as string | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
     retry: false,

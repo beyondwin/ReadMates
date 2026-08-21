@@ -1,6 +1,7 @@
 package com.readmates.observability.application.service
 
 import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.DistributionSummary
 import io.micrometer.core.instrument.MeterRegistry
 import io.micrometer.core.instrument.Tag
 import io.micrometer.core.instrument.Tags
@@ -79,6 +80,26 @@ class FrontendObservabilityMetrics(
             .tags(frontendTags(FrontendMetricLabel.REASON to reason))
             .register(meterRegistry)
             .increment()
+    }
+
+    fun recordHostScheduleDefaults(outcome: String) {
+        meterRegistry.counter("host.schedule.defaults", "outcome", outcome).increment()
+    }
+
+    fun recordHostOperationsCardLoad(
+        card: String,
+        outcome: String,
+        duration: Duration,
+    ) {
+        meterRegistry.counter("host.operations.card.load", "card", card, "outcome", outcome).increment()
+        meterRegistry.timer("host.operations.card.load.duration", "card", card, "outcome", outcome).record(duration)
+    }
+
+    fun recordHostAttentionResult(size: Int) {
+        DistributionSummary
+            .builder("host.attention.result.size")
+            .register(meterRegistry)
+            .record(size.toDouble())
     }
 
     private fun frontendTags(vararg labels: Pair<FrontendMetricLabel, String>): Tags =

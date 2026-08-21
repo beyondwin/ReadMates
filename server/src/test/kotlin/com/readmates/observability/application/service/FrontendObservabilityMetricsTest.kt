@@ -72,4 +72,70 @@ class FrontendObservabilityMetricsTest {
         assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } })
             .doesNotContain("email", "user_id", "club_id", "session_id", "url", "message", "stack")
     }
+
+    @Test
+    fun `host operation meters use approved enums and outcomes only`() {
+        val registry = SimpleMeterRegistry()
+        val metrics = FrontendObservabilityMetrics(registry)
+
+        metrics.recordHostScheduleDefaults("legacy_404")
+        metrics.recordHostOperationsCardLoad("notifications", "error", Duration.ofMillis(250))
+        metrics.recordHostAttentionResult(7)
+
+        assertThat(registry.counter("host.schedule.defaults", "outcome", "legacy_404").count()).isEqualTo(1.0)
+        assertThat(
+            registry
+                .counter(
+                    "host.operations.card.load",
+                    "card",
+                    "notifications",
+                    "outcome",
+                    "error",
+                ).count(),
+        ).isEqualTo(1.0)
+        val timer =
+            registry
+                .find("host.operations.card.load.duration")
+                .tag("card", "notifications")
+                .tag("outcome", "error")
+                .timer()
+        assertThat(timer).isNotNull
+        assertThat(timer!!.count()).isEqualTo(1)
+        assertThat(timer.totalTime(TimeUnit.MILLISECONDS)).isEqualTo(250.0)
+        assertThat(registry.find("host.attention.result.size").summary()?.count()).isEqualTo(1)
+        assertThat(registry.find("host.attention.result.size").summary()?.totalAmount()).isEqualTo(7.0)
+        assertThat(registry.meters.map { it.id.name })
+            .contains(
+                "host.schedule.defaults",
+                "host.operations.card.load",
+                "host.operations.card.load.duration",
+                "host.attention.result.size",
+            )
+        assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } }.toSet())
+            .doesNotContain(
+                "club_id",
+                "session_id",
+                "membership_id",
+                "request_id",
+                "note",
+                "passcode",
+                "has_passcode",
+                "url",
+            )
+        assertThat(
+            registry
+                .find("host.schedule.defaults")
+                .counter()!!
+                .id.tags
+                .map { it.key },
+        ).containsExactly("outcome")
+        assertThat(
+            registry
+                .find("host.operations.card.load")
+                .counter()!!
+                .id.tags
+                .map { it.key }
+                .toSet(),
+        ).containsExactlyInAnyOrder("card", "outcome")
+    }
 }

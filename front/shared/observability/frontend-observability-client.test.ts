@@ -100,4 +100,61 @@ describe("frontend observability client", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(client.pendingCount()).toBe(0);
   });
+
+  it("flushes bounded host operation events and drops extra identifiers", async () => {
+    const sendBeacon = vi.fn(() => true);
+    const client = createFrontendObservabilityClient({
+      sendBeacon,
+      fetchImpl: vi.fn(),
+    });
+
+    client.record({
+      type: "HOST_SCHEDULE_DEFAULTS",
+      routePattern: "/app/host/sessions/new",
+      outcome: "success",
+    });
+    client.record({
+      type: "HOST_OPERATIONS_CARD_LOAD",
+      routePattern: "/app/host/operations",
+      card: "club_readiness",
+      outcome: "error",
+      durationMs: 18,
+    });
+    client.record({
+      type: "HOST_ATTENTION_RESULT",
+      routePattern: "/app/host/operations",
+      size: 4,
+    });
+    client.record({
+      type: "HOST_SCHEDULE_DEFAULTS",
+      routePattern: "/app/host/sessions/new",
+      outcome: "success",
+      hasPasscode: true,
+    } as never);
+    expect(client.pendingCount()).toBe(3);
+    await client.flush();
+
+    const body = sendBeacon.mock.calls[0]?.[1];
+    expect(JSON.parse(await (body as Blob).text())).toEqual({
+      events: [
+        {
+          type: "HOST_SCHEDULE_DEFAULTS",
+          routePattern: "/app/host/sessions/new",
+          outcome: "success",
+        },
+        {
+          type: "HOST_OPERATIONS_CARD_LOAD",
+          routePattern: "/app/host/operations",
+          card: "club_readiness",
+          outcome: "error",
+          durationMs: 18,
+        },
+        {
+          type: "HOST_ATTENTION_RESULT",
+          routePattern: "/app/host/operations",
+          size: 4,
+        },
+      ],
+    });
+  });
 });

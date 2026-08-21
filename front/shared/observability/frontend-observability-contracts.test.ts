@@ -85,4 +85,97 @@ describe("frontend observability event contracts", () => {
     }));
     expect(sanitizeFrontendObservabilityBatch(events).events).toHaveLength(FRONTEND_OBSERVABILITY_MAX_EVENTS);
   });
+
+  it("keeps only allowlisted host schedule default outcomes", () => {
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_SCHEDULE_DEFAULTS",
+        routePattern: "/app/host/sessions/new",
+        outcome: "legacy_404",
+      }),
+    ).toEqual({
+      type: "HOST_SCHEDULE_DEFAULTS",
+      routePattern: "/app/host/sessions/new",
+      outcome: "legacy_404",
+    });
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_SCHEDULE_DEFAULTS",
+        routePattern: "/app/host/sessions/new",
+        outcome: "timeout",
+      }),
+    ).toBeNull();
+  });
+
+  it("clamps host card duration and attention size and rejects extra identifiers", () => {
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_OPERATIONS_CARD_LOAD",
+        routePattern: "/app/host/operations",
+        card: "attention",
+        outcome: "success",
+        durationMs: 90_000.4,
+      }),
+    ).toEqual({
+      type: "HOST_OPERATIONS_CARD_LOAD",
+      routePattern: "/app/host/operations",
+      card: "attention",
+      outcome: "success",
+      durationMs: 60_000,
+    });
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_ATTENTION_RESULT",
+        routePattern: "/app/host/operations",
+        size: -12.7,
+      }),
+    ).toEqual({
+      type: "HOST_ATTENTION_RESULT",
+      routePattern: "/app/host/operations",
+      size: 0,
+    });
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_ATTENTION_RESULT",
+        routePattern: "/app/host/operations",
+        size: 50_000,
+      }),
+    ).toEqual({
+      type: "HOST_ATTENTION_RESULT",
+      routePattern: "/app/host/operations",
+      size: 10_000,
+    });
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_SCHEDULE_DEFAULTS",
+        routePattern: "/app/host/sessions/new",
+        outcome: "success",
+        hasPasscode: false,
+        meetingUrl: "https://meeting.invalid/club",
+        clubId: "club-1",
+        sessionId: "session-1",
+      }),
+    ).toBeNull();
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_OPERATIONS_CARD_LOAD",
+        routePattern: "/app/host/operations",
+        card: "dashboard",
+        outcome: "success",
+        durationMs: 12,
+      }),
+    ).toBeNull();
+    expect(
+      sanitizeFrontendObservabilityEvent({
+        type: "HOST_OPERATIONS_CARD_LOAD",
+        routePattern: "/app/host/operations",
+        card: "notifications",
+        outcome: "error",
+        durationMs: 40,
+        membershipId: "membership-1",
+        requestId: "req-1",
+        reasonNote: "private",
+      }),
+    ).toBeNull();
+  });
 });

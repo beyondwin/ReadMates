@@ -3,6 +3,7 @@ import type { FrontendApiGroup, FrontendRoutePattern } from "./route-patterns";
 export const FRONTEND_OBSERVABILITY_MAX_EVENTS = 20;
 
 const MAX_DURATION_MS = 60_000;
+const MAX_ATTENTION_RESULT_SIZE = 10_000;
 const SAFE_CODE = /^[A-Z][A-Z0-9_]{1,63}$/;
 const HASH_PREFIX = /^[a-f0-9]{8,64}$/i;
 
@@ -37,10 +38,37 @@ export type FrontendApiFailureEvent = {
   errorCode: string;
 };
 
+export type HostScheduleDefaultsOutcome = "success" | "legacy_404" | "error";
+export type HostOperationsCard = "attention" | "ai_defaults" | "club_readiness" | "notifications";
+export type HostOperationsOutcome = "success" | "error";
+
+export type HostScheduleDefaultsEvent = {
+  type: "HOST_SCHEDULE_DEFAULTS";
+  routePattern: FrontendRoutePattern;
+  outcome: HostScheduleDefaultsOutcome;
+};
+
+export type HostOperationsCardLoadEvent = {
+  type: "HOST_OPERATIONS_CARD_LOAD";
+  routePattern: FrontendRoutePattern;
+  card: HostOperationsCard;
+  outcome: HostOperationsOutcome;
+  durationMs: number;
+};
+
+export type HostAttentionResultEvent = {
+  type: "HOST_ATTENTION_RESULT";
+  routePattern: FrontendRoutePattern;
+  size: number;
+};
+
 export type FrontendObservabilityEvent =
   | FrontendRouteLoadEvent
   | FrontendRuntimeErrorEvent
-  | FrontendApiFailureEvent;
+  | FrontendApiFailureEvent
+  | HostScheduleDefaultsEvent
+  | HostOperationsCardLoadEvent
+  | HostAttentionResultEvent;
 
 export type FrontendObservabilityBatch = {
   events: FrontendObservabilityEvent[];
@@ -74,6 +102,14 @@ const apiGroups = new Set<FrontendApiGroup>([
   "public",
   "unknown",
 ]);
+const hostScheduleOutcomes = new Set<HostScheduleDefaultsOutcome>(["success", "legacy_404", "error"]);
+const hostOperationsCards = new Set<HostOperationsCard>([
+  "attention",
+  "ai_defaults",
+  "club_readiness",
+  "notifications",
+]);
+const hostOperationsOutcomes = new Set<HostOperationsOutcome>(["success", "error"]);
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
@@ -110,6 +146,15 @@ function safeDuration(value: unknown): number | null {
   return Math.max(0, Math.min(MAX_DURATION_MS, Math.round(value)));
 }
 
+function safeAttentionSize(value: unknown): number | null {
+  if (typeof value !== "number" || !Number.isFinite(value)) return null;
+  return Math.max(0, Math.min(MAX_ATTENTION_RESULT_SIZE, Math.round(value)));
+}
+
+function hasOnlyKeys(record: Record<string, unknown>, allowed: readonly string[]): boolean {
+  return Object.keys(record).every((key) => allowed.includes(key));
+}
+
 export function sanitizeFrontendObservabilityEvent(event: unknown): FrontendObservabilityEvent | null {
   const record = asRecord(event);
   if (!record || typeof record.type !== "string") return null;
@@ -143,6 +188,31 @@ export function sanitizeFrontendObservabilityEvent(event: unknown): FrontendObse
     const errorCode = safeCode(record.errorCode);
     if (!apiGroups.has(apiGroup) || !statusClasses.has(statusClass) || !errorCode) return null;
     return { type: "API_FAILURE", routePattern, apiGroup, statusClass, errorCode };
+  }
+
+  if (record.type === "HOST_SCHEDULE_DEFAULTS") {
+    if (!hasOnlyKeys(record, ["type", "routePattern", "outcome"])) return null;
+    const outcome = record.outcome as HostScheduleDefaultsOutcome;
+    if (!hostScheduleOutcomes.has(outcome)) return null;
+    return { type: "HOST_SCHEDULE_DEFAULTS", routePattern, outcome };
+  }
+
+  if (record.type === "HOST_OPERATIONS_CARD_LOAD") {
+    if (!hasOnlyKeys(record, ["type", "routePattern", "card", "outcome", "durationMs"])) return null;
+    const durationMs = safeDuration(record.durationMs);
+    const card = record.card as HostOperationsCard;
+    const outcome = record.outcome as HostOperationsOutcome;
+    if (durationMs === null || !hostOperationsCards.has(card) || !hostOperationsOutcomes.has(outcome)) {
+      return null;
+    }
+    return { type: "HOST_OPERATIONS_CARD_LOAD", routePattern, card, outcome, durationMs };
+  }
+
+  if (record.type === "HOST_ATTENTION_RESULT") {
+    if (!hasOnlyKeys(record, ["type", "routePattern", "size"])) return null;
+    const size = safeAttentionSize(record.size);
+    if (size === null) return null;
+    return { type: "HOST_ATTENTION_RESULT", routePattern, size };
   }
 
   return null;

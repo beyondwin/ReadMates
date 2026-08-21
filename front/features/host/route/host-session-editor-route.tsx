@@ -14,6 +14,7 @@ import HostSessionEditor, {
 import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import type { ReadmatesApiContext } from "@/shared/api/client";
+import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
 import type { HostSessionEditorActions } from "@/features/host/route/host-session-editor-actions";
 import type {
   HostSessionHistoryItem,
@@ -49,6 +50,7 @@ import {
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
   hostSessionKeys,
+  classifyScheduleDefaultsError,
   hostSessionScheduleDefaultsQuery,
   invalidateHostSessionManualDispatches,
   invalidateHostSessionRecordSurfaces,
@@ -79,6 +81,32 @@ import {
 
 const EDITOR_MANUAL_DISPATCH_PAGE_LIMIT = 20;
 const EDITOR_HISTORY_PAGE_LIMIT = 30;
+
+function useRecordHostScheduleDefaultsOutcome(query: {
+  isPending: boolean;
+  isFetching: boolean;
+  isSuccess: boolean;
+  isError: boolean;
+  error: unknown;
+}) {
+  const inFlightRef = useRef(false);
+  useEffect(() => {
+    if (query.isPending || query.isFetching) {
+      inFlightRef.current = true;
+      return;
+    }
+    if (!inFlightRef.current || (!query.isSuccess && !query.isError)) {
+      return;
+    }
+    inFlightRef.current = false;
+    const outcome = query.isSuccess
+      ? "success"
+      : classifyScheduleDefaultsError(query.error).kind === "legacy-404"
+        ? "legacy_404"
+        : "error";
+    recordHostScheduleDefaults({ outcome });
+  }, [query.error, query.isError, query.isFetching, query.isPending, query.isSuccess]);
+}
 
 type HostSessionEditorRouteProps = {
   returnTarget?: ReadmatesReturnTarget;
@@ -351,6 +379,7 @@ export function NewHostSessionRoute({
   );
   const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
+  useRecordHostScheduleDefaultsOutcome(scheduleDefaultsQuery);
   const scheduleDefaultsLoadState = resolveHostScheduleDefaultsLoadState(scheduleDefaultsQuery);
   return (
     <HostSessionEditor

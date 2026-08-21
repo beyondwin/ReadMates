@@ -6,6 +6,9 @@ import com.readmates.observability.application.model.FrontendApiFailureEvent
 import com.readmates.observability.application.model.FrontendObservabilityEvent
 import com.readmates.observability.application.model.FrontendRouteLoadEvent
 import com.readmates.observability.application.model.FrontendRuntimeErrorEvent
+import com.readmates.observability.application.model.HostAttentionResultEvent
+import com.readmates.observability.application.model.HostOperationsCardLoadEvent
+import com.readmates.observability.application.model.HostScheduleDefaultsEvent
 import com.readmates.observability.application.port.`in`.RecordFrontendObservabilityUseCase
 import org.springframework.http.HttpStatus
 import org.springframework.web.bind.annotation.PostMapping
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 import java.time.Duration
 
 private const val MAX_DURATION_MS = 60_000L
+private const val MAX_ATTENTION_RESULT_SIZE = 10_000L
 private val uuidLikeValue = Regex("[0-9a-f]{8}-[0-9a-f-]{27}", RegexOption.IGNORE_CASE)
 private val rawClubSlugPath = Regex("/clubs/(?!:slug(?:/|$))[^/]+")
 
@@ -79,6 +83,9 @@ data class FrontendObservabilityEventRequest(
     val severity: String? = null,
     val apiGroup: String? = null,
     val statusClass: String? = null,
+    val outcome: String? = null,
+    val card: String? = null,
+    val size: Long? = null,
 ) {
     fun toApplicationEvent(): FrontendObservabilityEvent? {
         val safeRoute = routePattern?.takeIf(::isSafeRoutePattern) ?: return null
@@ -86,6 +93,9 @@ data class FrontendObservabilityEventRequest(
             "ROUTE_LOAD" -> routeLoadEvent(safeRoute)
             "RUNTIME_ERROR" -> runtimeErrorEvent(safeRoute)
             "API_FAILURE" -> apiFailureEvent(safeRoute)
+            "HOST_SCHEDULE_DEFAULTS" -> hostScheduleDefaultsEvent(safeRoute)
+            "HOST_OPERATIONS_CARD_LOAD" -> hostOperationsCardLoadEvent(safeRoute)
+            "HOST_ATTENTION_RESULT" -> hostAttentionResultEvent(safeRoute)
             else -> null
         }
     }
@@ -123,6 +133,23 @@ data class FrontendObservabilityEventRequest(
         }
     }
 
+    private fun hostScheduleDefaultsEvent(safeRoute: String): HostScheduleDefaultsEvent? {
+        val mappedOutcome = outcome?.takeIf { it in allowedHostScheduleOutcomes } ?: return null
+        return HostScheduleDefaultsEvent(safeRoute, mappedOutcome)
+    }
+
+    private fun hostOperationsCardLoadEvent(safeRoute: String): HostOperationsCardLoadEvent? {
+        val mappedCard = card?.takeIf { it in allowedHostOperationsCards } ?: return null
+        val mappedOutcome = outcome?.takeIf { it in allowedHostOperationsOutcomes } ?: return null
+        val duration = durationMs?.coerceIn(0, MAX_DURATION_MS) ?: return null
+        return HostOperationsCardLoadEvent(safeRoute, mappedCard, mappedOutcome, Duration.ofMillis(duration))
+    }
+
+    private fun hostAttentionResultEvent(safeRoute: String): HostAttentionResultEvent? {
+        val mappedSize = size?.coerceIn(0, MAX_ATTENTION_RESULT_SIZE)?.toInt() ?: return null
+        return HostAttentionResultEvent(safeRoute, mappedSize)
+    }
+
     fun dropReason(): String =
         if (routePattern?.let(::isSafeRoutePattern) == false) {
             "invalid_route_pattern"
@@ -142,6 +169,9 @@ private val allowedRuntimeKinds = setOf("render", "unhandled-rejection", "unknow
 private val allowedSeverities = setOf("warn", "error")
 private val allowedStatusClasses = setOf("4xx", "5xx", "network", "unknown")
 private val allowedDroppedReasons = setOf("invalid_route_pattern", "invalid_event", "batch_limit")
+private val allowedHostScheduleOutcomes = setOf("success", "legacy_404", "error")
+private val allowedHostOperationsCards = setOf("attention", "ai_defaults", "club_readiness", "notifications")
+private val allowedHostOperationsOutcomes = setOf("success", "error")
 private val allowedApiGroups =
     setOf(
         "admin-ai",

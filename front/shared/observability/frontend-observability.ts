@@ -4,6 +4,9 @@ import {
   type FrontendRuntimeErrorKind,
   type FrontendSeverity,
   type FrontendStatusClass,
+  type HostOperationsCard,
+  type HostOperationsOutcome,
+  type HostScheduleDefaultsOutcome,
 } from "./frontend-observability-contracts";
 import { createFrontendObservabilityClient } from "./frontend-observability-client";
 import { frontendApiGroupFromPath, normalizeFrontendRoutePattern } from "./route-patterns";
@@ -85,6 +88,46 @@ export function recordFrontendApiFailure(input: {
     apiGroup: frontendApiGroupFromPath(input.path),
     statusClass: statusClass(input.status),
     errorCode: safeErrorCode(input.errorCode),
+  });
+  void frontendObservability.flush();
+}
+
+export function recordHostScheduleDefaults(input: {
+  pathname?: string;
+  outcome: HostScheduleDefaultsOutcome;
+}) {
+  frontendObservability.record({
+    type: "HOST_SCHEDULE_DEFAULTS",
+    routePattern: normalizeFrontendRoutePattern(currentPathname(input.pathname)),
+    outcome: input.outcome,
+  });
+  void frontendObservability.flush();
+}
+
+export function recordHostOperationsCardLoad(input: {
+  pathname?: string;
+  card: HostOperationsCard;
+  outcome: HostOperationsOutcome;
+  durationMs: number;
+}) {
+  frontendObservability.record({
+    type: "HOST_OPERATIONS_CARD_LOAD",
+    routePattern: normalizeFrontendRoutePattern(currentPathname(input.pathname)),
+    card: input.card,
+    outcome: input.outcome,
+    durationMs: input.durationMs,
+  });
+  void frontendObservability.flush();
+}
+
+export function recordHostAttentionResult(input: {
+  pathname?: string;
+  size: number;
+}) {
+  frontendObservability.record({
+    type: "HOST_ATTENTION_RESULT",
+    routePattern: normalizeFrontendRoutePattern(currentPathname(input.pathname)),
+    size: input.size,
   });
   void frontendObservability.flush();
 }

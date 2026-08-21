@@ -5,6 +5,9 @@ import com.readmates.observability.application.model.FrontendObservabilityEvent
 import com.readmates.observability.application.model.FrontendObservabilityResult
 import com.readmates.observability.application.model.FrontendRouteLoadEvent
 import com.readmates.observability.application.model.FrontendRuntimeErrorEvent
+import com.readmates.observability.application.model.HostAttentionResultEvent
+import com.readmates.observability.application.model.HostOperationsCardLoadEvent
+import com.readmates.observability.application.model.HostScheduleDefaultsEvent
 import com.readmates.observability.application.port.`in`.RecordFrontendObservabilityUseCase
 import org.springframework.stereotype.Service
 
@@ -28,6 +31,21 @@ class FrontendObservabilityService(
 
                 is FrontendApiFailureEvent -> {
                     metrics.recordApiFailure(event.routePattern, event.apiGroup, event.statusClass, event.errorCode)
+                    accepted += 1
+                }
+
+                is HostScheduleDefaultsEvent -> {
+                    metrics.recordHostScheduleDefaults(event.outcome)
+                    accepted += 1
+                }
+
+                is HostOperationsCardLoadEvent -> {
+                    metrics.recordHostOperationsCardLoad(event.card, event.outcome, event.duration)
+                    accepted += 1
+                }
+
+                is HostAttentionResultEvent -> {
+                    metrics.recordHostAttentionResult(event.size)
                     accepted += 1
                 }
             }

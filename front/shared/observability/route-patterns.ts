@@ -62,6 +62,7 @@ const routeRules: PatternRule[] = [
   { pattern: "/app/host/members", regex: /^\/app\/host\/members\/?$/ },
   { pattern: "/app/host/invitations", regex: /^\/app\/host\/invitations\/?$/ },
   { pattern: "/app/host/notifications", regex: /^\/app\/host\/notifications\/?$/ },
+  { pattern: "/app/host/operations", regex: /^\/app\/host\/operations\/?$/ },
   { pattern: "/app/host/sessions/new", regex: /^\/app\/host\/sessions\/new\/?$/ },
   { pattern: "/app/host/sessions/:sessionId/closing", regex: /^\/app\/host\/sessions\/[^/]+\/closing\/?$/ },
   { pattern: "/app/host/sessions/:sessionId/edit", regex: /^\/app\/host\/sessions\/[^/]+\/edit\/?$/ },
@@ -70,6 +71,7 @@ const routeRules: PatternRule[] = [
   { pattern: "/clubs/:slug/app/host/members", regex: /^\/clubs\/[^/]+\/app\/host\/members\/?$/ },
   { pattern: "/clubs/:slug/app/host/invitations", regex: /^\/clubs\/[^/]+\/app\/host\/invitations\/?$/ },
   { pattern: "/clubs/:slug/app/host/notifications", regex: /^\/clubs\/[^/]+\/app\/host\/notifications\/?$/ },
+  { pattern: "/clubs/:slug/app/host/operations", regex: /^\/clubs\/[^/]+\/app\/host\/operations\/?$/ },
   { pattern: "/clubs/:slug/app/host/sessions/new", regex: /^\/clubs\/[^/]+\/app\/host\/sessions\/new\/?$/ },
   {
     pattern: "/clubs/:slug/app/host/sessions/:sessionId/closing",

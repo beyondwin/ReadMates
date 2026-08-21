@@ -1,12 +1,49 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLoaderData, useParams } from "react-router";
+import { getAiGenerationCapabilities, getClubAiDefault } from "@/features/host/aigen/api/aigen-api";
 import { hostClubOperationsQuery } from "@/features/host/queries/host-club-operations-queries";
 import { hostNotificationHealthQuery } from "@/features/host/queries/host-notification-queries";
 import { hostSessionRecordAttentionPagesQuery } from "@/features/host/queries/host-session-record-queries";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import { HostOperationsPage } from "@/features/host/ui/host-operations-page";
+import type { HostOperationsCard } from "@/shared/observability/frontend-observability-contracts";
+import { recordHostOperationsCardLoad } from "@/shared/observability/frontend-observability";
 import type { HostOperationsRouteData } from "./host-operations-data";
+
+function useRecordHostOperationsCardLoad(
+  card: HostOperationsCard,
+  query: {
+    isFetching: boolean;
+    isError: boolean;
+    isSuccess: boolean;
+  },
+  enabled = true,
+) {
+  const startedAtRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!enabled) {
+      startedAtRef.current = null;
+      return;
+    }
+    if (query.isFetching) {
+      if (startedAtRef.current === null) {
+        startedAtRef.current = performance.now();
+      }
+      return;
+    }
+    const startedAt = startedAtRef.current;
+    if (startedAt === null || (!query.isSuccess && !query.isError)) {
+      return;
+    }
+    startedAtRef.current = null;
+    recordHostOperationsCardLoad({
+      card,
+      outcome: query.isError ? "error" : "success",
+      durationMs: performance.now() - startedAt,
+    });
+  }, [card, enabled, query.isError, query.isFetching, query.isSuccess]);
+}
 
 export function HostOperationsRoute({
   LinkComponent,
@@ -21,6 +58,28 @@ export function HostOperationsRoute({
   const attentionQuery = useInfiniteQuery(hostSessionRecordAttentionPagesQuery(context));
   const clubOpsQuery = useQuery(hostClubOperationsQuery(context));
   const notificationsQuery = useQuery(hostNotificationHealthQuery(context));
+  const aiCapabilitiesQuery = useQuery({
+    queryKey: ["host", "aigen", "capabilities", resolvedSlug],
+    queryFn: () => getAiGenerationCapabilities(resolvedSlug ?? ""),
+    staleTime: 0,
+    enabled: Boolean(resolvedSlug),
+  });
+  const aiGenerationEnabled =
+    aiCapabilitiesQuery.data?.enabled === true && !aiCapabilitiesQuery.isFetching;
+  const aiDefaultsQuery = useQuery({
+    queryKey: ["host", "aigen", "club-ai-default", resolvedSlug],
+    queryFn: () => getClubAiDefault(resolvedSlug ?? ""),
+    enabled: Boolean(resolvedSlug) && aiGenerationEnabled,
+  });
+  useRecordHostOperationsCardLoad("attention", attentionQuery);
+  useRecordHostOperationsCardLoad("club_readiness", clubOpsQuery);
+  useRecordHostOperationsCardLoad("notifications", notificationsQuery);
+  useRecordHostOperationsCardLoad("ai_defaults", aiCapabilitiesQuery, Boolean(resolvedSlug));
+  useRecordHostOperationsCardLoad(
+    "ai_defaults",
+    aiDefaultsQuery,
+    Boolean(resolvedSlug) && aiGenerationEnabled,
+  );
 
   const attentionItems = attentionQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const totalCount = attentionQuery.data?.pages[0]?.summary.needsAttentionCount ?? 0;

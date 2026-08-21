@@ -13,6 +13,10 @@ vi.mock("@/features/host/api/host-session-record-api", () => ({
   saveHostSessionRecordDraft: vi.fn(),
 }));
 
+vi.mock("@/shared/observability/frontend-observability", () => ({
+  recordHostAttentionResult: vi.fn(),
+}));
+
 import {
   HostSessionRecordApplyPreviewResponseSchema,
   HostSessionRecordApplyResultResponseSchema,
@@ -26,7 +30,9 @@ import {
   saveHostSessionRecordDraft,
 } from "@/features/host/api/host-session-record-api";
 import { hostSessionKeys } from "./host-session-queries";
+import { recordHostAttentionResult } from "@/shared/observability/frontend-observability";
 import {
+  hostSessionRecordAttentionPagesQuery,
   hostSessionRecordEditorQuery,
   hostSessionRecordHistoryQuery,
   hostSessionRecordKeys,
@@ -136,6 +142,33 @@ describe("host session record queries", () => {
       "ledger",
       "attention-pages",
     ]);
+  });
+
+  it("records attention page size after each successful page", async () => {
+    vi.mocked(fetchHostSessionRecordLedger)
+      .mockResolvedValueOnce({
+        items: [
+          { sessionId: "att-1" },
+          { sessionId: "att-2" },
+        ] as never,
+        nextCursor: "page-2",
+        summary: { needsAttentionCount: 3, incompletePublishedCount: 0, draftCount: 0 },
+      })
+      .mockResolvedValueOnce({
+        items: [{ sessionId: "att-3" }] as never,
+        nextCursor: null,
+        summary: { needsAttentionCount: 3, incompletePublishedCount: 0, draftCount: 0 },
+      });
+    const context = { clubSlug: "reading-sai" };
+    const { client } = createWrapper();
+    await client.fetchInfiniteQuery({
+      ...hostSessionRecordAttentionPagesQuery(context),
+      pages: 2,
+    });
+
+    expect(recordHostAttentionResult).toHaveBeenNthCalledWith(1, { size: 2 });
+    expect(recordHostAttentionResult).toHaveBeenNthCalledWith(2, { size: 1 });
+    expect(recordHostAttentionResult).toHaveBeenCalledTimes(2);
   });
 
   it("writes scoped ledger, editor, and history responses to normalized cache keys", async () => {
