@@ -1,5 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { expect, test, type Page, type Request } from "@playwright/test";
+import { FRONTEND_OBSERVABILITY_BROWSER_PATH } from "../../shared/observability/frontend-observability-paths";
 import {
   cleanupGeneratedSessions,
   cleanupViewerGoogleUserFixtures,
@@ -404,6 +405,58 @@ function jsonHasKey(value: unknown, key: string): boolean {
   ));
 }
 
+function expectOmitsConnectionSecretKeys(payload: { body: unknown; text: string }) {
+  expect(jsonHasKey(payload.body, "meetingUrl")).toBe(false);
+  expect(jsonHasKey(payload.body, "meetingPasscode")).toBe(false);
+  expect(payload.text).not.toContain(FIXTURE_PASSCODE);
+  expect(payload.text).not.toContain(FIXTURE_MEETING_URL);
+}
+
+function expectNoConnectionSecretValues(
+  payload: { text: string },
+  session: Record<string, unknown> | null | undefined,
+) {
+  expect(session).toBeTruthy();
+  expect(session?.meetingUrl ?? null).toBeNull();
+  expect(session?.meetingPasscode ?? null).toBeNull();
+  expect(payload.text).not.toContain(FIXTURE_PASSCODE);
+  expect(payload.text).not.toContain(FIXTURE_MEETING_URL);
+}
+
+function telemetryRequestBody(request: Request) {
+  return request.postData() ?? request.postDataBuffer()?.toString("utf8") ?? "";
+}
+
+function hostOperationTelemetryTypes(payloads: string[]) {
+  return payloads.flatMap((payload) => {
+    if (!payload.trim()) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(payload) as { events?: Array<{ type?: string }> };
+      return Array.isArray(parsed.events)
+        ? parsed.events.map((event) => event?.type).filter((type): type is string => Boolean(type))
+        : [];
+    } catch {
+      return [];
+    }
+  });
+}
+
+function expectNonVacuousTelemetryWithoutSecrets(payloads: string[]) {
+  const bodies = payloads.filter((payload) => payload.trim().length > 0);
+  expect(bodies.length).toBeGreaterThan(0);
+  const types = hostOperationTelemetryTypes(bodies);
+  expect(types.length).toBeGreaterThan(0);
+  expect(
+    types.some((type) => type === "HOST_SCHEDULE_DEFAULTS" || type === "HOST_OPERATIONS_CARD_LOAD"),
+  ).toBe(true);
+  const joined = bodies.join("\n");
+  expect(joined).not.toContain(FIXTURE_PASSCODE);
+  expect(joined).not.toContain("Synthetic deletion fixture body");
+  expect(joined).not.toContain("member1@example.com");
+}
+
 async function fetchJson(page: Page, url: string, headers?: Record<string, string>) {
   return page.evaluate(async ({ target, extraHeaders }) => {
     const response = await fetch(target, { cache: "no-store", headers: extraHeaders });
@@ -481,8 +534,8 @@ function collectTelemetryPayloads(page: Page) {
   const payloads: string[] = [];
   const listener = (request: Request) => {
     const url = new URL(request.url());
-    if (url.pathname === "/api/bff/observability/frontend-events") {
-      payloads.push(request.postData() ?? "");
+    if (request.method() === "POST" && url.pathname === FRONTEND_OBSERVABILITY_BROWSER_PATH) {
+      payloads.push(telemetryRequestBody(request));
     }
   };
   page.on("request", listener);
@@ -622,6 +675,12 @@ test("previous online meeting secrets stay out of create until explicit adoption
   await loginWithGoogleFixture(page, "host@example.com");
   const creates = collectCreateBodies(page);
   const telemetry = collectTelemetryPayloads(page);
+  await page.route(`**${FRONTEND_OBSERVABILITY_BROWSER_PATH}`, async (route) => {
+    if (route.request().method() === "POST") {
+      telemetry.payloads.push(telemetryRequestBody(route.request()));
+    }
+    await route.continue();
+  });
   try {
     await page.goto(`${HOST_PATH}/sessions/new`);
     await page.getByRole("tab", { name: "기본 정보" }).click();
@@ -629,6 +688,9 @@ test("previous online meeting secrets stay out of create until explicit adoption
     await expect(page.getByLabel("미팅 URL")).toHaveValue("");
     await expect(page.getByLabel("Passcode · 선택")).toHaveValue("");
     await expect(page.getByText(FIXTURE_PASSCODE)).toHaveCount(0);
+    await expect.poll(() => (
+      hostOperationTelemetryTypes(telemetry.payloads).includes("HOST_SCHEDULE_DEFAULTS")
+    )).toBe(true);
 
     await page.getByLabel("세션 제목").fill("명시적 채택 모임");
     await page.getByLabel("책 제목").fill("명시적 채택 책");
@@ -646,13 +708,11 @@ test("previous online meeting secrets stay out of create until explicit adoption
     await expect(page.getByLabel("Passcode · 선택")).toHaveValue(FIXTURE_PASSCODE);
     await expect(page.getByLabel("미팅 URL")).toHaveValue(FIXTURE_MEETING_URL);
 
-    const joined = telemetry.payloads.join("\n");
-    expect(joined).not.toContain(FIXTURE_PASSCODE);
-    expect(joined).not.toContain("Synthetic deletion fixture body");
-    expect(joined).not.toContain("member1@example.com");
+    expectNonVacuousTelemetryWithoutSecrets(telemetry.payloads);
   } finally {
     creates.dispose();
     telemetry.dispose();
+    await page.unroute(`**${FRONTEND_OBSERVABILITY_BROWSER_PATH}`);
   }
 });
 
@@ -767,15 +827,11 @@ test("guest and public DTOs omit connection secrets and GUEST_READABLE is not PU
     `/api/bff/api/public/clubs/${CLUB_SLUG}/browse/sessions/current`,
   );
   expect(guestCurrent.status).toBe(200);
-  expect(jsonHasKey(guestCurrent.body, "meetingUrl")).toBe(false);
-  expect(jsonHasKey(guestCurrent.body, "meetingPasscode")).toBe(false);
-  expect(guestCurrent.text).not.toContain(FIXTURE_PASSCODE);
-  expect(guestCurrent.text).not.toContain(FIXTURE_MEETING_URL);
+  expectOmitsConnectionSecretKeys(guestCurrent);
 
   const publicClub = await fetchJson(page, `/api/bff/api/public/clubs/${CLUB_SLUG}`);
   expect(publicClub.status).toBe(200);
-  expect(jsonHasKey(publicClub.body, "meetingUrl")).toBe(false);
-  expect(jsonHasKey(publicClub.body, "meetingPasscode")).toBe(false);
+  expectOmitsConnectionSecretKeys(publicClub);
   expect(JSON.stringify(publicClub.body)).not.toContain(guestOpenId);
 
   const publicSession = await fetchJson(
@@ -783,15 +839,15 @@ test("guest and public DTOs omit connection secrets and GUEST_READABLE is not PU
     `/api/bff/api/public/clubs/${CLUB_SLUG}/sessions/${guestOpenId}`,
   );
   expect(publicSession.status).toBe(404);
-  expect(jsonHasKey(publicSession.body, "meetingUrl")).toBe(false);
-  expect(jsonHasKey(publicSession.body, "meetingPasscode")).toBe(false);
+  expectOmitsConnectionSecretKeys(publicSession);
 
   const viewerEmail = uniqueViewerEmail("guest-boundary");
   viewerEmails.push(viewerEmail);
   await loginWithGoogleFixture(page, viewerEmail);
   const viewerCurrent = await fetchJson(page, `/api/bff/api/sessions/current?clubSlug=${CLUB_SLUG}`);
   expect(viewerCurrent.status).toBe(200);
-  expect((viewerCurrent.body as { currentSession?: unknown }).currentSession).toBeTruthy();
+  const viewerSession = (viewerCurrent.body as { currentSession?: Record<string, unknown> | null }).currentSession;
+  expectNoConnectionSecretValues(viewerCurrent, viewerSession);
 
   await page.context().clearCookies();
   await loginWithGoogleFixture(page, "member1@example.com");
