@@ -5,7 +5,9 @@
       "type": "BASIC_INFO_UPDATED",
       "createdAt": "2026-08-01T00:00:00Z",
       "actorMembershipId": "00000000-0000-0000-0000-000000000201",
-      "changedFields": ["title"],
+      "changedFields": [
+        "title"
+      ],
       "attendanceTransitions": [],
       "revisionId": null,
       "revisionVersion": null,
