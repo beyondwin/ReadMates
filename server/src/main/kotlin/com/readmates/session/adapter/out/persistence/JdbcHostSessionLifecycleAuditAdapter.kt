@@ -13,7 +13,8 @@ import java.util.UUID
 class JdbcHostSessionLifecycleAuditAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : HostSessionLifecycleAuditPort {
-    override fun record(entry: HostSessionLifecycleAuditEntry) {
+    override fun record(entry: HostSessionLifecycleAuditEntry): UUID? {
+        val changeId = UUID.randomUUID()
         jdbcTemplate.update(
             """
             insert into host_session_lifecycle_audit (
@@ -21,7 +22,7 @@ class JdbcHostSessionLifecycleAuditAdapter(
               from_state, to_state, reason_code, reason_note, request_id
             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
-            UUID.randomUUID().dbString(),
+            changeId.dbString(),
             entry.host.clubId.dbString(),
             entry.sessionId.dbString(),
             entry.host.membershipId.dbString(),
@@ -32,5 +33,6 @@ class JdbcHostSessionLifecycleAuditAdapter(
             entry.reasonNote,
             MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank) ?: UUID.randomUUID().toString(),
         )
+        return changeId
     }
 }

@@ -31,14 +31,23 @@ class HostSessionDraftCommandService(
     @Transactional
     override fun update(command: UpdateHostSessionCommand) =
         auditPort.loadBasicSnapshot(command.host, command.sessionId).let { before ->
-            draftPort.update(command).also {
-                val after = auditPort.loadBasicSnapshot(command.host, command.sessionId)
-                val changedFields = changedBasicFields(before, after)
-                if (changedFields.isNotEmpty()) {
-                    auditPort.recordBasicUpdate(command.host, command.sessionId, changedFields)
+            val detail = draftPort.update(command)
+            val after = auditPort.loadBasicSnapshot(command.host, command.sessionId)
+            val changedFields = changedBasicFields(before, after)
+            val receipt =
+                if (changedFields.isNotEmpty() && before != null && after != null) {
+                    auditPort.recordBasicUpdate(
+                        host = command.host,
+                        sessionId = command.sessionId,
+                        before = before,
+                        after = after,
+                        changedFields = changedFields,
+                    )
+                } else {
+                    null
                 }
-                cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-            }
+            cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+            detail.copy(changeReceipt = receipt)
         }
 }
 

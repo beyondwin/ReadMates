@@ -1,5 +1,6 @@
 package com.readmates.session.application
 
+import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.domain.PublicSiteVisibility
@@ -140,6 +141,7 @@ data class HostSessionDetailResponse(
     val visibility: SessionRecordVisibility,
     val accessScope: SessionAccessScope = SessionAccessScope.HOST_ONLY,
     val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
+    val changeReceipt: HostSessionChangeReceipt? = null,
 )
 
 data class HostSessionAttendee(
@@ -327,6 +329,7 @@ data class HostSessionDeletionCounts(
 data class HostAttendanceResponse(
     val sessionId: String,
     val count: Int,
+    val changeReceipt: HostSessionChangeReceipt? = null,
 )
 
 data class HostPublicationResponse(

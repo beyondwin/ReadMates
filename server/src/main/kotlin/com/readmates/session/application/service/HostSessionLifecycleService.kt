@@ -8,6 +8,8 @@ import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
+import com.readmates.session.application.model.HostSessionChangeKind
+import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -38,6 +40,7 @@ import org.slf4j.MDC
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
+import java.util.UUID
 
 @Service
 @Suppress("TooManyFunctions")
@@ -259,18 +262,23 @@ class HostSessionLifecycleService(
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
         return recordTransitionFailure(command, action, requestId) {
             val result = write()
+            val changeId =
+                if (result.changed) {
+                    lifecycleAudit.record(
+                        HostSessionLifecycleAuditEntry(
+                            host = command.host,
+                            sessionId = command.sessionId,
+                            action = action,
+                            fromState = from,
+                            toState = to,
+                            reasonCode = reasonCode,
+                            reasonNote = reasonNote,
+                        ),
+                    )
+                } else {
+                    null
+                }
             if (result.changed) {
-                lifecycleAudit.record(
-                    HostSessionLifecycleAuditEntry(
-                        host = command.host,
-                        sessionId = command.sessionId,
-                        action = action,
-                        fromState = from,
-                        toState = to,
-                        reasonCode = reasonCode,
-                        reasonNote = reasonNote,
-                    ),
-                )
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
                 if (reasonCode == HostSessionLifecycleReasonCode.LEGACY_UNSPECIFIED) {
                     metrics.legacyReason()
@@ -288,7 +296,16 @@ class HostSessionLifecycleService(
                 )
             }
             metrics.lifecycle(action, if (result.changed) "changed" else "unchanged")
-            result.detail
+            result.detail.copy(
+                changeReceipt =
+                    changeId?.let { id ->
+                        HostSessionChangeReceipt(
+                            changeId = id,
+                            kind = HostSessionChangeKind.LIFECYCLE,
+                            undoAvailable = true,
+                        )
+                    },
+            )
         }
     }
 
@@ -354,7 +371,7 @@ class HostSessionLifecycleService(
 }
 
 private object NoopHostSessionLifecycleAuditPort : HostSessionLifecycleAuditPort {
-    override fun record(entry: HostSessionLifecycleAuditEntry) = Unit
+    override fun record(entry: HostSessionLifecycleAuditEntry): UUID? = null
 }
 
 private fun isFirstMemberPublication(

@@ -2,6 +2,8 @@ package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostAttendanceAuditTransition
 import com.readmates.session.application.HostSessionBasicAuditSnapshot
+import com.readmates.session.application.model.HostSessionChangeKind
+import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcOffsetDateTime
@@ -85,39 +87,76 @@ class JdbcHostSessionAuditAdapter(
     override fun recordBasicUpdate(
         host: CurrentMember,
         sessionId: UUID,
+        before: HostSessionBasicAuditSnapshot,
+        after: HostSessionBasicAuditSnapshot,
         changedFields: Set<String>,
-    ) {
-        insertAudit(host, sessionId, "BASIC_INFO_UPDATED", objectMapper.writeValueAsString(changedFields.sorted()))
-    }
+        restoredFromChangeId: UUID?,
+    ): HostSessionChangeReceipt =
+        insertAudit(
+            host = host,
+            sessionId = sessionId,
+            actionType = "BASIC_INFO_UPDATED",
+            kind = HostSessionChangeKind.BASIC_INFO,
+            changedFieldsJson = objectMapper.writeValueAsString(changedFields.sorted()),
+            beforeSnapshotJson = objectMapper.writeValueAsString(before),
+            afterSnapshotJson = objectMapper.writeValueAsString(after),
+            restoredFromChangeId = restoredFromChangeId,
+        )
 
     override fun recordAttendanceUpdate(
         host: CurrentMember,
         sessionId: UUID,
         transitions: List<HostAttendanceAuditTransition>,
-    ) {
-        insertAudit(host, sessionId, "ATTENDANCE_UPDATED", objectMapper.writeValueAsString(transitions))
+        restoredFromChangeId: UUID?,
+    ): HostSessionChangeReceipt {
+        val sortedTransitions = transitions.sortedWith(compareBy(HostAttendanceAuditTransition::membershipId))
+        val snapshotJson = objectMapper.writeValueAsString(sortedTransitions)
+        return insertAudit(
+            host = host,
+            sessionId = sessionId,
+            actionType = "ATTENDANCE_UPDATED",
+            kind = HostSessionChangeKind.ATTENDANCE,
+            changedFieldsJson = objectMapper.writeValueAsString(sortedTransitions),
+            beforeSnapshotJson = snapshotJson,
+            afterSnapshotJson = snapshotJson,
+            restoredFromChangeId = restoredFromChangeId,
+        )
     }
 
     private fun insertAudit(
         host: CurrentMember,
         sessionId: UUID,
         actionType: String,
+        kind: HostSessionChangeKind,
         changedFieldsJson: String,
-    ) {
+        beforeSnapshotJson: String,
+        afterSnapshotJson: String,
+        restoredFromChangeId: UUID?,
+    ): HostSessionChangeReceipt {
+        val changeId = UUID.randomUUID()
         jdbcTemplate.update(
             """
             insert into host_session_change_audit (
               id, club_id, session_id, actor_membership_id,
-              action_type, changed_fields_json, request_id
-            ) values (?, ?, ?, ?, ?, ?, ?)
+              action_type, changed_fields_json, before_snapshot_json, after_snapshot_json,
+              restored_from_change_id, request_id
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
-            UUID.randomUUID().dbString(),
+            changeId.dbString(),
             host.clubId.dbString(),
             sessionId.dbString(),
             host.membershipId.dbString(),
             actionType,
             changedFieldsJson,
+            beforeSnapshotJson,
+            afterSnapshotJson,
+            restoredFromChangeId?.dbString(),
             MDC.get("requestId")?.takeIf(String::isNotBlank),
+        )
+        return HostSessionChangeReceipt(
+            changeId = changeId,
+            kind = kind,
+            undoAvailable = true,
         )
     }
 }

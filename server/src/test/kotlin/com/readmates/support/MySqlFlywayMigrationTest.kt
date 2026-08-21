@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(7)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(8)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("49")
+            assertThat(latestVersion).isEqualTo("50")
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -371,7 +371,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(5)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(6)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -383,7 +383,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("49")
+            assertThat(latestVersion).isEqualTo("50")
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1431,6 +1431,70 @@ class MySqlFlywayMigrationTest(
             jdbcTemplate.update(
                 "delete from host_session_lifecycle_audit where club_id = ?",
                 LIFECYCLE_AUDIT_CLUB_ID,
+            )
+        }
+    }
+
+    @Test
+    fun `mysql adds host session change snapshots without a self foreign key`() {
+        assertThat(columns("host_session_change_audit")).contains(
+            "before_snapshot_json",
+            "after_snapshot_json",
+            "restored_from_change_id",
+        )
+        assertEquals("YES", columnValue("host_session_change_audit", "before_snapshot_json", "is_nullable"))
+        assertEquals("YES", columnValue("host_session_change_audit", "after_snapshot_json", "is_nullable"))
+        assertEquals("YES", columnValue("host_session_change_audit", "restored_from_change_id", "is_nullable"))
+        assertThat(checkConstraintClause("host_session_change_audit_before_json_check")).contains("json_valid")
+        assertThat(checkConstraintClause("host_session_change_audit_after_json_check")).contains("json_valid")
+        assertThat(foreignKeyedColumns("host_session_change_audit")).doesNotContain("restored_from_change_id")
+
+        val auditId = "aaaaaaaa-0000-4000-8000-000000050001"
+        try {
+            jdbcTemplate.update(
+                """
+                insert into host_session_change_audit (
+                  id, club_id, session_id, actor_membership_id, action_type, changed_fields_json
+                ) values (?, ?, ?, ?, 'BASIC_INFO_UPDATED', '["title"]')
+                """.trimIndent(),
+                auditId,
+                CHANGE_SNAPSHOT_CLUB_ID,
+                CHANGE_SNAPSHOT_SESSION_ID,
+                CHANGE_SNAPSHOT_ACTOR_ID,
+            )
+            val row =
+                jdbcTemplate.queryForMap(
+                    """
+                    select before_snapshot_json, after_snapshot_json, restored_from_change_id, changed_fields_json
+                    from host_session_change_audit
+                    where id = ?
+                    """.trimIndent(),
+                    auditId,
+                )
+            assertThat(row["before_snapshot_json"]).isNull()
+            assertThat(row["after_snapshot_json"]).isNull()
+            assertThat(row["restored_from_change_id"]).isNull()
+            assertThat(row["changed_fields_json"].toString()).isEqualTo("""["title"]""")
+            assertThatThrownBy {
+                jdbcTemplate.update(
+                    """
+                    insert into host_session_change_audit (
+                      id, club_id, session_id, actor_membership_id, action_type,
+                      changed_fields_json, before_snapshot_json
+                    ) values (?, ?, ?, ?, 'BASIC_INFO_UPDATED', '["title"]', 'not-json')
+                    """.trimIndent(),
+                    "aaaaaaaa-0000-4000-8000-000000050002",
+                    CHANGE_SNAPSHOT_CLUB_ID,
+                    CHANGE_SNAPSHOT_SESSION_ID,
+                    CHANGE_SNAPSHOT_ACTOR_ID,
+                )
+            }.isInstanceOf(UncategorizedSQLException::class.java)
+                .hasMessageContaining("host_session_change_audit_before_json_check")
+        } finally {
+            jdbcTemplate.update(
+                "delete from host_session_change_audit where id in (?, ?)",
+                auditId,
+                "aaaaaaaa-0000-4000-8000-000000050002",
             )
         }
     }
@@ -2486,6 +2550,9 @@ class MySqlFlywayMigrationTest(
         private const val LIFECYCLE_AUDIT_CLUB_ID = "aaaaaaaa-0000-4000-8000-000000049002"
         private const val LIFECYCLE_AUDIT_SESSION_ID = "aaaaaaaa-0000-4000-8000-000000049003"
         private const val LIFECYCLE_AUDIT_ACTOR_ID = "aaaaaaaa-0000-4000-8000-000000049004"
+        private const val CHANGE_SNAPSHOT_CLUB_ID = "00000000-0000-0000-0000-000000000001"
+        private const val CHANGE_SNAPSHOT_SESSION_ID = "00000000-0000-0000-0000-000000000301"
+        private const val CHANGE_SNAPSHOT_ACTOR_ID = "00000000-0000-0000-0000-000000000201"
     }
 
     private fun assertLifecycleAuditSchema() {
@@ -2553,6 +2620,20 @@ class MySqlFlywayMigrationTest(
                 from information_schema.referential_constraints
                 where constraint_schema = database()
                   and table_name = ?
+                """.trimIndent(),
+                String::class.java,
+                tableName,
+            ).filterNotNull()
+
+    private fun foreignKeyedColumns(tableName: String): List<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select column_name
+                from information_schema.key_column_usage
+                where table_schema = database()
+                  and table_name = ?
+                  and referenced_table_name is not null
                 """.trimIndent(),
                 String::class.java,
                 tableName,

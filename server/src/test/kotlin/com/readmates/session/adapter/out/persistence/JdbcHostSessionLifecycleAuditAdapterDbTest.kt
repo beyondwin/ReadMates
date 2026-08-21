@@ -143,6 +143,34 @@ class JdbcHostSessionLifecycleAuditAdapterDbTest(
         UUID.fromString(checkNotNull(requestId))
     }
 
+    @Test
+    fun `record returns the generated lifecycle audit id`() {
+        insertDraftSessionFixture()
+        MDC.put(RequestIdFilter.MDC_KEY, REQUEST_ID)
+
+        val changeId =
+            auditAdapter.record(
+                HostSessionLifecycleAuditEntry(
+                    host = host(),
+                    sessionId = SESSION_ID,
+                    action = HostSessionLifecycleAction.DELETED,
+                    fromState = "DRAFT",
+                    toState = null,
+                    reasonCode = HostSessionLifecycleReasonCode.EMPTY_SESSION_DELETED,
+                    reasonNote = null,
+                ),
+            )
+
+        assertThat(changeId).isNotNull()
+        val storedId =
+            jdbcTemplate.queryForObject(
+                "select id from host_session_lifecycle_audit where session_id = ?",
+                String::class.java,
+                SESSION_ID.toString(),
+            )
+        assertThat(storedId).isEqualTo(changeId.toString())
+    }
+
     private fun insertDraftSessionFixture() {
         jdbcTemplate.update(
             """

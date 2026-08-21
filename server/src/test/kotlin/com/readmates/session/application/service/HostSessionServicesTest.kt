@@ -31,6 +31,8 @@ import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostSessionChangeKind
+import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionDeletionBlocker
@@ -119,6 +121,16 @@ class HostSessionServicesTest {
         service.list(host, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
 
         assertEquals(host, port.listHost)
+    }
+
+    @Test
+    fun `query detail returns no change receipt`() {
+        val port = RecordingHostSessionPorts()
+        val service = HostSessionQueryService(port)
+
+        val result = service.detail(HostSessionIdCommand(host, sessionId))
+
+        assertThat(result.changeReceipt).isNull()
     }
 
     @Test
@@ -435,6 +447,51 @@ class HostSessionServicesTest {
     }
 
     @Test
+    fun `basic update records before after snapshots and returns the audit receipt`() {
+        val port = RecordingHostSessionPorts()
+        val before = basicAuditSnapshot()
+        val after =
+            before.copy(
+                title = "수정된 회차",
+                meetingUrl = "https://changed.invalid/private",
+                meetingPasscode = "changed-private-value",
+            )
+        port.basicSnapshots += before
+        port.basicSnapshots += after
+        val receipt =
+            HostSessionChangeReceipt(
+                changeId = UUID.fromString("00000000-0000-0000-0000-000000000501"),
+                kind = HostSessionChangeKind.BASIC_INFO,
+                undoAvailable = true,
+            )
+        port.basicChangeReceipt = receipt
+        val service = HostSessionDraftCommandService(port, port)
+
+        val result = service.update(UpdateHostSessionCommand(host, sessionId, hostSessionCommand()))
+
+        assertThat(port.basicAuditBefore).isEqualTo(before)
+        assertThat(port.basicAuditAfter).isEqualTo(after)
+        assertThat(port.basicAuditFields).containsExactlyInAnyOrder("meetingPasscode", "meetingUrl", "title")
+        assertThat(port.basicAuditRestoredFromChangeId).isNull()
+        assertThat(result.changeReceipt).isEqualTo(receipt)
+    }
+
+    @Test
+    fun `idempotent basic update returns no change receipt`() {
+        val port = RecordingHostSessionPorts()
+        val snapshot = basicAuditSnapshot()
+        port.basicSnapshots += snapshot
+        port.basicSnapshots += snapshot
+        val service = HostSessionDraftCommandService(port, port)
+
+        val result = service.update(UpdateHostSessionCommand(host, sessionId, hostSessionCommand()))
+
+        assertThat(port.basicAuditBefore).isNull()
+        assertThat(port.basicAuditFields).isEmpty()
+        assertThat(result.changeReceipt).isNull()
+    }
+
+    @Test
     fun `attendance audit records membership id and changed state only`() {
         val port = RecordingHostSessionPorts()
         val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000401")
@@ -451,6 +508,60 @@ class HostSessionServicesTest {
 
         assertThat(port.attendanceAuditTransitions)
             .containsExactly(HostAttendanceAuditTransition(membershipId.toString(), "ABSENT", "ATTENDED"))
+    }
+
+    @Test
+    fun `attendance update returns one receipt for the batch of transitions`() {
+        val port = RecordingHostSessionPorts()
+        val firstId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        val secondId = UUID.fromString("00000000-0000-0000-0000-000000000402")
+        port.attendanceStates = mapOf(firstId to "ABSENT", secondId to "UNKNOWN")
+        val receipt =
+            HostSessionChangeReceipt(
+                changeId = UUID.fromString("00000000-0000-0000-0000-000000000502"),
+                kind = HostSessionChangeKind.ATTENDANCE,
+                undoAvailable = true,
+            )
+        port.attendanceChangeReceipt = receipt
+        val service = HostSessionAttendanceService(port, port)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(firstId.toString(), "ATTENDED"),
+                        AttendanceEntryCommand(secondId.toString(), "ABSENT"),
+                    ),
+            )
+
+        val result = service.confirmAttendance(command)
+
+        assertThat(port.attendanceAuditTransitions).containsExactly(
+            HostAttendanceAuditTransition(firstId.toString(), "ABSENT", "ATTENDED"),
+            HostAttendanceAuditTransition(secondId.toString(), "UNKNOWN", "ABSENT"),
+        )
+        assertThat(port.attendanceAuditRestoredFromChangeId).isNull()
+        assertThat(result.changeReceipt).isEqualTo(receipt)
+    }
+
+    @Test
+    fun `idempotent attendance update returns no change receipt`() {
+        val port = RecordingHostSessionPorts()
+        val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        port.attendanceStates = mapOf(membershipId to "ATTENDED")
+        val service = HostSessionAttendanceService(port, port)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED")),
+            )
+
+        val result = service.confirmAttendance(command)
+
+        assertThat(port.attendanceAuditTransitions).isEmpty()
+        assertThat(result.changeReceipt).isNull()
     }
 
     @Test
@@ -777,10 +888,17 @@ class HostSessionServicesTest {
         val harness = lifecycleHarness()
         val command = HostSessionIdCommand(host, sessionId)
 
-        harness.service.open(command)
+        val opened = harness.service.open(command)
         harness.service.close(command)
         harness.service.publish(command)
 
+        assertThat(opened.changeReceipt).isEqualTo(
+            HostSessionChangeReceipt(
+                changeId = harness.audit.lastChangeId,
+                kind = HostSessionChangeKind.LIFECYCLE,
+                undoAvailable = true,
+            ),
+        )
         assertThat(harness.audit.entries).hasSize(3)
         assertThat(harness.audit.entries[0])
             .extracting(
@@ -899,7 +1017,7 @@ class HostSessionServicesTest {
                     },
             )
 
-        harness.service.open(HostSessionIdCommand(host, sessionId))
+        val unchangedOpen = harness.service.open(HostSessionIdCommand(host, sessionId))
         harness.service.close(HostSessionIdCommand(host, sessionId))
         harness.service.publish(HostSessionIdCommand(host, sessionId))
         harness.service.reopen(reverseCommand())
@@ -908,6 +1026,7 @@ class HostSessionServicesTest {
 
         harness.service.reopen(reverseCommand(reasonCode = null))
 
+        assertThat(unchangedOpen.changeReceipt).isNull()
         assertThat(harness.audit.entries).isEmpty()
         assertThat(harness.transitionCount("OPENED", "unchanged")).isEqualTo(1.0)
         assertThat(harness.transitionCount("REOPENED", "unchanged")).isEqualTo(2.0)
@@ -1362,10 +1481,12 @@ class HostSessionServicesTest {
     private class RecordingHostSessionLifecycleAuditPort : HostSessionLifecycleAuditPort {
         val entries = mutableListOf<HostSessionLifecycleAuditEntry>()
         var failure: RuntimeException? = null
+        val lastChangeId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000601")
 
-        override fun record(entry: HostSessionLifecycleAuditEntry) {
+        override fun record(entry: HostSessionLifecycleAuditEntry): UUID? {
             failure?.let { throw it }
             entries += entry
+            return lastChangeId
         }
     }
 
@@ -1443,9 +1564,25 @@ class HostSessionServicesTest {
         var visibilityUpdateCount = 0
         var visibilityLockCount = 0
         val basicSnapshots = ArrayDeque<HostSessionBasicAuditSnapshot>()
+        var basicAuditBefore: HostSessionBasicAuditSnapshot? = null
+        var basicAuditAfter: HostSessionBasicAuditSnapshot? = null
         var basicAuditFields: Set<String> = emptySet()
+        var basicAuditRestoredFromChangeId: UUID? = null
+        var basicChangeReceipt =
+            HostSessionChangeReceipt(
+                changeId = UUID.fromString("00000000-0000-0000-0000-000000000501"),
+                kind = HostSessionChangeKind.BASIC_INFO,
+                undoAvailable = true,
+            )
         var attendanceStates: Map<UUID, String> = emptyMap()
         var attendanceAuditTransitions: List<HostAttendanceAuditTransition> = emptyList()
+        var attendanceAuditRestoredFromChangeId: UUID? = null
+        var attendanceChangeReceipt =
+            HostSessionChangeReceipt(
+                changeId = UUID.fromString("00000000-0000-0000-0000-000000000502"),
+                kind = HostSessionChangeKind.ATTENDANCE,
+                undoAvailable = true,
+            )
 
         override fun list(
             host: CurrentMember,
@@ -1500,17 +1637,27 @@ class HostSessionServicesTest {
         override fun recordBasicUpdate(
             host: CurrentMember,
             sessionId: UUID,
+            before: HostSessionBasicAuditSnapshot,
+            after: HostSessionBasicAuditSnapshot,
             changedFields: Set<String>,
-        ) {
+            restoredFromChangeId: UUID?,
+        ): HostSessionChangeReceipt {
+            basicAuditBefore = before
+            basicAuditAfter = after
             basicAuditFields = changedFields
+            basicAuditRestoredFromChangeId = restoredFromChangeId
+            return basicChangeReceipt
         }
 
         override fun recordAttendanceUpdate(
             host: CurrentMember,
             sessionId: UUID,
             transitions: List<HostAttendanceAuditTransition>,
-        ) {
+            restoredFromChangeId: UUID?,
+        ): HostSessionChangeReceipt {
             attendanceAuditTransitions = transitions
+            attendanceAuditRestoredFromChangeId = restoredFromChangeId
+            return attendanceChangeReceipt
         }
 
         override fun detail(command: HostSessionIdCommand) =

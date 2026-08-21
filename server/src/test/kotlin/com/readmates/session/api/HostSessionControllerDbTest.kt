@@ -1099,6 +1099,51 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `basic update persists snapshots and returns a change receipt`() {
+        val sessionId = createDraftSessionSeven()
+
+        val body =
+            mockMvc
+                .patch("/api/host/sessions/$sessionId") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = hostSessionRequestJson()
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.changeReceipt.kind") { value("BASIC_INFO") }
+                    jsonPath("$.changeReceipt.undoAvailable") { value(true) }
+                    jsonPath("$.changeReceipt.changeId") { exists() }
+                }.andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+
+        val changeId = body.get("changeReceipt").get("changeId").asString()
+        val audit =
+            jdbcTemplate.queryForMap(
+                """
+                select id, before_snapshot_json, after_snapshot_json, restored_from_change_id, changed_fields_json
+                from host_session_change_audit
+                where session_id = ?
+                """.trimIndent(),
+                sessionId,
+            )
+        assertThat(audit["id"]).isEqualTo(changeId)
+        assertThat(audit["restored_from_change_id"]).isNull()
+        val before = jsonMapper.readTree(audit["before_snapshot_json"].toString())
+        val after = jsonMapper.readTree(audit["after_snapshot_json"].toString())
+        assertThat(before.get("title").asString()).isEqualTo("7회차 · 테스트 책")
+        assertThat(before.get("meetingUrl").isNull).isTrue()
+        assertThat(after.get("meetingUrl").asString()).isEqualTo("https://meet.google.com/readmates-test")
+        assertThat(after.get("meetingPasscode").asString()).isEqualTo("readmates")
+        assertThat(audit["changed_fields_json"].toString())
+            .contains("meetingUrl", "meetingPasscode")
+            .doesNotContain("meet.google.com")
+            .doesNotContain("readmates")
+    }
+
+    @Test
     fun `attendance audit records membership id and state transition`() {
         createSessionSeven()
         val membershipId = "00000000-0000-0000-0000-000000000201"
@@ -1122,6 +1167,89 @@ class HostSessionControllerDbTest(
         assertThat(details)
             .contains(membershipId, """"from":"UNKNOWN"""", """"to":"ABSENT"""")
             .doesNotContain("host@example.com", "김호스트")
+    }
+
+    @Test
+    fun `attendance update persists sorted snapshots and returns a change receipt`() {
+        createSessionSeven()
+        val firstMembershipId = "00000000-0000-0000-0000-000000000201"
+        val secondMembershipId = "00000000-0000-0000-0000-000000000202"
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+
+        val body =
+            mockMvc
+                .post("/api/host/sessions/$sessionId/attendance") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        [
+                          {"membershipId":"$secondMembershipId","attendanceStatus":"ATTENDED"},
+                          {"membershipId":"$firstMembershipId","attendanceStatus":"ABSENT"}
+                        ]
+                        """.trimIndent()
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.changeReceipt.kind") { value("ATTENDANCE") }
+                    jsonPath("$.changeReceipt.undoAvailable") { value(true) }
+                    jsonPath("$.changeReceipt.changeId") { exists() }
+                    jsonPath("$.count") { value(2) }
+                }.andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+
+        val changeId = body.get("changeReceipt").get("changeId").asString()
+        val audit =
+            jdbcTemplate.queryForMap(
+                """
+                select id, before_snapshot_json, after_snapshot_json, restored_from_change_id, changed_fields_json
+                from host_session_change_audit
+                where session_id = ?
+                """.trimIndent(),
+                sessionId,
+            )
+        assertThat(audit["id"]).isEqualTo(changeId)
+        assertThat(audit["restored_from_change_id"]).isNull()
+        val snapshot = jsonMapper.readTree(audit["before_snapshot_json"].toString())
+        assertThat(snapshot).hasSize(2)
+        assertThat(snapshot.get(0).get("membershipId").asString()).isEqualTo(firstMembershipId)
+        assertThat(snapshot.get(1).get("membershipId").asString()).isEqualTo(secondMembershipId)
+        assertThat(audit["after_snapshot_json"].toString()).isEqualTo(audit["before_snapshot_json"].toString())
+        assertThat(audit["changed_fields_json"].toString())
+            .contains(firstMembershipId, secondMembershipId, """"from":"UNKNOWN"""")
+            .doesNotContain("host@example.com", "김호스트")
+    }
+
+    @Test
+    fun `legacy change audit rows without snapshots remain readable and unrestorable`() {
+        val sessionId = createDraftSessionSeven()
+        val auditId = "00000000-0000-4000-8000-00000000a039"
+        jdbcTemplate.update(
+            """
+            insert into host_session_change_audit (
+              id, club_id, session_id, actor_membership_id, action_type, changed_fields_json
+            ) values (?, '00000000-0000-0000-0000-000000000001', ?, ?, 'BASIC_INFO_UPDATED', '["title"]')
+            """.trimIndent(),
+            auditId,
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+        )
+
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select before_snapshot_json, after_snapshot_json, restored_from_change_id, changed_fields_json
+                from host_session_change_audit
+                where id = ?
+                """.trimIndent(),
+                auditId,
+            )
+        assertThat(row["before_snapshot_json"]).isNull()
+        assertThat(row["after_snapshot_json"]).isNull()
+        assertThat(row["restored_from_change_id"]).isNull()
+        assertThat(row["changed_fields_json"].toString()).isEqualTo("""["title"]""")
     }
 
     @Test
@@ -1362,15 +1490,30 @@ class HostSessionControllerDbTest(
     fun `host starts draft session as open and creates active participants`() {
         val sessionId = createDraftSessionSeven()
 
-        mockMvc
-            .post("/api/host/sessions/$sessionId/open") {
-                with(user("host@example.com"))
-                with(csrf())
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.state") { value("OPEN") }
-            }
+        val body =
+            mockMvc
+                .post("/api/host/sessions/$sessionId/open") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.state") { value("OPEN") }
+                    jsonPath("$.changeReceipt.kind") { value("LIFECYCLE") }
+                    jsonPath("$.changeReceipt.undoAvailable") { value(true) }
+                    jsonPath("$.changeReceipt.changeId") { exists() }
+                }.andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
 
+        val changeId = body.get("changeReceipt").get("changeId").asString()
+        val storedId =
+            jdbcTemplate.queryForObject(
+                "select id from host_session_lifecycle_audit where session_id = ?",
+                String::class.java,
+                sessionId,
+            )
+        assertEquals(changeId, storedId)
         val participantCount = participantCountForSessionNumber(7)
         assertEquals(6, participantCount)
     }
@@ -1401,6 +1544,7 @@ class HostSessionControllerDbTest(
                 status { isOk() }
                 jsonPath("$.attendees[0].avatarKey") { value("toast-brown-book") }
                 jsonPath("$.attendees[0].profileImageUrl") { doesNotExist() }
+                jsonPath("$.changeReceipt") { value(null) }
             }
     }
 
@@ -1447,6 +1591,7 @@ class HostSessionControllerDbTest(
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
                 jsonPath("$.state") { value("OPEN") }
+                jsonPath("$.changeReceipt.kind") { value("LIFECYCLE") }
             }
 
         val afterFirstOpen = lifecycleDbEvidence(sessionId)
@@ -1459,6 +1604,7 @@ class HostSessionControllerDbTest(
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
                 jsonPath("$.state") { value("OPEN") }
+                jsonPath("$.changeReceipt") { value(null) }
             }
 
         assertEquals(afterFirstOpen, lifecycleDbEvidence(sessionId))
