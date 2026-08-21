@@ -6,9 +6,18 @@ import {
 import type { HostSessionEditorLocation } from "./host-session-editor-navigation";
 import type { DraftSaveState } from "./host-session-record-editor-model";
 
+export type AppliedSessionRecordSource = "REVISION" | "LEGACY_SNAPSHOT";
+
 export type SessionRecordSnapshot = {
   visibility: SessionRecordVisibility;
   publicationSummary: string;
+  highlights: readonly unknown[];
+  oneLineReviews: readonly unknown[];
+  feedbackDocument: {
+    fileName: string;
+    title: string;
+    markdown: string;
+  };
 };
 
 export type HostSessionRecordDraft = {
@@ -42,6 +51,7 @@ export type HostSessionEditorNextActionKind =
 export type HostSessionEditorOverview = {
   applied: {
     exists: boolean;
+    source: AppliedSessionRecordSource | null;
     versionLabel: string | null;
     visibilityLabel: string;
     appliedAt: string | null;
@@ -62,7 +72,7 @@ export type HostSessionEditorOverview = {
   };
 };
 
-type HostSessionEditorOverviewInput = {
+export type HostSessionEditorOverviewInput = {
   isNewSession: boolean;
   liveRevision: number;
   liveSnapshot: SessionRecordSnapshot | null;
@@ -72,6 +82,22 @@ type HostSessionEditorOverviewInput = {
   draftLiveBaseStale: boolean;
   validationIssues: readonly string[];
 };
+
+export function hasAppliedSessionRecord({
+  liveRevision,
+  liveSnapshot,
+}: Pick<HostSessionEditorOverviewInput, "liveRevision" | "liveSnapshot">): boolean {
+  if (liveRevision > 0) return true;
+  if (!liveSnapshot) return false;
+  return Boolean(
+    liveSnapshot.publicationSummary.trim()
+      || liveSnapshot.highlights.length
+      || liveSnapshot.oneLineReviews.length
+      || liveSnapshot.feedbackDocument.title.trim()
+      || liveSnapshot.feedbackDocument.markdown.trim()
+      || liveSnapshot.feedbackDocument.fileName.trim(),
+  );
+}
 
 const recordTarget: HostSessionEditorLocation = { section: "records", source: "manual" };
 const overviewTarget: HostSessionEditorLocation = { section: "overview", source: "manual" };
@@ -114,9 +140,11 @@ const historySourceLabels: Record<NonNullable<HostSessionHistoryItem["revisionSo
 };
 
 export function buildHostSessionEditorOverview(input: HostSessionEditorOverviewInput): HostSessionEditorOverview {
+  const exists = hasAppliedSessionRecord(input);
   return {
     applied: {
-      exists: input.liveRevision > 0,
+      exists,
+      source: input.liveRevision > 0 ? "REVISION" : exists ? "LEGACY_SNAPSHOT" : null,
       versionLabel: input.liveRevision > 0 ? `버전 ${input.liveRevision}` : null,
       visibilityLabel: recordVisibilityLabel(input.liveSnapshot?.visibility ?? "HOST_ONLY"),
       appliedAt: input.lastAppliedAt,
@@ -203,7 +231,7 @@ function buildNextAction(input: HostSessionEditorOverviewInput): HostSessionEdit
   if (input.draft && input.draftSaveState === "saved") {
     return { kind: "REVIEW_DRAFT", label: "초안 내용을 검토하세요", target: recordTarget, enabled: true };
   }
-  if (input.liveRevision === 0 && !input.draft) {
+  if (!hasAppliedSessionRecord(input) && !input.draft) {
     return { kind: "CREATE_DRAFT", label: "기록 초안을 만들어 보세요", target: recordTarget, enabled: true };
   }
   return { kind: "UP_TO_DATE", label: "현재 기록이 최신입니다", target: overviewTarget, enabled: false };

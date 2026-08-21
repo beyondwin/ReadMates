@@ -88,9 +88,7 @@ class SessionRecordApplyService(
                 "Session record draft hash is invalid",
             )
         }
-        val encodedLive = codec.encode(editor.live.snapshot)
         val trustedAuthorBindings = draft.trustedAuthorBindings()
-        store.insertBaselineIfAbsent(host, editor.live, encodedLive)
         val replacement =
             replacer.replace(
                 SessionRecordContentReplacement(

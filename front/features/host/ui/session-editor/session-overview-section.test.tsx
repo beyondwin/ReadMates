@@ -29,6 +29,7 @@ describe("SessionOverviewSection", () => {
       overview: overviewFixture({
         applied: {
           exists: false,
+          source: null,
           versionLabel: null,
           visibilityLabel: "호스트만",
           appliedAt: null,
@@ -329,6 +330,7 @@ function overviewFixture(
   return {
     applied: {
       exists: true,
+      source: "REVISION",
       versionLabel: "버전 3",
       visibilityLabel: "게스트 공개",
       appliedAt: "2026-07-27T12:00:00+09:00",

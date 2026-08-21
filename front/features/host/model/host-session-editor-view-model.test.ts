@@ -3,6 +3,7 @@ import {
   buildHostSessionEditorOverview,
   buildHostSessionHistoryItemView,
   compactSessionLifecycleLabel,
+  hasAppliedSessionRecord,
 } from "./host-session-editor-view-model";
 
 const snapshot = {
@@ -167,6 +168,7 @@ describe("host session editor view model", () => {
       lastAppliedAt: null,
     }).applied).toEqual({
       exists: false,
+      source: null,
       versionLabel: null,
       visibilityLabel: "게스트 공개 · 공개 기록에 게시",
       appliedAt: null,
@@ -174,10 +176,37 @@ describe("host session editor view model", () => {
     });
     expect(buildHostSessionEditorOverview(overviewInput()).applied).toEqual({
       exists: true,
+      source: "REVISION",
       versionLabel: "버전 3",
       visibilityLabel: "게스트 공개",
       appliedAt: "2026-07-27T09:00:00+09:00",
       summary: "함께 읽은 기록입니다.",
+    });
+  });
+
+  it("treats a meaningful revision-zero live snapshot as an applied legacy baseline", () => {
+    const legacySnapshot = {
+      ...snapshot,
+      publicationSummary: "레거시 공개 요약입니다.",
+    };
+    const legacyInput = {
+      ...overviewInput(),
+      liveRevision: 0,
+      liveSnapshot: legacySnapshot,
+      lastAppliedAt: null,
+      draft: null,
+    };
+
+    expect(hasAppliedSessionRecord({ liveRevision: 0, liveSnapshot: legacySnapshot })).toBe(true);
+    expect(hasAppliedSessionRecord({ liveRevision: 0, liveSnapshot: null })).toBe(false);
+    expect(buildHostSessionEditorOverview(legacyInput).nextAction.kind).toBe("UP_TO_DATE");
+    expect(buildHostSessionEditorOverview(legacyInput).applied).toEqual({
+      exists: true,
+      source: "LEGACY_SNAPSHOT",
+      versionLabel: null,
+      visibilityLabel: "게스트 공개",
+      appliedAt: null,
+      summary: "레거시 공개 요약입니다.",
     });
   });
 

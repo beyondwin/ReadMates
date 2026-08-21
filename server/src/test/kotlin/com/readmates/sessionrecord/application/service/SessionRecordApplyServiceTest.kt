@@ -103,17 +103,14 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
-    fun `first apply writes a baseline then a new immutable revision`() {
+    fun `first apply on a legacy revision zero snapshot writes only version one`() {
         val fixture = Fixture(liveRevision = 0)
 
         val result = fixture.apply()
 
-        assertEquals(
-            listOf(SessionRecordSource.BASELINE, SessionRecordSource.MANUAL),
-            fixture.store.revisions.map { it.source },
-        )
-        assertEquals(listOf(1L, 2L), fixture.store.revisions.map { it.version })
-        assertEquals(2L, result.liveRevision)
+        assertEquals(listOf(SessionRecordSource.MANUAL), fixture.store.revisions.map { it.source })
+        assertEquals(listOf(1L), fixture.store.revisions.map { it.version })
+        assertEquals(1L, result.liveRevision)
         assertNull(fixture.store.draft)
     }
 
@@ -241,7 +238,7 @@ class SessionRecordApplyServiceTest {
         }
 
         assertEquals(
-            listOf("baseline", "live replacement", "applied revision"),
+            listOf("live replacement", "applied revision"),
             fixture.store.operations,
         )
         assertNotNull(fixture.replacer.lastInput)
@@ -472,17 +469,6 @@ private class FakeApplyStore(
             receipts += it
         }
 
-    override fun insertBaselineIfAbsent(
-        host: AuthenticatedClubActor,
-        live: LiveSessionRecord,
-        encoded: EncodedSessionRecordSnapshot,
-    ) {
-        if (live.revision == 0L) {
-            operations += "baseline"
-            stagedRevisions += revision(host, live.snapshot, 1, SessionRecordSource.BASELINE, null)
-        }
-    }
-
     override fun insertAppliedRevision(
         host: AuthenticatedClubActor,
         editor: SessionRecordEditor,
@@ -492,7 +478,7 @@ private class FakeApplyStore(
         if (failOnAppliedRevisionInsert) {
             throw IllegalStateException("test-only applied revision failure")
         }
-        val version = if (editor.live.revision == 0L) 2 else editor.live.revision + 1
+        val version = editor.live.revision + 1
         val source = SessionRecordSource.valueOf(requireNotNull(editor.draft).source.name)
         return revision(host, codec.decode(encoded.json), version, source, editor.draft.restoredFromRevisionId)
             .also(stagedRevisions::add)

@@ -351,12 +351,6 @@ class SessionRecordDraftServiceTest {
             revision = revision,
         )
 
-        override fun insertBaselineIfAbsent(
-            host: AuthenticatedClubActor,
-            live: LiveSessionRecord,
-            encoded: EncodedSessionRecordSnapshot,
-        ) = Unit
-
         override fun insertAppliedRevision(
             host: AuthenticatedClubActor,
             editor: SessionRecordEditor,

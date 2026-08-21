@@ -266,7 +266,54 @@ class JdbcSessionRecordAdapterTest(
     }
 
     @Test
-    fun `apply persistence writes baseline and immutable revision before deleting the draft`() {
+    fun `first apply on revision zero writes only version one without a baseline row`() {
+        val fixture = fixture("legacy-apply")
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        assertThat(live.revision).isEqualTo(0)
+        val draft =
+            adapter.insertDraft(
+                fixture.host,
+                live,
+                SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+                codec.encode(fixture.snapshot),
+            )
+        val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
+
+        val applied = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
+
+        assertThat(applied.version).isEqualTo(1L)
+        assertThat(adapter.deleteAppliedDraft(fixture.host, fixture.sessionId, draft.draftRevision)).isTrue()
+        assertThat(adapter.loadDraft(fixture.host, fixture.sessionId)).isNull()
+        assertThat(
+            jdbcTemplate.queryForList(
+                """
+                select version
+                from session_record_revisions
+                where club_id = ? and session_id = ?
+                order by version
+                """.trimIndent(),
+                Long::class.java,
+                fixture.host.clubId.toString(),
+                fixture.sessionId.toString(),
+            ),
+        ).containsExactly(1L)
+        assertThat(
+            jdbcTemplate.queryForList(
+                """
+                select source
+                from session_record_revisions
+                where club_id = ? and session_id = ?
+                order by version
+                """.trimIndent(),
+                String::class.java,
+                fixture.host.clubId.toString(),
+                fixture.sessionId.toString(),
+            ),
+        ).doesNotContain("BASELINE")
+    }
+
+    @Test
+    fun `apply persistence writes an immutable revision before deleting the draft`() {
         val fixture = fixture("apply")
         val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
         val draft =
@@ -278,10 +325,9 @@ class JdbcSessionRecordAdapterTest(
             )
         val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
 
-        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
         val applied = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
 
-        assertThat(applied.version).isEqualTo(2)
+        assertThat(applied.version).isEqualTo(1)
         assertThat(adapter.deleteAppliedDraft(fixture.host, fixture.sessionId, draft.draftRevision)).isTrue()
         assertThat(adapter.loadDraft(fixture.host, fixture.sessionId)).isNull()
         assertThat(
@@ -296,7 +342,7 @@ class JdbcSessionRecordAdapterTest(
                 fixture.host.clubId.toString(),
                 fixture.sessionId.toString(),
             ),
-        ).containsExactly("BASELINE", "MANUAL")
+        ).containsExactly("MANUAL")
     }
 
     @Test
@@ -311,7 +357,6 @@ class JdbcSessionRecordAdapterTest(
                 codec.encode(fixture.snapshot),
             )
         val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
-        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
         val revision = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
         val requestId = UUID.randomUUID()
         val command =
@@ -432,37 +477,6 @@ class JdbcSessionRecordAdapterTest(
     }
 
     @Test
-    fun `baseline insert never overwrites the first immutable snapshot`() {
-        val fixture = fixture("baseline-once")
-        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
-        val changed = live.snapshot.copy(publicationSummary = "덮어쓰면 안 되는 요약")
-
-        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
-        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(changed))
-
-        val storedJson =
-            jdbcTemplate.queryForObject(
-                """
-                select snapshot_json
-                from session_record_revisions
-                where club_id = ? and session_id = ? and version = 1
-                """.trimIndent(),
-                String::class.java,
-                fixture.host.clubId.toString(),
-                fixture.sessionId.toString(),
-            )
-        assertThat(codec.decode(requireNotNull(storedJson))).isEqualTo(live.snapshot)
-        assertThat(
-            jdbcTemplate.queryForObject(
-                "select count(*) from session_record_revisions where club_id = ? and session_id = ?",
-                Long::class.java,
-                fixture.host.clubId.toString(),
-                fixture.sessionId.toString(),
-            ),
-        ).isEqualTo(1L)
-    }
-
-    @Test
     fun `restored draft insert is conditional and update keeps optimistic revision`() {
         val fixture = fixture("restore-cas")
         val revisionId =
@@ -502,7 +516,6 @@ class JdbcSessionRecordAdapterTest(
                 codec.encode(fixture.snapshot),
             )
         val editor = requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId))
-        adapter.insertBaselineIfAbsent(fixture.host, live, codec.encode(live.snapshot))
         val revision = adapter.insertAppliedRevision(fixture.host, editor, codec.encode(draft.snapshot))
         val command =
             ApplySessionRecordCommand(

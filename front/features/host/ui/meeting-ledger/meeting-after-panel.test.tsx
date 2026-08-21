@@ -2,6 +2,8 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
+import { buildHostSessionEditorOverview } from "@/features/host/model/host-session-editor-view-model";
+import { SessionOverviewSection } from "../session-editor/session-overview-section";
 import { MeetingAfterPanel } from "./meeting-after-panel";
 
 const importPreview: SessionImportPreviewResponse = {
@@ -18,7 +20,45 @@ const importPreview: SessionImportPreviewResponse = {
   issues: [],
 };
 
+const legacySnapshot = {
+  schema: "readmates-session-record:v1",
+  visibility: "MEMBER",
+  publicationSummary: "레거시 공개 요약입니다.",
+  highlights: [],
+  oneLineReviews: [],
+  feedbackDocument: { fileName: "", title: "", markdown: "" },
+} as const;
+
 describe("MeetingAfterPanel", () => {
+  it("publishes from a legacy applied snapshot summary without a revision number", () => {
+    const overview = buildHostSessionEditorOverview({
+      isNewSession: false,
+      liveRevision: 0,
+      liveSnapshot: legacySnapshot,
+      lastAppliedAt: null,
+      draft: null,
+      draftSaveState: "idle",
+      draftLiveBaseStale: false,
+      validationIssues: [],
+    });
+
+    render(
+      <SessionOverviewSection
+        overview={overview}
+        sessionState="CLOSED"
+        onNextAction={() => {}}
+        onPublishSession={() => {}}
+        lifecyclePending={false}
+        accessScope="GUEST_READABLE"
+      />,
+    );
+
+    expect(screen.getByText(legacySnapshot.publicationSummary)).toBeInTheDocument();
+    expect(screen.getByText("이전 적용본")).toBeInTheDocument();
+    expect(screen.queryByText("버전 0")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
+  });
+
   it("offers package upload not a feedback textarea", () => {
     render(<MeetingAfterPanel state="CLOSED" summary="" accessScope="GUEST_READABLE" />);
     expect(screen.getByRole("button", { name: "정리본 올리기" })).toBeInTheDocument();

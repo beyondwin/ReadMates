@@ -59,12 +59,6 @@ interface SessionRecordApplyStorePort {
         revision: SessionRecordRevision,
     ): SessionRecordApplyReceipt
 
-    fun insertBaselineIfAbsent(
-        host: AuthenticatedClubActor,
-        live: LiveSessionRecord,
-        encoded: EncodedSessionRecordSnapshot,
-    )
-
     fun insertAppliedRevision(
         host: AuthenticatedClubActor,
         editor: SessionRecordEditor,

@@ -75,6 +75,12 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
       );
     delete from session_record_drafts
     where session_id = '00000000-0000-0000-0000-000000019777';
+    delete from session_record_apply_receipts
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
     delete from session_record_revisions
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
@@ -312,9 +318,62 @@ class HostSessionControllerDbTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val hostSessionDraftPort: HostSessionDraftPort,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    private val jsonMapper = tools.jackson.databind.ObjectMapper()
+
     private companion object {
         const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
         const val MEMBER5_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000206"
+        val LEGACY_FEEDBACK_MARKDOWN =
+            """
+            <!-- readmates-feedback:v1 -->
+
+            # 독서모임 7차 피드백
+
+            테스트 책 · 2026.05.20
+
+            ## 메타
+
+            - 일시: 2026.05.20 (수) · 20:00
+            - 책: 테스트 책
+
+            ## 관찰자 노트
+
+            레거시 관찰 노트입니다.
+
+            ## 참여자별 피드백
+
+            ### 01. 김호스트
+
+            역할: 진행자
+
+            #### 참여 스타일
+
+            진행을 이끌었습니다.
+
+            #### 실질 기여
+
+            - 레거시 기여입니다.
+
+            #### 문제점과 자기모순
+
+            ##### 1. 레거시 개선점
+
+            - 핵심: 핵심입니다.
+            - 근거: 근거입니다.
+            - 해석: 해석입니다.
+
+            #### 실천 과제
+
+            1. 다음 모임에서 확인합니다.
+
+            #### 드러난 한 문장
+
+            > 레거시 문장입니다.
+
+            맥락: 레거시 맥락입니다.
+
+            주석: 레거시 주석입니다.
+            """.trimIndent()
     }
 
     @Test
@@ -1496,6 +1555,117 @@ class HostSessionControllerDbTest(
 
             assertEquals(beforePublish, lifecycleDbEvidence(sessionId))
         }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `legacy revision zero snapshot publishes and first apply writes only version one`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+        updateSessionVisibility(sessionId, "MEMBER")
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility
+            ) values (?, ?, ?, '레거시 공개 요약입니다.', false, 'MEMBER', 'HIDDEN')
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009720",
+            "00000000-0000-0000-0000-000000000001",
+            sessionId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, ?, ?, ?, '레거시 하이라이트', 0)
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009721",
+            "00000000-0000-0000-0000-000000000001",
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
+            values (?, ?, ?, ?, '레거시 한줄평', 'SESSION')
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009724",
+            "00000000-0000-0000-0000-000000000001",
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_feedback_documents (
+              id, club_id, session_id, version, source_text, document_title, file_name, content_type, file_size
+            ) values (?, ?, ?, 1, ?, '레거시 피드백', 'feedback.md', 'text/markdown', ?)
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009723",
+            "00000000-0000-0000-0000-000000000001",
+            sessionId,
+            LEGACY_FEEDBACK_MARKDOWN,
+            LEGACY_FEEDBACK_MARKDOWN.toByteArray().size,
+        )
+        assertThat(revisions(sessionId)).isEmpty()
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("PUBLISHED") }
+            }
+
+        val editor = recordEditor(sessionId)
+        assertThat(editor.get("liveRevision").asLong()).isEqualTo(0)
+        val liveSnapshot = editor.get("liveSnapshot")
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/record-draft") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedDraftRevision":null,"snapshot":$liveSnapshot}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.baseLiveRevision") { value(0) }
+                jsonPath("$.draftRevision") { value(1) }
+            }
+
+        val draftHash =
+            mockMvc
+                .post("/api/host/sessions/$sessionId/record-apply-preview") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"expectedDraftRevision":1,"expectedLiveRevision":0}"""
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response.contentAsString
+                .let { jsonMapper.readTree(it).get("expectedDraftHash").asString() }
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "applyRequestId": "00000000-0000-0000-0000-000000009722",
+                      "expectedDraftRevision": 1,
+                      "expectedLiveRevision": 0,
+                      "expectedDraftHash": "$draftHash"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.liveRevision") { value(1) }
+            }
+
+        assertThat(revisions(sessionId)).extracting<Long> { it.version }.containsExactly(1L)
+        assertThat(revisionSources(sessionId)).doesNotContain("BASELINE")
     }
 
     @Test
@@ -3524,6 +3694,35 @@ class HostSessionControllerDbTest(
             ?.get(1)
             ?: error("created session response did not include a sessionId")
     }
+
+    private fun recordEditor(sessionId: String): tools.jackson.databind.JsonNode =
+        mockMvc
+            .get("/api/host/sessions/$sessionId/record-editor") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+            }.andReturn()
+            .response.contentAsString
+            .let(jsonMapper::readTree)
+
+    private fun revisions(sessionId: String): List<SessionRecordRevisionRow> =
+        jdbcTemplate.query(
+            """
+            select version, source
+            from session_record_revisions
+            where session_id = ?
+            order by version
+            """.trimIndent(),
+            { rs, _ -> SessionRecordRevisionRow(rs.getLong("version"), rs.getString("source")) },
+            sessionId,
+        )
+
+    private fun revisionSources(sessionId: String): List<String> = revisions(sessionId).map { it.source }
+
+    private data class SessionRecordRevisionRow(
+        val version: Long,
+        val source: String,
+    )
 
     private fun insertRecordDraft(
         sessionId: String,

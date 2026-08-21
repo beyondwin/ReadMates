@@ -1649,7 +1649,6 @@ private val sessionRecordCapabilityMethods =
                 "findCompletedApply",
                 "findApplyReceipt",
                 "insertApplyReceipt",
-                "insertBaselineIfAbsent",
                 "insertAppliedRevision",
                 "deleteAppliedDraft",
             ),

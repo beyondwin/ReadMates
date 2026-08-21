@@ -5,7 +5,6 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
-import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
@@ -157,34 +156,6 @@ internal class JdbcSessionRecordApplyStore(
         return requireNotNull(findApplyReceipt(host, command.sessionId, applyRequestId))
     }
 
-    override fun insertBaselineIfAbsent(
-        host: AuthenticatedClubActor,
-        live: LiveSessionRecord,
-        encoded: EncodedSessionRecordSnapshot,
-    ) {
-        if (live.revision != 0L) return
-        jdbcTemplate.update(
-            """
-            insert into session_record_revisions (
-              id, session_id, club_id, version, source, restored_from_revision_id,
-              snapshot_json, snapshot_sha256, applied_by_membership_id
-            )
-            select ?, ?, ?, 1, 'BASELINE', null, ?, ?, ?
-            where not exists (
-              select 1 from session_record_revisions where club_id = ? and session_id = ?
-            )
-            """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            live.sessionId.dbString(),
-            host.clubId.dbString(),
-            encoded.json,
-            encoded.sha256,
-            host.membershipId.dbString(),
-            host.clubId.dbString(),
-            live.sessionId.dbString(),
-        )
-    }
-
     override fun insertAppliedRevision(
         host: AuthenticatedClubActor,
         editor: SessionRecordEditor,
@@ -192,18 +163,13 @@ internal class JdbcSessionRecordApplyStore(
     ): SessionRecordRevision {
         val draft = requireNotNull(editor.draft)
         val id = UUID.randomUUID()
-        val version = if (editor.live.revision == 0L) 2L else editor.live.revision + 1
+        val nextVersion = editor.live.revision + 1L
         jdbcTemplate.update(
-            """
-            insert into session_record_revisions (
-              id, session_id, club_id, version, source, restored_from_revision_id,
-              snapshot_json, snapshot_sha256, applied_by_membership_id
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """.trimIndent(),
+            INSERT_APPLIED_REVISION_SQL,
             id.dbString(),
             draft.sessionId.dbString(),
             host.clubId.dbString(),
-            version,
+            nextVersion,
             draft.source.name,
             draft.restoredFromRevisionId?.dbString(),
             encoded.json,
@@ -218,4 +184,10 @@ internal class JdbcSessionRecordApplyStore(
         sessionId: UUID,
         expectedDraftRevision: Long,
     ): Boolean = draftStore.deleteDraft(host, sessionId, expectedDraftRevision)
+
+    @Suppress("MaxLineLength")
+    private companion object {
+        const val INSERT_APPLIED_REVISION_SQL =
+            "insert into session_record_revisions (id, session_id, club_id, version, source, restored_from_revision_id, snapshot_json, snapshot_sha256, applied_by_membership_id) values (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+    }
 }

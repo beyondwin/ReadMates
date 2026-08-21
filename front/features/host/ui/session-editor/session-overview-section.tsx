@@ -76,7 +76,9 @@ export function SessionOverviewSection({
           <div>
             <div className="h3 editorial" style={{ margin: 0 }}>
               {overview.applied.exists
-                ? overview.applied.versionLabel
+                ? overview.applied.source === "LEGACY_SNAPSHOT"
+                  ? "이전 적용본"
+                  : overview.applied.versionLabel
                 : "아직 적용된 기록이 없습니다"}
             </div>
             <p className="small" style={{ margin: "8px 0 0", color: "var(--text-2)" }}>
