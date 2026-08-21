@@ -1,65 +1,45 @@
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.HostSessionDeletionAssessment
 import com.readmates.session.application.HostSessionDeletionCounts
-import com.readmates.session.application.HostSessionDeletionHistoryExistsException
 import com.readmates.session.application.HostSessionDeletionNotAllowedException
-import com.readmates.session.application.HostSessionDeletionPreviewResponse
-import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.model.HostSessionDeletionTarget
+import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.requireHost
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
-import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
-
-private data class HostSessionDeletionTarget(
-    val sessionId: UUID,
-    val sessionNumber: Int,
-    val title: String,
-    val state: String,
-)
 
 @Repository
 class HostSessionDeletionQueries(
     private val jdbcTemplate: JdbcTemplate,
 ) {
-    fun previewOpenSessionDeletion(
-        member: CurrentMember,
-        sessionId: UUID,
-    ): HostSessionDeletionPreviewResponse {
-        requireHost(member)
-        val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = false)
+    fun assess(
+        command: HostSessionIdCommand,
+        lock: Boolean,
+    ): HostSessionDeletionAssessment {
+        requireHost(command.host)
+        val target = findDeletionTarget(command.host, command.sessionId, lock)
         requireDeletableTarget(target)
-        val hasDurableHistory = hasDurableHistory(jdbcTemplate, member.clubId, sessionId)
-
-        return HostSessionDeletionPreviewResponse(
-            sessionId = target.sessionId.toString(),
-            sessionNumber = target.sessionNumber,
-            title = target.title,
-            state = target.state,
-            canDelete = !hasDurableHistory,
-            counts = countSessionDeletionRows(jdbcTemplate, member.clubId, sessionId),
+        return HostSessionDeletionAssessment(
+            target = target,
+            blockers = countDeletionBlockers(command.host.clubId, command.sessionId),
+            counts = countSessionDeletionRows(command.host.clubId, command.sessionId),
         )
     }
 
-    @Transactional
-    fun deleteOpenHostSession(
-        member: CurrentMember,
-        sessionId: UUID,
-    ): HostSessionDeletionResponse {
-        requireHost(member)
-        val target = findDeletionTarget(jdbcTemplate, member, sessionId, lock = true)
-        requireDeletableTarget(target)
-        if (hasDurableHistory(jdbcTemplate, member.clubId, sessionId)) {
-            throw HostSessionDeletionHistoryExistsException()
-        }
-        val counts = countSessionDeletionRows(jdbcTemplate, member.clubId, sessionId)
-
-        deleteSessionOwnedRows(jdbcTemplate, member.clubId, sessionId)
-
+    fun deleteAssessed(
+        command: HostSessionIdCommand,
+        target: HostSessionDeletionTarget,
+    ): Boolean {
+        requireHost(command.host)
+        check(target.sessionId == command.sessionId)
+        deleteSessionOwnedRows(command.host.clubId, command.sessionId)
         val deletedSessions =
             jdbcTemplate.update(
                 """
@@ -68,23 +48,13 @@ class HostSessionDeletionQueries(
                   and club_id = ?
                   and state in ('OPEN', 'DRAFT')
                 """.trimIndent(),
-                sessionId.dbString(),
-                member.clubId.dbString(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
             )
-        if (deletedSessions == 0) {
-            throw HostSessionNotFoundException()
-        }
-
-        return HostSessionDeletionResponse(
-            sessionId = target.sessionId.toString(),
-            sessionNumber = target.sessionNumber,
-            deleted = true,
-            counts = counts,
-        )
+        return deletedSessions > 0
     }
 
     private fun findDeletionTarget(
-        jdbcTemplate: JdbcTemplate,
         member: CurrentMember,
         sessionId: UUID,
         lock: Boolean,
@@ -118,15 +88,77 @@ class HostSessionDeletionQueries(
         }
     }
 
+    private fun countDeletionBlockers(
+        clubId: UUID,
+        sessionId: UUID,
+    ) = hostSessionDeletionBlockers(
+        revisionCount =
+            countSessionRows(
+                "select count(*) from session_record_revisions where club_id = ? and session_id = ?",
+                clubId,
+                sessionId,
+            ),
+        decisionCount =
+            countSessionRows(
+                "select count(*) from host_action_notification_decisions where club_id = ? and session_id = ?",
+                clubId,
+                sessionId,
+            ),
+        manualDispatchCount =
+            countSessionRows(
+                "select count(*) from notification_manual_dispatches where club_id = ? and session_id = ?",
+                clubId,
+                sessionId,
+            ),
+        eventCount =
+            countSessionRows(
+                """
+                select count(*)
+                from notification_event_outbox
+                where club_id = ?
+                  and aggregate_type = 'SESSION'
+                  and aggregate_id = ?
+                """.trimIndent(),
+                clubId,
+                sessionId,
+            ),
+        deliveryCount =
+            countSessionRows(
+                """
+                select count(*)
+                from notification_deliveries d
+                inner join notification_event_outbox e
+                  on e.id = d.event_id and e.club_id = d.club_id
+                where e.club_id = ?
+                  and e.aggregate_type = 'SESSION'
+                  and e.aggregate_id = ?
+                """.trimIndent(),
+                clubId,
+                sessionId,
+            ),
+        memberNotificationCount =
+            countSessionRows(
+                """
+                select count(*)
+                from member_notifications m
+                inner join notification_event_outbox e
+                  on e.id = m.event_id and e.club_id = m.club_id
+                where e.club_id = ?
+                  and e.aggregate_type = 'SESSION'
+                  and e.aggregate_id = ?
+                """.trimIndent(),
+                clubId,
+                sessionId,
+            ),
+    )
+
     private fun countSessionDeletionRows(
-        jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
     ): HostSessionDeletionCounts =
         HostSessionDeletionCounts(
             participants =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from session_participants where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
@@ -146,56 +178,48 @@ class HostSessionDeletionQueries(
                 ) ?: 0,
             questions =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from questions where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
                 ),
             checkins =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from reading_checkins where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
                 ),
             oneLineReviews =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from one_line_reviews where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
                 ),
             longReviews =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from long_reviews where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
                 ),
             highlights =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from highlights where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
                 ),
             publications =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from public_session_publications where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
                 ),
             feedbackReports =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from feedback_reports where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
                 ),
             feedbackDocuments =
                 countSessionRows(
-                    jdbcTemplate,
                     "select count(*) from session_feedback_documents where club_id = ? and session_id = ?",
                     clubId,
                     sessionId,
@@ -203,7 +227,6 @@ class HostSessionDeletionQueries(
         )
 
     private fun countSessionRows(
-        jdbcTemplate: JdbcTemplate,
         sql: String,
         clubId: UUID,
         sessionId: UUID,
@@ -215,35 +238,11 @@ class HostSessionDeletionQueries(
             sessionId.dbString(),
         ) ?: 0
 
-    private fun hasDurableHistory(
-        jdbcTemplate: JdbcTemplate,
-        clubId: UUID,
-        sessionId: UUID,
-    ): Boolean =
-        jdbcTemplate.queryForObject(
-            """
-            select exists(
-              select 1
-              from session_record_revisions
-              where club_id = ? and session_id = ?
-              union all
-              select 1
-              from host_action_notification_decisions
-              where club_id = ? and session_id = ?
-            )
-            """.trimIndent(),
-            Boolean::class.java,
-            clubId.dbString(),
-            sessionId.dbString(),
-            clubId.dbString(),
-            sessionId.dbString(),
-        ) == true
-
     private fun deleteSessionOwnedRows(
-        jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
     ) {
+        // Lifecycle audit and AI provider/job audit are durable evidence, not cleanup targets.
         jdbcTemplate.update(
             "delete from ai_generation_commit_receipts where club_id = ? and session_id = ?",
             clubId.dbString(),

@@ -1,5 +1,7 @@
 package com.readmates.session.application.service
 
+import com.readmates.session.application.model.HostSessionDeletionBlocker
+import com.readmates.session.application.model.HostSessionDeletionBlockerCode
 import com.readmates.session.application.model.HostSessionLifecycleAction
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -52,5 +54,36 @@ class HostSessionOperationalMetricsTest {
                 .counter()
                 .id.tags,
         ).isEmpty()
+    }
+
+    @Test
+    fun `deletion blocked counters use blocker enum names only`() {
+        val registry = SimpleMeterRegistry()
+        val metrics = HostSessionOperationalMetrics(registry)
+
+        metrics.deletionBlocked(
+            listOf(
+                HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS, 1),
+                HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.NOTIFICATION_EVENT_EXISTS, 2),
+            ),
+        )
+        metrics.deletionBlocked(
+            listOf(HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS, 1)),
+        )
+
+        assertThat(
+            registry
+                .counter("session.deletion.blocked", "blocker", "MANUAL_DISPATCH_EXISTS")
+                .count(),
+        ).isEqualTo(2.0)
+        assertThat(
+            registry
+                .counter("session.deletion.blocked", "blocker", "NOTIFICATION_EVENT_EXISTS")
+                .count(),
+        ).isEqualTo(1.0)
+        assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } }.toSet())
+            .containsExactly("blocker")
+        assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.value } }.toSet())
+            .containsExactlyInAnyOrder("MANUAL_DISPATCH_EXISTS", "NOTIFICATION_EVENT_EXISTS")
     }
 }

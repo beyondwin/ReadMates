@@ -15,9 +15,9 @@ import com.readmates.session.application.HostAttendanceAuditTransition
 import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionBasicAuditSnapshot
+import com.readmates.session.application.HostSessionDeletionAssessment
 import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
-import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListPage
@@ -31,6 +31,10 @@ import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.HostSessionDeletionBlockedException
+import com.readmates.session.application.model.HostSessionDeletionBlocker
+import com.readmates.session.application.model.HostSessionDeletionBlockerCode
+import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionLifecycleAction
 import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
@@ -42,6 +46,7 @@ import com.readmates.session.application.model.USER_SELECTABLE_LIFECYCLE_REASONS
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.model.normalized
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
@@ -71,6 +76,7 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -1029,6 +1035,196 @@ class HostSessionServicesTest {
     }
 
     @Test
+    fun `deletion blockers keep stable enum order and omit zero counts`() {
+        assertThat(HostSessionDeletionBlockerCode.entries).containsExactly(
+            HostSessionDeletionBlockerCode.RECORD_REVISION_EXISTS,
+            HostSessionDeletionBlockerCode.NOTIFICATION_DECISION_EXISTS,
+            HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS,
+            HostSessionDeletionBlockerCode.NOTIFICATION_EVENT_EXISTS,
+            HostSessionDeletionBlockerCode.NOTIFICATION_DELIVERY_EXISTS,
+            HostSessionDeletionBlockerCode.MEMBER_NOTIFICATION_EXISTS,
+        )
+        assertThat(
+            hostSessionDeletionBlockers(1, 2, 0, 3, 0, 4).map { it.code to it.count },
+        ).containsExactly(
+            HostSessionDeletionBlockerCode.RECORD_REVISION_EXISTS to 1,
+            HostSessionDeletionBlockerCode.NOTIFICATION_DECISION_EXISTS to 2,
+            HostSessionDeletionBlockerCode.NOTIFICATION_EVENT_EXISTS to 3,
+            HostSessionDeletionBlockerCode.MEMBER_NOTIFICATION_EXISTS to 4,
+        )
+        assertThat(hostSessionDeletionBlockers(0, 0, 0, 0, 0, 0)).isEmpty()
+        assertThat(HostSessionDeletionBlockedException(emptyList()).blockers).isEmpty()
+        assertThat(
+            HostSessionDeletionTarget(sessionId, 7, "7회차", "OPEN"),
+        ).extracting(
+            HostSessionDeletionTarget::sessionId,
+            HostSessionDeletionTarget::state,
+        ).containsExactly(sessionId, "OPEN")
+        assertThat(HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS, 1))
+            .extracting(HostSessionDeletionBlocker::code, HostSessionDeletionBlocker::count)
+            .containsExactly(HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS, 1)
+    }
+
+    @Test
+    fun `deletion preview uses shared assessment blockers and empty list when deletable`() {
+        val harness = lifecycleHarness()
+        val preview = harness.service.deletionPreview(HostSessionIdCommand(host, sessionId))
+
+        assertThat(preview).isEqualTo(
+            HostSessionDeletionPreviewResponse(
+                sessionId = sessionId.toString(),
+                sessionNumber = 7,
+                title = "7회차",
+                state = "OPEN",
+                canDelete = true,
+                counts = emptyDeletionCounts(),
+                blockers = emptyList(),
+            ),
+        )
+        assertThat(harness.port.calls).containsExactly("assess:$sessionId")
+
+        val blockers =
+            listOf(HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS, 1))
+        harness.port.deletionAssessment = harness.port.deletionAssessment.copy(blockers = blockers)
+        val blockedPreview = harness.service.deletionPreview(HostSessionIdCommand(host, sessionId))
+        assertThat(blockedPreview.canDelete).isFalse()
+        assertThat(blockedPreview.blockers).isEqualTo(blockers)
+    }
+
+    @Test
+    fun `successful delete records audit metrics cache and correlation log`() {
+        val harness = lifecycleHarness()
+        val requestId = "delete-req-1"
+        MDC.put(RequestIdFilter.MDC_KEY, requestId)
+        try {
+            captureHostSessionLogs().use { logs ->
+                val response = harness.service.delete(HostSessionIdCommand(host, sessionId))
+
+                assertThat(response.deleted).isTrue()
+                assertThat(harness.port.calls).containsExactly(
+                    "lockAndAssess:$sessionId",
+                    "deleteAssessed:$sessionId",
+                )
+                assertThat(harness.audit.entries.single())
+                    .extracting(
+                        HostSessionLifecycleAuditEntry::action,
+                        HostSessionLifecycleAuditEntry::fromState,
+                        HostSessionLifecycleAuditEntry::toState,
+                        HostSessionLifecycleAuditEntry::reasonCode,
+                        HostSessionLifecycleAuditEntry::reasonNote,
+                    ).containsExactly(
+                        HostSessionLifecycleAction.DELETED,
+                        "OPEN",
+                        null,
+                        HostSessionLifecycleReasonCode.EMPTY_SESSION_DELETED,
+                        null,
+                    )
+                assertThat(harness.invalidation.clubs).containsExactly(host.clubId)
+                assertThat(harness.transitionCount("DELETED", "deleted")).isEqualTo(1.0)
+                assertThat(logs.events.single().formattedMessage)
+                    .contains(requestId)
+                    .contains("outcome=deleted")
+                    .doesNotContain(host.email)
+            }
+        } finally {
+            MDC.remove(RequestIdFilter.MDC_KEY)
+        }
+    }
+
+    @Test
+    fun `blocked delete throws shared blockers without deleting or auditing`() {
+        val blockers =
+            listOf(
+                HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.NOTIFICATION_EVENT_EXISTS, 1),
+                HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.MEMBER_NOTIFICATION_EXISTS, 2),
+            )
+        val harness =
+            lifecycleHarness(
+                port = RecordingHostSessionPorts().apply { deletionAssessment = deletionAssessment.copy(blockers = blockers) },
+            )
+        captureHostSessionLogs().use { logs ->
+            val thrown =
+                assertThrows(HostSessionDeletionBlockedException::class.java) {
+                    harness.service.delete(HostSessionIdCommand(host, sessionId))
+                }
+
+            assertThat(thrown.blockers).isEqualTo(blockers)
+            assertThat(harness.port.calls).containsExactly("lockAndAssess:$sessionId")
+            assertThat(harness.audit.entries).isEmpty()
+            assertThat(harness.invalidation.clubs).isEmpty()
+            assertThat(harness.transitionCount("DELETED", "blocked")).isEqualTo(1.0)
+            assertThat(harness.deletionBlockedCount("NOTIFICATION_EVENT_EXISTS")).isEqualTo(1.0)
+            assertThat(harness.deletionBlockedCount("MEMBER_NOTIFICATION_EXISTS")).isEqualTo(1.0)
+            assertThat(logs.events.single().formattedMessage)
+                .contains("outcome=blocked")
+                .contains("NOTIFICATION_EVENT_EXISTS")
+                .contains("MEMBER_NOTIFICATION_EXISTS")
+                .doesNotContain("payload")
+                .doesNotContain("recipient")
+                .doesNotContain("passcode")
+        }
+    }
+
+    @Test
+    fun `integrity failure with a now visible blocker becomes delete blocked`() {
+        val blockers =
+            listOf(HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS, 1))
+        val integrity = DataIntegrityViolationException("fk constraint")
+        val allowed = allowedDeletionAssessment()
+        val harness =
+            lifecycleHarness(
+                port =
+                    RecordingHostSessionPorts().apply {
+                        lockAssessment = allowed
+                        assessAssessment = allowed.copy(blockers = blockers)
+                        deleteAssessedFailure = integrity
+                    },
+            )
+
+        val thrown =
+            assertThrows(HostSessionDeletionBlockedException::class.java) {
+                harness.service.delete(HostSessionIdCommand(host, sessionId))
+            }
+
+        assertThat(thrown.blockers).isEqualTo(blockers)
+        assertThat(harness.port.calls).containsExactly(
+            "lockAndAssess:$sessionId",
+            "deleteAssessed:$sessionId",
+            "assess:$sessionId",
+        )
+        assertThat(harness.invalidation.clubs).isEmpty()
+        assertThat(harness.transitionCount("DELETED", "blocked")).isEqualTo(1.0)
+        assertThat(harness.deletionBlockedCount("MANUAL_DISPATCH_EXISTS")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("DELETED", "failure")).isZero()
+    }
+
+    @Test
+    fun `integrity failure without an approved blocker is rethrown`() {
+        val integrity = DataIntegrityViolationException("unknown schema")
+        val harness =
+            lifecycleHarness(
+                port =
+                    RecordingHostSessionPorts().apply {
+                        deleteAssessedFailure = integrity
+                    },
+            )
+
+        val thrown =
+            assertThrows(DataIntegrityViolationException::class.java) {
+                harness.service.delete(HostSessionIdCommand(host, sessionId))
+            }
+
+        assertThat(thrown).isSameAs(integrity)
+        assertThat(harness.port.calls).containsExactly(
+            "lockAndAssess:$sessionId",
+            "deleteAssessed:$sessionId",
+            "assess:$sessionId",
+        )
+        assertThat(harness.transitionCount("DELETED", "failure")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("DELETED", "blocked")).isZero()
+    }
+
+    @Test
     fun `user selectable lifecycle reasons exclude internal codes`() {
         assertThat(USER_SELECTABLE_LIFECYCLE_REASONS).containsExactlyInAnyOrder(
             HostSessionLifecycleReasonCode.ACCIDENTAL_TRANSITION,
@@ -1082,6 +1278,19 @@ class HostSessionServicesTest {
         }
     }
 
+    private fun allowedDeletionAssessment() =
+        HostSessionDeletionAssessment(
+            target =
+                HostSessionDeletionTarget(
+                    sessionId = sessionId,
+                    sessionNumber = 7,
+                    title = "7회차",
+                    state = "OPEN",
+                ),
+            blockers = emptyList(),
+            counts = emptyDeletionCounts(),
+        )
+
     private fun reverseCommand(
         reasonCode: HostSessionLifecycleReasonCode? = HostSessionLifecycleReasonCode.ACCIDENTAL_TRANSITION,
         reasonNote: String? = null,
@@ -1131,6 +1340,8 @@ class HostSessionServicesTest {
                 .count()
 
         fun legacyReasonCount(): Double = registry.counter("session.lifecycle.legacy.reason").count()
+
+        fun deletionBlockedCount(blocker: String): Double = registry.counter("session.deletion.blocked", "blocker", blocker).count()
     }
 
     private class RecordingHostSessionLifecycleAuditPort : HostSessionLifecycleAuditPort {
@@ -1176,7 +1387,7 @@ class HostSessionServicesTest {
             meetingPasscode = "original-private-value",
         )
 
-    private class RecordingHostSessionPorts :
+    private inner class RecordingHostSessionPorts :
         HostSessionQueryPort,
         HostSessionDraftPort,
         HostSessionLifecyclePort,
@@ -1413,23 +1624,43 @@ class HostSessionServicesTest {
             )
         }
 
-        override fun deletionPreview(command: HostSessionIdCommand) =
-            HostSessionDeletionPreviewResponse(
-                sessionId = command.sessionId.toString(),
-                sessionNumber = 7,
-                title = "7회차",
-                state = "OPEN",
-                canDelete = true,
+        var deletionAssessment =
+            HostSessionDeletionAssessment(
+                target =
+                    HostSessionDeletionTarget(
+                        sessionId = sessionId,
+                        sessionNumber = 7,
+                        title = "7회차",
+                        state = "OPEN",
+                    ),
+                blockers = emptyList(),
                 counts = emptyDeletionCounts(),
-            ).also { calls += "deletionPreview:${command.sessionId}" }
+            )
+        var lockAssessment: HostSessionDeletionAssessment? = null
+        var assessAssessment: HostSessionDeletionAssessment? = null
+        var deleteAssessedResult = true
+        var deleteAssessedFailure: RuntimeException? = null
 
-        override fun delete(command: HostSessionIdCommand) =
-            HostSessionDeletionResponse(
-                sessionId = command.sessionId.toString(),
-                sessionNumber = 7,
-                deleted = true,
-                counts = emptyDeletionCounts(),
-            ).also { calls += "delete:${command.sessionId}" }
+        override fun assess(command: HostSessionIdCommand) =
+            (assessAssessment ?: deletionAssessment)
+                .copy(
+                    target = (assessAssessment ?: deletionAssessment).target.copy(sessionId = command.sessionId),
+                ).also { calls += "assess:${command.sessionId}" }
+
+        override fun lockAndAssess(command: HostSessionIdCommand) =
+            (lockAssessment ?: deletionAssessment)
+                .copy(
+                    target = (lockAssessment ?: deletionAssessment).target.copy(sessionId = command.sessionId),
+                ).also { calls += "lockAndAssess:${command.sessionId}" }
+
+        override fun deleteAssessed(
+            command: HostSessionIdCommand,
+            target: HostSessionDeletionTarget,
+        ): Boolean {
+            calls += "deleteAssessed:${command.sessionId}"
+            deleteAssessedFailure?.let { throw it }
+            return deleteAssessedResult
+        }
 
         override fun confirmAttendance(command: ConfirmAttendanceCommand) =
             HostAttendanceResponse(
@@ -1503,20 +1734,6 @@ class HostSessionServicesTest {
                     ),
                 visibility = SessionRecordVisibility.HOST_ONLY,
             )
-
-        private fun emptyDeletionCounts() =
-            HostSessionDeletionCounts(
-                participants = 0,
-                rsvpResponses = 0,
-                questions = 0,
-                checkins = 0,
-                oneLineReviews = 0,
-                longReviews = 0,
-                highlights = 0,
-                publications = 0,
-                feedbackReports = 0,
-                feedbackDocuments = 0,
-            )
     }
 
     private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {
@@ -1549,6 +1766,20 @@ private class HostSessionLogCapture(
         appender.stop()
     }
 }
+
+private fun emptyDeletionCounts() =
+    HostSessionDeletionCounts(
+        participants = 0,
+        rsvpResponses = 0,
+        questions = 0,
+        checkins = 0,
+        oneLineReviews = 0,
+        longReviews = 0,
+        highlights = 0,
+        publications = 0,
+        feedbackReports = 0,
+        feedbackDocuments = 0,
+    )
 
 private fun captureHostSessionLogs(): HostSessionLogCapture {
     val logger = LoggerFactory.getLogger(HostSessionLifecycleService::class.java) as Logger

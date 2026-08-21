@@ -5,6 +5,7 @@ import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
@@ -59,14 +60,14 @@ class JdbcHostSessionWriteAdapter(
 
     override fun update(command: UpdateHostSessionCommand) = draftWrites.update(command)
 
-    override fun deletionPreview(command: HostSessionIdCommand) =
-        deletionQueries.previewOpenSessionDeletion(command.host, command.sessionId)
+    override fun assess(command: HostSessionIdCommand) = deletionQueries.assess(command, lock = false)
 
-    override fun delete(command: HostSessionIdCommand) =
-        deletionQueries.deleteOpenHostSession(
-            command.host,
-            command.sessionId,
-        )
+    override fun lockAndAssess(command: HostSessionIdCommand) = deletionQueries.assess(command, lock = true)
+
+    override fun deleteAssessed(
+        command: HostSessionIdCommand,
+        target: HostSessionDeletionTarget,
+    ) = deletionQueries.deleteAssessed(command, target)
 
     override fun confirmAttendance(command: ConfirmAttendanceCommand) = attendance.confirm(command)
 

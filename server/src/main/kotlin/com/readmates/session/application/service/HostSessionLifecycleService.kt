@@ -4,9 +4,11 @@ import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
+import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionLifecycleAction
 import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
@@ -21,6 +23,7 @@ import com.readmates.session.application.port.out.HostSessionLifecycleAuditPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
+import com.readmates.session.application.toPreviewResponse
 import com.readmates.session.config.HostSessionLifecycleProperties
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
@@ -31,6 +34,7 @@ import com.readmates.shared.observability.RequestIdFilter
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
+import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -44,6 +48,8 @@ class HostSessionLifecycleService(
     private val lifecycleAudit: HostSessionLifecycleAuditPort = NoopHostSessionLifecycleAuditPort,
     private val metrics: HostSessionOperationalMetrics = HostSessionOperationalMetrics(SimpleMeterRegistry()),
     private val lifecycleProperties: HostSessionLifecycleProperties = HostSessionLifecycleProperties(),
+    private val deletionTransaction: HostSessionDeletionTransaction =
+        HostSessionDeletionTransaction(deletionPort, lifecycleAudit),
 ) : HostSessionLifecycleUseCase {
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
@@ -161,11 +167,40 @@ class HostSessionLifecycleService(
             write = lifecyclePort::returnToDraft,
         )
 
-    override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.deletionPreview(command)
+    override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.assess(command).toPreviewResponse()
 
-    @Transactional
-    override fun delete(command: HostSessionIdCommand) =
-        deletionPort.delete(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
+    override fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse {
+        val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
+        return try {
+            deletionTransaction.delete(command).also {
+                cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                metrics.lifecycle(HostSessionLifecycleAction.DELETED, "deleted")
+                logger.info(
+                    "Session lifecycle action={} outcome={} requestId={} clubId={} sessionId={}",
+                    HostSessionLifecycleAction.DELETED,
+                    "deleted",
+                    requestId,
+                    command.host.clubId,
+                    command.sessionId,
+                )
+            }
+        } catch (blocked: HostSessionDeletionBlockedException) {
+            recordBlockedDeletion(command, requestId, blocked)
+            throw blocked
+        } catch (failure: DataIntegrityViolationException) {
+            val reassessment = deletionPort.assess(command)
+            if (!reassessment.canDelete) {
+                val blocked = HostSessionDeletionBlockedException(reassessment.blockers)
+                recordBlockedDeletion(command, requestId, blocked)
+                throw blocked
+            }
+            recordFailedDeletion(command, requestId, failure)
+            throw failure
+        } catch (failure: RuntimeException) {
+            recordFailedDeletion(command, requestId, failure)
+            throw failure
+        }
+    }
 
     private fun reverseTransition(
         command: HostSessionReverseCommand,
@@ -242,6 +277,40 @@ class HostSessionLifecycleService(
             )
             throw failure
         }
+    }
+
+    private fun recordBlockedDeletion(
+        command: HostSessionIdCommand,
+        requestId: String?,
+        blocked: HostSessionDeletionBlockedException,
+    ) {
+        metrics.lifecycle(HostSessionLifecycleAction.DELETED, "blocked")
+        metrics.deletionBlocked(blocked.blockers)
+        logger.info(
+            "Session lifecycle action={} outcome={} requestId={} clubId={} sessionId={} blockers={}",
+            HostSessionLifecycleAction.DELETED,
+            "blocked",
+            requestId,
+            command.host.clubId,
+            command.sessionId,
+            blocked.blockers.joinToString(",") { it.code.name },
+        )
+    }
+
+    private fun recordFailedDeletion(
+        command: HostSessionIdCommand,
+        requestId: String?,
+        failure: RuntimeException,
+    ) {
+        metrics.lifecycle(HostSessionLifecycleAction.DELETED, "failure")
+        logger.warn(
+            "Session lifecycle action={} outcome=failure requestId={} clubId={} sessionId={}",
+            HostSessionLifecycleAction.DELETED,
+            requestId,
+            command.host.clubId,
+            command.sessionId,
+            failure,
+        )
     }
 
     private companion object {

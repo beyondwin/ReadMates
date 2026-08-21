@@ -2,7 +2,6 @@ package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.CurrentSessionNotOpenException
 import com.readmates.session.application.HostSessionCloseNotAllowedException
-import com.readmates.session.application.HostSessionDeletionHistoryExistsException
 import com.readmates.session.application.HostSessionDeletionNotAllowedException
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionOpenNotAllowedException
@@ -18,8 +17,10 @@ import com.readmates.session.application.InvalidQuestionSetException
 import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
+import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionLifecycleReasonRequiredException
 import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
+import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import org.springframework.http.HttpStatus
@@ -29,12 +30,21 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
 class SessionApplicationErrorHandler {
-    @ExceptionHandler(HostSessionDeletionHistoryExistsException::class)
-    fun handleDeletionHistoryExists(): ResponseEntity<ApiErrorResponse> =
+    @ExceptionHandler(HostSessionDeletionBlockedException::class)
+    fun handleDeletionBlocked(ex: HostSessionDeletionBlockedException): ResponseEntity<ApiErrorResponse> =
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
-            code = "SESSION_DELETE_HISTORY_EXISTS",
-            message = "적용 기록 또는 알림 확인 이력이 있는 세션은 삭제할 수 없습니다.",
+            code = "SESSION_DELETE_BLOCKED",
+            message = "적용 기록 또는 알림 이력이 있는 세션은 삭제할 수 없습니다.",
+            blockers = ex.blockers.map { ApiErrorBlocker(it.code.name, it.count) },
+        )
+
+    @ExceptionHandler(HostSessionDeletionNotAllowedException::class)
+    fun handleDeletionNotAllowed(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "SESSION_DELETION_NOT_ALLOWED",
+            message = "초안 또는 진행 중인 세션만 삭제할 수 있습니다.",
         )
 
     @ExceptionHandler(HostSessionRecordStagingRequiredException::class)
@@ -88,7 +98,6 @@ class SessionApplicationErrorHandler {
 
     @ExceptionHandler(
         CurrentSessionNotOpenException::class,
-        HostSessionDeletionNotAllowedException::class,
         HostSessionOpenNotAllowedException::class,
         HostSessionCloseNotAllowedException::class,
         HostSessionPublishNotAllowedException::class,

@@ -1,5 +1,7 @@
 package com.readmates.session.application
 
+import com.readmates.session.application.model.HostSessionDeletionBlocker
+import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
@@ -263,7 +265,36 @@ data class HostSessionDeletionPreviewResponse(
     val state: String,
     val canDelete: Boolean,
     val counts: HostSessionDeletionCounts,
+    val blockers: List<HostSessionDeletionBlocker> = emptyList(),
 )
+
+data class HostSessionDeletionAssessment(
+    val target: HostSessionDeletionTarget,
+    val blockers: List<HostSessionDeletionBlocker>,
+    val counts: HostSessionDeletionCounts,
+) {
+    val canDelete: Boolean
+        get() = blockers.isEmpty()
+}
+
+fun HostSessionDeletionAssessment.toPreviewResponse() =
+    HostSessionDeletionPreviewResponse(
+        sessionId = target.sessionId.toString(),
+        sessionNumber = target.sessionNumber,
+        title = target.title,
+        state = target.state,
+        canDelete = canDelete,
+        counts = counts,
+        blockers = blockers,
+    )
+
+fun HostSessionDeletionAssessment.toDeletionResponse() =
+    HostSessionDeletionResponse(
+        sessionId = target.sessionId.toString(),
+        sessionNumber = target.sessionNumber,
+        deleted = true,
+        counts = counts,
+    )
 
 data class HostSessionDeletionResponse(
     val sessionId: String,

@@ -1,6 +1,10 @@
 package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.OpenSessionAlreadyExistsException
+import com.readmates.session.application.model.HostSessionDeletionBlockedException
+import com.readmates.session.application.model.HostSessionDeletionBlocker
+import com.readmates.session.application.model.HostSessionDeletionBlockerCode
+import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -33,6 +37,48 @@ class SessionApplicationErrorHandlerTest {
                 status = 400,
             ),
         )
+    }
+
+    @Test
+    fun `maps deletion blockers to SESSION_DELETE_BLOCKED with ordered blockers`() {
+        val response =
+            SessionApplicationErrorHandler().handleDeletionBlocked(
+                HostSessionDeletionBlockedException(
+                    listOf(
+                        HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.RECORD_REVISION_EXISTS, 2),
+                        HostSessionDeletionBlocker(HostSessionDeletionBlockerCode.MANUAL_DISPATCH_EXISTS, 1),
+                    ),
+                ),
+            )
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
+        assertThat(response.body).isEqualTo(
+            ApiErrorResponse(
+                code = "SESSION_DELETE_BLOCKED",
+                message = "적용 기록 또는 알림 이력이 있는 세션은 삭제할 수 없습니다.",
+                status = 409,
+                blockers =
+                    listOf(
+                        ApiErrorBlocker("RECORD_REVISION_EXISTS", 2),
+                        ApiErrorBlocker("MANUAL_DISPATCH_EXISTS", 1),
+                    ),
+            ),
+        )
+    }
+
+    @Test
+    fun `maps deletion not allowed to SESSION_DELETION_NOT_ALLOWED without blockers`() {
+        SessionApplicationErrorHandler().handleDeletionNotAllowed().also { response ->
+            assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
+            assertThat(response.body).isEqualTo(
+                ApiErrorResponse(
+                    code = "SESSION_DELETION_NOT_ALLOWED",
+                    message = "초안 또는 진행 중인 세션만 삭제할 수 있습니다.",
+                    status = 409,
+                ),
+            )
+            assertThat(response.body?.blockers).isEmpty()
+        }
     }
 
     @Test

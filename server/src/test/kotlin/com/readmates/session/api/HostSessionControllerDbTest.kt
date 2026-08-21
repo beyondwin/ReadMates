@@ -94,7 +94,58 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
         where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
       );
     delete from host_session_lifecycle_audit
-    where session_id = '00000000-0000-0000-0000-000000019777';
+    where session_id in (
+      '00000000-0000-0000-0000-000000009777',
+      '00000000-0000-0000-0000-000000019777'
+    );
+    delete mn from member_notifications mn
+    inner join notification_event_outbox e on e.id = mn.event_id and e.club_id = mn.club_id
+    where e.club_id = '00000000-0000-0000-0000-000000000001'
+      and e.aggregate_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete mn from member_notifications mn
+    inner join notification_event_outbox e on e.id = mn.event_id
+    where e.aggregate_id in (
+      '00000000-0000-0000-0000-000000009777',
+      '00000000-0000-0000-0000-000000019777'
+    );
+    delete d from notification_deliveries d
+    inner join notification_event_outbox e on e.id = d.event_id and e.club_id = d.club_id
+    where e.club_id = '00000000-0000-0000-0000-000000000001'
+      and e.aggregate_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete d from notification_deliveries d
+    inner join notification_event_outbox e on e.id = d.event_id
+    where e.aggregate_id in (
+      '00000000-0000-0000-0000-000000009777',
+      '00000000-0000-0000-0000-000000019777'
+    );
+    delete from notification_manual_dispatches
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from notification_manual_dispatches
+    where session_id in (
+      '00000000-0000-0000-0000-000000009777',
+      '00000000-0000-0000-0000-000000019777'
+    );
+    delete from ai_generation_audit_log
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from ai_generation_audit_log
+    where session_id in (
+      '00000000-0000-0000-0000-000000009777',
+      '00000000-0000-0000-0000-000000019777'
+    );
     delete from admin_closing_risk_ledger
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
@@ -112,7 +163,10 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
           and number >= 7
       );
     delete from notification_event_outbox
-    where aggregate_id = '00000000-0000-0000-0000-000000019777';
+    where aggregate_id in (
+      '00000000-0000-0000-0000-000000009777',
+      '00000000-0000-0000-0000-000000019777'
+    );
     delete from notification_outbox
     where club_id = '00000000-0000-0000-0000-000000000001'
       and aggregate_id in (
@@ -258,6 +312,11 @@ class HostSessionControllerDbTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val hostSessionDraftPort: HostSessionDraftPort,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    private companion object {
+        const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
+        const val MEMBER5_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000206"
+    }
+
     @Test
     fun `host creates draft upcoming session without participants`() {
         seedNonActiveMemberships()
@@ -2414,6 +2473,7 @@ class HostSessionControllerDbTest(
                 jsonPath("$.title") { value("7회차 · 테스트 책") }
                 jsonPath("$.state") { value("OPEN") }
                 jsonPath("$.canDelete") { value(true) }
+                jsonPath("$.blockers.length()") { value(0) }
                 jsonPath("$.counts.participants") { value(6) }
                 jsonPath("$.counts.rsvpResponses") { value(1) }
                 jsonPath("$.counts.questions") { value(2) }
@@ -2548,22 +2608,11 @@ class HostSessionControllerDbTest(
             "00000000-0000-0000-0000-000000009905",
         )
 
-        mockMvc
-            .get("/api/host/sessions/$sessionId/deletion-preview") {
-                with(user("host@example.com"))
-            }.andExpect {
-                status { isOk() }
-                jsonPath("$.canDelete") { value(false) }
-            }
-        mockMvc
-            .delete("/api/host/sessions/$sessionId") {
-                with(user("host@example.com"))
-                with(csrf())
-            }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("SESSION_DELETE_HISTORY_EXISTS") }
-            }
-        assertEquals(1, countRows("sessions", "id = '$sessionId'"))
+        expectBlockedDeletion(
+            sessionId,
+            "RECORD_REVISION_EXISTS" to 1,
+            "NOTIFICATION_DECISION_EXISTS" to 1,
+        )
         assertEquals(1, countRows("host_action_notification_decisions", "session_id = '$sessionId'"))
     }
 
@@ -2652,20 +2701,7 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
         )
 
-        mockMvc
-            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
-                with(user("host@example.com"))
-            }.andExpect {
-                status { isConflict() }
-            }
-
-        mockMvc
-            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-                with(user("host@example.com"))
-                with(csrf())
-            }.andExpect {
-                status { isConflict() }
-            }
+        expectDeletionNotAllowed("00000000-0000-0000-0000-000000009777")
 
         jdbcTemplate.update(
             """
@@ -2675,20 +2711,7 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
         )
 
-        mockMvc
-            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
-                with(user("host@example.com"))
-            }.andExpect {
-                status { isConflict() }
-            }
-
-        mockMvc
-            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
-                with(user("host@example.com"))
-                with(csrf())
-            }.andExpect {
-                status { isConflict() }
-            }
+        expectDeletionNotAllowed("00000000-0000-0000-0000-000000009777")
     }
 
     @Test
@@ -2700,6 +2723,7 @@ class HostSessionControllerDbTest(
                 status { isOk() }
                 jsonPath("$.state") { value("DRAFT") }
                 jsonPath("$.canDelete") { value(true) }
+                jsonPath("$.blockers.length()") { value(0) }
             }
         mockMvc
             .delete("/api/host/sessions/$sessionId") { withHost() }
@@ -2712,12 +2736,7 @@ class HostSessionControllerDbTest(
     @Test
     fun `host cannot delete draft session with record revision history`() {
         val sessionId = createDraftWithRevision()
-        mockMvc
-            .delete("/api/host/sessions/$sessionId") { withHost() }
-            .andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("SESSION_DELETE_HISTORY_EXISTS") }
-            }
+        expectBlockedDeletion(sessionId, "RECORD_REVISION_EXISTS" to 1)
     }
 
     @Test
@@ -2946,6 +2965,197 @@ class HostSessionControllerDbTest(
         assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777'"))
     }
 
+    @Test
+    fun `durable blocker revision history blocks open deletion`() {
+        createSessionSeven()
+        seedRecordRevision("00000000-0000-0000-0000-000000009777", "00000000-0000-0000-0000-000000009921")
+        expectBlockedDeletion("00000000-0000-0000-0000-000000009777", "RECORD_REVISION_EXISTS" to 1)
+    }
+
+    @Test
+    fun `durable blocker notification decision blocks open deletion`() {
+        createSessionSeven()
+        seedSkipNotificationDecision(
+            sessionId = "00000000-0000-0000-0000-000000009777",
+            previewId = "00000000-0000-0000-0000-000000009922",
+            decisionId = "00000000-0000-0000-0000-000000009923",
+        )
+        expectBlockedDeletion("00000000-0000-0000-0000-000000009777", "NOTIFICATION_DECISION_EXISTS" to 1)
+    }
+
+    @Test
+    fun `durable blocker manual dispatch blocks open deletion`() {
+        createSessionSeven()
+        val eventId = "00000000-0000-0000-0000-000000009924"
+        seedSessionOutboxEvent("00000000-0000-0000-0000-000000009777", eventId, "manual-dispatch")
+        seedManualDispatch("00000000-0000-0000-0000-000000009777", eventId, "00000000-0000-0000-0000-000000009925")
+        expectBlockedDeletion(
+            "00000000-0000-0000-0000-000000009777",
+            "MANUAL_DISPATCH_EXISTS" to 1,
+            "NOTIFICATION_EVENT_EXISTS" to 1,
+        )
+    }
+
+    @Test
+    fun `durable blocker session outbox event blocks open deletion`() {
+        createSessionSeven()
+        seedSessionOutboxEvent(
+            "00000000-0000-0000-0000-000000009777",
+            "00000000-0000-0000-0000-000000009926",
+            "session-event",
+        )
+        expectBlockedDeletion("00000000-0000-0000-0000-000000009777", "NOTIFICATION_EVENT_EXISTS" to 1)
+    }
+
+    @Test
+    fun `durable blocker notification delivery blocks open deletion`() {
+        createSessionSeven()
+        val eventId = "00000000-0000-0000-0000-000000009927"
+        seedSessionOutboxEvent("00000000-0000-0000-0000-000000009777", eventId, "delivery")
+        seedNotificationDelivery(eventId, "00000000-0000-0000-0000-000000009928", "delivery")
+        expectBlockedDeletion(
+            "00000000-0000-0000-0000-000000009777",
+            "NOTIFICATION_EVENT_EXISTS" to 1,
+            "NOTIFICATION_DELIVERY_EXISTS" to 1,
+        )
+    }
+
+    @Test
+    fun `durable blocker member notification blocks open deletion`() {
+        createSessionSeven()
+        val eventId = "00000000-0000-0000-0000-000000009929"
+        val deliveryId = "00000000-0000-0000-0000-000000009930"
+        seedSessionOutboxEvent("00000000-0000-0000-0000-000000009777", eventId, "member-notification")
+        seedNotificationDelivery(eventId, deliveryId, "member-notification")
+        seedMemberNotification(eventId, deliveryId, "00000000-0000-0000-0000-000000009931")
+        expectBlockedDeletion(
+            "00000000-0000-0000-0000-000000009777",
+            "NOTIFICATION_EVENT_EXISTS" to 1,
+            "NOTIFICATION_DELIVERY_EXISTS" to 1,
+            "MEMBER_NOTIFICATION_EXISTS" to 1,
+        )
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `combined durable blockers keep enum order and omit sensitive fields`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+        seedSessionOwnedRows()
+        seedRecordRevision(sessionId, "00000000-0000-0000-0000-000000009932")
+        seedSkipNotificationDecision(
+            sessionId = sessionId,
+            previewId = "00000000-0000-0000-0000-000000009933",
+            decisionId = "00000000-0000-0000-0000-000000009934",
+        )
+        val eventId = "00000000-0000-0000-0000-000000009935"
+        seedSessionOutboxEvent(sessionId, eventId, "combined")
+        seedManualDispatch(sessionId, eventId, "00000000-0000-0000-0000-000000009936")
+        seedNotificationDelivery(eventId, "00000000-0000-0000-0000-000000009937", "combined")
+        seedMemberNotification(eventId, "00000000-0000-0000-0000-000000009937", "00000000-0000-0000-0000-000000009938")
+
+        expectBlockedDeletion(
+            sessionId,
+            "RECORD_REVISION_EXISTS" to 1,
+            "NOTIFICATION_DECISION_EXISTS" to 1,
+            "MANUAL_DISPATCH_EXISTS" to 1,
+            "NOTIFICATION_EVENT_EXISTS" to 1,
+            "NOTIFICATION_DELIVERY_EXISTS" to 1,
+            "MEMBER_NOTIFICATION_EXISTS" to 1,
+        )
+        mockMvc
+            .get("/api/host/sessions/$sessionId/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.counts.participants") { value(6) }
+                jsonPath("$.counts.questions") { value(2) }
+                jsonPath("$.payload") { doesNotExist() }
+                jsonPath("$.passcode") { doesNotExist() }
+                jsonPath("$.recipient") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `payload text is not used as a deletion blocker`() {
+        createSessionSeven()
+        jdbcTemplate.update(
+            """
+            insert into notification_event_outbox (
+              id, club_id, event_type, aggregate_type, aggregate_id, payload_json, kafka_key, dedupe_key
+            ) values (
+              ?, '00000000-0000-0000-0000-000000000001', 'NEXT_BOOK_PUBLISHED', 'CLUB',
+              '00000000-0000-0000-0000-000000009777',
+              json_object(
+                'sessionId', '00000000-0000-0000-0000-000000009777',
+                'passcode', 'synthetic-passcode',
+                'recipient', 'member5@example.com'
+              ),
+              'deletion-payload-club',
+              'deletion-payload-club'
+            )
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009939",
+        )
+
+        mockMvc
+            .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.canDelete") { value(true) }
+                jsonPath("$.blockers.length()") { value(0) }
+            }
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
+                withHost()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.deleted") { value(true) }
+            }
+        assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(
+            1,
+            countRows("notification_event_outbox", "id = '00000000-0000-0000-0000-000000009939'"),
+        )
+    }
+
+    @Test
+    fun `successful delete writes lifecycle audit and keeps AI provider job evidence`() {
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        createSessionSeven()
+        jdbcTemplate.update(
+            """
+            insert into ai_generation_audit_log (
+              job_id, session_id, club_id, host_user_id, kind, provider, model, status, created_at
+            ) values (
+              ?, ?, '00000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101',
+              'GENERATE', 'openai', 'gpt-safe', 'SUCCEEDED', utc_timestamp(6)
+            )
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000009940",
+            sessionId,
+        )
+
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") { withHost() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.deleted") { value(true) }
+            }
+
+        assertEquals(0, countRows("sessions", "id = '$sessionId'"))
+        assertEquals(
+            1,
+            countRows(
+                "host_session_lifecycle_audit",
+                "session_id = '$sessionId' and action_type = 'DELETED' and to_state is null " +
+                    "and reason_code = 'EMPTY_SESSION_DELETED'",
+            ),
+        )
+        assertEquals(1, countRows("ai_generation_audit_log", "session_id = '$sessionId'"))
+    }
+
     private fun hostSessionRequestJson() =
         """
         {
@@ -2979,6 +3189,211 @@ class HostSessionControllerDbTest(
     private fun MockHttpServletRequestDsl.withHost() {
         with(user("host@example.com"))
         with(csrf())
+    }
+
+    private fun expectBlockedDeletion(
+        sessionId: String,
+        vararg expected: Pair<String, Int>,
+    ) {
+        mockMvc
+            .get("/api/host/sessions/$sessionId/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.canDelete") { value(false) }
+                jsonPath("$.blockers.length()") { value(expected.size) }
+                expected.forEachIndexed { index, (code, count) ->
+                    jsonPath("$.blockers[$index].code") { value(code) }
+                    jsonPath("$.blockers[$index].count") { value(count) }
+                    jsonPath("$.blockers[$index].payload") { doesNotExist() }
+                    jsonPath("$.blockers[$index].passcode") { doesNotExist() }
+                    jsonPath("$.blockers[$index].recipient") { doesNotExist() }
+                    jsonPath("$.blockers[$index].url") { doesNotExist() }
+                }
+            }
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") { withHost() }
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_DELETE_BLOCKED") }
+                jsonPath("$.blockers.length()") { value(expected.size) }
+                jsonPath("$.payload") { doesNotExist() }
+                jsonPath("$.passcode") { doesNotExist() }
+                jsonPath("$.recipient") { doesNotExist() }
+                expected.forEachIndexed { index, (code, count) ->
+                    jsonPath("$.blockers[$index].code") { value(code) }
+                    jsonPath("$.blockers[$index].count") { value(count) }
+                }
+            }
+        assertEquals(1, countRows("sessions", "id = '$sessionId'"))
+    }
+
+    private fun expectDeletionNotAllowed(sessionId: String) {
+        mockMvc
+            .get("/api/host/sessions/$sessionId/deletion-preview") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_DELETION_NOT_ALLOWED") }
+                jsonPath("$.blockers") { doesNotExist() }
+            }
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") { withHost() }
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_DELETION_NOT_ALLOWED") }
+                jsonPath("$.blockers") { doesNotExist() }
+            }
+        assertEquals(1, countRows("sessions", "id = '$sessionId'"))
+    }
+
+    private fun seedRecordRevision(
+        sessionId: String,
+        revisionId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into session_record_revisions (
+              id, session_id, club_id, version, source, snapshot_json, snapshot_sha256,
+              applied_by_membership_id
+            ) values (?, ?, '00000000-0000-0000-0000-000000000001', 1, 'BASELINE', '{}', ?, ?)
+            """.trimIndent(),
+            revisionId,
+            sessionId,
+            "a".repeat(64),
+            HOST_MEMBERSHIP_ID,
+        )
+    }
+
+    private fun seedSkipNotificationDecision(
+        sessionId: String,
+        previewId: String,
+        decisionId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_previews (
+              id, club_id, session_id, host_membership_id, action_type, event_type, request_hash,
+              expected_live_revision, target_count, expected_in_app_count, expected_email_count,
+              excluded_count, expires_at
+            ) values (?, '00000000-0000-0000-0000-000000000001', ?, ?, 'RECORD_APPLY',
+                      'SESSION_RECORD_UPDATED', ?, 0, 0, 0, 0, 0,
+                      timestampadd(hour, 1, utc_timestamp(6)))
+            """.trimIndent(),
+            previewId,
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+            "d".repeat(64),
+        )
+        jdbcTemplate.update(
+            """
+            insert into host_action_notification_decisions (
+              id, preview_id, club_id, session_id, host_membership_id, action_type, event_type,
+              live_revision, decision, target_count, expected_in_app_count, expected_email_count,
+              excluded_count
+            ) values (?, ?, '00000000-0000-0000-0000-000000000001', ?, ?, 'RECORD_APPLY',
+                      'SESSION_RECORD_UPDATED', 0, 'SKIP', 0, 0, 0, 0)
+            """.trimIndent(),
+            decisionId,
+            previewId,
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+        )
+        jdbcTemplate.update(
+            """
+            update host_action_notification_previews
+            set consumed_at = utc_timestamp(6), consumed_decision_id = ?
+            where id = ?
+            """.trimIndent(),
+            decisionId,
+            previewId,
+        )
+    }
+
+    private fun seedSessionOutboxEvent(
+        sessionId: String,
+        eventId: String,
+        suffix: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_event_outbox (
+              id, club_id, event_type, aggregate_type, aggregate_id, payload_json, kafka_key, dedupe_key
+            ) values (
+              ?, '00000000-0000-0000-0000-000000000001', 'SESSION_REMINDER_DUE', 'SESSION', ?,
+              json_object('source', 'deletion-blocker-fixture'), ?, ?
+            )
+            """.trimIndent(),
+            eventId,
+            sessionId,
+            "deletion-blocker-$suffix",
+            "deletion-blocker-$suffix",
+        )
+    }
+
+    private fun seedManualDispatch(
+        sessionId: String,
+        eventId: String,
+        dispatchId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_manual_dispatches (
+              id, club_id, event_id, session_id, event_type, requested_by_membership_id,
+              requested_channels, audience, target_count, expected_in_app_count, expected_email_count,
+              resend, send_mode
+            ) values (
+              ?, '00000000-0000-0000-0000-000000000001', ?, ?, 'SESSION_REMINDER_DUE', ?,
+              'IN_APP', 'ALL_ACTIVE_MEMBERS', 0, 0, 0, false, 'NOW'
+            )
+            """.trimIndent(),
+            dispatchId,
+            eventId,
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+        )
+    }
+
+    private fun seedNotificationDelivery(
+        eventId: String,
+        deliveryId: String,
+        suffix: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into notification_deliveries (
+              id, event_id, club_id, recipient_membership_id, channel, status, dedupe_key
+            ) values (
+              ?, ?, '00000000-0000-0000-0000-000000000001', ?, 'IN_APP', 'SENT', ?
+            )
+            """.trimIndent(),
+            deliveryId,
+            eventId,
+            MEMBER5_MEMBERSHIP_ID,
+            "deletion-blocker-delivery-$suffix",
+        )
+    }
+
+    private fun seedMemberNotification(
+        eventId: String,
+        deliveryId: String,
+        notificationId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into member_notifications (
+              id, event_id, delivery_id, club_id, recipient_membership_id, event_type,
+              title, body, deep_link_path
+            ) values (
+              ?, ?, ?, '00000000-0000-0000-0000-000000000001', ?, 'SESSION_REMINDER_DUE',
+              'Synthetic deletion fixture', 'Synthetic deletion fixture body', '/app/sessions/current'
+            )
+            """.trimIndent(),
+            notificationId,
+            eventId,
+            deliveryId,
+            MEMBER5_MEMBERSHIP_ID,
+        )
     }
 
     private fun createSession(

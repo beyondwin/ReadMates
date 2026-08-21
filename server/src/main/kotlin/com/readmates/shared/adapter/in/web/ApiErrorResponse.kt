@@ -6,6 +6,11 @@ import org.slf4j.MDC
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 
+data class ApiErrorBlocker(
+    val code: String,
+    val count: Int,
+)
+
 data class ApiErrorResponse(
     val code: String,
     val message: String,
@@ -13,6 +18,8 @@ data class ApiErrorResponse(
     val traceId: String? = null,
     @field:JsonInclude(JsonInclude.Include.NON_NULL)
     val openSessionId: String? = null,
+    @field:JsonInclude(JsonInclude.Include.NON_EMPTY)
+    val blockers: List<ApiErrorBlocker> = emptyList(),
 )
 
 fun apiErrorResponse(
@@ -20,6 +27,7 @@ fun apiErrorResponse(
     code: String,
     message: String = status.defaultApiErrorMessage(),
     openSessionId: String? = null,
+    blockers: List<ApiErrorBlocker> = emptyList(),
 ): ResponseEntity<ApiErrorResponse> =
     ResponseEntity
         .status(status)
@@ -30,6 +38,7 @@ fun apiErrorResponse(
                 status = status.value(),
                 traceId = MDC.get(RequestIdFilter.MDC_KEY),
                 openSessionId = openSessionId,
+                blockers = blockers,
             ),
         )
 
