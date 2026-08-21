@@ -112,13 +112,28 @@ describe("buildHostSessionWorkspace", () => {
     });
   });
 
-  it("fixes an invalid or stale CLOSED draft before apply", () => {
+  it("fixes a stale CLOSED draft before apply", () => {
     expect(
       buildHostSessionWorkspace({
         ...baseInput,
         state: "CLOSED",
         hasRecordDraft: true,
         recordDraftStale: true,
+        recordValidationIssueCount: 0,
+      }),
+    ).toMatchObject({
+      statusLabel: "기록 정리 중",
+      primaryAction: { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" },
+    });
+  });
+
+  it("fixes an invalid CLOSED draft before apply", () => {
+    expect(
+      buildHostSessionWorkspace({
+        ...baseInput,
+        state: "CLOSED",
+        hasRecordDraft: true,
+        recordDraftStale: false,
         recordValidationIssueCount: 2,
       }),
     ).toMatchObject({
@@ -153,6 +168,23 @@ describe("buildHostSessionWorkspace", () => {
     ).toMatchObject({
       statusLabel: "기록 정리 중",
       primaryAction: { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" },
+      publicationReady: true,
+    });
+  });
+
+  it("keeps PUBLISH_RECORD when applied but not publication-ready", () => {
+    expect(
+      buildHostSessionWorkspace({
+        ...baseInput,
+        state: "CLOSED",
+        hasRecordDraft: true,
+        hasAppliedRecord: true,
+        publicationReady: false,
+      }),
+    ).toMatchObject({
+      statusLabel: "기록 정리 중",
+      primaryAction: { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" },
+      publicationReady: false,
     });
   });
 

@@ -21,6 +21,7 @@ export type HostSessionWorkspaceView = {
   statusLabel: "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "공개 완료";
   primaryAction: { kind: string; label: string; panel: HostSessionWorkspacePanel };
   progress: ReadonlyArray<{ id: string; label: string; state: "done" | "current" | "next" }>;
+  publicationReady: boolean;
 };
 
 type ProgressState = "done" | "current" | "next";
@@ -33,6 +34,7 @@ export function buildHostSessionWorkspace(input: HostSessionWorkspaceInput): Hos
     statusLabel: statusLabelFor(input.state),
     primaryAction,
     progress: progressFor(input.state, primaryAction.kind),
+    publicationReady: input.publicationReady,
   };
 }
 
