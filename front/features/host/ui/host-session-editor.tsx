@@ -67,6 +67,7 @@ import {
   type ReadmatesReturnTarget,
 } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
+import { rsvpLabel } from "@/shared/ui/readmates-display";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { AttendancePanel } from "./session-editor/attendance-panel";
 import { BasicSessionPanel } from "./session-editor/basic-session-panel";
@@ -280,15 +281,22 @@ export default function HostSessionEditor({
   const [sessionImportStatus, setSessionImportStatus] = useState<"idle" | "previewing" | "ready" | "committing" | "error">("idle");
   const [sessionImportError, setSessionImportError] = useState<string | null>(null);
   const [visitedPanels, setVisitedPanels] = useState<Set<HostSessionWorkspacePanel>>(
-    () => new Set([navigation.location.panel]),
+    () => new Set(
+      session
+        ? [navigation.location.panel]
+        : ["basic", navigation.location.panel],
+    ),
   );
   const [visitedSources, setVisitedSources] = useState<Set<HostSessionDraftSource>>(
     () => new Set(navigation.location.panel === "records" ? [navigation.location.source] : []),
   );
 
   const sessionIdForAigen = session?.sessionId;
-  const activePanel = navigation.location.panel;
-  const activeSource = navigation.location.source;
+  const workspaceLocation = !session && navigation.location.panel === "focus"
+    ? { panel: "basic" as const, source: navigation.location.source }
+    : navigation.location;
+  const activePanel = workspaceLocation.panel;
+  const activeSource = workspaceLocation.source;
 
   if (!visitedPanels.has(activePanel)) {
     setVisitedPanels((current) => new Set(current).add(activePanel));
@@ -973,6 +981,7 @@ export default function HostSessionEditor({
       return;
     }
     if (kind === "REVIEW_MEMBER_INPUT") {
+      document.getElementById("workspace-member-responses")?.focus();
       return;
     }
     if (kind === "CHECK_ATTENDANCE") {
@@ -1029,7 +1038,7 @@ export default function HostSessionEditor({
           time: time || displaySession?.startTime || null,
           location: locationLabel || displaySession?.locationLabel || null,
         }}
-        location={navigation.location}
+        location={workspaceLocation}
         onLocationChange={changeLocation}
         onPrimaryAction={handlePrimaryAction}
         primaryActionDisabled={
@@ -1039,7 +1048,7 @@ export default function HostSessionEditor({
         }
         publicRecordHref={
           displaySession?.state === "PUBLISHED" && session
-            ? `/app/sessions/${encodeURIComponent(session.sessionId)}`
+            ? scopedHostRedirectHref(`/app/sessions/${encodeURIComponent(session.sessionId)}`)
             : null
         }
         reverseAction={
@@ -1062,19 +1071,24 @@ export default function HostSessionEditor({
         }
         LinkComponent={LinkComponent}
         focusContent={
-          displaySession ? (
-            <HostSessionNotificationActions
-              sessionId={displaySession.sessionId}
-              state={displaySession.state}
-              visibility={displaySession.visibility}
-              feedbackDocumentUploaded={displaySession.feedbackDocument.uploaded}
-              dispatches={notificationDispatches}
-              LinkComponent={LinkComponent}
-            />
-          ) : null
+          <>
+            {displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT" && session ? (
+              <MemberResponseSummary attendees={session.attendees} />
+            ) : null}
+            {displaySession ? (
+              <HostSessionNotificationActions
+                sessionId={displaySession.sessionId}
+                state={displaySession.state}
+                visibility={displaySession.visibility}
+                feedbackDocumentUploaded={displaySession.feedbackDocument.uploaded}
+                dispatches={notificationDispatches}
+                LinkComponent={LinkComponent}
+              />
+            ) : null}
+          </>
         }
         basicPanel={
-          visitedPanels.has("basic") || activePanel === "basic" ? (
+          isNewSession || visitedPanels.has("basic") || activePanel === "basic" ? (
             <form
               id="host-session-editor"
               onSubmit={handleSubmit}
@@ -1318,6 +1332,38 @@ export default function HostSessionEditor({
         </div>
       ) : null}
     </main>
+  );
+}
+
+function MemberResponseSummary({
+  attendees,
+}: {
+  attendees: HostSessionDetailResponse["attendees"];
+}) {
+  const active = attendees.filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE");
+  return (
+    <section
+      id="workspace-member-responses"
+      tabIndex={-1}
+      aria-labelledby="workspace-member-responses-title"
+    >
+      <h3 id="workspace-member-responses-title" className="h4 editorial" style={{ margin: "0 0 10px" }}>
+        참석 응답
+      </h3>
+      {active.length === 0 ? (
+        <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
+          아직 참석 대상자가 없습니다.
+        </p>
+      ) : (
+        <ul className="stack" style={{ "--stack": "8px", margin: 0, padding: 0, listStyle: "none" } as CSSProperties}>
+          {active.map((attendee) => (
+            <li key={attendee.membershipId} className="small">
+              {attendee.displayName} · RSVP {rsvpLabel(attendee.rsvpStatus)}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

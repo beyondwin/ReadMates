@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from "react";
 import type {
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
@@ -11,6 +11,14 @@ import { WorkspaceHeader, type WorkspaceHeaderModel } from "./workspace-header";
 import { WorkspacePanel } from "./workspace-panel";
 import { WorkspaceProgressList } from "./workspace-progress-list";
 import { WorkspaceUndoBar, type WorkspacePendingUndo } from "./workspace-undo-bar";
+
+const focusableSelector = [
+  "button:not([disabled])",
+  "a[href]",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+].join(", ");
 
 export type HostSessionWorkspaceProps = {
   view: HostSessionWorkspaceView;
@@ -44,6 +52,11 @@ function panelLocation(panel: HostSessionWorkspacePanel, source: HostSessionWork
   return { panel, source };
 }
 
+function visibleFocusable(root: HTMLElement) {
+  return Array.from(root.querySelectorAll<HTMLElement>(focusableSelector))
+    .filter((element) => !element.closest("[hidden]"));
+}
+
 export function HostSessionWorkspace({
   view,
   header,
@@ -73,25 +86,68 @@ export function HostSessionWorkspace({
   const recordsOpen = location.panel === "records";
   const sheetOpen = basicOpen || historyOpen;
   const statusLabel = view.statusLabel;
+  const sheetRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  const changePanel = (next: HostSessionWorkspaceLocation) => {
+    const openingOverlay = (next.panel === "basic" || next.panel === "history") && !sheetOpen;
+    if (openingOverlay && document.activeElement instanceof HTMLElement) {
+      triggerRef.current = document.activeElement;
+    }
+    onLocationChange(next);
+  };
 
   useEffect(() => {
     if (!sheetOpen) {
       return;
     }
-    const onKeyDown = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== "Escape") {
-        return;
-      }
+    const first = sheetRef.current ? visibleFocusable(sheetRef.current)[0] : null;
+    first?.focus();
+  }, [sheetOpen, basicOpen, historyOpen]);
+
+  const sheetWasOpenRef = useRef(false);
+  useEffect(() => {
+    if (sheetOpen) {
+      sheetWasOpenRef.current = true;
+      return;
+    }
+    if (sheetWasOpenRef.current) {
+      triggerRef.current?.focus();
+      sheetWasOpenRef.current = false;
+    }
+  }, [sheetOpen]);
+
+  const closeSheet = () => changePanel(focusLocation());
+  const handleSheetKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape") {
       if (document.querySelectorAll('[role="dialog"][aria-modal="true"]').length > 1) {
         return;
       }
-      onLocationChange(focusLocation());
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  }, [onLocationChange, sheetOpen]);
-
-  const closeSheet = () => onLocationChange(focusLocation());
+      event.preventDefault();
+      closeSheet();
+      return;
+    }
+    if (event.key !== "Tab" || !sheetRef.current) {
+      return;
+    }
+    const focusable = visibleFocusable(sheetRef.current);
+    if (focusable.length === 0) {
+      event.preventDefault();
+      return;
+    }
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+    const active = document.activeElement;
+    if (event.shiftKey && (active === first || !sheetRef.current.contains(active))) {
+      event.preventDefault();
+      last.focus();
+      return;
+    }
+    if (!event.shiftKey && (active === last || !sheetRef.current.contains(active))) {
+      event.preventDefault();
+      first.focus();
+    }
+  };
   const primaryLabel = view.primaryAction.label;
   const publishBlocked = view.primaryAction.kind === "PUBLISH_RECORD" && !view.publicationReady;
   const disabled = primaryActionDisabled || publishBlocked;
@@ -99,14 +155,15 @@ export function HostSessionWorkspace({
 
   return (
     <div className="rm-host-session-workspace">
+      <div className="rm-host-session-workspace__chrome" inert={sheetOpen || undefined}>
       <div className="rm-host-session-workspace__frame">
         <WorkspaceHeader
           header={header}
           statusLabel={statusLabel}
           basicOpen={basicOpen}
           historyOpen={historyOpen}
-          onOpenBasic={() => onLocationChange(basicOpen ? focusLocation() : panelLocation("basic"))}
-          onOpenHistory={() => onLocationChange(historyOpen ? focusLocation() : panelLocation("history"))}
+          onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+          onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
           LinkComponent={LinkComponent}
         />
 
@@ -133,7 +190,7 @@ export function HostSessionWorkspace({
                 title="출석"
                 eyebrow="참석 명단"
                 expanded={attendanceOpen}
-                onToggle={() => onLocationChange(attendanceOpen ? focusLocation() : panelLocation("attendance"))}
+                onToggle={() => changePanel(attendanceOpen ? focusLocation() : panelLocation("attendance"))}
               >
                 {attendancePanel}
               </WorkspacePanel>
@@ -145,7 +202,7 @@ export function HostSessionWorkspace({
                 title="기록"
                 eyebrow="모임 기록"
                 expanded={recordsOpen}
-                onToggle={() => onLocationChange(recordsOpen ? focusLocation() : panelLocation("records", location.source))}
+                onToggle={() => changePanel(recordsOpen ? focusLocation() : panelLocation("records", location.source))}
               >
                 {recordsPanel}
               </WorkspacePanel>
@@ -155,7 +212,7 @@ export function HostSessionWorkspace({
           <aside className="rm-host-session-workspace__rail">
             <WorkspaceProgressList
               progress={view.progress}
-              onSelect={(panel) => onLocationChange(panelLocation(panel, panel === "records" ? location.source : "manual"))}
+              onSelect={(panel) => changePanel(panelLocation(panel, panel === "records" ? location.source : "manual"))}
             />
             {draftSaveLabel ? (
               <p className="small rm-host-session-workspace__save-state">{draftSaveLabel}</p>
@@ -167,7 +224,7 @@ export function HostSessionWorkspace({
         <WorkspaceUndoBar pendingUndo={pendingUndo} />
       </div>
 
-      <div className="rm-host-session-workspace__sticky-cta">
+      <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">
         {showPublicLink && publicRecordHref ? (
           <LinkComponent
             to={publicRecordHref}
@@ -186,6 +243,7 @@ export function HostSessionWorkspace({
           </button>
         )}
       </div>
+      </div>
 
       <div
         className="rm-host-session-workspace__sheet-backdrop"
@@ -197,10 +255,13 @@ export function HostSessionWorkspace({
         }}
       >
         <div
-          className="rm-host-session-workspace__sheet"
+          ref={sheetRef}
+          className="rm-host-session-workspace__sheet rm-host-session-workspace__sheet--bottom"
           role="dialog"
           aria-modal={sheetOpen}
           aria-labelledby={basicOpen ? "workspace-panel-basic-title" : "workspace-panel-history-title"}
+          tabIndex={-1}
+          onKeyDown={handleSheetKeyDown}
         >
           <div hidden={!basicOpen}>
             <WorkspacePanel

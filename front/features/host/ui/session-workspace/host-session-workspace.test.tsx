@@ -328,4 +328,37 @@ describe("HostSessionWorkspace", () => {
     );
     expect(screen.queryByRole("button", { name: "되돌리기" })).not.toBeInTheDocument();
   });
+
+  it("pins the overlay sheet as a bottom sheet and the mobile CTA as a footer", async () => {
+    const user = userEvent.setup();
+    render(<WorkspaceHarness view={viewFor({ ...baseInput, state: "OPEN" })} />);
+
+    await user.click(screen.getByRole("button", { name: "변경 내역" }));
+    const sheet = screen.getByRole("dialog", { name: "변경 내역" });
+    expect(sheet).toHaveClass("rm-host-session-workspace__sheet");
+    expect(sheet).toHaveClass("rm-host-session-workspace__sheet--bottom");
+    expect(document.querySelector(".rm-host-session-workspace__sticky-cta"))
+      .toHaveClass("rm-host-session-workspace__footer-cta");
+  });
+
+  it("closes 변경 내역 on Escape and restores trigger focus as Back would", async () => {
+    const user = userEvent.setup();
+    const onLocationChange = vi.fn();
+    render(
+      <WorkspaceHarness
+        view={viewFor({ ...baseInput, state: "OPEN" })}
+        onLocationChange={onLocationChange}
+      />,
+    );
+
+    const trigger = screen.getByRole("button", { name: "변경 내역" });
+    await user.click(trigger);
+    const dialog = screen.getByRole("dialog", { name: "변경 내역" });
+    expect(dialog).toContainElement(document.activeElement as HTMLElement);
+
+    await user.keyboard("{Escape}");
+    expect(onLocationChange).toHaveBeenCalledWith({ panel: "focus", source: "manual" });
+    expect(screen.queryByRole("dialog", { name: "변경 내역" })).not.toBeInTheDocument();
+    expect(trigger).toHaveFocus();
+  });
 });

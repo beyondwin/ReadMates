@@ -1161,9 +1161,9 @@ describe("host session editor route navigation", () => {
     [
       "an absent query",
       "/app/host/sessions/new",
-      { panel: "focus", source: "manual" },
-      "",
-      "POP",
+      { panel: "basic", source: "manual" },
+      "?section=basic",
+      "REPLACE",
     ],
     [
       "canonical AI records",
@@ -1207,8 +1207,7 @@ describe("host session editor route navigation", () => {
     },
   );
 
-  it("replaces editor sections without push state, a full reload, or unrelated URL loss", async () => {
-    const pushState = vi.spyOn(window.history, "pushState");
+  it("replaces editor sections without a full reload or unrelated URL loss", async () => {
     const { router } = renderNewRouteAt(
       "/app/host/sessions/new?returnTo=%2Fapp%2Fhost&from=dashboard&section=records&source=ai#audit",
     );
@@ -1222,10 +1221,34 @@ describe("host session editor route navigation", () => {
       );
       expect(router.state.location.hash).toBe("#audit");
     });
-    expect(router.state.historyAction).toBe("REPLACE");
-    expect(pushState).not.toHaveBeenCalled();
     expect(screen.getByText("record workflow route ready")).toBeInTheDocument();
-    pushState.mockRestore();
+  });
+
+  it("pushes overlay history so Back closes 변경 내역 without leaving the editor", async () => {
+    const { router } = renderNewRouteAt(
+      "/app/host/sessions/new?returnTo=%2Fapp%2Fhost&section=records",
+    );
+
+    await waitFor(() => {
+      expect(capturedNavigation().location).toEqual({ panel: "records", source: "manual" });
+    });
+
+    act(() => capturedNavigation().onChange({ panel: "history", source: "manual" }));
+    await waitFor(() => {
+      expect(router.state.location.search).toBe("?returnTo=%2Fapp%2Fhost&section=history");
+      expect(router.state.historyAction).toBe("PUSH");
+    });
+    expect(screen.getByText("record workflow route ready")).toBeInTheDocument();
+
+    await act(async () => {
+      await router.navigate(-1);
+    });
+    await waitFor(() => {
+      expect(capturedNavigation().location).toEqual({ panel: "records", source: "manual" });
+      expect(router.state.location.search).toBe("?returnTo=%2Fapp%2Fhost&section=records");
+      expect(router.state.location.pathname).toBe("/app/host/sessions/new");
+    });
+    expect(screen.getByText("record workflow route ready")).toBeInTheDocument();
   });
 
   it("canonicalizes each legacy source URL once under StrictMode without duplicate revalidation", async () => {

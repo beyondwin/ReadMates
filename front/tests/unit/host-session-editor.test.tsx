@@ -152,7 +152,7 @@ type HostSessionEditorProps = Parameters<typeof HostSessionEditor>[0];
 function HostSessionEditorForTest({
   actions,
   navigation,
-  initialLocation = { panel: "focus", source: "manual" },
+  initialLocation,
   recordWorkflow: workflow,
   session: testSession,
   ...props
@@ -161,7 +161,13 @@ function HostSessionEditorForTest({
   navigation?: HostSessionEditorProps["navigation"];
   initialLocation?: HostSessionWorkspaceLocation;
 }) {
-  const [location, setLocation] = useState(initialLocation);
+  const [location, setLocation] = useState(
+    () => initialLocation ?? (
+      testSession
+        ? { panel: "focus" as const, source: "manual" as const }
+        : { panel: "basic" as const, source: "manual" as const }
+    ),
+  );
   const [defaultWorkflow, setDefaultWorkflow] = useState(
     () => recordWorkflow(testSession?.visibility ?? "HOST_ONLY"),
   );
@@ -390,6 +396,28 @@ describe("HostSessionEditor", () => {
       ...values,
       questionDeadlineAt: "2026-05-19T23:59:00+09:00",
     });
+  });
+
+  it("defaults a new session to the basic panel so SAVE_BASIC can submit the form", async () => {
+    const user = userEvent.setup();
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ sessionId: "created-session-basic" }),
+    });
+    const location = { href: "", pathname: "/app/host/sessions/new" };
+    vi.stubGlobal("fetch", fetchMock);
+    vi.stubGlobal("location", location);
+
+    render(<HostSessionEditorForTest session={null} />);
+
+    expect(screen.getByLabelText("세션 제목")).toBeVisible();
+    await user.type(screen.getByLabelText("세션 제목"), "8회차 모임 · 새 책");
+    await user.type(screen.getByLabelText("책 제목"), "새 책");
+    await user.type(screen.getByLabelText("저자"), "새 저자");
+    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
+
+    await waitFor(() => expect(fetchMock).toHaveBeenCalled());
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/bff/api/host/sessions");
   });
 
   it("labels new session document creation separately from current session editing", () => {
@@ -1520,6 +1548,44 @@ describe("HostSessionEditor", () => {
 
     expect(screen.getByText("공개 완료")).toBeVisible();
     expect(screen.queryByText("기록 정리 중")).not.toBeInTheDocument();
+  });
+
+  it("scopes the public-result href through the existing app-link helper", () => {
+    vi.stubGlobal("location", {
+      ...window.location,
+      pathname: "/clubs/club-a/app/host/sessions/session-1",
+    });
+
+    render(
+      <HostSessionEditorForTest
+        session={{
+          ...session,
+          state: "PUBLISHED",
+          publication: {
+            publicSummary: "멤버에게 공개된 기록입니다.",
+            visibility: "MEMBER",
+          },
+        }}
+      />,
+    );
+
+    const links = screen.getAllByRole("link", { name: "공개 기록 보기" });
+    expect(links[0]).toHaveAttribute("href", "/clubs/club-a/app/sessions/session-1");
+    expect(links[1]).toHaveAttribute("href", "/clubs/club-a/app/sessions/session-1");
+  });
+
+  it("reveals member RSVP responses for OPEN before the meeting date", async () => {
+    const user = userEvent.setup();
+    const upcomingOpen = {
+      ...openSession,
+      date: "2099-01-15",
+    };
+    render(<HostSessionEditorForTest session={upcomingOpen} />);
+
+    expect(screen.getByRole("heading", { name: "참석 응답" })).toBeVisible();
+    expect(screen.getAllByText(/RSVP 참석/).length).toBeGreaterThan(0);
+    await user.click(screen.getAllByRole("button", { name: "멤버 응답 확인하기" })[0]!);
+    expect(document.getElementById("workspace-member-responses")).toHaveFocus();
   });
 
   it("lets hosts open a draft meeting after confirming 멤버에게 열기", async () => {

@@ -3392,6 +3392,10 @@ a.rm-recent-record__destination:hover {
   border-left: 1px solid var(--line);
 }
 
+.rm-host-session-workspace__footer-cta {
+  display: none;
+}
+
 .rm-host-session-workspace input,
 .rm-host-session-workspace textarea,
 .rm-host-session-workspace select {
@@ -3419,19 +3423,33 @@ a.rm-recent-record__destination:hover {
     min-height: 44px;
   }
 
-  .rm-host-session-workspace__sticky-cta {
+  .rm-host-session-workspace {
+    padding-bottom: calc(88px + env(safe-area-inset-bottom) + var(--m-nav-h, 0px));
+  }
+
+  .rm-host-session-workspace__sticky-cta,
+  .rm-host-session-workspace__footer-cta {
     display: flex;
-    position: sticky;
+    position: fixed;
+    left: 0;
+    right: 0;
     bottom: 0;
     z-index: 30;
-    padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+    padding: 12px var(--rm-workspace-gap) calc(12px + env(safe-area-inset-bottom) + var(--m-nav-h, 0px));
     background: color-mix(in oklch, var(--bg) 92%, transparent);
   }
 
-  .rm-host-session-workspace__sheet {
+  .rm-host-session-workspace:has(.rm-host-session-workspace__sheet-backdrop:not([hidden])) .rm-host-session-workspace__footer-cta,
+  .rm-host-session-workspace:has(input:focus, textarea:focus, select:focus) .rm-host-session-workspace__footer-cta {
+    display: none;
+  }
+
+  .rm-host-session-workspace__sheet,
+  .rm-host-session-workspace__sheet--bottom {
     top: auto;
     right: 0;
     left: 0;
+    bottom: 0;
     height: auto;
     max-height: min(86vh, 720px);
     width: 100%;

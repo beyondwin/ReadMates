@@ -31,6 +31,7 @@ import {
   buildHostSessionWorkspaceUrl,
   parseHostSessionWorkspaceLocation,
   type HostSessionWorkspaceLocation,
+  type HostSessionWorkspacePanel,
 } from "@/features/host/model/host-session-workspace-navigation";
 import { hasAppliedSessionRecord } from "@/features/host/model/host-session-editor-view-model";
 import {
@@ -126,31 +127,69 @@ function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
   return { clubSlug };
 }
 
-function useHostSessionEditorLocation(): {
+function isOverlayPanel(
+  panel: HostSessionWorkspacePanel,
+  homePanel: HostSessionWorkspacePanel,
+) {
+  if (panel === homePanel) {
+    return false;
+  }
+  return panel === "basic" || panel === "history";
+}
+
+function useHostSessionEditorLocation(options?: {
+  homePanel?: HostSessionWorkspacePanel;
+}): {
   location: HostSessionWorkspaceLocation;
   replaceLocation: (next: HostSessionWorkspaceLocation) => void;
 } {
+  const homePanel = options?.homePanel ?? "focus";
   const routerLocation = useLocation();
   const navigate = useNavigate();
   const currentUrl =
     `${routerLocation.pathname}${routerLocation.search}${routerLocation.hash}`;
   const currentUrlRef = useRef(currentUrl);
   const canonicalizedSourceUrlRef = useRef<string | null>(null);
-  const location = useMemo(
+  const overlayPushedRef = useRef(false);
+  const parsedLocation = useMemo(
     () => parseHostSessionWorkspaceLocation(routerLocation.search),
     [routerLocation.search],
   );
+  const location = useMemo((): HostSessionWorkspaceLocation => {
+    if (homePanel === "basic" && parsedLocation.panel === "focus") {
+      return { panel: "basic", source: "manual" };
+    }
+    return parsedLocation;
+  }, [homePanel, parsedLocation]);
   const replaceLocation = useCallback((next: HostSessionWorkspaceLocation) => {
     const nextUrl = buildHostSessionWorkspaceUrl(currentUrlRef.current, next);
     if (nextUrl === currentUrlRef.current) {
       return;
     }
+    const openingOverlay = isOverlayPanel(next.panel, homePanel)
+      && !isOverlayPanel(location.panel, homePanel);
+    const closingOverlay = !isOverlayPanel(next.panel, homePanel)
+      && isOverlayPanel(location.panel, homePanel);
+
+    if (closingOverlay && overlayPushedRef.current) {
+      overlayPushedRef.current = false;
+      void navigate(-1);
+      return;
+    }
+
+    overlayPushedRef.current = openingOverlay;
     currentUrlRef.current = nextUrl;
     void navigate(nextUrl, {
-      replace: true,
+      replace: !openingOverlay,
       state: routerLocation.state,
     });
-  }, [navigate, routerLocation.state]);
+  }, [homePanel, location.panel, navigate, routerLocation.state]);
+
+  useEffect(() => {
+    if (!isOverlayPanel(location.panel, homePanel)) {
+      overlayPushedRef.current = false;
+    }
+  }, [homePanel, location.panel]);
 
   useEffect(() => {
     const canonicalUrl = buildHostSessionWorkspaceUrl(currentUrl, location);
@@ -363,7 +402,7 @@ export function NewHostSessionRoute({
 }: HostSessionEditorRouteProps) {
   const { clubSlug } = useParams<{ clubSlug: string }>();
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
-  const { location, replaceLocation } = useHostSessionEditorLocation();
+  const { location, replaceLocation } = useHostSessionEditorLocation({ homePanel: "basic" });
   const navigation = useMemo(
     () => ({ location, onChange: replaceLocation }),
     [location, replaceLocation],
