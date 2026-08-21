@@ -14,7 +14,10 @@ import {
   type SessionAccessScope,
 } from "@/features/host/model/session-exposure-model";
 import type { HostSessionDraftSource } from "@/features/host/model/host-session-editor-navigation";
-import type { HostSessionRecordDraft } from "@/features/host/model/host-session-editor-view-model";
+import {
+  hasAppliedSessionRecord,
+  type HostSessionRecordDraft,
+} from "@/features/host/model/host-session-editor-view-model";
 import type { SessionImportPreviewResponse } from "@/features/host/model/host-view-types";
 import type { SessionImportCommitResult } from "@/features/host/model/session-import-model";
 import type { ReadmatesReturnState } from "@/shared/routing/readmates-route-state";
@@ -263,7 +266,11 @@ export function SessionRecordWorkspace({
             멤버에게 보이는 기록
           </h3>
           <div className="row" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
-            {liveRevision > 0 ? <span className="badge">버전 {liveRevision}</span> : null}
+            {liveRevision > 0 ? (
+              <span className="badge">버전 {liveRevision}</span>
+            ) : hasAppliedSessionRecord({ liveRevision, liveSnapshot }) ? (
+              <span className="badge">이전 적용본</span>
+            ) : null}
             <span className="badge">{exposureCopy.accessLabel}</span>
             <span className="badge">{exposureCopy.siteLabel}</span>
             <span className="badge">{feedbackDocument.uploaded ? "업로드 완료" : "미등록"}</span>

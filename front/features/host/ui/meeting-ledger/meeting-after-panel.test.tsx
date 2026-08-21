@@ -103,7 +103,7 @@ describe("MeetingAfterPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
-    expect(screen.getByText("공개하려면 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
+    expect(screen.getByText("공개하려면 게스트와 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("공개하려면 요약이 필요합니다")).not.toBeInTheDocument();
   });
 
@@ -117,7 +117,7 @@ describe("MeetingAfterPanel", () => {
     );
 
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
-    expect(screen.getByText("공개하려면 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
+    expect(screen.getByText("공개하려면 게스트와 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("공개하려면 요약이 필요합니다")).not.toBeInTheDocument();
   });
 
@@ -184,7 +184,7 @@ describe("MeetingAfterPanel", () => {
     expect(screen.queryByText(/회차/)).not.toBeInTheDocument();
     expect(screen.queryByText(/세션/)).not.toBeInTheDocument();
     expect(screen.getByText("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "멤버에게 보이기로 바꾸기" }));
+    await user.click(screen.getByRole("button", { name: "게스트와 멤버에게 보이기로 바꾸기" }));
     expect(onSetGuestReadable).toHaveBeenCalledTimes(1);
   });
 
@@ -211,6 +211,7 @@ describe("MeetingAfterPanel", () => {
             nextLiveRevision: 1,
             draftRevision: 4,
             visibility: "MEMBER",
+            hasAppliedRecord: true,
           },
           submitting: false,
         }}
@@ -222,6 +223,7 @@ describe("MeetingAfterPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
     const dialog = screen.getByRole("dialog", { name: "반영 전 확인" });
+    expect(within(dialog).getByText("이전 적용본 → 버전 1")).toBeVisible();
     expect(within(dialog).getByRole("button", { name: "멤버에게 반영" })).toBeEnabled();
     await user.click(within(dialog).getByRole("button", { name: "멤버에게 반영" }));
     expect(onConfirmApply).toHaveBeenCalledTimes(1);

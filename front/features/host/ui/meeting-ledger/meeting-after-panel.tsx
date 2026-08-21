@@ -41,7 +41,7 @@ export type MeetingAfterPanelProps = {
 };
 
 const SUMMARY_PUBLISH_REASON = "공개하려면 요약이 필요합니다";
-const HOST_ONLY_PUBLISH_REASON = "공개하려면 멤버에게 보이기로 바꿔 주세요.";
+const HOST_ONLY_PUBLISH_REASON = "공개하려면 게스트와 멤버에게 보이기로 바꿔 주세요.";
 
 function publishBlockedReason(accessScope: SessionAccessScope, summary: string) {
   if (accessScope === "HOST_ONLY") {

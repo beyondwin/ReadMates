@@ -14,6 +14,7 @@ export type HostSessionRecordApplyReview = {
   nextLiveRevision: number;
   draftRevision: number;
   visibility: SessionRecordVisibility;
+  hasAppliedRecord?: boolean;
 };
 
 export type SessionRecordApplyDialogProps = {
@@ -23,6 +24,16 @@ export type SessionRecordApplyDialogProps = {
   onCancel: () => void;
   onConfirm: () => void;
 };
+
+function applyVersionLabel(preview: HostSessionRecordApplyReview): string {
+  if (preview.liveRevision > 0) {
+    return `버전 ${preview.liveRevision} → 버전 ${preview.nextLiveRevision}`;
+  }
+  if (preview.hasAppliedRecord) {
+    return `이전 적용본 → 버전 ${preview.nextLiveRevision}`;
+  }
+  return `현재 적용본 없음 → 버전 ${preview.nextLiveRevision}`;
+}
 
 function dialogFocusableElements(container: HTMLElement) {
   return Array.from(container.querySelectorAll<HTMLElement>(
@@ -126,9 +137,7 @@ export function SessionRecordApplyDialog({
         <section className="surface-quiet stack" style={{ "--stack": "10px", padding: 14 } as CSSProperties}>
           <div className="field-label">버전</div>
           <div className="small">
-            {preview.liveRevision > 0
-              ? `버전 ${preview.liveRevision} → 버전 ${preview.nextLiveRevision}`
-              : `현재 적용본 없음 → 버전 ${preview.nextLiveRevision}`}
+            {applyVersionLabel(preview)}
           </div>
           <div className="field-label">변경 항목</div>
           {preview.changedSections.length > 0 ? (

@@ -79,30 +79,25 @@ private class ManualNotificationConfirmation(
 ) {
     fun confirmManualDispatch(input: ManualNotificationConfirmTransactionInput): ManualNotificationConfirmAttempt {
         writer.lockClubForAudienceMutation(input.clubId)
+        val session =
+            readQueries.findSessionContext(input.clubId, input.selection.sessionId, forUpdate = true)
+                ?: return rejected(ManualNotificationConfirmRejection.SESSION_STATE_INVALID)
         val preview = previewStore.lockPreview(input.previewId, input.clubId, input.hostMembershipId)
-        return confirmPreview(input, preview)
+        return confirmPreview(input, preview, session)
     }
 
     private fun confirmPreview(
         input: ManualNotificationConfirmTransactionInput,
         preview: LockedManualNotificationPreview?,
+        session: ManualNotificationSessionContext,
     ): ManualNotificationConfirmAttempt =
         when {
             preview == null -> rejected(ManualNotificationConfirmRejection.PREVIEW_NOT_FOUND)
             else ->
                 previewRejection(preview, input)
                     ?.let(::rejected)
-                    ?: confirmAcceptedPreview(input, preview)
+                    ?: confirmSession(input, preview, session)
         }
-
-    private fun confirmAcceptedPreview(
-        input: ManualNotificationConfirmTransactionInput,
-        preview: LockedManualNotificationPreview,
-    ): ManualNotificationConfirmAttempt =
-        readQueries
-            .findSessionContext(input.clubId, input.selection.sessionId, forUpdate = true)
-            ?.let { session -> confirmSession(input, preview, session) }
-            ?: rejected(ManualNotificationConfirmRejection.SESSION_STATE_INVALID)
 
     private fun confirmSession(
         input: ManualNotificationConfirmTransactionInput,

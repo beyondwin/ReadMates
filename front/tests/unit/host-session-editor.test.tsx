@@ -1253,7 +1253,7 @@ describe("HostSessionEditor", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
-    await user.click(screen.getByRole("button", { name: "멤버에게 보이기로 바꾸기" }));
+    await user.click(screen.getByRole("button", { name: "게스트와 멤버에게 보이기로 바꾸기" }));
 
     expect(saveSessionAccessScope).toHaveBeenCalledTimes(1);
     expect(saveSessionAccessScope).toHaveBeenCalledWith(session.sessionId, {

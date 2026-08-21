@@ -32,6 +32,7 @@ import {
   parseHostSessionEditorLocation,
   type HostSessionEditorLocation,
 } from "@/features/host/model/host-session-editor-navigation";
+import { hasAppliedSessionRecord } from "@/features/host/model/host-session-editor-view-model";
 import {
   hostNotificationKeys,
 } from "@/features/host/queries/host-notification-queries";
@@ -672,6 +673,10 @@ export function EditHostSessionRecordWorkflow({
         nextLiveRevision: recordEditor.liveRevision + 1,
         draftRevision: expectedDraftRevision,
         visibility: controller.snapshot.visibility,
+        hasAppliedRecord: hasAppliedSessionRecord({
+          liveRevision: recordEditor.liveRevision,
+          liveSnapshot: recordEditor.liveSnapshot,
+        }),
       });
       setConfirmationOpen(true);
       return preview;

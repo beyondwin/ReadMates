@@ -244,9 +244,6 @@ class HostSessionLifecycleService(
                 reasonNote = normalized.reasonNote,
                 write = { write(idCommand) },
             )
-        if (command.reasonCode == null) {
-            metrics.legacyReason()
-        }
         return detail
     }
 
@@ -275,6 +272,9 @@ class HostSessionLifecycleService(
                     ),
                 )
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                if (reasonCode == HostSessionLifecycleReasonCode.LEGACY_UNSPECIFIED) {
+                    metrics.legacyReason()
+                }
                 logger.info(
                     "Session lifecycle action={} outcome={} requestId={} clubId={} " +
                         "sessionId={} fromState={} toState={}",

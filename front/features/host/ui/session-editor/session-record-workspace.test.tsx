@@ -189,6 +189,7 @@ describe("SessionRecordWorkspace", () => {
     expect(within(sourceTabs).getByRole("tab", { name: "AI로 생성" })).toBeVisible();
     expect(within(sourceTabs).getByRole("tab", { name: "정리본 올리기" })).toBeVisible();
     expect(within(sourceTabs).queryByRole("tab", { name: "외부 JSON" })).not.toBeInTheDocument();
+    expect(within(applied).getByText("이전 적용본")).toBeVisible();
     expect(screen.queryByText("버전 0")).not.toBeInTheDocument();
     expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
     expect(screen.queryByText("공개 기록 초안")).not.toBeInTheDocument();

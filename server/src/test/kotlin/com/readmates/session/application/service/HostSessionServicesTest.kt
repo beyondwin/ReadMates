@@ -906,10 +906,13 @@ class HostSessionServicesTest {
         harness.service.unpublish(reverseCommand())
         harness.service.returnToDraft(reverseCommand())
 
+        harness.service.reopen(reverseCommand(reasonCode = null))
+
         assertThat(harness.audit.entries).isEmpty()
         assertThat(harness.transitionCount("OPENED", "unchanged")).isEqualTo(1.0)
-        assertThat(harness.transitionCount("REOPENED", "unchanged")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("REOPENED", "unchanged")).isEqualTo(2.0)
         assertThat(harness.transitionCount("OPENED", "changed")).isZero()
+        assertThat(harness.legacyReasonCount()).isZero()
     }
 
     @Test

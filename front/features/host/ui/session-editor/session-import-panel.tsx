@@ -118,7 +118,7 @@ export function SessionImportPanelBody({
       {review && preview ? <SessionImportReviewCard review={review} summary={preview.publication.summary} /> : null}
       {hostOnlyBlocked && onSetGuestReadable ? (
         <button className="btn btn-quiet btn-sm" type="button" onClick={onSetGuestReadable}>
-          멤버에게 보이기로 바꾸기
+          게스트와 멤버에게 보이기로 바꾸기
         </button>
       ) : null}
       <button className="btn btn-primary" type="button" disabled={!canCommit} onClick={onCommit}>
