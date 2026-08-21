@@ -53,6 +53,7 @@ class HostSessionTrashService(
     }
 
     @Transactional
+    @Suppress("ThrowsCount")
     override fun restore(command: HostSessionIdCommand): HostSessionDetailResponse {
         requireHost(command.host)
         deletionPort.lockClub(command.host.clubId)

@@ -101,14 +101,16 @@ test("JSON-upload and AI-generate modes coexist and toggle via URL query params"
     });
   });
 
-  // 1) A bare editor URL opens the overview instead of choosing an import tool.
+  // 1) A bare editor URL opens the calculated focus card instead of choosing an import tool.
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`);
-  await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   await expect(page.getByLabel(/대본 파일/)).toHaveCount(0);
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toHaveCount(0);
 
   // 2) The record workspace defaults to manual editing and owns one shared draft.
-  await page.getByRole("tab", { name: "기록", exact: true }).click();
+  await page.getByRole("listitem", { name: /^기록 / }).getByRole("button").click();
+  await expect(page.locator("#workspace-panel-records")).toBeVisible();
   await expect(page).toHaveURL(/\?section=records$/);
   await expect(page.getByRole("tab", { name: "직접 작성" }))
     .toHaveAttribute("aria-selected", "true");

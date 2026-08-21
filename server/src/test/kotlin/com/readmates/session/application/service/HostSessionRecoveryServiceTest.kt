@@ -60,9 +60,21 @@ class HostSessionRecoveryServiceTest {
         val receipt = fixture.service.restore(fixture.restoreCommand(preview.expectedCurrentHash))
 
         assertThat(receipt).isEqualTo(fixture.basicReceipt)
-        assertThat(fixture.draft.updated?.session?.title).isEqualTo(TITLE_BEFORE)
-        assertThat(fixture.draft.updated?.session?.bookTitle).isEqualTo(BOOK_TITLE)
-        assertThat(fixture.draft.updated?.session?.meetingUrl).isEqualTo("")
+        assertThat(
+            fixture.draft.updated
+                ?.session
+                ?.title,
+        ).isEqualTo(TITLE_BEFORE)
+        assertThat(
+            fixture.draft.updated
+                ?.session
+                ?.bookTitle,
+        ).isEqualTo(BOOK_TITLE)
+        assertThat(
+            fixture.draft.updated
+                ?.session
+                ?.meetingUrl,
+        ).isEqualTo("")
         assertThat(fixture.audit.basicRestoredFromChangeId).isEqualTo(CHANGE_ID)
         assertThat(fixture.cache.clubs).containsExactly(CLUB_ID)
     }
@@ -244,8 +256,8 @@ class HostSessionRecoveryServiceTest {
 
         fun withMissingChange() = apply { recovery.change = null }
 
-        fun previewCommand(actor: CurrentMember = host()) =
-            PreviewHostSessionRestoreCommand(actor, SESSION_ID, CHANGE_ID)
+        @Suppress("MaxLineLength")
+        fun previewCommand(actor: CurrentMember = host()) = PreviewHostSessionRestoreCommand(actor, SESSION_ID, CHANGE_ID)
 
         fun restoreCommand(
             hash: String,

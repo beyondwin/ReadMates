@@ -12,6 +12,7 @@ import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
+@Suppress("TooManyFunctions")
 interface HostSessionDeletionPort {
     fun assess(command: HostSessionIdCommand): HostSessionDeletionAssessment
 

@@ -2902,6 +2902,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host moves open session to trash and preserves owned rows`() {
         createSessionSeven()
         seedSessionOwnedRows()

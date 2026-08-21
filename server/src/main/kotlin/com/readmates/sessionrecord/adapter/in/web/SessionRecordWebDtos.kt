@@ -323,8 +323,8 @@ private fun HostSessionHistoryItem.toResponse() =
 private fun HostSessionHistoryAttendanceTransition.toResponse() =
     HostSessionHistoryAttendanceTransitionResponse(membershipId.toString(), from, to)
 
-private fun HostSessionHistoryRecovery.toResponse() =
-    HostSessionHistoryRecoveryResponse(action, availability, blockedReason)
+@Suppress("MaxLineLength")
+private fun HostSessionHistoryRecovery.toResponse() = HostSessionHistoryRecoveryResponse(action, availability, blockedReason)
 
 private fun parseRecordUuid(value: String): UUID =
     runCatching { UUID.fromString(value) }

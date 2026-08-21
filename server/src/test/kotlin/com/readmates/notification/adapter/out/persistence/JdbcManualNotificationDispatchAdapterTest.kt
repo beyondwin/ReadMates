@@ -362,10 +362,9 @@ class JdbcManualNotificationDispatchAdapterTest(
             sessionLock.autoCommit = false
             sessionLock
                 .prepareStatement(
-                    "select id from sessions where club_id = ? and id = ? for update",
+                    "select id from memberships where club_id = ? for update",
                 ).use { statement ->
                     statement.setString(1, clubId.toString())
-                    statement.setString(2, sessionId.toString())
                     statement.executeQuery().use { resultSet -> assertThat(resultSet.next()).isTrue() }
                 }
             val confirmation =

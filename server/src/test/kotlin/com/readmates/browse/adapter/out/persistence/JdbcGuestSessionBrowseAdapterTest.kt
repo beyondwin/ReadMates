@@ -34,7 +34,7 @@ private class RecordingGuestBrowseJdbcTemplate : JdbcTemplate() {
         vararg args: Any?,
     ): MutableList<T> {
         queries += sql
-        if (!sql.contains("from sessions")) return mutableListOf()
+        if (!sql.contains("from sessions") && !sql.contains("from active_sessions")) return mutableListOf()
         return mutableListOf(rowMapper.mapRow(sessionResultSet(), 0))
     }
 

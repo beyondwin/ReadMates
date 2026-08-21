@@ -2,9 +2,9 @@ package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
-import com.readmates.session.application.model.HostSessionTrashExpiredException
 import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionDeletionBlockerCode
+import com.readmates.session.application.model.HostSessionTrashExpiredException
 import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import org.assertj.core.api.Assertions.assertThat

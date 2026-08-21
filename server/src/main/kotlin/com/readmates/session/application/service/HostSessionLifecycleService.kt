@@ -5,7 +5,6 @@ import com.readmates.notification.application.model.HostActionNotificationExcept
 import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.HostSessionDetailResponse
-import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.model.HostSessionChangeKind
@@ -17,6 +16,7 @@ import com.readmates.session.application.model.HostSessionLifecycleAction
 import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
 import com.readmates.session.application.model.HostSessionLifecycleReasonCode
 import com.readmates.session.application.model.HostSessionReverseCommand
+import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.normalized
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase

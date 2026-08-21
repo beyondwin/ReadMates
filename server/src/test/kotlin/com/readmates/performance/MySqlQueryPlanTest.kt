@@ -2,8 +2,8 @@ package com.readmates.performance
 
 import com.readmates.session.adapter.out.persistence.HOST_SESSION_LEDGER_FACTS_SQL
 import com.readmates.sessionclosing.adapter.out.persistence.SessionClosingStatusSql
-import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import com.readmates.support.MySqlExplainRow
+import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import com.readmates.support.assertUsesIndexFor
 import com.readmates.support.explain
 import org.assertj.core.api.Assertions.assertThat
@@ -20,6 +20,7 @@ import org.springframework.jdbc.core.JdbcTemplate
     ],
 )
 @Tag("integration")
+@Suppress("LargeClass")
 class MySqlQueryPlanTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {

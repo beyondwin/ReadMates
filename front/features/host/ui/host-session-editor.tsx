@@ -38,15 +38,17 @@ import {
   hostSessionTrashDeletedAtLabel,
   hostSessionTrashRemainingCopy,
 } from "@/features/host/model/host-session-ledger-model";
-import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lifecycle-model";
+
 import {
   buildHostSessionEditorOverview,
   hasAppliedSessionRecord,
 } from "@/features/host/model/host-session-editor-view-model";
 import { buildHostSessionWorkspace } from "@/features/host/model/host-session-workspace-model";
 import {
+  classifyHostSessionTrashRestoreFailure,
   isReverseLifecycleKind,
   lifecycleConfirmCopy,
+  openAlreadyExistsMessage,
   reverseLifecycleAction,
   type HostSessionReverseRequest,
   type SessionLifecycleConfirmKind,
@@ -73,7 +75,6 @@ import {
   type ReadmatesReturnTarget,
 } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
-import { isReadmatesApiError } from "@/shared/api/errors";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { AttendancePanel } from "./session-editor/attendance-panel";
@@ -662,7 +663,8 @@ export default function HostSessionEditor({
         document.querySelector<HTMLElement>(".rm-host-session-workspace__title")?.focus();
       });
     } catch (error) {
-      if (isReadmatesApiError(error) && (error.status === 410 || error.code === "HOST_SESSION_TRASH_EXPIRED")) {
+      const failure = classifyHostSessionTrashRestoreFailure(error);
+      if (failure.kind === "expired") {
         setTrashRestoreState({
           restoring: false,
           success: false,
@@ -673,7 +675,7 @@ export default function HostSessionEditor({
         });
         return;
       }
-      if (isReadmatesApiError(error) && error.code === "SESSION_OPEN_ALREADY_EXISTS" && error.openSessionId) {
+      if (failure.kind === "open-conflict") {
         setTrashRestoreState({
           restoring: false,
           success: false,
@@ -681,7 +683,7 @@ export default function HostSessionEditor({
           disabledReason: null,
           error: null,
           conflict: {
-            openSessionHref: scopedHostSessionEditHref(error.openSessionId, clubSlug),
+            openSessionHref: scopedHostSessionEditHref(failure.openSessionId, clubSlug),
             message: openAlreadyExistsMessage(),
           },
         });

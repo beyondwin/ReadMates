@@ -115,7 +115,9 @@ class HostSessionRecoveryControllerDbTest(
         val preview = jsonMapper.readTree(body)
         val meeting =
             preview.get("items").let { items ->
-                (0 until items.size()).map { items.get(it) }.first { node -> node.get("field").asString() == "meetingUrl" }
+                (0 until items.size())
+                    .map { items.get(it) }
+                    .first { node -> node.get("field").asString() == "meetingUrl" }
             }
         assertThat(meeting.get("sensitive").booleanValue()).isTrue()
         assertThat(meeting.get("currentValue").isNull).isTrue()
@@ -225,10 +227,11 @@ class HostSessionRecoveryControllerDbTest(
 
     private fun createOpenSession(): String {
         val sessionId = createDraftSession()
-        mockMvc.post("/api/host/sessions/$sessionId/open") {
-            with(user("host@example.com"))
-            with(csrf())
-        }.andExpect { status { isOk() } }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect { status { isOk() } }
         return sessionId
     }
 

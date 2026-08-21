@@ -23,5 +23,6 @@
   },
   "visibility": "PUBLIC",
   "accessScope": "GUEST_READABLE",
-  "siteVisibility": "PUBLIC_RECORD"
+  "siteVisibility": "PUBLIC_RECORD",
+  "changeReceipt": null
 }

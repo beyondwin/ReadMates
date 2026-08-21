@@ -262,9 +262,8 @@ test("session closing flywheel links host member and public surfaces", async ({ 
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`);
   await expect(page).toHaveURL(new RegExp(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/(edit|closing)\/?$/);
-  await expect(page.getByRole("heading", { name: /지금 다루는 모임/ })).toBeVisible();
-  await expect(page.getByRole("button", { name: "정리본 올리기" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "모임 하나 더" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "공개 기록 보기" })).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
   const screenshot = await page.screenshot({ path: testInfo.outputPath("session-closing-board.png"), fullPage: true });

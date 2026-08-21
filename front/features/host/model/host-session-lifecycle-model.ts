@@ -95,6 +95,22 @@ export function openAlreadyExistsMessage(): string {
   return "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.";
 }
 
+export type HostSessionTrashRestoreFailure =
+  | { kind: "expired" }
+  | { kind: "open-conflict"; openSessionId: string }
+  | { kind: "failed" };
+
+export function classifyHostSessionTrashRestoreFailure(error: unknown): HostSessionTrashRestoreFailure {
+  const candidate = error as { status?: number; code?: string; openSessionId?: string | null };
+  if (candidate.status === 410 || candidate.code === "HOST_SESSION_TRASH_EXPIRED") {
+    return { kind: "expired" };
+  }
+  if (candidate.code === "SESSION_OPEN_ALREADY_EXISTS" && candidate.openSessionId) {
+    return { kind: "open-conflict", openSessionId: candidate.openSessionId };
+  }
+  return { kind: "failed" };
+}
+
 export const REVERSE_REASON_NOTE_MAX_LENGTH = 500;
 
 export const SELECTABLE_REVERSE_REASON_OPTIONS = [

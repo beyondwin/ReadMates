@@ -40,7 +40,8 @@ test("mobile review keeps the ledger and editor usable and shows evidence in a f
   await page.goto(
     `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?section=records&source=ai`,
   );
-  await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.locator("#workspace-panel-records")).toBeVisible();
   await expect(page.getByRole("tab", { name: "AI로 생성" })).toHaveAttribute("aria-selected", "true");
   await page.getByLabel(/대본 파일/).setInputFiles({
     name: "transcript.txt", mimeType: "text/plain",

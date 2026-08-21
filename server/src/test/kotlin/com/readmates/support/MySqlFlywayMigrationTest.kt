@@ -1436,6 +1436,7 @@ class MySqlFlywayMigrationTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `mysql adds host session change snapshots without a self foreign key`() {
         assertThat(columns("host_session_change_audit")).contains(
             "before_snapshot_json",
@@ -1500,6 +1501,7 @@ class MySqlFlywayMigrationTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `mysql adds host session trash columns view and restored lifecycle contract`() {
         assertThat(columns("sessions")).contains(
             "deleted_at",

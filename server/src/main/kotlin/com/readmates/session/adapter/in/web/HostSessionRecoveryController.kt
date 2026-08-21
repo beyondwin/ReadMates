@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.port.`in`.PreviewHostSessionRestoreCommand

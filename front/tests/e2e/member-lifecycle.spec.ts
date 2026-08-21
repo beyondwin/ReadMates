@@ -22,17 +22,19 @@ async function expectCanonicalMeetingUrl(page: Page) {
 
 async function createOpenSessionThroughUi(page: Page) {
   await page.goto("/app/host/sessions/new");
-  await page.getByRole("tab", { name: "기본 정보" }).click();
+  await expect(page.getByLabel("세션 제목")).toBeVisible();
   await page.getByLabel("세션 제목").fill("7회차 모임 · 생명주기 테스트");
   await page.getByLabel("책 제목").fill(lifecycleBookTitle);
   await page.getByLabel("저자").fill("테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: "세션 문서 저장" }).click();
-
-  await expectCanonicalMeetingUrl(page);
-  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
   const meetingUrl = page.url();
-  await page.getByRole("button", { name: "멤버에게 열기" }).click();
+  await expectCanonicalMeetingUrl(page);
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  const openCta = page.getByRole("region", { name: "지금 할 일" }).getByRole("button", { name: "멤버와 준비 시작" });
+  await expect(openCta).toBeVisible();
+  await openCta.click();
   const dialog = page.getByRole("dialog", { name: "멤버에게 열기" });
   await expect(dialog).toBeVisible();
   const openResponse = page.waitForResponse(
@@ -60,17 +62,44 @@ test("host confirms before closing a session from the editor overview", async ({
   const meetingUrl = await createOpenSessionThroughUi(page);
 
   await page.goto(meetingUrl);
-  await page.getByRole("tab", { name: "개요" }).click();
-  await expect(page.getByRole("button", { name: "모임 마치기" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  const checkAttendance = page.getByRole("button", { name: "출석 확인하기" }).locator("visible=true");
+  const finish = page.getByRole("button", { name: "모임 마치기" }).locator("visible=true");
+  await expect(checkAttendance.or(finish)).toBeVisible({ timeout: 10_000 });
+  if (await checkAttendance.count()) {
+    await checkAttendance.click();
+    const attendancePanel = page.locator("#workspace-panel-attendance");
+    const collapse = attendancePanel.getByRole("button", { name: "접기" });
+    if (!(await collapse.isVisible().catch(() => false))) {
+      await page.getByRole("listitem", { name: /출석/ }).getByRole("button").click();
+    }
+    await expect(collapse).toBeVisible();
+    const attendButtons = attendancePanel.getByRole("button", { name: /참석$/ });
+    await expect(attendButtons.first()).toBeVisible();
+    const attendCount = await attendButtons.count();
+    for (let index = 0; index < attendCount; index += 1) {
+      const button = attendButtons.nth(index);
+      if ((await button.getAttribute("aria-pressed")) !== "true") {
+        const save = page.waitForResponse((response) => (
+          response.request().method() === "POST"
+          && response.url().includes("/attendance")
+        ));
+        await button.click();
+        expect((await save).ok()).toBe(true);
+      }
+      await expect(button).toHaveAttribute("aria-pressed", "true");
+    }
+  }
+  await expect(finish).toBeVisible({ timeout: 10_000 });
 
-  await page.getByRole("button", { name: "모임 마치기" }).click();
+  await finish.click();
   const dialog = page.getByRole("dialog", { name: "모임 마치기" });
   await expect(dialog).toBeVisible();
   await dialog.getByRole("button", { name: "취소" }).click();
   await expect(dialog).toBeHidden();
-  await expect(page.getByRole("button", { name: "모임 마치기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "모임 마치기" }).locator("visible=true")).toBeVisible();
 
-  await page.getByRole("button", { name: "모임 마치기" }).click();
+  await page.getByRole("button", { name: "모임 마치기" }).locator("visible=true").click();
   const closeResponse = page.waitForResponse(
     (response) =>
       response.url().includes("/api/bff/api/host/sessions/") &&
@@ -80,7 +109,7 @@ test("host confirms before closing a session from the editor overview", async ({
   await page.getByRole("dialog", { name: "모임 마치기" }).getByRole("button", { name: "모임 마치기" }).click();
   await closeResponse;
   await expect(page.getByRole("button", { name: "다시 진행 중으로" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: /모임을 마쳤습니다/ })).toBeVisible();
+  await expect(page.getByText("기록 정리 중")).toBeVisible();
 });
 
 test("host suspends member and member cannot save current session activity", async ({ context, page }) => {

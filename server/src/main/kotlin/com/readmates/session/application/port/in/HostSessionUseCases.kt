@@ -5,7 +5,6 @@ import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDetailResponse
-import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionScheduleDefaults
@@ -16,6 +15,7 @@ import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionReverseCommand
+import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand

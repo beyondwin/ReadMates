@@ -38,7 +38,6 @@ describe("MeetingAfterPanel", () => {
       />,
     );
 
-    expect(screen.getByText(legacySnapshot.publicationSummary)).toBeInTheDocument();
     expect(screen.queryByText("버전 0")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
   });

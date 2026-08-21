@@ -48,11 +48,15 @@ class ActiveSessionProjectionArchitectureTest {
         source: String,
         match: MatchResult,
     ): Boolean {
-        if (sourceFile.name == "HostSessionDeletionQueries.kt") return true
-        if (sourceFile.name != "HostSessionWriteQueries.kt") return false
         val windowStart = (match.range.first - 80).coerceAtLeast(0)
         val windowEnd = (match.range.last + 40).coerceAtMost(source.length)
-        return MAX_NUMBER_ALLOCATION_COLLAPSED in collapseWhitespace(source.substring(windowStart, windowEnd))
+        val inMaxNumberWindow =
+            MAX_NUMBER_ALLOCATION_COLLAPSED in collapseWhitespace(source.substring(windowStart, windowEnd))
+        return when {
+            sourceFile.name == "HostSessionDeletionQueries.kt" -> true
+            sourceFile.name != "HostSessionWriteQueries.kt" -> false
+            else -> inMaxNumberWindow
+        }
     }
 
     private fun kotlinFiles(root: Path): List<Path> =

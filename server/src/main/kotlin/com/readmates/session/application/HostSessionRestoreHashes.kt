@@ -4,6 +4,11 @@ import com.readmates.shared.security.Sha256
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 
+private const val UNICODE_ESCAPE_WIDTH = 4
+private const val HEX_RADIX = 16
+private const val HEX_PAD_CHAR = '0'
+private const val FIRST_PRINTABLE_CHAR = ' '
+
 internal object HostSessionRestoreHashes {
     private val DIGEST = Regex("^[0-9a-f]{64}$")
 
@@ -40,7 +45,12 @@ private fun escapeJson(value: String): String =
                 '\n' -> append("\\n")
                 '\r' -> append("\\r")
                 '\t' -> append("\\t")
-                else -> if (ch < ' ') append("\\u").append(ch.code.toString(16).padStart(4, '0')) else append(ch)
+                else ->
+                    if (ch < FIRST_PRINTABLE_CHAR) {
+                        append("\\u").append(ch.code.toString(HEX_RADIX).padStart(UNICODE_ESCAPE_WIDTH, HEX_PAD_CHAR))
+                    } else {
+                        append(ch)
+                    }
             }
         }
     }

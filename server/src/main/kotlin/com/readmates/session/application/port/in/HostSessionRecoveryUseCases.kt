@@ -1,3 +1,5 @@
+@file:Suppress("ktlint:standard:package-name")
+
 package com.readmates.session.application.port.`in`
 
 import com.readmates.session.application.model.HostSessionChangeReceipt

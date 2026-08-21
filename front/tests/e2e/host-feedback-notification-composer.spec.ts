@@ -234,9 +234,14 @@ async function waitForDraftSaved(page: Page) {
 }
 
 async function openRecordWorkspace(page: Page) {
-  const tab = page.getByRole("tab", { name: "기록", exact: true });
-  await tab.click();
-  await expect(tab).toHaveAttribute("aria-selected", "true");
+  const panel = page.locator("#workspace-panel-records");
+  const collapse = panel.getByRole("button", { name: "접기" });
+  if (await collapse.isVisible().catch(() => false)) {
+    return;
+  }
+  await page.getByRole("listitem", { name: /^기록 / }).getByRole("button").click();
+  await expect(panel).toBeVisible();
+  await expect(collapse).toBeVisible();
 }
 
 async function reviewAndApply(page: Page, sessionId: string) {
@@ -338,16 +343,17 @@ test("draft commits stay silent and final apply composes without automatic dispa
   test.setTimeout(90_000);
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`${HOST_PATH}/sessions/new`);
-  await page.getByRole("tab", { name: "기본 정보" }).click();
+  await expect(page.getByLabel("세션 제목")).toBeVisible();
   await page.getByLabel("세션 제목").fill("Feedback Composer Contract Session");
   await page.getByLabel("책 제목").fill(RECORD_BOOK);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-08-20");
-  await page.getByRole("button", { name: "세션 문서 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+  await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
+  const sessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
-  const sessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   expect(sessionId).not.toBe("");
   const detail = await fetchHostSession(page, sessionId);
 
@@ -385,20 +391,26 @@ set state = 'CLOSED',
 where id = ${sqlValue(sessionId)};
 `);
 
-  await page.goto(`${HOST_PATH}/sessions/${sessionId}?section=records&source=json`);
-  await expect(page).toHaveURL(/\?section=records&source=json$/);
+  await page.goto(`${HOST_PATH}/sessions/${sessionId}?section=records`);
+  await expect(page).toHaveURL(/\?section=records/);
+  await expect(page.locator("#workspace-panel-records")).toBeVisible();
+  const sourceTabs = page.getByRole("tablist", { name: "초안 만들기" });
+  if (await sourceTabs.isVisible().catch(() => false)) {
+    await sourceTabs.getByRole("tab", { name: "직접 작성" }).click();
+  }
   const authors = activeParticipantNames(sessionId);
   expect(authors.length).toBeGreaterThanOrEqual(1);
   const firstAuthor = authors[0]!;
   const secondAuthor = authors[1] ?? firstAuthor;
 
-  await page.getByRole("tab", { name: "직접 작성" }).click();
+  const guestReadable = page.getByRole("radio", { name: "게스트와 멤버에게 보이기" });
+  await expect(guestReadable).toBeVisible();
   const initialDraftSave = page.waitForResponse(
     (response) =>
       response.request().method() === "PATCH"
       && response.url().includes(`/host/sessions/${sessionId}/record-draft`),
   );
-  await page.getByRole("radio", { name: "게스트와 멤버에게 보이기" }).click();
+  await guestReadable.click();
   const initialDraft = await initialDraftSave;
   expect(initialDraft.status(), await initialDraft.text()).toBe(200);
   await waitForDraftSaved(page);
@@ -432,7 +444,8 @@ where id = ${sqlValue(sessionId)};
   await page.getByRole("button", { name: "작성 중에 넣기" }).click();
   const imported = await importResponse;
   expect(imported.status(), await imported.text()).toBe(200);
-  await page.getByRole("tablist", { name: "초안 만들기" }).getByRole("tab", { name: "직접 작성" }).click();
+  await expect(page.getByRole("dialog", { name: "반영 전 확인" })).toBeVisible({ timeout: 10_000 });
+  await dismissBlockingDialogs(page);
   await waitForDraftSaved(page);
   await expect(page.getByRole("region", { name: "작성 중" }))
     .toContainText("정리본");

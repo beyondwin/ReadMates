@@ -107,6 +107,7 @@ class JdbcHostSessionWriteAdapter(
         sessionId: UUID,
     ): HostSessionDeletionCounts = deletionQueries.deletionCounts(clubId, sessionId)
 
+    @Suppress("MaxLineLength")
     override fun lockExpiredForPurge(limit: Int): List<HostSessionTrashPurgeTarget> = deletionQueries.lockExpiredForPurge(limit)
 
     override fun purgeLocked(target: HostSessionTrashPurgeTarget): Boolean = deletionQueries.purgeLocked(target)

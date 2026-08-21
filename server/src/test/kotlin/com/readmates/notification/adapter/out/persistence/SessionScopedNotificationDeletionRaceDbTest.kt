@@ -104,7 +104,8 @@ class SessionScopedNotificationDeletionRaceDbTest(
         assertThatThrownBy { enqueueSessionOutbox(sessionId, "race-outbox-after-delete") }
             .isInstanceOf(NotificationSessionNotFoundException::class.java)
         assertThat(orphanSessionAggregateCount(sessionId)).isZero()
-        assertThat(sessionExists(sessionId)).isFalse()
+        assertThat(sessionExists(sessionId)).isTrue()
+        assertThat(sessionIsActive(sessionId)).isFalse()
     }
 
     @Test
@@ -143,7 +144,8 @@ class SessionScopedNotificationDeletionRaceDbTest(
         assertThatThrownBy { insertManualDispatch(sessionId, "race-manual-after-delete") }
             .isInstanceOf(NotificationSessionNotFoundException::class.java)
         assertThat(orphanSessionAggregateCount(sessionId)).isZero()
-        assertThat(sessionExists(sessionId)).isFalse()
+        assertThat(sessionExists(sessionId)).isTrue()
+        assertThat(sessionIsActive(sessionId)).isFalse()
     }
 
     @Test
@@ -369,6 +371,14 @@ class SessionScopedNotificationDeletionRaceDbTest(
     private fun sessionExists(sessionId: UUID): Boolean =
         jdbcTemplate.queryForObject(
             "select count(*) from sessions where club_id = ? and id = ?",
+            Int::class.java,
+            clubId.toString(),
+            sessionId.toString(),
+        ) == 1
+
+    private fun sessionIsActive(sessionId: UUID): Boolean =
+        jdbcTemplate.queryForObject(
+            "select count(*) from active_sessions where club_id = ? and id = ?",
             Int::class.java,
             clubId.toString(),
             sessionId.toString(),

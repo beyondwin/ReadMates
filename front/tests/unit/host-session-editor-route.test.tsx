@@ -416,7 +416,7 @@ describe("NewHostSessionRoute schedule defaults", () => {
     });
     expect(screen.queryByText("기본 일정을 불러오지 못해 기본값을 사용합니다")).not.toBeInTheDocument();
     expect(screen.getByLabelText("시작 시간")).toHaveValue("20:00");
-    expect(screen.getByRole("button", { name: "세션 문서 저장" })).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]).toBeEnabled();
   });
 
   it.each([401, 403, 500])("shows a retryable warning for %s without blocking the editor", async (status) => {
@@ -429,7 +429,7 @@ describe("NewHostSessionRoute schedule defaults", () => {
     expect(within(alert).getByRole("button", { name: "다시 시도" })).toBeVisible();
     expect(alert.closest("section")).toHaveAttribute("id", "host-editor-panel-basic-schedule");
     expect(screen.getByLabelText("세션 제목")).toBeEnabled();
-    expect(screen.getByRole("button", { name: "세션 문서 저장" })).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]).toBeEnabled();
   });
 
   it("does not overwrite a cleared field when late defaults arrive", async () => {
@@ -465,7 +465,7 @@ describe("NewHostSessionRoute schedule defaults", () => {
     await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
     await user.type(screen.getByLabelText("책 제목"), "새 책");
     await user.type(screen.getByLabelText("저자"), "새 저자");
-    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
 
     await waitFor(() => expect(createHostSession).toHaveBeenCalledTimes(1));
     expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
@@ -493,7 +493,7 @@ describe("NewHostSessionRoute schedule defaults", () => {
     await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
     await user.type(screen.getByLabelText("책 제목"), "새 책");
     await user.type(screen.getByLabelText("저자"), "새 저자");
-    await user.click(screen.getByRole("button", { name: "세션 문서 저장" }));
+    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
 
     await waitFor(() => expect(createHostSession).toHaveBeenCalledTimes(1));
     expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({

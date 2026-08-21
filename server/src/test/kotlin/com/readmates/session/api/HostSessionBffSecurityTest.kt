@@ -191,9 +191,11 @@ class HostSessionBffSecurityTest(
         mockMvc.perform(restoreSession("recovery.viewer@example.com")).andExpect(status().isForbidden)
         mockMvc.perform(restoreChange("member5@example.com")).andExpect(status().isForbidden)
         mockMvc.perform(restoreSession("member5@example.com")).andExpect(status().isForbidden)
-        mockMvc.perform(restoreChange("host@example.com", OUTSIDE_SESSION_ID, OUTSIDE_CHANGE_ID))
+        mockMvc
+            .perform(restoreChange("host@example.com", OUTSIDE_SESSION_ID, OUTSIDE_CHANGE_ID))
             .andExpect(status().isNotFound)
-        mockMvc.perform(restoreSession("host@example.com", OUTSIDE_SESSION_ID))
+        mockMvc
+            .perform(restoreSession("host@example.com", OUTSIDE_SESSION_ID))
             .andExpect(status().isNotFound)
     }
 
@@ -467,6 +469,7 @@ class HostSessionBffSecurityTest(
         )
     }
 
+    @Suppress("LongMethod")
     private fun createOutsideClubSession() {
         jdbcTemplate.update(
             """

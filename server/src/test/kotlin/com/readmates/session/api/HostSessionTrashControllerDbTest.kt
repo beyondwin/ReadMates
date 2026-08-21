@@ -40,6 +40,7 @@ class HostSessionTrashControllerDbTest(
     private val jsonMapper = tools.jackson.databind.ObjectMapper()
 
     @Test
+    @Suppress("LongMethod")
     fun `delete preserves children for seven days and restore returns the active session`() {
         val first = createDraft("8회차 · 휴지통 첫째")
         val second = createDraft("9회차 · 휴지통 둘째")
@@ -58,7 +59,8 @@ class HostSessionTrashControllerDbTest(
                 .let(jsonMapper::readTree)
         val deletedAt = OffsetDateTime.parse(trashed.get("deletedAt").asString())
         val purgeAfter = OffsetDateTime.parse(trashed.get("purgeAfter").asString())
-        assertThat(Duration.between(deletedAt, purgeAfter)).isEqualTo(Duration.ofDays(HOST_SESSION_TRASH_RETENTION_DAYS))
+        assertThat(Duration.between(deletedAt, purgeAfter))
+            .isEqualTo(Duration.ofDays(HOST_SESSION_TRASH_RETENTION_DAYS))
         assertThat(countRows("questions", "session_id = '$first'")).isEqualTo(1)
         assertThat(countRows("sessions", "id = '$first' and deleted_at is not null")).isEqualTo(1)
 
@@ -97,7 +99,15 @@ class HostSessionTrashControllerDbTest(
                 status { isOk() }
                 jsonPath("$.items.length()") { value(1) }
                 jsonPath("$.items[0].sessionId") {
-                    value(org.hamcrest.Matchers.not(firstPage.get("items").get(0).get("sessionId").asString()))
+                    value(
+                        org.hamcrest.Matchers.not(
+                            firstPage
+                                .get("items")
+                                .get(0)
+                                .get("sessionId")
+                                .asString(),
+                        ),
+                    )
                 }
             }
 
@@ -146,10 +156,11 @@ class HostSessionTrashControllerDbTest(
         mockMvc.get("/api/host/sessions/$sessionId/trash") { with(user("member5@example.com")) }.andExpect {
             status { isForbidden() }
         }
-        mockMvc.post("/api/host/sessions/$sessionId/restore") {
-            with(user("member5@example.com"))
-            with(csrf())
-        }.andExpect { status { isForbidden() } }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/restore") {
+                with(user("member5@example.com"))
+                with(csrf())
+            }.andExpect { status { isForbidden() } }
     }
 
     @Test

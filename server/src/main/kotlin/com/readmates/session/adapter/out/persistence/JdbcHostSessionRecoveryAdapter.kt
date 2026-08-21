@@ -46,8 +46,11 @@ class JdbcHostSessionRecoveryAdapter(
         changeId: UUID,
     ): HostSessionRestoreLock? {
         requireHost(host)
-        val basic = loadBasicSnapshot(host, sessionId, forUpdate = true) ?: return null
-        val change = loadChangeRow(host, sessionId, changeId, forUpdate = true) ?: return null
+        val basic = loadBasicSnapshot(host, sessionId, forUpdate = true)
+        val change = loadChangeRow(host, sessionId, changeId, forUpdate = true)
+        if (basic == null || change == null) {
+            return null
+        }
         val attendance = loadAttendance(host, sessionId, change.transitionMembershipIds(), forUpdate = true)
         return HostSessionRestoreLock(change, HostSessionRestoreCurrentState(basic, attendance))
     }

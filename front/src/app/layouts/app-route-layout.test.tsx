@@ -262,6 +262,29 @@ describe("AppRouteLayout host session navigation", () => {
         }
         if (path === mutationPath && init?.method === mutationMethod) {
           currentSessionId = nextSessionId;
+          if (mutationMethod === "DELETE") {
+            return Promise.resolve(jsonResponse({
+              sessionId: "session-7",
+              sessionNumber: 7,
+              title: "휴지통 모임",
+              state: "DRAFT",
+              deletedAt: "2026-08-01T00:00:00Z",
+              purgeAfter: "2026-08-08T00:00:00Z",
+              trashed: true,
+              counts: {
+                participants: 0,
+                rsvpResponses: 0,
+                questions: 0,
+                checkins: 0,
+                oneLineReviews: 0,
+                longReviews: 0,
+                highlights: 0,
+                publications: 0,
+                feedbackReports: 0,
+                feedbackDocuments: 0,
+              },
+            }));
+          }
           return Promise.resolve(jsonResponse({}));
         }
         return Promise.reject(new Error(`Unexpected fetch: ${path}`));

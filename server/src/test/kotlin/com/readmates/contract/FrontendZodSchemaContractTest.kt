@@ -60,6 +60,7 @@ import java.util.UUID
 )
 @AutoConfigureMockMvc
 @Tag("integration")
+@Suppress("LargeClass")
 class FrontendZodSchemaContractTest
     @Autowired
     constructor(
@@ -115,6 +116,7 @@ class FrontendZodSchemaContractTest
             statements = [CLEANUP_CONTRACT_RECOVERY_SQL],
             executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
         )
+        @Suppress("LongMethod")
         fun `host mutation responses accept optional receipt recovery and trash fields`() {
             val sessionId = createDraftSession("88회차 · 계약 복원 책")
             val patched =
@@ -625,6 +627,7 @@ class FrontendZodSchemaContractTest
             )
         }
 
+        @Suppress("ReturnCount")
         private fun assertJsonShapeAcceptsOptionalFields(
             actual: JsonNode?,
             expected: JsonNode,

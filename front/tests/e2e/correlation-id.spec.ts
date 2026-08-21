@@ -53,7 +53,7 @@ test("host lifecycle reverse stores the request ID on the audit row", async ({ p
   const requestId = "e2e-correlation-lifecycle-1";
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
-  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   await page.route(`**/api/bff/api/host/sessions/${sessionId}/reopen**`, async (route) => {
     await route.continue({
       headers: {

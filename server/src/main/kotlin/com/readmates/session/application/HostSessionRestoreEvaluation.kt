@@ -24,9 +24,8 @@ internal data class HostSessionRestoreEvaluation(
     val hashValues: Map<String, String?>,
 )
 
-internal fun HostSessionRecoverableChange.evaluate(
-    current: HostSessionRestoreCurrentState,
-): HostSessionRestoreEvaluation {
+@Suppress("MaxLineLength")
+internal fun HostSessionRecoverableChange.evaluate(current: HostSessionRestoreCurrentState): HostSessionRestoreEvaluation {
     val blocked = blockedReason(current)
     return HostSessionRestoreEvaluation(
         canRestore = blocked == null,
@@ -44,6 +43,7 @@ internal fun HostSessionRecoverableChange.toUpdateCommand(
     current: HostSessionBasicAuditSnapshot,
 ): UpdateHostSessionCommand {
     val before = requireNotNull(this.before)
+
     fun required(
         field: String,
         value: String,
@@ -53,6 +53,7 @@ internal fun HostSessionRecoverableChange.toUpdateCommand(
         field: String,
         value: String?,
     ) = if (field in changedFields) before.valueOf(field) ?: "" else value
+
     return UpdateHostSessionCommand(
         host = host,
         sessionId = sessionId,
@@ -85,13 +86,13 @@ internal fun HostSessionRecoverableChange.toAttendanceCommand(host: CurrentMembe
                 .map { AttendanceEntryCommand(it.membershipId, it.from) },
     )
 
-internal fun HostSessionRecoverableChange.restoreAttendanceTransitions(
-    current: Map<UUID, String>,
-): List<HostAttendanceAuditTransition> =
+@Suppress("MaxLineLength")
+internal fun HostSessionRecoverableChange.restoreAttendanceTransitions(current: Map<UUID, String>): List<HostAttendanceAuditTransition> =
     transitions
         .sortedBy { it.membershipId }
         .mapNotNull { transition ->
-            val membershipId = runCatching { UUID.fromString(transition.membershipId) }.getOrNull() ?: return@mapNotNull null
+            val membershipId =
+                runCatching { UUID.fromString(transition.membershipId) }.getOrNull() ?: return@mapNotNull null
             HostAttendanceAuditTransition(
                 membershipId = transition.membershipId,
                 from = current[membershipId] ?: return@mapNotNull null,
@@ -100,34 +101,33 @@ internal fun HostSessionRecoverableChange.restoreAttendanceTransitions(
         }
 
 private fun HostSessionRecoverableChange.blockedReason(current: HostSessionRestoreCurrentState): String? {
-    if (alreadyRestored) return RESTORE_BLOCKED_ALREADY_RESTORED
-    if (!completeSnapshots) return RESTORE_BLOCKED_SNAPSHOT
-    if (kind == HostSessionChangeKind.BASIC_INFO) {
-        if (before == null || after == null || changedFields.isEmpty()) return RESTORE_BLOCKED_SNAPSHOT
-    } else if (kind == HostSessionChangeKind.ATTENDANCE) {
-        if (transitions.isEmpty()) return RESTORE_BLOCKED_SNAPSHOT
-        val missing = transitionMembershipIds().any { it !in current.attendance }
-        if (missing) return RESTORE_BLOCKED_PARTICIPANT
-    } else {
-        return RESTORE_BLOCKED_SNAPSHOT
+    val missingAttendance = transitionMembershipIds().any { it !in current.attendance }
+    return when {
+        alreadyRestored -> RESTORE_BLOCKED_ALREADY_RESTORED
+        !completeSnapshots -> RESTORE_BLOCKED_SNAPSHOT
+        kind == HostSessionChangeKind.BASIC_INFO && (before == null || after == null || changedFields.isEmpty()) ->
+            RESTORE_BLOCKED_SNAPSHOT
+        kind == HostSessionChangeKind.ATTENDANCE && transitions.isEmpty() -> RESTORE_BLOCKED_SNAPSHOT
+        kind == HostSessionChangeKind.ATTENDANCE && missingAttendance -> RESTORE_BLOCKED_PARTICIPANT
+        kind != HostSessionChangeKind.BASIC_INFO && kind != HostSessionChangeKind.ATTENDANCE -> RESTORE_BLOCKED_SNAPSHOT
+        else -> null
     }
-    return null
 }
 
 private fun HostSessionRecoverableChange.hashValues(current: HostSessionRestoreCurrentState): Map<String, String?> =
     if (kind == HostSessionChangeKind.ATTENDANCE) {
         transitions
             .mapNotNull { transition ->
-                val membershipId = runCatching { UUID.fromString(transition.membershipId) }.getOrNull() ?: return@mapNotNull null
+                val membershipId =
+                    runCatching { UUID.fromString(transition.membershipId) }.getOrNull() ?: return@mapNotNull null
                 membershipId.toString() to current.attendance[membershipId]
             }.toMap()
     } else {
         changedFields.associateWith { field -> current.basic?.valueOf(field) }
     }
 
-private fun HostSessionRecoverableChange.restoreItems(
-    current: HostSessionRestoreCurrentState,
-): List<HostSessionRestoreItem> =
+@Suppress("MaxLineLength")
+private fun HostSessionRecoverableChange.restoreItems(current: HostSessionRestoreCurrentState): List<HostSessionRestoreItem> =
     if (kind == HostSessionChangeKind.ATTENDANCE) {
         transitions
             .sortedBy { it.membershipId }

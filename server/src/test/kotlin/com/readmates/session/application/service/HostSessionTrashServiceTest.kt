@@ -67,7 +67,11 @@ class HostSessionTrashServiceTest {
         assertThat(fixture.port.childrenRemoved).isFalse()
         assertThat(fixture.port.physicallyDeleted).isFalse()
         assertThat(fixture.port.trashedIds).containsExactly(SESSION_ID)
-        assertThat(fixture.audit.entries.single().action).isEqualTo(HostSessionLifecycleAction.DELETED)
+        assertThat(
+            fixture.audit.entries
+                .single()
+                .action,
+        ).isEqualTo(HostSessionLifecycleAction.DELETED)
         assertThat(fixture.cache.clubs).containsExactly(CLUB_ID)
         assertThat(fixture.port.calls).containsExactly(
             "lockAndAssess:$SESSION_ID",
@@ -106,17 +110,18 @@ class HostSessionTrashServiceTest {
         assertThat(restored.state).isEqualTo("DRAFT")
         assertThat(fixture.port.trashedIds).isEmpty()
         assertThat(fixture.port.childrenRemoved).isFalse()
-        assertThat(fixture.audit.entries.single()).extracting(
-            HostSessionLifecycleAuditEntry::action,
-            HostSessionLifecycleAuditEntry::fromState,
-            HostSessionLifecycleAuditEntry::toState,
-            HostSessionLifecycleAuditEntry::reasonCode,
-        ).containsExactly(
-            HostSessionLifecycleAction.RESTORED,
-            "DRAFT",
-            "DRAFT",
-            HostSessionLifecycleReasonCode.OPERATIONAL_RECOVERY,
-        )
+        assertThat(fixture.audit.entries.single())
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+            ).containsExactly(
+                HostSessionLifecycleAction.RESTORED,
+                "DRAFT",
+                "DRAFT",
+                HostSessionLifecycleReasonCode.OPERATIONAL_RECOVERY,
+            )
         assertThat(fixture.cache.clubs).containsExactly(CLUB_ID)
     }
 
@@ -127,7 +132,11 @@ class HostSessionTrashServiceTest {
 
         assertThat(restored.state).isEqualTo("OPEN")
         assertThat(fixture.port.findOpenSessionId(CLUB_ID)).isEqualTo(SESSION_ID)
-        assertThat(fixture.audit.entries.single().action).isEqualTo(HostSessionLifecycleAction.RESTORED)
+        assertThat(
+            fixture.audit.entries
+                .single()
+                .action,
+        ).isEqualTo(HostSessionLifecycleAction.RESTORED)
         assertThat(fixture.cache.clubs).containsExactly(CLUB_ID)
     }
 
@@ -303,8 +312,8 @@ class HostSessionTrashServiceTest {
         val purgedIds = mutableListOf<UUID>()
         val calls = mutableListOf<String>()
 
-        override fun assess(command: HostSessionIdCommand) =
-            deletionAssessment.also { calls += "assess:${command.sessionId}" }
+        @Suppress("MaxLineLength")
+        override fun assess(command: HostSessionIdCommand) = deletionAssessment.also { calls += "assess:${command.sessionId}" }
 
         override fun lockAndAssess(command: HostSessionIdCommand) =
             (lockAssessment ?: deletionAssessment).also { calls += "lockAndAssess:${command.sessionId}" }
@@ -444,21 +453,18 @@ class HostSessionTrashServiceTest {
                 hints = emptyList(),
             )
 
-        override fun confirmAttendance(command: ConfirmAttendanceCommand) =
-            HostAttendanceResponse(command.sessionId.toString(), 0)
+        @Suppress("MaxLineLength")
+        override fun confirmAttendance(command: ConfirmAttendanceCommand) = HostAttendanceResponse(command.sessionId.toString(), 0)
 
-        override fun create(command: com.readmates.session.application.model.HostSessionCommand) =
-            error("unused")
+        override fun create(command: com.readmates.session.application.model.HostSessionCommand) = error("unused")
 
         override fun update(command: com.readmates.session.application.model.UpdateHostSessionCommand) =
             hostSessionDetail(command.sessionId, state)
 
-        override fun lockVisibilitySnapshot(command: HostSessionIdCommand) =
-            error("unused")
+        override fun lockVisibilitySnapshot(command: HostSessionIdCommand) = error("unused")
 
-        override fun updateVisibility(
-            command: com.readmates.session.application.model.UpdateHostSessionVisibilityCommand,
-        ) = error("unused")
+        @Suppress("MaxLineLength")
+        override fun updateVisibility(command: com.readmates.session.application.model.UpdateHostSessionVisibilityCommand) = error("unused")
 
         override fun open(command: HostSessionIdCommand) = error("unused")
 

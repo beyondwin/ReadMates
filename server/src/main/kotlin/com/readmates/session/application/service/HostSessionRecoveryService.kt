@@ -54,6 +54,7 @@ class HostSessionRecoveryService(
     }
 
     @Transactional
+    @Suppress("ThrowsCount")
     override fun restore(command: RestoreHostSessionCommand): HostSessionChangeReceipt {
         requireHost(command.host)
         if (!HostSessionRestoreHashes.isDigest(command.expectedCurrentHash)) {
@@ -118,9 +119,7 @@ class HostSessionRecoveryService(
 
 private const val SNAPSHOT_UNAVAILABLE = "SNAPSHOT_UNAVAILABLE"
 
-private fun HostSessionRecoverableChange.toPreview(
-    current: HostSessionRestoreCurrentState,
-): HostSessionRestorePreview {
+private fun HostSessionRecoverableChange.toPreview(current: HostSessionRestoreCurrentState): HostSessionRestorePreview {
     val evaluation = evaluate(current)
     return HostSessionRestorePreview(
         sessionId = sessionId,
