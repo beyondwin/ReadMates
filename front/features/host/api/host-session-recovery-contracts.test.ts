@@ -5,6 +5,7 @@ import {
 } from "./host-contracts";
 import {
   parseHostSessionChangeReceipt,
+  parseOptionalHostSessionChangeReceipt,
   parseHostSessionHistoryRecovery,
   parseHostSessionRestorePreview,
   parseHostSessionRestoreRequest,
@@ -49,6 +50,19 @@ function hostSessionDetail(overrides: Record<string, unknown> = {}) {
 describe("host session recovery contracts", () => {
   it("parses a change receipt", () => {
     expect(parseHostSessionChangeReceipt(receipt)).toEqual(receipt);
+  });
+
+  it("reads an optional receipt from a partial mutation body without requiring full session detail", () => {
+    expect(parseOptionalHostSessionChangeReceipt({
+      changeReceipt: receipt,
+    })).toEqual(receipt);
+    expect(parseOptionalHostSessionChangeReceipt({
+      title: "부분 응답",
+    })).toBeNull();
+    expect(parseOptionalHostSessionChangeReceipt({
+      changeReceipt: null,
+    })).toBeNull();
+    expect(parseOptionalHostSessionChangeReceipt(null)).toBeNull();
   });
 
   it("parses optional receipts on session detail responses", () => {

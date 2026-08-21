@@ -10,7 +10,12 @@ import { WorkspaceFocusCard } from "./workspace-focus-card";
 import { WorkspaceHeader, type WorkspaceHeaderModel } from "./workspace-header";
 import { WorkspacePanel } from "./workspace-panel";
 import { WorkspaceProgressList } from "./workspace-progress-list";
-import { WorkspaceUndoBar, type WorkspacePendingUndo, type WorkspaceUndoConfirm } from "./workspace-undo-bar";
+import {
+  WorkspaceUndoBar,
+  type WorkspacePendingUndo,
+  type WorkspaceRestoreNotice,
+  type WorkspaceUndoConfirm,
+} from "./workspace-undo-bar";
 
 const focusableSelector = [
   "button:not([disabled])",
@@ -34,6 +39,7 @@ export type HostSessionWorkspaceProps = {
   error?: { message: string; onRetry: () => void } | null;
   pendingUndo?: WorkspacePendingUndo | null;
   undoConfirm?: WorkspaceUndoConfirm | null;
+  restoreNotice?: WorkspaceRestoreNotice | null;
   draftSaveLabel?: string | null;
   descriptionOverride?: string | null;
   focusContent?: ReactNode;
@@ -72,6 +78,7 @@ export function HostSessionWorkspace({
   error = null,
   pendingUndo = null,
   undoConfirm = null,
+  restoreNotice = null,
   draftSaveLabel = null,
   descriptionOverride = null,
   focusContent,
@@ -223,7 +230,11 @@ export function HostSessionWorkspace({
           </aside>
         </div>
 
-        <WorkspaceUndoBar pendingUndo={pendingUndo} confirm={undoConfirm} />
+        <WorkspaceUndoBar
+          pendingUndo={pendingUndo}
+          confirm={undoConfirm}
+          restoreNotice={restoreNotice}
+        />
       </div>
 
       <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">

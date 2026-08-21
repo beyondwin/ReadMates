@@ -339,6 +339,7 @@ describe("host session editor view model", () => {
       targetValue: null,
       sensitive: true,
     })).toEqual({
+      key: "meetingUrl",
       label: "미팅 URL",
       currentValue: null,
       targetValue: null,
@@ -350,11 +351,26 @@ describe("host session editor view model", () => {
       currentValue: "ATTENDED",
       targetValue: "UNKNOWN",
       sensitive: false,
-    })).toEqual({
-      label: "출석",
+    }, { memberLabel: "멤버1" })).toEqual({
+      key: "attendanceStatus:membership-1",
+      label: "출석 · 멤버1",
       currentValue: "참석",
       targetValue: "미확인",
       sensitive: false,
     });
+    expect(buildHostSessionRestorePreviewItemView({
+      field: "attendanceStatus",
+      subjectId: "membership-2",
+      currentValue: "ABSENT",
+      targetValue: "UNKNOWN",
+      sensitive: false,
+    }).key).toBe("attendanceStatus:membership-2");
+    expect(buildHostSessionRestorePreviewItemView({
+      field: "attendanceStatus",
+      subjectId: "membership-2",
+      currentValue: "ABSENT",
+      targetValue: "UNKNOWN",
+      sensitive: false,
+    }).label).toBe("출석 · membership-2");
   });
 });

@@ -7,8 +7,10 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
 } from "@/features/host/api/host-contracts";
-import { parseHostSessionDetailResponse } from "@/features/host/api/host-contracts";
-import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
+import {
+  parseOptionalHostSessionChangeReceipt,
+  type HostSessionChangeReceipt,
+} from "@/features/host/api/host-session-recovery-contracts";
 import type { HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import { hostSessionChangeUndoDescription } from "@/features/host/model/host-session-editor-view-model";
 import type { HostSessionRequest, HostSessionState } from "@/features/host/model/host-session-editor-model";
@@ -100,9 +102,9 @@ export function wrapHostSessionEditorActionsForUndo(
     saveSession: async (sessionId, request) => {
       const response = await actions.saveSession(sessionId, request);
       if (response.ok && sessionId) {
-        const detail = parseHostSessionDetailResponse(await response.clone().json());
+        const body = await readResponseJson(response);
         captureReceipt(
-          detail.changeReceipt,
+          parseOptionalHostSessionChangeReceipt(body),
           hostSessionChangeUndoDescription("BASIC_INFO"),
           onReceipt,
         );
@@ -119,4 +121,12 @@ export function wrapHostSessionEditorActionsForUndo(
       return result;
     },
   };
+}
+
+async function readResponseJson(response: Response): Promise<unknown> {
+  try {
+    return await response.clone().json();
+  } catch {
+    return null;
+  }
 }

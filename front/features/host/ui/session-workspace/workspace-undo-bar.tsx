@@ -17,12 +17,21 @@ export type WorkspaceUndoConfirm = {
   onCancel: () => void;
 };
 
+export type WorkspaceRestoreNotice = {
+  message: string;
+  onRetry: () => void;
+  onOpenHistory: () => void;
+  onDismiss: () => void;
+};
+
 export function WorkspaceUndoBar({
   pendingUndo,
   confirm = null,
+  restoreNotice = null,
 }: {
   pendingUndo: WorkspacePendingUndo | null;
   confirm?: WorkspaceUndoConfirm | null;
+  restoreNotice?: WorkspaceRestoreNotice | null;
 }) {
   const cancelRef = useRef<HTMLButtonElement | null>(null);
   const confirmRef = useRef<HTMLButtonElement | null>(null);
@@ -34,7 +43,7 @@ export function WorkspaceUndoBar({
     }
   }, [confirm]);
 
-  if (!pendingUndo && !confirm) {
+  if (!pendingUndo && !confirm && !restoreNotice) {
     return null;
   }
 
@@ -93,6 +102,25 @@ export function WorkspaceUndoBar({
             </button>
           </div>
         </div>
+      ) : restoreNotice ? (
+        <div className="rm-workspace-undo-bar" role="status">
+          <div>
+            <p role="alert" className="small" style={{ color: "var(--danger)", margin: 0 }}>
+              {restoreNotice.message}
+            </p>
+          </div>
+          <div className="rm-workspace-undo-bar__actions">
+            <button type="button" className="btn btn-quiet btn-sm" onClick={restoreNotice.onRetry}>
+              다시 시도
+            </button>
+            <button type="button" className="btn btn-quiet btn-sm" onClick={restoreNotice.onOpenHistory}>
+              변경 내역
+            </button>
+            <button type="button" className="btn btn-ghost btn-sm" onClick={restoreNotice.onDismiss}>
+              닫기
+            </button>
+          </div>
+        </div>
       ) : null}
 
       {confirm ? (
@@ -112,7 +140,7 @@ export function WorkspaceUndoBar({
             <h2 className="h3" style={{ margin: 0 }}>이 변경을 되돌릴까요?</h2>
             <ul className="small" style={{ margin: 0, paddingLeft: 18 }}>
               {confirm.items.map((item) => (
-                <li key={item.label}>
+                <li key={item.key}>
                   {item.sensitive
                     ? `${item.label}: 미리보기에 표시하지 않습니다`
                     : `${item.label}: ${item.currentValue ?? "없음"} → ${item.targetValue ?? "없음"}`}

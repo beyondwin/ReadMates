@@ -103,6 +103,7 @@ import {
 import { HostSessionWorkspace } from "./session-workspace/host-session-workspace";
 import type {
   WorkspacePendingUndo,
+  WorkspaceRestoreNotice,
   WorkspaceUndoConfirm,
 } from "./session-workspace/workspace-undo-bar";
 
@@ -216,6 +217,7 @@ export default function HostSessionEditor({
   scheduleDefaultsLoadState,
   pendingUndo = null,
   undoConfirm = null,
+  restoreNotice = null,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -235,6 +237,7 @@ export default function HostSessionEditor({
   scheduleDefaultsLoadState?: HostScheduleDefaultsLoadState;
   pendingUndo?: WorkspacePendingUndo | null;
   undoConfirm?: WorkspaceUndoConfirm | null;
+  restoreNotice?: WorkspaceRestoreNotice | null;
 }) {
   const resolvedScheduleDefaults = scheduleDefaultsLoadState?.defaults ?? scheduleDefaults ?? null;
   if (session && !recordWorkflow) {
@@ -1068,6 +1071,7 @@ export default function HostSessionEditor({
         error={lifecycleError ? { message: lifecycleError.message, onRetry: retryLifecycle } : null}
         pendingUndo={pendingUndo}
         undoConfirm={undoConfirm}
+        restoreNotice={restoreNotice}
         draftSaveLabel={overview.draft.exists ? overview.draft.statusLabel : null}
         descriptionOverride={
           sessionState === "OPEN" && date && todayIsoDate() > date

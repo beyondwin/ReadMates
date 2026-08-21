@@ -1197,9 +1197,9 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("captures a pending undo from a basic save receipt and restores with the preview hash", async () => {
-    const saveSession = vi.fn(async () => jsonResponse(sessionDetail({
+    const saveSession = vi.fn(async () => jsonResponse({
       changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
-    })));
+    }));
     routeMocks.previewRestore.mockResolvedValue({
       sessionId: "session-1",
       changeId: "change-basic-1",
@@ -1259,6 +1259,48 @@ describe("EditHostSessionRecordWorkflow", () => {
       .toBe("모임 정보를 저장했습니다.");
   });
 
+  it("clears the undo bar when restore completes without a new undoable receipt", async () => {
+    const saveSession = vi.fn(async () => jsonResponse({
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
+    }));
+    routeMocks.previewRestore.mockResolvedValue({
+      sessionId: "session-1",
+      changeId: "change-basic-1",
+      kind: "BASIC_INFO",
+      expectedCurrentHash: "a".repeat(64),
+      canRestore: true,
+      blockedReason: null,
+      items: [{
+        field: "title",
+        subjectId: null,
+        currentValue: "새 제목",
+        targetValue: "이전 제목",
+        sensitive: false,
+      }],
+    });
+    routeMocks.restoreChange.mockResolvedValue({
+      changeId: "change-basic-2",
+      kind: "BASIC_INFO",
+      undoAvailable: false,
+    });
+    renderWorkflow(recordEditor, vi.fn(), undefined, {
+      session: sessionDetail(),
+      actions: { saveSession },
+    });
+    await act(async () => {
+      await (routeMocks.capturedProps?.actions as { saveSession: typeof saveSession })
+        .saveSession("session-1", { title: "새 제목" } as never);
+    });
+    await act(async () => {
+      (routeMocks.capturedProps?.pendingUndo as { onUndo: () => void }).onUndo();
+    });
+    await act(async () => {
+      (routeMocks.capturedProps?.undoConfirm as { onConfirm: () => void }).onConfirm();
+    });
+    expect(routeMocks.capturedProps?.pendingUndo).toBeNull();
+    expect(routeMocks.capturedProps?.undoConfirm).toBeNull();
+  });
+
   it("captures attendance undo only after the server-confirmed receipt", async () => {
     const updateAttendance = vi.fn(async () => ({
       sessionId: "session-1",
@@ -1277,6 +1319,99 @@ describe("EditHostSessionRecordWorkflow", () => {
     });
     expect((routeMocks.capturedProps?.pendingUndo as { description: string }).description)
       .toBe("출석을 바꿨습니다.");
+  });
+
+  it("undoes attendance through preview, member identity, and restore POST", async () => {
+    const updateAttendance = vi.fn(async () => ({
+      sessionId: "session-1",
+      count: 1,
+      changeReceipt: { changeId: "change-att-1", kind: "ATTENDANCE", undoAvailable: true },
+    }));
+    routeMocks.previewRestore.mockResolvedValue({
+      sessionId: "session-1",
+      changeId: "change-att-1",
+      kind: "ATTENDANCE",
+      expectedCurrentHash: "d".repeat(64),
+      canRestore: true,
+      blockedReason: null,
+      items: [
+        {
+          field: "attendanceStatus",
+          subjectId: "membership-1",
+          currentValue: "ATTENDED",
+          targetValue: "UNKNOWN",
+          sensitive: false,
+        },
+        {
+          field: "attendanceStatus",
+          subjectId: "membership-2",
+          currentValue: "ABSENT",
+          targetValue: "UNKNOWN",
+          sensitive: false,
+        },
+      ],
+    });
+    routeMocks.restoreChange.mockResolvedValue({
+      changeId: "change-att-2",
+      kind: "ATTENDANCE",
+      undoAvailable: true,
+    });
+    const session = sessionDetail({
+      attendees: [
+        {
+          membershipId: "membership-1",
+          avatarKey: "banana-green-book",
+          displayName: "멤버1",
+          accountName: "안멤버1",
+          rsvpStatus: "GOING",
+          attendanceStatus: "ATTENDED",
+        },
+        {
+          membershipId: "membership-2",
+          avatarKey: "cloud-green-book",
+          displayName: "멤버2",
+          accountName: "안멤버2",
+          rsvpStatus: "GOING",
+          attendanceStatus: "ABSENT",
+        },
+      ],
+    });
+    renderWorkflow(recordEditor, vi.fn(), undefined, {
+      session,
+      actions: { updateAttendance },
+    });
+
+    await act(async () => {
+      await (routeMocks.capturedProps?.actions as { updateAttendance: typeof updateAttendance })
+        .updateAttendance("session-1", [{ membershipId: "membership-1", attendanceStatus: "ATTENDED" }]);
+    });
+    await act(async () => {
+      (routeMocks.capturedProps?.pendingUndo as { onUndo: () => void }).onUndo();
+    });
+    const confirm = routeMocks.capturedProps?.undoConfirm as {
+      items: Array<{ key: string; label: string; currentValue: string | null }>;
+      onConfirm: () => void;
+    };
+    expect(confirm.items.map((item) => item.key)).toEqual([
+      "attendanceStatus:membership-1",
+      "attendanceStatus:membership-2",
+    ]);
+    expect(confirm.items[0]).toMatchObject({
+      label: "출석 · 멤버1",
+      currentValue: "참석",
+    });
+    expect(confirm.items[1]).toMatchObject({
+      label: "출석 · 멤버2",
+      currentValue: "불참",
+    });
+
+    await act(async () => confirm.onConfirm());
+    expect(routeMocks.restoreChange).toHaveBeenCalledWith(
+      "session-1",
+      "change-att-1",
+      { expectedCurrentHash: "d".repeat(64) },
+      { clubSlug: "club-a" },
+    );
   });
 
   it("undoes a lifecycle change with the accidental transition reason", async () => {
@@ -1314,21 +1449,37 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("keeps the undo bar and form receipt after a stale restore", async () => {
-    const saveSession = vi.fn(async () => jsonResponse(sessionDetail({
+    const session = sessionDetail({
+      title: "저장된 제목",
+      attendees: [{
+        membershipId: "membership-1",
+        avatarKey: "banana-green-book",
+        displayName: "멤버1",
+        accountName: "안멤버1",
+        rsvpStatus: "GOING",
+        attendanceStatus: "ATTENDED",
+      }],
+    });
+    const saveSession = vi.fn(async () => jsonResponse({
       changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
-    })));
+    }));
+    const updateAttendance = vi.fn(async () => ({
+      sessionId: "session-1",
+      count: 1,
+      changeReceipt: { changeId: "change-att-1", kind: "ATTENDANCE", undoAvailable: true },
+    }));
     routeMocks.previewRestore.mockResolvedValue({
       sessionId: "session-1",
-      changeId: "change-basic-1",
-      kind: "BASIC_INFO",
+      changeId: "change-att-1",
+      kind: "ATTENDANCE",
       expectedCurrentHash: "b".repeat(64),
       canRestore: true,
       blockedReason: null,
       items: [{
-        field: "title",
-        subjectId: null,
-        currentValue: "새 제목",
-        targetValue: "이전 제목",
+        field: "attendanceStatus",
+        subjectId: "membership-1",
+        currentValue: "ATTENDED",
+        targetValue: "UNKNOWN",
         sensitive: false,
       }],
     });
@@ -1337,13 +1488,13 @@ describe("EditHostSessionRecordWorkflow", () => {
       status: 409,
     });
     renderWorkflow(recordEditor, vi.fn(), undefined, {
-      session: sessionDetail(),
-      actions: { saveSession },
+      session,
+      actions: { saveSession, updateAttendance },
     });
 
     await act(async () => {
-      await (routeMocks.capturedProps?.actions as { saveSession: typeof saveSession })
-        .saveSession("session-1", { title: "새 제목" } as never);
+      await (routeMocks.capturedProps?.actions as { updateAttendance: typeof updateAttendance })
+        .updateAttendance("session-1", [{ membershipId: "membership-1", attendanceStatus: "ATTENDED" }]);
     });
     await act(async () => {
       (routeMocks.capturedProps?.pendingUndo as { onUndo: () => void }).onUndo();
@@ -1355,6 +1506,12 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect((routeMocks.capturedProps?.pendingUndo as { error: string }).error)
       .toBe("그 사이 다른 변경이 있습니다. 변경 내역에서 다시 확인하세요.");
     expect(routeMocks.capturedProps?.pendingUndo).not.toBeNull();
+    expect(saveSession).not.toHaveBeenCalled();
+    expect(updateAttendance).toHaveBeenCalledTimes(1);
+    expect(routeMocks.capturedProps?.session).toMatchObject({
+      title: "저장된 제목",
+      attendees: [{ membershipId: "membership-1", attendanceStatus: "ATTENDED" }],
+    });
   });
 
   it("does not create a receipt when a mutation fails", async () => {
@@ -1425,11 +1582,43 @@ describe("EditHostSessionRecordWorkflow", () => {
       { clubSlug: "club-a" },
     );
     expect((routeMocks.capturedProps?.undoConfirm as {
-      items: Array<{ label: string; currentValue: string | null }>;
+      items: Array<{ key: string; label: string; currentValue: string | null }>;
     }).items[0]).toMatchObject({
-      label: "출석",
+      key: "attendanceStatus:membership-1",
+      label: "출석 · membership-1",
       currentValue: "참석",
     });
+  });
+
+  it("explains a history restore preview failure without inventing a receipt", async () => {
+    routeMocks.previewRestore.mockRejectedValue({
+      code: "HOST_SESSION_CHANGE_NOT_RESTORABLE",
+      status: 409,
+    });
+    const navigation = {
+      location: { panel: "history", source: "manual" } as const,
+      onChange: vi.fn(),
+    };
+    renderWorkflow(recordEditor, vi.fn(), navigation);
+    expect(routeMocks.capturedProps?.pendingUndo).toBeNull();
+
+    await act(async () => {
+      await (routeMocks.capturedProps?.recordWorkflow as {
+        onRestoreChange: (changeId: string) => Promise<void>;
+      }).onRestoreChange("history-change-1");
+    });
+
+    expect(routeMocks.capturedProps?.pendingUndo).toBeNull();
+    const notice = routeMocks.capturedProps?.restoreNotice as {
+      message: string;
+      onRetry: () => void;
+      onOpenHistory: () => void;
+    };
+    expect(notice.message).toBe("이 변경은 복원할 기록이 없어 바로 되돌릴 수 없습니다.");
+    await act(async () => notice.onRetry());
+    expect(routeMocks.previewRestore).toHaveBeenCalledTimes(2);
+    act(() => notice.onOpenHistory());
+    expect(navigation.onChange).toHaveBeenCalledWith({ panel: "history", source: "manual" });
   });
 });
 

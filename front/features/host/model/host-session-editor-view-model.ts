@@ -201,6 +201,7 @@ export type HostSessionHistoryItemView = {
 };
 
 export type HostSessionRestorePreviewItemView = {
+  key: string;
   label: string;
   currentValue: string | null;
   targetValue: string | null;
@@ -266,13 +267,32 @@ export function hostSessionRestoreStaleExplanation(): string {
 
 export function buildHostSessionRestorePreviewItemView(
   item: HostSessionRestoreItem,
+  options?: { memberLabel?: string | null },
 ): HostSessionRestorePreviewItemView {
   return {
-    label: restoreFieldLabels[item.field] ?? "변경 항목",
+    key: restorePreviewItemKey(item),
+    label: restorePreviewItemLabel(item, options?.memberLabel),
     currentValue: item.sensitive ? null : displayRestoreValue(item.field, item.currentValue),
     targetValue: item.sensitive ? null : displayRestoreValue(item.field, item.targetValue),
     sensitive: item.sensitive,
   };
+}
+
+function restorePreviewItemKey(item: HostSessionRestoreItem): string {
+  return item.subjectId ? `${item.field}:${item.subjectId}` : item.field;
+}
+
+function restorePreviewItemLabel(item: HostSessionRestoreItem, memberLabel?: string | null): string {
+  if (item.field === "attendanceStatus") {
+    if (memberLabel) {
+      return `출석 · ${memberLabel}`;
+    }
+    if (item.subjectId) {
+      return `출석 · ${item.subjectId}`;
+    }
+    return "출석";
+  }
+  return restoreFieldLabels[item.field] ?? "변경 항목";
 }
 
 export function buildHostSessionHistoryRecoveryView(

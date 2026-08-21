@@ -19,7 +19,10 @@ import {
   wrapHostSessionEditorActionsForUndo,
   type HostSessionEditorActions,
 } from "@/features/host/route/host-session-editor-actions";
-import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
+import type {
+  HostSessionChangeReceipt,
+  HostSessionRestorePreview,
+} from "@/features/host/api/host-session-recovery-contracts";
 import type {
   HostSessionHistoryItem,
   HostSessionHistoryPage,
@@ -593,6 +596,14 @@ export function EditHostSessionRecordWorkflow({
     submitting: boolean;
     error: string | null;
   } | null>(null);
+  const [restoreNotice, setRestoreNotice] = useState<{
+    message: string;
+    changeId: string;
+  } | null>(null);
+  const pendingUndoRef = useRef(pendingUndo);
+  useEffect(() => {
+    pendingUndoRef.current = pendingUndo;
+  }, [pendingUndo]);
   const previewMutation = usePreviewHostSessionRecordApplyMutation(context);
   const applyMutation = useApplyHostSessionRecordMutation(context, async (event) => {
     await onSessionRecordsChanged(event.sessionId);
@@ -842,8 +853,15 @@ export function EditHostSessionRecordWorkflow({
     description: string,
     sessionState?: HostSessionDetailResponse["state"],
   ) => {
+    if (!receipt.undoAvailable) {
+      setPendingUndo(null);
+      setUndoConfirm(null);
+      setRestoreNotice(null);
+      return;
+    }
     setPendingUndo({ receipt, description, error: null, sessionState });
     setUndoConfirm(null);
+    setRestoreNotice(null);
   }, []);
 
   const editorActions = useMemo(
@@ -858,7 +876,24 @@ export function EditHostSessionRecordWorkflow({
   const dismissUndo = useCallback(() => {
     setPendingUndo(null);
     setUndoConfirm(null);
+    setRestoreNotice(null);
   }, []);
+
+  const memberLabelById = useMemo(() => {
+    const labels = new Map<string, string>();
+    for (const attendee of session.attendees ?? []) {
+      if (attendee.displayName) {
+        labels.set(attendee.membershipId, attendee.displayName);
+      }
+    }
+    return labels;
+  }, [session.attendees]);
+
+  const previewItemsFromRestore = useCallback((items: HostSessionRestorePreview["items"]) => (
+    items.map((item) => buildHostSessionRestorePreviewItemView(item, {
+      memberLabel: item.subjectId ? memberLabelById.get(item.subjectId) ?? null : null,
+    }))
+  ), [memberLabelById]);
 
   const restoreChangeFailureMessage = useCallback((error: unknown) => {
     const code = apiErrorCode(error);
@@ -871,32 +906,44 @@ export function EditHostSessionRecordWorkflow({
     return "되돌리지 못했습니다. 변경 내역에서 다시 확인하세요.";
   }, []);
 
+  const showRestoreError = useCallback((message: string, changeId: string) => {
+    setUndoConfirm(null);
+    if (pendingUndoRef.current) {
+      setPendingUndo((current) => current ? { ...current, error: message } : current);
+      setRestoreNotice(null);
+      return;
+    }
+    setRestoreNotice({ message, changeId });
+  }, []);
+
   const startChangeRestore = useCallback(async (changeId: string) => {
     try {
       const preview = await queryClient.fetchQuery(
         hostSessionRestorePreviewQuery(session.sessionId, changeId, context),
       );
       if (!preview.canRestore) {
-        setUndoConfirm(null);
-        setPendingUndo((current) => current
-          ? { ...current, error: hostSessionRestoreBlockedExplanation(preview.blockedReason) }
-          : current);
+        showRestoreError(hostSessionRestoreBlockedExplanation(preview.blockedReason), changeId);
         return;
       }
+      setRestoreNotice(null);
       setUndoConfirm({
         changeId: preview.changeId,
-        items: preview.items.map(buildHostSessionRestorePreviewItemView),
+        items: previewItemsFromRestore(preview.items),
         expectedCurrentHash: preview.expectedCurrentHash,
         submitting: false,
         error: null,
       });
     } catch (error) {
-      setUndoConfirm(null);
-      setPendingUndo((current) => current
-        ? { ...current, error: restoreChangeFailureMessage(error) }
-        : current);
+      showRestoreError(restoreChangeFailureMessage(error), changeId);
     }
-  }, [context, queryClient, restoreChangeFailureMessage, session.sessionId]);
+  }, [
+    context,
+    previewItemsFromRestore,
+    queryClient,
+    restoreChangeFailureMessage,
+    session.sessionId,
+    showRestoreError,
+  ]);
 
   const undoLifecycle = useCallback(async () => {
     const reverse = reverseLifecycleAction(pendingUndo?.sessionState ?? session.state);
@@ -939,7 +986,13 @@ export function EditHostSessionRecordWorkflow({
         changeId: undoConfirm.changeId,
         request: { expectedCurrentHash: undoConfirm.expectedCurrentHash },
       });
-      captureChangeReceipt(receipt, hostSessionChangeUndoDescription(receipt.kind));
+      if (receipt.undoAvailable) {
+        captureChangeReceipt(receipt, hostSessionChangeUndoDescription(receipt.kind));
+      } else {
+        setPendingUndo(null);
+        setUndoConfirm(null);
+        setRestoreNotice(null);
+      }
     } catch (error) {
       const message = restoreChangeFailureMessage(error);
       setUndoConfirm((current) => current ? { ...current, submitting: false, error: message } : current);
@@ -977,6 +1030,17 @@ export function EditHostSessionRecordWorkflow({
       }
     : null;
 
+  const restoreNoticeView = restoreNotice && !pendingUndo
+    ? {
+        message: restoreNotice.message,
+        onRetry: () => {
+          void startChangeRestore(restoreNotice.changeId);
+        },
+        onOpenHistory: openHistoryPanel,
+        onDismiss: () => setRestoreNotice(null),
+      }
+    : null;
+
   return (
     <>
       <HostSessionEditor
@@ -986,6 +1050,7 @@ export function EditHostSessionRecordWorkflow({
         actions={editorActions}
         pendingUndo={pendingUndoView}
         undoConfirm={undoConfirmView}
+        restoreNotice={restoreNoticeView}
         clubSlug={clubSlug}
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}

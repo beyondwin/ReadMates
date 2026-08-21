@@ -90,6 +90,20 @@ export function parseHostSessionChangeReceipt(value: unknown): HostSessionChange
   return HostSessionChangeReceiptSchema.parse(value);
 }
 
+export function parseOptionalHostSessionChangeReceipt(value: unknown): HostSessionChangeReceipt | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  if (!("changeReceipt" in value)) {
+    return null;
+  }
+  const receipt = (value as { changeReceipt: unknown }).changeReceipt;
+  if (receipt == null) {
+    return null;
+  }
+  return parseHostSessionChangeReceipt(receipt);
+}
+
 export function parseHostSessionRestoreRequest(value: unknown): HostSessionRestoreRequest {
   return HostSessionRestoreRequestSchema.parse(value);
 }

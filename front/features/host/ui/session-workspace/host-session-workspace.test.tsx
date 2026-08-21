@@ -359,8 +359,8 @@ describe("HostSessionWorkspace", () => {
     function UndoConfirmHarness() {
       const [confirm, setConfirm] = useState<HostSessionWorkspaceProps["undoConfirm"]>({
         items: [
-          { label: "세션 제목", currentValue: "새 제목", targetValue: "이전 제목", sensitive: false },
-          { label: "미팅 URL", currentValue: null, targetValue: null, sensitive: true },
+          { key: "title", label: "세션 제목", currentValue: "새 제목", targetValue: "이전 제목", sensitive: false },
+          { key: "meetingUrl", label: "미팅 URL", currentValue: null, targetValue: null, sensitive: true },
         ],
         submitting: false,
         onConfirm,
@@ -390,6 +390,31 @@ describe("HostSessionWorkspace", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "이 변경을 되돌릴까요?" })).not.toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it("explains a history restore failure without a receipt and offers retry", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    const onOpenHistory = vi.fn();
+    render(
+      <WorkspaceHarness
+        view={viewFor({ ...baseInput, state: "OPEN" })}
+        restoreNotice={{
+          message: "되돌리지 못했습니다. 변경 내역에서 다시 확인하세요.",
+          onRetry,
+          onOpenHistory,
+          onDismiss: vi.fn(),
+        }}
+      />,
+    );
+
+    const status = screen.getByRole("status");
+    expect(screen.getByRole("alert")).toHaveTextContent("되돌리지 못했습니다");
+    expect(screen.queryByRole("button", { name: "되돌리기" })).not.toBeInTheDocument();
+    await user.click(within(status).getByRole("button", { name: "다시 시도" }));
+    await user.click(within(status).getByRole("button", { name: "변경 내역" }));
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(onOpenHistory).toHaveBeenCalledTimes(1);
   });
 
   it("pins the overlay sheet as a bottom sheet and the mobile CTA as a footer", async () => {
