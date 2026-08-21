@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
@@ -243,13 +244,10 @@ describe("HostMeetingLedger", () => {
         <HostMeetingLedger
           items={[{ sessionId: "open-1", state: "OPEN", date: "2026-04-15" }]}
           sessionId="open-1"
-          attentionPage={{
-            items: [
-              attentionItem({ sessionId: "open-1", bookTitle: "이 모임", state: "OPEN" }),
-              attentionItem({ sessionId: "other", bookTitle: "다른 모임" }),
-            ],
+          sessionAttention={{
+            items: [attentionItem({ sessionId: "open-1", bookTitle: "이 모임", state: "OPEN" })],
             summary: {
-              needsAttentionCount: 2,
+              needsAttentionCount: 1,
               incompletePublishedCount: 0,
               draftCount: 0,
             },
@@ -263,5 +261,69 @@ describe("HostMeetingLedger", () => {
     expect(screen.queryByText("다른 모임")).not.toBeInTheDocument();
     expect(screen.queryByText("확인 필요 2건")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "모두 보기" })).not.toBeInTheDocument();
+  });
+
+  it("shows the viewed session alert even when the club-wide attention page omitted it", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[{ sessionId: "deep-1", state: "PUBLISHED", date: "2026-01-11" }]}
+          sessionId="deep-1"
+          attentionPage={{
+            items: [
+              attentionItem({ sessionId: "top-1", bookTitle: "상위 1", sessionNumber: 20 }),
+              attentionItem({ sessionId: "top-2", bookTitle: "상위 2", sessionNumber: 19 }),
+              attentionItem({ sessionId: "top-3", bookTitle: "상위 3", sessionNumber: 18 }),
+            ],
+            summary: {
+              needsAttentionCount: 8,
+              incompletePublishedCount: 4,
+              draftCount: 0,
+            },
+          }}
+          sessionAttention={{
+            items: [attentionItem({
+              sessionId: "deep-1",
+              sessionNumber: 2,
+              bookTitle: "깊은 기록",
+              state: "PUBLISHED",
+            })],
+            summary: {
+              needsAttentionCount: 1,
+              incompletePublishedCount: 1,
+              draftCount: 0,
+            },
+          }}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("깊은 기록")).toBeInTheDocument();
+    expect(screen.queryByText("상위 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("상위 2")).not.toBeInTheDocument();
+    expect(screen.queryByText("상위 3")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "모두 보기" })).not.toBeInTheDocument();
+  });
+
+  it("shows a recoverable attention error on empty home", async () => {
+    const onRetryAttention = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[]}
+          attentionError
+          onRetryAttention={onRetryAttention}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("확인 필요 목록을 불러오지 못했습니다.");
+    expect(screen.queryByText("확인 필요한 세션 기록이 없습니다.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetryAttention).toHaveBeenCalled();
   });
 });

@@ -49,6 +49,9 @@ export function HostMeetingLedger({
   scheduleDefaultsWarning,
   onRetryScheduleDefaults,
   attentionPage,
+  sessionAttention,
+  attentionError = false,
+  onRetryAttention,
 }: {
   items: readonly MeetingListItem[];
   sessionId?: string;
@@ -63,6 +66,9 @@ export function HostMeetingLedger({
   scheduleDefaultsWarning?: string | null;
   onRetryScheduleDefaults?: () => void;
   attentionPage?: HostSessionAttentionData | null;
+  sessionAttention?: HostSessionAttentionData | null;
+  attentionError?: boolean;
+  onRetryAttention?: () => void;
 }) {
   const active = resolveViewedMeeting(items, sessionId);
 
@@ -86,7 +92,16 @@ export function HostMeetingLedger({
                 첫 모임 만들기
               </LinkComponent>
             </div>
-            {attentionPage && attentionCount > 0 ? (
+            {attentionError ? (
+              <div className="rm-host-ledger__error" role="alert" style={{ marginTop: 28 }}>
+                <span>확인 필요 목록을 불러오지 못했습니다.</span>
+                {onRetryAttention ? (
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={onRetryAttention}>
+                    다시 시도
+                  </button>
+                ) : null}
+              </div>
+            ) : attentionPage && attentionCount > 0 ? (
               <section aria-label="확인 필요" style={{ marginTop: 28 }}>
                 <p className="small" style={{ margin: "0 0 12px", color: "var(--text-2)" }}>
                   확인 필요 {attentionCount}건
@@ -106,12 +121,7 @@ export function HostMeetingLedger({
   }
 
   const previousHref = previousRecordAttentionHref(active, items);
-  const selectedAttention = attentionPage
-    ? {
-        ...attentionPage,
-        items: attentionPage.items.filter((item) => item.sessionId === active.sessionId),
-      }
-    : null;
+  const selectedAttention = sessionAttention ?? null;
   const showUpcoming = active.phase === "during" || active.phase === "after";
   const hasNextBooks = draftsByDate(upcomingItems).length > 0;
   const upcoming = showUpcoming ? (

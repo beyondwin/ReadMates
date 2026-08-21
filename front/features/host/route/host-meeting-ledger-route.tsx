@@ -6,6 +6,7 @@ import type {
   HostSessionDetailResponse,
   HostSessionListItem,
 } from "@/features/host/api/host-contracts";
+import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
 import {
   meetingListItemsFromHostSources,
   type MeetingListItemSource,
@@ -71,6 +72,27 @@ function detailToMeetingSource(detail: HostSessionDetailResponse): MeetingListIt
   };
 }
 
+function viewedSessionAttention(
+  sessionId: string | undefined,
+  sessions: readonly HostSessionListItem[] | undefined,
+): HostSessionAttentionData | null {
+  if (!sessionId) {
+    return null;
+  }
+  const viewed = sessions?.find((item) => item.sessionId === sessionId);
+  if (!viewed?.needsAttention) {
+    return null;
+  }
+  return {
+    items: [viewed],
+    summary: {
+      needsAttentionCount: 1,
+      incompletePublishedCount: viewed.state === "PUBLISHED" && viewed.recordStatus !== "COMPLETE" ? 1 : 0,
+      draftCount: viewed.hasDraft ? 1 : 0,
+    },
+  };
+}
+
 function toUpcomingBookItem(
   item: Pick<HostSessionListItem, "sessionId" | "state" | "date" | "bookTitle" | "accessScope">,
 ): UpcomingBookListItem | null {
@@ -104,6 +126,20 @@ export function HostMeetingLedgerRoute({
     ...hostSessionDetailQuery(sessionId ?? "", context),
     enabled: Boolean(sessionId),
   });
+  const viewedListItem = sessionId
+    ? sessionsQuery.data?.items.find((item) => item.sessionId === sessionId)
+    : undefined;
+  const sessionAttentionQuery = useQuery({
+    ...hostSessionRecordLedgerQuery({
+      needsAttention: true,
+      search: detailQuery.data ? String(detailQuery.data.sessionNumber) : null,
+      page: { limit: 20 },
+    }, context),
+    enabled: Boolean(sessionId)
+      && sessionsQuery.isSuccess
+      && !viewedListItem
+      && Boolean(detailQuery.data),
+  });
   const queryClient = useQueryClient();
   const { mutateAsync: createSession, isPending: creatingSession } = useCreateHostSessionMutation(context);
   const { mutateAsync: saveAccessScope, isPending: savingAccessScope } = useSaveHostSessionAccessScopeMutation(context);
@@ -127,6 +163,19 @@ export function HostMeetingLedgerRoute({
         .filter((item): item is MeetingListItemSource => item !== null),
     );
   }, [detailQuery.data, recordAttentionQuery.data, sessionsQuery.data]);
+
+  const sessionAttention = useMemo(() => {
+    const fromList = viewedSessionAttention(sessionId, sessionsQuery.data?.items);
+    if (fromList) {
+      return fromList;
+    }
+    const fromSessionQuery = sessionAttentionQuery.data?.items.find(
+      (item) => item.sessionId === sessionId && item.needsAttention,
+    );
+    return fromSessionQuery
+      ? viewedSessionAttention(sessionId, [fromSessionQuery])
+      : null;
+  }, [sessionAttentionQuery.data, sessionId, sessionsQuery.data]);
 
   const upcomingItems = useMemo(
     () =>
@@ -182,7 +231,7 @@ export function HostMeetingLedgerRoute({
         items={items}
         sessionId={sessionId}
         LinkComponent={LinkComponent}
-        attentionPage={recordAttentionQuery.data ?? undefined}
+        sessionAttention={sessionAttention}
         upcomingItems={upcomingItems}
         onSaveUpcomingAccessScope={handleSaveUpcomingAccessScope}
         onCreateUpcomingSession={handleCreateUpcomingSession}

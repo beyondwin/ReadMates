@@ -37,6 +37,7 @@ vi.mock("@tanstack/react-query", () => ({
     data: query.testData,
     isError: false,
     isPending: false,
+    isSuccess: true,
     refetch: vi.fn(),
   }),
   useQueryClient: () => ({
@@ -451,5 +452,50 @@ describe("HostMeetingLedgerRoute", () => {
 
     expect(screen.queryByRole("heading", { name: "다음에 읽을 책" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "모임 하나 더" })).not.toBeInTheDocument();
+  });
+
+  it("shows the viewed session's own attention alert when it is outside the club-wide top 3", () => {
+    routeMocks.hostSessions = {
+      items: [{
+        sessionId: "deep-1",
+        sessionNumber: 2,
+        title: "2회차",
+        bookTitle: "깊은 기록",
+        bookAuthor: "저자",
+        bookImageUrl: null,
+        date: "2026-01-11",
+        startTime: "20:00",
+        endTime: "22:00",
+        locationLabel: "온라인",
+        state: "PUBLISHED",
+        visibility: "MEMBER",
+        recordStatus: "INCOMPLETE",
+        needsAttention: true,
+        hasDraft: false,
+        liveRevision: 1,
+        draftRevision: null,
+        lastModifiedAt: "2026-01-12T00:00:00Z",
+      }],
+      nextCursor: null,
+    };
+    routeMocks.recordAttention = {
+      items: [
+        { sessionId: "top-1", state: "CLOSED", date: "2026-04-15", bookTitle: "상위 1", recordStatus: "INCOMPLETE" },
+        { sessionId: "top-2", state: "CLOSED", date: "2026-03-15", bookTitle: "상위 2", recordStatus: "INCOMPLETE" },
+        { sessionId: "top-3", state: "PUBLISHED", date: "2026-02-15", bookTitle: "상위 3", recordStatus: "INCOMPLETE" },
+      ],
+      nextCursor: "more",
+      summary: {
+        needsAttentionCount: 8,
+        incompletePublishedCount: 4,
+        draftCount: 0,
+      },
+    };
+    renderMeetingSurface("deep-1");
+
+    expect(screen.getByText("깊은 기록")).toBeInTheDocument();
+    expect(screen.queryByText("상위 1")).not.toBeInTheDocument();
+    expect(screen.queryByText("상위 2")).not.toBeInTheDocument();
+    expect(screen.queryByText("상위 3")).not.toBeInTheDocument();
   });
 });

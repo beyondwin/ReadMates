@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
@@ -6,6 +7,8 @@ import type { HostSessionLedgerItem } from "@/features/host/model/host-session-l
 const routeMocks = vi.hoisted(() => ({
   hostSessions: { items: [] as Array<Record<string, unknown>>, nextCursor: null as string | null },
   current: { currentSession: null as null | Record<string, unknown> },
+  attentionError: false,
+  refetchAttention: vi.fn(),
   recordAttention: {
     items: [] as HostSessionLedgerItem[],
     nextCursor: null as string | null,
@@ -19,8 +22,10 @@ const routeMocks = vi.hoisted(() => ({
 
 vi.mock("@tanstack/react-query", () => ({
   useQuery: (query: { testData?: unknown }) => ({
-    data: query.testData,
-    isError: false,
+    data: routeMocks.attentionError ? undefined : query.testData,
+    isError: routeMocks.attentionError,
+    isFetching: false,
+    refetch: routeMocks.refetchAttention,
   }),
 }));
 
@@ -31,7 +36,8 @@ vi.mock("react-router", async (importOriginal) => {
     useLoaderData: () => ({
       current: routeMocks.current,
       hostSessions: routeMocks.hostSessions,
-      recordAttention: routeMocks.recordAttention,
+      recordAttention: routeMocks.attentionError ? null : routeMocks.recordAttention,
+      attentionError: routeMocks.attentionError,
     }),
     useParams: () => ({ clubSlug: "reading-sai" }),
     Navigate: ({ to }: { to: string }) => (
@@ -87,6 +93,8 @@ function renderRoute() {
 beforeEach(() => {
   routeMocks.hostSessions = { items: [], nextCursor: null };
   routeMocks.current = { currentSession: null };
+  routeMocks.attentionError = false;
+  routeMocks.refetchAttention.mockReset();
   routeMocks.recordAttention = {
     items: [],
     nextCursor: null,
@@ -161,5 +169,18 @@ describe("HostDashboardRoute", () => {
     expect(screen.getByText("확인 필요 1건")).toBeInTheDocument();
     expect(screen.getByText("한 권")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "모두 보기" })).not.toBeInTheDocument();
+  });
+
+  it("shows a retryable attention error on empty home instead of a silent empty list", async () => {
+    const user = userEvent.setup();
+    routeMocks.attentionError = true;
+    renderRoute();
+
+    expect(screen.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("확인 필요 목록을 불러오지 못했습니다.");
+    expect(screen.queryByText("확인 필요 0건")).not.toBeInTheDocument();
+    expect(screen.queryByText("확인 필요한 세션 기록이 없습니다.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(routeMocks.refetchAttention).toHaveBeenCalled();
   });
 });

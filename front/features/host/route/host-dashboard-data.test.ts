@@ -255,5 +255,30 @@ describe("hostDashboardLoaderFactory", () => {
     expect(result).not.toHaveProperty("data");
     expect(result).not.toHaveProperty("notifications");
     expect(result).not.toHaveProperty("clubOperations");
+    expect(result).toMatchObject({ attentionError: false });
+  });
+
+  it("keeps empty-home data when attention fails instead of crashing the loader", async () => {
+    const fetchMock = fetchMockFor({
+      "/api/bff/api/auth/me": hostAuth,
+      "/api/bff/api/sessions/current": { currentSession: null },
+      "/api/bff/api/host/sessions?limit=50": { items: [], nextCursor: null },
+      "/api/bff/api/host/sessions?needsAttention=true&limit=1": new Response(
+        JSON.stringify({ message: "attention unavailable" }),
+        { status: 503, headers: { "Content-Type": "application/json" } },
+      ),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
+      request: new Request("https://readmates.test/app/host"),
+    } as unknown as LoaderFunctionArgs);
+
+    expect(result).toMatchObject({
+      current: { currentSession: null },
+      hostSessions: { items: [], nextCursor: null },
+      recordAttention: null,
+      attentionError: true,
+    });
   });
 });

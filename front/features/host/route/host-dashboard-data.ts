@@ -28,6 +28,7 @@ export type HostDashboardRouteData = {
   current: CurrentSessionResponse;
   hostSessions: HostSessionListPage;
   recordAttention: HostSessionRecordLedgerPage | null;
+  attentionError: boolean;
 };
 
 export function preserveLocationSuffix(requestUrl: string, destination: string): string {
@@ -51,13 +52,16 @@ export function hostDashboardLoaderFactory(client: QueryClient) {
     await requireHostLoaderAuth(args);
     const context = { clubSlug: clubSlugFromLoaderArgs(args) };
 
-    const [current, hostSessions, recordAttention] = await Promise.all([
+    const [current, hostSessions, attentionResult] = await Promise.all([
       client.fetchQuery(hostCurrentSessionQuery(context)),
       client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)),
       client.fetchQuery(hostSessionRecordLedgerQuery({
         needsAttention: true,
         page: { limit: HOST_HOME_ATTENTION_LIMIT },
-      }, context)).catch(() => null),
+      }, context)).then(
+        (page) => ({ page, error: false as const }),
+        () => ({ page: null, error: true as const }),
+      ),
     ]);
 
     const active = resolveActiveMeeting(canonicalHomeMeetingItems(hostSessions, current));
@@ -71,7 +75,8 @@ export function hostDashboardLoaderFactory(client: QueryClient) {
     return {
       current,
       hostSessions,
-      recordAttention,
+      recordAttention: attentionResult.page,
+      attentionError: attentionResult.error,
     };
   };
 }

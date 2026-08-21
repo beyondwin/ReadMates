@@ -422,6 +422,7 @@ describe("HostDashboard", () => {
         nextCursor: null,
         summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
       },
+      attentionError: false,
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
@@ -499,6 +500,7 @@ describe("HostDashboard", () => {
           nextCursor: null,
           summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
         },
+        attentionError: false,
       });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url)).every((url) => !url.includes("clubSlug="))).toBe(true);
@@ -545,6 +547,7 @@ describe("HostDashboard", () => {
         nextCursor: null,
         summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
       },
+      attentionError: false,
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
