@@ -13,9 +13,7 @@ import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.requireHost
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
-import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
-import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
@@ -24,7 +22,9 @@ import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.util.UUID
 
-internal class HostSessionQueries {
+internal class HostSessionQueries(
+    private val attentionQueries: HostSessionAttentionQueries = HostSessionAttentionQueries(),
+) {
     @Suppress("LongMethod")
     fun list(
         jdbcTemplate: JdbcTemplate,
@@ -34,20 +34,12 @@ internal class HostSessionQueries {
     ): HostSessionListPage {
         requireHost(host)
         val normalizedQuery = query.normalized()
+        if (normalizedQuery.needsAttention == true) {
+            return attentionQueries.list(jdbcTemplate, host, pageRequest, normalizedQuery)
+        }
         val queryKey = normalizedQuery.fingerprint()
         val cursor = HostSessionCursor.from(pageRequest.cursor, queryKey, host.clubId)
-        val baseConditions = mutableListOf("club_id = ?")
-        val baseParameters = mutableListOf<Any>(host.clubId.dbString())
-        normalizedQuery.search?.let { search ->
-            baseConditions += "(cast(number as char) = ? or lower(title) like ? or lower(book_title) like ?)"
-            baseParameters += search
-            baseParameters += "%$search%"
-            baseParameters += "%$search%"
-        }
-        normalizedQuery.state?.let {
-            baseConditions += "state = ?"
-            baseParameters += it
-        }
+        val filters = hostSessionListFilters(host.clubId, normalizedQuery)
         val scan =
             scanHostSessionLedger(
                 limit = pageRequest.limit,
@@ -60,8 +52,8 @@ internal class HostSessionQueries {
                         )
                 },
             ) { scanCursor, chunkSize ->
-                val conditions = baseConditions.toMutableList()
-                val parameters = baseParameters.toMutableList()
+                val conditions = filters.conditions.toMutableList()
+                val parameters = filters.parameters.toMutableList()
                 scanCursor?.let {
                     conditions += "(number < ? or (number = ? and id < ?))"
                     parameters += it.number
@@ -73,53 +65,7 @@ internal class HostSessionQueries {
                     """
                     select *
                     from (
-                      select sessions.id, sessions.club_id, sessions.number, sessions.title,
-                             sessions.book_title, sessions.book_author, sessions.book_image_url,
-                             sessions.session_date, sessions.start_time, sessions.end_time,
-                             sessions.location_label, sessions.state, sessions.visibility, sessions.access_scope,
-                             coalesce(publication.site_visibility, 'HIDDEN') as site_visibility,
-                             publication.public_summary,
-                             (select count(*) from highlights
-                              where highlights.club_id = sessions.club_id
-                                and highlights.session_id = sessions.id) as highlight_count,
-                             (select count(*) from one_line_reviews
-                              where one_line_reviews.club_id = sessions.club_id
-                                and one_line_reviews.session_id = sessions.id) as one_liner_count,
-                             exists (
-                               select 1 from session_feedback_documents
-                               where session_feedback_documents.club_id = sessions.club_id
-                                 and session_feedback_documents.session_id = sessions.id
-                             ) as feedback_ready,
-                             (draft.session_id is not null) as has_draft,
-                             draft.draft_revision,
-                             coalesce(revision.live_revision, 0) as live_revision,
-                             greatest(
-                               sessions.updated_at,
-                               coalesce(draft.updated_at, sessions.updated_at),
-                               coalesce(revision.applied_at, sessions.updated_at),
-                               coalesce(audit.created_at, sessions.updated_at)
-                             ) as last_modified_at
-                      from sessions
-                      left join public_session_publications publication
-                        on publication.club_id = sessions.club_id
-                       and publication.session_id = sessions.id
-                      left join session_record_drafts draft
-                        on draft.club_id = sessions.club_id
-                       and draft.session_id = sessions.id
-                      left join (
-                        select club_id, session_id, max(version) as live_revision, max(applied_at) as applied_at
-                        from session_record_revisions
-                        group by club_id, session_id
-                      ) revision
-                        on revision.club_id = sessions.club_id
-                       and revision.session_id = sessions.id
-                      left join (
-                        select club_id, session_id, max(created_at) as created_at
-                        from host_session_change_audit
-                        group by club_id, session_id
-                      ) audit
-                        on audit.club_id = sessions.club_id
-                       and audit.session_id = sessions.id
+                      $HOST_SESSION_LEDGER_FACTS_SQL
                     ) ledger_facts
                     where ${conditions.joinToString(" and ")}
                     order by number desc, id desc
@@ -135,54 +81,9 @@ internal class HostSessionQueries {
                 scan.continuation?.let {
                     hostSessionCursor(it.number, it.id, queryKey, host.clubId)
                 },
-            summary = loadLedgerSummary(jdbcTemplate, host),
+            summary = loadHostSessionLedgerSummary(jdbcTemplate, host),
         )
     }
-
-    private fun loadLedgerSummary(
-        jdbcTemplate: JdbcTemplate,
-        host: CurrentMember,
-    ): HostSessionListSummary =
-        summarizeHostSessionLedger(
-            jdbcTemplate.query(
-                """
-                select sessions.state,
-                       publication.public_summary,
-                       (select count(*) from highlights
-                        where highlights.club_id = sessions.club_id
-                          and highlights.session_id = sessions.id) as highlight_count,
-                       (select count(*) from one_line_reviews
-                        where one_line_reviews.club_id = sessions.club_id
-                          and one_line_reviews.session_id = sessions.id) as one_liner_count,
-                       exists (
-                         select 1 from session_feedback_documents
-                         where session_feedback_documents.club_id = sessions.club_id
-                           and session_feedback_documents.session_id = sessions.id
-                       ) as feedback_ready,
-                       exists (
-                         select 1 from session_record_drafts
-                         where session_record_drafts.club_id = sessions.club_id
-                           and session_record_drafts.session_id = sessions.id
-                       ) as has_draft
-                from sessions
-                left join public_session_publications publication
-                  on publication.club_id = sessions.club_id
-                 and publication.session_id = sessions.id
-                where sessions.club_id = ?
-                """.trimIndent(),
-                { resultSet, _ ->
-                    HostSessionLedgerReadiness(
-                        state = resultSet.getString("state"),
-                        summaryPublished = !resultSet.getString("public_summary").isNullOrBlank(),
-                        highlightCount = resultSet.getInt("highlight_count"),
-                        oneLinerCount = resultSet.getInt("one_liner_count"),
-                        feedbackReady = resultSet.getBoolean("feedback_ready"),
-                        hasDraft = resultSet.getBoolean("has_draft"),
-                    )
-                },
-                host.clubId.dbString(),
-            ),
-        )
 
     fun upcoming(
         jdbcTemplate: JdbcTemplate,
@@ -634,24 +535,145 @@ private fun HostSessionListItem.toScanCursor() = HostSessionCursor(sessionNumber
 internal const val HOST_SESSION_LEDGER_SCAN_CHUNK_SIZE = 200
 internal const val HOST_SESSION_LEDGER_MAX_SCAN_CHUNKS = 10
 
-private fun invalidCursor(): Nothing = throw InvalidHostSessionCursorException()
+internal val HOST_SESSION_LEDGER_FACTS_SQL =
+    """
+    select sessions.id, sessions.club_id, sessions.number, sessions.title,
+           sessions.book_title, sessions.book_author, sessions.book_image_url,
+           sessions.session_date, sessions.start_time, sessions.end_time,
+           sessions.location_label, sessions.state, sessions.visibility, sessions.access_scope,
+           coalesce(publication.site_visibility, 'HIDDEN') as site_visibility,
+           publication.public_summary,
+           (select count(*) from highlights
+            where highlights.club_id = sessions.club_id
+              and highlights.session_id = sessions.id) as highlight_count,
+           (select count(*) from one_line_reviews
+            where one_line_reviews.club_id = sessions.club_id
+              and one_line_reviews.session_id = sessions.id) as one_liner_count,
+           exists (
+             select 1 from session_feedback_documents
+             where session_feedback_documents.club_id = sessions.club_id
+               and session_feedback_documents.session_id = sessions.id
+           ) as feedback_ready,
+           (draft.session_id is not null) as has_draft,
+           draft.draft_revision,
+           coalesce(revision.live_revision, 0) as live_revision,
+           greatest(
+             sessions.updated_at,
+             coalesce(draft.updated_at, sessions.updated_at),
+             coalesce(revision.applied_at, sessions.updated_at),
+             coalesce(audit.created_at, sessions.updated_at)
+           ) as last_modified_at
+    from sessions
+    left join public_session_publications publication
+      on publication.club_id = sessions.club_id
+     and publication.session_id = sessions.id
+    left join session_record_drafts draft
+      on draft.club_id = sessions.club_id
+     and draft.session_id = sessions.id
+    left join (
+      select club_id, session_id, max(version) as live_revision, max(applied_at) as applied_at
+      from session_record_revisions
+      group by club_id, session_id
+    ) revision
+      on revision.club_id = sessions.club_id
+     and revision.session_id = sessions.id
+    left join (
+      select club_id, session_id, max(created_at) as created_at
+      from host_session_change_audit
+      group by club_id, session_id
+    ) audit
+      on audit.club_id = sessions.club_id
+     and audit.session_id = sessions.id
+    """.trimIndent()
 
-private fun HostSessionListQuery.normalized() =
+internal data class HostSessionListFilters(
+    val conditions: MutableList<String>,
+    val parameters: MutableList<Any>,
+)
+
+internal fun hostSessionListFilters(
+    clubId: UUID,
+    query: HostSessionListQuery,
+): HostSessionListFilters {
+    val conditions = mutableListOf("club_id = ?")
+    val parameters = mutableListOf<Any>(clubId.dbString())
+    query.search?.let { search ->
+        conditions += "(cast(number as char) = ? or lower(title) like ? or lower(book_title) like ?)"
+        parameters += search
+        parameters += "%$search%"
+        parameters += "%$search%"
+    }
+    query.state?.let {
+        conditions += "state = ?"
+        parameters += it
+    }
+    return HostSessionListFilters(conditions, parameters)
+}
+
+internal fun loadHostSessionLedgerSummary(
+    jdbcTemplate: JdbcTemplate,
+    host: CurrentMember,
+): HostSessionListSummary =
+    summarizeHostSessionLedger(
+        jdbcTemplate.query(
+            """
+            select sessions.state,
+                   publication.public_summary,
+                   (select count(*) from highlights
+                    where highlights.club_id = sessions.club_id
+                      and highlights.session_id = sessions.id) as highlight_count,
+                   (select count(*) from one_line_reviews
+                    where one_line_reviews.club_id = sessions.club_id
+                      and one_line_reviews.session_id = sessions.id) as one_liner_count,
+                   exists (
+                     select 1 from session_feedback_documents
+                     where session_feedback_documents.club_id = sessions.club_id
+                       and session_feedback_documents.session_id = sessions.id
+                   ) as feedback_ready,
+                   exists (
+                     select 1 from session_record_drafts
+                     where session_record_drafts.club_id = sessions.club_id
+                       and session_record_drafts.session_id = sessions.id
+                   ) as has_draft
+            from sessions
+            left join public_session_publications publication
+              on publication.club_id = sessions.club_id
+             and publication.session_id = sessions.id
+            where sessions.club_id = ?
+            """.trimIndent(),
+            { resultSet, _ ->
+                HostSessionLedgerReadiness(
+                    state = resultSet.getString("state"),
+                    summaryPublished = !resultSet.getString("public_summary").isNullOrBlank(),
+                    highlightCount = resultSet.getInt("highlight_count"),
+                    oneLinerCount = resultSet.getInt("one_liner_count"),
+                    feedbackReady = resultSet.getBoolean("feedback_ready"),
+                    hasDraft = resultSet.getBoolean("has_draft"),
+                )
+            },
+            host.clubId.dbString(),
+        ),
+    )
+
+internal fun invalidCursor(): Nothing = throw InvalidHostSessionCursorException()
+
+internal fun HostSessionListQuery.normalized() =
     copy(
         search = search?.trim()?.lowercase()?.takeIf(String::isNotBlank),
         state = state?.trim()?.uppercase()?.takeIf(String::isNotBlank),
     )
 
-private fun HostSessionListQuery.fingerprint(): String {
-    val value =
-        listOf(
-            search.orEmpty(),
-            state.orEmpty(),
-            recordStatus?.name.orEmpty(),
-            needsAttention?.toString().orEmpty(),
-        ).joinToString("\u0000")
+internal fun HostSessionListQuery.fingerprint(orderingVersion: String? = null): String {
+    val parts =
+        buildList {
+            add(search.orEmpty())
+            add(state.orEmpty())
+            add(recordStatus?.name.orEmpty())
+            add(needsAttention?.toString().orEmpty())
+            if (orderingVersion != null) add(orderingVersion)
+        }
     return MessageDigest
         .getInstance("SHA-256")
-        .digest(value.toByteArray(StandardCharsets.UTF_8))
+        .digest(parts.joinToString("\u0000").toByteArray(StandardCharsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 }

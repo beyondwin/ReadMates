@@ -1034,6 +1034,45 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
+    fun `host attention list orders by rank date and id and pages without gaps`() {
+        val closedIncomplete = createAttentionSession("closed-incomplete", "2026-06-01", "CLOSED", withDraft = false)
+        val closedDraft = createAttentionSession("closed-draft", "2026-06-01", "CLOSED", withDraft = true)
+        val publishedIncompleteA =
+            createAttentionSession("published-incomplete-a", "2026-07-01", "PUBLISHED", withDraft = false)
+        val publishedDraftLater =
+            createAttentionSession("published-draft-later", "2026-08-01", "PUBLISHED", withDraft = true)
+        val publishedDraftEarlier =
+            createAttentionSession("published-draft-earlier", "2026-05-01", "PUBLISHED", withDraft = true)
+        val publishedIncompleteB =
+            createAttentionSession("published-incomplete-b", "2026-07-01", "PUBLISHED", withDraft = false)
+        val rankOneIds = listOf(publishedIncompleteA, publishedIncompleteB).sorted()
+        val expectedIds =
+            listOf(
+                publishedDraftEarlier,
+                publishedDraftLater,
+                rankOneIds[0],
+                rankOneIds[1],
+                closedDraft,
+                closedIncomplete,
+            )
+
+        val firstPage = hostAttentionPage(limit = 3)
+        assertThat(hostSessionIds(firstPage)).containsExactlyElementsOf(expectedIds.take(3))
+        assertThat(firstPage.get("summary").get("needsAttentionCount").asInt()).isEqualTo(6)
+        val cursor = firstPage.get("nextCursor").asString()
+        assertThat(cursor).isNotBlank()
+
+        val secondPage = hostAttentionPage(limit = 3, cursor = cursor)
+        assertThat(hostSessionIds(secondPage)).containsExactlyElementsOf(expectedIds.drop(3))
+        assertThat(secondPage.get("summary").get("needsAttentionCount").asInt()).isEqualTo(6)
+        assertThat(secondPage.get("nextCursor").isNull).isTrue()
+
+        val concatenated = hostSessionIds(firstPage) + hostSessionIds(secondPage)
+        assertThat(concatenated).containsExactlyElementsOf(expectedIds).doesNotHaveDuplicates()
+    }
+
+    @Test
     fun `basic update audit records field names but not meeting credentials`() {
         val sessionId = createDraftSessionSeven()
 
@@ -3666,6 +3705,51 @@ class HostSessionControllerDbTest(
     private fun createDraftSessionSeven(): String = createDraftSession("7회차 · 테스트 책", "테스트 책", "2026-05-20")
 
     private fun createDraftSessionEight(): String = createDraftSession("8회차 · 다음 책", "다음 책", "2026-06-17")
+
+    private fun createAttentionSession(
+        bookTitle: String,
+        date: String,
+        state: String,
+        withDraft: Boolean,
+    ): String {
+        val sessionId = createDraftSession("$bookTitle 회차", bookTitle, date)
+        if (state == "PUBLISHED") {
+            publishSession(sessionId)
+        } else {
+            updateSessionState(sessionId, state)
+        }
+        if (withDraft) {
+            insertRecordDraft(sessionId)
+        }
+        return sessionId
+    }
+
+    private fun hostAttentionPage(
+        limit: Int,
+        cursor: String? = null,
+    ): tools.jackson.databind.JsonNode {
+        val content =
+            mockMvc
+                .get("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    param("needsAttention", "true")
+                    param("limit", limit.toString())
+                    if (cursor != null) {
+                        param("cursor", cursor)
+                    }
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response
+                .contentAsString
+        return jsonMapper.readTree(content)
+    }
+
+    private fun hostSessionIds(page: tools.jackson.databind.JsonNode): List<String> {
+        val ids = mutableListOf<String>()
+        page.get("items").forEach { item -> ids += item.get("sessionId").asString() }
+        return ids
+    }
 
     private fun <T> runConcurrently(
         workerCount: Int,

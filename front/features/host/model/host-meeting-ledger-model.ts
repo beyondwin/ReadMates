@@ -43,6 +43,10 @@ export function hostMeetingHref(sessionId: string) {
   return `/app/host/sessions/${encodeURIComponent(sessionId)}`;
 }
 
+export function attentionItems<T>(page: { items: T[] }): T[] {
+  return page.items;
+}
+
 export type MeetingListItemSource = {
   sessionId: string;
   state: MeetingListItem["state"];

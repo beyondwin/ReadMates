@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  attentionItems,
   hostSessionLedgerActionLabel,
   hostSessionLedgerBadges,
   hostSessionLedgerModifiedAtLabel,
   normalizeHostSessionLedgerFilters,
   toHostSessionLedgerSearch,
+  type HostSessionLedgerItem,
 } from "./host-session-ledger-model";
 
 describe("host session ledger model", () => {
@@ -53,4 +55,59 @@ describe("host session ledger model", () => {
       .toBe("마지막 수정 2026.07.23 10:00");
     expect(hostSessionLedgerModifiedAtLabel(null)).toBe("수정 기록 없음");
   });
+
+  it("returns attention page items without closed-only filtering or slicing", () => {
+    const items: HostSessionLedgerItem[] = [
+      ledgerItem("published-draft", "PUBLISHED", true),
+      ledgerItem("published-incomplete", "PUBLISHED", false),
+      ledgerItem("closed-draft", "CLOSED", true),
+      ledgerItem("closed-incomplete", "CLOSED", false),
+      ledgerItem("closed-later", "CLOSED", false),
+    ];
+    const page = {
+      items,
+      summary: {
+        needsAttentionCount: 9,
+        incompletePublishedCount: 2,
+        draftCount: 3,
+      },
+    };
+
+    expect(attentionItems(page)).toBe(items);
+    expect(attentionItems(page).map((row) => row.state)).toEqual([
+      "PUBLISHED",
+      "PUBLISHED",
+      "CLOSED",
+      "CLOSED",
+      "CLOSED",
+    ]);
+    expect(page.summary.needsAttentionCount).toBe(9);
+  });
 });
+
+function ledgerItem(
+  sessionId: string,
+  state: HostSessionLedgerItem["state"],
+  hasDraft: boolean,
+): HostSessionLedgerItem {
+  return {
+    sessionId,
+    sessionNumber: 1,
+    title: sessionId,
+    bookTitle: sessionId,
+    bookAuthor: "Author",
+    bookImageUrl: null,
+    date: "2026-05-01",
+    startTime: "19:00",
+    endTime: "21:00",
+    locationLabel: "온라인",
+    state,
+    visibility: "MEMBER",
+    recordStatus: hasDraft ? "INCOMPLETE" : "NOT_STARTED",
+    needsAttention: true,
+    hasDraft,
+    liveRevision: 0,
+    draftRevision: hasDraft ? 1 : null,
+    lastModifiedAt: null,
+  };
+}

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  attentionItems,
   meetingListItemsFromHostSources,
   meetingPhaseFromState,
   previousRecordAttentionHref,
@@ -81,6 +82,36 @@ describe("meetingListItemsFromHostSources", () => {
       item({ sessionId: "draft-1", state: "DRAFT", date: "2026-06-11" }),
       item({ sessionId: "closed-1", state: "CLOSED", date: "2026-04-15", recordStatus: "NOT_STARTED" }),
     ]);
+  });
+});
+
+describe("attentionItems", () => {
+  it("returns the server page items unchanged, including PUBLISHED, without slicing", () => {
+    const page = {
+      items: [
+        item({ sessionId: "published-draft", state: "PUBLISHED", date: "2026-05-01", recordStatus: "INCOMPLETE" }),
+        item({ sessionId: "published-incomplete", state: "PUBLISHED", date: "2026-05-01", recordStatus: "NOT_STARTED" }),
+        item({ sessionId: "closed-draft", state: "CLOSED", date: "2026-06-01", recordStatus: "INCOMPLETE" }),
+        item({ sessionId: "closed-incomplete", state: "CLOSED", date: "2026-06-01", recordStatus: "NOT_STARTED" }),
+        item({ sessionId: "closed-later", state: "CLOSED", date: "2026-07-01", recordStatus: "INCOMPLETE" }),
+      ],
+      nextCursor: "attention-cursor",
+      summary: {
+        needsAttentionCount: 9,
+        incompletePublishedCount: 2,
+        draftCount: 3,
+      },
+    };
+
+    expect(attentionItems(page)).toBe(page.items);
+    expect(attentionItems(page).map((row) => row.state)).toEqual([
+      "PUBLISHED",
+      "PUBLISHED",
+      "CLOSED",
+      "CLOSED",
+      "CLOSED",
+    ]);
+    expect(page.summary.needsAttentionCount).toBe(9);
   });
 });
 

@@ -49,6 +49,10 @@ export type HostSessionAttentionData = {
   summary: HostSessionLedgerSummary;
 };
 
+export function attentionItems(page: Pick<HostSessionAttentionData, "items">): HostSessionLedgerItem[] {
+  return page.items;
+}
+
 const SESSION_STATES = new Set<SessionState>(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]);
 const RECORD_STATUSES = new Set<HostSessionLedgerRecordStatus>(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]);
 
