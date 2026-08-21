@@ -2,6 +2,7 @@ package com.readmates.support
 
 import com.readmates.auth.domain.BookClubAvatarKey
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.flywaydb.core.Flyway
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
@@ -81,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(6)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(7)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -93,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("48")
+            assertThat(latestVersion).isEqualTo("49")
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -370,7 +371,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(5)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -382,7 +383,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("48")
+            assertThat(latestVersion).isEqualTo("49")
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1371,6 +1372,67 @@ class MySqlFlywayMigrationTest(
         val decisions = checkConstraintClause("host_action_notification_decisions_decision_check")
         assertTrue(decisions.contains("SEND") && decisions.contains("SKIP"))
         assertHostNotificationComposerSchema()
+    }
+
+    @Test
+    fun `mysql creates append-only host session lifecycle audit without cascade foreign keys`() {
+        assertThat(tableExists("host_session_lifecycle_audit")).isTrue()
+        assertThat(importedKeys("host_session_lifecycle_audit")).isEmpty()
+        assertLifecycleAuditSchema()
+        assertThatThrownBy {
+            insertLifecycleAudit(action = "OPENED", from = "CLOSED", to = "OPEN", reason = null)
+        }.isInstanceOf(UncategorizedSQLException::class.java)
+            .hasMessageContaining("host_session_lifecycle_audit_contract_check")
+        assertThatThrownBy {
+            insertLifecycleAudit(action = "REOPENED", from = "CLOSED", to = "OPEN", reason = null)
+        }.isInstanceOf(UncategorizedSQLException::class.java)
+            .hasMessageContaining("host_session_lifecycle_audit_contract_check")
+        assertThatThrownBy {
+            insertLifecycleAudit(
+                action = "DELETED",
+                from = "DRAFT",
+                to = null,
+                reason = "ACCIDENTAL_TRANSITION",
+            )
+        }.isInstanceOf(UncategorizedSQLException::class.java)
+            .hasMessageContaining("host_session_lifecycle_audit_contract_check")
+        assertThatThrownBy {
+            insertLifecycleAudit(
+                action = "REOPENED",
+                from = "CLOSED",
+                to = "OPEN",
+                reason = "NOT_A_REASON",
+            )
+        }.isInstanceOf(UncategorizedSQLException::class.java)
+            .hasMessageContaining("host_session_lifecycle_audit_reason_check")
+        try {
+            insertLifecycleAudit(action = "OPENED", from = "DRAFT", to = "OPEN", reason = null)
+            insertLifecycleAudit(
+                action = "DELETED",
+                from = "OPEN",
+                to = null,
+                reason = "EMPTY_SESSION_DELETED",
+            )
+            insertLifecycleAudit(
+                action = "REOPENED",
+                from = "CLOSED",
+                to = "OPEN",
+                reason = "ACCIDENTAL_TRANSITION",
+            )
+            assertEquals(
+                3,
+                jdbcTemplate.queryForObject(
+                    "select count(*) from host_session_lifecycle_audit where club_id = ?",
+                    Int::class.java,
+                    LIFECYCLE_AUDIT_CLUB_ID,
+                ),
+            )
+        } finally {
+            jdbcTemplate.update(
+                "delete from host_session_lifecycle_audit where club_id = ?",
+                LIFECYCLE_AUDIT_CLUB_ID,
+            )
+        }
     }
 
     private fun assertHostNotificationComposerSchema() {
@@ -2421,6 +2483,105 @@ class MySqlFlywayMigrationTest(
             "db/mysql/migration/V46__integrated_member_profile_avatar_catalog.sql"
         private val ADD_COLUMN_NAME_REGEX = Regex("(?i)\\bADD\\s+COLUMN\\s+`?([a-z0-9_]+)`?")
         private val V43_AVATAR_KEY_REGEX = Regex("'([a-z0-9-]+)'")
+        private const val LIFECYCLE_AUDIT_CLUB_ID = "aaaaaaaa-0000-4000-8000-000000049002"
+        private const val LIFECYCLE_AUDIT_SESSION_ID = "aaaaaaaa-0000-4000-8000-000000049003"
+        private const val LIFECYCLE_AUDIT_ACTOR_ID = "aaaaaaaa-0000-4000-8000-000000049004"
+    }
+
+    private fun assertLifecycleAuditSchema() {
+        assertThat(columns("host_session_lifecycle_audit")).containsExactlyInAnyOrder(
+            "id",
+            "club_id",
+            "session_id",
+            "actor_membership_id",
+            "action_type",
+            "from_state",
+            "to_state",
+            "reason_code",
+            "reason_note",
+            "request_id",
+            "created_at",
+        )
+        listOf("action_type", "from_state", "to_state", "reason_code").forEach { column ->
+            assertEquals("ascii", columnValue("host_session_lifecycle_audit", column, "character_set_name"))
+            assertEquals("ascii_bin", columnValue("host_session_lifecycle_audit", column, "collation_name"))
+        }
+        assertEquals("NO", columnValue("host_session_lifecycle_audit", "from_state", "is_nullable"))
+        assertEquals("YES", columnValue("host_session_lifecycle_audit", "to_state", "is_nullable"))
+        assertEquals("YES", columnValue("host_session_lifecycle_audit", "reason_code", "is_nullable"))
+        assertEquals("NO", columnValue("host_session_lifecycle_audit", "request_id", "is_nullable"))
+        assertEquals("6", columnValue("host_session_lifecycle_audit", "created_at", "datetime_precision"))
+        assertEquals(
+            "club_id,session_id,created_at,id",
+            indexColumns("host_session_lifecycle_audit", "host_session_lifecycle_audit_history_idx"),
+        )
+        assertEquals(
+            "club_id,actor_membership_id,created_at",
+            indexColumns("host_session_lifecycle_audit", "host_session_lifecycle_audit_actor_idx"),
+        )
+        assertThat(checkConstraintClause("host_session_lifecycle_audit_contract_check"))
+            .contains("OPENED", "CLOSED", "PUBLISHED", "REOPENED", "UNPUBLISHED", "RETURNED_TO_DRAFT", "DELETED")
+        assertThat(checkConstraintClause("host_session_lifecycle_audit_reason_check"))
+            .contains(
+                "ACCIDENTAL_TRANSITION",
+                "MEETING_RESCHEDULED",
+                "CONTENT_CORRECTION",
+                "OPERATIONAL_RECOVERY",
+                "OTHER_OPERATIONAL_REASON",
+                "LEGACY_UNSPECIFIED",
+                "EMPTY_SESSION_DELETED",
+            )
+    }
+
+    private fun tableExists(tableName: String): Boolean =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.tables
+            where table_schema = database()
+              and table_name = ?
+            """.trimIndent(),
+            Int::class.java,
+            tableName,
+        ) == 1
+
+    private fun importedKeys(tableName: String): List<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select referenced_table_name
+                from information_schema.referential_constraints
+                where constraint_schema = database()
+                  and table_name = ?
+                """.trimIndent(),
+                String::class.java,
+                tableName,
+            ).filterNotNull()
+
+    private fun insertLifecycleAudit(
+        action: String,
+        from: String,
+        to: String?,
+        reason: String?,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into host_session_lifecycle_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              from_state, to_state, reason_code, reason_note, request_id
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            LIFECYCLE_AUDIT_CLUB_ID,
+            LIFECYCLE_AUDIT_SESSION_ID,
+            LIFECYCLE_AUDIT_ACTOR_ID,
+            action,
+            from,
+            to,
+            reason,
+            null,
+            "lifecycle-audit-test",
+        )
     }
 
     private fun uniqueIndexCount(
