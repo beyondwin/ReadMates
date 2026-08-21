@@ -611,10 +611,12 @@ describe("NotesFeedPage", () => {
         }),
       );
 
-      await waitFor(() => expect(startViewTransition).toHaveBeenCalledTimes(1));
-      expect(screen.getByLabelText("current route")).toHaveTextContent(
-        "/app/notes?sessionId=session-9",
-      );
+      await waitFor(() => {
+        expect(startViewTransition).toHaveBeenCalledTimes(1);
+        expect(screen.getByLabelText("current route")).toHaveTextContent(
+          "/app/notes?sessionId=session-9",
+        );
+      });
     } finally {
       Reflect.deleteProperty(document, "startViewTransition");
     }
