@@ -37,6 +37,7 @@ internal fun ResultSet.toRecoverableChange(objectMapper: ObjectMapper): HostSess
     val beforeJson = getString("before_snapshot_json")
     val afterJson = getString("after_snapshot_json")
     val changedJson = getString("changed_fields_json")
+    val completeSnapshots = !beforeJson.isNullOrBlank() && !afterJson.isNullOrBlank()
     return if (actionType == "ATTENDANCE_UPDATED") {
         HostSessionRecoverableChange(
             changeId = UUID.fromString(getString("id")),
@@ -45,8 +46,14 @@ internal fun ResultSet.toRecoverableChange(objectMapper: ObjectMapper): HostSess
             changedFields = emptyList(),
             before = null,
             after = null,
-            transitions = objectMapper.readAttendanceTransitions(beforeJson ?: afterJson ?: changedJson),
+            transitions =
+                if (completeSnapshots) {
+                    objectMapper.readAttendanceTransitions(beforeJson)
+                } else {
+                    emptyList()
+                },
             alreadyRestored = false,
+            completeSnapshots = completeSnapshots,
         )
     } else {
         HostSessionRecoverableChange(
@@ -58,6 +65,7 @@ internal fun ResultSet.toRecoverableChange(objectMapper: ObjectMapper): HostSess
             after = objectMapper.readBasicSnapshot(afterJson),
             transitions = emptyList(),
             alreadyRestored = false,
+            completeSnapshots = completeSnapshots,
         )
     }
 }

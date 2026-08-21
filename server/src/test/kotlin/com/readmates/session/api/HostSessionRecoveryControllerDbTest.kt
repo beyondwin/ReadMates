@@ -172,6 +172,26 @@ class HostSessionRecoveryControllerDbTest(
         assertThat(status).isEqualTo("UNKNOWN")
     }
 
+    @Test
+    fun `legacy attendance without snapshots is not restorable`() {
+        val sessionId = createOpenSession()
+        val changeId = insertLegacyAttendanceChange(sessionId)
+        val preview = previewRestore(sessionId, changeId)
+
+        assertThat(preview.get("canRestore").booleanValue()).isFalse()
+        assertThat(preview.get("blockedReason").asString()).isEqualTo("SNAPSHOT_UNAVAILABLE")
+        mockMvc
+            .post("/api/host/sessions/$sessionId/changes/$changeId/restore") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedCurrentHash":"${preview.get("expectedCurrentHash").asString()}"}"""
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("HOST_SESSION_CHANGE_NOT_RESTORABLE") }
+            }
+    }
+
     private fun previewRestore(
         sessionId: String,
         changeId: String,
@@ -269,6 +289,24 @@ class HostSessionRecoveryControllerDbTest(
             .get("changeId")
             .asString()
 
+    private fun insertLegacyAttendanceChange(sessionId: String): String {
+        val changeId = LEGACY_ATTENDANCE_CHANGE_ID
+        val transitions =
+            """[{"membershipId":"$HOST_MEMBERSHIP_ID","from":"UNKNOWN","to":"ABSENT"}]"""
+        jdbcTemplate.update(
+            """
+            insert into host_session_change_audit (
+              id, club_id, session_id, actor_membership_id, action_type, changed_fields_json
+            ) values (?, '00000000-0000-0000-0000-000000000001', ?, ?, 'ATTENDANCE_UPDATED', ?)
+            """.trimIndent(),
+            changeId,
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+            transitions,
+        )
+        return changeId
+    }
+
     private fun insertOutsideClubChange() {
         jdbcTemplate.update(
             """
@@ -351,6 +389,7 @@ class HostSessionRecoveryControllerDbTest(
         const val OUTSIDE_MEMBERSHIP_ID = "00000000-0000-0000-0000-00000000a201"
         const val OUTSIDE_SESSION_ID = "00000000-0000-0000-0000-00000000a301"
         const val OUTSIDE_CHANGE_ID = "00000000-0000-0000-0000-00000000a401"
+        const val LEGACY_ATTENDANCE_CHANGE_ID = "00000000-0000-0000-0000-00000000a501"
         const val MEETING_URL = "https://meet.example.invalid/restore-secret"
         const val MEETING_PASSCODE = "restore-passcode-secret"
     }

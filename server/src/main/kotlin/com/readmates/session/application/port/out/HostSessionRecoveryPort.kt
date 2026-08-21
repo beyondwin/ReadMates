@@ -15,6 +15,7 @@ data class HostSessionRecoverableChange(
     val after: HostSessionBasicAuditSnapshot?,
     val transitions: List<HostAttendanceAuditTransition>,
     val alreadyRestored: Boolean,
+    val completeSnapshots: Boolean,
 )
 
 data class HostSessionRestoreCurrentState(

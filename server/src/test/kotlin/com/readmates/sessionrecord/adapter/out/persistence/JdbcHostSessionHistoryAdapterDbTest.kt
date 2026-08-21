@@ -155,6 +155,8 @@ class JdbcHostSessionHistoryAdapterDbTest(
         insertSnapshotAudit()
         insertPublishedLifecycle()
         insertRestoredRevision()
+        insertAttendanceSnapshotAudit()
+        insertLegacyAttendanceAudit()
 
         val page = historyService.history(host(), SESSION_ID, PageRequest(limit = 20, cursor = emptyMap()))
         val byId = page.items.associateBy { it.id }
@@ -176,6 +178,12 @@ class JdbcHostSessionHistoryAdapterDbTest(
         )
         assertThat(byId.getValue(LIFECYCLE_PUBLISHED_ID).recovery).isEqualTo(
             HostSessionHistoryRecovery("REVERSE_LIFECYCLE", "AVAILABLE"),
+        )
+        assertThat(byId.getValue(ATTENDANCE_SNAPSHOT_AUDIT_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("RESTORE_CHANGE", "AVAILABLE"),
+        )
+        assertThat(byId.getValue(ATTENDANCE_LEGACY_AUDIT_ID).recovery).isEqualTo(
+            HostSessionHistoryRecovery("RESTORE_CHANGE", "UNAVAILABLE", "SNAPSHOT_UNAVAILABLE"),
         )
     }
 
@@ -412,6 +420,44 @@ class JdbcHostSessionHistoryAdapterDbTest(
         )
     }
 
+    private fun insertAttendanceSnapshotAudit() {
+        val snapshot =
+            """
+            [{"membershipId":"$HOST_MEMBERSHIP_ID","from":"UNKNOWN","to":"ABSENT"}]
+            """.trimIndent()
+        jdbcTemplate.update(
+            """
+            insert into host_session_change_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              changed_fields_json, before_snapshot_json, after_snapshot_json, created_at
+            ) values (?, ?, ?, ?, 'ATTENDANCE_UPDATED', ?, ?, ?, '2026-07-23 11:01:00.000000')
+            """.trimIndent(),
+            ATTENDANCE_SNAPSHOT_AUDIT_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            snapshot,
+            snapshot,
+            snapshot,
+        )
+    }
+
+    private fun insertLegacyAttendanceAudit() {
+        jdbcTemplate.update(
+            """
+            insert into host_session_change_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              changed_fields_json, created_at
+            ) values (?, ?, ?, ?, 'ATTENDANCE_UPDATED', ?, '2026-07-23 11:02:00.000000')
+            """.trimIndent(),
+            ATTENDANCE_LEGACY_AUDIT_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            """[{"membershipId":"$HOST_MEMBERSHIP_ID","from":"UNKNOWN","to":"ABSENT"}]""",
+        )
+    }
+
     private fun insertSnapshotAudit() {
         val snapshot =
             """
@@ -492,6 +538,8 @@ class JdbcHostSessionHistoryAdapterDbTest(
         val OLDER_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098004")
         val SNAPSHOT_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098005")
         val RESTORED_REVISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098006")
+        val ATTENDANCE_SNAPSHOT_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098007")
+        val ATTENDANCE_LEGACY_AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098008")
         val OUTSIDE_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098101")
         val OUTSIDE_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098201")
         val OUTSIDE_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098301")
@@ -539,6 +587,8 @@ private const val CLEANUP_HISTORY_TEST_FIXTURES = """
       '00000000-0000-0000-0000-000000098003',
       '00000000-0000-0000-0000-000000098004',
       '00000000-0000-0000-0000-000000098005',
+      '00000000-0000-0000-0000-000000098007',
+      '00000000-0000-0000-0000-000000098008',
       '00000000-0000-0000-0000-000000098401'
     );
     delete from session_record_revisions where id = '00000000-0000-0000-0000-000000098006';

@@ -101,6 +101,7 @@ internal fun HostSessionRecoverableChange.restoreAttendanceTransitions(
 
 private fun HostSessionRecoverableChange.blockedReason(current: HostSessionRestoreCurrentState): String? {
     if (alreadyRestored) return RESTORE_BLOCKED_ALREADY_RESTORED
+    if (!completeSnapshots) return RESTORE_BLOCKED_SNAPSHOT
     if (kind == HostSessionChangeKind.BASIC_INFO) {
         if (before == null || after == null || changedFields.isEmpty()) return RESTORE_BLOCKED_SNAPSHOT
     } else if (kind == HostSessionChangeKind.ATTENDANCE) {

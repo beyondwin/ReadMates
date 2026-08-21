@@ -113,6 +113,17 @@ class HostSessionRecoveryServiceTest {
     }
 
     @Test
+    fun `attendance without snapshots is not restorable even when changed fields exist`() {
+        val fixture = Fixture().withAttendanceChange(completeSnapshots = false)
+        val preview = fixture.service.preview(fixture.previewCommand())
+
+        assertThat(preview.canRestore).isFalse()
+        assertThat(preview.blockedReason).isEqualTo("SNAPSHOT_UNAVAILABLE")
+        assertRestoreNotRestorable(fixture, preview, "SNAPSHOT_UNAVAILABLE")
+        assertThat(fixture.attendance.confirmed).isNull()
+    }
+
+    @Test
     fun `another clubs change is not found`() {
         val fixture = Fixture().withMissingChange()
 
@@ -202,6 +213,7 @@ class HostSessionRecoveryServiceTest {
                     after = after,
                     transitions = emptyList(),
                     alreadyRestored = alreadyRestored,
+                    completeSnapshots = before != null && after != null,
                 )
             recovery.current = { HostSessionRestoreCurrentState(currentBasic, emptyMap()) }
         }
@@ -209,6 +221,7 @@ class HostSessionRecoveryServiceTest {
         fun withAttendanceChange(
             current: Map<UUID, String> =
                 mapOf(FIRST_MEMBER to "ATTENDED", SECOND_MEMBER to "ABSENT"),
+            completeSnapshots: Boolean = true,
         ) = apply {
             recovery.change =
                 HostSessionRecoverableChange(
@@ -224,6 +237,7 @@ class HostSessionRecoveryServiceTest {
                             HostAttendanceAuditTransition(SECOND_MEMBER.toString(), "UNKNOWN", "ABSENT"),
                         ),
                     alreadyRestored = false,
+                    completeSnapshots = completeSnapshots,
                 )
             recovery.current = { HostSessionRestoreCurrentState(null, current) }
         }
