@@ -9,6 +9,7 @@ import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
+import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionLifecycleAction
 import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
@@ -39,6 +40,7 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
 @Service
+@Suppress("TooManyFunctions")
 class HostSessionLifecycleService(
     private val lifecyclePort: HostSessionLifecyclePort,
     private val deletionPort: HostSessionDeletionPort,
@@ -171,7 +173,15 @@ class HostSessionLifecycleService(
 
     override fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse {
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
-        return try {
+        return deleteRecordingOutcomes(command, requestId)
+    }
+
+    @Suppress("TooGenericExceptionCaught") // record deletion failure metrics for every runtime failure before rethrow
+    private fun deleteRecordingOutcomes(
+        command: HostSessionIdCommand,
+        requestId: String?,
+    ): HostSessionDeletionResponse =
+        try {
             deletionTransaction.delete(command).also {
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
                 metrics.lifecycle(HostSessionLifecycleAction.DELETED, "deleted")
@@ -185,21 +195,34 @@ class HostSessionLifecycleService(
                 )
             }
         } catch (blocked: HostSessionDeletionBlockedException) {
-            recordBlockedDeletion(command, requestId, blocked)
-            throw blocked
+            throwRecordedBlockedDeletion(command, requestId, blocked.blockers)
         } catch (failure: DataIntegrityViolationException) {
             val reassessment = deletionPort.assess(command)
             if (!reassessment.canDelete) {
-                val blocked = HostSessionDeletionBlockedException(reassessment.blockers)
-                recordBlockedDeletion(command, requestId, blocked)
-                throw blocked
+                throwRecordedBlockedDeletion(command, requestId, reassessment.blockers)
             }
-            recordFailedDeletion(command, requestId, failure)
-            throw failure
+            throwRecordedFailedDeletion(command, requestId, failure)
         } catch (failure: RuntimeException) {
-            recordFailedDeletion(command, requestId, failure)
-            throw failure
+            throwRecordedFailedDeletion(command, requestId, failure)
         }
+
+    private fun throwRecordedBlockedDeletion(
+        command: HostSessionIdCommand,
+        requestId: String?,
+        blockers: List<HostSessionDeletionBlocker>,
+    ): Nothing {
+        val blocked = HostSessionDeletionBlockedException(blockers)
+        recordBlockedDeletion(command, requestId, blocked)
+        throw blocked
+    }
+
+    private fun throwRecordedFailedDeletion(
+        command: HostSessionIdCommand,
+        requestId: String?,
+        failure: RuntimeException,
+    ): Nothing {
+        recordFailedDeletion(command, requestId, failure)
+        throw failure
     }
 
     private fun reverseTransition(
@@ -237,7 +260,7 @@ class HostSessionLifecycleService(
         write: () -> HostSessionTransitionResult,
     ): HostSessionDetailResponse {
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
-        try {
+        return recordTransitionFailure(command, action, requestId) {
             val result = write()
             if (result.changed) {
                 lifecycleAudit.record(
@@ -253,7 +276,8 @@ class HostSessionLifecycleService(
                 )
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
                 logger.info(
-                    "Session lifecycle action={} outcome={} requestId={} clubId={} sessionId={} fromState={} toState={}",
+                    "Session lifecycle action={} outcome={} requestId={} clubId={} " +
+                        "sessionId={} fromState={} toState={}",
                     action,
                     "changed",
                     requestId,
@@ -264,7 +288,19 @@ class HostSessionLifecycleService(
                 )
             }
             metrics.lifecycle(action, if (result.changed) "changed" else "unchanged")
-            return result.detail
+            result.detail
+        }
+    }
+
+    @Suppress("TooGenericExceptionCaught") // record transition failure metrics for every runtime failure before rethrow
+    private fun <T> recordTransitionFailure(
+        command: HostSessionIdCommand,
+        action: HostSessionLifecycleAction,
+        requestId: String?,
+        write: () -> T,
+    ): T =
+        try {
+            write()
         } catch (failure: RuntimeException) {
             metrics.lifecycle(action, "failure")
             logger.warn(
@@ -277,7 +313,6 @@ class HostSessionLifecycleService(
             )
             throw failure
         }
-    }
 
     private fun recordBlockedDeletion(
         command: HostSessionIdCommand,

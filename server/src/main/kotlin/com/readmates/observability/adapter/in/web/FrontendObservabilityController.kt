@@ -139,10 +139,14 @@ data class FrontendObservabilityEventRequest(
     }
 
     private fun hostOperationsCardLoadEvent(safeRoute: String): HostOperationsCardLoadEvent? {
-        val mappedCard = card?.takeIf { it in allowedHostOperationsCards } ?: return null
-        val mappedOutcome = outcome?.takeIf { it in allowedHostOperationsOutcomes } ?: return null
-        val duration = durationMs?.coerceIn(0, MAX_DURATION_MS) ?: return null
-        return HostOperationsCardLoadEvent(safeRoute, mappedCard, mappedOutcome, Duration.ofMillis(duration))
+        val mappedCard = card?.takeIf { it in allowedHostOperationsCards }
+        val mappedOutcome = outcome?.takeIf { it in allowedHostOperationsOutcomes }
+        val duration = durationMs?.coerceIn(0, MAX_DURATION_MS)
+        return if (mappedCard != null && mappedOutcome != null && duration != null) {
+            HostOperationsCardLoadEvent(safeRoute, mappedCard, mappedOutcome, Duration.ofMillis(duration))
+        } else {
+            null
+        }
     }
 
     private fun hostAttentionResultEvent(safeRoute: String): HostAttentionResultEvent? {

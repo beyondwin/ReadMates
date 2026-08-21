@@ -185,7 +185,9 @@ class JdbcHostActionNotificationAdapterTest(
                     ready.countDown()
                     check(start.await(10, TimeUnit.SECONDS))
                     try {
-                        deleteTemplate.execute { lifecycleService.delete(HostSessionIdCommand(hostMember(), RACE_SESSION_ID)) }
+                        deleteTemplate.execute {
+                            lifecycleService.delete(HostSessionIdCommand(hostMember(), RACE_SESSION_ID))
+                        }
                         true
                     } catch (_: HostSessionDeletionBlockedException) {
                         false

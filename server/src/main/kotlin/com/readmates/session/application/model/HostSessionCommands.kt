@@ -28,6 +28,8 @@ data class HostSessionIdCommand(
     val sessionId: UUID,
 )
 
+const val MAX_REASON_NOTE_LENGTH = 500
+
 data class HostSessionReverseCommand(
     val host: CurrentMember,
     val sessionId: UUID,
@@ -35,7 +37,10 @@ data class HostSessionReverseCommand(
     val reasonNote: String?,
 )
 
-fun HostSessionReverseCommand.normalized(requireReason: Boolean): HostSessionReverseCommand {
+fun HostSessionReverseCommand.normalized(requireReason: Boolean): HostSessionReverseCommand =
+    copy(reasonCode = resolvedReasonCode(requireReason), reasonNote = validatedReasonNote())
+
+private fun HostSessionReverseCommand.resolvedReasonCode(requireReason: Boolean): HostSessionLifecycleReasonCode {
     val code =
         reasonCode
             ?: if (requireReason) {
@@ -46,11 +51,15 @@ fun HostSessionReverseCommand.normalized(requireReason: Boolean): HostSessionRev
     if (reasonCode != null && reasonCode !in USER_SELECTABLE_LIFECYCLE_REASONS) {
         throw InvalidHostSessionLifecycleReasonException()
     }
+    return code
+}
+
+private fun HostSessionReverseCommand.validatedReasonNote(): String? {
     val note = reasonNote?.trim()?.takeIf(String::isNotEmpty)
-    if (note != null && (note.length > 500 || note.any(Char::isISOControl))) {
+    if (note != null && (note.length > MAX_REASON_NOTE_LENGTH || note.any(Char::isISOControl))) {
         throw InvalidHostSessionLifecycleReasonException()
     }
-    return copy(reasonCode = code, reasonNote = note)
+    return note
 }
 
 val USER_SELECTABLE_LIFECYCLE_REASONS =

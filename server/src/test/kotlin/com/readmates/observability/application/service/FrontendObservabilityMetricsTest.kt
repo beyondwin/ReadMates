@@ -111,17 +111,7 @@ class FrontendObservabilityMetricsTest {
                 "host.operations.card.load.duration",
                 "host.attention.result.size",
             )
-        assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } }.toSet())
-            .doesNotContain(
-                "club_id",
-                "session_id",
-                "membership_id",
-                "request_id",
-                "note",
-                "passcode",
-                "has_passcode",
-                "url",
-            )
+        assertNoSensitiveHostOperationTags(registry)
         assertThat(
             registry
                 .find("host.schedule.defaults")
@@ -137,5 +127,19 @@ class FrontendObservabilityMetricsTest {
                 .map { it.key }
                 .toSet(),
         ).containsExactlyInAnyOrder("card", "outcome")
+    }
+
+    private fun assertNoSensitiveHostOperationTags(registry: SimpleMeterRegistry) {
+        assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } }.toSet())
+            .doesNotContain(
+                "club_id",
+                "session_id",
+                "membership_id",
+                "request_id",
+                "note",
+                "passcode",
+                "has_passcode",
+                "url",
+            )
     }
 }

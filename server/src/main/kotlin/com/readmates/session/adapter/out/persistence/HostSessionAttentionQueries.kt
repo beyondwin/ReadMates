@@ -13,6 +13,11 @@ import java.time.LocalDate
 import java.util.UUID
 
 internal const val HOST_SESSION_ATTENTION_ORDERING_VERSION = "attention-rank-v1"
+internal const val ATTENTION_RANK_PUBLISHED_WITH_DRAFT = 0
+internal const val ATTENTION_RANK_PUBLISHED = 1
+internal const val ATTENTION_RANK_CLOSED_WITH_DRAFT = 2
+internal const val ATTENTION_RANK_CLOSED = 3
+internal val ATTENTION_RANK_RANGE = ATTENTION_RANK_PUBLISHED_WITH_DRAFT..ATTENTION_RANK_CLOSED
 
 internal class HostSessionAttentionQueries {
     fun list(
@@ -75,10 +80,10 @@ internal class HostSessionAttentionQueries {
               select
                 ledger_facts.*,
                 case
-                  when state = 'PUBLISHED' and has_draft then 0
-                  when state = 'PUBLISHED' then 1
-                  when state = 'CLOSED' and has_draft then 2
-                  else 3
+                  when state = 'PUBLISHED' and has_draft then $ATTENTION_RANK_PUBLISHED_WITH_DRAFT
+                  when state = 'PUBLISHED' then $ATTENTION_RANK_PUBLISHED
+                  when state = 'CLOSED' and has_draft then $ATTENTION_RANK_CLOSED_WITH_DRAFT
+                  else $ATTENTION_RANK_CLOSED
                 end as attention_rank,
                 case
                   when (
@@ -114,10 +119,10 @@ internal fun hostSessionAttentionRank(
     hasDraft: Boolean,
 ): Int =
     when {
-        state == "PUBLISHED" && hasDraft -> 0
-        state == "PUBLISHED" -> 1
-        state == "CLOSED" && hasDraft -> 2
-        else -> 3
+        state == "PUBLISHED" && hasDraft -> ATTENTION_RANK_PUBLISHED_WITH_DRAFT
+        state == "PUBLISHED" -> ATTENTION_RANK_PUBLISHED
+        state == "CLOSED" && hasDraft -> ATTENTION_RANK_CLOSED_WITH_DRAFT
+        else -> ATTENTION_RANK_CLOSED
     }
 
 internal fun hostSessionAttentionComparator(): Comparator<HostSessionListItem> =
@@ -157,7 +162,7 @@ internal data class HostSessionAttentionCursor(
         ): HostSessionAttentionCursor? {
             if (cursor.isEmpty()) return null
             if (cursor.keys != setOf("rank", "date", "id", "query", "clubId")) invalidCursor()
-            val rank = cursor["rank"]?.toIntOrNull()?.takeIf { it in 0..3 } ?: invalidCursor()
+            val rank = cursor["rank"]?.toIntOrNull()?.takeIf { it in ATTENTION_RANK_RANGE } ?: invalidCursor()
             val date =
                 cursor["date"]
                     ?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
@@ -184,8 +189,7 @@ private fun nextAttentionCursor(
     clubId: UUID,
     limit: Int,
 ): String? {
-    if (rowCount <= limit) return null
-    val last = visible.lastOrNull() ?: return null
+    val last = visible.lastOrNull()?.takeIf { rowCount > limit } ?: return null
     return hostSessionAttentionCursor(
         rank = hostSessionAttentionRank(last.state, last.hasDraft),
         date = LocalDate.parse(last.date),

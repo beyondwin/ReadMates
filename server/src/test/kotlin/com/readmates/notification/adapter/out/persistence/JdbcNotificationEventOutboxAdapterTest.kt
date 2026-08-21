@@ -105,6 +105,7 @@ private const val TEST_NOTIFICATION_EVENTS_TOPIC = "readmates.notification.event
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
 @Tag("integration")
+@Suppress("LargeClass")
 class JdbcNotificationEventOutboxAdapterTest(
     @param:Autowired private val adapter: JdbcNotificationEventOutboxAdapter,
     @param:Autowired private val deliveryBacklogPort: NotificationDeliveryBacklogPort,
@@ -202,7 +203,11 @@ class JdbcNotificationEventOutboxAdapterTest(
     @Test
     fun `session aggregate enqueue rejects a missing parent session`() {
         insertClub()
-        jdbcTemplate.update("delete from sessions where id = ? and club_id = ?", sessionId.toString(), clubId.toString())
+        jdbcTemplate.update(
+            "delete from sessions where id = ? and club_id = ?",
+            sessionId.toString(),
+            clubId.toString(),
+        )
 
         assertThatThrownBy {
             adapter.enqueueEvent(
@@ -220,7 +225,11 @@ class JdbcNotificationEventOutboxAdapterTest(
     @Test
     fun `non-session aggregate enqueue does not require a live session`() {
         insertClub()
-        jdbcTemplate.update("delete from sessions where id = ? and club_id = ?", sessionId.toString(), clubId.toString())
+        jdbcTemplate.update(
+            "delete from sessions where id = ? and club_id = ?",
+            sessionId.toString(),
+            clubId.toString(),
+        )
         val jobId = UUID.fromString("00000000-0000-0000-0000-000000000121")
 
         val inserted =

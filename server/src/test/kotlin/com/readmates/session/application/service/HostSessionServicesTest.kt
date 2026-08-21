@@ -43,6 +43,7 @@ import com.readmates.session.application.model.HostSessionLifecycleReasonCode
 import com.readmates.session.application.model.HostSessionLifecycleReasonRequiredException
 import com.readmates.session.application.model.HostSessionReverseCommand
 import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
+import com.readmates.session.application.model.MAX_REASON_NOTE_LENGTH
 import com.readmates.session.application.model.USER_SELECTABLE_LIFECYCLE_REASONS
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
@@ -82,6 +83,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.OffsetDateTime
 import java.util.UUID
 
+@Suppress("LargeClass")
 class HostSessionServicesTest {
     private val host =
         CurrentMember(
@@ -1011,7 +1013,7 @@ class HostSessionServicesTest {
             reverseCommand(reasonNote = "line\nbreak").normalized(requireReason = false)
         }
         assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
-            reverseCommand(reasonNote = "a".repeat(501)).normalized(requireReason = false)
+            reverseCommand(reasonNote = "a".repeat(MAX_REASON_NOTE_LENGTH + 1)).normalized(requireReason = false)
         }
 
         val trimmedBlank =
@@ -1024,13 +1026,13 @@ class HostSessionServicesTest {
         val maxNote =
             reverseCommand(
                 reasonCode = HostSessionLifecycleReasonCode.OTHER_OPERATIONAL_REASON,
-                reasonNote = "b".repeat(500),
+                reasonNote = "b".repeat(MAX_REASON_NOTE_LENGTH),
             ).normalized(requireReason = false)
-        assertThat(maxNote.reasonNote).hasSize(500)
+        assertThat(maxNote.reasonNote).hasSize(MAX_REASON_NOTE_LENGTH)
 
         val harness = lifecycleHarness()
         assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
-            harness.service.returnToDraft(reverseCommand(reasonNote = "a".repeat(501)))
+            harness.service.returnToDraft(reverseCommand(reasonNote = "a".repeat(MAX_REASON_NOTE_LENGTH + 1)))
         }
         assertThat(harness.audit.entries).isEmpty()
     }
@@ -1141,7 +1143,10 @@ class HostSessionServicesTest {
             )
         val harness =
             lifecycleHarness(
-                port = RecordingHostSessionPorts().apply { deletionAssessment = deletionAssessment.copy(blockers = blockers) },
+                port =
+                    RecordingHostSessionPorts().apply {
+                        deletionAssessment = deletionAssessment.copy(blockers = blockers)
+                    },
             )
         captureHostSessionLogs().use { logs ->
             val thrown =
@@ -1342,7 +1347,13 @@ class HostSessionServicesTest {
 
         fun legacyReasonCount(): Double = registry.counter("session.lifecycle.legacy.reason").count()
 
-        fun deletionBlockedCount(blocker: String): Double = registry.counter("session.deletion.blocked", "blocker", blocker).count()
+        fun deletionBlockedCount(blocker: String): Double =
+            registry
+                .counter(
+                    "session.deletion.blocked",
+                    "blocker",
+                    blocker,
+                ).count()
     }
 
     private class RecordingHostSessionLifecycleAuditPort : HostSessionLifecycleAuditPort {

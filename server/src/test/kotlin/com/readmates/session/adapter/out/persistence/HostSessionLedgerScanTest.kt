@@ -59,10 +59,12 @@ class HostSessionLedgerScanTest {
 
     @Test
     fun `attention rank is published draft then published incomplete then closed draft then closed incomplete`() {
-        assertThat(hostSessionAttentionRank("PUBLISHED", hasDraft = true)).isEqualTo(0)
-        assertThat(hostSessionAttentionRank("PUBLISHED", hasDraft = false)).isEqualTo(1)
-        assertThat(hostSessionAttentionRank("CLOSED", hasDraft = true)).isEqualTo(2)
-        assertThat(hostSessionAttentionRank("CLOSED", hasDraft = false)).isEqualTo(3)
+        assertThat(hostSessionAttentionRank("PUBLISHED", hasDraft = true))
+            .isEqualTo(ATTENTION_RANK_PUBLISHED_WITH_DRAFT)
+        assertThat(hostSessionAttentionRank("PUBLISHED", hasDraft = false)).isEqualTo(ATTENTION_RANK_PUBLISHED)
+        assertThat(hostSessionAttentionRank("CLOSED", hasDraft = true))
+            .isEqualTo(ATTENTION_RANK_CLOSED_WITH_DRAFT)
+        assertThat(hostSessionAttentionRank("CLOSED", hasDraft = false)).isEqualTo(ATTENTION_RANK_CLOSED)
     }
 
     @Test
@@ -136,7 +138,13 @@ class HostSessionLedgerScanTest {
     }
 
     private fun ledgerItem(number: Int) =
-        ledgerItem(number, state = "OPEN", hasDraft = false, date = "2026-07-23", needsAttention = false)
+        ledgerItem(
+            number,
+            state = "OPEN",
+            hasDraft = false,
+            date = "2026-07-23",
+            needsAttention = false,
+        )
 
     private fun ledgerItem(
         number: Int,

@@ -17,22 +17,7 @@ class FrontendObservabilityServiceTest {
         val registry = SimpleMeterRegistry()
         val service = FrontendObservabilityService(FrontendObservabilityMetrics(registry))
 
-        val result =
-            service.record(
-                listOf(
-                    FrontendRouteLoadEvent("/app", Duration.ofMillis(80), "LOAD", "success"),
-                    FrontendRuntimeErrorEvent("/admin", "render", "REACT_ROUTE_ERROR", "error"),
-                    FrontendApiFailureEvent("/clubs/:slug/app", "host-session", "5xx", "INTERNAL_ERROR"),
-                    HostScheduleDefaultsEvent("/app/host/sessions/new", "success"),
-                    HostOperationsCardLoadEvent(
-                        "/app/host/operations",
-                        "club_readiness",
-                        "error",
-                        Duration.ofMillis(40),
-                    ),
-                    HostAttentionResultEvent("/app/host/operations", 3),
-                ),
-            )
+        val result = service.record(supportedFrontendEvents())
 
         assertThat(result.accepted).isEqualTo(6)
         assertThat(result.dropped).isZero()
@@ -78,6 +63,21 @@ class FrontendObservabilityServiceTest {
         ).isEqualTo(1.0)
         assertThat(registry.find("host.attention.result.size").summary()?.totalAmount()).isEqualTo(3.0)
     }
+
+    private fun supportedFrontendEvents() =
+        listOf(
+            FrontendRouteLoadEvent("/app", Duration.ofMillis(80), "LOAD", "success"),
+            FrontendRuntimeErrorEvent("/admin", "render", "REACT_ROUTE_ERROR", "error"),
+            FrontendApiFailureEvent("/clubs/:slug/app", "host-session", "5xx", "INTERNAL_ERROR"),
+            HostScheduleDefaultsEvent("/app/host/sessions/new", "success"),
+            HostOperationsCardLoadEvent(
+                "/app/host/operations",
+                "club_readiness",
+                "error",
+                Duration.ofMillis(40),
+            ),
+            HostAttentionResultEvent("/app/host/operations", 3),
+        )
 
     @Test
     fun `records dropped frontend observability events`() {

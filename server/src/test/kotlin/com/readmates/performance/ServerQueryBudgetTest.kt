@@ -236,8 +236,10 @@ class ServerQueryBudgetTest(
         insertOpenSessionForDeletionPreview()
 
         assertQueryBudget(
-            budget = 16,
-            reason = "deletion preview intentionally issues separate count queries for each owned table",
+            budget = 21,
+            reason =
+                "deletion preview issues one session lookup, six fail-closed blocker counts, " +
+                    "and separate owned-table counts",
         ) {
             mockMvc
                 .get("/api/host/sessions/00000000-0000-0000-0000-000000009777/deletion-preview") {

@@ -68,25 +68,7 @@ class JdbcHostSessionLifecycleAuditAdapterDbTest(
                 SESSION_ID.toString(),
             ),
         ).isZero()
-        val row =
-            jdbcTemplate.queryForMap(
-                """
-                select club_id, session_id, actor_membership_id, action_type,
-                       from_state, to_state, reason_code, reason_note, request_id
-                from host_session_lifecycle_audit
-                where session_id = ?
-                """.trimIndent(),
-                SESSION_ID.toString(),
-            )
-        assertThat(row["club_id"]).isEqualTo(CLUB_ID.toString())
-        assertThat(row["session_id"]).isEqualTo(SESSION_ID.toString())
-        assertThat(row["actor_membership_id"]).isEqualTo(HOST_MEMBERSHIP_ID.toString())
-        assertThat(row["action_type"]).isEqualTo("DELETED")
-        assertThat(row["from_state"]).isEqualTo("DRAFT")
-        assertThat(row["to_state"]).isNull()
-        assertThat(row["reason_code"]).isEqualTo("EMPTY_SESSION_DELETED")
-        assertThat(row["reason_note"]).isEqualTo("empty session deleted")
-        assertThat(row["request_id"]).isEqualTo(REQUEST_ID)
+        assertDeletedAuditRow(loadDeletedAuditRow())
         assertThat(lifecycleAuditColumns()).containsExactlyInAnyOrder(
             "id",
             "club_id",
@@ -106,6 +88,29 @@ class JdbcHostSessionLifecycleAuditAdapterDbTest(
                 column.contains("payload") ||
                 column.contains("recipient")
         }
+    }
+
+    private fun loadDeletedAuditRow(): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select club_id, session_id, actor_membership_id, action_type,
+                   from_state, to_state, reason_code, reason_note, request_id
+            from host_session_lifecycle_audit
+            where session_id = ?
+            """.trimIndent(),
+            SESSION_ID.toString(),
+        )
+
+    private fun assertDeletedAuditRow(row: Map<String, Any?>) {
+        assertThat(row["club_id"]).isEqualTo(CLUB_ID.toString())
+        assertThat(row["session_id"]).isEqualTo(SESSION_ID.toString())
+        assertThat(row["actor_membership_id"]).isEqualTo(HOST_MEMBERSHIP_ID.toString())
+        assertThat(row["action_type"]).isEqualTo("DELETED")
+        assertThat(row["from_state"]).isEqualTo("DRAFT")
+        assertThat(row["to_state"]).isNull()
+        assertThat(row["reason_code"]).isEqualTo("EMPTY_SESSION_DELETED")
+        assertThat(row["reason_note"]).isEqualTo("empty session deleted")
+        assertThat(row["request_id"]).isEqualTo(REQUEST_ID)
         assertThat(row.values.map { it?.toString().orEmpty() }).noneMatch { value ->
             value.contains("passcode", ignoreCase = true) || value.contains("meet.example")
         }

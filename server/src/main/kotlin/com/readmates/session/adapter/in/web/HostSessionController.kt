@@ -88,7 +88,7 @@ class HostSessionController(
     )
 
     @GetMapping("/schedule-defaults")
-    fun scheduleDefaults(member: CurrentMember) =
+    fun scheduleDefaults(member: CurrentMember): HostSessionScheduleDefaultsResponse =
         HostSessionScheduleDefaultsResponse.from(hostSessionQueryUseCase.scheduleDefaults(member))
 
     @GetMapping("/{sessionId}")

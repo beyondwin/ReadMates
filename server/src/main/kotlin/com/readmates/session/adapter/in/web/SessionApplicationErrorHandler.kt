@@ -29,6 +29,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
 @RestControllerAdvice
+@Suppress("TooManyFunctions")
 class SessionApplicationErrorHandler {
     @ExceptionHandler(HostSessionDeletionBlockedException::class)
     fun handleDeletionBlocked(ex: HostSessionDeletionBlockedException): ResponseEntity<ApiErrorResponse> =

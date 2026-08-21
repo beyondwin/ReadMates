@@ -33,6 +33,7 @@ import java.util.concurrent.TimeoutException
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Tag("integration")
+@Suppress("LargeClass")
 class JdbcSessionRecordAdapterTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val codec: SessionRecordSnapshotCodec,

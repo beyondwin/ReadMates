@@ -25,6 +25,8 @@ import java.util.UUID
 private const val CLEANUP_CORRELATION_OUTBOX_SQL = """
     delete from notification_event_outbox
     where club_id = '00000000-0000-0000-0000-0000000000c1';
+    delete from sessions
+    where id = '00000000-0000-0000-0000-0000000000c2';
     delete from clubs
     where id = '00000000-0000-0000-0000-0000000000c1';
 """
@@ -118,6 +120,18 @@ class CorrelationIdEndToEndTest(
             insert into clubs (id, slug, name, tagline, about)
             values (?, 'readmates-correlation-test', 'ReadMates', 'Read together', 'Correlation id end-to-end test club.')
             """.trimIndent(),
+            clubId.toString(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
+            )
+            values (?, ?, 1, '상관관계 테스트 회차', 'Correlation Id Test', '테스트 저자',
+                    '2026-05-01', '19:00:00', '21:00:00', '온라인', '2026-04-30 19:00:00', 'OPEN', 'MEMBER')
+            """.trimIndent(),
+            sessionId.toString(),
             clubId.toString(),
         )
     }

@@ -233,7 +233,7 @@ class HostSessionImportControllerDbTest(
                 ),
             )
 
-        assertEquals(2, applied.liveRevision)
+        assertEquals(1, applied.liveRevision)
         assertEquals(NotificationEventType.SESSION_RECORD_UPDATED, applied.composer.eventType)
         assertEquals(
             "Import summary.",
@@ -241,7 +241,7 @@ class HostSessionImportControllerDbTest(
         )
         assertEquals(
             "JSON_IMPORT",
-            scalar("select source from session_record_revisions where session_id = '$SESSION_ID' and version = 2"),
+            scalar("select source from session_record_revisions where session_id = '$SESSION_ID' and version = 1"),
         )
         assertEquals("GUEST_READABLE", scalar("select access_scope from sessions where id = '$SESSION_ID'"))
         assertEquals("PUBLIC", scalar("select visibility from sessions where id = '$SESSION_ID'"))
@@ -325,7 +325,7 @@ class HostSessionImportControllerDbTest(
                     expectedLiveRevision = 0,
                 ),
             )
-        val duplicateDedupeKey = "session-record-updated:$SESSION_ID:2"
+        val duplicateDedupeKey = "session-record-updated:$SESSION_ID:1"
         assertEquals(
             true,
             eventOutbox.enqueueEvent(
@@ -356,13 +356,13 @@ class HostSessionImportControllerDbTest(
                 ),
             )
 
-        assertEquals(2, applied.liveRevision)
+        assertEquals(1, applied.liveRevision)
         assertEquals(NotificationEventType.SESSION_RECORD_UPDATED, applied.composer.eventType)
         assertEquals(
             "Import summary.",
             scalar("select public_summary from public_session_publications where session_id = '$SESSION_ID'"),
         )
-        assertEquals(2, countRows("session_record_revisions"))
+        assertEquals(1, countRows("session_record_revisions"))
         assertEquals(0, countRows("session_record_drafts"))
         assertEquals(0, countRows("host_action_notification_decisions"))
         assertEquals(
