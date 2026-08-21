@@ -14,6 +14,7 @@ class HostSessionTrashScheduler(
     private val properties: HostSessionTrashProperties,
 ) {
     @Scheduled(fixedDelayString = "\${readmates.session.trash.purge-fixed-delay:1h}")
+    @Suppress("TooGenericExceptionCaught") // one failed tick must not retry unboundedly
     fun purgeExpired() {
         try {
             purgeExpiredHostSessionTrash.purgeExpired(properties.boundedPurgeBatchSize())
