@@ -11,7 +11,6 @@ import type {
   CreateHostInvitationRequest,
   HostAttendanceUpdate,
   HostClubOperationsResponse,
-  HostDashboardResponse,
   HostInvitationListPage,
   HostInvitationResponse,
   HostNotificationDeliveryListResponse,
@@ -70,10 +69,6 @@ export type { HostSessionReverseRequest };
 
 export function fetchHostCurrentSession(context?: ReadmatesApiContext) {
   return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
-}
-
-export function fetchHostDashboard(context?: ReadmatesApiContext) {
-  return readmatesFetch<HostDashboardResponse>("/api/host/dashboard", undefined, context);
 }
 
 export function fetchHostClubOperations(context: { clubSlug: string | undefined }) {

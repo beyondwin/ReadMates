@@ -34,6 +34,7 @@ describe("SessionOverviewSection", () => {
           visibilityLabel: "호스트만",
           appliedAt: null,
           summary: "요약이 아직 없습니다",
+          publicationSummary: "",
         },
       }),
     });
@@ -335,6 +336,7 @@ function overviewFixture(
       visibilityLabel: "게스트 공개",
       appliedAt: "2026-07-27T12:00:00+09:00",
       summary: "세 번째 적용본 요약",
+      publicationSummary: "세 번째 적용본 요약",
     },
     draft: {
       exists: true,

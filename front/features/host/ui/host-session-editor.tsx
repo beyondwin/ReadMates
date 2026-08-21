@@ -32,7 +32,7 @@ import type {
   HostSessionEditorLocation,
   HostSessionEditorSection,
 } from "@/features/host/model/host-session-editor-navigation";
-import { hostSessionEditHref } from "@/features/host/model/host-dashboard-model";
+import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
   buildHostSessionEditorOverview,
   compactSessionLifecycleLabel,
@@ -188,7 +188,7 @@ function scopedHostRedirectHref(href: string) {
 }
 
 function scopedHostSessionEditHref(sessionId: string, clubSlug?: string) {
-  const href = hostSessionEditHref(sessionId);
+  const href = hostMeetingHref(sessionId);
   return clubSlug
     ? scopedAppLinkTarget(`/clubs/${encodeURIComponent(clubSlug)}/app`, href)
     : scopedHostRedirectHref(href);

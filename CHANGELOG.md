@@ -13,6 +13,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Fixed
 
+- **호스트 운영 무결성:** 모임 삭제의 기록·알림 blocker와 동시성 검사를 fail-closed로 통합하고, 수명주기 사유 감사, revision 0 호환, 명시적 온라인 정보 채택, 전체 주의 목록과 독립 실패 운영 허브를 추가했습니다. Flyway lifecycle audit은 additive이며 기존 적용 기록 backfill은 수행하지 않습니다.
 - **세션 되돌리기 후 화면 정합성:** 공개 취소·마감 취소·예정 환원 직후 멤버 current/archive와 공개 클럽 캐시를 바로 무효화합니다. 잘못된 세션 id로 `/reopen`하면 다른 진행 중 세션이 있어도 `404`를 유지합니다.
 
 ## v2.4.1 - 2026-08-17

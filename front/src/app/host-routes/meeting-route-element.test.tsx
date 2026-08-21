@@ -50,6 +50,28 @@ vi.mock("@/features/host/queries/host-session-queries", () => ({
   hostSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
   hostSessionDetailQuery: () => ({ testData: undefined }),
   invalidateHostSessionManualDispatches: vi.fn(),
+  resolveHostScheduleDefaultsLoadState: (query: {
+    data?: unknown;
+    refetch?: () => unknown;
+  }) => ({
+    defaults: query.data ?? {
+      automatic: {
+        startTime: "20:00",
+        endTime: "22:00",
+        locationLabel: "온라인",
+        accessScope: "HOST_ONLY",
+        suggestedDate: null,
+        questionDeadlineOffsetDays: 1,
+      },
+      previousOnlineMeeting: null,
+      hints: [],
+    },
+    status: "ready",
+    warning: null,
+    retry: () => {
+      void query.refetch?.();
+    },
+  }),
   useCreateHostSessionMutation: () => ({
     mutateAsync: vi.fn(),
     isPending: false,
@@ -64,14 +86,15 @@ vi.mock("@/features/host/queries/host-session-queries", () => ({
   }),
   hostSessionScheduleDefaultsQuery: () => ({
     testData: {
-      startTime: "20:00",
-      endTime: "22:00",
-      locationLabel: "온라인",
-      meetingUrl: null,
-      meetingPasscode: null,
-      accessScope: "HOST_ONLY",
-      suggestedDate: null,
-      questionDeadlineOffsetDays: 1,
+      automatic: {
+        startTime: "20:00",
+        endTime: "22:00",
+        locationLabel: "온라인",
+        accessScope: "HOST_ONLY",
+        suggestedDate: null,
+        questionDeadlineOffsetDays: 1,
+      },
+      previousOnlineMeeting: null,
       hints: [],
     },
   }),

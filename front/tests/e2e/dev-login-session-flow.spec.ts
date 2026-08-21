@@ -1,5 +1,10 @@
 import { expect, test, type Dialog, type Page } from "@playwright/test";
-import { hostMeetingUrlPattern, loginWithGoogleFixture, resetE2eState } from "./readmates-e2e-db";
+import {
+  createOpenSessionFixture,
+  hostMeetingUrlPattern,
+  loginWithGoogleFixture,
+  resetE2eState,
+} from "./readmates-e2e-db";
 
 test.describe.configure({ mode: "serial" });
 
@@ -102,6 +107,7 @@ test.afterEach(() => {
 });
 
 test("host creates member-visible upcoming session then starts it", async ({ page }) => {
+  createOpenSessionFixture();
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");
   await expectCanonicalMeetingUrl(page);
@@ -122,7 +128,9 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
       && response.ok(),
   );
   await page.getByRole("button", { name: "목록에 넣기" }).click();
-  expect((await createResponse).ok()).toBe(true);
+  const created = await createResponse;
+  expect(created.ok()).toBe(true);
+  const createdBody = await created.json() as { sessionId: string };
   await expect(page.getByText("E2E 예정 책")).toBeVisible();
   await dismissNextBookNoticeIfPresent(page);
 
@@ -132,6 +140,9 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");
+  await expectCanonicalMeetingUrl(page);
+  await confirmLifecycle(page, "모임 마치기", "/close");
+  await page.goto(`/app/host/sessions/${createdBody.sessionId}`);
   await expectCanonicalMeetingUrl(page);
   await expect(page.getByRole("button", { name: "멤버에게 열기" })).toBeVisible();
   await openMeetingForMembers(page);

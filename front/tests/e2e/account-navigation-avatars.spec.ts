@@ -288,7 +288,17 @@ async function routeSyntheticApp(
         hints: [],
       });
     }
-    if (path.endsWith("/api/host/sessions")) return json(route, { items: [], nextCursor: null });
+    if (path.endsWith("/api/host/sessions")) {
+      const url = new URL(route.request().url());
+      if (url.searchParams.has("needsAttention")) {
+        return json(route, {
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        });
+      }
+      return json(route, { items: [], nextCursor: null });
+    }
     if (path.endsWith("/api/host/notifications/summary")) {
       return json(route, { pending: 0, failed: 0, dead: 0, sentLast24h: 0, latestFailures: [] });
     }
@@ -298,7 +308,19 @@ async function routeSyntheticApp(
     if (path.endsWith("/api/host/club-operations") || path.includes("/record-ledger")) {
       return json(route, { code: "NOT_AVAILABLE" }, 404);
     }
-    if (path.includes("/ai-generation/capabilities")) return json(route, { enabled: false });
+    if (path.includes("/ai-generation/capabilities") || path.endsWith("/api/host/capabilities")) {
+      return json(route, {
+        enabled: false,
+        sessionRecordDrafts: true,
+        hostActionNotificationConfirmationRequired: true,
+      });
+    }
+    if (path.includes("/closing-status")) {
+      return json(route, { sessionId: "session-avatar-roster", state: "OPEN" });
+    }
+    if (path.includes("/api/host/")) {
+      return json(route, { items: [], nextCursor: null });
+    }
 
     throw new Error(`Unhandled synthetic BFF request: ${path}`);
   });
@@ -543,6 +565,7 @@ test("member-home shortcuts keep the desktop divider inset and mobile cards divi
     await expect(mobileShortcutGrid.locator(".rm-mobile-shortcuts__icon")).toHaveCount(2);
     await expect(mobileCards.nth(0)).toHaveAttribute("href", `${APP_BASE}/archive?view=report`);
     await expect(mobileCards.nth(1)).toHaveAttribute("href", "/about");
+    await page.evaluate(() => document.fonts.ready);
 
     const mobileGeometry = await mobileShortcutGrid.evaluate((element) => {
       const cards = Array.from(element.querySelectorAll<HTMLElement>(":scope > a.m-card-quiet"));
@@ -701,7 +724,7 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await expectAvatarRoleSize(narrowAccount.locator(".rm-avatar-chip"), "navigation", 36);
   await page.screenshot({ path: testInfo.outputPath("320-member-header.png"), fullPage: true });
   await page.getByRole("link", { name: "호스트 화면" }).click();
-  await expect(page).toHaveURL(`${APP_BASE}/host`);
+  await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
   const hostHeader = page.getByRole("banner");
   await expect(hostHeader.getByRole("link", { name: "멤버 화면으로" })).toBeVisible();
   await expect(hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();

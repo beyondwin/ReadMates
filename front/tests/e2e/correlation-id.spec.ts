@@ -1,4 +1,11 @@
 import { expect, test } from "@playwright/test";
+import {
+  cleanupGeneratedSessions,
+  createOpenSessionFixture,
+  loginWithGoogleFixture,
+  resetSeedGoogleLogins,
+  runMysql,
+} from "./readmates-e2e-db";
 
 // `/api/bff/api/auth/me` is a GET-safe BFF endpoint reachable without prior auth
 // in every test profile (see multi-club-flow.spec.ts and public-auth-member-host.spec.ts
@@ -36,4 +43,42 @@ test("client-supplied X-Readmates-Request-Id is preserved end-to-end on /api/bff
   );
 
   expect(headerValue).toBe(supplied);
+});
+
+test("host lifecycle reverse stores the request ID on the audit row", async ({ page }) => {
+  cleanupGeneratedSessions();
+  const sessionId = createOpenSessionFixture({ number: 8, bookTitle: "요청 ID 감사 모임" });
+  runMysql(`update sessions set state = 'CLOSED', updated_at = utc_timestamp(6) where id = '${sessionId}'`);
+  resetSeedGoogleLogins(["host@example.com"]);
+  const requestId = "e2e-correlation-lifecycle-1";
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
+  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
+  await page.route(`**/api/bff/api/host/sessions/${sessionId}/reopen**`, async (route) => {
+    await route.continue({
+      headers: {
+        ...route.request().headers(),
+        "x-readmates-request-id": requestId,
+      },
+    });
+  });
+  await page.getByRole("button", { name: "다시 진행 중으로" }).click();
+  const dialog = page.getByRole("dialog", { name: "다시 진행 중으로" });
+  await dialog.getByLabel("변경 사유").selectOption("OPERATIONAL_RECOVERY");
+  const reverse = page.waitForResponse((response) => (
+    response.request().method() === "POST"
+    && response.url().includes(`/host/sessions/${sessionId}/reopen`)
+  ));
+  await dialog.getByRole("button", { name: "다시 진행 중으로" }).click();
+  expect((await reverse).status()).toBe(200);
+  const audit = runMysql(`
+select request_id, reason_code
+from host_session_lifecycle_audit
+where session_id = '${sessionId}'
+  and action_type = 'REOPENED';
+`);
+  expect(audit).toContain(requestId);
+  expect(audit).toContain("OPERATIONAL_RECOVERY");
+  cleanupGeneratedSessions();
+  resetSeedGoogleLogins(["host@example.com"]);
 });

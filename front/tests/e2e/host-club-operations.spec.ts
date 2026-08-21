@@ -171,6 +171,16 @@ test("host meeting ledger captures public-safe visual evidence", async ({ page }
   }
 });
 
+test("host operations hub stays public-safe without the retired dashboard page", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await routeHostClubOperations(page);
+
+  await page.goto("/clubs/reading-sai/app/host/operations");
+  await expect(page.getByRole("heading", { name: "운영 허브" })).toBeVisible();
+  await expect(page.getByText("member1@example.com")).toHaveCount(0);
+  await expectNoHostPrivateSentinels(page);
+});
+
 test("host empty meeting ledger stays public-safe at 320px", async ({ page }, testInfo) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await routeHostDashboardPublicSafe(page);

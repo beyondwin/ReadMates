@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   countManualNotificationEventsForSession,
+  createOpenSessionFixture,
   loginWithGoogleFixture,
   readNotificationEventCount,
   resetE2eState,
@@ -17,6 +18,7 @@ function resetNextBookComposerState() {
     cleanupManualNotifications: true,
     googleLoginEmails: ["host@example.com", "member1@example.com"],
   });
+  createOpenSessionFixture();
 }
 
 async function createDraftAndPublishNextBook(

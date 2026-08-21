@@ -133,19 +133,6 @@ export type MemberLifecycleResponse = {
   currentSessionPolicyResult: CurrentSessionPolicyResult;
 };
 
-export type HostDashboardResponse = {
-  rsvpPending: number;
-  checkinMissing: number;
-  publishPending: number;
-  feedbackPending: number;
-  currentSessionMissingMemberCount?: number;
-  currentSessionMissingMembers?: Array<{
-    membershipId: string;
-    displayName: string;
-    email: string;
-  }>;
-};
-
 export type HostNotificationEventType =
   | "NEXT_BOOK_PUBLISHED"
   | "SESSION_REMINDER_DUE"

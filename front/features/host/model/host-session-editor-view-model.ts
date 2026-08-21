@@ -68,6 +68,7 @@ export type HostSessionEditorOverview = {
     visibilityLabel: string;
     appliedAt: string | null;
     summary: string;
+    publicationSummary: string;
   };
   draft: {
     exists: boolean;
@@ -160,6 +161,7 @@ const historySourceLabels: Record<NonNullable<HostSessionHistoryItem["revisionSo
 
 export function buildHostSessionEditorOverview(input: HostSessionEditorOverviewInput): HostSessionEditorOverview {
   const exists = hasAppliedSessionRecord(input);
+  const publicationSummary = input.liveSnapshot?.publicationSummary.trim() ?? "";
   return {
     applied: {
       exists,
@@ -167,7 +169,8 @@ export function buildHostSessionEditorOverview(input: HostSessionEditorOverviewI
       versionLabel: input.liveRevision > 0 ? `버전 ${input.liveRevision}` : null,
       visibilityLabel: recordVisibilityLabel(input.liveSnapshot?.visibility ?? "HOST_ONLY"),
       appliedAt: input.lastAppliedAt,
-      summary: input.liveSnapshot?.publicationSummary.trim() || "요약이 아직 없습니다",
+      summary: publicationSummary || "요약이 아직 없습니다",
+      publicationSummary,
     },
     draft: buildDraftOverview(input),
     nextAction: buildNextAction(input),

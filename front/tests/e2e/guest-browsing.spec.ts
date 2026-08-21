@@ -4,6 +4,7 @@ import {
   createOpenSessionFixture,
   loginWithGoogleFixture,
   resetSeedGoogleLogins,
+  runMysql,
 } from "./readmates-e2e-db";
 
 const clubSlug = "reading-sai";
@@ -522,4 +523,35 @@ test("write 401 preserves the current-session draft and only offers reauthentica
     await expectTapTarget(recovery.getByRole("link", { name: "재로그인" }));
     if (width < 720) await expectMobileNavigationClearance(page, recovery);
   }
+});
+
+test("anonymous guest and public-site DTOs omit meeting connection secrets", async ({ page }) => {
+  runMysql(`
+update sessions
+set meeting_url = 'https://meeting.invalid/guest-browse',
+    meeting_passcode = 'guest-room-2048'
+where club_id = '00000000-0000-0000-0000-000000000001'
+  and state = 'OPEN';
+`);
+  await page.goto(clubBase);
+  const guestCurrent = await page.evaluate(async () => {
+    const response = await fetch("/api/bff/api/public/clubs/reading-sai/browse/sessions/current", { cache: "no-store" });
+    const text = await response.text();
+    return { status: response.status, text };
+  });
+  expect(guestCurrent.status).toBe(200);
+  expect(guestCurrent.text).not.toContain("meetingUrl");
+  expect(guestCurrent.text).not.toContain("meetingPasscode");
+  expect(guestCurrent.text).not.toContain("guest-room-2048");
+  expect(guestCurrent.text).not.toContain("https://meeting.invalid/guest-browse");
+
+  const publicClub = await page.evaluate(async () => {
+    const response = await fetch("/api/bff/api/public/clubs/reading-sai", { cache: "no-store" });
+    const text = await response.text();
+    return { status: response.status, text };
+  });
+  expect(publicClub.status).toBe(200);
+  expect(publicClub.text).not.toContain("meetingUrl");
+  expect(publicClub.text).not.toContain("meetingPasscode");
+  expect(publicClub.text).not.toContain("guest-room-2048");
 });

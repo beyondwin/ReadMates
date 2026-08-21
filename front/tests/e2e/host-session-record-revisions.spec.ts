@@ -657,3 +657,14 @@ where id = '${recordSessionId}';
   });
   expect(narrowScreenshot.byteLength).toBeGreaterThan(10_000);
 });
+
+test("9. applied revisions start at version 1 without inventing a baseline row", async () => {
+  const output = runMysql(`
+select version, source
+from session_record_revisions
+where session_id = '${recordSessionId}'
+order by version, source;
+`);
+  expect(output).not.toContain("BASELINE");
+  expect(output).toMatch(/\n1\s+/);
+});

@@ -151,7 +151,7 @@ export function SessionOverviewSection({
           {sessionState === "CLOSED" || sessionState === "PUBLISHED" ? (
             <MeetingAfterPanel
               state={sessionState}
-              summary={overview.applied.exists ? overview.applied.summary : ""}
+              summary={overview.applied.exists ? overview.applied.publicationSummary : ""}
               accessScope={accessScope}
               sessionId={sessionId}
               recordVisibility={recordVisibility}

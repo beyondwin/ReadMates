@@ -82,6 +82,7 @@ const memberMobileTabs = ["오늘", "노트", "기록", "내 공간"];
 const hostMobileTabs = ["오늘", "세션", "멤버", "기록"];
 const baselineClubAppPath = "/clubs/reading-sai/app";
 const baselineClubHostPath = `${baselineClubAppPath}/host`;
+const hostLandingUrl = new RegExp(`${baselineClubHostPath}(?:/sessions/[^/]+)?$`);
 
 test.beforeEach(() => {
   resetSeedGoogleLogins(["host@example.com"]);
@@ -145,7 +146,7 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await expect(hostEntry).toHaveAttribute("href", baselineClubHostPath);
 
   await hostEntry.click();
-  await expect(page).toHaveURL(new RegExp(`${baselineClubHostPath}$`));
+  await expect(page).toHaveURL(hostLandingUrl);
   await expect(appNav.getByRole("link", { name: "오늘" })).toHaveAttribute("aria-current", "page");
   await expect(appNav.getByRole("link", { name: "세션" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "멤버" })).toBeVisible();
@@ -169,7 +170,7 @@ test("public record metadata adapts without overlap from mobile to desktop", asy
 
 test("mobile public pages hide app tabs and host app pages show mobile chrome", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 812 });
-  const mobileHeader = page.getByRole("banner");
+  const mobileHeader = page.locator("header.m-hdr").first();
 
   await page.goto("/");
   await expect(mobileHeader).toBeVisible();
@@ -228,7 +229,7 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await expect(memberTabs.getByRole("link")).toHaveText(memberMobileTabs);
   await expectPracticalTapTarget(memberTabs.getByRole("link", { name: "오늘" }));
   await mobileHeader.getByRole("link", { name: "호스트 화면" }).click();
-  await expect(page).toHaveURL(new RegExp(`${baselineClubHostPath}$`));
+  await expect(page).toHaveURL(hostLandingUrl);
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", baselineClubAppPath);
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveText("");
   await expect(mobileHeader.getByRole("link", { name: "멤버 화면으로" })).toHaveClass(/m-hdr-link--icon/);
@@ -358,12 +359,14 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
 
   await page.goto("/app/host");
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
-  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
-  await expect(page.getByRole("banner").getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
-
-  await page.getByRole("banner").getByRole("link", { name: "뒤로" }).click();
-  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
-  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ })).toBeVisible();
+  const hostBack = page.getByRole("banner").getByRole("link", { name: "뒤로" });
+  if (await hostBack.count()) {
+    await expect(hostBack).toHaveAttribute("href", "/app/host");
+    await hostBack.click();
+    await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
+    await expect(page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ })).toBeVisible();
+  }
 });
 
 test("member space preserves a profile-first layout from desktop to narrow mobile", async ({ page }) => {

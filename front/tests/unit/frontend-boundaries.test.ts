@@ -723,7 +723,6 @@ describe("frontend architecture boundaries", () => {
 
   it("keeps host presentation components free of API-backed defaults", () => {
     const hostPresentationComponents = [
-      "features/host/ui/host-dashboard.tsx",
       "features/host/ui/host-session-editor.tsx",
       "features/host/ui/host-members.tsx",
       "features/host/ui/host-invitations.tsx",

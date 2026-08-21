@@ -2,7 +2,6 @@ export type {
   CreatedSessionResponse,
   CreateHostInvitationRequest,
   HostAttendanceUpdate,
-  HostDashboardResponse,
   HostInvitationListItem,
   HostInvitationResponse,
   HostMemberListItem,
@@ -22,7 +21,6 @@ export {
   HostDashboardRoute,
 } from "@/features/host/route/host-dashboard-route";
 export {
-  hostDashboardActions,
   hostDashboardLoaderFactory,
   preserveLocationSuffix,
   type HostDashboardRouteData,

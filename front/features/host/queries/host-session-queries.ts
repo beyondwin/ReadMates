@@ -6,7 +6,6 @@ import {
   createHostSession,
   deleteHostSession,
   fetchHostCurrentSession,
-  fetchHostDashboard,
   fetchHostSessionClosingStatus,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
@@ -27,7 +26,6 @@ import {
 import type {
   CurrentSessionResponse,
   HostAttendanceUpdate,
-  HostDashboardResponse,
   HostSessionClosingStatusResponse,
   HostSessionDetailResponse,
   HostSessionListPage,
@@ -110,13 +108,6 @@ export function hostCurrentSessionQuery(context?: ReadmatesApiContext) {
   return queryOptions<CurrentSessionResponse>({
     queryKey: hostSessionKeys.current(context),
     queryFn: () => fetchHostCurrentSession(context),
-  });
-}
-
-export function hostDashboardQuery(context?: ReadmatesApiContext) {
-  return queryOptions<HostDashboardResponse>({
-    queryKey: hostSessionKeys.dashboard(context),
-    queryFn: () => fetchHostDashboard(context),
   });
 }
 

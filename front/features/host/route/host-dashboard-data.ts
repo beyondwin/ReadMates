@@ -1,7 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { redirect, type LoaderFunctionArgs } from "react-router";
-import { submitHostMemberLifecycle } from "@/features/host/api/host-api";
-import type { HostDashboardActions } from "@/features/host/route/host-dashboard-actions";
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostCurrentSessionQuery,
@@ -80,16 +78,3 @@ export function hostDashboardLoaderFactory(client: QueryClient) {
     };
   };
 }
-
-export const hostDashboardActions = {
-  updateCurrentSessionParticipation: async (membershipId, action) => {
-    const response = await submitHostMemberLifecycle(
-      membershipId,
-      action === "add" ? "/current-session/add" : "/current-session/remove",
-    );
-
-    if (!response.ok) {
-      throw new Error("Current session member action failed");
-    }
-  },
-} satisfies Pick<HostDashboardActions, "updateCurrentSessionParticipation">;

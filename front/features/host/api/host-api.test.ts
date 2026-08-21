@@ -9,7 +9,6 @@ import {
   deleteHostSession,
   fetchHostClubOperations,
   fetchHostCurrentSession,
-  fetchHostDashboard,
   fetchHostMembers,
   fetchHostNotificationDetail,
   fetchHostNotificationEvents,
@@ -161,7 +160,6 @@ describe("host api wrappers", () => {
     const context = { clubSlug: "reading-sai" };
 
     await fetchHostCurrentSession(context);
-    await fetchHostDashboard(context);
     await fetchHostClubOperations(context);
     await fetchHostNotificationSummary(context);
     await fetchHostNotificationPolicy(context);
@@ -185,7 +183,6 @@ describe("host api wrappers", () => {
     const urls = fetchMock.mock.calls.map(([url]) => url);
     expect(urls).toEqual([
       "/api/bff/api/sessions/current?clubSlug=reading-sai",
-      "/api/bff/api/host/dashboard?clubSlug=reading-sai",
       "/api/bff/api/host/club-operations?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/summary?clubSlug=reading-sai",
       "/api/bff/api/host/notifications/policy?clubSlug=reading-sai",
