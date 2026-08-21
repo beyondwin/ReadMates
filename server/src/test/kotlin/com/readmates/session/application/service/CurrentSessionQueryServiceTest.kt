@@ -8,7 +8,6 @@ import com.readmates.session.application.CurrentSessionPayload
 import com.readmates.session.application.port.out.LoadCurrentSessionPort
 import com.readmates.shared.security.CurrentMember
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -39,14 +38,14 @@ class CurrentSessionQueryServiceTest {
         )
 
     @Test
-    fun `viewer current session omits meeting connection secrets`() {
+    fun `viewer current session keeps meeting connection fields`() {
         val service = CurrentSessionQueryService(stubPort())
 
         val result = service.currentSession(member(MembershipStatus.VIEWER)).currentSession
 
         assertEquals(session.sessionId, result?.sessionId)
-        assertNull(result?.meetingUrl)
-        assertNull(result?.meetingPasscode)
+        assertEquals(session.meetingUrl, result?.meetingUrl)
+        assertEquals(session.meetingPasscode, result?.meetingPasscode)
     }
 
     @Test

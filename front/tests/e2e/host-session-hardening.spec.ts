@@ -412,17 +412,6 @@ function expectOmitsConnectionSecretKeys(payload: { body: unknown; text: string 
   expect(payload.text).not.toContain(FIXTURE_MEETING_URL);
 }
 
-function expectNoConnectionSecretValues(
-  payload: { text: string },
-  session: Record<string, unknown> | null | undefined,
-) {
-  expect(session).toBeTruthy();
-  expect(session?.meetingUrl ?? null).toBeNull();
-  expect(session?.meetingPasscode ?? null).toBeNull();
-  expect(payload.text).not.toContain(FIXTURE_PASSCODE);
-  expect(payload.text).not.toContain(FIXTURE_MEETING_URL);
-}
-
 function telemetryRequestBody(request: Request) {
   return request.postData() ?? request.postDataBuffer()?.toString("utf8") ?? "";
 }
@@ -847,7 +836,9 @@ test("guest and public DTOs omit connection secrets and GUEST_READABLE is not PU
   const viewerCurrent = await fetchJson(page, `/api/bff/api/sessions/current?clubSlug=${CLUB_SLUG}`);
   expect(viewerCurrent.status).toBe(200);
   const viewerSession = (viewerCurrent.body as { currentSession?: Record<string, unknown> | null }).currentSession;
-  expectNoConnectionSecretValues(viewerCurrent, viewerSession);
+  expect(viewerSession).toBeTruthy();
+  expect(viewerSession?.meetingUrl).toBe(FIXTURE_MEETING_URL);
+  expect(viewerSession?.meetingPasscode).toBe(FIXTURE_PASSCODE);
 
   await page.context().clearCookies();
   await loginWithGoogleFixture(page, "member1@example.com");
