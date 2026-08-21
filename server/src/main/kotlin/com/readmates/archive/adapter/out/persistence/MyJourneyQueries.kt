@@ -235,7 +235,7 @@ private val PAGE_SQL =
       coalesce(my_questions.question_count, 0) as question_count,
       coalesce(my_reviews.review_count, 0) as review_count,
       latest_feedback_document.id as feedback_document_id
-    from sessions
+    from active_sessions sessions
     $MY_JOURNEY_ACTIVITY_JOINS_SQL
     where $MY_JOURNEY_ELIGIBILITY_SQL
       and (
@@ -263,7 +263,7 @@ private val SUMMARY_SQL =
       count(distinct case
         when ? = true and latest_feedback_document.id is not null then sessions.id
       end) as readable_feedback_document_count
-    from sessions
+    from active_sessions sessions
     $MY_JOURNEY_ACTIVITY_JOINS_SQL
     where $MY_JOURNEY_ELIGIBILITY_SQL
     """.trimIndent()

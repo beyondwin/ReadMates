@@ -96,7 +96,7 @@ class JdbcNotesFeedAdapter(
                         )
                       )
                   ) as highlight_count
-                from sessions
+                from active_sessions sessions
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
                   and sessions.visibility in ('MEMBER', 'PUBLIC')
@@ -163,7 +163,7 @@ class JdbcNotesFeedAdapter(
                     10 as source_order,
                     questions.priority as item_order
                   from questions force index (questions_club_session_created_idx)
-                  join sessions on sessions.id = questions.session_id
+                  join active_sessions sessions on sessions.id = questions.session_id
                     and sessions.club_id = questions.club_id
                   join memberships on memberships.id = questions.membership_id
                     and memberships.club_id = questions.club_id
@@ -192,8 +192,8 @@ class JdbcNotesFeedAdapter(
                     long_reviews.created_at as created_at,
                     40 as source_order,
                     0 as item_order
-                  from long_reviews
-                  join sessions on sessions.id = long_reviews.session_id
+                  from long_reviews force index (long_reviews_club_visibility_created_idx)
+                  join active_sessions sessions on sessions.id = long_reviews.session_id
                     and sessions.club_id = long_reviews.club_id
                   join memberships on memberships.id = long_reviews.membership_id
                     and memberships.club_id = long_reviews.club_id
@@ -224,7 +224,7 @@ class JdbcNotesFeedAdapter(
                     30 as source_order,
                     0 as item_order
                   from one_line_reviews
-                  join sessions on sessions.id = one_line_reviews.session_id
+                  join active_sessions sessions on sessions.id = one_line_reviews.session_id
                     and sessions.club_id = one_line_reviews.club_id
                   join memberships on memberships.id = one_line_reviews.membership_id
                     and memberships.club_id = one_line_reviews.club_id
@@ -255,7 +255,7 @@ class JdbcNotesFeedAdapter(
                     20 as source_order,
                     highlights.sort_order as item_order
                   from highlights force index (highlights_club_session_created_idx)
-                  join sessions on sessions.id = highlights.session_id
+                  join active_sessions sessions on sessions.id = highlights.session_id
                     and sessions.club_id = highlights.club_id
                   left join memberships on memberships.id = highlights.membership_id
                     and memberships.club_id = highlights.club_id
@@ -341,7 +341,7 @@ class JdbcNotesFeedAdapter(
                     10 as source_order,
                     questions.priority as item_order
                   from questions
-                  join sessions on sessions.id = questions.session_id
+                  join active_sessions sessions on sessions.id = questions.session_id
                     and sessions.club_id = questions.club_id
                   join memberships on memberships.id = questions.membership_id
                     and memberships.club_id = questions.club_id
@@ -372,7 +372,7 @@ class JdbcNotesFeedAdapter(
                     40 as source_order,
                     0 as item_order
                   from long_reviews
-                  join sessions on sessions.id = long_reviews.session_id
+                  join active_sessions sessions on sessions.id = long_reviews.session_id
                     and sessions.club_id = long_reviews.club_id
                   join memberships on memberships.id = long_reviews.membership_id
                     and memberships.club_id = long_reviews.club_id
@@ -404,7 +404,7 @@ class JdbcNotesFeedAdapter(
                     30 as source_order,
                     0 as item_order
                   from one_line_reviews
-                  join sessions on sessions.id = one_line_reviews.session_id
+                  join active_sessions sessions on sessions.id = one_line_reviews.session_id
                     and sessions.club_id = one_line_reviews.club_id
                   join memberships on memberships.id = one_line_reviews.membership_id
                     and memberships.club_id = one_line_reviews.club_id
@@ -436,7 +436,7 @@ class JdbcNotesFeedAdapter(
                     20 as source_order,
                     highlights.sort_order as item_order
                   from highlights
-                  join sessions on sessions.id = highlights.session_id
+                  join active_sessions sessions on sessions.id = highlights.session_id
                     and sessions.club_id = highlights.club_id
                   left join memberships on memberships.id = highlights.membership_id
                     and memberships.club_id = highlights.club_id

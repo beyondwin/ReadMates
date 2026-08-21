@@ -52,7 +52,7 @@ internal object SessionClosingStatusSql {
             where one_line_reviews.club_id = sessions.club_id
               and one_line_reviews.session_id = sessions.id
           ) as one_liner_count
-        from sessions
+        from active_sessions sessions
         left join public_session_publications
           on public_session_publications.club_id = sessions.club_id
          and public_session_publications.session_id = sessions.id

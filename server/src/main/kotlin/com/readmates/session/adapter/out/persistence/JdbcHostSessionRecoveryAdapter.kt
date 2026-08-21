@@ -107,7 +107,7 @@ class JdbcHostSessionRecoveryAdapter(
                 select title, book_title, book_author, book_link, book_image_url,
                        session_date, start_time, end_time, question_deadline_at,
                        location_label, meeting_url, meeting_passcode
-                from sessions
+                from active_sessions sessions
                 where club_id = ? and id = ?$lock
                 """.trimIndent(),
                 { rs, _ -> rs.toHostSessionBasicSnapshot() },

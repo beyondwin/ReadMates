@@ -49,7 +49,7 @@ class JdbcCurrentSessionAdapter(
                       meeting_url,
                       meeting_passcode,
                       question_deadline_at
-                    from sessions
+                    from active_sessions sessions
                     where club_id = ?
                       and state = 'OPEN'
                     order by number desc
@@ -70,7 +70,7 @@ class JdbcCurrentSessionAdapter(
             .query(
                 """
                 select id
-                from sessions
+                from active_sessions sessions
                 where club_id = ?
                   and state = 'OPEN'
                 order by number desc

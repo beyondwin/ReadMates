@@ -50,7 +50,7 @@ class JdbcFeedbackDocumentStoreAdapter(
                   order by session_feedback_documents.version desc, session_feedback_documents.created_at desc
                 ) as document_rank
               from session_feedback_documents
-              join sessions on sessions.id = session_feedback_documents.session_id
+              join active_sessions sessions on sessions.id = session_feedback_documents.session_id
                 and sessions.club_id = session_feedback_documents.club_id
               where session_feedback_documents.club_id = ?
                 and sessions.state in ('CLOSED', 'PUBLISHED')
@@ -93,7 +93,7 @@ class JdbcFeedbackDocumentStoreAdapter(
             .query(
                 """
                 select id, number, book_title, session_date
-                from sessions
+                from active_sessions sessions
                 where id = ?
                   and club_id = ?
                   and state in ('OPEN', 'CLOSED', 'PUBLISHED')
@@ -111,7 +111,7 @@ class JdbcFeedbackDocumentStoreAdapter(
             .query(
                 """
                 select id, number, book_title, session_date
-                from sessions
+                from active_sessions sessions
                 where id = ?
                   and club_id = ?
                 """.trimIndent(),
@@ -136,7 +136,7 @@ class JdbcFeedbackDocumentStoreAdapter(
                   session_feedback_documents.file_name,
                   session_feedback_documents.created_at
                 from session_feedback_documents
-                join sessions on sessions.id = session_feedback_documents.session_id
+                join active_sessions sessions on sessions.id = session_feedback_documents.session_id
                   and sessions.club_id = session_feedback_documents.club_id
                 where session_feedback_documents.club_id = ?
                   and session_feedback_documents.session_id = ?

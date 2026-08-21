@@ -255,7 +255,7 @@ class JdbcGuestSessionBrowseAdapter(
               time_format(sessions.end_time, '%H:%i:%s') as end_time,
               date_format(sessions.question_deadline_at, '%Y-%m-%dT%H:%i:%s') as question_deadline_at,
               sessions.state
-            from sessions
+            from active_sessions sessions
             join clubs on clubs.id = sessions.club_id
             """.trimIndent() + "\n"
     }

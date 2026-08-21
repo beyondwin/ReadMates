@@ -51,6 +51,7 @@ internal class HostSessionPublicationWriteOperations(
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
+              and deleted_at is null
             """.trimIndent(),
             accessScope,
             sessionVisibility,

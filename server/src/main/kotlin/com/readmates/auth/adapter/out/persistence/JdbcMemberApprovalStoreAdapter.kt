@@ -120,7 +120,7 @@ class JdbcMemberApprovalStoreAdapter(
               participation_status
             )
             select ?, sessions.club_id, sessions.id, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE'
-            from sessions
+            from active_sessions sessions
             where sessions.club_id = ?
               and sessions.state = 'OPEN'
             order by sessions.number desc

@@ -93,7 +93,7 @@ internal class HostSessionQueries(
             """
             select id, number, title, book_title, book_author, book_image_url,
                    session_date, start_time, end_time, location_label, visibility
-            from sessions
+            from active_sessions sessions
             where club_id = ?
               and state = 'DRAFT'
               and access_scope = 'GUEST_READABLE'
@@ -118,7 +118,7 @@ internal class HostSessionQueries(
                       and reading_checkins.id is null
                     then 1 else 0
                   end), 0) as checkin_missing
-                from sessions
+                from active_sessions sessions
                 join session_participants on session_participants.session_id = sessions.id
                   and session_participants.club_id = sessions.club_id
                 left join reading_checkins on reading_checkins.session_id = sessions.id
@@ -136,7 +136,7 @@ internal class HostSessionQueries(
             jdbcTemplate.queryForObject(
                 """
                 select count(*)
-                from sessions
+                from active_sessions sessions
                 left join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
@@ -151,7 +151,7 @@ internal class HostSessionQueries(
             jdbcTemplate.queryForObject(
                 """
                 select count(*)
-                from sessions
+                from active_sessions sessions
                 where sessions.club_id = ?
                   and sessions.state in ('PUBLISHED', 'CLOSED')
                   and exists (
@@ -195,7 +195,7 @@ internal class HostSessionQueries(
           users.email as email
         from (
           select id, club_id
-          from sessions
+          from active_sessions sessions
           where club_id = ?
             and state = 'OPEN'
           order by session_date desc, number desc
@@ -264,7 +264,7 @@ internal class HostSessionQueries(
                   and public_session_publications.session_id = sessions.id
                 limit 1
               ), 'HIDDEN') as site_visibility
-            from sessions
+            from active_sessions sessions
             where id = ?
               and club_id = ?
             """.trimIndent(),
@@ -289,7 +289,7 @@ internal class HostSessionQueries(
                 .query(
                     """
                     select 1
-                    from sessions
+                    from active_sessions sessions
                     where id = ?
                       and club_id = ?
                     """.trimIndent(),
@@ -311,7 +311,7 @@ internal class HostSessionQueries(
             .query(
                 """
                 select start_time, end_time, question_deadline_at
-                from sessions
+                from active_sessions sessions
                 where id = ?
                   and club_id = ?
                 for update
@@ -330,7 +330,7 @@ internal class HostSessionQueries(
             .query(
                 """
                 select state
-                from sessions
+                from active_sessions sessions
                 where id = ?
                   and club_id = ?
                 """.trimIndent(),
@@ -563,7 +563,7 @@ internal val HOST_SESSION_LEDGER_FACTS_SQL =
              coalesce(revision.applied_at, sessions.updated_at),
              coalesce(audit.created_at, sessions.updated_at)
            ) as last_modified_at
-    from sessions
+    from active_sessions sessions
     left join public_session_publications publication
       on publication.club_id = sessions.club_id
      and publication.session_id = sessions.id
@@ -635,7 +635,7 @@ internal fun loadHostSessionLedgerSummary(
                      where session_record_drafts.club_id = sessions.club_id
                        and session_record_drafts.session_id = sessions.id
                    ) as has_draft
-            from sessions
+            from active_sessions sessions
             left join public_session_publications publication
               on publication.club_id = sessions.club_id
              and publication.session_id = sessions.id

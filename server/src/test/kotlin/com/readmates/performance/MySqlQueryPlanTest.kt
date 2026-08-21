@@ -1,9 +1,12 @@
 package com.readmates.performance
 
+import com.readmates.session.adapter.out.persistence.HOST_SESSION_LEDGER_FACTS_SQL
 import com.readmates.sessionclosing.adapter.out.persistence.SessionClosingStatusSql
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import com.readmates.support.MySqlExplainRow
 import com.readmates.support.assertUsesIndexFor
 import com.readmates.support.explain
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -49,7 +52,7 @@ class MySqlQueryPlanTest(
                   count(session_participants.id) as total,
                   coalesce(public_session_publications.visibility = 'PUBLIC', false) as published,
                   latest_feedback_document.created_at as feedback_document_uploaded_at
-                from sessions
+                from active_sessions sessions
                 left join session_participants current_participant on current_participant.session_id = sessions.id
                   and current_participant.club_id = sessions.club_id
                   and current_participant.membership_id = ?
@@ -185,7 +188,7 @@ class MySqlQueryPlanTest(
                         )
                       )
                   ) as highlight_count
-                from sessions
+                from active_sessions sessions
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
                   and sessions.visibility in ('MEMBER', 'PUBLIC')
@@ -300,7 +303,7 @@ class MySqlQueryPlanTest(
                       then public_session_publications.public_summary
                     else null
                   end as public_summary
-                from sessions
+                from active_sessions sessions
                 left join session_participants current_participant on current_participant.session_id = sessions.id
                   and current_participant.club_id = sessions.club_id
                   and current_participant.membership_id = ?
@@ -430,13 +433,13 @@ class MySqlQueryPlanTest(
                       when 'INACTIVE' then 4
                       else 5
                     end as status_rank
-                  from memberships
+                  from memberships force index (club_id)
                   join users on users.id = memberships.user_id
-                  left join sessions current_session on current_session.club_id = memberships.club_id
+                  left join active_sessions current_session on current_session.club_id = memberships.club_id
                     and current_session.state = 'OPEN'
                     and current_session.id = (
                       select sessions.id
-                      from sessions
+                      from active_sessions sessions
                       where sessions.club_id = memberships.club_id
                         and sessions.state = 'OPEN'
                       order by sessions.number desc
@@ -479,7 +482,6 @@ class MySqlQueryPlanTest(
             )
 
         plan.assertUsesIndexFor("memberships", "host member cursor page")
-        plan.assertUsesIndexFor("current_session", "host member current open session join")
         plan.assertUsesIndexFor("sessions", "host member current open session lookup")
         plan.assertUsesIndexFor("session_participants", "host member current session participation join")
     }
@@ -506,6 +508,7 @@ class MySqlQueryPlanTest(
 
     @Test
     fun `admin analytics benchmark query uses indexed access on operating tables`() {
+        largeFixture.seedNotesFeed(sessionCount = 80)
         val plan =
             jdbcTemplate.explain(
                 """
@@ -531,7 +534,7 @@ class MySqlQueryPlanTest(
                       and n.updated_at >= utc_timestamp(6) - interval ? day
                   ), 0) as notif_sent
                 from clubs c
-                left join sessions s on s.club_id = c.id and s.session_date >= current_date() - interval ? day
+                left join active_sessions s on s.club_id = c.id and s.session_date >= current_date() - interval ? day
                 left join session_participants sp force index (session_participants_session_club_fk)
                   on sp.session_id = s.id and sp.club_id = s.club_id
                 group by c.id, c.slug, c.name
@@ -545,7 +548,7 @@ class MySqlQueryPlanTest(
                 30,
             )
 
-        plan.assertUsesIndexFor("s", "admin analytics benchmark session window")
+        plan.assertUsesIndexFor("sessions", "admin analytics benchmark session window")
         plan.assertUsesIndexFor("sp", "admin analytics benchmark participant aggregation")
         plan.assertUsesIndexFor("a", "admin analytics benchmark AI cost subquery")
         plan.assertUsesIndexFor("n", "admin analytics benchmark notification subqueries")
@@ -558,7 +561,7 @@ class MySqlQueryPlanTest(
                 """
                 select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author,
                        sessions.book_image_url, sessions.session_date, public_session_publications.public_summary
-                from sessions
+                from active_sessions sessions
                 join clubs on clubs.id = sessions.club_id
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
@@ -600,6 +603,83 @@ class MySqlQueryPlanTest(
         notificationPlan.assertUsesIndexFor("notification_event_outbox", "host closing latest notification event")
     }
 
+    @Test
+    fun `host session ledger query uses club indexes through active sessions view`() {
+        largeFixture.seedNotesFeed(sessionCount = 80)
+        val plan =
+            jdbcTemplate.explain(
+                """
+                select *
+                from (
+                  $HOST_SESSION_LEDGER_FACTS_SQL
+                ) ledger_facts
+                where club_id = ?
+                order by number desc, id desc
+                limit ?
+                """.trimIndent(),
+                READING_SAI_CLUB_ID,
+                31,
+            )
+        plan.assertUsesIndexFor("sessions", "host session ledger through active_sessions")
+        assertUsesClubScopedSessionIndex(plan, "host session ledger")
+    }
+
+    @Test
+    fun `current open session query uses club state indexes through active sessions view`() {
+        val plan =
+            jdbcTemplate.explain(
+                """
+                select id, number, title
+                from active_sessions sessions
+                where club_id = ?
+                  and state = 'OPEN'
+                order by number desc
+                limit 1
+                """.trimIndent(),
+                READING_SAI_CLUB_ID,
+            )
+        plan.assertUsesIndexFor("sessions", "current open session through active_sessions")
+        assertUsesClubScopedSessionIndex(plan, "current open session")
+    }
+
+    @Test
+    fun `guest public browse current session uses club access indexes through active sessions view`() {
+        val plan =
+            jdbcTemplate.explain(
+                """
+                select sessions.id, sessions.number, sessions.title
+                from active_sessions sessions
+                join clubs on clubs.id = sessions.club_id
+                where clubs.slug = ?
+                  and clubs.status = 'ACTIVE'
+                  and clubs.public_visibility = 'PUBLIC'
+                  and sessions.access_scope = 'GUEST_READABLE'
+                  and sessions.state = 'OPEN'
+                order by sessions.number desc, sessions.id desc
+                limit 1
+                """.trimIndent(),
+                "reading-sai",
+            )
+        plan.assertUsesIndexFor("sessions", "guest current session through active_sessions")
+        assertUsesClubScopedSessionIndex(plan, "guest current session")
+    }
+
+    private fun assertUsesClubScopedSessionIndex(
+        plan: List<MySqlExplainRow>,
+        reason: String,
+    ) {
+        val sessionKeys =
+            plan
+                .filter { row -> row.table == "sessions" }
+                .mapNotNull { row -> row.key }
+        assertThat(sessionKeys)
+            .describedAs("active_sessions should merge to club/state/access session indexes for $reason. Plan: $plan")
+            .isNotEmpty
+            .allMatch { key ->
+                key in CLUB_SCOPED_SESSION_INDEXES || key.contains("club") || key == "PRIMARY"
+            }
+    }
+
     private fun membershipIdFor(email: String): String =
         jdbcTemplate.queryForObject(
             """
@@ -617,6 +697,12 @@ class MySqlQueryPlanTest(
     companion object {
         private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
         private const val MEMBER_5_ID = "00000000-0000-0000-0000-000000000206"
+        private val CLUB_SCOPED_SESSION_INDEXES =
+            setOf(
+                "sessions_club_state_visibility_number_idx",
+                "sessions_club_access_state_number_idx",
+                "sessions_club_deleted_state_number_idx",
+            )
 
         private const val ARCHIVE_DETAIL_PUBLIC_BATCH_PLAN_SQL = """
             select 'HIGHLIGHT' as section,
@@ -805,7 +891,7 @@ class MySqlQueryPlanTest(
                 'QUESTION' as kind, questions.text as text, questions.created_at as created_at,
                 10 as source_order, questions.priority as item_order
               from questions force index (questions_club_session_created_idx)
-              join sessions on sessions.id = questions.session_id and sessions.club_id = questions.club_id
+              join active_sessions sessions on sessions.id = questions.session_id and sessions.club_id = questions.club_id
               join memberships on memberships.id = questions.membership_id and memberships.club_id = questions.club_id
               join users on users.id = memberships.user_id
               join session_participants on session_participants.session_id = questions.session_id
@@ -824,8 +910,8 @@ class MySqlQueryPlanTest(
                 coalesce(memberships.short_name, users.name) as author_short_name_source,
                 'LONG_REVIEW' as kind, long_reviews.body as text, long_reviews.created_at as created_at,
                 40 as source_order, 0 as item_order
-              from long_reviews
-              join sessions on sessions.id = long_reviews.session_id and sessions.club_id = long_reviews.club_id
+              from long_reviews force index (long_reviews_club_visibility_created_idx)
+              join active_sessions sessions on sessions.id = long_reviews.session_id and sessions.club_id = long_reviews.club_id
               join memberships on memberships.id = long_reviews.membership_id and memberships.club_id = long_reviews.club_id
               join users on users.id = memberships.user_id
               join session_participants on session_participants.session_id = long_reviews.session_id
@@ -845,7 +931,7 @@ class MySqlQueryPlanTest(
                 'ONE_LINE_REVIEW' as kind, one_line_reviews.text as text, one_line_reviews.created_at as created_at,
                 30 as source_order, 0 as item_order
               from one_line_reviews
-              join sessions on sessions.id = one_line_reviews.session_id and sessions.club_id = one_line_reviews.club_id
+              join active_sessions sessions on sessions.id = one_line_reviews.session_id and sessions.club_id = one_line_reviews.club_id
               join memberships on memberships.id = one_line_reviews.membership_id and memberships.club_id = one_line_reviews.club_id
               join users on users.id = memberships.user_id
               join session_participants on session_participants.session_id = one_line_reviews.session_id
@@ -865,7 +951,7 @@ class MySqlQueryPlanTest(
                 'HIGHLIGHT' as kind, highlights.text as text, highlights.created_at as created_at,
                 20 as source_order, highlights.sort_order as item_order
               from highlights force index (highlights_club_session_created_idx)
-              join sessions on sessions.id = highlights.session_id and sessions.club_id = highlights.club_id
+              join active_sessions sessions on sessions.id = highlights.session_id and sessions.club_id = highlights.club_id
               left join memberships on memberships.id = highlights.membership_id and memberships.club_id = highlights.club_id
               left join users on users.id = memberships.user_id
               left join session_participants on session_participants.session_id = highlights.session_id

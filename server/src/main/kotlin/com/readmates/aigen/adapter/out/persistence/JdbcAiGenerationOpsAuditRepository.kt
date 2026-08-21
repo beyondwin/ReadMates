@@ -140,7 +140,7 @@ class JdbcAiGenerationOpsAuditRepository(
                   a.created_at
                 from ai_generation_audit_log a
                 left join clubs c on c.id = a.club_id
-                left join sessions s on s.id = a.session_id
+                left join active_sessions s on s.id = a.session_id
                 $where
                 order by a.created_at desc, a.id desc
                 limit ${LIST_LIMIT + 1}
@@ -176,7 +176,7 @@ class JdbcAiGenerationOpsAuditRepository(
                   a.created_at
                 from ai_generation_audit_log a
                 left join clubs c on c.id = a.club_id
-                left join sessions s on s.id = a.session_id
+                left join active_sessions s on s.id = a.session_id
                 where a.job_id = ?
                 order by a.created_at desc, a.id desc
                 limit 1

@@ -52,7 +52,7 @@ class JdbcHostActionNotificationAdapter(
                       and trim(users.email) <> ''
                     then 1 else 0 end
                   ) as expected_email_count
-                from sessions
+                from active_sessions sessions
                 join memberships on memberships.club_id = sessions.club_id
                   and memberships.status = 'ACTIVE'
                 join users on users.id = memberships.user_id

@@ -38,7 +38,7 @@ internal class ArchiveListQueries {
                   count(session_participants.id) as total,
                   coalesce(public_session_publications.visibility = 'PUBLIC', false) as published,
                   latest_feedback_document.created_at as feedback_document_uploaded_at
-                from sessions
+                from active_sessions sessions
                 left join session_participants current_participant on current_participant.session_id = sessions.id
                   and current_participant.club_id = sessions.club_id
                   and current_participant.membership_id = ?
@@ -113,7 +113,7 @@ internal class ArchiveListQueries {
                 select questions.id as question_id, sessions.id, sessions.number, sessions.book_title, sessions.session_date,
                        questions.priority, questions.text, questions.draft_thought
                 from questions
-                join sessions on sessions.id = questions.session_id
+                join active_sessions sessions on sessions.id = questions.session_id
                   and sessions.club_id = questions.club_id
                 where questions.club_id = ?
                   and questions.membership_id = ?
@@ -161,7 +161,7 @@ internal class ArchiveListQueries {
                   'LONG_REVIEW' as kind,
                   long_reviews.body as text
                 from long_reviews
-                join sessions on sessions.id = long_reviews.session_id
+                join active_sessions sessions on sessions.id = long_reviews.session_id
                   and sessions.club_id = long_reviews.club_id
                 where long_reviews.club_id = ?
                   and long_reviews.membership_id = ?
@@ -204,7 +204,7 @@ internal class ArchiveListQueries {
                     session_participants.attendance_status as attendance_status,
                     session_participants.attendance_status = 'ATTENDED' as attended,
                     coalesce(reading_checkins.reading_progress, 0) as reading_progress
-                  from sessions
+                  from active_sessions sessions
                   join session_participants on session_participants.session_id = sessions.id
                     and session_participants.club_id = sessions.club_id
                     and session_participants.membership_id = ?
@@ -234,7 +234,7 @@ internal class ArchiveListQueries {
                   (
                     select count(*)
                     from session_participants
-                    join sessions on sessions.id = session_participants.session_id
+                    join active_sessions sessions on sessions.id = session_participants.session_id
                       and sessions.club_id = session_participants.club_id
                     where session_participants.club_id = memberships.club_id
                       and session_participants.membership_id = memberships.id
@@ -243,14 +243,14 @@ internal class ArchiveListQueries {
                   ) as session_count,
                   (
                     select count(*)
-                    from sessions
+                    from active_sessions sessions
                     where sessions.club_id = memberships.club_id
                       and sessions.state = 'PUBLISHED'
                   ) as total_session_count,
                   (
                     select count(*)
                     from reading_checkins
-                    join sessions on sessions.id = reading_checkins.session_id
+                    join active_sessions sessions on sessions.id = reading_checkins.session_id
                       and sessions.club_id = reading_checkins.club_id
                     where reading_checkins.club_id = memberships.club_id
                       and reading_checkins.membership_id = memberships.id
@@ -259,7 +259,7 @@ internal class ArchiveListQueries {
                   ) as completed_reading_count,
                   (
                     select sessions.id
-                    from sessions
+                    from active_sessions sessions
                     where sessions.club_id = memberships.club_id
                       and sessions.state = 'OPEN'
                     order by sessions.number desc

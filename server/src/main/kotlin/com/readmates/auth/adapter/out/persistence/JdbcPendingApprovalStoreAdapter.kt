@@ -27,7 +27,7 @@ class JdbcPendingApprovalStoreAdapter(
                   sessions.session_date,
                   sessions.location_label
                 from clubs
-                left join sessions on sessions.club_id = clubs.id
+                left join active_sessions sessions on sessions.club_id = clubs.id
                   and sessions.state in ('OPEN', 'PUBLISHED')
                 where clubs.id = ?
                 order by sessions.number desc

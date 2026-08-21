@@ -94,7 +94,7 @@ class JdbcSessionParticipationWriteAdapter(
                     updated_at = utc_timestamp(6)
                 where session_id = (
                     select sessions.id
-                    from sessions
+                    from active_sessions sessions
                     where sessions.club_id = ?
                       and sessions.state = 'OPEN'
                     order by sessions.number desc
@@ -139,7 +139,7 @@ class JdbcSessionParticipationWriteAdapter(
                   ?
                 from (
                   select id, club_id
-                  from sessions
+                  from active_sessions sessions
                   where club_id = ?
                     and state = 'OPEN'
                   order by number desc
@@ -194,7 +194,7 @@ class JdbcSessionParticipationWriteAdapter(
                   ?
                 from (
                   select id, club_id
-                  from sessions
+                  from active_sessions sessions
                   where club_id = ?
                     and state = 'OPEN'
                   order by number desc
@@ -248,7 +248,7 @@ class JdbcSessionParticipationWriteAdapter(
                       session_participants.membership_id as membership_id
                     from (
                       select id, club_id
-                      from sessions
+                      from active_sessions sessions
                       where club_id = ?
                         and state = 'OPEN'
                       order by number desc
@@ -329,7 +329,7 @@ class JdbcSessionParticipationWriteAdapter(
                 select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'PUBLIC'
                 from (
                   select id, club_id
-                  from sessions
+                  from active_sessions sessions
                   where club_id = ?
                     and state = 'OPEN'
                   order by number desc
@@ -371,7 +371,7 @@ class JdbcSessionParticipationWriteAdapter(
                       session_participants.membership_id as membership_id
                     from (
                       select id, club_id
-                      from sessions
+                      from active_sessions sessions
                       where club_id = ?
                         and state = 'OPEN'
                       order by number desc
@@ -458,7 +458,7 @@ class JdbcSessionParticipationWriteAdapter(
                 from session_participants
                 where session_participants.session_id = (
                     select sessions.id
-                    from sessions
+                    from active_sessions sessions
                     where sessions.club_id = ?
                       and sessions.state = 'OPEN'
                     order by sessions.number desc

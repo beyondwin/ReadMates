@@ -256,11 +256,11 @@ class JdbcMemberProfileStoreAdapter(
                   session_participants.participation_status
                 from memberships
                 join users on users.id = memberships.user_id
-                left join sessions current_session on current_session.club_id = memberships.club_id
+                left join active_sessions current_session on current_session.club_id = memberships.club_id
                   and current_session.state = 'OPEN'
                   and current_session.id = (
                     select sessions.id
-                    from sessions
+                    from active_sessions sessions
                     where sessions.club_id = memberships.club_id
                       and sessions.state = 'OPEN'
                     order by sessions.number desc

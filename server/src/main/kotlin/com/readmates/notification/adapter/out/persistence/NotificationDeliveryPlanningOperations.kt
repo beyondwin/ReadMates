@@ -187,7 +187,7 @@ internal class NotificationDeliveryPlanningOperations(
                 and coalesce(notification_preferences.email_enabled, true)
                 and coalesce(notification_preferences.$preferenceColumn, true)
               ) as email_allowed
-            from sessions
+            from active_sessions sessions
             join memberships on memberships.club_id = sessions.club_id
             join users on users.id = memberships.user_id
             left join notification_preferences on notification_preferences.membership_id = memberships.id
@@ -218,7 +218,7 @@ internal class NotificationDeliveryPlanningOperations(
                 and coalesce(notification_preferences.email_enabled, true)
                 and coalesce(notification_preferences.feedback_document_published_enabled, true)
               ) as email_allowed
-            from sessions
+            from active_sessions sessions
             join memberships on memberships.club_id = sessions.club_id
             join users on users.id = memberships.user_id
             left join session_participants on session_participants.club_id = sessions.club_id
@@ -256,7 +256,7 @@ internal class NotificationDeliveryPlanningOperations(
                 and coalesce(notification_preferences.email_enabled, true)
                 and coalesce(notification_preferences.review_published_enabled, false)
               ) as email_allowed
-            from sessions
+            from active_sessions sessions
             join memberships on memberships.club_id = sessions.club_id
             join users on users.id = memberships.user_id
             left join notification_preferences on notification_preferences.membership_id = memberships.id

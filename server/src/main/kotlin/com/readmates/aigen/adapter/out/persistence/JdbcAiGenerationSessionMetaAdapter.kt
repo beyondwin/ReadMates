@@ -20,7 +20,7 @@ class JdbcAiGenerationSessionMetaAdapter(
                 .queryForList(
                     """
                     select s.club_id, s.number, s.book_title, s.book_author, s.session_date
-                    from sessions s
+                    from active_sessions s
                     where s.id = ?
                     """.trimIndent(),
                     sessionId.toString(),

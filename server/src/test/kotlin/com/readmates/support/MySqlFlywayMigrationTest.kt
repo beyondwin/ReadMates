@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(8)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("50")
+            assertThat(latestVersion).isEqualTo("51")
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -371,7 +371,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(6)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(7)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -383,7 +383,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("50")
+            assertThat(latestVersion).isEqualTo("51")
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1499,6 +1499,135 @@ class MySqlFlywayMigrationTest(
         }
     }
 
+    @Test
+    fun `mysql adds host session trash columns view and restored lifecycle contract`() {
+        assertThat(columns("sessions")).contains(
+            "deleted_at",
+            "deleted_by_membership_id",
+            "purge_after",
+        )
+        assertEquals("YES", columnValue("sessions", "deleted_at", "is_nullable"))
+        assertEquals("YES", columnValue("sessions", "deleted_by_membership_id", "is_nullable"))
+        assertEquals("YES", columnValue("sessions", "purge_after", "is_nullable"))
+        assertEquals("datetime", columnValue("sessions", "deleted_at", "data_type"))
+        assertEquals("datetime", columnValue("sessions", "purge_after", "data_type"))
+        assertEquals("6", columnValue("sessions", "deleted_at", "datetime_precision"))
+        assertEquals("6", columnValue("sessions", "purge_after", "datetime_precision"))
+        assertEquals("char", columnValue("sessions", "deleted_by_membership_id", "data_type"))
+        assertEquals(
+            "club_id,deleted_at,state,number",
+            indexColumns("sessions", "sessions_club_deleted_state_number_idx"),
+        )
+        assertEquals("purge_after,id", indexColumns("sessions", "sessions_purge_after_idx"))
+        assertThat(checkConstraintClause("sessions_trash_contract_check"))
+            .contains("deleted_at", "deleted_by_membership_id", "purge_after")
+        assertTrue(viewExists("active_sessions"))
+        assertThat(viewDefinition("active_sessions")).containsIgnoringCase("deleted_at")
+
+        val restoredDraftId = "aaaaaaaa-0000-4000-8000-000000051001"
+        val restoredOpenId = "aaaaaaaa-0000-4000-8000-000000051002"
+        try {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set deleted_at = utc_timestamp(6),
+                    deleted_by_membership_id = ?,
+                    purge_after = date_add(utc_timestamp(6), interval 7 day)
+                where id = ?
+                """.trimIndent(),
+                CHANGE_SNAPSHOT_ACTOR_ID,
+                CHANGE_SNAPSHOT_SESSION_ID,
+            )
+            assertEquals(
+                0,
+                jdbcTemplate.queryForObject(
+                    "select count(*) from active_sessions where id = ?",
+                    Int::class.java,
+                    CHANGE_SNAPSHOT_SESSION_ID,
+                ),
+            )
+            assertEquals(
+                1,
+                jdbcTemplate.queryForObject(
+                    "select count(*) from sessions where id = ?",
+                    Int::class.java,
+                    CHANGE_SNAPSHOT_SESSION_ID,
+                ),
+            )
+            assertThatThrownBy {
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set deleted_at = utc_timestamp(6),
+                        deleted_by_membership_id = null,
+                        purge_after = null
+                    where id = ?
+                    """.trimIndent(),
+                    CHANGE_SNAPSHOT_SESSION_ID,
+                )
+            }.isInstanceOf(UncategorizedSQLException::class.java)
+                .hasMessageContaining("sessions_trash_contract_check")
+
+            insertLifecycleAudit(
+                action = "RESTORED",
+                from = "DRAFT",
+                to = "DRAFT",
+                reason = "OPERATIONAL_RECOVERY",
+                id = restoredDraftId,
+            )
+            insertLifecycleAudit(
+                action = "RESTORED",
+                from = "OPEN",
+                to = "OPEN",
+                reason = "OPERATIONAL_RECOVERY",
+                id = restoredOpenId,
+            )
+            assertThatThrownBy {
+                insertLifecycleAudit(
+                    action = "RESTORED",
+                    from = "DRAFT",
+                    to = "OPEN",
+                    reason = "OPERATIONAL_RECOVERY",
+                )
+            }.isInstanceOf(UncategorizedSQLException::class.java)
+                .hasMessageContaining("host_session_lifecycle_audit_contract_check")
+            assertThatThrownBy {
+                insertLifecycleAudit(
+                    action = "RESTORED",
+                    from = "CLOSED",
+                    to = "CLOSED",
+                    reason = "OPERATIONAL_RECOVERY",
+                )
+            }.isInstanceOf(UncategorizedSQLException::class.java)
+                .hasMessageContaining("host_session_lifecycle_audit_contract_check")
+            assertThatThrownBy {
+                insertLifecycleAudit(
+                    action = "RESTORED",
+                    from = "DRAFT",
+                    to = "DRAFT",
+                    reason = "ACCIDENTAL_TRANSITION",
+                )
+            }.isInstanceOf(UncategorizedSQLException::class.java)
+                .hasMessageContaining("host_session_lifecycle_audit_contract_check")
+        } finally {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set deleted_at = null,
+                    deleted_by_membership_id = null,
+                    purge_after = null
+                where id = ?
+                """.trimIndent(),
+                CHANGE_SNAPSHOT_SESSION_ID,
+            )
+            jdbcTemplate.update(
+                "delete from host_session_lifecycle_audit where id in (?, ?)",
+                restoredDraftId,
+                restoredOpenId,
+            )
+        }
+    }
+
     private fun assertHostNotificationComposerSchema() {
         assertThat(columns("session_record_apply_receipts"))
             .contains(
@@ -2587,7 +2716,16 @@ class MySqlFlywayMigrationTest(
             indexColumns("host_session_lifecycle_audit", "host_session_lifecycle_audit_actor_idx"),
         )
         assertThat(checkConstraintClause("host_session_lifecycle_audit_contract_check"))
-            .contains("OPENED", "CLOSED", "PUBLISHED", "REOPENED", "UNPUBLISHED", "RETURNED_TO_DRAFT", "DELETED")
+            .contains(
+                "OPENED",
+                "CLOSED",
+                "PUBLISHED",
+                "REOPENED",
+                "UNPUBLISHED",
+                "RETURNED_TO_DRAFT",
+                "DELETED",
+                "RESTORED",
+            )
         assertThat(checkConstraintClause("host_session_lifecycle_audit_reason_check"))
             .contains(
                 "ACCIDENTAL_TRANSITION",
@@ -2611,6 +2749,30 @@ class MySqlFlywayMigrationTest(
             Int::class.java,
             tableName,
         ) == 1
+
+    private fun viewExists(viewName: String): Boolean =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from information_schema.views
+            where table_schema = database()
+              and table_name = ?
+            """.trimIndent(),
+            Int::class.java,
+            viewName,
+        ) == 1
+
+    private fun viewDefinition(viewName: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select view_definition
+            from information_schema.views
+            where table_schema = database()
+              and table_name = ?
+            """.trimIndent(),
+            String::class.java,
+            viewName,
+        ) ?: error("View $viewName does not exist")
 
     private fun importedKeys(tableName: String): List<String> =
         jdbcTemplate
@@ -2644,6 +2806,7 @@ class MySqlFlywayMigrationTest(
         from: String,
         to: String?,
         reason: String?,
+        id: String = UUID.randomUUID().toString(),
     ) {
         jdbcTemplate.update(
             """
@@ -2652,7 +2815,7 @@ class MySqlFlywayMigrationTest(
               from_state, to_state, reason_code, reason_note, request_id
             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
-            UUID.randomUUID().toString(),
+            id,
             LIFECYCLE_AUDIT_CLUB_ID,
             LIFECYCLE_AUDIT_SESSION_ID,
             LIFECYCLE_AUDIT_ACTOR_ID,

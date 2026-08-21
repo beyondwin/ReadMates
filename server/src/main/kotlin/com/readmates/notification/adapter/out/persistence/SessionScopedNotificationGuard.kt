@@ -28,7 +28,7 @@ class SessionScopedNotificationGuard(
         val found =
             jdbcTemplate
                 .query(
-                    "select id from sessions where club_id = ? and id = ? for update",
+                    "select id from active_sessions sessions where club_id = ? and id = ? for update",
                     { rs, _ -> rs.getString("id") },
                     clubId.dbString(),
                     sessionId.dbString(),
@@ -41,7 +41,7 @@ class SessionScopedNotificationGuard(
         return jdbcTemplate.query(
             """
             select sessions.club_id, sessions.id, sessions.number, sessions.book_title
-            from sessions
+            from active_sessions sessions
             where sessions.session_date = ?
               and sessions.state in ('DRAFT', 'OPEN')
               and sessions.visibility in ('MEMBER', 'PUBLIC')

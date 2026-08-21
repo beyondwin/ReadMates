@@ -55,7 +55,7 @@ class JdbcPublicQueryAdapter(
                 """
                 select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
                        public_session_publications.public_summary
-                from sessions
+                from active_sessions sessions
                 join clubs on clubs.id = sessions.club_id
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
@@ -93,7 +93,7 @@ class JdbcPublicQueryAdapter(
             select
               (
                 select count(*)
-                from sessions
+                from active_sessions sessions
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
@@ -102,7 +102,7 @@ class JdbcPublicQueryAdapter(
               ) as session_count,
               (
                 select count(distinct sessions.book_title)
-                from sessions
+                from active_sessions sessions
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
@@ -150,7 +150,7 @@ class JdbcPublicQueryAdapter(
               public_session_publications.public_summary,
               coalesce(highlight_counts.cnt, 0) as highlight_count,
               coalesce(one_liner_counts.cnt, 0) as one_liner_count
-            from sessions
+            from active_sessions sessions
             join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
             left join (

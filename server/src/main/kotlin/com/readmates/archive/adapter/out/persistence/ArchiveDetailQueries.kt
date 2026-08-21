@@ -48,7 +48,7 @@ internal class ArchiveDetailQueries {
                       then public_session_publications.public_summary
                     else null
                   end as public_summary
-                from sessions
+                from active_sessions sessions
                 left join session_participants current_participant on current_participant.session_id = sessions.id
                   and current_participant.club_id = sessions.club_id
                   and current_participant.membership_id = ?

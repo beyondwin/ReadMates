@@ -51,7 +51,7 @@ internal class ManualNotificationDispatchReadQueries(
                      and session_record_revisions.session_id = sessions.id
                    order by session_record_revisions.version desc
                    limit 1) as session_record_content_revision
-                from sessions
+                from active_sessions sessions
                 where sessions.club_id = ?
                   and sessions.id = ?
                 ${if (forUpdate) "for update" else ""}
@@ -269,7 +269,7 @@ internal class ManualNotificationDispatchReadQueries(
             from notification_manual_dispatches
             join notification_event_outbox on notification_event_outbox.id = notification_manual_dispatches.event_id
               and notification_event_outbox.club_id = notification_manual_dispatches.club_id
-            join sessions on sessions.id = notification_manual_dispatches.session_id
+            join active_sessions sessions on sessions.id = notification_manual_dispatches.session_id
               and sessions.club_id = notification_manual_dispatches.club_id
             join memberships on memberships.id = notification_manual_dispatches.requested_by_membership_id
               and memberships.club_id = notification_manual_dispatches.club_id

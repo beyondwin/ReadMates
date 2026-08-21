@@ -31,7 +31,7 @@ class JdbcSessionImportWriteAdapter(
                 .query(
                     """
                     select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.session_date
-                    from sessions
+                    from active_sessions sessions
                     join memberships on memberships.club_id = sessions.club_id
                     where sessions.id = ?
                       and sessions.club_id = ?
@@ -100,7 +100,7 @@ class JdbcSessionImportWriteAdapter(
         jdbcTemplate.queryForObject(
             """
             select state
-            from sessions
+            from active_sessions sessions
             where id = ?
               and club_id = ?
             for update
@@ -123,6 +123,7 @@ class JdbcSessionImportWriteAdapter(
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
+              and deleted_at is null
             """.trimIndent(),
             exposure.accessScope.name,
             compatibility.sessionVisibility,

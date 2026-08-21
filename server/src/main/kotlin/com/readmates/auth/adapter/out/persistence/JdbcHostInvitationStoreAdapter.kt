@@ -382,7 +382,7 @@ class JdbcHostInvitationStoreAdapter(
               participation_status
             )
             select ?, sessions.club_id, sessions.id, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE'
-            from sessions
+            from active_sessions sessions
             where sessions.club_id = ?
               and sessions.state = 'OPEN'
               and sessions.question_deadline_at > utc_timestamp(6)

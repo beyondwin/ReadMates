@@ -94,7 +94,7 @@ class JdbcHostSessionHistoryAdapter(
                    actor_membership_id, created_at,
                    (
                      select state
-                     from sessions
+                     from active_sessions sessions
                      where sessions.id = host_session_lifecycle_audit.session_id
                        and sessions.club_id = host_session_lifecycle_audit.club_id
                    ) as current_state,

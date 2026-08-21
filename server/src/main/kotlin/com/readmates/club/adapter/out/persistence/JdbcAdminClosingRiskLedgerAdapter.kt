@@ -171,7 +171,7 @@ class JdbcAdminClosingRiskLedgerAdapter(
             """
             select l.*, s.number, s.book_title, s.session_date
             from admin_closing_risk_ledger l
-            join sessions s on s.id = l.session_id
+            join active_sessions s on s.id = l.session_id
             where l.session_id in ($placeholders)
             """.trimIndent(),
             { rs, _ -> rs.toLedgerRow() },
@@ -184,7 +184,7 @@ class JdbcAdminClosingRiskLedgerAdapter(
             """
             select l.*, s.number, s.book_title, s.session_date
             from admin_closing_risk_ledger l
-            join sessions s on s.id = l.session_id
+            join active_sessions s on s.id = l.session_id
             where l.club_id = ?
             order by coalesce(l.resolved_at, l.last_seen_at) desc, s.number desc
             """.trimIndent(),

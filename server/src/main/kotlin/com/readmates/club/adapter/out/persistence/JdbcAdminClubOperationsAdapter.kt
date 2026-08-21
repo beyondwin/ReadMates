@@ -157,7 +157,7 @@ class JdbcAdminClubOperationsAdapter(
               sum(case when state = 'CLOSED' and not exists (
                 select 1 from public_session_publications p where p.session_id = sessions.id and p.is_public = true
               ) then 1 else 0 end) as incomplete_record_count
-            from sessions
+            from active_sessions sessions
             where club_id = ?
             """.trimIndent(),
             { rs, _ ->
@@ -232,7 +232,7 @@ class JdbcAdminClubOperationsAdapter(
                     order by notification_event_outbox.created_at desc, notification_event_outbox.id desc
                     limit 1
                   ) as latest_notification_status
-                from sessions
+                from active_sessions sessions
                 left join public_session_publications
                   on public_session_publications.club_id = sessions.club_id
                  and public_session_publications.session_id = sessions.id
@@ -508,7 +508,7 @@ select
     order by notification_event_outbox.created_at desc, notification_event_outbox.id desc
     limit 1
   ) as latest_notification_status
-from sessions
+from active_sessions sessions
 join clubs on clubs.id = sessions.club_id
 left join public_session_publications
   on public_session_publications.club_id = sessions.club_id

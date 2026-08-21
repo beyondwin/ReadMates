@@ -91,7 +91,7 @@ class JdbcGuestRecordBrowseAdapter(
                     )
                   )
               ) as highlight_count
-            from sessions
+            from active_sessions sessions
             join clubs on clubs.id = sessions.club_id
             where clubs.slug = ?
               and clubs.status = 'ACTIVE'
@@ -158,7 +158,7 @@ class JdbcGuestRecordBrowseAdapter(
             """
             with eligible_sessions as (
               select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.session_date
-              from sessions
+              from active_sessions sessions
               join clubs on clubs.id = sessions.club_id
               where clubs.slug = ?
                 and clubs.status = 'ACTIVE'
@@ -277,7 +277,7 @@ class JdbcGuestRecordBrowseAdapter(
                where session_participants.session_id = sessions.id
                  and session_participants.club_id = sessions.club_id
                  and session_participants.participation_status = 'ACTIVE') as total
-            from sessions
+            from active_sessions sessions
             join clubs on clubs.id = sessions.club_id
             where clubs.slug = ?
               and clubs.status = 'ACTIVE'
@@ -314,7 +314,7 @@ class JdbcGuestRecordBrowseAdapter(
                        where session_participants.session_id = sessions.id
                          and session_participants.club_id = sessions.club_id
                          and session_participants.participation_status = 'ACTIVE') as total
-                    from sessions
+                    from active_sessions sessions
                     join clubs on clubs.id = sessions.club_id
                     left join public_session_publications on public_session_publications.session_id = sessions.id
                       and public_session_publications.club_id = sessions.club_id

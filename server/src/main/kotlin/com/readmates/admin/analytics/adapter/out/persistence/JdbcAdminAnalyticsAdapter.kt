@@ -77,7 +77,7 @@ private fun JdbcTemplate.sessionCount(
     prior: Boolean,
 ): Int =
     scalarInt(
-        "select count(*) from sessions where ${sessionDatePredicate(prior)}",
+        "select count(*) from active_sessions sessions where ${sessionDatePredicate(prior)}",
         sessionDateArgs(w, prior),
     )
 
@@ -88,7 +88,7 @@ private fun JdbcTemplate.completedSessionCount(
     scalarInt(
         """
         select count(*)
-        from sessions
+        from active_sessions sessions
         where state in ('CLOSED','PUBLISHED')
           and ${sessionDatePredicate(prior)}
         """.trimIndent(),
@@ -105,7 +105,7 @@ private fun JdbcTemplate.participantCount(
         """
         select count(*)
         from session_participants sp
-        join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
+        join active_sessions s on s.id = sp.session_id and s.club_id = sp.club_id
         where ${sessionDatePredicate(prior).replace("session_date", "s.session_date")}$rsvpClause
         """.trimIndent(),
         sessionDateArgs(w, prior),
@@ -120,7 +120,7 @@ private fun JdbcTemplate.activeMemberCount(
         """
         select count(distinct sp.membership_id)
         from session_participants sp
-        join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
+        join active_sessions s on s.id = sp.session_id and s.club_id = sp.club_id
         where ${sessionDatePredicate(prior).replace("session_date", "s.session_date")}
         """.trimIndent(),
         sessionDateArgs(w, prior),
@@ -185,7 +185,7 @@ private fun JdbcTemplate.benchmark(w: Long): List<AdminAnalyticsBenchmarkRaw> =
               and n.updated_at >= utc_timestamp(6) - interval ? day
           ), 0) as notif_sent
         from clubs c
-        left join sessions s on s.club_id = c.id and s.session_date >= current_date() - interval ? day
+        left join active_sessions s on s.club_id = c.id and s.session_date >= current_date() - interval ? day
         left join session_participants sp force index (session_participants_session_club_fk)
           on sp.session_id = s.id and sp.club_id = s.club_id
         group by c.id, c.slug, c.name
@@ -220,13 +220,13 @@ private fun JdbcTemplate.benchmark(w: Long): List<AdminAnalyticsBenchmarkRaw> =
 // rows to the window so every index falls within bucketStarts.
 private const val SERIES_SESSIONS_SQL = """
     select floor(datediff(session_date, ?) / ?) as bucket, count(*) as v
-    from sessions
+    from active_sessions sessions
     where session_date >= ? and session_date < ?
     group by bucket
 """
 private const val SERIES_COMPLETED_SQL = """
     select floor(datediff(session_date, ?) / ?) as bucket, count(*) as v
-    from sessions
+    from active_sessions sessions
     where session_date >= ? and session_date < ?
       and state in ('CLOSED','PUBLISHED')
     group by bucket
@@ -234,14 +234,14 @@ private const val SERIES_COMPLETED_SQL = """
 private const val SERIES_PARTICIPANTS_SQL = """
     select floor(datediff(s.session_date, ?) / ?) as bucket, count(*) as v
     from session_participants sp
-    join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
+    join active_sessions s on s.id = sp.session_id and s.club_id = sp.club_id
     where s.session_date >= ? and s.session_date < ?
     group by bucket
 """
 private const val SERIES_GOING_MAYBE_SQL = """
     select floor(datediff(s.session_date, ?) / ?) as bucket, count(*) as v
     from session_participants sp
-    join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
+    join active_sessions s on s.id = sp.session_id and s.club_id = sp.club_id
     where s.session_date >= ? and s.session_date < ?
       and sp.rsvp_status in ('GOING','MAYBE')
     group by bucket
@@ -249,7 +249,7 @@ private const val SERIES_GOING_MAYBE_SQL = """
 private const val SERIES_ACTIVE_MEMBERS_SQL = """
     select floor(datediff(s.session_date, ?) / ?) as bucket, count(distinct sp.membership_id) as v
     from session_participants sp
-    join sessions s on s.id = sp.session_id and s.club_id = sp.club_id
+    join active_sessions s on s.id = sp.session_id and s.club_id = sp.club_id
     where s.session_date >= ? and s.session_date < ?
     group by bucket
 """

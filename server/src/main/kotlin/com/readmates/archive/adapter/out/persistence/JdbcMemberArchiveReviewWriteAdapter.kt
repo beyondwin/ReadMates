@@ -35,7 +35,7 @@ class JdbcMemberArchiveReviewWriteAdapter(
                       sessions.book_title,
                       session_participants.membership_id,
                       long_reviews.visibility as previous_visibility
-                    from sessions
+                    from active_sessions sessions
                     join session_participants on session_participants.session_id = sessions.id
                       and session_participants.club_id = sessions.club_id
                       and session_participants.membership_id = ?

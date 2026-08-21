@@ -33,6 +33,7 @@ internal class HostSessionLifecycleWriteOperations(
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
+              and deleted_at is null
             """.trimIndent(),
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
@@ -51,6 +52,7 @@ internal class HostSessionLifecycleWriteOperations(
                     updated_at = utc_timestamp(6)
                 where id = ?
                   and club_id = ?
+                  and deleted_at is null
                   and state = 'OPEN'
                 """.trimIndent(),
                 command.sessionId.dbString(),
@@ -72,6 +74,7 @@ internal class HostSessionLifecycleWriteOperations(
                     updated_at = utc_timestamp(6)
                 where id = ?
                   and club_id = ?
+                  and deleted_at is null
                   and state = 'CLOSED'
                   and access_scope = 'GUEST_READABLE'
                   and exists (
@@ -115,6 +118,7 @@ internal class HostSessionLifecycleWriteOperations(
                     updated_at = utc_timestamp(6)
                 where id = ?
                   and club_id = ?
+                  and deleted_at is null
                   and state = 'PUBLISHED'
                 """.trimIndent(),
                 command.sessionId.dbString(),
@@ -137,6 +141,7 @@ internal class HostSessionLifecycleWriteOperations(
                     updated_at = utc_timestamp(6)
                 where id = ?
                   and club_id = ?
+                  and deleted_at is null
                   and state = 'OPEN'
                 """.trimIndent(),
                 command.sessionId.dbString(),
@@ -161,6 +166,7 @@ internal class HostSessionLifecycleWriteOperations(
                     updated_at = utc_timestamp(6)
                 where id = ?
                   and club_id = ?
+                  and deleted_at is null
                   and state = 'CLOSED'
                 """.trimIndent(),
                 command.sessionId.dbString(),
@@ -197,6 +203,7 @@ internal class HostSessionLifecycleWriteOperations(
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
+              and deleted_at is null
             """.trimIndent(),
             command.sessionId.dbString(),
             command.host.clubId.dbString(),

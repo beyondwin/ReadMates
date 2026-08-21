@@ -55,6 +55,7 @@ internal class HostSessionDraftWriteOperations(
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
+              and deleted_at is null
             """.trimIndent(),
             exposure.accessScope.name,
             compatibility.sessionVisibility,
@@ -140,7 +141,7 @@ internal class HostSessionDraftWriteOperations(
                 meeting_url = case when ? then ? else meeting_url end,
                 meeting_passcode = case when ? then ? else meeting_passcode end,
                 question_deadline_at = ?, updated_at = utc_timestamp(6)
-            where id = ? and club_id = ?
+            where id = ? and club_id = ? and deleted_at is null
             """.trimIndent(),
             request.title,
             request.bookTitle,

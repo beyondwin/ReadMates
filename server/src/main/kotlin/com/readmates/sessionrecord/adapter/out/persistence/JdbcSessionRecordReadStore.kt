@@ -33,7 +33,7 @@ internal class JdbcSessionRecordReadStore(
                              from session_record_revisions r
                              where r.club_id = s.club_id and r.session_id = s.id
                            ), 0) as live_revision
-                    from sessions s
+                    from active_sessions s
                     left join public_session_publications p
                       on p.club_id = s.club_id and p.session_id = s.id
                     where s.id = ? and s.club_id = ?

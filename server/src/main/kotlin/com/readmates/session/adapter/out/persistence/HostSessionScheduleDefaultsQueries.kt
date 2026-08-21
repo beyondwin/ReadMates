@@ -25,7 +25,7 @@ internal class HostSessionScheduleDefaultsQueries {
                 """
                 select session_date, start_time, end_time, location_label, meeting_url, meeting_passcode,
                        access_scope, question_deadline_at
-                from sessions
+                from active_sessions sessions
                 where club_id = ?
                 order by session_date desc, number desc
                 limit ?
@@ -59,7 +59,7 @@ internal class HostSessionScheduleDefaultsQueries {
             .query(
                 """
                 select meeting_url, meeting_passcode
-                from sessions
+                from active_sessions sessions
                 where club_id = ?
                   and meeting_url is not null
                   and trim(meeting_url) <> ''

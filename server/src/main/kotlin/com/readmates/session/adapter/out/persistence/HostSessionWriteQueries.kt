@@ -62,7 +62,7 @@ internal class HostSessionWriteQueries(
             .query(
                 """
                 select id
-                from sessions
+                from active_sessions sessions
                 where club_id = ?
                   and state = 'OPEN'
                 limit 1
@@ -97,7 +97,7 @@ internal class HostSessionWriteQueries(
                        public_session_publications.visibility as publication_visibility,
                        public_session_publications.site_visibility,
                        public_session_publications.is_public
-                from sessions
+                from active_sessions sessions
                 left join public_session_publications
                   on public_session_publications.club_id = sessions.club_id
                  and public_session_publications.session_id = sessions.id
@@ -132,7 +132,7 @@ internal class HostSessionWriteQueries(
             jdbcTemplate.queryForObject(
                 """
                 select state
-                from sessions
+                from active_sessions sessions
                 where id = ? and club_id = ?
                 for update
                 """.trimIndent(),
@@ -150,7 +150,7 @@ internal class HostSessionWriteQueries(
                 .query(
                     """
                     select updated_at
-                    from sessions
+                    from active_sessions sessions
                     where id = ? and club_id = ?
                     for update
                     """.trimIndent(),
