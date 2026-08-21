@@ -17,8 +17,8 @@ class HostSessionTrashScheduler(
     fun purgeExpired() {
         try {
             purgeExpiredHostSessionTrash.purgeExpired(properties.boundedPurgeBatchSize())
-        } catch (_: RuntimeException) {
-            logger.warn(PURGE_FAILED_MESSAGE)
+        } catch (ex: RuntimeException) {
+            logger.warn(PURGE_FAILED_MESSAGE, ex)
         }
     }
 

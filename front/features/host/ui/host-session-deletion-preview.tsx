@@ -133,10 +133,10 @@ export function HostSessionDeletionPreviewDialog({
         } as CSSProperties}
       >
         <h2 id="delete-session-title" style={{ margin: 0 }}>
-          이 모임을 목록에서 지울까요?
+          이 모임을 휴지통으로 옮길까요?
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "10px 0 18px" }}>
-          삭제하면 이 모임과 준비 기록이 모두 제거됩니다. 멤버 계정과 멤버십은 삭제되지 않습니다.
+          휴지통으로 옮긴 모임은 7일 동안 복구할 수 있습니다. 멤버 계정과 멤버십은 삭제되지 않습니다.
         </p>
 
         {previewLoading ? (
@@ -199,7 +199,7 @@ export function HostSessionDeletionPreviewDialog({
             onClick={onConfirm}
             style={{ background: "var(--danger)", borderColor: "var(--danger)" }}
           >
-            목록에서 지우기
+            휴지통으로 이동
           </button>
         </div>
       </div>

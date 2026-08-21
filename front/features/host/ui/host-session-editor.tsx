@@ -1317,7 +1317,7 @@ export default function HostSessionEditor({
                       onClick={openDeleteModal}
                       style={{ color: "var(--danger)" }}
                     >
-                      세션 삭제
+                      휴지통으로 이동
                     </button>
                     <div className="tiny" style={{ marginTop: "8px" }}>
                       {destructiveActionAvailability.guidance}

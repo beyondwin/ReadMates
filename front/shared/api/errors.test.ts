@@ -6,7 +6,7 @@ describe("apiErrorFromResponse", () => {
     const response = new Response(
       JSON.stringify({
         code: "SESSION_OPEN_ALREADY_EXISTS",
-        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 작성 중으로 되돌린 뒤 다시 시도하세요.",
         status: 409,
         openSessionId: "00000000-0000-0000-0000-000000000307",
       }),
@@ -26,7 +26,7 @@ describe("apiErrorFromResponse", () => {
     const response = new Response(
       JSON.stringify({
         code: "SESSION_OPEN_ALREADY_EXISTS",
-        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 작성 중으로 되돌린 뒤 다시 시도하세요.",
         status: 409,
         ...body,
       }),

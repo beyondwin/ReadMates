@@ -243,6 +243,8 @@ class HostSessionTrashServiceTest {
             .containsExactly("Scheduled host session trash purge failed result=failed")
         assertThat(appender.list.map { it.formattedMessage }.joinToString())
             .doesNotContain("private db endpoint")
+        assertThat(appender.list.map { it.throwableProxy?.message }.distinct())
+            .containsExactly("private db endpoint")
     }
 
     @Test

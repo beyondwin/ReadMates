@@ -108,7 +108,7 @@ test("host confirms before closing a session from the editor overview", async ({
   );
   await page.getByRole("dialog", { name: "모임 마치기" }).getByRole("button", { name: "모임 마치기" }).click();
   await closeResponse;
-  await expect(page.getByRole("button", { name: "다시 진행 중으로" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "다시 준비 중으로" })).toBeVisible();
   await expect(page.getByText("기록 정리 중")).toBeVisible();
 });
 

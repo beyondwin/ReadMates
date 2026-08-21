@@ -62,14 +62,14 @@ test("host lifecycle reverse stores the request ID on the audit row", async ({ p
       },
     });
   });
-  await page.getByRole("button", { name: "다시 진행 중으로" }).click();
-  const dialog = page.getByRole("dialog", { name: "다시 진행 중으로" });
+  await page.getByRole("button", { name: "다시 준비 중으로" }).click();
+  const dialog = page.getByRole("dialog", { name: "다시 준비 중으로" });
   await dialog.getByLabel("변경 사유").selectOption("OPERATIONAL_RECOVERY");
   const reverse = page.waitForResponse((response) => (
     response.request().method() === "POST"
     && response.url().includes(`/host/sessions/${sessionId}/reopen`)
   ));
-  await dialog.getByRole("button", { name: "다시 진행 중으로" }).click();
+  await dialog.getByRole("button", { name: "다시 준비 중으로" }).click();
   expect((await reverse).status()).toBe(200);
   const audit = runMysql(`
 select request_id, reason_code

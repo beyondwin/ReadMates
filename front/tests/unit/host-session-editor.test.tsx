@@ -756,14 +756,14 @@ describe("HostSessionEditor", () => {
     expect(screen.getByText("알림 발송")).toBeVisible();
     expect(screen.queryByText("운영 순서")).not.toBeInTheDocument();
     expect(screen.queryByText("저장 안내")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "휴지통으로 이동" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "모임 정보" }));
-    expect(screen.getByRole("button", { name: "세션 삭제" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "휴지통으로 이동" })).toBeVisible();
     expect(screen.queryByText("운영 순서")).not.toBeInTheDocument();
 
     await user.click(within(screen.getByRole("listitem", { name: /출석/ })).getByRole("button"));
-    expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "휴지통으로 이동" })).not.toBeInTheDocument();
   });
 
   it("shows a new-session empty message instead of static attendance and feedback document controls", () => {
@@ -1753,7 +1753,7 @@ describe("HostSessionEditor", () => {
     expect(closeSession).toHaveBeenCalledWith(openSession.sessionId);
   });
 
-  it("reopens a closed session after confirming 다시 진행 중으로", async () => {
+  it("reopens a closed session after confirming 다시 준비 중으로", async () => {
     const user = userEvent.setup();
     const closedSession = { ...session, state: "CLOSED" as const };
     const reopenSession = vi.fn(
@@ -1767,10 +1767,10 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "다시 진행 중으로" }));
+    await user.click(screen.getByRole("button", { name: "다시 준비 중으로" }));
     expect(reopenSession).not.toHaveBeenCalled();
 
-    await confirmReverseDialog(user, "다시 진행 중으로");
+    await confirmReverseDialog(user, "다시 준비 중으로");
 
     expect(reopenSession).toHaveBeenCalledTimes(1);
     expect(reopenSession).toHaveBeenCalledWith(closedSession.sessionId, {
@@ -1798,10 +1798,10 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "다시 진행 중으로" }));
-    await confirmReverseDialog(user, "다시 진행 중으로");
+    await user.click(screen.getByRole("button", { name: "다시 준비 중으로" }));
+    await confirmReverseDialog(user, "다시 준비 중으로");
 
-    const dialog = await screen.findByRole("dialog", { name: "다시 진행 중으로" });
+    const dialog = await screen.findByRole("dialog", { name: "다시 준비 중으로" });
     expect(dialog).toBeVisible();
     expect(within(dialog).getByRole("alert")).toHaveTextContent(openAlreadyExistsMessage());
     expect(within(dialog).getByRole("link", { name: "진행 중인 모임 열기" })).toHaveAttribute(
@@ -1836,7 +1836,7 @@ describe("HostSessionEditor", () => {
     });
   });
 
-  it("returns an open session to draft after confirming 모임 전으로 되돌리기", async () => {
+  it("returns an open session to draft after confirming 작성 중으로 되돌리기", async () => {
     const user = userEvent.setup();
     const returnSessionToDraft = vi.fn(
       async () => ({ ok: true as const, session: { ...openSession, state: "DRAFT" as const } }),
@@ -1849,10 +1849,10 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "모임 전으로 되돌리기" }));
+    await user.click(screen.getByRole("button", { name: "작성 중으로 되돌리기" }));
     expect(returnSessionToDraft).not.toHaveBeenCalled();
 
-    await confirmReverseDialog(user, "모임 전으로 되돌리기");
+    await confirmReverseDialog(user, "작성 중으로 되돌리기");
 
     expect(returnSessionToDraft).toHaveBeenCalledTimes(1);
     expect(returnSessionToDraft).toHaveBeenCalledWith(openSession.sessionId, {
@@ -2191,9 +2191,9 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+    await user.click(screen.getByRole("button", { name: "휴지통으로 이동" }));
 
-    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
     expect(dialog).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7/deletion-preview", expect.objectContaining({
@@ -2210,7 +2210,7 @@ describe("HostSessionEditor", () => {
     expect(screen.getByText("7개")).toBeInTheDocument();
     expect(screen.queryByText(retiredPersonalFeedbackReportLabel)).not.toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
+    await user.click(within(dialog).getByRole("button", { name: "휴지통으로 이동" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7", expect.objectContaining({
@@ -2255,9 +2255,9 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
-    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
-    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
+    await user.click(screen.getByRole("button", { name: "휴지통으로 이동" }));
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "휴지통으로 이동" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
     expect(location.href).toBe("");
@@ -2296,9 +2296,9 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
-    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
-    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
+    await user.click(screen.getByRole("button", { name: "휴지통으로 이동" }));
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "휴지통으로 이동" }));
 
     await waitFor(() => expect(onSessionTrashed).toHaveBeenCalledWith(expect.objectContaining({
       sessionId: "open-session-7",
@@ -2323,15 +2323,15 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    const trigger = screen.getByRole("button", { name: "세션 삭제" });
+    const trigger = screen.getByRole("button", { name: "휴지통으로 이동" });
     await user.click(trigger);
 
-    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
     const cancelButton = within(dialog).getByRole("button", { name: "취소" });
     await waitFor(() => expect(cancelButton).toHaveFocus());
 
     await screen.findByText("참석 대상");
-    const confirmButton = within(dialog).getByRole("button", { name: "목록에서 지우기" });
+    const confirmButton = within(dialog).getByRole("button", { name: "휴지통으로 이동" });
     expect(confirmButton).toBeEnabled();
 
     await user.tab();
@@ -2343,7 +2343,7 @@ describe("HostSessionEditor", () => {
 
     await user.keyboard("{Escape}");
 
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "이 모임을 목록에서 지울까요?" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" })).not.toBeInTheDocument());
     await waitFor(() => expect(trigger).toHaveFocus());
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/host/sessions/open-session-7", expect.objectContaining({
@@ -2354,8 +2354,7 @@ describe("HostSessionEditor", () => {
   it("does not show the delete action on the new-session editor", () => {
     render(<HostSessionEditorForTest />);
 
-    expect(screen.queryByRole("button", { name: "세션 삭제" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "목록에서 지우기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "휴지통으로 이동" })).not.toBeInTheDocument();
   });
 
   it("lets hosts remove a draft from the list after the deletion preview dialog", async () => {
@@ -2399,10 +2398,10 @@ describe("HostSessionEditor", () => {
     render(<HostSessionEditorForTest session={draftSession} />);
 
     await user.click(screen.getByRole("button", { name: "모임 정보" }));
-    await user.click(await screen.findByRole("button", { name: "세션 삭제" }));
+    await user.click(await screen.findByRole("button", { name: "휴지통으로 이동" }));
     expect(confirmSpy).not.toHaveBeenCalled();
 
-    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
     expect(dialog).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -2414,7 +2413,7 @@ describe("HostSessionEditor", () => {
       ),
     );
 
-    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
+    await user.click(within(dialog).getByRole("button", { name: "휴지통으로 이동" }));
 
     await waitFor(() =>
       expect(fetchMock).toHaveBeenCalledWith(
@@ -2438,7 +2437,7 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "세션 삭제" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "휴지통으로 이동" })).toBeDisabled();
   });
 
   it("shows a preview failure message and does not send delete", async () => {
@@ -2453,11 +2452,11 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+    await user.click(screen.getByRole("button", { name: "휴지통으로 이동" }));
 
     expect(await screen.findByText("모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
-    const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
-    expect(within(dialog).getByRole("button", { name: "목록에서 지우기" })).toBeDisabled();
+    const dialog = screen.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
+    expect(within(dialog).getByRole("button", { name: "휴지통으로 이동" })).toBeDisabled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
@@ -2479,10 +2478,10 @@ describe("HostSessionEditor", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+    await user.click(screen.getByRole("button", { name: "휴지통으로 이동" }));
     await screen.findByText("참석 대상");
-    const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
-    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
+    const dialog = screen.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "휴지통으로 이동" }));
 
     expect(await screen.findByText("모임을 지우지 못했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.")).toBeInTheDocument();
     expect(dialog).toBeInTheDocument();

@@ -766,8 +766,8 @@ test.describe("focus workspace recovery journey", () => {
     await page.goto(`${HOST_PATH}/sessions/${sessionId}?section=attendance`);
     await expect(page.getByRole("button", { name: "호스트 참석" })).toHaveAttribute("aria-pressed", "false");
 
-    await page.getByRole("button", { name: "모임 전으로 되돌리기" }).click();
-    await confirmLifecycle(page, "모임 전으로 되돌리기", "모임 전으로 되돌리기", "실수로 상태를 바꿈");
+    await page.getByRole("button", { name: "작성 중으로 되돌리기" }).click();
+    await confirmLifecycle(page, "작성 중으로 되돌리기", "작성 중으로 되돌리기", "실수로 상태를 바꿈");
     await expect(page.getByText("모임 작성 중")).toBeVisible();
   });
 
@@ -783,10 +783,10 @@ test.describe("focus workspace recovery journey", () => {
     const workspacePath = new URL(page.url()).pathname;
 
     await openBasicSheet(page);
-    await page.getByRole("button", { name: "세션 삭제" }).click();
-    const deleteDialog = page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    await page.getByRole("button", { name: "휴지통으로 이동" }).click();
+    const deleteDialog = page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
     await expect(deleteDialog).toBeVisible();
-    await deleteDialog.getByRole("button", { name: "목록에서 지우기" }).click();
+    await deleteDialog.getByRole("button", { name: "휴지통으로 이동" }).click();
     await expect(page.getByRole("heading", { name: "휴지통에서 복원" })).toBeVisible();
     expect(new URL(page.url()).pathname).toBe(workspacePath);
 
@@ -799,9 +799,9 @@ test.describe("focus workspace recovery journey", () => {
     await expect(page.getByText("모임 작성 중")).toBeVisible();
 
     await openBasicSheet(page);
-    await page.getByRole("button", { name: "세션 삭제" }).click();
-    await page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" })
-      .getByRole("button", { name: "목록에서 지우기" })
+    await page.getByRole("button", { name: "휴지통으로 이동" }).click();
+    await page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" })
+      .getByRole("button", { name: "휴지통으로 이동" })
       .click();
     await expect(page.getByRole("heading", { name: "휴지통에서 복원" })).toBeVisible();
 
@@ -812,9 +812,9 @@ test.describe("focus workspace recovery journey", () => {
 
     await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
     await openBasicSheet(page);
-    await page.getByRole("button", { name: "세션 삭제" }).click();
-    await page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" })
-      .getByRole("button", { name: "목록에서 지우기" })
+    await page.getByRole("button", { name: "휴지통으로 이동" }).click();
+    await page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" })
+      .getByRole("button", { name: "휴지통으로 이동" })
       .click();
     expireHostSessionTrash(sessionId);
     await page.reload();
@@ -864,10 +864,10 @@ test.describe("focus workspace recovery journey", () => {
     await page.goto(`${HOST_PATH}/sessions/${tombstoneId}`);
     await expect(page.getByText("모임 작성 중")).toBeVisible();
     await openBasicSheet(page);
-    await page.getByRole("button", { name: "세션 삭제" }).click();
-    const dialog = page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    await page.getByRole("button", { name: "휴지통으로 이동" }).click();
+    const dialog = page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
     await expectDialogFitsViewport(page, dialog);
-    await dialog.getByRole("button", { name: "목록에서 지우기" }).click();
+    await dialog.getByRole("button", { name: "휴지통으로 이동" }).click();
     await expect(page.getByRole("heading", { name: "휴지통에서 복원" })).toBeVisible();
     await captureWorkspaceViewport(page, testInfo, "focus-tombstone");
   });

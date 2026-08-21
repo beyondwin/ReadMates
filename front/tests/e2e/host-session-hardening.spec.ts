@@ -644,11 +644,11 @@ test("each deletion blocker and a preview/delete race fail closed", async ({ pag
     blocker.seed(sessionId);
     await openHostSession(page, sessionId);
     await openWorkspacePanel(page, "기본 정보");
-    await page.getByRole("button", { name: "세션 삭제" }).click();
-    const dialog = page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    await page.getByRole("button", { name: "휴지통으로 이동" }).click();
+    const dialog = page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText(`${BLOCKER_LABELS[blocker.code]} 1개`)).toBeVisible();
-    await expect(dialog.getByRole("button", { name: "목록에서 지우기" })).toBeDisabled();
+    await expect(dialog.getByRole("button", { name: "휴지통으로 이동" })).toBeDisabled();
     await expect(dialog.getByText(FIXTURE_PASSCODE)).toHaveCount(0);
     await expect(dialog.getByText("member1@example.com")).toHaveCount(0);
     await dialog.getByRole("button", { name: "취소" }).click();
@@ -658,22 +658,22 @@ test("each deletion blocker and a preview/delete race fail closed", async ({ pag
   const raceSessionId = insertSession({ bookTitle: "삭제 race", state: "DRAFT" });
   await openHostSession(page, raceSessionId);
   await openWorkspacePanel(page, "기본 정보");
-  await page.getByRole("button", { name: "세션 삭제" }).click();
-  const raceDialog = page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
-  await expect(raceDialog.getByRole("button", { name: "목록에서 지우기" })).toBeEnabled();
+  await page.getByRole("button", { name: "휴지통으로 이동" }).click();
+  const raceDialog = page.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
+  await expect(raceDialog.getByRole("button", { name: "휴지통으로 이동" })).toBeEnabled();
   seedRecordRevision(raceSessionId);
   const blockedDelete = page.waitForResponse((response) => (
     response.request().method() === "DELETE"
     && response.url().includes(`/host/sessions/${raceSessionId}`)
   ));
-  await raceDialog.getByRole("button", { name: "목록에서 지우기" }).click();
+  await raceDialog.getByRole("button", { name: "휴지통으로 이동" }).click();
   const blocked = await blockedDelete;
   expect(blocked.status()).toBe(409);
   const blockedBody = await blocked.json() as { code?: string; blockers?: Array<{ code: string }> };
   expect(blockedBody.code).toBe("SESSION_DELETE_BLOCKED");
   expect(blockedBody.blockers?.some((entry) => entry.code === "RECORD_REVISION_EXISTS")).toBe(true);
   await expect(raceDialog.getByText("적용된 기록 버전 1개")).toBeVisible();
-  await expect(raceDialog.getByRole("button", { name: "목록에서 지우기" })).toBeDisabled();
+  await expect(raceDialog.getByRole("button", { name: "휴지통으로 이동" })).toBeDisabled();
 });
 
 test("three reverse transitions record reason and history", async ({ page }) => {
@@ -689,18 +689,18 @@ test("three reverse transitions record reason and history", async ({ page }) => 
   await loginWithGoogleFixture(page, "host@example.com");
 
   await openHostSession(page, openId);
-  await page.getByRole("button", { name: "모임 전으로 되돌리기" }).click();
-  const returnDialog = page.getByRole("dialog", { name: "모임 전으로 되돌리기" });
-  await returnDialog.getByRole("button", { name: "모임 전으로 되돌리기" }).click();
+  await page.getByRole("button", { name: "작성 중으로 되돌리기" }).click();
+  const returnDialog = page.getByRole("dialog", { name: "작성 중으로 되돌리기" });
+  await returnDialog.getByRole("button", { name: "작성 중으로 되돌리기" }).click();
   await expect(returnDialog.getByRole("alert")).toHaveText("사유를 선택해 주세요");
   await expect(returnDialog.getByLabel("변경 사유")).toBeFocused();
-  await confirmReverse(page, "모임 전으로 되돌리기", "ACCIDENTAL_TRANSITION");
-  await expect(page.locator(".m-toast").filter({ hasText: "모임 전으로 되돌렸습니다." })).toBeVisible();
+  await confirmReverse(page, "작성 중으로 되돌리기", "ACCIDENTAL_TRANSITION");
+  await expect(page.locator(".m-toast").filter({ hasText: "작성 중으로 되돌렸습니다." })).toBeVisible();
   await expectHistoryReason(page, openId, "RETURNED_TO_DRAFT", "ACCIDENTAL_TRANSITION", "실수로 상태를 바꿈");
 
   await openHostSession(page, closedId);
-  await page.getByRole("button", { name: "다시 진행 중으로" }).click();
-  await confirmReverse(page, "다시 진행 중으로", "MEETING_RESCHEDULED");
+  await page.getByRole("button", { name: "다시 준비 중으로" }).click();
+  await confirmReverse(page, "다시 준비 중으로", "MEETING_RESCHEDULED");
   await expectHistoryReason(page, closedId, "REOPENED", "MEETING_RESCHEDULED", "모임 일정이 바뀜");
 
   await openHostSession(page, publishedId);
@@ -995,8 +995,8 @@ test("reverse request IDs correlate to lifecycle audit without secrets", async (
   const requestId = "e2e-hardening-request-1";
   await loginWithGoogleFixture(page, "host@example.com");
   await openHostSession(page, sessionId);
-  await page.getByRole("button", { name: "다시 진행 중으로" }).click();
-  const dialog = page.getByRole("dialog", { name: "다시 진행 중으로" });
+  await page.getByRole("button", { name: "다시 준비 중으로" }).click();
+  const dialog = page.getByRole("dialog", { name: "다시 준비 중으로" });
   await dialog.getByLabel("변경 사유").selectOption("OPERATIONAL_RECOVERY");
 
   const reverse = page.waitForResponse((response) => (
@@ -1007,7 +1007,7 @@ test("reverse request IDs correlate to lifecycle audit without secrets", async (
     const headers = { ...route.request().headers(), "x-readmates-request-id": requestId };
     await route.continue({ headers });
   });
-  await dialog.getByRole("button", { name: "다시 진행 중으로" }).click();
+  await dialog.getByRole("button", { name: "다시 준비 중으로" }).click();
   const reverseResponse = await reverse;
   expect(reverseResponse.status()).toBe(200);
   expect((reverseResponse.headers()["x-readmates-request-id"] ?? "")).toBe(requestId);

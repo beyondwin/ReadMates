@@ -118,14 +118,14 @@ describe("WorkspaceTrashTombstone", () => {
         {...trash}
         restoreConflict={{
           openSessionHref: "/app/host/sessions/open-session",
-          message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+          message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 작성 중으로 되돌린 뒤 다시 시도하세요.",
         }}
         onRestore={vi.fn()}
       />,
     );
 
     expect(screen.getByText(
-      "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+      "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 작성 중으로 되돌린 뒤 다시 시도하세요.",
     )).toBeVisible();
     expect(screen.getByRole("link", { name: "진행 중인 모임 열기" })).toHaveAttribute(
       "href",

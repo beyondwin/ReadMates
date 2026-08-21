@@ -997,7 +997,7 @@ describe("EditHostSessionRecordWorkflow", () => {
     routeMocks.openSession.mockResolvedValue(
       new Response(JSON.stringify({
         code: "SESSION_OPEN_ALREADY_EXISTS",
-        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+        message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 작성 중으로 되돌린 뒤 다시 시도하세요.",
         status: 409,
         openSessionId,
       }), { status: 409 }),
@@ -1021,7 +1021,7 @@ describe("EditHostSessionRecordWorkflow", () => {
 
     await expect(actions.openSession("session-draft")).resolves.toEqual({
       ok: false,
-      message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+      message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 작성 중으로 되돌린 뒤 다시 시도하세요.",
       openSessionId,
     });
   });

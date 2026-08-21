@@ -139,9 +139,9 @@ const historyTypeLabels: Record<HostSessionHistoryItem["type"], string> = {
   SESSION_OPENED: "멤버에게 열기",
   SESSION_CLOSED: "모임 마치기",
   SESSION_PUBLISHED: "기록 공개",
-  SESSION_REOPENED: "다시 진행 중으로",
+  SESSION_REOPENED: "다시 준비 중으로",
   SESSION_UNPUBLISHED: "공개 취소",
-  SESSION_RETURNED_TO_DRAFT: "모임 전으로 되돌리기",
+  SESSION_RETURNED_TO_DRAFT: "작성 중으로 되돌리기",
   SESSION_DELETED: "휴지통으로 이동",
   SESSION_RESTORED: "모임 복원",
 };

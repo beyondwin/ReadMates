@@ -50,7 +50,7 @@ describe("HostSessionDeletionPreviewDialog", () => {
     expect(alert).toHaveTextContent("멤버 알림 3개");
     expect(alert.textContent).toMatch(/적용된 기록 버전 2개.*수동 알림 발송 1개.*멤버 알림 3개/);
     expect(screen.queryByText("닫히거나 공개된 모임은 삭제할 수 없습니다. 기록 보존을 위해 위험 작업이 잠겨 있습니다.")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "목록에서 지우기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "휴지통으로 이동" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "다시 확인" })).toBeEnabled();
   });
 
@@ -62,8 +62,8 @@ describe("HostSessionDeletionPreviewDialog", () => {
       onRefreshPreview,
     });
 
-    const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
-    const confirm = within(dialog).getByRole("button", { name: "목록에서 지우기" });
+    const dialog = screen.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
+    const confirm = within(dialog).getByRole("button", { name: "휴지통으로 이동" });
     confirm.focus();
     expect(confirm).toHaveFocus();
 
@@ -96,7 +96,8 @@ describe("HostSessionDeletionPreviewDialog", () => {
   it("keeps the deletion preview inside a bounded action sheet", () => {
     renderDialog({ preview });
 
-    const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    const dialog = screen.getByRole("dialog", { name: "이 모임을 휴지통으로 옮길까요?" });
+    expect(dialog).toHaveTextContent("휴지통으로 옮긴 모임은 7일 동안 복구할 수 있습니다.");
     expect(dialog).toHaveClass("rm-host-action-dialog-sheet");
     expect(dialog).toHaveStyle({
       maxHeight: "calc(100dvh - 24px)",

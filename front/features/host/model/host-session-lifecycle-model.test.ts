@@ -13,8 +13,8 @@ import {
 
 describe("reverseLifecycleAction", () => {
   it.each([
-    ["OPEN", { kind: "return-to-draft", label: "모임 전으로 되돌리기" }],
-    ["CLOSED", { kind: "reopen", label: "다시 진행 중으로" }],
+    ["OPEN", { kind: "return-to-draft", label: "작성 중으로 되돌리기" }],
+    ["CLOSED", { kind: "reopen", label: "다시 준비 중으로" }],
     ["PUBLISHED", { kind: "unpublish", label: "공개 취소" }],
     ["DRAFT", null],
   ] as const satisfies ReadonlyArray<
@@ -60,10 +60,10 @@ describe("lifecycleConfirmCopy", () => {
       "reopen",
       {
         kind: "reopen",
-        title: "다시 진행 중으로",
-        body: "다시 진행 중이 됩니다. 공개 사이트 배치는 숨깁니다. 기록은 남습니다.",
-        confirmLabel: "다시 진행 중으로",
-        successFlash: "다시 진행 중으로 바꿨습니다.",
+        title: "다시 준비 중으로",
+        body: "다시 준비 중이 됩니다. 공개 사이트 배치는 숨깁니다. 기록은 남습니다.",
+        confirmLabel: "다시 준비 중으로",
+        successFlash: "다시 준비 중으로 바꿨습니다.",
       },
     ],
     [
@@ -80,10 +80,10 @@ describe("lifecycleConfirmCopy", () => {
       "return-to-draft",
       {
         kind: "return-to-draft",
-        title: "모임 전으로 되돌리기",
-        body: "모임 전 상태가 됩니다. 참석·질문은 남습니다.",
-        confirmLabel: "모임 전으로 되돌리기",
-        successFlash: "모임 전으로 되돌렸습니다.",
+        title: "작성 중으로 되돌리기",
+        body: "작성 중 상태가 됩니다. 참석·질문은 남습니다.",
+        confirmLabel: "작성 중으로 되돌리기",
+        successFlash: "작성 중으로 되돌렸습니다.",
       },
     ],
   ] as const satisfies ReadonlyArray<[SessionLifecycleConfirmKind, SessionLifecycleConfirmCopy]>)(
@@ -97,7 +97,7 @@ describe("lifecycleConfirmCopy", () => {
 describe("openAlreadyExistsMessage", () => {
   it("returns the spec conflict sentence", () => {
     expect(openAlreadyExistsMessage()).toBe(
-      "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+      "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 작성 중으로 되돌린 뒤 다시 시도하세요.",
     );
   });
 });

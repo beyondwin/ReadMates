@@ -43,6 +43,29 @@ class ActiveSessionProjectionArchitectureTest {
         )
     }
 
+    @Test
+    fun `existing session updates require deleted_at is null or active_sessions`() {
+        val violations =
+            kotlinFiles(sourceRoot()).flatMap { sourceFile ->
+                val source = sourceFile.readText()
+                SESSION_UPDATE_SCAN.findAll(source).mapNotNull { match ->
+                    if (isAllowlisted(sourceFile, source, match) || isGuardedSessionUpdate(source, match)) {
+                        null
+                    } else {
+                        val lineNumber = source.take(match.range.first).count { character -> character == '\n' } + 1
+                        val relative = sourceFile.toAbsolutePath().normalize().relativeTo(projectRoot())
+                        "$relative:$lineNumber: ${lineAt(source, match.range.first).trim()}"
+                    }
+                }
+            }
+
+        assertTrue(
+            violations.isEmpty(),
+            "Existing-session UPDATE must include deleted_at is null or active_sessions:\n" +
+                violations.joinToString("\n"),
+        )
+    }
+
     private fun isAllowlisted(
         sourceFile: Path,
         source: String,
@@ -57,6 +80,18 @@ class ActiveSessionProjectionArchitectureTest {
             sourceFile.name != "HostSessionWriteQueries.kt" -> false
             else -> inMaxNumberWindow
         }
+    }
+
+    private fun isGuardedSessionUpdate(
+        source: String,
+        match: MatchResult,
+    ): Boolean {
+        val windowEnd =
+            source.indexOf("\"\"\"", match.range.last).let { end ->
+                if (end < 0) (match.range.last + 1200).coerceAtMost(source.length) else end
+            }
+        val statement = collapseWhitespace(source.substring(match.range.first, windowEnd)).lowercase()
+        return "deleted_at is null" in statement || "active_sessions" in statement
     }
 
     private fun kotlinFiles(root: Path): List<Path> =
@@ -93,6 +128,7 @@ class ActiveSessionProjectionArchitectureTest {
 
     private companion object {
         val SESSION_TABLE_SCAN = Regex("""(?i)\b(?:from|join)\s+sessions\b""")
+        val SESSION_UPDATE_SCAN = Regex("""(?i)\bupdate\s+sessions\b""")
         const val MAX_NUMBER_ALLOCATION_COLLAPSED =
             "select coalesce(max(number), 0) + 1 from sessions where club_id = ?"
 

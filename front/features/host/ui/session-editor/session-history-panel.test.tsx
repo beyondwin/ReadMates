@@ -229,7 +229,7 @@ describe("SessionHistoryPanel", () => {
       />,
     );
 
-    expect(screen.getByText("다시 진행 중으로")).toBeVisible();
+    expect(screen.getByText("다시 준비 중으로")).toBeVisible();
     expect(screen.getByText("마감 → 준비 중")).toBeVisible();
     expect(screen.getByText("이전 클라이언트에서 사유 없이 변경됨")).toBeVisible();
     expect(screen.getByText("<img src=x onerror=alert(1)>keep as text")).toBeVisible();
