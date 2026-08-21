@@ -59,14 +59,6 @@ const notificationSummary = {
   ],
 } satisfies HostNotificationSummary;
 
-const emptyNotificationSummary = {
-  pending: 0,
-  failed: 0,
-  dead: 0,
-  sentLast24h: 0,
-  latestFailures: [],
-};
-
 const hostAuth: AuthMeResponse = {
   authenticated: true,
   userId: "user-host",
@@ -394,7 +386,7 @@ describe("HostDashboard", () => {
     }
   });
 
-  it("allows active hosts to load the host dashboard endpoints", async () => {
+  it("allows active hosts to load the host home endpoints", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -403,19 +395,19 @@ describe("HostDashboard", () => {
       }
 
       if (url === "/api/bff/api/sessions/current") {
-        return Promise.resolve(new Response(JSON.stringify(current), { status: 200 }));
-      }
-
-      if (url === "/api/bff/api/host/dashboard") {
-        return Promise.resolve(new Response(JSON.stringify(dashboard), { status: 200 }));
+        return Promise.resolve(new Response(JSON.stringify(noCurrent), { status: 200 }));
       }
 
       if (url === "/api/bff/api/host/sessions?limit=50") {
         return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
 
-      if (url === "/api/bff/api/host/notifications/summary") {
-        return Promise.resolve(new Response(JSON.stringify(notificationSummary), { status: 200 }));
+      if (url === "/api/bff/api/host/sessions?needsAttention=true&limit=1") {
+        return Promise.resolve(jsonResponse({
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        }));
       }
 
       return Promise.resolve(new Response(JSON.stringify({ message: "unexpected request" }), { status: 404 }));
@@ -423,21 +415,24 @@ describe("HostDashboard", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(hostDashboardLoaderForTest()).resolves.toEqual({
-      current,
-      data: dashboard,
+      current: noCurrent,
       hostSessions: { items: [], nextCursor: null },
-      notifications: notificationSummary,
-      clubOperations: null,
+      recordAttention: {
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      },
     });
 
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/auth/me", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.objectContaining({ cache: "no-store" }));
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/dashboard", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions?limit=50", expect.objectContaining({ cache: "no-store" }));
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/host/notifications/summary",
+      "/api/bff/api/host/sessions?needsAttention=true&limit=1",
       expect.objectContaining({ cache: "no-store" }),
     );
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/host/dashboard"))).toBe(false);
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/host/notifications"))).toBe(false);
   });
 
   it("shows the host next action reading-loop state and bridge copy", () => {
@@ -476,19 +471,19 @@ describe("HostDashboard", () => {
       }
 
       if (url === "/api/bff/api/sessions/current") {
-        return Promise.resolve(jsonResponse(current));
-      }
-
-      if (url === "/api/bff/api/host/dashboard") {
-        return Promise.resolve(jsonResponse(dashboard));
+        return Promise.resolve(jsonResponse(noCurrent));
       }
 
       if (url === "/api/bff/api/host/sessions?limit=50") {
         return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
 
-      if (url === "/api/bff/api/host/notifications/summary") {
-        return Promise.resolve(jsonResponse(notificationSummary));
+      if (url === "/api/bff/api/host/sessions?needsAttention=true&limit=1") {
+        return Promise.resolve(jsonResponse({
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        }));
       }
 
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
@@ -496,7 +491,15 @@ describe("HostDashboard", () => {
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(hostDashboardLoaderForTest({ params: {}, request: new Request("https://readmates.test/app/host") } as LoaderFunctionArgs))
-      .resolves.toEqual({ current, data: dashboard, hostSessions: { items: [], nextCursor: null }, notifications: notificationSummary, clubOperations: null });
+      .resolves.toEqual({
+        current: noCurrent,
+        hostSessions: { items: [], nextCursor: null },
+        recordAttention: {
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        },
+      });
 
     expect(fetchMock.mock.calls.map(([url]) => String(url)).every((url) => !url.includes("clubSlug="))).toBe(true);
   });
@@ -510,19 +513,19 @@ describe("HostDashboard", () => {
       }
 
       if (url === "/api/bff/api/sessions/current?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse(current));
-      }
-
-      if (url === "/api/bff/api/host/dashboard?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse(dashboard));
+        return Promise.resolve(jsonResponse(noCurrent));
       }
 
       if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
         return Promise.resolve(jsonResponse({ items: [], nextCursor: "cursor-1" }));
       }
 
-      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse(notificationSummary));
+      if (url === "/api/bff/api/host/sessions?needsAttention=true&limit=1&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        }));
       }
 
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
@@ -535,51 +538,58 @@ describe("HostDashboard", () => {
         request: new Request("https://readmates.test/clubs/reading-sai/app/host"),
       } as LoaderFunctionArgs),
     ).resolves.toEqual({
-      current,
-      data: dashboard,
+      current: noCurrent,
       hostSessions: { items: [], nextCursor: "cursor-1" },
-      notifications: notificationSummary,
-      clubOperations: null,
+      recordAttention: {
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      },
     });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/auth/me?clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/host/dashboard?clubSlug=reading-sai",
-      expect.objectContaining({ cache: "no-store" }),
-    );
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/host/dashboard"))).toBe(false);
   });
 
   it("loads host session list for the dashboard", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
-      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
-      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(noCurrent));
       if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: "cursor-1" }));
-      if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
+      if (url === "/api/bff/api/host/sessions?needsAttention=true&limit=1") {
+        return Promise.resolve(jsonResponse({
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        }));
+      }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const data = await hostDashboardLoaderForTest();
 
-    expect(data.hostSessions).toEqual({ items: [], nextCursor: "cursor-1" });
+    expect(data).toMatchObject({ hostSessions: { items: [], nextCursor: "cursor-1" } });
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/sessions?limit=50", expect.objectContaining({}));
   });
 
-  it("seeds host dashboard query data into the shared query client", async () => {
+  it("seeds host home query data into the shared query client", async () => {
     const client = createTestQueryClient();
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/bff/api/auth/me?clubSlug=reading-sai") return Promise.resolve(authResponse(hostAuth));
-      if (url === "/api/bff/api/sessions/current?clubSlug=reading-sai") return Promise.resolve(jsonResponse(current));
-      if (url === "/api/bff/api/host/dashboard?clubSlug=reading-sai") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/sessions/current?clubSlug=reading-sai") return Promise.resolve(jsonResponse(noCurrent));
       if (url === "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse({ items: hostSessions, nextCursor: null }));
+        return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
       }
-      if (url === "/api/bff/api/host/notifications/summary?clubSlug=reading-sai") {
-        return Promise.resolve(jsonResponse(notificationSummary));
+      if (url === "/api/bff/api/host/sessions?needsAttention=true&limit=1&clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse({
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        }));
       }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
@@ -590,21 +600,19 @@ describe("HostDashboard", () => {
       request: new Request("https://readmates.test/clubs/reading-sai/app/host"),
     } as LoaderFunctionArgs);
 
-    const { hostCurrentSessionQuery, hostDashboardQuery, hostSessionListQuery } = await import(
+    const { hostCurrentSessionQuery, hostSessionListQuery } = await import(
       "@/features/host/queries/host-session-queries"
     );
-    const { hostNotificationSummaryQuery } = await import("@/features/host/queries/host-notification-queries");
 
-    expect(client.getQueryData(hostCurrentSessionQuery({ clubSlug: "reading-sai" }).queryKey)).toEqual(current);
-    expect(client.getQueryData(hostDashboardQuery({ clubSlug: "reading-sai" }).queryKey)).toEqual(dashboard);
+    expect(client.getQueryData(hostCurrentSessionQuery({ clubSlug: "reading-sai" }).queryKey)).toEqual(noCurrent);
     expect(client.getQueryData(hostSessionListQuery({ limit: 50 }, { clubSlug: "reading-sai" }).queryKey)).toEqual({
-      items: hostSessions,
+      items: [],
       nextCursor: null,
     });
-    expect(client.getQueryData(hostNotificationSummaryQuery({ clubSlug: "reading-sai" }).queryKey)).toEqual(notificationSummary);
 
     const fetchedUrls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(fetchedUrls.some((url) => url.includes("limit=50") && url.includes("clubSlug=reading-sai"))).toBe(true);
+    expect(fetchedUrls.some((url) => url.includes("/host/dashboard"))).toBe(false);
   });
 
   it("seeds host session editor detail and manual dispatches into the shared query client", async () => {
@@ -671,59 +679,26 @@ describe("HostDashboard", () => {
     )).toEqual({ items: [], nextCursor: null });
   });
 
-  it("loads host notification status for the dashboard", async () => {
+  it("does not fetch notification status from the host home loader", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
-      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
-      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
+      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(noCurrent));
       if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
-      if (url === "/api/bff/api/host/notifications/summary") return Promise.resolve(jsonResponse(notificationSummary));
+      if (url === "/api/bff/api/host/sessions?needsAttention=true&limit=1") {
+        return Promise.resolve(jsonResponse({
+          items: [],
+          nextCursor: null,
+          summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+        }));
+      }
       return Promise.reject(new Error(`Unexpected URL: ${url}`));
     });
     vi.stubGlobal("fetch", fetchMock);
 
     const data = await hostDashboardLoaderForTest();
 
-    expect(data).toMatchObject({ notifications: notificationSummary });
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/notifications/summary", expect.objectContaining({}));
-  });
-
-  it("keeps host dashboard loader usable when notification status is temporarily unavailable", async () => {
-    const fetchMock = vi.fn((url: string) => {
-      if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
-      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
-      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
-      if (url === "/api/bff/api/host/notifications/summary") {
-        return Promise.resolve(new Response(JSON.stringify({ message: "notification status unavailable" }), { status: 503 }));
-      }
-      return Promise.reject(new Error(`Unexpected URL: ${url}`));
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(hostDashboardLoaderForTest()).resolves.toEqual({
-      current,
-      data: dashboard,
-      hostSessions: { items: [], nextCursor: null },
-      notifications: emptyNotificationSummary,
-      clubOperations: null,
-    });
-  });
-
-  it("does not hide notification status authorization failures", async () => {
-    const fetchMock = vi.fn((url: string) => {
-      if (url === "/api/bff/api/auth/me") return Promise.resolve(authResponse(hostAuth));
-      if (url === "/api/bff/api/sessions/current") return Promise.resolve(jsonResponse(current));
-      if (url === "/api/bff/api/host/dashboard") return Promise.resolve(jsonResponse(dashboard));
-      if (url === "/api/bff/api/host/sessions?limit=50") return Promise.resolve(jsonResponse({ items: [], nextCursor: null }));
-      if (url === "/api/bff/api/host/notifications/summary") {
-        return Promise.resolve(new Response(JSON.stringify({ message: "forbidden" }), { status: 403 }));
-      }
-      return Promise.reject(new Error(`Unexpected URL: ${url}`));
-    });
-    vi.stubGlobal("fetch", fetchMock);
-
-    await expect(hostDashboardLoaderForTest()).rejects.toThrow("이 작업을 수행할 권한이 없습니다.");
+    expect(data).not.toHaveProperty("notifications");
+    expect(fetchMock.mock.calls.some(([url]) => String(url).includes("/host/notifications"))).toBe(false);
   });
 
   it("renders notification status without full recipient email addresses", () => {

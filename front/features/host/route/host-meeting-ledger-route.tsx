@@ -182,6 +182,7 @@ export function HostMeetingLedgerRoute({
         items={items}
         sessionId={sessionId}
         LinkComponent={LinkComponent}
+        attentionPage={recordAttentionQuery.data ?? undefined}
         upcomingItems={upcomingItems}
         onSaveUpcomingAccessScope={handleSaveUpcomingAccessScope}
         onCreateUpcomingSession={handleCreateUpcomingSession}

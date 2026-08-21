@@ -541,7 +541,12 @@ export default function HostDashboard({
 
           {clubOperations ? (
             <div className="rm-host-dashboard-ledger__operations-signal">
-              <HostClubOperationsCard snapshot={clubOperations} LinkComponent={LinkComponent} />
+              <HostClubOperationsCard
+                snapshot={clubOperations}
+                LinkComponent={({ to, className, children }) => (
+                  <LinkComponent to={to} className={className}>{children}</LinkComponent>
+                )}
+              />
             </div>
           ) : null}
         </div>

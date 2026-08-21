@@ -1,12 +1,13 @@
 import { render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
+import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
 
 const routeMocks = vi.hoisted(() => ({
   hostSessions: { items: [] as Array<Record<string, unknown>>, nextCursor: null as string | null },
   current: { currentSession: null as null | Record<string, unknown> },
   recordAttention: {
-    items: [] as Array<Record<string, unknown>>,
+    items: [] as HostSessionLedgerItem[],
     nextCursor: null as string | null,
     summary: {
       needsAttentionCount: 0,
@@ -29,21 +30,7 @@ vi.mock("react-router", async (importOriginal) => {
     ...actual,
     useLoaderData: () => ({
       current: routeMocks.current,
-      data: {
-        rsvpPending: 0,
-        checkinMissing: 0,
-        publishPending: 0,
-        feedbackPending: 0,
-      },
       hostSessions: routeMocks.hostSessions,
-      notifications: {
-        pending: 0,
-        failed: 0,
-        dead: 0,
-        sentLast24h: 0,
-        latestFailures: [],
-      },
-      clubOperations: null,
       recordAttention: routeMocks.recordAttention,
     }),
     useParams: () => ({ clubSlug: "reading-sai" }),
@@ -64,6 +51,30 @@ vi.mock("@/features/host/queries/host-session-record-queries", () => ({
 }));
 
 import { HostDashboardRoute } from "./host-dashboard-route";
+
+function attentionItem(overrides: Partial<HostSessionLedgerItem> = {}): HostSessionLedgerItem {
+  return {
+    sessionId: "closed-1",
+    sessionNumber: 12,
+    title: "12회차",
+    bookTitle: "닫힌 책",
+    bookAuthor: "저자",
+    bookImageUrl: null,
+    date: "2026-04-15",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "온라인",
+    state: "CLOSED",
+    visibility: "MEMBER",
+    recordStatus: "INCOMPLETE",
+    needsAttention: true,
+    hasDraft: false,
+    liveRevision: 1,
+    draftRevision: null,
+    lastModifiedAt: "2026-04-16T00:00:00Z",
+    ...overrides,
+  };
+}
 
 function renderRoute() {
   return render(
@@ -101,59 +112,54 @@ describe("HostDashboardRoute", () => {
     expect(screen.queryByTestId("host-meeting-redirect")).not.toBeInTheDocument();
   });
 
-  it("opens the active open meeting on the canonical ledger URL", () => {
-    routeMocks.hostSessions = {
-      items: [{
-        sessionId: "open-1",
-        state: "OPEN",
-        date: "2026-04-15",
-        recordStatus: "NOT_STARTED",
-      }],
-      nextCursor: null,
-    };
-    renderRoute();
-
-    expect(screen.getByTestId("host-meeting-redirect")).toHaveTextContent("/app/host/sessions/open-1");
-    expect(screen.queryByRole("heading", { name: "아직 열린 모임이 없습니다" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("AI 운영 도구")).not.toBeInTheDocument();
-  });
-
-  it("prefers the current open meeting when the list page omitted it", () => {
-    routeMocks.current = {
-      currentSession: {
-        sessionId: "open-current",
-        date: "2026-04-15",
+  it("shows the total attention count and only the top item, including PUBLISHED", () => {
+    routeMocks.recordAttention = {
+      items: [
+        attentionItem({
+          sessionId: "published-1",
+          sessionNumber: 11,
+          bookTitle: "공개된 책",
+          state: "PUBLISHED",
+        }),
+        attentionItem({
+          sessionId: "closed-2",
+          sessionNumber: 10,
+          bookTitle: "두 번째 책",
+        }),
+      ],
+      nextCursor: "more",
+      summary: {
+        needsAttentionCount: 4,
+        incompletePublishedCount: 1,
+        draftCount: 0,
       },
     };
     renderRoute();
 
-    expect(screen.getByTestId("host-meeting-redirect")).toHaveTextContent(
-      "/app/host/sessions/open-current",
+    expect(screen.getByText("확인 필요 4건")).toBeInTheDocument();
+    expect(screen.getByText("공개된 책")).toBeInTheDocument();
+    expect(screen.queryByText("두 번째 책")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "모두 보기" })).toHaveAttribute(
+      "href",
+      "/app/host/operations",
     );
+    expect(screen.queryByTestId("host-meeting-redirect")).not.toBeInTheDocument();
   });
 
-  it("opens the nearest draft rather than a closed meeting that still needs a record", () => {
-    routeMocks.hostSessions = {
-      items: [
-        {
-          sessionId: "draft-1",
-          state: "DRAFT",
-          date: "2026-06-11",
-          recordStatus: "NOT_STARTED",
-        },
-        {
-          sessionId: "closed-1",
-          state: "CLOSED",
-          date: "2026-04-15",
-          recordStatus: "NOT_STARTED",
-        },
-      ],
+  it("hides 모두 보기 when only one attention row exists", () => {
+    routeMocks.recordAttention = {
+      items: [attentionItem({ bookTitle: "한 권" })],
       nextCursor: null,
+      summary: {
+        needsAttentionCount: 1,
+        incompletePublishedCount: 0,
+        draftCount: 0,
+      },
     };
     renderRoute();
 
-    expect(screen.getByTestId("host-meeting-redirect")).toHaveTextContent(
-      "/app/host/sessions/draft-1",
-    );
+    expect(screen.getByText("확인 필요 1건")).toBeInTheDocument();
+    expect(screen.getByText("한 권")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "모두 보기" })).not.toBeInTheDocument();
   });
 });

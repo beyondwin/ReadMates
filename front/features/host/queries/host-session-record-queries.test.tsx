@@ -129,6 +129,13 @@ describe("host session record queries", () => {
     expect(hostSessionRecordHistoryQuery("session-28", {}, context).queryKey).toEqual(
       hostSessionRecordHistoryQuery("session-28", undefined, context).queryKey,
     );
+    expect(hostSessionRecordKeys.attentionPages(context)).toEqual([
+      "host",
+      "session-records",
+      "reading-sai",
+      "ledger",
+      "attention-pages",
+    ]);
   });
 
   it("writes scoped ledger, editor, and history responses to normalized cache keys", async () => {

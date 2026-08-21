@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   hostNotificationKeys,
   hostNotificationEventsQuery,
+  hostNotificationHealthQuery,
   hostNotificationManualOptionsQuery,
   hostNotificationPolicyQuery,
   hostNotificationSessionsQuery,
@@ -20,6 +21,9 @@ describe("host notification query keys", () => {
       "overview",
       "summary",
     ]);
+    expect(hostNotificationHealthQuery({ clubSlug: "reading-sai" }).queryKey).toEqual(
+      hostNotificationKeys.summary({ clubSlug: "reading-sai" }),
+    );
   });
 
   it("keeps policy state in its own club-scoped key", () => {

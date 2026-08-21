@@ -100,6 +100,18 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       },
     }),
     scopedHostRoute({
+      path: "operations",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="운영 허브를 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostOperationsRouteElement: Component }, { hostOperationsLoader }] = await Promise.all([
+          import("@/src/app/host-routes/operations-route-element"),
+          import("@/features/host/route/host-operations-data"),
+        ]);
+        return { Component, loader: hostOperationsLoader };
+      },
+    }),
+    scopedHostRoute({
       path: "sessions",
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="세션 기록 장부를 불러오는 중" variant="host" />,
@@ -220,6 +232,21 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
         return {
           Component: HostNotificationsRouteElement,
           loader: hostNotificationsLoaderFactory(queryClient),
+        };
+      },
+    },
+    {
+      path: "operations",
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="운영 허브를 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const [{ HostOperationsRouteElement }, { hostOperationsLoader }] = await Promise.all([
+          import("@/src/app/host-routes/operations-route-element"),
+          import("@/features/host/route/host-operations-data"),
+        ]);
+        return {
+          Component: HostOperationsRouteElement,
+          loader: hostOperationsLoader,
         };
       },
     },

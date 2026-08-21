@@ -4,6 +4,7 @@ import {
   resolveViewedMeeting,
   type MeetingListItem,
 } from "@/features/host/model/host-meeting-ledger-model";
+import type { HostSessionAttentionData } from "@/features/host/model/host-session-ledger-model";
 import { draftsByDate } from "@/features/host/model/upcoming-book-list-model";
 import type { HostSessionScheduleDefaults } from "@/features/host/model/host-schedule-defaults-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
@@ -11,15 +12,18 @@ import type {
   UpcomingBookCreateInput,
   UpcomingBookListItem,
 } from "@/features/host/model/upcoming-book-list-model";
+import { HostSessionAttentionSummary } from "../host-session-ledger";
 import { MeetingPhaseRail } from "./meeting-phase-rail";
 import { UpcomingBookList } from "./upcoming-book-list";
 
 const NEW_MEETING_HREF = "/app/host/sessions/new";
+const OPERATIONS_HREF = "/app/host/operations";
 
 export type HostMeetingLedgerLinkProps = {
   to: string;
   className?: string;
   children: ReactNode;
+  "aria-label"?: string;
 };
 
 export type HostMeetingLedgerLinkComponent = ComponentType<HostMeetingLedgerLinkProps>;
@@ -44,6 +48,7 @@ export function HostMeetingLedger({
   scheduleDefaultsStatus,
   scheduleDefaultsWarning,
   onRetryScheduleDefaults,
+  attentionPage,
 }: {
   items: readonly MeetingListItem[];
   sessionId?: string;
@@ -57,6 +62,7 @@ export function HostMeetingLedger({
   scheduleDefaultsStatus?: "loading" | "ready" | "warning";
   scheduleDefaultsWarning?: string | null;
   onRetryScheduleDefaults?: () => void;
+  attentionPage?: HostSessionAttentionData | null;
 }) {
   const active = resolveViewedMeeting(items, sessionId);
 
@@ -64,6 +70,8 @@ export function HostMeetingLedger({
     if (sessionId) {
       return children ?? null;
     }
+
+    const attentionCount = attentionPage?.summary.needsAttentionCount ?? 0;
 
     return (
       <main>
@@ -78,6 +86,19 @@ export function HostMeetingLedger({
                 첫 모임 만들기
               </LinkComponent>
             </div>
+            {attentionPage && attentionCount > 0 ? (
+              <section aria-label="확인 필요" style={{ marginTop: 28 }}>
+                <p className="small" style={{ margin: "0 0 12px", color: "var(--text-2)" }}>
+                  확인 필요 {attentionCount}건
+                </p>
+                <HostSessionAttentionSummary
+                  page={attentionPage}
+                  maxItems={1}
+                  allHref={attentionCount > 1 ? OPERATIONS_HREF : undefined}
+                  LinkComponent={LinkComponent}
+                />
+              </section>
+            ) : null}
           </div>
         </section>
       </main>
@@ -85,6 +106,12 @@ export function HostMeetingLedger({
   }
 
   const previousHref = previousRecordAttentionHref(active, items);
+  const selectedAttention = attentionPage
+    ? {
+        ...attentionPage,
+        items: attentionPage.items.filter((item) => item.sessionId === active.sessionId),
+      }
+    : null;
   const showUpcoming = active.phase === "during" || active.phase === "after";
   const hasNextBooks = draftsByDate(upcomingItems).length > 0;
   const upcoming = showUpcoming ? (
@@ -113,9 +140,22 @@ export function HostMeetingLedger({
               </LinkComponent>
             </p>
           ) : null}
-          <div className="eyebrow">모임 장부</div>
+          <div className="row-between" style={{ alignItems: "baseline", gap: 12 }}>
+            <div className="eyebrow">모임 장부</div>
+            <LinkComponent to={OPERATIONS_HREF} className="tiny">
+              운영 허브
+            </LinkComponent>
+          </div>
           <h1 className="h1 editorial">지금 다루는 모임</h1>
           <MeetingPhaseRail activePhase={active.phase} />
+          {selectedAttention ? (
+            <HostSessionAttentionSummary
+              page={selectedAttention}
+              maxItems={selectedAttention.items.length}
+              hideEmpty
+              LinkComponent={LinkComponent}
+            />
+          ) : null}
         </div>
       </header>
       {active.phase === "after" ? (

@@ -306,4 +306,24 @@ describe("ClubAiDefaultsSection", () => {
       );
     });
   });
+
+  it("retries a failed defaults load from the compact card without leaving the section", async () => {
+    mockedGet
+      .mockRejectedValueOnce(new Error("load failed"))
+      .mockResolvedValueOnce({ defaultModel: CLUB_AI_OPENAI_DEFAULT_MODEL_ID });
+    const { Wrapper } = createWrapper();
+
+    render(
+      <Wrapper>
+        <ClubAiDefaultsSection clubSlug="club-a" variant="compact" />
+      </Wrapper>,
+    );
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "기본 모델 정보를 불러오지 못했습니다.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await findModelSelect()).toBeInTheDocument();
+    expect(mockedGet).toHaveBeenCalledTimes(2);
+  });
 });

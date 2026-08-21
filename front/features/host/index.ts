@@ -24,8 +24,16 @@ export {
 export {
   hostDashboardActions,
   hostDashboardLoaderFactory,
+  preserveLocationSuffix,
   type HostDashboardRouteData,
 } from "@/features/host/route/host-dashboard-data";
+export {
+  hostOperationsLoader,
+  type HostOperationsRouteData,
+} from "@/features/host/route/host-operations-data";
+export {
+  HostOperationsRoute,
+} from "@/features/host/route/host-operations-route";
 export {
   EditHostSessionRoute,
   NewHostSessionRoute,

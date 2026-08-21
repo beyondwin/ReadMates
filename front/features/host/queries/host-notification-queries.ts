@@ -127,6 +127,14 @@ export function hostNotificationSummaryQuery(context?: ReadmatesApiContext) {
   });
 }
 
+export function hostNotificationHealthQuery(context?: ReadmatesApiContext) {
+  return queryOptions({
+    queryKey: hostNotificationKeys.summary(context),
+    queryFn: () => fetchHostNotificationSummary(context),
+    retry: false,
+  });
+}
+
 export function hostNotificationPolicyQuery(context?: ReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.policy(context),

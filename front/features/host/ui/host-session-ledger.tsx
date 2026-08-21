@@ -320,51 +320,66 @@ export function HostSessionLedger({
 export function HostSessionAttentionSummary({
   page,
   LinkComponent = DefaultLink,
+  maxItems = 3,
+  allHref,
+  hideEmpty = false,
 }: {
   page: HostSessionAttentionData;
   LinkComponent?: HostSessionLedgerLinkComponent;
+  maxItems?: number;
+  allHref?: string;
+  hideEmpty?: boolean;
 }) {
-  const visibleItems = page.items.slice(0, 3);
+  const visibleItems = page.items.slice(0, maxItems);
 
   if (visibleItems.length === 0) {
-    return <p className="rm-host-attention__empty">확인 필요한 세션 기록이 없습니다.</p>;
+    return hideEmpty ? null : (
+      <p className="rm-host-attention__empty">확인 필요한 세션 기록이 없습니다.</p>
+    );
   }
 
   return (
-    <ol className="rm-host-attention" aria-label="확인 필요한 세션 기록">
-      {visibleItems.map((item) => {
-        const status = hostSessionLedgerBadges(item)[0] ?? {
-          label: "기록 확인",
-          tone: "default",
-        };
+    <>
+      <ol className="rm-host-attention" aria-label="확인 필요한 세션 기록">
+        {visibleItems.map((item) => {
+          const status = hostSessionLedgerBadges(item)[0] ?? {
+            label: "기록 확인",
+            tone: "default",
+          };
 
-        return (
-          <li key={item.sessionId} className="rm-host-attention__item">
-            <LinkComponent
-              to={sessionRecordHref(item.sessionId)}
-              className="rm-host-attention__row"
-              aria-label={`${item.sessionNumber}회차 기록 열기`}
-            >
-              <span className="rm-host-attention__number ledger-number">No.{item.sessionNumber}</span>
-              <span className="rm-host-attention__copy">
-                <strong>{item.bookTitle}</strong>
-                <span>{item.bookAuthor}</span>
-              </span>
-              <span
-                className={`rm-host-attention__status badge${
-                  status.tone === "default" ? "" : ` badge-${status.tone}`
-                } badge-dot`}
+          return (
+            <li key={item.sessionId} className="rm-host-attention__item">
+              <LinkComponent
+                to={sessionRecordHref(item.sessionId)}
+                className="rm-host-attention__row"
+                aria-label={`${item.sessionNumber}회차 기록 열기`}
               >
-                {status.label}
-              </span>
-              <span className="rm-host-attention__action">
-                기록 열기
-                <span aria-hidden="true">→</span>
-              </span>
-            </LinkComponent>
-          </li>
-        );
-      })}
-    </ol>
+                <span className="rm-host-attention__number ledger-number">No.{item.sessionNumber}</span>
+                <span className="rm-host-attention__copy">
+                  <strong>{item.bookTitle}</strong>
+                  <span>{item.bookAuthor}</span>
+                </span>
+                <span
+                  className={`rm-host-attention__status badge${
+                    status.tone === "default" ? "" : ` badge-${status.tone}`
+                  } badge-dot`}
+                >
+                  {status.label}
+                </span>
+                <span className="rm-host-attention__action">
+                  기록 열기
+                  <span aria-hidden="true">→</span>
+                </span>
+              </LinkComponent>
+            </li>
+          );
+        })}
+      </ol>
+      {allHref ? (
+        <LinkComponent to={allHref} className="rm-host-attention__all">
+          모두 보기
+        </LinkComponent>
+      ) : null}
+    </>
   );
 }

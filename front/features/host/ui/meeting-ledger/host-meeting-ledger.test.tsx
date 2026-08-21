@@ -4,7 +4,32 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { HostMeetingLedger } from "./host-meeting-ledger";
 import type { MeetingListItem } from "@/features/host/model/host-meeting-ledger-model";
+import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
 import type { UpcomingBookListItem } from "@/features/host/model/upcoming-book-list-model";
+
+function attentionItem(overrides: Partial<HostSessionLedgerItem> = {}): HostSessionLedgerItem {
+  return {
+    sessionId: "closed-1",
+    sessionNumber: 12,
+    title: "12회차",
+    bookTitle: "닫힌 책",
+    bookAuthor: "저자",
+    bookImageUrl: null,
+    date: "2026-04-15",
+    startTime: "20:00",
+    endTime: "22:00",
+    locationLabel: "온라인",
+    state: "CLOSED",
+    visibility: "MEMBER",
+    recordStatus: "INCOMPLETE",
+    needsAttention: true,
+    hasDraft: false,
+    liveRevision: 1,
+    draftRevision: null,
+    lastModifiedAt: "2026-04-16T00:00:00Z",
+    ...overrides,
+  };
+}
 
 function TestLink({
   to,
@@ -180,5 +205,63 @@ describe("HostMeetingLedger", () => {
 
     expect(screen.queryByRole("heading", { name: "다음에 읽을 책" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "모임 하나 더" })).not.toBeInTheDocument();
+  });
+
+  it("shows the home attention total and only the top item with 모두 보기", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[]}
+          attentionPage={{
+            items: [
+              attentionItem({ sessionId: "published-1", bookTitle: "공개된 책", state: "PUBLISHED" }),
+              attentionItem({ sessionId: "closed-2", bookTitle: "두 번째 책" }),
+            ],
+            summary: {
+              needsAttentionCount: 4,
+              incompletePublishedCount: 1,
+              draftCount: 0,
+            },
+          }}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("확인 필요 4건")).toBeInTheDocument();
+    expect(screen.getByText("공개된 책")).toBeInTheDocument();
+    expect(screen.queryByText("두 번째 책")).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "모두 보기" })).toHaveAttribute(
+      "href",
+      "/app/host/operations",
+    );
+  });
+
+  it("shows only alerts that belong to the viewed meeting", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          items={[{ sessionId: "open-1", state: "OPEN", date: "2026-04-15" }]}
+          sessionId="open-1"
+          attentionPage={{
+            items: [
+              attentionItem({ sessionId: "open-1", bookTitle: "이 모임", state: "OPEN" }),
+              attentionItem({ sessionId: "other", bookTitle: "다른 모임" }),
+            ],
+            summary: {
+              needsAttentionCount: 2,
+              incompletePublishedCount: 0,
+              draftCount: 0,
+            },
+          }}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("이 모임")).toBeInTheDocument();
+    expect(screen.queryByText("다른 모임")).not.toBeInTheDocument();
+    expect(screen.queryByText("확인 필요 2건")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "모두 보기" })).not.toBeInTheDocument();
   });
 });

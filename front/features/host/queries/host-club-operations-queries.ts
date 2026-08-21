@@ -10,5 +10,6 @@ export function hostClubOperationsQuery(context: { clubSlug: string | undefined 
   return queryOptions({
     queryKey: hostClubOperationsKeys.snapshot(context.clubSlug),
     queryFn: () => fetchHostClubOperations(context),
+    retry: false,
   });
 }

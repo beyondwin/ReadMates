@@ -1,5 +1,5 @@
 import { clubAiFailureDelta, type HostClubOperationsSnapshot } from "@/shared/model/club-operations";
-import type { HostDashboardLinkComponent, HostDashboardLinkProps } from "./dashboard/types";
+import type { HostLinkComponent, HostLinkProps } from "./host-link-types";
 
 type ReadinessTone = "ok" | "warn" | "neutral";
 
@@ -73,7 +73,7 @@ function operatingMetrics(snapshot: HostClubOperationsSnapshot): OperatingMetric
   ];
 }
 
-function PlainHostClubOperationsLink({ to, children, ...props }: HostDashboardLinkProps) {
+function PlainHostClubOperationsLink({ to, children, ...props }: HostLinkProps) {
   return (
     <a {...props} href={to}>
       {children}
@@ -86,7 +86,7 @@ export function HostClubOperationsCard({
   LinkComponent = PlainHostClubOperationsLink,
 }: {
   snapshot: HostClubOperationsSnapshot;
-  LinkComponent?: HostDashboardLinkComponent;
+  LinkComponent?: HostLinkComponent;
 }) {
   const tone = readinessTone(snapshot.readiness.state, snapshot.readiness.blockingReasons);
   const metrics = operatingMetrics(snapshot);

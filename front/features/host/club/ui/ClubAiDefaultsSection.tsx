@@ -123,6 +123,13 @@ export function ClubAiDefaultsSection({
       ) : capabilitiesQuery.error ? (
         <div className="small" role="alert" style={{ color: "var(--danger)" }}>
           AI 기능 상태를 확인하지 못했습니다.
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => void capabilitiesQuery.refetch()}
+          >
+            다시 시도
+          </button>
         </div>
       ) : !aiGenerationEnabled ? (
         <div className="small" role="status" style={{ color: "var(--text-2)" }}>
@@ -131,6 +138,13 @@ export function ClubAiDefaultsSection({
       ) : loadError ? (
         <div className="small" role="alert" style={{ color: "var(--danger)" }}>
           기본 모델 정보를 불러오지 못했습니다.
+          <button
+            type="button"
+            className="btn btn-ghost btn-sm"
+            onClick={() => void defaultsQuery.refetch()}
+          >
+            다시 시도
+          </button>
         </div>
       ) : null}
 

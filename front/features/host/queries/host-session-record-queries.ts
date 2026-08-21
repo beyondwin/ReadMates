@@ -1,5 +1,5 @@
 import type { QueryClient } from "@tanstack/react-query";
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   applyHostSessionRecord,
   deleteHostSessionRecordDraft,
@@ -44,6 +44,8 @@ export const hostSessionRecordKeys = {
     [...hostSessionRecordKeys.scope(context), "ledger"] as const,
   ledger: (request?: HostSessionLedgerRequest, context?: ReadmatesApiContext) =>
     [...hostSessionRecordKeys.ledgers(context), normalizeHostSessionLedgerRequest(request)] as const,
+  attentionPages: (context?: ReadmatesApiContext) =>
+    [...hostSessionRecordKeys.ledgers(context), "attention-pages"] as const,
   editor: (sessionId: string, context?: ReadmatesApiContext) =>
     [...hostSessionRecordKeys.scope(context), "editor", sessionId] as const,
   historyRoot: (sessionId: string, context?: ReadmatesApiContext) =>
@@ -59,6 +61,8 @@ export function hostSessionRecordCapabilitiesQuery(context?: ReadmatesApiContext
   });
 }
 
+export const HOST_OPERATIONS_ATTENTION_PAGE_LIMIT = 20;
+
 export function hostSessionRecordLedgerQuery(
   request?: HostSessionLedgerRequest,
   context?: ReadmatesApiContext,
@@ -67,6 +71,22 @@ export function hostSessionRecordLedgerQuery(
   return queryOptions({
     queryKey: hostSessionRecordKeys.ledger(normalizedRequest, context),
     queryFn: () => fetchHostSessionRecordLedger(normalizedRequest, context),
+  });
+}
+
+export function hostSessionRecordAttentionPagesQuery(context?: ReadmatesApiContext) {
+  return infiniteQueryOptions({
+    queryKey: hostSessionRecordKeys.attentionPages(context),
+    queryFn: ({ pageParam }) => fetchHostSessionRecordLedger({
+      needsAttention: true,
+      page: {
+        limit: HOST_OPERATIONS_ATTENTION_PAGE_LIMIT,
+        cursor: pageParam,
+      },
+    }, context),
+    initialPageParam: null as string | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    retry: false,
   });
 }
 
