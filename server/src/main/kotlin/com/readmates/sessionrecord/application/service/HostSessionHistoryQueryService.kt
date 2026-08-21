@@ -31,7 +31,8 @@ class HostSessionHistoryQueryService(
             (
                 historyPort.loadAuditHistory(host, sessionId, cursor, sourceLimit) +
                     historyPort.loadRevisionHistory(host, sessionId, cursor, sourceLimit) +
-                    historyPort.loadNotificationHistory(host, sessionId, cursor, sourceLimit)
+                    historyPort.loadNotificationHistory(host, sessionId, cursor, sourceLimit) +
+                    historyPort.loadLifecycleHistory(host, sessionId, cursor, sourceLimit)
             ).sortedWith(historyComparator)
         val visible = rows.take(pageRequest.limit)
         return CursorPage(

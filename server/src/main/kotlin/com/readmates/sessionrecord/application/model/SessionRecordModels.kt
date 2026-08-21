@@ -221,6 +221,13 @@ private const val RECORD_REVISION_APPLIED_SORT = 30
 private const val RECORD_REVISION_RESTORED_SORT = 40
 private const val NOTIFICATION_SENT_SORT = 50
 private const val NOTIFICATION_SKIPPED_SORT = 60
+private const val SESSION_OPENED_SORT = 70
+private const val SESSION_CLOSED_SORT = 80
+private const val SESSION_PUBLISHED_SORT = 90
+private const val SESSION_REOPENED_SORT = 100
+private const val SESSION_UNPUBLISHED_SORT = 110
+private const val SESSION_RETURNED_TO_DRAFT_SORT = 120
+private const val SESSION_DELETED_SORT = 130
 
 enum class HostSessionHistoryType(
     val typeSort: Int,
@@ -231,6 +238,13 @@ enum class HostSessionHistoryType(
     RECORD_REVISION_RESTORED(RECORD_REVISION_RESTORED_SORT),
     NOTIFICATION_SENT(NOTIFICATION_SENT_SORT),
     NOTIFICATION_SKIPPED(NOTIFICATION_SKIPPED_SORT),
+    SESSION_OPENED(SESSION_OPENED_SORT),
+    SESSION_CLOSED(SESSION_CLOSED_SORT),
+    SESSION_PUBLISHED(SESSION_PUBLISHED_SORT),
+    SESSION_REOPENED(SESSION_REOPENED_SORT),
+    SESSION_UNPUBLISHED(SESSION_UNPUBLISHED_SORT),
+    SESSION_RETURNED_TO_DRAFT(SESSION_RETURNED_TO_DRAFT_SORT),
+    SESSION_DELETED(SESSION_DELETED_SORT),
 }
 
 data class HostSessionHistoryAttendanceTransition(
@@ -251,6 +265,10 @@ data class HostSessionHistoryItem(
     val revisionSource: SessionRecordSource? = null,
     val restoredFromRevisionId: UUID? = null,
     val notificationEventId: UUID? = null,
+    val fromState: String? = null,
+    val toState: String? = null,
+    val reasonCode: String? = null,
+    val reasonNote: String? = null,
 )
 
 data class HostSessionHistoryCursor(

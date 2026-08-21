@@ -80,6 +80,34 @@ class JdbcHostSessionHistoryAdapter(
             limit,
         ) { rs -> rs.toNotificationHistory() }
 
+    override fun loadLifecycleHistory(
+        host: CurrentMember,
+        sessionId: UUID,
+        cursor: HostSessionHistoryCursor?,
+        limit: Int,
+    ): List<HostSessionHistoryItem> =
+        queryHistory(
+            """
+            select id, action_type, from_state, to_state, reason_code, reason_note,
+                   actor_membership_id, created_at,
+                   case action_type
+                     when 'OPENED' then 70
+                     when 'CLOSED' then 80
+                     when 'PUBLISHED' then 90
+                     when 'REOPENED' then 100
+                     when 'UNPUBLISHED' then 110
+                     when 'RETURNED_TO_DRAFT' then 120
+                     when 'DELETED' then 130
+                   end as type_sort
+            from host_session_lifecycle_audit
+            where club_id = ? and session_id = ?
+            """.trimIndent(),
+            host,
+            sessionId,
+            cursor,
+            limit,
+        ) { rs -> rs.toLifecycleHistory() }
+
     private fun queryHistory(
         baseSql: String,
         host: CurrentMember,
@@ -184,6 +212,30 @@ private fun ResultSet.toNotificationHistory(): HostSessionHistoryItem {
         notificationEventId = getString("event_id")?.let(UUID::fromString),
     )
 }
+
+private fun ResultSet.toLifecycleHistory(): HostSessionHistoryItem =
+    HostSessionHistoryItem(
+        id = UUID.fromString(getString("id")),
+        type = lifecycleHistoryType(getString("action_type")),
+        createdAt = utcOffsetDateTime("created_at"),
+        actorMembershipId = UUID.fromString(getString("actor_membership_id")),
+        fromState = getString("from_state"),
+        toState = getString("to_state"),
+        reasonCode = getString("reason_code"),
+        reasonNote = getString("reason_note"),
+    )
+
+private fun lifecycleHistoryType(actionType: String): HostSessionHistoryType =
+    when (actionType) {
+        "OPENED" -> HostSessionHistoryType.SESSION_OPENED
+        "CLOSED" -> HostSessionHistoryType.SESSION_CLOSED
+        "PUBLISHED" -> HostSessionHistoryType.SESSION_PUBLISHED
+        "REOPENED" -> HostSessionHistoryType.SESSION_REOPENED
+        "UNPUBLISHED" -> HostSessionHistoryType.SESSION_UNPUBLISHED
+        "RETURNED_TO_DRAFT" -> HostSessionHistoryType.SESSION_RETURNED_TO_DRAFT
+        "DELETED" -> HostSessionHistoryType.SESSION_DELETED
+        else -> error("Unsupported lifecycle history action")
+    }
 
 private data class AuditTransitionJson(
     val membershipId: String,

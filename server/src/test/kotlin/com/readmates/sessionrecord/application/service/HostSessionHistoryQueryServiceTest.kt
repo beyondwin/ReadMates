@@ -35,16 +35,39 @@ class HostSessionHistoryQueryServiceTest {
             listOf(
                 item("00000000-0000-0000-0000-000000000013", HostSessionHistoryType.NOTIFICATION_SKIPPED, sameTime),
             )
+        historyPort.lifecycle =
+            listOf(
+                item(
+                    "00000000-0000-0000-0000-000000000014",
+                    HostSessionHistoryType.SESSION_REOPENED,
+                    sameTime,
+                    fromState = "CLOSED",
+                    toState = "OPEN",
+                    reasonCode = "MEETING_RESCHEDULED",
+                    reasonNote = "moved online",
+                ),
+            )
 
         val page = service.history(host(), SESSION_ID, PageRequest(limit = 2, cursor = emptyMap()))
 
         assertThat(page.items.map { it.type }).containsExactly(
+            HostSessionHistoryType.SESSION_REOPENED,
             HostSessionHistoryType.NOTIFICATION_SKIPPED,
-            HostSessionHistoryType.RECORD_REVISION_APPLIED,
+        )
+        assertThat(page.items.first()).isEqualTo(
+            item(
+                "00000000-0000-0000-0000-000000000014",
+                HostSessionHistoryType.SESSION_REOPENED,
+                sameTime,
+                fromState = "CLOSED",
+                toState = "OPEN",
+                reasonCode = "MEETING_RESCHEDULED",
+                reasonNote = "moved online",
+            ),
         )
         val cursor = CursorCodec.decode(page.nextCursor)
         assertThat(cursor).containsOnlyKeys("createdAt", "typeSort", "id", "clubId", "sessionId")
-        assertThat(cursor?.get("typeSort")).isEqualTo("30")
+        assertThat(cursor?.get("typeSort")).isEqualTo("60")
         assertThat(cursor?.get("clubId")).isEqualTo(CLUB_ID.toString())
         assertThat(cursor?.get("sessionId")).isEqualTo(SESSION_ID.toString())
     }
@@ -159,11 +182,19 @@ class HostSessionHistoryQueryServiceTest {
         id: String,
         type: HostSessionHistoryType,
         createdAt: OffsetDateTime,
+        fromState: String? = null,
+        toState: String? = null,
+        reasonCode: String? = null,
+        reasonNote: String? = null,
     ) = HostSessionHistoryItem(
         id = UUID.fromString(id),
         type = type,
         createdAt = createdAt,
         actorMembershipId = HOST_MEMBERSHIP_ID,
+        fromState = fromState,
+        toState = toState,
+        reasonCode = reasonCode,
+        reasonNote = reasonNote,
     )
 
     private fun host() =
@@ -183,6 +214,7 @@ class HostSessionHistoryQueryServiceTest {
         var audit = emptyList<HostSessionHistoryItem>()
         var revisions = emptyList<HostSessionHistoryItem>()
         var notifications = emptyList<HostSessionHistoryItem>()
+        var lifecycle = emptyList<HostSessionHistoryItem>()
         val cursors = mutableListOf<HostSessionHistoryCursor?>()
 
         override fun loadAuditHistory(
@@ -205,6 +237,13 @@ class HostSessionHistoryQueryServiceTest {
             cursor: HostSessionHistoryCursor?,
             limit: Int,
         ) = notifications.also { cursors += cursor }
+
+        override fun loadLifecycleHistory(
+            host: CurrentMember,
+            sessionId: UUID,
+            cursor: HostSessionHistoryCursor?,
+            limit: Int,
+        ) = lifecycle.also { cursors += cursor }
     }
 
     private companion object {

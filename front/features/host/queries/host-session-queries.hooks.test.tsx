@@ -318,9 +318,6 @@ describe("host session mutation hooks", () => {
     ["open", useOpenHostSessionMutation, openHostSession, false],
     ["close", useCloseHostSessionMutation, closeHostSession, true],
     ["publish", usePublishHostSessionMutation, publishHostSession, true],
-    ["reopen", useReopenHostSessionMutation, reopenHostSession, true],
-    ["unpublish", useUnpublishHostSessionMutation, unpublishHostSession, true],
-    ["return-to-draft", useReturnHostSessionToDraftMutation, returnHostSessionToDraft, true],
   ] as const)("invalidates session surfaces after %s", async (_name, hook, apiFn, expectsManualDispatches) => {
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
@@ -344,6 +341,33 @@ describe("host session mutation hooks", () => {
     } else {
       expectFresh(client, [entries.manualDispatches]);
     }
+    expectFresh(client, [entries.otherClubDetail]);
+  });
+
+  it.each([
+    ["reopen", useReopenHostSessionMutation, reopenHostSession],
+    ["unpublish", useUnpublishHostSessionMutation, unpublishHostSession],
+    ["return-to-draft", useReturnHostSessionToDraftMutation, returnHostSessionToDraft],
+  ] as const)("invalidates session surfaces after reverse %s", async (_name, hook, apiFn) => {
+    const request = { reasonCode: "ACCIDENTAL_TRANSITION" as const };
+    vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
+    const { client, Wrapper } = createWrapper();
+    const { entries } = seedSurfaces(client);
+    const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "session-7", request });
+    });
+
+    expect(apiFn).toHaveBeenCalledWith("session-7", request);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.closingStatus,
+      entries.list,
+      entries.dashboard,
+      entries.current,
+      entries.manualDispatches,
+    ]);
     expectFresh(client, [entries.otherClubDetail]);
   });
 

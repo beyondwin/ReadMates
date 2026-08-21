@@ -269,10 +269,10 @@ function useHostSessionEditorActions(
   const { mutateAsync: saveAccessScope } = useSaveHostSessionAccessScopeMutation(context);
 
   const runLifecycle = useCallback(async (
-    mutate: (sessionId: string) => Promise<Response>,
+    mutate: () => Promise<Response>,
     sessionId: string,
   ) => {
-    const result = await hostSessionLifecycleResultFromResponse(await mutate(sessionId));
+    const result = await hostSessionLifecycleResultFromResponse(await mutate());
     if (result.ok) {
       await onSessionRecordsChanged?.(sessionId);
     }
@@ -283,12 +283,15 @@ function useHostSessionEditorActions(
     loadDeletionPreview: (sessionId) =>
       queryClient.fetchQuery(hostSessionDeletionPreviewQuery(sessionId, context)),
     deleteSession: (sessionId) => deleteSession(sessionId),
-    openSession: (sessionId) => runLifecycle(openSession, sessionId),
-    closeSession: (sessionId) => runLifecycle(closeSession, sessionId),
-    publishSession: (sessionId) => runLifecycle(publishSession, sessionId),
-    reopenSession: (sessionId) => runLifecycle(reopenSession, sessionId),
-    unpublishSession: (sessionId) => runLifecycle(unpublishSession, sessionId),
-    returnSessionToDraft: (sessionId) => runLifecycle(returnSessionToDraft, sessionId),
+    openSession: (sessionId) => runLifecycle(() => openSession(sessionId), sessionId),
+    closeSession: (sessionId) => runLifecycle(() => closeSession(sessionId), sessionId),
+    publishSession: (sessionId) => runLifecycle(() => publishSession(sessionId), sessionId),
+    reopenSession: (sessionId, request) =>
+      runLifecycle(() => reopenSession({ sessionId, request }), sessionId),
+    unpublishSession: (sessionId, request) =>
+      runLifecycle(() => unpublishSession({ sessionId, request }), sessionId),
+    returnSessionToDraft: (sessionId, request) =>
+      runLifecycle(() => returnSessionToDraft({ sessionId, request }), sessionId),
     saveSession: (sessionId, request) =>
       sessionId === null
         ? createSession(request)

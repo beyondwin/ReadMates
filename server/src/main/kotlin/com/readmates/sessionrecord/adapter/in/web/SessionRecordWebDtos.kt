@@ -2,6 +2,7 @@
 
 package com.readmates.sessionrecord.adapter.`in`.web
 
+import com.fasterxml.jackson.annotation.JsonInclude
 import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.NotificationDecision
@@ -212,6 +213,14 @@ data class HostSessionHistoryItemResponse(
     val revisionSource: String?,
     val restoredFromRevisionId: String?,
     val notificationEventId: String?,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val fromState: String? = null,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val toState: String? = null,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val reasonCode: String? = null,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val reasonNote: String? = null,
 )
 
 data class HostSessionHistoryAttendanceTransitionResponse(
@@ -294,6 +303,10 @@ private fun HostSessionHistoryItem.toResponse() =
         revisionSource = revisionSource?.name,
         restoredFromRevisionId = restoredFromRevisionId?.toString(),
         notificationEventId = notificationEventId?.toString(),
+        fromState = fromState,
+        toState = toState,
+        reasonCode = reasonCode,
+        reasonNote = reasonNote,
     )
 
 private fun HostSessionHistoryAttendanceTransition.toResponse() =

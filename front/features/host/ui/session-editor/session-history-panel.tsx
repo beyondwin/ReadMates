@@ -104,6 +104,11 @@ export function SessionHistoryPanel({
                         ))}
                       </div>
                     ) : null}
+                    {view.reasonNote ? (
+                      <p className="small" style={{ margin: "8px 0 0", overflowWrap: "anywhere" }}>
+                        {view.reasonNote}
+                      </p>
+                    ) : null}
                   </div>
                   {view.canCreateDraft && item.revisionId && item.revisionVersion !== null ? (
                     <button

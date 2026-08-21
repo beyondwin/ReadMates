@@ -12,6 +12,10 @@ export type SessionHistoryPanelItem = {
   revisionSource: HostSessionHistoryItem["revisionSource"];
   restoredFromRevisionId: string | null;
   notificationEventId: string | null;
+  fromState?: string | null;
+  toState?: string | null;
+  reasonCode?: string | null;
+  reasonNote?: string | null;
 };
 
 export function appendUniqueSessionHistory<T extends { id: string }>(

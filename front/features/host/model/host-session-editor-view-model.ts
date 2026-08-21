@@ -1,3 +1,4 @@
+import { lifecycleReasonLabel } from "./host-session-lifecycle-model";
 import {
   recordVisibilityLabel,
   type HostSessionState,
@@ -32,11 +33,22 @@ export type HostSessionHistoryItem = {
     | "RECORD_REVISION_APPLIED"
     | "RECORD_REVISION_RESTORED"
     | "NOTIFICATION_SENT"
-    | "NOTIFICATION_SKIPPED";
+    | "NOTIFICATION_SKIPPED"
+    | "SESSION_OPENED"
+    | "SESSION_CLOSED"
+    | "SESSION_PUBLISHED"
+    | "SESSION_REOPENED"
+    | "SESSION_UNPUBLISHED"
+    | "SESSION_RETURNED_TO_DRAFT"
+    | "SESSION_DELETED";
   changedFields: readonly string[];
   revisionId: string | null;
   revisionVersion: number | null;
   revisionSource: "BASELINE" | "MANUAL" | "JSON_IMPORT" | "AI_GENERATED" | "RESTORED" | null;
+  fromState?: string | null;
+  toState?: string | null;
+  reasonCode?: string | null;
+  reasonNote?: string | null;
 };
 
 export type HostSessionEditorNextActionKind =
@@ -117,6 +129,13 @@ const historyTypeLabels: Record<HostSessionHistoryItem["type"], string> = {
   RECORD_REVISION_RESTORED: "과거 버전으로 초안 생성",
   NOTIFICATION_SENT: "알림 발송",
   NOTIFICATION_SKIPPED: "알림 보내지 않음",
+  SESSION_OPENED: "멤버에게 열기",
+  SESSION_CLOSED: "모임 마치기",
+  SESSION_PUBLISHED: "기록 공개",
+  SESSION_REOPENED: "다시 진행 중으로",
+  SESSION_UNPUBLISHED: "공개 취소",
+  SESSION_RETURNED_TO_DRAFT: "모임 전으로 되돌리기",
+  SESSION_DELETED: "모임 삭제",
 };
 
 const changedFieldLabels: Record<string, string> = {
@@ -161,18 +180,40 @@ export type HostSessionHistoryItemView = {
   detailItems: string[];
   sourceLabel: string | null;
   canCreateDraft: boolean;
+  reasonNote: string | null;
 };
 
 export function buildHostSessionHistoryItemView(item: HostSessionHistoryItem): HostSessionHistoryItemView {
+  const reasonLabel = lifecycleReasonLabel(item.reasonCode);
+  const stateTransition = lifecycleStateTransitionLabel(item.fromState, item.toState);
   return {
     title: historyTypeLabels[item.type],
     versionLabel: item.revisionVersion && item.revisionVersion > 0 ? `버전 ${item.revisionVersion}` : null,
-    detailItems: item.changedFields.flatMap((field) => changedFieldLabels[field] ? [changedFieldLabels[field]] : []),
+    detailItems: [
+      ...item.changedFields.flatMap((field) => changedFieldLabels[field] ? [changedFieldLabels[field]] : []),
+      ...stateTransition ? [stateTransition] : [],
+      ...reasonLabel ? [reasonLabel] : [],
+    ],
     sourceLabel: item.revisionSource ? historySourceLabels[item.revisionSource] : null,
     canCreateDraft: item.revisionId !== null
       && item.revisionVersion !== null
       && item.revisionVersion > 0,
+    reasonNote: item.reasonNote ?? null,
   };
+}
+
+function lifecycleStateTransitionLabel(fromState: string | null | undefined, toState: string | null | undefined): string | null {
+  if (!fromState && !toState) {
+    return null;
+  }
+  return `${historyStateLabel(fromState)} → ${historyStateLabel(toState)}`;
+}
+
+function historyStateLabel(state: string | null | undefined): string {
+  if (state === "DRAFT" || state === "OPEN" || state === "CLOSED" || state === "PUBLISHED") {
+    return compactSessionLifecycleLabels[state];
+  }
+  return "삭제";
 }
 
 export function compactSessionLifecycleLabel(state: HostSessionState | null): string {

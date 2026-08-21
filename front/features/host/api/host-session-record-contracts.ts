@@ -13,7 +13,29 @@ export type HostSessionHistoryType =
   | "RECORD_REVISION_APPLIED"
   | "RECORD_REVISION_RESTORED"
   | "NOTIFICATION_SENT"
-  | "NOTIFICATION_SKIPPED";
+  | "NOTIFICATION_SKIPPED"
+  | "SESSION_OPENED"
+  | "SESSION_CLOSED"
+  | "SESSION_PUBLISHED"
+  | "SESSION_REOPENED"
+  | "SESSION_UNPUBLISHED"
+  | "SESSION_RETURNED_TO_DRAFT"
+  | "SESSION_DELETED";
+
+export const HOST_SESSION_REVERSE_REASON_CODES = [
+  "ACCIDENTAL_TRANSITION",
+  "MEETING_RESCHEDULED",
+  "CONTENT_CORRECTION",
+  "OPERATIONAL_RECOVERY",
+  "OTHER_OPERATIONAL_REASON",
+] as const;
+
+export type HostSessionReverseReasonCode = (typeof HOST_SESSION_REVERSE_REASON_CODES)[number];
+
+export type HostSessionReverseRequest = {
+  reasonCode: HostSessionReverseReasonCode;
+  reasonNote?: string;
+};
 
 export type SessionRecordEntry = {
   membershipId: string;
@@ -121,6 +143,10 @@ export type HostSessionHistoryItem = {
   revisionSource: SessionRecordSource | null;
   restoredFromRevisionId: string | null;
   notificationEventId: string | null;
+  fromState?: string | null;
+  toState?: string | null;
+  reasonCode?: string | null;
+  reasonNote?: string | null;
 };
 
 export type HostSessionHistoryPage = PagedResponse<HostSessionHistoryItem>;
@@ -228,6 +254,13 @@ export const HostSessionHistoryPageResponseSchema = z.object({
       "RECORD_REVISION_RESTORED",
       "NOTIFICATION_SENT",
       "NOTIFICATION_SKIPPED",
+      "SESSION_OPENED",
+      "SESSION_CLOSED",
+      "SESSION_PUBLISHED",
+      "SESSION_REOPENED",
+      "SESSION_UNPUBLISHED",
+      "SESSION_RETURNED_TO_DRAFT",
+      "SESSION_DELETED",
     ]),
     createdAt: z.string(),
     actorMembershipId: z.string(),
@@ -242,6 +275,10 @@ export const HostSessionHistoryPageResponseSchema = z.object({
     revisionSource: SessionRecordSourceSchema.nullable(),
     restoredFromRevisionId: nullableString,
     notificationEventId: nullableString,
+    fromState: z.string().nullable().optional(),
+    toState: z.string().nullable().optional(),
+    reasonCode: z.string().nullable().optional(),
+    reasonNote: z.string().nullable().optional(),
   })),
   nextCursor: nullableString,
 });

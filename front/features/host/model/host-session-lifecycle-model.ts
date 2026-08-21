@@ -1,5 +1,8 @@
+import type { HostSessionReverseRequest } from "../api/host-session-record-contracts";
 import type { HostSessionState } from "./host-session-editor-model";
 import type { HostSessionDetailResponse } from "./host-view-types";
+
+export type { HostSessionReverseRequest };
 
 export type HostSessionLifecycleResult =
   | { ok: true; session: HostSessionDetailResponse }
@@ -90,4 +93,83 @@ export function lifecycleConfirmCopy(kind: SessionLifecycleConfirmKind): Session
 
 export function openAlreadyExistsMessage(): string {
   return "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.";
+}
+
+export const REVERSE_REASON_NOTE_MAX_LENGTH = 500;
+
+export const SELECTABLE_REVERSE_REASON_OPTIONS = [
+  { code: "ACCIDENTAL_TRANSITION", label: "실수로 상태를 바꿈" },
+  { code: "MEETING_RESCHEDULED", label: "모임 일정이 바뀜" },
+  { code: "CONTENT_CORRECTION", label: "내용을 바로잡기 위함" },
+  { code: "OPERATIONAL_RECOVERY", label: "운영을 복구하기 위함" },
+  { code: "OTHER_OPERATIONAL_REASON", label: "그 밖의 운영 사유" },
+] as const;
+
+const reverseReasonLabels: Record<string, string> = {
+  ACCIDENTAL_TRANSITION: "실수로 상태를 바꿈",
+  MEETING_RESCHEDULED: "모임 일정이 바뀜",
+  CONTENT_CORRECTION: "내용을 바로잡기 위함",
+  OPERATIONAL_RECOVERY: "운영을 복구하기 위함",
+  OTHER_OPERATIONAL_REASON: "그 밖의 운영 사유",
+  LEGACY_UNSPECIFIED: "이전 클라이언트에서 사유 없이 변경됨",
+  EMPTY_SESSION_DELETED: "빈 모임 삭제",
+};
+
+export type ReverseLifecycleConfirmKind = ReverseLifecycleAction["kind"];
+
+export function isReverseLifecycleKind(
+  kind: SessionLifecycleConfirmKind,
+): kind is ReverseLifecycleConfirmKind {
+  return kind === "reopen" || kind === "unpublish" || kind === "return-to-draft";
+}
+
+export function lifecycleReasonLabel(reasonCode: string | null | undefined): string | null {
+  if (!reasonCode) {
+    return null;
+  }
+  return reverseReasonLabels[reasonCode] ?? null;
+}
+
+export function remainingReverseReasonNoteCount(note: string): number {
+  return REVERSE_REASON_NOTE_MAX_LENGTH - note.length;
+}
+
+export type ReverseReasonValidationResult =
+  | { ok: true; request: HostSessionReverseRequest }
+  | { ok: false; message: string; focus: "reason" | "note" };
+
+export function buildHostSessionReverseRequest(input: {
+  reasonCode: string;
+  reasonNote: string;
+}): ReverseReasonValidationResult {
+  if (!SELECTABLE_REVERSE_REASON_OPTIONS.some((option) => option.code === input.reasonCode)) {
+    return { ok: false, message: "사유를 선택해 주세요", focus: "reason" };
+  }
+  const trimmedNote = input.reasonNote.trim();
+  if (!trimmedNote) {
+    return { ok: true, request: { reasonCode: input.reasonCode as HostSessionReverseRequest["reasonCode"] } };
+  }
+  if (trimmedNote.length > REVERSE_REASON_NOTE_MAX_LENGTH) {
+    return { ok: false, message: "설명은 500자까지입니다", focus: "note" };
+  }
+  if (hasIsoControlCharacter(trimmedNote)) {
+    return { ok: false, message: "설명에 사용할 수 없는 문자가 있습니다", focus: "note" };
+  }
+  return {
+    ok: true,
+    request: {
+      reasonCode: input.reasonCode as HostSessionReverseRequest["reasonCode"],
+      reasonNote: trimmedNote,
+    },
+  };
+}
+
+function hasIsoControlCharacter(value: string): boolean {
+  for (let index = 0; index < value.length; index += 1) {
+    const code = value.charCodeAt(index);
+    if (code <= 0x1f || (code >= 0x7f && code <= 0x9f)) {
+      return true;
+    }
+  }
+  return false;
 }

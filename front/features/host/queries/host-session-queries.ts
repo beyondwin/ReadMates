@@ -41,6 +41,7 @@ import type {
   HostNotificationEventType,
   SessionImportRequest,
 } from "@/features/host/api/host-contracts";
+import type { HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import {
@@ -352,8 +353,9 @@ export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
 export function useReopenHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (sessionId: string) => reopenHostSession(sessionId),
-    onSuccess: (response, sessionId) =>
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) =>
+      reopenHostSession(sessionId, request),
+    onSuccess: (response, { sessionId }) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
 }
@@ -361,8 +363,9 @@ export function useReopenHostSessionMutation(context?: ReadmatesApiContext) {
 export function useUnpublishHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (sessionId: string) => unpublishHostSession(sessionId),
-    onSuccess: (response, sessionId) =>
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) =>
+      unpublishHostSession(sessionId, request),
+    onSuccess: (response, { sessionId }) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
 }
@@ -370,8 +373,9 @@ export function useUnpublishHostSessionMutation(context?: ReadmatesApiContext) {
 export function useReturnHostSessionToDraftMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (sessionId: string) => returnHostSessionToDraft(sessionId),
-    onSuccess: (response, sessionId) =>
+    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) =>
+      returnHostSessionToDraft(sessionId, request),
+    onSuccess: (response, { sessionId }) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
 }

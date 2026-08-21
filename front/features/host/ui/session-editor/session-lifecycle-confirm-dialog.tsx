@@ -1,10 +1,27 @@
 import {
+  type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MutableRefObject,
   useEffect,
   useRef,
+  useState,
 } from "react";
-import type { SessionLifecycleConfirmCopy } from "../../model/host-session-lifecycle-model";
+import {
+  buildHostSessionReverseRequest,
+  isReverseLifecycleKind,
+  remainingReverseReasonNoteCount,
+  SELECTABLE_REVERSE_REASON_OPTIONS,
+  type HostSessionReverseRequest,
+  type SessionLifecycleConfirmCopy,
+} from "../../model/host-session-lifecycle-model";
+
+const focusableSelector = [
+  "button:not([disabled])",
+  "a[href]",
+  "select:not([disabled])",
+  "textarea:not([disabled])",
+  "input:not([disabled])",
+].join(", ");
 
 export type SessionLifecycleConfirmDialogProps = {
   copy: SessionLifecycleConfirmCopy;
@@ -13,7 +30,7 @@ export type SessionLifecycleConfirmDialogProps = {
   submitting: boolean;
   restoreFocusRef: MutableRefObject<HTMLElement | null>;
   onClose: () => void;
-  onConfirm: () => void;
+  onConfirm: (request?: HostSessionReverseRequest) => void;
 };
 
 export function SessionLifecycleConfirmDialog({
@@ -28,7 +45,13 @@ export function SessionLifecycleConfirmDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
   const confirmButtonRef = useRef<HTMLButtonElement>(null);
-  const openSessionLinkRef = useRef<HTMLAnchorElement>(null);
+  const reasonSelectRef = useRef<HTMLSelectElement>(null);
+  const reasonNoteRef = useRef<HTMLTextAreaElement>(null);
+  const [reasonCode, setReasonCode] = useState("");
+  const [reasonNote, setReasonNote] = useState("");
+  const [validationMessage, setValidationMessage] = useState<string | null>(null);
+  const reverse = isReverseLifecycleKind(copy.kind);
+  const alertMessage = validationMessage ?? errorMessage;
 
   useEffect(() => {
     const focusTarget = cancelButtonRef.current ?? confirmButtonRef.current ?? dialogRef.current;
@@ -53,16 +76,9 @@ export function SessionLifecycleConfirmDialog({
       return;
     }
 
-    const focusableElements = [
-      openSessionLinkRef.current,
-      cancelButtonRef.current,
-      confirmButtonRef.current,
-    ].filter((element): element is HTMLElement => {
-      if (!element) {
-        return false;
-      }
-      return !(element instanceof HTMLButtonElement && element.disabled);
-    });
+    const focusableElements = Array.from(
+      dialogRef.current?.querySelectorAll<HTMLElement>(focusableSelector) ?? [],
+    );
 
     if (focusableElements.length === 0) {
       event.preventDefault();
@@ -92,6 +108,28 @@ export function SessionLifecycleConfirmDialog({
       event.preventDefault();
       firstElement.focus();
     }
+  };
+
+  const handleConfirm = () => {
+    if (submitting) {
+      return;
+    }
+    if (!reverse) {
+      onConfirm();
+      return;
+    }
+    const result = buildHostSessionReverseRequest({ reasonCode, reasonNote });
+    if (!result.ok) {
+      setValidationMessage(result.message);
+      if (result.focus === "reason") {
+        reasonSelectRef.current?.focus();
+      } else {
+        reasonNoteRef.current?.focus();
+      }
+      return;
+    }
+    setValidationMessage(null);
+    onConfirm(result.request);
   };
 
   return (
@@ -124,15 +162,60 @@ export function SessionLifecycleConfirmDialog({
           {copy.body}
         </p>
 
-        {errorMessage ? (
+        {reverse ? (
+          <div className="stack" style={{ "--stack": "14px", marginBottom: "18px" } as CSSProperties}>
+            <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
+              <label className="label" htmlFor="session-lifecycle-reason">변경 사유</label>
+              <select
+                ref={reasonSelectRef}
+                id="session-lifecycle-reason"
+                className="input"
+                value={reasonCode}
+                disabled={submitting}
+                onChange={(event) => {
+                  setReasonCode(event.currentTarget.value);
+                  setValidationMessage(null);
+                }}
+              >
+                <option value="">사유 선택</option>
+                {SELECTABLE_REVERSE_REASON_OPTIONS.map((option) => (
+                  <option key={option.code} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="stack" style={{ "--stack": "6px" } as CSSProperties}>
+              <label className="label" htmlFor="session-lifecycle-reason-note">설명 (선택)</label>
+              <textarea
+                ref={reasonNoteRef}
+                id="session-lifecycle-reason-note"
+                className="input"
+                rows={3}
+                value={reasonNote}
+                disabled={submitting}
+                onChange={(event) => {
+                  setReasonNote(event.currentTarget.value);
+                  setValidationMessage(null);
+                }}
+                style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}
+              />
+              <span className="tiny" style={{ color: "var(--text-3)" }}>
+                남은 글자 {remainingReverseReasonNoteCount(reasonNote)}
+              </span>
+            </div>
+          </div>
+        ) : null}
+
+        {alertMessage ? (
           <p className="small" role="alert" style={{ color: "var(--danger)", margin: "0 0 18px" }}>
-            {errorMessage}
+            {alertMessage}
           </p>
         ) : null}
 
         {openSessionHref ? (
           <p className="small" style={{ margin: "0 0 18px" }}>
-            <a ref={openSessionLinkRef} href={openSessionHref}>
+            <a href={openSessionHref}>
               진행 중인 모임 열기
             </a>
           </p>
@@ -160,7 +243,7 @@ export function SessionLifecycleConfirmDialog({
             className="btn btn-primary btn-sm"
             type="button"
             disabled={submitting}
-            onClick={onConfirm}
+            onClick={handleConfirm}
           >
             {copy.confirmLabel}
           </button>

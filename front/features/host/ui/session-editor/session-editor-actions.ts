@@ -7,7 +7,10 @@ import type {
   SessionImportRequest,
 } from "@/features/host/model/host-view-types";
 import type { HostSessionRequest } from "@/features/host/model/host-session-editor-model";
-import type { HostSessionLifecycleResult } from "@/features/host/model/host-session-lifecycle-model";
+import type {
+  HostSessionLifecycleResult,
+  HostSessionReverseRequest,
+} from "@/features/host/model/host-session-lifecycle-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 
 export type SaveState = "idle" | "saving" | "saved" | "error";
@@ -24,9 +27,9 @@ export type HostSessionEditorActions = {
   openSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   closeSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   publishSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
-  reopenSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
-  unpublishSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
-  returnSessionToDraft: (sessionId: string) => Promise<HostSessionLifecycleResult>;
+  reopenSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
+  unpublishSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
+  returnSessionToDraft: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
   updateAttendance: (
     sessionId: string,

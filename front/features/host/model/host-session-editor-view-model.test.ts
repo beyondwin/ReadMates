@@ -259,6 +259,7 @@ describe("host session editor view model", () => {
       detailItems: ["공개 요약", "공개 범위", "하이라이트", "한줄평", "피드백 문서"],
       sourceLabel: "AI로 생성",
       canCreateDraft: true,
+      reasonNote: null,
     });
   });
 

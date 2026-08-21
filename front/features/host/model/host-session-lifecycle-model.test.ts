@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { HostSessionState } from "./host-session-editor-model";
 import {
+  buildHostSessionReverseRequest,
   lifecycleConfirmCopy,
+  lifecycleReasonLabel,
   openAlreadyExistsMessage,
   reverseLifecycleAction,
+  SELECTABLE_REVERSE_REASON_OPTIONS,
   type SessionLifecycleConfirmCopy,
   type SessionLifecycleConfirmKind,
 } from "./host-session-lifecycle-model";
@@ -96,5 +99,36 @@ describe("openAlreadyExistsMessage", () => {
     expect(openAlreadyExistsMessage()).toBe(
       "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
     );
+  });
+});
+
+describe("reverse reason helpers", () => {
+  it("does not expose internal fallback codes as selectable reasons", () => {
+    expect(SELECTABLE_REVERSE_REASON_OPTIONS.map((option) => option.code)).not.toContain("LEGACY_UNSPECIFIED");
+    expect(SELECTABLE_REVERSE_REASON_OPTIONS.map((option) => option.code)).not.toContain("EMPTY_SESSION_DELETED");
+    expect(lifecycleReasonLabel("LEGACY_UNSPECIFIED")).toBe("이전 클라이언트에서 사유 없이 변경됨");
+  });
+
+  it("builds a trimmed reverse request and rejects invalid notes", () => {
+    expect(buildHostSessionReverseRequest({
+      reasonCode: "MEETING_RESCHEDULED",
+      reasonNote: "  moved online  ",
+    })).toEqual({
+      ok: true,
+      request: { reasonCode: "MEETING_RESCHEDULED", reasonNote: "moved online" },
+    });
+    expect(buildHostSessionReverseRequest({ reasonCode: "", reasonNote: "" })).toEqual({
+      ok: false,
+      message: "사유를 선택해 주세요",
+      focus: "reason",
+    });
+    expect(buildHostSessionReverseRequest({
+      reasonCode: "ACCIDENTAL_TRANSITION",
+      reasonNote: "ok\u0001nope",
+    }).ok).toBe(false);
+    expect(buildHostSessionReverseRequest({
+      reasonCode: "ACCIDENTAL_TRANSITION",
+      reasonNote: "x".repeat(501),
+    }).ok).toBe(false);
   });
 });

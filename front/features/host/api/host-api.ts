@@ -64,6 +64,9 @@ import {
 import { normalizeHostSessionScheduleDefaults } from "../model/host-schedule-defaults-state";
 import { buildSessionAccessScopeRequest } from "../model/session-exposure-model";
 import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
+import type { HostSessionReverseRequest } from "./host-session-record-contracts";
+
+export type { HostSessionReverseRequest };
 
 export function fetchHostCurrentSession(context?: ReadmatesApiContext) {
   return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
@@ -360,21 +363,27 @@ export function publishHostSession(sessionId: string) {
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
-export function reopenHostSession(sessionId: string) {
+export function reopenHostSession(sessionId: string, request: HostSessionReverseRequest) {
   return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/reopen`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
-export function unpublishHostSession(sessionId: string) {
+export function unpublishHostSession(sessionId: string, request: HostSessionReverseRequest) {
   return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/unpublish`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
-export function returnHostSessionToDraft(sessionId: string) {
+export function returnHostSessionToDraft(sessionId: string, request: HostSessionReverseRequest) {
   return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/return-to-draft`, {
     method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(request),
   }) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 

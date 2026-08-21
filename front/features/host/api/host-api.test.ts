@@ -237,9 +237,9 @@ describe("host api wrappers", () => {
     await openHostSession(sessionId);
     await closeHostSession(sessionId);
     await publishHostSession(sessionId);
-    await reopenHostSession(sessionId);
-    await unpublishHostSession(sessionId);
-    await returnHostSessionToDraft(sessionId);
+    await reopenHostSession(sessionId, { reasonCode: "MEETING_RESCHEDULED", reasonNote: "moved online" });
+    await unpublishHostSession(sessionId, { reasonCode: "CONTENT_CORRECTION" });
+    await returnHostSessionToDraft(sessionId, { reasonCode: "ACCIDENTAL_TRANSITION" });
     await commitHostSessionImport(sessionId, { payload: "{}" });
     await submitHostMemberLifecycle(membershipId, "/current-session/remove", { currentSessionPolicy: "NEXT_SESSION" });
     await submitHostViewerAction(membershipId, "activate");
@@ -284,8 +284,38 @@ describe("host api wrappers", () => {
     ]);
     expect(calls[1].body).toBe(JSON.stringify({ sessionReminderEnabled: true }));
     expect(calls[2].body).toBe(JSON.stringify({ templateKey: "SESSION_REMINDER", sessionId }));
+    expect(calls[17].body).toBe(JSON.stringify({
+      reasonCode: "MEETING_RESCHEDULED",
+      reasonNote: "moved online",
+    }));
+    expect(calls[18].body).toBe(JSON.stringify({ reasonCode: "CONTENT_CORRECTION" }));
+    expect(calls[19].body).toBe(JSON.stringify({ reasonCode: "ACCIDENTAL_TRANSITION" }));
     expect(calls[21].body).toBe(JSON.stringify({ currentSessionPolicy: "NEXT_SESSION" }));
     expect(calls[23].body).toBe(JSON.stringify({ displayName: "Alice" }));
+  });
+
+  it("sends reverse lifecycle JSON and keeps forward actions body-less", async () => {
+    const fetchMock = stubFetch();
+    const sessionId = "session 7";
+    const request = { reasonCode: "OPERATIONAL_RECOVERY" as const, reasonNote: "restored" };
+
+    await openHostSession(sessionId);
+    await closeHostSession(sessionId);
+    await publishHostSession(sessionId);
+    await reopenHostSession(sessionId, request);
+    await unpublishHostSession(sessionId, request);
+    await returnHostSessionToDraft(sessionId, request);
+
+    const calls = fetchMock.mock.calls.map(([, init]) => init as RequestInit);
+    expect(calls.slice(0, 3).map((init) => init.body)).toEqual([undefined, undefined, undefined]);
+    expect(calls.slice(3).map((init) => ({
+      contentType: new Headers(init.headers).get("Content-Type"),
+      body: init.body,
+    }))).toEqual([
+      { contentType: "application/json", body: JSON.stringify(request) },
+      { contentType: "application/json", body: JSON.stringify(request) },
+      { contentType: "application/json", body: JSON.stringify(request) },
+    ]);
   });
 
   it("parses visibility responses and returns the composer result", async () => {

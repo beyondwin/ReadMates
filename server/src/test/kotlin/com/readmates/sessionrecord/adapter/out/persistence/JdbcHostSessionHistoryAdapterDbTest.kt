@@ -95,6 +95,59 @@ class JdbcHostSessionHistoryAdapterDbTest(
     }
 
     @Test
+    fun `merges lifecycle rows with other sources at equal timestamps and keeps reason fields`() {
+        insertFirstClubHistory()
+        insertNotificationHistory()
+        insertLifecycleHistory()
+
+        val page = historyService.history(host(), SESSION_ID, PageRequest(limit = 10, cursor = emptyMap()))
+
+        assertThat(page.items.map { it.type }).containsExactly(
+            HostSessionHistoryType.SESSION_REOPENED,
+            HostSessionHistoryType.SESSION_OPENED,
+            HostSessionHistoryType.NOTIFICATION_SKIPPED,
+            HostSessionHistoryType.NOTIFICATION_SENT,
+            HostSessionHistoryType.RECORD_REVISION_APPLIED,
+            HostSessionHistoryType.BASIC_INFO_UPDATED,
+            HostSessionHistoryType.BASIC_INFO_UPDATED,
+        )
+        val reopened = page.items.first()
+        assertThat(reopened.id).isEqualTo(LIFECYCLE_REOPENED_ID)
+        assertThat(reopened.fromState).isEqualTo("CLOSED")
+        assertThat(reopened.toState).isEqualTo("OPEN")
+        assertThat(reopened.reasonCode).isEqualTo("MEETING_RESCHEDULED")
+        assertThat(reopened.reasonNote).isEqualTo("moved online")
+        val opened = page.items[1]
+        assertThat(opened.id).isEqualTo(LIFECYCLE_OPENED_ID)
+        assertThat(opened.fromState).isEqualTo("DRAFT")
+        assertThat(opened.toState).isEqualTo("OPEN")
+        assertThat(opened.reasonCode).isNull()
+        assertThat(opened.reasonNote).isNull()
+        assertThat(page.items.filter { it.type == HostSessionHistoryType.RECORD_REVISION_APPLIED })
+            .allSatisfy { item ->
+                assertThat(item.fromState).isNull()
+                assertThat(item.toState).isNull()
+                assertThat(item.reasonCode).isNull()
+                assertThat(item.reasonNote).isNull()
+            }
+        assertThat(page.nextCursor).isNull()
+    }
+
+    @Test
+    fun `keeps a deleted lifecycle row queryable after the session is gone`() {
+        insertDeletedLifecycleHistory()
+
+        val page = historyService.history(host(), DELETED_SESSION_ID, PageRequest(limit = 10, cursor = emptyMap()))
+
+        assertThat(page.items).hasSize(1)
+        assertThat(page.items.single().type).isEqualTo(HostSessionHistoryType.SESSION_DELETED)
+        assertThat(page.items.single().fromState).isEqualTo("DRAFT")
+        assertThat(page.items.single().toState).isNull()
+        assertThat(page.items.single().reasonCode).isEqualTo("EMPTY_SESSION_DELETED")
+        assertThat(page.items.single().reasonNote).isNull()
+    }
+
+    @Test
     fun `notification send and skip at equal time map and paginate by database tuple`() {
         insertNotificationHistory()
         val decisionRowsBeforeRead = legacyDecisionRows()
@@ -206,6 +259,57 @@ class JdbcHostSessionHistoryAdapterDbTest(
             OUTSIDE_SESSION_ID.toString(),
             OUTSIDE_MEMBERSHIP_ID.toString(),
         )
+        jdbcTemplate.update(
+            """
+            insert into host_session_lifecycle_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              from_state, to_state, reason_code, reason_note, request_id, created_at
+            ) values (?, ?, ?, ?, 'CLOSED', 'OPEN', 'CLOSED', null, null, 'outside-history', '2026-07-23 11:00:00.000000')
+            """.trimIndent(),
+            OUTSIDE_LIFECYCLE_ID.toString(),
+            OUTSIDE_CLUB_ID.toString(),
+            OUTSIDE_SESSION_ID.toString(),
+            OUTSIDE_MEMBERSHIP_ID.toString(),
+        )
+    }
+
+    private fun insertLifecycleHistory() {
+        jdbcTemplate.update(
+            """
+            insert into host_session_lifecycle_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              from_state, to_state, reason_code, reason_note, request_id, created_at
+            ) values
+              (?, ?, ?, ?, 'REOPENED', 'CLOSED', 'OPEN', 'MEETING_RESCHEDULED', 'moved online', 'history-reopen', ?),
+              (?, ?, ?, ?, 'OPENED', 'DRAFT', 'OPEN', null, null, 'history-open', ?)
+            """.trimIndent(),
+            LIFECYCLE_REOPENED_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            HISTORY_TIMESTAMP,
+            LIFECYCLE_OPENED_ID.toString(),
+            CLUB_ID.toString(),
+            SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            HISTORY_TIMESTAMP,
+        )
+    }
+
+    private fun insertDeletedLifecycleHistory() {
+        jdbcTemplate.update(
+            """
+            insert into host_session_lifecycle_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              from_state, to_state, reason_code, reason_note, request_id, created_at
+            ) values (?, ?, ?, ?, 'DELETED', 'DRAFT', null, 'EMPTY_SESSION_DELETED', null, 'history-deleted', ?)
+            """.trimIndent(),
+            LIFECYCLE_DELETED_ID.toString(),
+            CLUB_ID.toString(),
+            DELETED_SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            HISTORY_TIMESTAMP,
+        )
     }
 
     @Suppress("LongMethod")
@@ -308,6 +412,11 @@ class JdbcHostSessionHistoryAdapterDbTest(
         val SEND_DECISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098601")
         val SKIP_DECISION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098602")
         val NOTIFICATION_EVENT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098701")
+        val LIFECYCLE_REOPENED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098801")
+        val LIFECYCLE_OPENED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098802")
+        val LIFECYCLE_DELETED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098803")
+        val OUTSIDE_LIFECYCLE_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098804")
+        val DELETED_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098901")
         const val HISTORY_TIMESTAMP = "2026-07-23 10:00:00.000000"
         const val PREVIEW_EXPIRY = "2026-07-23 10:05:00.000000"
     }
@@ -329,6 +438,12 @@ private const val CLEANUP_HISTORY_TEST_FIXTURES = """
       '00000000-0000-0000-0000-000000098502'
     );
     delete from notification_event_outbox where id = '00000000-0000-0000-0000-000000098701';
+    delete from host_session_lifecycle_audit where id in (
+      '00000000-0000-0000-0000-000000098801',
+      '00000000-0000-0000-0000-000000098802',
+      '00000000-0000-0000-0000-000000098803',
+      '00000000-0000-0000-0000-000000098804'
+    );
     delete from host_session_change_audit where id in (
       '00000000-0000-0000-0000-000000098003',
       '00000000-0000-0000-0000-000000098004',

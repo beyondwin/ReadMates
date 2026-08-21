@@ -26,4 +26,11 @@ interface HostSessionHistoryPort {
         cursor: HostSessionHistoryCursor?,
         limit: Int,
     ): List<HostSessionHistoryItem>
+
+    fun loadLifecycleHistory(
+        host: CurrentMember,
+        sessionId: UUID,
+        cursor: HostSessionHistoryCursor?,
+        limit: Int,
+    ): List<HostSessionHistoryItem>
 }

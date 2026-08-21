@@ -38,8 +38,10 @@ import {
   compactSessionLifecycleLabel,
 } from "@/features/host/model/host-session-editor-view-model";
 import {
+  isReverseLifecycleKind,
   lifecycleConfirmCopy,
   reverseLifecycleAction,
+  type HostSessionReverseRequest,
   type SessionLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
 import {
@@ -151,6 +153,30 @@ type HostSessionRecordWorkflow = {
 };
 
 const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
+
+async function runSessionLifecycleAction(
+  actions: HostSessionEditorActions,
+  kind: SessionLifecycleConfirmKind,
+  sessionId: string,
+  request?: HostSessionReverseRequest,
+) {
+  if (kind === "reopen") {
+    return actions.reopenSession(sessionId, request as HostSessionReverseRequest);
+  }
+  if (kind === "unpublish") {
+    return actions.unpublishSession(sessionId, request as HostSessionReverseRequest);
+  }
+  if (kind === "return-to-draft") {
+    return actions.returnSessionToDraft(sessionId, request as HostSessionReverseRequest);
+  }
+  if (kind === "open") {
+    return actions.openSession(sessionId);
+  }
+  if (kind === "close") {
+    return actions.closeSession(sessionId);
+  }
+  return actions.publishSession(sessionId);
+}
 
 const defaultHostDashboardReturnTarget: ReadmatesReturnTarget = {
   href: "/app/host",
@@ -608,26 +634,26 @@ export default function HostSessionEditor({
     setLifecycleSaveState("idle");
   }, [lifecycleSaveState]);
 
-  const confirmLifecycle = useCallback(async () => {
+  const confirmLifecycle = useCallback(async (request?: HostSessionReverseRequest) => {
     if (!session || !lifecycleConfirm || lifecycleSaveState === "saving") {
       return;
     }
+    if (isReverseLifecycleKind(lifecycleConfirm) && !request) {
+      return;
+    }
 
-    const actionByKind = {
-      open: actions.openSession,
-      close: actions.closeSession,
-      publish: actions.publishSession,
-      reopen: actions.reopenSession,
-      unpublish: actions.unpublishSession,
-      "return-to-draft": actions.returnSessionToDraft,
-    } as const;
     const copy = lifecycleConfirmCopy(lifecycleConfirm);
 
     setLifecycleSaveState("saving");
     setLifecycleError(null);
 
     try {
-      const result = await actionByKind[lifecycleConfirm](session.sessionId);
+      const result = await runSessionLifecycleAction(
+        actions,
+        lifecycleConfirm,
+        session.sessionId,
+        request,
+      );
 
       if (!result.ok) {
         setLifecycleSaveState("error");
@@ -1227,7 +1253,7 @@ export default function HostSessionEditor({
           submitting={lifecycleSaveState === "saving"}
           restoreFocusRef={lifecycleRestoreFocusRef}
           onClose={closeLifecycleConfirm}
-          onConfirm={() => void confirmLifecycle()}
+          onConfirm={(request) => void confirmLifecycle(request)}
         />
       ) : null}
 

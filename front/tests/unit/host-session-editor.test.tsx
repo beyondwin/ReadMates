@@ -141,6 +141,12 @@ const hostSessionEditorTestActions = {
   saveSessionAccessScope: async () => undefined,
 } satisfies HostSessionEditorActions;
 
+async function confirmReverseDialog(user: ReturnType<typeof userEvent.setup>, name: string) {
+  const dialog = screen.getByRole("dialog", { name });
+  await user.selectOptions(within(dialog).getByLabelText("변경 사유"), "ACCIDENTAL_TRANSITION");
+  await user.click(within(dialog).getByRole("button", { name }));
+}
+
 type HostSessionEditorProps = Parameters<typeof HostSessionEditor>[0];
 
 function HostSessionEditorForTest({
@@ -1749,12 +1755,12 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "다시 진행 중으로" }));
     expect(reopenSession).not.toHaveBeenCalled();
 
-    await user.click(
-      within(screen.getByRole("dialog", { name: "다시 진행 중으로" })).getByRole("button", { name: "다시 진행 중으로" }),
-    );
+    await confirmReverseDialog(user, "다시 진행 중으로");
 
     expect(reopenSession).toHaveBeenCalledTimes(1);
-    expect(reopenSession).toHaveBeenCalledWith(closedSession.sessionId);
+    expect(reopenSession).toHaveBeenCalledWith(closedSession.sessionId, {
+      reasonCode: "ACCIDENTAL_TRANSITION",
+    });
   });
 
   it("keeps the dialog open and links to the other open session on SESSION_OPEN_ALREADY_EXISTS", async () => {
@@ -1778,9 +1784,7 @@ describe("HostSessionEditor", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "다시 진행 중으로" }));
-    await user.click(
-      within(screen.getByRole("dialog", { name: "다시 진행 중으로" })).getByRole("button", { name: "다시 진행 중으로" }),
-    );
+    await confirmReverseDialog(user, "다시 진행 중으로");
 
     const dialog = await screen.findByRole("dialog", { name: "다시 진행 중으로" });
     expect(dialog).toBeVisible();
@@ -1809,10 +1813,12 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "공개 취소" }));
     expect(unpublishSession).not.toHaveBeenCalled();
 
-    await user.click(within(screen.getByRole("dialog", { name: "공개 취소" })).getByRole("button", { name: "공개 취소" }));
+    await confirmReverseDialog(user, "공개 취소");
 
     expect(unpublishSession).toHaveBeenCalledTimes(1);
-    expect(unpublishSession).toHaveBeenCalledWith(publishedSession.sessionId);
+    expect(unpublishSession).toHaveBeenCalledWith(publishedSession.sessionId, {
+      reasonCode: "ACCIDENTAL_TRANSITION",
+    });
   });
 
   it("returns an open session to draft after confirming 모임 전으로 되돌리기", async () => {
@@ -1831,14 +1837,12 @@ describe("HostSessionEditor", () => {
     await user.click(screen.getByRole("button", { name: "모임 전으로 되돌리기" }));
     expect(returnSessionToDraft).not.toHaveBeenCalled();
 
-    await user.click(
-      within(screen.getByRole("dialog", { name: "모임 전으로 되돌리기" })).getByRole("button", {
-        name: "모임 전으로 되돌리기",
-      }),
-    );
+    await confirmReverseDialog(user, "모임 전으로 되돌리기");
 
     expect(returnSessionToDraft).toHaveBeenCalledTimes(1);
-    expect(returnSessionToDraft).toHaveBeenCalledWith(openSession.sessionId);
+    expect(returnSessionToDraft).toHaveBeenCalledWith(openSession.sessionId, {
+      reasonCode: "ACCIDENTAL_TRANSITION",
+    });
   });
 
   it("publishes the applied record through the session publish action", async () => {

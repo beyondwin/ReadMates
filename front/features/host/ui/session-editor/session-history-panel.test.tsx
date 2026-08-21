@@ -210,6 +210,71 @@ describe("SessionHistoryPanel", () => {
 
     expect(appended.map((item) => item.id)).toEqual(["history-1", "history-2"]);
   });
+
+  it("renders reverse lifecycle history with the approved legacy reason and a text note", () => {
+    render(
+      <SessionHistoryPanel
+        activeSection="history"
+        items={[
+          {
+            ...historyItem(),
+            id: "history-reopen",
+            type: "SESSION_REOPENED",
+            revisionId: null,
+            revisionVersion: null,
+            revisionSource: null,
+            fromState: "CLOSED",
+            toState: "OPEN",
+            reasonCode: "LEGACY_UNSPECIFIED",
+            reasonNote: "<img src=x onerror=alert(1)>keep as text",
+          },
+        ]}
+        expectedDraftRevision={4}
+        restoring={false}
+        onRestore={vi.fn()}
+        onRestoreCompleted={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("다시 진행 중으로")).toBeVisible();
+    expect(screen.getByText("마감 → 준비 중")).toBeVisible();
+    expect(screen.getByText("이전 클라이언트에서 사유 없이 변경됨")).toBeVisible();
+    expect(screen.getByText("<img src=x onerror=alert(1)>keep as text")).toBeVisible();
+    expect(document.querySelector("img")).toBeNull();
+    expect(screen.queryByText("LEGACY_UNSPECIFIED")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "이 버전으로 초안 만들기" })).not.toBeInTheDocument();
+  });
+
+  it("renders a retained deleted lifecycle row in an audit-capable history list", () => {
+    render(
+      <SessionHistoryPanel
+        activeSection="history"
+        items={[
+          {
+            ...historyItem(),
+            id: "history-deleted",
+            type: "SESSION_DELETED",
+            revisionId: null,
+            revisionVersion: null,
+            revisionSource: null,
+            fromState: "DRAFT",
+            toState: null,
+            reasonCode: "EMPTY_SESSION_DELETED",
+            reasonNote: null,
+          },
+        ]}
+        expectedDraftRevision={null}
+        restoring={false}
+        onRestore={vi.fn()}
+        onRestoreCompleted={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("모임 삭제")).toBeVisible();
+    expect(screen.getByText("예정 → 삭제")).toBeVisible();
+    expect(screen.getByText("빈 모임 삭제")).toBeVisible();
+    expect(screen.queryByText("EMPTY_SESSION_DELETED")).not.toBeInTheDocument();
+  });
 });
 
 function historyItem() {
@@ -225,5 +290,9 @@ function historyItem() {
     revisionSource: "MANUAL" as const,
     restoredFromRevisionId: null,
     notificationEventId: null,
+    fromState: null,
+    toState: null,
+    reasonCode: null,
+    reasonNote: null,
   };
 }

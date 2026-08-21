@@ -64,9 +64,9 @@ vi.mock("@/features/host/ui/host-session-editor", async (importOriginal) => {
         openSession: (sessionId: string) => Promise<unknown>;
         closeSession: (sessionId: string) => Promise<unknown>;
         publishSession: (sessionId: string) => Promise<unknown>;
-        reopenSession: (sessionId: string) => Promise<unknown>;
-        unpublishSession: (sessionId: string) => Promise<unknown>;
-        returnSessionToDraft: (sessionId: string) => Promise<unknown>;
+        reopenSession: (sessionId: string, request: { reasonCode: string }) => Promise<unknown>;
+        unpublishSession: (sessionId: string, request: { reasonCode: string }) => Promise<unknown>;
+        returnSessionToDraft: (sessionId: string, request: { reasonCode: string }) => Promise<unknown>;
       };
     }) => {
       routeUnitMocks.capturedProps = props;
@@ -100,13 +100,24 @@ vi.mock("@/features/host/ui/host-session-editor", async (importOriginal) => {
           <button type="button" onClick={() => void props.actions.publishSession("session-7")}>
             publish session
           </button>
-          <button type="button" onClick={() => void props.actions.reopenSession("session-7")}>
+          <button
+            type="button"
+            onClick={() => void props.actions.reopenSession("session-7", { reasonCode: "ACCIDENTAL_TRANSITION" })}
+          >
             reopen session
           </button>
-          <button type="button" onClick={() => void props.actions.unpublishSession("session-7")}>
+          <button
+            type="button"
+            onClick={() => void props.actions.unpublishSession("session-7", { reasonCode: "ACCIDENTAL_TRANSITION" })}
+          >
             unpublish session
           </button>
-          <button type="button" onClick={() => void props.actions.returnSessionToDraft("session-7")}>
+          <button
+            type="button"
+            onClick={() =>
+              void props.actions.returnSessionToDraft("session-7", { reasonCode: "ACCIDENTAL_TRANSITION" })
+            }
+          >
             return session to draft
           </button>
         </>
@@ -256,7 +267,11 @@ describe("EditHostSessionRoute query actions", () => {
     renderEditRoute(client, onSessionRecordsChanged);
     await user.click(screen.getByRole("button", { name: label }));
 
-    expect(apiFn).toHaveBeenCalledWith("session-7");
+    if (_name === "reopen" || _name === "unpublish" || _name === "return-to-draft") {
+      expect(apiFn).toHaveBeenCalledWith("session-7", { reasonCode: "ACCIDENTAL_TRANSITION" });
+    } else {
+      expect(apiFn).toHaveBeenCalledWith("session-7");
+    }
     expect(onSessionRecordsChanged).toHaveBeenCalledWith({
       sessionId: "session-7",
       clubSlug: "reading-sai",
@@ -280,7 +295,7 @@ describe("EditHostSessionRoute query actions", () => {
     renderEditRoute(client, onSessionRecordsChanged);
     await user.click(screen.getByRole("button", { name: "reopen session" }));
 
-    expect(reopenHostSession).toHaveBeenCalledWith("session-7");
+    expect(reopenHostSession).toHaveBeenCalledWith("session-7", { reasonCode: "ACCIDENTAL_TRANSITION" });
     expect(onSessionRecordsChanged).not.toHaveBeenCalled();
   });
 
