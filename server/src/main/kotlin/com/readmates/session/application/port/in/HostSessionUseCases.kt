@@ -15,6 +15,7 @@ import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.HostSessionReverseCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
@@ -28,11 +29,11 @@ interface HostSessionLifecycleUseCase {
 
     fun publish(command: HostSessionIdCommand): HostSessionDetailResponse
 
-    fun reopen(command: HostSessionIdCommand): HostSessionDetailResponse
+    fun reopen(command: HostSessionReverseCommand): HostSessionDetailResponse
 
-    fun unpublish(command: HostSessionIdCommand): HostSessionDetailResponse
+    fun unpublish(command: HostSessionReverseCommand): HostSessionDetailResponse
 
-    fun returnToDraft(command: HostSessionIdCommand): HostSessionDetailResponse
+    fun returnToDraft(command: HostSessionReverseCommand): HostSessionDetailResponse
 
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
 

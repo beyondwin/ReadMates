@@ -5,6 +5,7 @@ import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.shared.observability.RequestIdFilter
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -86,6 +87,14 @@ private const val CLEANUP_GENERATED_SESSIONS_SQL = """
         select id from sessions
         where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
       );
+    delete from host_session_lifecycle_audit
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number >= 7
+      );
+    delete from host_session_lifecycle_audit
+    where session_id = '00000000-0000-0000-0000-000000019777';
     delete from admin_closing_risk_ledger
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
@@ -2092,6 +2101,221 @@ class HostSessionControllerDbTest(
             }
 
         assertEquals("DRAFT", findSessionState(sessionId))
+        assertThat(hostSessionLifecycleAuditRows(sessionId)).isEmpty()
+    }
+
+    @Test
+    fun `body-less reopen records legacy unspecified audit`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        val rows = hostSessionLifecycleAuditRows(sessionId)
+        assertThat(rows).hasSize(1)
+        assertEquals("REOPENED", rows.single()["action_type"])
+        assertEquals("CLOSED", rows.single()["from_state"])
+        assertEquals("OPEN", rows.single()["to_state"])
+        assertEquals("LEGACY_UNSPECIFIED", rows.single()["reason_code"])
+        assertNull(rows.single()["reason_note"])
+        assertEquals(membershipIdByEmail("host@example.com"), rows.single()["actor_membership_id"])
+        assertNotNull(rows.single()["request_id"])
+    }
+
+    @Test
+    fun `reopen with reason records selectable reason and trimmed note`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "reasonCode": "MEETING_RESCHEDULED",
+                      "reasonNote": "  moved online  "
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        val rows = hostSessionLifecycleAuditRows(sessionId)
+        assertThat(rows).hasSize(1)
+        assertEquals("REOPENED", rows.single()["action_type"])
+        assertEquals("MEETING_RESCHEDULED", rows.single()["reason_code"])
+        assertEquals("moved online", rows.single()["reason_note"])
+    }
+
+    @Test
+    fun `unknown reverse reason returns LIFECYCLE_REASON_INVALID`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"reasonCode":"NOT_A_REASON"}"""
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+        assertThat(hostSessionLifecycleAuditRows(sessionId)).isEmpty()
+    }
+
+    @Test
+    fun `internal reverse reason returns LIFECYCLE_REASON_INVALID`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"reasonCode":"LEGACY_UNSPECIFIED"}"""
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
+            }
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"reasonCode":"EMPTY_SESSION_DELETED"}"""
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+        assertThat(hostSessionLifecycleAuditRows(sessionId)).isEmpty()
+    }
+
+    @Test
+    fun `control character reverse note returns LIFECYCLE_REASON_INVALID`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = "{\"reasonCode\":\"ACCIDENTAL_TRANSITION\",\"reasonNote\":\"ok\\u0001nope\"}"
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+        assertThat(hostSessionLifecycleAuditRows(sessionId)).isEmpty()
+    }
+
+    @Test
+    fun `oversized reverse note returns LIFECYCLE_REASON_INVALID`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+        val note = "a".repeat(501)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"reasonCode":"ACCIDENTAL_TRANSITION","reasonNote":"$note"}"""
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
+            }
+
+        assertEquals("CLOSED", findSessionState(sessionId))
+        assertThat(hostSessionLifecycleAuditRows(sessionId)).isEmpty()
+    }
+
+    @Test
+    fun `rejected reopen does not add lifecycle audit`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+        updateSessionVisibility(sessionId, "MEMBER")
+        updateSessionState(sessionId, "PUBLISHED")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"reasonCode":"ACCIDENTAL_TRANSITION"}"""
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
+            }
+
+        assertEquals("PUBLISHED", findSessionState(sessionId))
+        assertThat(hostSessionLifecycleAuditRows(sessionId)).isEmpty()
+    }
+
+    @Test
+    fun `open records opened audit without reason`() {
+        val sessionId = createDraftSessionSeven()
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/open") {
+                with(user("host@example.com"))
+                with(csrf())
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        val rows = hostSessionLifecycleAuditRows(sessionId)
+        assertThat(rows).hasSize(1)
+        assertEquals("OPENED", rows.single()["action_type"])
+        assertEquals("DRAFT", rows.single()["from_state"])
+        assertEquals("OPEN", rows.single()["to_state"])
+        assertNull(rows.single()["reason_code"])
+        assertNull(rows.single()["reason_note"])
+    }
+
+    @Test
+    fun `reopen stores request id on lifecycle audit`() {
+        val sessionId = createDraftSessionSeven()
+        updateSessionState(sessionId, "CLOSED")
+        val requestId = "lifecycle-req1"
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/reopen") {
+                with(user("host@example.com"))
+                with(csrf())
+                header(RequestIdFilter.HEADER, requestId)
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"reasonCode":"OPERATIONAL_RECOVERY"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("OPEN") }
+            }
+
+        val rows = hostSessionLifecycleAuditRows(sessionId)
+        assertThat(rows).hasSize(1)
+        assertEquals("OPERATIONAL_RECOVERY", rows.single()["reason_code"])
+        assertEquals(requestId, rows.single()["request_id"])
     }
 
     @Test
@@ -3510,6 +3734,26 @@ class HostSessionControllerDbTest(
             order by id
             """.trimIndent(),
             sessionId,
+            sessionId,
+        )
+
+    private fun hostSessionLifecycleAuditRows(sessionId: String): List<Map<String, Any?>> =
+        jdbcTemplate.queryForList(
+            """
+            select
+              action_type,
+              from_state,
+              to_state,
+              reason_code,
+              reason_note,
+              request_id,
+              actor_membership_id,
+              session_id,
+              club_id
+            from host_session_lifecycle_audit
+            where session_id = ?
+            order by created_at, id
+            """.trimIndent(),
             sessionId,
         )
 

@@ -8,18 +8,29 @@ import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.HostSessionLifecycleAction
+import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
+import com.readmates.session.application.model.HostSessionLifecycleReasonCode
+import com.readmates.session.application.model.HostSessionReverseCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
+import com.readmates.session.application.model.normalized
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.session.application.port.out.HostSessionLifecycleAuditPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
+import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
+import com.readmates.session.config.HostSessionLifecycleProperties
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.observability.RequestIdFilter
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -30,6 +41,9 @@ class HostSessionLifecycleService(
     private val draftPort: HostSessionDraftPort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val confirmationProperties: HostActionConfirmationProperties = HostActionConfirmationProperties(),
+    private val lifecycleAudit: HostSessionLifecycleAuditPort = NoopHostSessionLifecycleAuditPort,
+    private val metrics: HostSessionOperationalMetrics = HostSessionOperationalMetrics(SimpleMeterRegistry()),
+    private val lifecycleProperties: HostSessionLifecycleProperties = HostSessionLifecycleProperties(),
 ) : HostSessionLifecycleUseCase {
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
@@ -89,105 +103,63 @@ class HostSessionLifecycleService(
 
     @Transactional
     override fun open(command: HostSessionIdCommand) =
-        lifecyclePort
-            .open(command)
-            .also { result ->
-                if (result.changed) {
-                    logger.info(
-                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                        command.host.clubId,
-                        command.sessionId,
-                        "DRAFT",
-                        "OPEN",
-                    )
-                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-                }
-            }.detail
+        transition(
+            command = command,
+            action = HostSessionLifecycleAction.OPENED,
+            from = "DRAFT",
+            to = "OPEN",
+            write = { lifecyclePort.open(command) },
+        )
 
     @Transactional
     override fun close(command: HostSessionIdCommand) =
-        lifecyclePort
-            .close(command)
-            .also { result ->
-                if (result.changed) {
-                    logger.info(
-                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                        command.host.clubId,
-                        command.sessionId,
-                        "OPEN",
-                        "CLOSED",
-                    )
-                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-                }
-            }.detail
+        transition(
+            command = command,
+            action = HostSessionLifecycleAction.CLOSED,
+            from = "OPEN",
+            to = "CLOSED",
+            write = { lifecyclePort.close(command) },
+        )
 
     @Transactional
     override fun publish(command: HostSessionIdCommand) =
-        lifecyclePort
-            .publish(command)
-            .also { result ->
-                if (result.changed) {
-                    logger.info(
-                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                        command.host.clubId,
-                        command.sessionId,
-                        "CLOSED",
-                        "PUBLISHED",
-                    )
-                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-                }
-            }.detail
+        transition(
+            command = command,
+            action = HostSessionLifecycleAction.PUBLISHED,
+            from = "CLOSED",
+            to = "PUBLISHED",
+            write = { lifecyclePort.publish(command) },
+        )
 
     @Transactional
-    override fun reopen(command: HostSessionIdCommand) =
-        lifecyclePort
-            .reopen(command)
-            .also { result ->
-                if (result.changed) {
-                    logger.info(
-                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                        command.host.clubId,
-                        command.sessionId,
-                        "CLOSED",
-                        "OPEN",
-                    )
-                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-                }
-            }.detail
+    override fun reopen(command: HostSessionReverseCommand) =
+        reverseTransition(
+            command = command,
+            action = HostSessionLifecycleAction.REOPENED,
+            from = "CLOSED",
+            to = "OPEN",
+            write = lifecyclePort::reopen,
+        )
 
     @Transactional
-    override fun unpublish(command: HostSessionIdCommand) =
-        lifecyclePort
-            .unpublish(command)
-            .also { result ->
-                if (result.changed) {
-                    logger.info(
-                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                        command.host.clubId,
-                        command.sessionId,
-                        "PUBLISHED",
-                        "CLOSED",
-                    )
-                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-                }
-            }.detail
+    override fun unpublish(command: HostSessionReverseCommand) =
+        reverseTransition(
+            command = command,
+            action = HostSessionLifecycleAction.UNPUBLISHED,
+            from = "PUBLISHED",
+            to = "CLOSED",
+            write = lifecyclePort::unpublish,
+        )
 
     @Transactional
-    override fun returnToDraft(command: HostSessionIdCommand) =
-        lifecyclePort
-            .returnToDraft(command)
-            .also { result ->
-                if (result.changed) {
-                    logger.info(
-                        "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                        command.host.clubId,
-                        command.sessionId,
-                        "OPEN",
-                        "DRAFT",
-                    )
-                    cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-                }
-            }.detail
+    override fun returnToDraft(command: HostSessionReverseCommand) =
+        reverseTransition(
+            command = command,
+            action = HostSessionLifecycleAction.RETURNED_TO_DRAFT,
+            from = "OPEN",
+            to = "DRAFT",
+            write = lifecyclePort::returnToDraft,
+        )
 
     override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.deletionPreview(command)
 
@@ -195,9 +167,90 @@ class HostSessionLifecycleService(
     override fun delete(command: HostSessionIdCommand) =
         deletionPort.delete(command).also { cacheInvalidation.evictClubContentAfterCommit(command.host.clubId) }
 
+    private fun reverseTransition(
+        command: HostSessionReverseCommand,
+        action: HostSessionLifecycleAction,
+        from: String,
+        to: String,
+        write: (HostSessionIdCommand) -> HostSessionTransitionResult,
+    ): HostSessionDetailResponse {
+        val normalized = command.normalized(lifecycleProperties.requireReverseReason)
+        val idCommand = HostSessionIdCommand(normalized.host, normalized.sessionId)
+        val detail =
+            transition(
+                command = idCommand,
+                action = action,
+                from = from,
+                to = to,
+                reasonCode = normalized.reasonCode,
+                reasonNote = normalized.reasonNote,
+                write = { write(idCommand) },
+            )
+        if (command.reasonCode == null) {
+            metrics.legacyReason()
+        }
+        return detail
+    }
+
+    private fun transition(
+        command: HostSessionIdCommand,
+        action: HostSessionLifecycleAction,
+        from: String,
+        to: String,
+        reasonCode: HostSessionLifecycleReasonCode? = null,
+        reasonNote: String? = null,
+        write: () -> HostSessionTransitionResult,
+    ): HostSessionDetailResponse {
+        val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
+        try {
+            val result = write()
+            if (result.changed) {
+                lifecycleAudit.record(
+                    HostSessionLifecycleAuditEntry(
+                        host = command.host,
+                        sessionId = command.sessionId,
+                        action = action,
+                        fromState = from,
+                        toState = to,
+                        reasonCode = reasonCode,
+                        reasonNote = reasonNote,
+                    ),
+                )
+                cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+                logger.info(
+                    "Session lifecycle action={} outcome={} requestId={} clubId={} sessionId={} fromState={} toState={}",
+                    action,
+                    "changed",
+                    requestId,
+                    command.host.clubId,
+                    command.sessionId,
+                    from,
+                    to,
+                )
+            }
+            metrics.lifecycle(action, if (result.changed) "changed" else "unchanged")
+            return result.detail
+        } catch (failure: RuntimeException) {
+            metrics.lifecycle(action, "failure")
+            logger.warn(
+                "Session lifecycle action={} outcome=failure requestId={} clubId={} sessionId={}",
+                action,
+                requestId,
+                command.host.clubId,
+                command.sessionId,
+                failure,
+            )
+            throw failure
+        }
+    }
+
     private companion object {
         private val logger = LoggerFactory.getLogger(HostSessionLifecycleService::class.java)
     }
+}
+
+private object NoopHostSessionLifecycleAuditPort : HostSessionLifecycleAuditPort {
+    override fun record(entry: HostSessionLifecycleAuditEntry) = Unit
 }
 
 private fun isFirstMemberPublication(

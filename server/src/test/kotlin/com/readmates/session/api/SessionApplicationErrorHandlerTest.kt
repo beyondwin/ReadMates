@@ -109,4 +109,24 @@ class SessionApplicationErrorHandlerTest {
             ),
         )
     }
+
+    @Test
+    fun `maps missing lifecycle reason to LIFECYCLE_REASON_REQUIRED`() {
+        val response = SessionApplicationErrorHandler().handleLifecycleReasonRequired()
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(response.body?.code).isEqualTo("LIFECYCLE_REASON_REQUIRED")
+        assertThat(response.body?.status).isEqualTo(400)
+        assertThat(response.body?.openSessionId).isNull()
+    }
+
+    @Test
+    fun `maps invalid lifecycle reason to LIFECYCLE_REASON_INVALID`() {
+        val response = SessionApplicationErrorHandler().handleInvalidLifecycleReason()
+
+        assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
+        assertThat(response.body?.code).isEqualTo("LIFECYCLE_REASON_INVALID")
+        assertThat(response.body?.status).isEqualTo(400)
+        assertThat(response.body?.openSessionId).isNull()
+    }
 }

@@ -32,32 +32,45 @@ import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.HostSessionLifecycleAction
+import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
+import com.readmates.session.application.model.HostSessionLifecycleReasonCode
+import com.readmates.session.application.model.HostSessionLifecycleReasonRequiredException
+import com.readmates.session.application.model.HostSessionReverseCommand
+import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
+import com.readmates.session.application.model.USER_SELECTABLE_LIFECYCLE_REASONS
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.model.normalized
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.session.application.port.out.HostSessionLifecycleAuditPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
+import com.readmates.session.config.HostSessionLifecycleProperties
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.observability.RequestIdFilter
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
+import org.slf4j.MDC
 import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -615,7 +628,21 @@ class HostSessionServicesTest {
             assertThat(thrown).isSameAs(failure)
             assertThat(port.lifecycleStateWriteCount).isZero()
             assertThat(invalidation.clubs).isEmpty()
-            assertThat(logs.events).isEmpty()
+            assertThat(logs.events.single().level).isEqualTo(Level.WARN)
+            assertThat(logs.events.single().message)
+                .isEqualTo("Session lifecycle action={} outcome=failure requestId={} clubId={} sessionId={}")
+            assertThat(
+                logs.events
+                    .single()
+                    .argumentArray
+                    .toList(),
+            ).containsExactly(HostSessionLifecycleAction.OPENED, null, host.clubId, sessionId)
+            assertThat(
+                logs.events
+                    .single()
+                    .throwableProxy
+                    ?.className,
+            ).isEqualTo(HostSessionOpenNotAllowedException::class.java.name)
             assertLifecycleHasNoNotificationDispatchCollaborator()
         }
     }
@@ -633,14 +660,22 @@ class HostSessionServicesTest {
 
             assertThat(logs.events.map { it.level }).containsExactly(Level.INFO, Level.INFO, Level.INFO)
             assertThat(logs.events.map { it.message }).containsExactly(
-                "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                "Session state changed clubId={} sessionId={} oldState={} newState={}",
-                "Session state changed clubId={} sessionId={} oldState={} newState={}",
+                "Session lifecycle action={} outcome={} requestId={} clubId={} sessionId={} fromState={} toState={}",
+                "Session lifecycle action={} outcome={} requestId={} clubId={} sessionId={} fromState={} toState={}",
+                "Session lifecycle action={} outcome={} requestId={} clubId={} sessionId={} fromState={} toState={}",
             )
             assertThat(logs.events.map { it.argumentArray.toList() }).containsExactly(
-                listOf(host.clubId, sessionId, "DRAFT", "OPEN"),
-                listOf(host.clubId, sessionId, "OPEN", "CLOSED"),
-                listOf(host.clubId, sessionId, "CLOSED", "PUBLISHED"),
+                listOf(HostSessionLifecycleAction.OPENED, "changed", null, host.clubId, sessionId, "DRAFT", "OPEN"),
+                listOf(HostSessionLifecycleAction.CLOSED, "changed", null, host.clubId, sessionId, "OPEN", "CLOSED"),
+                listOf(
+                    HostSessionLifecycleAction.PUBLISHED,
+                    "changed",
+                    null,
+                    host.clubId,
+                    sessionId,
+                    "CLOSED",
+                    "PUBLISHED",
+                ),
             )
             assertThat(logs.events.map { it.formattedMessage }.joinToString("\n"))
                 .doesNotContain(host.email)
@@ -670,38 +705,442 @@ class HostSessionServicesTest {
 
     @Test
     fun `changed reverse transitions evict cache and log states`() {
-        val port = RecordingHostSessionPorts()
-        val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
-        val command = HostSessionIdCommand(host, sessionId)
+        val harness = lifecycleHarness()
+        val command = reverseCommand()
         captureHostSessionLogs().use { logs ->
-            assertThat(service.reopen(command).state).isEqualTo("OPEN")
-            assertThat(service.unpublish(command).state).isEqualTo("CLOSED")
-            assertThat(service.returnToDraft(command).state).isEqualTo("DRAFT")
-            assertThat(invalidation.clubs).containsExactly(host.clubId, host.clubId, host.clubId)
+            assertThat(harness.service.reopen(command).state).isEqualTo("OPEN")
+            assertThat(harness.service.unpublish(command).state).isEqualTo("CLOSED")
+            assertThat(harness.service.returnToDraft(command).state).isEqualTo("DRAFT")
+            assertThat(harness.invalidation.clubs).containsExactly(host.clubId, host.clubId, host.clubId)
             assertThat(logs.events.map { it.argumentArray.toList() }).containsExactly(
-                listOf(host.clubId, sessionId, "CLOSED", "OPEN"),
-                listOf(host.clubId, sessionId, "PUBLISHED", "CLOSED"),
-                listOf(host.clubId, sessionId, "OPEN", "DRAFT"),
+                listOf(
+                    HostSessionLifecycleAction.REOPENED,
+                    "changed",
+                    null,
+                    host.clubId,
+                    sessionId,
+                    "CLOSED",
+                    "OPEN",
+                ),
+                listOf(
+                    HostSessionLifecycleAction.UNPUBLISHED,
+                    "changed",
+                    null,
+                    host.clubId,
+                    sessionId,
+                    "PUBLISHED",
+                    "CLOSED",
+                ),
+                listOf(
+                    HostSessionLifecycleAction.RETURNED_TO_DRAFT,
+                    "changed",
+                    null,
+                    host.clubId,
+                    sessionId,
+                    "OPEN",
+                    "DRAFT",
+                ),
             )
         }
     }
 
     @Test
     fun `noop reverse transitions do not evict cache`() {
-        val port =
-            RecordingHostSessionPorts().apply {
-                reopenChanged = false
-                unpublishChanged = false
-                returnToDraftChanged = false
-            }
-        val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val harness =
+            lifecycleHarness(
+                port =
+                    RecordingHostSessionPorts().apply {
+                        reopenChanged = false
+                        unpublishChanged = false
+                        returnToDraftChanged = false
+                    },
+            )
+        val command = reverseCommand()
+        harness.service.reopen(command)
+        harness.service.unpublish(command)
+        harness.service.returnToDraft(command)
+        assertThat(harness.invalidation.clubs).isEmpty()
+        assertThat(harness.audit.entries).isEmpty()
+    }
+
+    @Test
+    fun `changed forward transitions record one audit row each without reason`() {
+        val harness = lifecycleHarness()
         val command = HostSessionIdCommand(host, sessionId)
-        service.reopen(command)
-        service.unpublish(command)
-        service.returnToDraft(command)
-        assertThat(invalidation.clubs).isEmpty()
+
+        harness.service.open(command)
+        harness.service.close(command)
+        harness.service.publish(command)
+
+        assertThat(harness.audit.entries).hasSize(3)
+        assertThat(harness.audit.entries[0])
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+                HostSessionLifecycleAuditEntry::reasonNote,
+            ).containsExactly(HostSessionLifecycleAction.OPENED, "DRAFT", "OPEN", null, null)
+        assertThat(harness.audit.entries[1])
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+            ).containsExactly(HostSessionLifecycleAction.CLOSED, "OPEN", "CLOSED", null)
+        assertThat(harness.audit.entries[2])
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+            ).containsExactly(HostSessionLifecycleAction.PUBLISHED, "CLOSED", "PUBLISHED", null)
+        assertThat(harness.transitionCount("OPENED", "changed")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("CLOSED", "changed")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("PUBLISHED", "changed")).isEqualTo(1.0)
+    }
+
+    @Test
+    fun `changed reverse transition records selectable reason and trims note`() {
+        val harness = lifecycleHarness()
+        val command =
+            reverseCommand(
+                reasonCode = HostSessionLifecycleReasonCode.MEETING_RESCHEDULED,
+                reasonNote = "  moved online  ",
+            )
+
+        harness.service.reopen(command)
+
+        assertThat(harness.audit.entries.single())
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+                HostSessionLifecycleAuditEntry::reasonNote,
+                HostSessionLifecycleAuditEntry::sessionId,
+                HostSessionLifecycleAuditEntry::host,
+            ).containsExactly(
+                HostSessionLifecycleAction.REOPENED,
+                "CLOSED",
+                "OPEN",
+                HostSessionLifecycleReasonCode.MEETING_RESCHEDULED,
+                "moved online",
+                sessionId,
+                host,
+            )
+        assertThat(harness.port.reopenCommand).isEqualTo(HostSessionIdCommand(host, sessionId))
+        assertThat(harness.transitionCount("REOPENED", "changed")).isEqualTo(1.0)
+        assertThat(harness.legacyReasonCount()).isZero()
+    }
+
+    @Test
+    fun `changed reverse actions record one audit row each`() {
+        val harness = lifecycleHarness()
+
+        harness.service.reopen(reverseCommand(HostSessionLifecycleReasonCode.ACCIDENTAL_TRANSITION))
+        harness.service.unpublish(reverseCommand(HostSessionLifecycleReasonCode.CONTENT_CORRECTION))
+        harness.service.returnToDraft(reverseCommand(HostSessionLifecycleReasonCode.OPERATIONAL_RECOVERY))
+
+        assertThat(harness.audit.entries).hasSize(3)
+        assertThat(harness.audit.entries[0])
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+            ).containsExactly(HostSessionLifecycleAction.REOPENED, "CLOSED", "OPEN")
+        assertThat(harness.audit.entries[1])
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+            ).containsExactly(
+                HostSessionLifecycleAction.UNPUBLISHED,
+                "PUBLISHED",
+                "CLOSED",
+                HostSessionLifecycleReasonCode.CONTENT_CORRECTION,
+            )
+        assertThat(harness.audit.entries[2])
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+            ).containsExactly(
+                HostSessionLifecycleAction.RETURNED_TO_DRAFT,
+                "OPEN",
+                "DRAFT",
+                HostSessionLifecycleReasonCode.OPERATIONAL_RECOVERY,
+            )
+    }
+
+    @Test
+    fun `unchanged transitions record no audit rows`() {
+        val harness =
+            lifecycleHarness(
+                port =
+                    RecordingHostSessionPorts().apply {
+                        openChanged = false
+                        closeChanged = false
+                        publishChanged = false
+                        reopenChanged = false
+                        unpublishChanged = false
+                        returnToDraftChanged = false
+                    },
+            )
+
+        harness.service.open(HostSessionIdCommand(host, sessionId))
+        harness.service.close(HostSessionIdCommand(host, sessionId))
+        harness.service.publish(HostSessionIdCommand(host, sessionId))
+        harness.service.reopen(reverseCommand())
+        harness.service.unpublish(reverseCommand())
+        harness.service.returnToDraft(reverseCommand())
+
+        assertThat(harness.audit.entries).isEmpty()
+        assertThat(harness.transitionCount("OPENED", "unchanged")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("REOPENED", "unchanged")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("OPENED", "changed")).isZero()
+    }
+
+    @Test
+    fun `state write failure records no audit and increments failure`() {
+        val failure = HostSessionOpenNotAllowedException()
+        val harness =
+            lifecycleHarness(
+                port = RecordingHostSessionPorts().apply { openFailure = failure },
+            )
+
+        val thrown =
+            assertThrows(HostSessionOpenNotAllowedException::class.java) {
+                harness.service.open(HostSessionIdCommand(host, sessionId))
+            }
+
+        assertThat(thrown).isSameAs(failure)
+        assertThat(harness.audit.entries).isEmpty()
+        assertThat(harness.transitionCount("OPENED", "failure")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("OPENED", "changed")).isZero()
+        assertThat(harness.invalidation.clubs).isEmpty()
+    }
+
+    @Test
+    fun `audit write failure records failure metric and does not evict cache`() {
+        val failure = IllegalStateException("audit insert failed")
+        val harness = lifecycleHarness(auditFailure = failure)
+
+        val thrown =
+            assertThrows(IllegalStateException::class.java) {
+                harness.service.open(HostSessionIdCommand(host, sessionId))
+            }
+
+        assertThat(thrown).isSameAs(failure)
+        assertThat(harness.audit.entries).isEmpty()
+        assertThat(harness.port.lifecycleStateWriteCount).isEqualTo(1)
+        assertThat(harness.invalidation.clubs).isEmpty()
+        assertThat(harness.transitionCount("OPENED", "failure")).isEqualTo(1.0)
+        assertThat(harness.transitionCount("OPENED", "changed")).isZero()
+    }
+
+    @Test
+    fun `compatibility reverse missing reason records legacy unspecified and increments metric`() {
+        val harness = lifecycleHarness()
+
+        harness.service.reopen(reverseCommand(reasonCode = null))
+
+        assertThat(harness.audit.entries.single())
+            .extracting(
+                HostSessionLifecycleAuditEntry::action,
+                HostSessionLifecycleAuditEntry::fromState,
+                HostSessionLifecycleAuditEntry::toState,
+                HostSessionLifecycleAuditEntry::reasonCode,
+                HostSessionLifecycleAuditEntry::reasonNote,
+            ).containsExactly(
+                HostSessionLifecycleAction.REOPENED,
+                "CLOSED",
+                "OPEN",
+                HostSessionLifecycleReasonCode.LEGACY_UNSPECIFIED,
+                null,
+            )
+        assertThat(harness.legacyReasonCount()).isEqualTo(1.0)
+    }
+
+    @Test
+    fun `enforced reverse missing reason throws and records no audit`() {
+        val harness = lifecycleHarness(requireReverseReason = true)
+
+        assertThrows(HostSessionLifecycleReasonRequiredException::class.java) {
+            harness.service.reopen(reverseCommand(reasonCode = null))
+        }
+
+        assertThat(harness.audit.entries).isEmpty()
+        assertThat(harness.port.reopenCommand).isNull()
+        assertThat(harness.legacyReasonCount()).isZero()
+        assertThat(harness.transitionCount("REOPENED", "failure")).isZero()
+    }
+
+    @Test
+    fun `internal reverse reason selection is rejected`() {
+        assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
+            reverseCommand(HostSessionLifecycleReasonCode.LEGACY_UNSPECIFIED).normalized(requireReason = false)
+        }
+        assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
+            reverseCommand(HostSessionLifecycleReasonCode.EMPTY_SESSION_DELETED).normalized(requireReason = false)
+        }
+
+        val harness = lifecycleHarness()
+        assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
+            harness.service.unpublish(reverseCommand(HostSessionLifecycleReasonCode.LEGACY_UNSPECIFIED))
+        }
+        assertThat(harness.audit.entries).isEmpty()
+        assertThat(harness.port.unpublishCommand).isNull()
+    }
+
+    @Test
+    fun `reverse reason notes reject control characters and oversized values`() {
+        assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
+            reverseCommand(reasonNote = "ok\u0001").normalized(requireReason = false)
+        }
+        assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
+            reverseCommand(reasonNote = "line\nbreak").normalized(requireReason = false)
+        }
+        assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
+            reverseCommand(reasonNote = "a".repeat(501)).normalized(requireReason = false)
+        }
+
+        val trimmedBlank =
+            reverseCommand(
+                reasonCode = HostSessionLifecycleReasonCode.OTHER_OPERATIONAL_REASON,
+                reasonNote = "   ",
+            ).normalized(requireReason = false)
+        assertThat(trimmedBlank.reasonNote).isNull()
+
+        val maxNote =
+            reverseCommand(
+                reasonCode = HostSessionLifecycleReasonCode.OTHER_OPERATIONAL_REASON,
+                reasonNote = "b".repeat(500),
+            ).normalized(requireReason = false)
+        assertThat(maxNote.reasonNote).hasSize(500)
+
+        val harness = lifecycleHarness()
+        assertThrows(InvalidHostSessionLifecycleReasonException::class.java) {
+            harness.service.returnToDraft(reverseCommand(reasonNote = "a".repeat(501)))
+        }
+        assertThat(harness.audit.entries).isEmpty()
+    }
+
+    @Test
+    fun `user selectable lifecycle reasons exclude internal codes`() {
+        assertThat(USER_SELECTABLE_LIFECYCLE_REASONS).containsExactlyInAnyOrder(
+            HostSessionLifecycleReasonCode.ACCIDENTAL_TRANSITION,
+            HostSessionLifecycleReasonCode.MEETING_RESCHEDULED,
+            HostSessionLifecycleReasonCode.CONTENT_CORRECTION,
+            HostSessionLifecycleReasonCode.OPERATIONAL_RECOVERY,
+            HostSessionLifecycleReasonCode.OTHER_OPERATIONAL_REASON,
+        )
+        assertThat(USER_SELECTABLE_LIFECYCLE_REASONS)
+            .doesNotContain(
+                HostSessionLifecycleReasonCode.LEGACY_UNSPECIFIED,
+                HostSessionLifecycleReasonCode.EMPTY_SESSION_DELETED,
+            )
+    }
+
+    @Test
+    fun `changed reverse transition logs request correlation without reason note`() {
+        val harness = lifecycleHarness()
+        val requestId = "lifecycle-req-1"
+        MDC.put(RequestIdFilter.MDC_KEY, requestId)
+        try {
+            captureHostSessionLogs().use { logs ->
+                harness.service.reopen(
+                    reverseCommand(
+                        reasonCode = HostSessionLifecycleReasonCode.ACCIDENTAL_TRANSITION,
+                        reasonNote = "secret-reason-note",
+                    ),
+                )
+
+                assertThat(
+                    logs.events
+                        .single()
+                        .argumentArray
+                        .toList(),
+                ).containsExactly(
+                    HostSessionLifecycleAction.REOPENED,
+                    "changed",
+                    requestId,
+                    host.clubId,
+                    sessionId,
+                    "CLOSED",
+                    "OPEN",
+                )
+                assertThat(logs.events.single().formattedMessage)
+                    .contains(requestId)
+                    .doesNotContain("secret-reason-note")
+                    .doesNotContain(host.email)
+            }
+        } finally {
+            MDC.remove(RequestIdFilter.MDC_KEY)
+        }
+    }
+
+    private fun reverseCommand(
+        reasonCode: HostSessionLifecycleReasonCode? = HostSessionLifecycleReasonCode.ACCIDENTAL_TRANSITION,
+        reasonNote: String? = null,
+    ) = HostSessionReverseCommand(
+        host = host,
+        sessionId = sessionId,
+        reasonCode = reasonCode,
+        reasonNote = reasonNote,
+    )
+
+    private fun lifecycleHarness(
+        port: RecordingHostSessionPorts = RecordingHostSessionPorts(),
+        invalidation: RecordingReadCacheInvalidationPort = RecordingReadCacheInvalidationPort(),
+        confirmationProperties: HostActionConfirmationProperties = HostActionConfirmationProperties(),
+        requireReverseReason: Boolean = false,
+        auditFailure: RuntimeException? = null,
+    ): LifecycleHarness {
+        val audit = RecordingHostSessionLifecycleAuditPort().apply { failure = auditFailure }
+        val registry = SimpleMeterRegistry()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                invalidation,
+                confirmationProperties,
+                audit,
+                HostSessionOperationalMetrics(registry),
+                HostSessionLifecycleProperties(requireReverseReason = requireReverseReason),
+            )
+        return LifecycleHarness(port, invalidation, audit, registry, service)
+    }
+
+    private class LifecycleHarness(
+        val port: RecordingHostSessionPorts,
+        val invalidation: RecordingReadCacheInvalidationPort,
+        val audit: RecordingHostSessionLifecycleAuditPort,
+        val registry: SimpleMeterRegistry,
+        val service: HostSessionLifecycleService,
+    ) {
+        fun transitionCount(
+            action: String,
+            outcome: String,
+        ): Double =
+            registry
+                .counter("session.lifecycle.transition", "action", action, "outcome", outcome)
+                .count()
+
+        fun legacyReasonCount(): Double = registry.counter("session.lifecycle.legacy.reason").count()
+    }
+
+    private class RecordingHostSessionLifecycleAuditPort : HostSessionLifecycleAuditPort {
+        val entries = mutableListOf<HostSessionLifecycleAuditEntry>()
+        var failure: RuntimeException? = null
+
+        override fun record(entry: HostSessionLifecycleAuditEntry) {
+            failure?.let { throw it }
+            entries += entry
+        }
     }
 
     private fun hostSessionCommand() =
@@ -763,6 +1202,11 @@ class HostSessionServicesTest {
         var unpublishChanged = true
         var returnToDraftChanged = true
         var openFailure: RuntimeException? = null
+        var closeFailure: RuntimeException? = null
+        var publishFailure: RuntimeException? = null
+        var reopenFailure: RuntimeException? = null
+        var unpublishFailure: RuntimeException? = null
+        var returnToDraftFailure: RuntimeException? = null
         var lifecycleStateWriteCount = 0
         var throwOnUpsertPublication = false
         var visibilityState = "OPEN"
@@ -911,6 +1355,7 @@ class HostSessionServicesTest {
 
         override fun close(command: HostSessionIdCommand): HostSessionTransitionResult {
             closeCommand = command
+            closeFailure?.let { throw it }
             if (closeChanged) {
                 lifecycleStateWriteCount += 1
             }
@@ -922,6 +1367,7 @@ class HostSessionServicesTest {
 
         override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult {
             publishCommand = command
+            publishFailure?.let { throw it }
             if (publishChanged) {
                 lifecycleStateWriteCount += 1
             }
@@ -933,6 +1379,7 @@ class HostSessionServicesTest {
 
         override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult {
             reopenCommand = command
+            reopenFailure?.let { throw it }
             if (reopenChanged) {
                 lifecycleStateWriteCount += 1
             }
@@ -944,6 +1391,7 @@ class HostSessionServicesTest {
 
         override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult {
             unpublishCommand = command
+            unpublishFailure?.let { throw it }
             if (unpublishChanged) {
                 lifecycleStateWriteCount += 1
             }
@@ -955,6 +1403,7 @@ class HostSessionServicesTest {
 
         override fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult {
             returnToDraftCommand = command
+            returnToDraftFailure?.let { throw it }
             if (returnToDraftChanged) {
                 lifecycleStateWriteCount += 1
             }

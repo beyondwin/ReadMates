@@ -28,6 +28,44 @@ data class HostSessionIdCommand(
     val sessionId: UUID,
 )
 
+data class HostSessionReverseCommand(
+    val host: CurrentMember,
+    val sessionId: UUID,
+    val reasonCode: HostSessionLifecycleReasonCode?,
+    val reasonNote: String?,
+)
+
+fun HostSessionReverseCommand.normalized(requireReason: Boolean): HostSessionReverseCommand {
+    val code =
+        reasonCode
+            ?: if (requireReason) {
+                throw HostSessionLifecycleReasonRequiredException()
+            } else {
+                HostSessionLifecycleReasonCode.LEGACY_UNSPECIFIED
+            }
+    if (reasonCode != null && reasonCode !in USER_SELECTABLE_LIFECYCLE_REASONS) {
+        throw InvalidHostSessionLifecycleReasonException()
+    }
+    val note = reasonNote?.trim()?.takeIf(String::isNotEmpty)
+    if (note != null && (note.length > 500 || note.any(Char::isISOControl))) {
+        throw InvalidHostSessionLifecycleReasonException()
+    }
+    return copy(reasonCode = code, reasonNote = note)
+}
+
+val USER_SELECTABLE_LIFECYCLE_REASONS =
+    setOf(
+        HostSessionLifecycleReasonCode.ACCIDENTAL_TRANSITION,
+        HostSessionLifecycleReasonCode.MEETING_RESCHEDULED,
+        HostSessionLifecycleReasonCode.CONTENT_CORRECTION,
+        HostSessionLifecycleReasonCode.OPERATIONAL_RECOVERY,
+        HostSessionLifecycleReasonCode.OTHER_OPERATIONAL_REASON,
+    )
+
+class HostSessionLifecycleReasonRequiredException : RuntimeException("Lifecycle reason is required")
+
+class InvalidHostSessionLifecycleReasonException : RuntimeException("Lifecycle reason is invalid")
+
 data class UpdateHostSessionCommand(
     val host: CurrentMember,
     val sessionId: UUID,

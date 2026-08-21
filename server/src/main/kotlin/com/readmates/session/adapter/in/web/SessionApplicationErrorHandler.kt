@@ -18,6 +18,8 @@ import com.readmates.session.application.InvalidQuestionSetException
 import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
+import com.readmates.session.application.model.HostSessionLifecycleReasonRequiredException
+import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import org.springframework.http.HttpStatus
@@ -127,5 +129,21 @@ class SessionApplicationErrorHandler {
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_CURSOR",
             message = "커서가 현재 검색 조건과 일치하지 않습니다.",
+        )
+
+    @ExceptionHandler(HostSessionLifecycleReasonRequiredException::class)
+    fun handleLifecycleReasonRequired(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "LIFECYCLE_REASON_REQUIRED",
+            message = "수명주기 되돌리기 사유를 선택해 주세요.",
+        )
+
+    @ExceptionHandler(InvalidHostSessionLifecycleReasonException::class)
+    fun handleInvalidLifecycleReason(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "LIFECYCLE_REASON_INVALID",
+            message = "수명주기 되돌리기 사유가 올바르지 않습니다.",
         )
 }
