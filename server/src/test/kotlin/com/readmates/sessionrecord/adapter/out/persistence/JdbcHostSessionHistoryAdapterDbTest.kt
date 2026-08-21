@@ -149,6 +149,19 @@ class JdbcHostSessionHistoryAdapterDbTest(
     }
 
     @Test
+    fun `maps restored lifecycle rows to SESSION_RESTORED`() {
+        insertRestoredLifecycleHistory()
+
+        val page = historyService.history(host(), RESTORED_SESSION_ID, PageRequest(limit = 10, cursor = emptyMap()))
+
+        assertThat(page.items).hasSize(1)
+        assertThat(page.items.single().type).isEqualTo(HostSessionHistoryType.SESSION_RESTORED)
+        assertThat(page.items.single().fromState).isEqualTo("DRAFT")
+        assertThat(page.items.single().toState).isEqualTo("DRAFT")
+        assertThat(page.items.single().reasonCode).isEqualTo("OPERATIONAL_RECOVERY")
+    }
+
+    @Test
     fun `exposes recovery metadata from snapshots revisions and current lifecycle state`() {
         insertFirstClubHistory()
         insertLifecycleHistory()
@@ -347,6 +360,22 @@ class JdbcHostSessionHistoryAdapterDbTest(
             LIFECYCLE_DELETED_ID.toString(),
             CLUB_ID.toString(),
             DELETED_SESSION_ID.toString(),
+            HOST_MEMBERSHIP_ID.toString(),
+            HISTORY_TIMESTAMP,
+        )
+    }
+
+    private fun insertRestoredLifecycleHistory() {
+        jdbcTemplate.update(
+            """
+            insert into host_session_lifecycle_audit (
+              id, club_id, session_id, actor_membership_id, action_type,
+              from_state, to_state, reason_code, reason_note, request_id, created_at
+            ) values (?, ?, ?, ?, 'RESTORED', 'DRAFT', 'DRAFT', 'OPERATIONAL_RECOVERY', null, 'history-restored', ?)
+            """.trimIndent(),
+            LIFECYCLE_RESTORED_ID.toString(),
+            CLUB_ID.toString(),
+            RESTORED_SESSION_ID.toString(),
             HOST_MEMBERSHIP_ID.toString(),
             HISTORY_TIMESTAMP,
         )
@@ -554,7 +583,9 @@ class JdbcHostSessionHistoryAdapterDbTest(
         val LIFECYCLE_DELETED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098803")
         val OUTSIDE_LIFECYCLE_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098804")
         val LIFECYCLE_PUBLISHED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098805")
+        val LIFECYCLE_RESTORED_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098806")
         val DELETED_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098901")
+        val RESTORED_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000098902")
         const val HISTORY_TIMESTAMP = "2026-07-23 10:00:00.000000"
         const val PREVIEW_EXPIRY = "2026-07-23 10:05:00.000000"
     }
@@ -581,7 +612,8 @@ private const val CLEANUP_HISTORY_TEST_FIXTURES = """
       '00000000-0000-0000-0000-000000098802',
       '00000000-0000-0000-0000-000000098803',
       '00000000-0000-0000-0000-000000098804',
-      '00000000-0000-0000-0000-000000098805'
+      '00000000-0000-0000-0000-000000098805',
+      '00000000-0000-0000-0000-000000098806'
     );
     delete from host_session_change_audit where id in (
       '00000000-0000-0000-0000-000000098003',

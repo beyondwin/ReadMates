@@ -4,8 +4,8 @@ import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
-import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionScheduleDefaults
@@ -37,7 +37,7 @@ interface HostSessionLifecycleUseCase {
 
     fun deletionPreview(command: HostSessionIdCommand): HostSessionDeletionPreviewResponse
 
-    fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse
+    fun delete(command: HostSessionIdCommand): HostSessionTrashResponse
 
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult
 }

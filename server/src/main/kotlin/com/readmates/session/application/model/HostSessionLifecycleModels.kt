@@ -3,7 +3,16 @@ package com.readmates.session.application.model
 import com.readmates.shared.security.CurrentMember
 import java.util.UUID
 
-enum class HostSessionLifecycleAction { OPENED, CLOSED, PUBLISHED, REOPENED, UNPUBLISHED, RETURNED_TO_DRAFT, DELETED }
+enum class HostSessionLifecycleAction {
+    OPENED,
+    CLOSED,
+    PUBLISHED,
+    REOPENED,
+    UNPUBLISHED,
+    RETURNED_TO_DRAFT,
+    DELETED,
+    RESTORED,
+}
 
 enum class HostSessionLifecycleReasonCode {
     ACCIDENTAL_TRANSITION,

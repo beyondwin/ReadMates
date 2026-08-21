@@ -78,6 +78,7 @@ class SecurityConfig(
                         Regex("^/api/host/sessions/[^/]+/revisions/[^/]+/restore-to-draft$"),
                     ),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/changes/[^/]+/restore$")),
+                    methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/restore$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/open$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/close$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/publish$")),

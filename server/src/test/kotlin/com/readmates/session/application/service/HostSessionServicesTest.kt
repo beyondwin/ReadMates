@@ -20,6 +20,10 @@ import com.readmates.session.application.HostSessionDeletionAssessment
 import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionDeletionPreviewResponse
 import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
+import com.readmates.session.application.model.HostSessionTrashPage
+import com.readmates.session.application.model.HostSessionTrashPurgeTarget
+import com.readmates.session.application.model.HostSessionTrashRecord
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
@@ -1225,10 +1229,16 @@ class HostSessionServicesTest {
             captureHostSessionLogs().use { logs ->
                 val response = harness.service.delete(HostSessionIdCommand(host, sessionId))
 
-                assertThat(response.deleted).isTrue()
+                assertThat(response.trashed).isTrue()
+                assertThat(
+                    java.time.Duration.between(
+                        OffsetDateTime.parse(response.deletedAt),
+                        OffsetDateTime.parse(response.purgeAfter),
+                    ),
+                ).isEqualTo(java.time.Duration.ofDays(HOST_SESSION_TRASH_RETENTION_DAYS))
                 assertThat(harness.port.calls).containsExactly(
                     "lockAndAssess:$sessionId",
-                    "deleteAssessed:$sessionId",
+                    "moveToTrash:$sessionId",
                 )
                 assertThat(harness.audit.entries.single())
                     .extracting(
@@ -1305,7 +1315,7 @@ class HostSessionServicesTest {
                     RecordingHostSessionPorts().apply {
                         lockAssessment = allowed
                         assessAssessment = allowed.copy(blockers = blockers)
-                        deleteAssessedFailure = integrity
+                        moveToTrashFailure = integrity
                     },
             )
 
@@ -1317,7 +1327,7 @@ class HostSessionServicesTest {
         assertThat(thrown.blockers).isEqualTo(blockers)
         assertThat(harness.port.calls).containsExactly(
             "lockAndAssess:$sessionId",
-            "deleteAssessed:$sessionId",
+            "moveToTrash:$sessionId",
             "assess:$sessionId",
         )
         assertThat(harness.invalidation.clubs).isEmpty()
@@ -1333,7 +1343,7 @@ class HostSessionServicesTest {
             lifecycleHarness(
                 port =
                     RecordingHostSessionPorts().apply {
-                        deleteAssessedFailure = integrity
+                        moveToTrashFailure = integrity
                     },
             )
 
@@ -1345,7 +1355,7 @@ class HostSessionServicesTest {
         assertThat(thrown).isSameAs(integrity)
         assertThat(harness.port.calls).containsExactly(
             "lockAndAssess:$sessionId",
-            "deleteAssessed:$sessionId",
+            "moveToTrash:$sessionId",
             "assess:$sessionId",
         )
         assertThat(harness.transitionCount("DELETED", "failure")).isEqualTo(1.0)
@@ -1802,6 +1812,7 @@ class HostSessionServicesTest {
         var assessAssessment: HostSessionDeletionAssessment? = null
         var deleteAssessedResult = true
         var deleteAssessedFailure: RuntimeException? = null
+        var moveToTrashFailure: RuntimeException? = null
 
         override fun assess(command: HostSessionIdCommand) =
             (assessAssessment ?: deletionAssessment)
@@ -1823,6 +1834,55 @@ class HostSessionServicesTest {
             deleteAssessedFailure?.let { throw it }
             return deleteAssessedResult
         }
+
+        override fun moveToTrash(
+            command: HostSessionIdCommand,
+            target: HostSessionDeletionTarget,
+        ): HostSessionTrashRecord {
+            calls += "moveToTrash:${command.sessionId}"
+            moveToTrashFailure?.let { throw it }
+            val deletedAt = OffsetDateTime.parse("2026-08-21T10:00:00Z")
+            return HostSessionTrashRecord(
+                sessionId = target.sessionId,
+                sessionNumber = target.sessionNumber,
+                title = target.title,
+                state = target.state,
+                deletedAt = deletedAt,
+                purgeAfter = deletedAt.plusDays(HOST_SESSION_TRASH_RETENTION_DAYS),
+                restorable = true,
+            )
+        }
+
+        override fun listTrash(
+            host: CurrentMember,
+            pageRequest: PageRequest,
+        ): HostSessionTrashPage = HostSessionTrashPage(emptyList(), null)
+
+        override fun findTrash(command: HostSessionIdCommand): HostSessionTrashRecord? = null
+
+        override fun lockClub(clubId: UUID) {
+            calls += "lockClub:$clubId"
+        }
+
+        override fun lockTrash(command: HostSessionIdCommand): HostSessionTrashRecord? = null
+
+        override fun restoreTrash(command: HostSessionIdCommand): Boolean = false
+
+        override fun findOpenSessionId(clubId: UUID): UUID? = null
+
+        override fun deletionCounts(
+            clubId: UUID,
+            sessionId: UUID,
+        ) = emptyDeletionCounts()
+
+        override fun lockExpiredForPurge(limit: Int): List<HostSessionTrashPurgeTarget> = emptyList()
+
+        override fun purgeLocked(target: HostSessionTrashPurgeTarget): Boolean = false
+
+        override fun latestDeletedOrRestoredAction(
+            clubId: UUID,
+            sessionId: UUID,
+        ): HostSessionLifecycleAction? = null
 
         override fun confirmAttendance(command: ConfirmAttendanceCommand) =
             HostAttendanceResponse(

@@ -228,6 +228,7 @@ private const val SESSION_REOPENED_SORT = 100
 private const val SESSION_UNPUBLISHED_SORT = 110
 private const val SESSION_RETURNED_TO_DRAFT_SORT = 120
 private const val SESSION_DELETED_SORT = 130
+private const val SESSION_RESTORED_SORT = 140
 
 enum class HostSessionHistoryType(
     val typeSort: Int,
@@ -245,6 +246,7 @@ enum class HostSessionHistoryType(
     SESSION_UNPUBLISHED(SESSION_UNPUBLISHED_SORT),
     SESSION_RETURNED_TO_DRAFT(SESSION_RETURNED_TO_DRAFT_SORT),
     SESSION_DELETED(SESSION_DELETED_SORT),
+    SESSION_RESTORED(SESSION_RESTORED_SORT),
 }
 
 data class HostSessionHistoryAttendanceTransition(

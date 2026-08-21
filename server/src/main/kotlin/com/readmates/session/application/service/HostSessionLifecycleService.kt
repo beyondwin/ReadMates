@@ -4,8 +4,8 @@ import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.domain.NotificationEventType
-import com.readmates.session.application.HostSessionDeletionResponse
 import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.model.HostSessionChangeKind
@@ -174,7 +174,7 @@ class HostSessionLifecycleService(
 
     override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.assess(command).toPreviewResponse()
 
-    override fun delete(command: HostSessionIdCommand): HostSessionDeletionResponse {
+    override fun delete(command: HostSessionIdCommand): HostSessionTrashResponse {
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
         return deleteRecordingOutcomes(command, requestId)
     }
@@ -183,7 +183,7 @@ class HostSessionLifecycleService(
     private fun deleteRecordingOutcomes(
         command: HostSessionIdCommand,
         requestId: String?,
-    ): HostSessionDeletionResponse =
+    ): HostSessionTrashResponse =
         try {
             deletionTransaction.delete(command).also {
                 cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)

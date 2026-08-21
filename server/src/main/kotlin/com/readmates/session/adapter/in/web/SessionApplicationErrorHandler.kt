@@ -21,6 +21,7 @@ import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionLifecycleReasonRequiredException
+import com.readmates.session.application.model.HostSessionTrashExpiredException
 import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
 import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
@@ -173,5 +174,13 @@ class SessionApplicationErrorHandler {
             status = HttpStatus.CONFLICT,
             code = "HOST_SESSION_RESTORE_STALE",
             message = "모임이 바뀌었습니다. 최신 값을 확인한 뒤 다시 복원하세요.",
+        )
+
+    @ExceptionHandler(HostSessionTrashExpiredException::class)
+    fun handleTrashExpired(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.GONE,
+            code = "HOST_SESSION_TRASH_EXPIRED",
+            message = "복원 기간이 지났습니다.",
         )
 }

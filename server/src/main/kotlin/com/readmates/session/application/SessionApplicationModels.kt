@@ -3,6 +3,7 @@ package com.readmates.session.application
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionDeletionTarget
+import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
@@ -305,6 +306,20 @@ fun HostSessionDeletionAssessment.toDeletionResponse() =
         deleted = true,
         counts = counts,
     )
+
+fun HostSessionDeletionAssessment.toTrashResponse(
+    deletedAt: String,
+    purgeAfter: String,
+) = HostSessionTrashResponse(
+    sessionId = target.sessionId.toString(),
+    sessionNumber = target.sessionNumber,
+    title = target.title,
+    state = target.state,
+    trashed = true,
+    deletedAt = deletedAt,
+    purgeAfter = purgeAfter,
+    counts = counts,
+)
 
 data class HostSessionDeletionResponse(
     val sessionId: String,

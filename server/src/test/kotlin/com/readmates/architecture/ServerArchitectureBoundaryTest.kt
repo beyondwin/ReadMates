@@ -55,7 +55,11 @@ private val serverSlices =
         ServerSlice(
             name = "session",
             type = ServerSliceType.WRITE,
-            inboundAdapterPackages = listOf("com.readmates.session.adapter.in.web.."),
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.session.adapter.in.web..",
+                    "com.readmates.session.adapter.in.scheduling..",
+                ),
             applicationPackages = listOf("com.readmates.session.application.."),
         ),
         ServerSlice(
@@ -407,6 +411,7 @@ class ServerArchitectureBoundaryTest {
         assertTrue(inboundPackages.contains("com.readmates.notification.adapter.in.kafka.."))
         assertTrue(inboundPackages.contains("com.readmates.notification.adapter.in.scheduler.."))
         assertTrue(inboundPackages.contains("com.readmates.admin.health.adapter.in.scheduling.."))
+        assertTrue(inboundPackages.contains("com.readmates.session.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.adapter.in.security.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.infrastructure.security.."))
     }

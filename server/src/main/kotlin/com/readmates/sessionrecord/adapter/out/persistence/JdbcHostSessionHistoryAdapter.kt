@@ -106,6 +106,7 @@ class JdbcHostSessionHistoryAdapter(
                      when 'UNPUBLISHED' then 110
                      when 'RETURNED_TO_DRAFT' then 120
                      when 'DELETED' then 130
+                     when 'RESTORED' then 140
                    end as type_sort
             from host_session_lifecycle_audit
             where club_id = ? and session_id = ?
@@ -251,6 +252,7 @@ private fun lifecycleHistoryType(actionType: String): HostSessionHistoryType =
         "UNPUBLISHED" -> HostSessionHistoryType.SESSION_UNPUBLISHED
         "RETURNED_TO_DRAFT" -> HostSessionHistoryType.SESSION_RETURNED_TO_DRAFT
         "DELETED" -> HostSessionHistoryType.SESSION_DELETED
+        "RESTORED" -> HostSessionHistoryType.SESSION_RESTORED
         else -> error("Unsupported lifecycle history action")
     }
 

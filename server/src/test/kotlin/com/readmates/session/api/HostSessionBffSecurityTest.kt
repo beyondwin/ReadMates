@@ -105,12 +105,36 @@ class HostSessionBffSecurityTest(
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
                 jsonPath("$.sessionNumber") { value(88) }
-                jsonPath("$.deleted") { value(true) }
+                jsonPath("$.trashed") { value(true) }
                 jsonPath("$.counts.participants") { value(6) }
             }
 
-        assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009888'"))
-        assertEquals(0, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
+        assertEquals(1, countRows("sessions", "id = '00000000-0000-0000-0000-000000009888' and deleted_at is not null"))
+        assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
+    }
+
+    @Test
+    fun `host session restore bff request reaches controller without spring csrf token`() {
+        createDraftSession()
+        mockMvc
+            .delete("/api/host/sessions/00000000-0000-0000-0000-000000009888") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect { status { isOk() } }
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009888/restore") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
+                jsonPath("$.state") { value("DRAFT") }
+            }
+
+        assertEquals(1, countRows("sessions", "id = '00000000-0000-0000-0000-000000009888' and deleted_at is null"))
     }
 
     @Test

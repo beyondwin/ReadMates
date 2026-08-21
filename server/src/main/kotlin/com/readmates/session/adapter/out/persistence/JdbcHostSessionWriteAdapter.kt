@@ -1,5 +1,6 @@
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.UpcomingSessionItem
@@ -7,6 +8,10 @@ import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
+import com.readmates.session.application.model.HostSessionLifecycleAction
+import com.readmates.session.application.model.HostSessionTrashPage
+import com.readmates.session.application.model.HostSessionTrashPurgeTarget
+import com.readmates.session.application.model.HostSessionTrashRecord
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
@@ -23,8 +28,10 @@ import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.util.UUID
 
 @Repository
+@Suppress("TooManyFunctions")
 class JdbcHostSessionWriteAdapter(
     private val jdbcTemplate: JdbcTemplate,
     private val deletionQueries: HostSessionDeletionQueries,
@@ -74,6 +81,40 @@ class JdbcHostSessionWriteAdapter(
         command: HostSessionIdCommand,
         target: HostSessionDeletionTarget,
     ) = deletionQueries.deleteAssessed(command, target)
+
+    override fun moveToTrash(
+        command: HostSessionIdCommand,
+        target: HostSessionDeletionTarget,
+    ) = deletionQueries.moveToTrash(command, target)
+
+    override fun listTrash(
+        host: CurrentMember,
+        pageRequest: PageRequest,
+    ): HostSessionTrashPage = deletionQueries.listTrash(host, pageRequest)
+
+    override fun findTrash(command: HostSessionIdCommand): HostSessionTrashRecord? = deletionQueries.findTrash(command)
+
+    override fun lockClub(clubId: UUID) = deletionQueries.lockClub(clubId)
+
+    override fun lockTrash(command: HostSessionIdCommand): HostSessionTrashRecord? = deletionQueries.lockTrash(command)
+
+    override fun restoreTrash(command: HostSessionIdCommand): Boolean = deletionQueries.restoreTrash(command)
+
+    override fun findOpenSessionId(clubId: UUID): UUID? = deletionQueries.findOpenSessionId(clubId)
+
+    override fun deletionCounts(
+        clubId: UUID,
+        sessionId: UUID,
+    ): HostSessionDeletionCounts = deletionQueries.deletionCounts(clubId, sessionId)
+
+    override fun lockExpiredForPurge(limit: Int): List<HostSessionTrashPurgeTarget> = deletionQueries.lockExpiredForPurge(limit)
+
+    override fun purgeLocked(target: HostSessionTrashPurgeTarget): Boolean = deletionQueries.purgeLocked(target)
+
+    override fun latestDeletedOrRestoredAction(
+        clubId: UUID,
+        sessionId: UUID,
+    ): HostSessionLifecycleAction? = deletionQueries.latestDeletedOrRestoredAction(clubId, sessionId)
 
     override fun confirmAttendance(command: ConfirmAttendanceCommand) = attendance.confirm(command)
 

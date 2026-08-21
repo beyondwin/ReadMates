@@ -98,6 +98,9 @@ readmates:
   session:
     lifecycle:
       require-reverse-reason: false
+    trash:
+      purge-fixed-delay: ${READMATES_SESSION_TRASH_PURGE_FIXED_DELAY:1h}
+      purge-batch-size: ${READMATES_SESSION_TRASH_PURGE_BATCH_SIZE:50}
   auth:
     auth-base-url: ${READMATES_AUTH_BASE_URL:${READMATES_APP_BASE_URL:http://localhost:3000}}
     return-state-secret: ${READMATES_AUTH_RETURN_STATE_SECRET:}

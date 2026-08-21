@@ -2,6 +2,7 @@ package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
+import com.readmates.session.application.model.HostSessionTrashExpiredException
 import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionDeletionBlockerCode
 import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
@@ -174,5 +175,18 @@ class SessionApplicationErrorHandlerTest {
         assertThat(response.body?.code).isEqualTo("LIFECYCLE_REASON_INVALID")
         assertThat(response.body?.status).isEqualTo(400)
         assertThat(response.body?.openSessionId).isNull()
+    }
+
+    @Test
+    fun `maps expired trash to HOST_SESSION_TRASH_EXPIRED`() {
+        val response = SessionApplicationErrorHandler().handleTrashExpired()
+        assertThat(response.statusCode).isEqualTo(HttpStatus.GONE)
+        assertThat(response.body).isEqualTo(
+            ApiErrorResponse(
+                code = "HOST_SESSION_TRASH_EXPIRED",
+                message = "복원 기간이 지났습니다.",
+                status = 410,
+            ),
+        )
     }
 }

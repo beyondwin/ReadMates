@@ -29,6 +29,7 @@ class SessionRecordModelsTest {
                 HostSessionHistoryType.SESSION_UNPUBLISHED to 110,
                 HostSessionHistoryType.SESSION_RETURNED_TO_DRAFT to 120,
                 HostSessionHistoryType.SESSION_DELETED to 130,
+                HostSessionHistoryType.SESSION_RESTORED to 140,
             ),
             HostSessionHistoryType.entries.associateWith(HostSessionHistoryType::typeSort),
         )

@@ -2902,7 +2902,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
-    fun `host deletes open session and all session owned rows`() {
+    fun `host moves open session to trash and preserves owned rows`() {
         createSessionSeven()
         seedSessionOwnedRows()
         seedNonSessionRows()
@@ -2915,7 +2915,9 @@ class HostSessionControllerDbTest(
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
                 jsonPath("$.sessionNumber") { value(7) }
-                jsonPath("$.deleted") { value(true) }
+                jsonPath("$.trashed") { value(true) }
+                jsonPath("$.deletedAt") { exists() }
+                jsonPath("$.purgeAfter") { exists() }
                 jsonPath("$.counts.participants") { value(6) }
                 jsonPath("$.counts.rsvpResponses") { value(1) }
                 jsonPath("$.counts.questions") { value(2) }
@@ -2928,16 +2930,16 @@ class HostSessionControllerDbTest(
                 jsonPath("$.counts.feedbackDocuments") { value(1) }
             }
 
-        assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("questions", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("reading_checkins", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("one_line_reviews", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("long_reviews", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("highlights", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("public_session_publications", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("feedback_reports", "session_id = '00000000-0000-0000-0000-000000009777'"))
-        assertEquals(0, countRows("session_feedback_documents", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777' and deleted_at is not null"))
+        assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(2, countRows("questions", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("reading_checkins", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("one_line_reviews", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("long_reviews", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("highlights", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("public_session_publications", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("feedback_reports", "session_id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("session_feedback_documents", "session_id = '00000000-0000-0000-0000-000000009777'"))
         assertEquals(
             1,
             countRows(
@@ -3032,7 +3034,7 @@ class HostSessionControllerDbTest(
 
     @Test
     @Suppress("LongMethod")
-    fun `open deletion removes ephemeral draft audit preview and AI receipt rows transactionally`() {
+    fun `open trash preserves ephemeral draft audit preview and AI receipt rows`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         val clubId = "00000000-0000-0000-0000-000000000001"
         val hostMembershipId = "00000000-0000-0000-0000-000000000201"
@@ -3100,7 +3102,7 @@ class HostSessionControllerDbTest(
             "host_action_notification_previews",
             "ai_generation_commit_receipts",
         ).forEach { table ->
-            assertEquals(0, countRows(table, "session_id = '$sessionId'"), table)
+            assertEquals(1, countRows(table, "session_id = '$sessionId'"), table)
         }
     }
 
@@ -3143,7 +3145,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/$sessionId") { withHost() }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.deleted") { value(true) }
+                jsonPath("$.trashed") { value(true) }
             }
     }
 
@@ -3307,7 +3309,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
-    fun `session number is reused after deleting open session`() {
+    fun `session number is not reused while a session is in trash`() {
         createSessionSeven()
 
         mockMvc
@@ -3334,7 +3336,7 @@ class HostSessionControllerDbTest(
                     """.trimIndent()
             }.andExpect {
                 status { isCreated() }
-                jsonPath("$.sessionNumber") { value(7) }
+                jsonPath("$.sessionNumber") { value(8) }
                 jsonPath("$.state") { value("DRAFT") }
             }
     }
@@ -3376,7 +3378,7 @@ class HostSessionControllerDbTest(
 
         assertThat(statuses.count { it == 200 }).isEqualTo(1)
         assertThat(statuses.count { it == 404 }).isEqualTo(1)
-        assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777' and deleted_at is not null"))
     }
 
     @Test
@@ -3525,9 +3527,9 @@ class HostSessionControllerDbTest(
                 withHost()
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.deleted") { value(true) }
+                jsonPath("$.trashed") { value(true) }
             }
-        assertEquals(0, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777'"))
+        assertEquals(1, countRows("sessions", "id = '00000000-0000-0000-0000-000000009777' and deleted_at is not null"))
         assertEquals(
             1,
             countRows("notification_event_outbox", "id = '00000000-0000-0000-0000-000000009939'"),
@@ -3555,10 +3557,10 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/$sessionId") { withHost() }
             .andExpect {
                 status { isOk() }
-                jsonPath("$.deleted") { value(true) }
+                jsonPath("$.trashed") { value(true) }
             }
 
-        assertEquals(0, countRows("sessions", "id = '$sessionId'"))
+        assertEquals(1, countRows("sessions", "id = '$sessionId' and deleted_at is not null"))
         assertEquals(
             1,
             countRows(
