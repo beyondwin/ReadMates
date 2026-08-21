@@ -1,6 +1,8 @@
-import { memo, type CSSProperties } from "react";
+import { memo, useRef, useState, type CSSProperties } from "react";
 import type { HostSessionEditorSection } from "@/features/host/model/host-session-editor-navigation";
+import type { PreviousOnlineMeeting } from "@/features/host/model/host-schedule-defaults-model";
 import { BookCover } from "@/shared/ui/book-cover";
+import { PreviousOnlineMeetingDialog } from "./previous-online-meeting-dialog";
 import { Panel } from "./session-editor-panel";
 
 export const BasicSessionPanel = memo(function BasicSessionPanel({
@@ -27,6 +29,11 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
   onLocationLabelChange,
   onMeetingUrlChange,
   onMeetingPasscodeChange,
+  previousOnlineMeeting = null,
+  scheduleDefaultsStatus = "ready",
+  scheduleDefaultsWarning = null,
+  onRetryScheduleDefaults,
+  onAdoptPreviousOnlineMeeting,
 }: {
   activeSection: HostSessionEditorSection;
   title: string;
@@ -51,7 +58,15 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
   onLocationLabelChange: (value: string) => void;
   onMeetingUrlChange: (value: string) => void;
   onMeetingPasscodeChange: (value: string) => void;
+  previousOnlineMeeting?: PreviousOnlineMeeting | null;
+  scheduleDefaultsStatus?: "loading" | "ready" | "warning";
+  scheduleDefaultsWarning?: string | null;
+  onRetryScheduleDefaults?: () => void;
+  onAdoptPreviousOnlineMeeting?: (next: { meetingUrl: string; meetingPasscode: string }) => void;
 }) {
+  const [previousMeetingOpen, setPreviousMeetingOpen] = useState(false);
+  const previousMeetingTriggerRef = useRef<HTMLButtonElement>(null);
+  const previousMeetingRestoreFocusRef = useRef<HTMLElement | null>(null);
   return (
     <>
       <Panel
@@ -196,6 +211,42 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
             onChange={(event) => onLocationLabelChange(event.target.value)}
           />
         </div>
+        {scheduleDefaultsStatus === "loading" ? (
+          <p className="small" role="status" style={{ margin: "14px 0 0" }}>
+            기본 일정을 불러오는 중입니다.
+          </p>
+        ) : null}
+        {scheduleDefaultsStatus === "warning" && scheduleDefaultsWarning ? (
+          <div className="surface-quiet stack" role="alert" style={{ padding: 14, marginTop: 14 }}>
+            <p className="small" style={{ margin: 0 }}>{scheduleDefaultsWarning}</p>
+            {onRetryScheduleDefaults ? (
+              <div>
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-sm"
+                  onClick={onRetryScheduleDefaults}
+                >
+                  다시 시도
+                </button>
+              </div>
+            ) : null}
+          </div>
+        ) : null}
+        {previousOnlineMeeting && onAdoptPreviousOnlineMeeting ? (
+          <div style={{ marginTop: "14px" }}>
+            <button
+              ref={previousMeetingTriggerRef}
+              type="button"
+              className="btn btn-quiet btn-sm"
+              onClick={() => {
+                previousMeetingRestoreFocusRef.current = previousMeetingTriggerRef.current;
+                setPreviousMeetingOpen(true);
+              }}
+            >
+              이전 온라인 모임 정보 사용
+            </button>
+          </div>
+        ) : null}
         <div className="grid-2" style={{ marginTop: "14px" }}>
           <div>
             <label className="label" htmlFor="meeting-url">
@@ -228,6 +279,14 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
         <div className="marginalia" style={{ marginTop: "12px" }}>
           일정과 링크는 저장 즉시 멤버 홈과 현재 세션 화면에 반영됩니다. 자동 안내 발송은 아직 연결되지 않았습니다.
         </div>
+        {previousMeetingOpen && previousOnlineMeeting && onAdoptPreviousOnlineMeeting ? (
+          <PreviousOnlineMeetingDialog
+            previous={previousOnlineMeeting}
+            restoreFocusRef={previousMeetingRestoreFocusRef}
+            onClose={() => setPreviousMeetingOpen(false)}
+            onAdopt={onAdoptPreviousOnlineMeeting}
+          />
+        ) : null}
       </Panel>
     </>
   );

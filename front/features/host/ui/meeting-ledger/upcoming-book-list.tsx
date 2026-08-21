@@ -1,10 +1,13 @@
-import { type FormEvent, useId, useMemo, useState } from "react";
+import { type FormEvent, useId, useMemo, useRef, useState } from "react";
 import {
-  applyScheduleDefaults,
+  mergeUntouchedScheduleDefaults,
   scheduleTimeHint,
   type HostScheduleFormValues,
   type HostSessionScheduleDefaults,
+  type ScheduleField,
+  type TouchedScheduleFields,
 } from "@/features/host/model/host-schedule-defaults-model";
+import { PreviousOnlineMeetingDialog } from "@/features/host/ui/session-editor/previous-online-meeting-dialog";
 import {
   DEFAULT_UPCOMING_ACCESS_SCOPE,
   draftsByDate,
@@ -22,6 +25,9 @@ export type UpcomingBookListProps = {
   pending?: boolean;
   defaultAccessScope?: SessionAccessScope;
   scheduleDefaults?: HostSessionScheduleDefaults | null;
+  scheduleDefaultsStatus?: "loading" | "ready" | "warning";
+  scheduleDefaultsWarning?: string | null;
+  onRetryScheduleDefaults?: () => void;
   compact?: boolean;
 };
 
@@ -46,6 +52,9 @@ export function UpcomingBookList({
   pending = false,
   defaultAccessScope = DEFAULT_UPCOMING_ACCESS_SCOPE,
   scheduleDefaults = null,
+  scheduleDefaultsStatus = "ready",
+  scheduleDefaultsWarning = null,
+  onRetryScheduleDefaults,
   compact = false,
 }: UpcomingBookListProps) {
   const headingId = useId();
@@ -53,26 +62,39 @@ export function UpcomingBookList({
   const authorId = useId();
   const dateId = useId();
   const timeId = useId();
+  const urlId = useId();
+  const passcodeId = useId();
   const visibilityId = useId();
   const drafts = draftsByDate(items);
   const [expanded, setExpanded] = useState(false);
-  const [accessScopeTouched, setAccessScopeTouched] = useState(false);
+  const [touched, setTouched] = useState<TouchedScheduleFields>(() => new Set());
   const [draft, setDraft] = useState<HostScheduleFormValues>(() => blankForm(defaultAccessScope));
   const [error, setError] = useState<string | null>(null);
+  const [previousMeetingOpen, setPreviousMeetingOpen] = useState(false);
+  const previousMeetingTriggerRef = useRef<HTMLButtonElement>(null);
+  const previousMeetingRestoreFocusRef = useRef<HTMLElement | null>(null);
   const timeHint = scheduleDefaults ? scheduleTimeHint(scheduleDefaults) : null;
+  const previousOnlineMeeting = scheduleDefaults?.previousOnlineMeeting ?? null;
   const form = useMemo(() => {
     if (!scheduleDefaults) {
       return draft;
     }
-    return {
-      ...applyScheduleDefaults(draft, scheduleDefaults),
-      accessScope: accessScopeTouched ? draft.accessScope : scheduleDefaults.automatic.accessScope,
-    };
-  }, [accessScopeTouched, draft, scheduleDefaults]);
+    return mergeUntouchedScheduleDefaults(draft, scheduleDefaults, touched);
+  }, [draft, scheduleDefaults, touched]);
+
+  function markTouched<K extends ScheduleField>(field: K, value: HostScheduleFormValues[K]) {
+    setTouched((current) => {
+      const next = new Set(current);
+      next.add(field);
+      return next;
+    });
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
 
   function expandForm() {
     setError(null);
-    setAccessScopeTouched(false);
+    setTouched(new Set());
+    setPreviousMeetingOpen(false);
     setDraft(blankForm(scheduleDefaults?.automatic.accessScope ?? defaultAccessScope));
     setExpanded((open) => !open);
   }
@@ -102,7 +124,7 @@ export function UpcomingBookList({
         questionDeadlineOffsetDays: scheduleDefaults?.automatic.questionDeadlineOffsetDays ?? 1,
       });
       setExpanded(false);
-      setAccessScopeTouched(false);
+      setTouched(new Set());
       setDraft(blankForm(scheduleDefaults?.automatic.accessScope ?? defaultAccessScope));
     } catch {
       setError("모임을 넣지 못했습니다.");
@@ -161,6 +183,28 @@ export function UpcomingBookList({
         </ul>
 
         <div className="rm-upcoming-book-list__footer">
+          {scheduleDefaultsStatus === "loading" ? (
+            <p className="small" role="status" style={{ margin: "0 0 12px" }}>
+              기본 일정을 불러오는 중입니다.
+            </p>
+          ) : null}
+          {scheduleDefaultsStatus === "warning" && scheduleDefaultsWarning ? (
+            <div className="surface-quiet stack" role="alert" style={{ padding: 14, marginBottom: 12 }}>
+              <p className="small" style={{ margin: 0 }}>{scheduleDefaultsWarning}</p>
+              {onRetryScheduleDefaults ? (
+                <div>
+                  <button
+                    type="button"
+                    className="btn btn-quiet btn-sm"
+                    onClick={onRetryScheduleDefaults}
+                  >
+                    다시 시도
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
           <button
             type="button"
             className="btn btn-primary"
@@ -209,7 +253,7 @@ export function UpcomingBookList({
                     value={form.date}
                     required
                     disabled={pending}
-                    onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
+                    onChange={(event) => markTouched("date", event.target.value)}
                   />
                 </div>
                 <div>
@@ -220,13 +264,56 @@ export function UpcomingBookList({
                     type="time"
                     value={form.startTime}
                     disabled={pending}
-                    onChange={(event) => setDraft((current) => ({ ...current, startTime: event.target.value }))}
+                    onChange={(event) => markTouched("startTime", event.target.value)}
                   />
                   {timeHint ? (
                     <p className="tiny" style={{ marginTop: "6px", color: "var(--text-3)" }}>
                       {timeHint}
                     </p>
                   ) : null}
+                </div>
+              </div>
+              {previousOnlineMeeting ? (
+                <div>
+                  <button
+                    ref={previousMeetingTriggerRef}
+                    type="button"
+                    className="btn btn-quiet btn-sm"
+                    disabled={pending}
+                    onClick={() => {
+                      previousMeetingRestoreFocusRef.current = previousMeetingTriggerRef.current;
+                      setPreviousMeetingOpen(true);
+                    }}
+                  >
+                    이전 온라인 모임 정보 사용
+                  </button>
+                </div>
+              ) : null}
+              <div className="grid-2">
+                <div>
+                  <label className="label" htmlFor={urlId}>미팅 URL</label>
+                  <input
+                    id={urlId}
+                    className="input"
+                    value={form.meetingUrl}
+                    autoComplete="off"
+                    disabled={pending}
+                    onChange={(event) => setDraft((current) => ({ ...current, meetingUrl: event.target.value }))}
+                  />
+                </div>
+                <div>
+                  <label className="label" htmlFor={passcodeId}>Passcode · 선택</label>
+                  <input
+                    id={passcodeId}
+                    className="input"
+                    value={form.meetingPasscode}
+                    autoComplete="off"
+                    disabled={pending}
+                    onChange={(event) => setDraft((current) => ({
+                      ...current,
+                      meetingPasscode: event.target.value,
+                    }))}
+                  />
                 </div>
               </div>
               <label className="rm-upcoming-book-list__visibility" htmlFor={visibilityId}>
@@ -240,12 +327,7 @@ export function UpcomingBookList({
                     checked={form.accessScope === "GUEST_READABLE"}
                     disabled={pending}
                     onChange={(event) => {
-                      const checked = event.currentTarget.checked;
-                      setAccessScopeTouched(true);
-                      setDraft((current) => ({
-                        ...current,
-                        accessScope: checked ? "GUEST_READABLE" : "HOST_ONLY",
-                      }));
+                      markTouched("accessScope", event.currentTarget.checked ? "GUEST_READABLE" : "HOST_ONLY");
                     }}
                   />
                   <span className="rm-upcoming-book-list__track" aria-hidden="true">
@@ -264,6 +346,20 @@ export function UpcomingBookList({
                 </button>
               </div>
             </form>
+          ) : null}
+          {previousMeetingOpen && previousOnlineMeeting ? (
+            <PreviousOnlineMeetingDialog
+              previous={previousOnlineMeeting}
+              restoreFocusRef={previousMeetingRestoreFocusRef}
+              onClose={() => setPreviousMeetingOpen(false)}
+              onAdopt={(next) => {
+                setDraft((current) => ({
+                  ...current,
+                  meetingUrl: next.meetingUrl,
+                  meetingPasscode: next.meetingPasscode,
+                }));
+              }}
+            />
           ) : null}
         </div>
       </div>

@@ -37,6 +37,7 @@ vi.mock("@tanstack/react-query", () => ({
     data: query.testData,
     isError: false,
     isPending: false,
+    refetch: vi.fn(),
   }),
   useQueryClient: () => ({
     removeQueries: vi.fn(),
@@ -44,7 +45,8 @@ vi.mock("@tanstack/react-query", () => ({
   }),
 }));
 
-vi.mock("@/features/host/queries/host-session-queries", () => ({
+vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/queries/host-session-queries")>()),
   DEFAULT_HOST_SESSION_LIST_LIMIT: 50,
   hostSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
   hostSessionDetailQuery: (sessionId: string) => ({ testData: routeMocks.details[sessionId] }),

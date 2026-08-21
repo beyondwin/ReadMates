@@ -10,10 +10,6 @@ import {
   meetingListItemsFromHostSources,
   type MeetingListItemSource,
 } from "@/features/host/model/host-meeting-ledger-model";
-import {
-  BUILTIN_SCHEDULE_DEFAULTS,
-  resolvedScheduleDefaults,
-} from "@/features/host/model/host-schedule-defaults-model";
 import { buildHostSessionRequest } from "@/features/host/model/host-session-editor-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
 import {
@@ -27,6 +23,7 @@ import {
   hostSessionListQuery,
   hostSessionScheduleDefaultsQuery,
   invalidateHostSessionManualDispatches,
+  resolveHostScheduleDefaultsLoadState,
   useCreateHostSessionMutation,
   useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
@@ -112,9 +109,7 @@ export function HostMeetingLedgerRoute({
   const { mutateAsync: saveAccessScope, isPending: savingAccessScope } = useSaveHostSessionAccessScopeMutation(context);
   const [composerRequest, setComposerRequest] = useState<HostNotificationComposerRequest | null>(null);
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
-  const scheduleDefaults = scheduleDefaultsQuery.isError
-    ? BUILTIN_SCHEDULE_DEFAULTS
-    : resolvedScheduleDefaults(scheduleDefaultsQuery.data);
+  const scheduleDefaultsLoadState = resolveHostScheduleDefaultsLoadState(scheduleDefaultsQuery);
 
   const items = useMemo(() => {
     const sessions = (sessionsQuery.data?.items ?? [])
@@ -191,7 +186,10 @@ export function HostMeetingLedgerRoute({
         onSaveUpcomingAccessScope={handleSaveUpcomingAccessScope}
         onCreateUpcomingSession={handleCreateUpcomingSession}
         upcomingPending={creatingSession || savingAccessScope}
-        scheduleDefaults={scheduleDefaults}
+        scheduleDefaults={scheduleDefaultsLoadState.defaults}
+        scheduleDefaultsStatus={scheduleDefaultsLoadState.status}
+        scheduleDefaultsWarning={scheduleDefaultsLoadState.warning}
+        onRetryScheduleDefaults={scheduleDefaultsLoadState.retry}
       >
         {children}
       </HostMeetingLedger>

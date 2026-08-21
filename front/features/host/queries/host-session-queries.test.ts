@@ -19,7 +19,10 @@ import {
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
 } from "@/features/host/api/host-api";
+import { ReadmatesApiError } from "@/shared/api/errors";
+import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import {
+  classifyScheduleDefaultsError,
   hostCurrentSessionQuery,
   hostDashboardQuery,
   hostSessionDeletionPreviewQuery,
@@ -34,6 +37,7 @@ import {
   invalidateHostSessionLists,
   invalidateHostSessionManualDispatches,
   invalidateHostSessionSurface,
+  resolveHostScheduleDefaultsLoadState,
 } from "./host-session-queries";
 
 async function runQuery(query: { queryFn?: (context: never) => unknown }) {
@@ -167,20 +171,12 @@ describe("host session query keys", () => {
     expect(fetchHostSessionScheduleDefaults).toHaveBeenCalledWith({ clubSlug: "reading-sai" });
   });
 
-  it("returns built-in evening online defaults when schedule-defaults fetch fails", async () => {
+  it("propagates schedule-defaults fetch failures instead of swallowing them", async () => {
     vi.mocked(fetchHostSessionScheduleDefaults).mockRejectedValue(new Error("defaults-unavailable"));
 
-    await expect(runQuery(hostSessionScheduleDefaultsQuery({ clubSlug: "reading-sai" }))).resolves.toMatchObject({
-      automatic: {
-        startTime: "20:00",
-        endTime: "22:00",
-        locationLabel: "온라인",
-        accessScope: "HOST_ONLY",
-        suggestedDate: null,
-      },
-      previousOnlineMeeting: null,
-      hints: [],
-    });
+    await expect(runQuery(hostSessionScheduleDefaultsQuery({ clubSlug: "reading-sai" }))).rejects.toThrow(
+      "defaults-unavailable",
+    );
   });
 
   it("does not retain deletion preview results between fetches", () => {
@@ -221,3 +217,83 @@ describe("host session query keys", () => {
     });
   });
 });
+
+describe("classifyScheduleDefaultsError", () => {
+  it("treats a typed 404 as legacy fallback", () => {
+    expect(classifyScheduleDefaultsError(apiError(404))).toEqual({ kind: "legacy-404" });
+  });
+
+  it.each([401, 403, 500])("treats %s as a visible error", (status) => {
+    expect(classifyScheduleDefaultsError(apiError(status))).toEqual({ kind: "visible-error" });
+  });
+
+  it("treats transport failures as visible errors", () => {
+    expect(classifyScheduleDefaultsError(new TypeError("Failed to fetch"))).toEqual({ kind: "visible-error" });
+  });
+});
+
+describe("resolveHostScheduleDefaultsLoadState", () => {
+  it("starts with builtins while the query is pending", () => {
+    const refetch = vi.fn();
+    expect(resolveHostScheduleDefaultsLoadState({
+      isPending: true,
+      isError: false,
+      error: null,
+      data: undefined,
+      refetch,
+    })).toMatchObject({
+      defaults: BUILTIN_SCHEDULE_DEFAULTS,
+      status: "loading",
+      warning: null,
+    });
+  });
+
+  it("suppresses the warning for a typed 404 and keeps builtins", () => {
+    const refetch = vi.fn();
+    const state = resolveHostScheduleDefaultsLoadState({
+      isPending: false,
+      isError: true,
+      error: apiError(404),
+      data: undefined,
+      refetch,
+    });
+
+    expect(state).toMatchObject({
+      defaults: BUILTIN_SCHEDULE_DEFAULTS,
+      status: "ready",
+      warning: null,
+    });
+    state.retry();
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("shows builtins with a warning and retry for 401, 403, 5xx, and transport errors", () => {
+    const refetch = vi.fn();
+    for (const error of [apiError(401), apiError(403), apiError(500), new TypeError("Failed to fetch")]) {
+      const state = resolveHostScheduleDefaultsLoadState({
+        isPending: false,
+        isError: true,
+        error,
+        data: undefined,
+        refetch,
+      });
+      expect(state).toMatchObject({
+        defaults: BUILTIN_SCHEDULE_DEFAULTS,
+        status: "warning",
+        warning: "기본 일정을 불러오지 못해 기본값을 사용합니다",
+      });
+    }
+  });
+});
+
+function apiError(status: number) {
+  return new ReadmatesApiError(
+    {
+      code: "TEST_ERROR",
+      message: "test",
+      status,
+      fallback: false,
+    },
+    new Response(JSON.stringify({ code: "TEST_ERROR", message: "test", status }), { status }),
+  );
+}

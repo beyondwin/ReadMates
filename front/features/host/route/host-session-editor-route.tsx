@@ -44,7 +44,6 @@ import {
   useRestoreHostSessionRevisionToDraftMutation,
   useSaveHostSessionRecordDraftMutation,
 } from "@/features/host/queries/host-session-record-queries";
-import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import { useSessionRecordDraftController } from "@/features/host/hooks/use-session-record-draft-controller";
 import {
   hostSessionDeletionPreviewQuery,
@@ -54,6 +53,7 @@ import {
   invalidateHostSessionManualDispatches,
   invalidateHostSessionRecordSurfaces,
   hostSessionManualDispatchesQuery,
+  resolveHostScheduleDefaultsLoadState,
   useCloseHostSessionMutation,
   useCommitHostSessionImportMutation,
   useCreateHostSessionMutation,
@@ -348,12 +348,7 @@ export function NewHostSessionRoute({
   );
   const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
-  if (scheduleDefaultsQuery.isPending) {
-    return <HostSessionEditorQueryState status="loading" />;
-  }
-  const scheduleDefaults = scheduleDefaultsQuery.isError
-    ? BUILTIN_SCHEDULE_DEFAULTS
-    : (scheduleDefaultsQuery.data ?? BUILTIN_SCHEDULE_DEFAULTS);
+  const scheduleDefaultsLoadState = resolveHostScheduleDefaultsLoadState(scheduleDefaultsQuery);
   return (
     <HostSessionEditor
       returnTarget={returnTarget}
@@ -364,7 +359,7 @@ export function NewHostSessionRoute({
       readmatesReturnState={readmatesReturnState}
       onSessionRecordsChanged={handleSessionRecordsChanged}
       navigation={navigation}
-      scheduleDefaults={scheduleDefaults}
+      scheduleDefaultsLoadState={scheduleDefaultsLoadState}
     />
   );
 }

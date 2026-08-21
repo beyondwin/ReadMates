@@ -1,11 +1,25 @@
 import {
   BUILTIN_SCHEDULE_DEFAULTS,
   type HostSessionScheduleDefaults,
+  type HostSessionAutomaticScheduleDefaults,
+  type PreviousOnlineMeeting,
 } from "./host-schedule-defaults-state";
 import type { SessionAccessScope } from "./session-exposure-model";
 
 export { BUILTIN_SCHEDULE_DEFAULTS };
-export type { HostSessionScheduleDefaults };
+export type { HostSessionScheduleDefaults, PreviousOnlineMeeting };
+
+export const SCHEDULE_DEFAULTS_LOAD_WARNING = "기본 일정을 불러오지 못해 기본값을 사용합니다";
+
+export type HostScheduleDefaultsLoadState = {
+  defaults: HostSessionScheduleDefaults;
+  status: "loading" | "ready" | "warning";
+  warning: string | null;
+  retry: () => void;
+};
+
+export type ScheduleField = "date" | "startTime" | "endTime" | "locationLabel" | "accessScope";
+export type TouchedScheduleFields = ReadonlySet<ScheduleField>;
 
 export type HostScheduleFormValues = {
   bookTitle: string;
@@ -50,6 +64,25 @@ export function applyScheduleDefaults<T extends object>(
     next[key] = incoming;
   }
   return next;
+}
+
+const automaticFieldEntries = [
+  ["date", (value: HostSessionAutomaticScheduleDefaults) => value.suggestedDate ?? ""],
+  ["startTime", (value: HostSessionAutomaticScheduleDefaults) => value.startTime],
+  ["endTime", (value: HostSessionAutomaticScheduleDefaults) => value.endTime],
+  ["locationLabel", (value: HostSessionAutomaticScheduleDefaults) => value.locationLabel],
+  ["accessScope", (value: HostSessionAutomaticScheduleDefaults) => value.accessScope],
+] as const;
+
+export function mergeUntouchedScheduleDefaults<T extends HostScheduleFormValues>(
+  form: T,
+  defaults: HostSessionScheduleDefaults,
+  touched: TouchedScheduleFields,
+): T {
+  return automaticFieldEntries.reduce(
+    (next, [field, read]) => touched.has(field) ? next : { ...next, [field]: read(defaults.automatic) },
+    form,
+  );
 }
 
 export function scheduleTimeHint(defaults: Pick<HostSessionScheduleDefaults, "hints">): string | null {

@@ -1,6 +1,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import type { UpcomingBookListItem } from "@/features/host/model/upcoming-book-list-model";
 import { UpcomingBookList } from "./upcoming-book-list";
 
@@ -211,5 +212,144 @@ describe("UpcomingBookList", () => {
       accessScope: "GUEST_READABLE",
       questionDeadlineOffsetDays: 1,
     });
+  });
+
+  it("does not show previous-meeting adoption when history is absent", async () => {
+    const user = userEvent.setup();
+    render(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={vi.fn()}
+        onCreateSession={vi.fn()}
+        scheduleDefaults={BUILTIN_SCHEDULE_DEFAULTS}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "모임 하나 더" }));
+
+    expect(screen.queryByRole("button", { name: "이전 온라인 모임 정보 사용" })).not.toBeInTheDocument();
+  });
+
+  it("adopts previous online meeting into create, then allows clearing before submit", async () => {
+    const user = userEvent.setup();
+    const onCreateSession = vi.fn();
+    render(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={vi.fn()}
+        onCreateSession={onCreateSession}
+        scheduleDefaults={{
+          automatic: {
+            startTime: "19:30",
+            endTime: "21:30",
+            locationLabel: "온라인",
+            accessScope: "HOST_ONLY",
+            suggestedDate: "2026-06-11",
+            questionDeadlineOffsetDays: 1,
+          },
+          previousOnlineMeeting: {
+            meetingUrl: "https://meeting.invalid/club",
+            meetingPasscode: "room-code-2048",
+          },
+          hints: [],
+        }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "모임 하나 더" }));
+    expect(screen.queryByText("room-code-2048")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "이전 온라인 모임 정보 사용" }));
+    expect(screen.queryByText("room-code-2048")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "현재 모임에 적용" }));
+
+    expect(screen.getByLabelText("미팅 URL")).toHaveValue("https://meeting.invalid/club");
+    expect(screen.getByLabelText("Passcode · 선택")).toHaveValue("room-code-2048");
+
+    await user.type(screen.getByLabelText("책 제목"), "새 책");
+    await user.type(screen.getByLabelText("저자"), "새 저자");
+    await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
+
+    expect(onCreateSession).toHaveBeenCalledWith(expect.objectContaining({
+      meetingUrl: "https://meeting.invalid/club",
+      meetingPasscode: "room-code-2048",
+    }));
+
+    await user.click(screen.getByRole("button", { name: "모임 하나 더" }));
+    await user.click(screen.getByRole("button", { name: "이전 온라인 모임 정보 사용" }));
+    await user.click(screen.getByRole("button", { name: "현재 모임에 적용" }));
+    await user.clear(screen.getByLabelText("미팅 URL"));
+    await user.clear(screen.getByLabelText("Passcode · 선택"));
+    await user.type(screen.getByLabelText("책 제목"), "다른 책");
+    await user.type(screen.getByLabelText("저자"), "다른 저자");
+    await user.click(screen.getByRole("button", { name: "목록에 넣기" }));
+
+    expect(onCreateSession).toHaveBeenLastCalledWith(expect.objectContaining({
+      meetingUrl: "",
+      meetingPasscode: "",
+    }));
+  });
+
+  it("does not overwrite a cleared start time when later defaults arrive", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={vi.fn()}
+        onCreateSession={vi.fn()}
+        scheduleDefaults={BUILTIN_SCHEDULE_DEFAULTS}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "모임 하나 더" }));
+    expect(screen.getByLabelText("시작 시간")).toHaveValue("20:00");
+    await user.clear(screen.getByLabelText("시작 시간"));
+
+    rerender(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={vi.fn()}
+        onCreateSession={vi.fn()}
+        scheduleDefaults={{
+          automatic: {
+            startTime: "19:30",
+            endTime: "21:30",
+            locationLabel: "온라인",
+            accessScope: "HOST_ONLY",
+            suggestedDate: "2026-06-11",
+            questionDeadlineOffsetDays: 1,
+          },
+          previousOnlineMeeting: null,
+          hints: [],
+        }}
+      />,
+    );
+
+    expect(screen.getByLabelText("시작 시간")).toHaveValue("");
+    expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-06-11");
+  });
+
+  it("shows a schedule-defaults warning and retry next to the form", async () => {
+    const user = userEvent.setup();
+    const onRetry = vi.fn();
+    render(
+      <UpcomingBookList
+        items={drafts}
+        onSaveAccessScope={vi.fn()}
+        onCreateSession={vi.fn()}
+        scheduleDefaults={BUILTIN_SCHEDULE_DEFAULTS}
+        scheduleDefaultsStatus="warning"
+        scheduleDefaultsWarning="기본 일정을 불러오지 못해 기본값을 사용합니다"
+        onRetryScheduleDefaults={onRetry}
+      />,
+    );
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent("기본 일정을 불러오지 못해 기본값을 사용합니다");
+    expect(alert.closest("section")).toHaveClass("rm-upcoming-book-list");
+    const retry = within(alert).getByRole("button", { name: "다시 시도" });
+    expect(retry).toBeVisible();
+    await user.click(retry);
+    expect(onRetry).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "모임 하나 더" })).toBeEnabled();
   });
 });

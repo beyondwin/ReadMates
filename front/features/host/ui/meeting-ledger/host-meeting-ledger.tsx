@@ -41,6 +41,9 @@ export function HostMeetingLedger({
   onCreateUpcomingSession = ignoreUpcomingCreate,
   upcomingPending = false,
   scheduleDefaults = null,
+  scheduleDefaultsStatus,
+  scheduleDefaultsWarning,
+  onRetryScheduleDefaults,
 }: {
   items: readonly MeetingListItem[];
   sessionId?: string;
@@ -51,6 +54,9 @@ export function HostMeetingLedger({
   onCreateUpcomingSession?: (input: UpcomingBookCreateInput) => void | Promise<void>;
   upcomingPending?: boolean;
   scheduleDefaults?: HostSessionScheduleDefaults | null;
+  scheduleDefaultsStatus?: "loading" | "ready" | "warning";
+  scheduleDefaultsWarning?: string | null;
+  onRetryScheduleDefaults?: () => void;
 }) {
   const active = resolveViewedMeeting(items, sessionId);
 
@@ -88,6 +94,9 @@ export function HostMeetingLedger({
       onCreateSession={onCreateUpcomingSession}
       pending={upcomingPending}
       scheduleDefaults={scheduleDefaults}
+      scheduleDefaultsStatus={scheduleDefaultsStatus}
+      scheduleDefaultsWarning={scheduleDefaultsWarning}
+      onRetryScheduleDefaults={onRetryScheduleDefaults}
       defaultAccessScope={scheduleDefaults?.automatic.accessScope}
       compact={active.phase === "after" && hasNextBooks}
     />

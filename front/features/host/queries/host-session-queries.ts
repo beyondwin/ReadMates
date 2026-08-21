@@ -47,7 +47,12 @@ import {
   normalizePageRequest,
   pageFromNormalizedPageRequest,
 } from "@/shared/query/cursor-pagination";
-import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
+import {
+  BUILTIN_SCHEDULE_DEFAULTS,
+  SCHEDULE_DEFAULTS_LOAD_WARNING,
+  type HostScheduleDefaultsLoadState,
+} from "@/features/host/model/host-schedule-defaults-model";
+import { isReadmatesApiError } from "@/shared/api/errors";
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
@@ -114,16 +119,60 @@ export function hostDashboardQuery(context?: ReadmatesApiContext) {
   });
 }
 
+export type ScheduleDefaultsErrorKind = "legacy-404" | "visible-error";
+
+export function classifyScheduleDefaultsError(error: unknown): { kind: ScheduleDefaultsErrorKind } {
+  return isReadmatesApiError(error) && error.status === 404
+    ? { kind: "legacy-404" }
+    : { kind: "visible-error" };
+}
+
+export function resolveHostScheduleDefaultsLoadState(query: {
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+  data: HostSessionScheduleDefaults | undefined;
+  refetch: () => unknown;
+}): HostScheduleDefaultsLoadState {
+  const retry = () => {
+    void query.refetch();
+  };
+  if (query.isPending) {
+    return {
+      defaults: BUILTIN_SCHEDULE_DEFAULTS,
+      status: "loading",
+      warning: null,
+      retry,
+    };
+  }
+  if (query.isError) {
+    if (classifyScheduleDefaultsError(query.error).kind === "legacy-404") {
+      return {
+        defaults: BUILTIN_SCHEDULE_DEFAULTS,
+        status: "ready",
+        warning: null,
+        retry,
+      };
+    }
+    return {
+      defaults: BUILTIN_SCHEDULE_DEFAULTS,
+      status: "warning",
+      warning: SCHEDULE_DEFAULTS_LOAD_WARNING,
+      retry,
+    };
+  }
+  return {
+    defaults: query.data ?? BUILTIN_SCHEDULE_DEFAULTS,
+    status: "ready",
+    warning: null,
+    retry,
+  };
+}
+
 export function hostSessionScheduleDefaultsQuery(context?: ReadmatesApiContext) {
-  return queryOptions<HostSessionScheduleDefaults>({
+  return queryOptions({
     queryKey: hostSessionKeys.scheduleDefaults(context),
-    queryFn: async () => {
-      try {
-        return await fetchHostSessionScheduleDefaults(context);
-      } catch {
-        return BUILTIN_SCHEDULE_DEFAULTS;
-      }
-    },
+    queryFn: () => fetchHostSessionScheduleDefaults(context),
     retry: false,
   });
 }

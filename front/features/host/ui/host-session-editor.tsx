@@ -52,6 +52,7 @@ import {
 } from "@/features/host/model/host-session-editor-form-state";
 import {
   scheduleTimeHint,
+  type HostScheduleDefaultsLoadState,
   type HostSessionScheduleDefaults,
 } from "@/features/host/model/host-schedule-defaults-model";
 import type { BasicSessionField } from "@/features/host/model/host-session-editor-form-state";
@@ -178,6 +179,7 @@ export default function HostSessionEditor({
   recordWorkflow,
   navigation,
   scheduleDefaults,
+  scheduleDefaultsLoadState,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -194,7 +196,9 @@ export default function HostSessionEditor({
     onChange: (next: HostSessionEditorLocation) => void;
   };
   scheduleDefaults?: HostSessionScheduleDefaults | null;
+  scheduleDefaultsLoadState?: HostScheduleDefaultsLoadState;
 }) {
+  const resolvedScheduleDefaults = scheduleDefaultsLoadState?.defaults ?? scheduleDefaults ?? null;
   if (session && !recordWorkflow) {
     throw new Error("recordWorkflow is required for persisted sessions");
   }
@@ -204,7 +208,7 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   const [formState, dispatch] = useReducer(
     hostSessionEditorReducer,
-    { session, scheduleDefaults },
+    { session, scheduleDefaults: resolvedScheduleDefaults },
     initialHostSessionEditorState,
   );
 
@@ -322,7 +326,7 @@ export default function HostSessionEditor({
   // ---------------------------------------------------------------------------
   const deadline = questionDeadlineLabelForForm(session, date, questionDeadlineOffsetDays);
   const isNewSession = session === null || session === undefined;
-  const timeHint = isNewSession ? scheduleTimeHint(scheduleDefaults ?? { hints: [] }) : null;
+  const timeHint = isNewSession ? scheduleTimeHint(resolvedScheduleDefaults ?? { hints: [] }) : null;
   const sessionImportVisibility = recordWorkflow?.snapshot.visibility ?? "HOST_ONLY";
   const sessionImportExpectedDraftRevision = recordWorkflow?.expectedDraftRevision ?? null;
   const sessionImportContextStale = Boolean(
@@ -379,11 +383,19 @@ export default function HostSessionEditor({
   // Stable dispatch helpers
   // ---------------------------------------------------------------------------
   useEffect(() => {
-    if (!isNewSession || !scheduleDefaults) {
+    if (!isNewSession || !resolvedScheduleDefaults) {
       return;
     }
-    dispatch({ type: "APPLY_SCHEDULE_DEFAULTS", defaults: scheduleDefaults });
-  }, [isNewSession, scheduleDefaults]);
+    dispatch({ type: "APPLY_SCHEDULE_DEFAULTS", defaults: resolvedScheduleDefaults });
+  }, [isNewSession, resolvedScheduleDefaults]);
+
+  const onAdoptPreviousOnlineMeeting = useCallback((next: { meetingUrl: string; meetingPasscode: string }) => {
+    dispatch({
+      type: "ADOPT_PREVIOUS_ONLINE_MEETING",
+      meetingUrl: next.meetingUrl,
+      meetingPasscode: next.meetingPasscode,
+    });
+  }, []);
 
   const setField = useCallback((key: BasicSessionField, value: string) => {
     dispatch({ type: "SET_FIELD", key, value });
@@ -1006,6 +1018,21 @@ export default function HostSessionEditor({
                     onLocationLabelChange={onLocationLabelChange}
                     onMeetingUrlChange={onMeetingUrlChange}
                     onMeetingPasscodeChange={onMeetingPasscodeChange}
+                    previousOnlineMeeting={isNewSession
+                      ? resolvedScheduleDefaults?.previousOnlineMeeting ?? null
+                      : null}
+                    scheduleDefaultsStatus={isNewSession
+                      ? scheduleDefaultsLoadState?.status ?? "ready"
+                      : "ready"}
+                    scheduleDefaultsWarning={isNewSession
+                      ? scheduleDefaultsLoadState?.warning ?? null
+                      : null}
+                    onRetryScheduleDefaults={isNewSession
+                      ? scheduleDefaultsLoadState?.retry
+                      : undefined}
+                    onAdoptPreviousOnlineMeeting={isNewSession
+                      ? onAdoptPreviousOnlineMeeting
+                      : undefined}
                   />
                   <div hidden={activeSection !== "basic"} className="stack" style={{ "--stack": "16px" } as CSSProperties}>
                     <div className="row" style={{ justifyContent: "flex-end" }}>

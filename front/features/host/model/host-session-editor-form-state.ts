@@ -1,8 +1,11 @@
 import type { HostSessionDetailResponse } from "@/features/host/model/host-view-types";
 import type { AttendanceStatus } from "@/shared/model/readmates-types";
 import {
-  applyScheduleDefaults,
+  mergeUntouchedScheduleDefaults,
+  type HostScheduleFormValues,
   type HostSessionScheduleDefaults,
+  type ScheduleField,
+  type TouchedScheduleFields,
 } from "@/features/host/model/host-schedule-defaults-model";
 import {
   initialAttendanceStatuses,
@@ -47,6 +50,8 @@ export type HostSessionEditorFormState = {
 
   // Feedback document
   feedbackDocument: HostSessionFeedbackDocumentStatus;
+
+  touchedScheduleFields: TouchedScheduleFields;
 };
 
 // ---------------------------------------------------------------------------
@@ -101,7 +106,32 @@ export type HostSessionEditorAction =
   | {
       type: "APPLY_SCHEDULE_DEFAULTS";
       defaults: HostSessionScheduleDefaults;
+    }
+  | {
+      type: "ADOPT_PREVIOUS_ONLINE_MEETING";
+      meetingUrl: string;
+      meetingPasscode: string;
     };
+
+const basicFieldToScheduleField = {
+  date: "date",
+  time: "startTime",
+  locationLabel: "locationLabel",
+} as const satisfies Partial<Record<BasicSessionField, ScheduleField>>;
+
+function hostScheduleFormValuesFromState(state: HostSessionEditorFormState): HostScheduleFormValues {
+  return {
+    bookTitle: state.bookTitle,
+    bookAuthor: state.bookAuthor,
+    date: state.date,
+    startTime: state.time,
+    endTime: state.endTime,
+    locationLabel: state.locationLabel,
+    meetingUrl: state.meetingUrl,
+    meetingPasscode: state.meetingPasscode,
+    accessScope: "HOST_ONLY",
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Reducer
@@ -112,8 +142,17 @@ export function hostSessionEditorReducer(
   action: HostSessionEditorAction,
 ): HostSessionEditorFormState {
   switch (action.type) {
-    case "SET_FIELD":
-      return { ...state, [action.key]: action.value };
+    case "SET_FIELD": {
+      const scheduleField = action.key === "date" || action.key === "time" || action.key === "locationLabel"
+        ? basicFieldToScheduleField[action.key]
+        : undefined;
+      if (!scheduleField) {
+        return { ...state, [action.key]: action.value };
+      }
+      const touchedScheduleFields = new Set(state.touchedScheduleFields);
+      touchedScheduleFields.add(scheduleField);
+      return { ...state, [action.key]: action.value, touchedScheduleFields };
+    }
 
     case "SET_RECORD_VISIBILITY":
       return { ...state, recordVisibility: action.visibility };
@@ -140,6 +179,7 @@ export function hostSessionEditorReducer(
         sessionState: action.session.state,
         attendanceStatuses: initialAttendanceStatuses(action.session.attendees),
         feedbackDocument: initialFeedbackDocumentStatus(action.session),
+        touchedScheduleFields: new Set(),
       };
     }
 
@@ -174,27 +214,27 @@ export function hostSessionEditorReducer(
       };
 
     case "APPLY_SCHEDULE_DEFAULTS": {
-      const applied = applyScheduleDefaults({
-        bookTitle: state.bookTitle,
-        bookAuthor: state.bookAuthor,
-        date: state.date,
-        startTime: state.time,
-        endTime: state.endTime,
-        locationLabel: state.locationLabel,
-        meetingUrl: state.meetingUrl,
-        meetingPasscode: state.meetingPasscode,
-      }, action.defaults);
+      const applied = mergeUntouchedScheduleDefaults(
+        hostScheduleFormValuesFromState(state),
+        action.defaults,
+        state.touchedScheduleFields,
+      );
       return {
         ...state,
         date: applied.date,
         time: applied.startTime,
         endTime: applied.endTime,
         locationLabel: applied.locationLabel,
-        meetingUrl: applied.meetingUrl,
-        meetingPasscode: applied.meetingPasscode,
         questionDeadlineOffsetDays: action.defaults.automatic.questionDeadlineOffsetDays,
       };
     }
+
+    case "ADOPT_PREVIOUS_ONLINE_MEETING":
+      return {
+        ...state,
+        meetingUrl: action.meetingUrl,
+        meetingPasscode: action.meetingPasscode,
+      };
   }
 }
 
@@ -215,7 +255,7 @@ export function initialHostSessionEditorState(
   const resolvedDefaults = init.scheduleDefaults ?? null;
   const prefillMode = !session && resolvedDefaults !== null;
   const applied = prefillMode && resolvedDefaults
-    ? applyScheduleDefaults({
+    ? mergeUntouchedScheduleDefaults({
       bookTitle: values.bookTitle,
       bookAuthor: values.bookAuthor,
       date: "",
@@ -224,7 +264,8 @@ export function initialHostSessionEditorState(
       locationLabel: "",
       meetingUrl: "",
       meetingPasscode: "",
-    }, resolvedDefaults)
+      accessScope: "HOST_ONLY",
+    }, resolvedDefaults, new Set())
     : null;
 
   return {
@@ -247,5 +288,6 @@ export function initialHostSessionEditorState(
     displaySessionSnapshot: null,
     attendanceStatuses: initialAttendanceStatuses(session?.attendees),
     feedbackDocument: initialFeedbackDocumentStatus(session),
+    touchedScheduleFields: new Set(),
   };
 }

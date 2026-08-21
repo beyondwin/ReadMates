@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   applyScheduleDefaults,
   BUILTIN_SCHEDULE_DEFAULTS,
+  mergeUntouchedScheduleDefaults,
   resolvedScheduleDefaults,
   scheduleTimeHint,
+  type HostScheduleFormValues,
 } from "./host-schedule-defaults-model";
 import {
   normalizeHostSessionScheduleDefaults,
@@ -121,6 +123,66 @@ describe("builtin schedule defaults", () => {
     expect(resolvedScheduleDefaults(null)).toEqual(BUILTIN_SCHEDULE_DEFAULTS);
     expect(resolvedScheduleDefaults(undefined)).toEqual(BUILTIN_SCHEDULE_DEFAULTS);
     expect(resolvedScheduleDefaults(clubDefaults)).toEqual(clubDefaults);
+  });
+});
+
+describe("mergeUntouchedScheduleDefaults", () => {
+  const blankForm: HostScheduleFormValues = {
+    bookTitle: "새 책",
+    bookAuthor: "새 저자",
+    date: "",
+    startTime: "",
+    endTime: "",
+    locationLabel: "",
+    meetingUrl: "",
+    meetingPasscode: "",
+    accessScope: "HOST_ONLY",
+  };
+
+  it("fills untouched automatic fields including an empty suggested date", () => {
+    expect(mergeUntouchedScheduleDefaults(blankForm, clubDefaults, new Set())).toEqual({
+      ...blankForm,
+      date: "2026-06-11",
+      startTime: "19:30",
+      endTime: "21:30",
+      locationLabel: "온라인",
+      accessScope: "GUEST_READABLE",
+    });
+  });
+
+  it("never overwrites a user-edited or explicitly cleared field", () => {
+    const next = mergeUntouchedScheduleDefaults(
+      {
+        ...blankForm,
+        date: "",
+        startTime: "18:00",
+        locationLabel: "",
+      },
+      clubDefaults,
+      new Set(["date", "locationLabel"]),
+    );
+
+    expect(next.date).toBe("");
+    expect(next.startTime).toBe("19:30");
+    expect(next.locationLabel).toBe("");
+    expect(next.endTime).toBe("21:30");
+  });
+
+  it("does not copy previous online meeting url or passcode into automatic fields", () => {
+    const next = mergeUntouchedScheduleDefaults(
+      blankForm,
+      {
+        ...clubDefaults,
+        previousOnlineMeeting: {
+          meetingUrl: "https://meeting.invalid/club",
+          meetingPasscode: "room-code-2048",
+        },
+      },
+      new Set(),
+    );
+
+    expect(next.meetingUrl).toBe("");
+    expect(next.meetingPasscode).toBe("");
   });
 });
 
