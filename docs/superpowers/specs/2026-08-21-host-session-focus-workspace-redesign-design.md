@@ -281,7 +281,7 @@ UI는 먼저 결과를 보여 줄 수 있지만 서버 실패 시 이전 값으�
 - 기본 정보·출석의 immutable change snapshot
 - change restore preview/commit endpoint와 optimistic concurrency 검사
 - 되돌릴 수 있는 기존 mutation 응답의 `changeId` 연결
-- BFF path allowlist와 frontend contract 갱신
+- 기존 generic BFF proxy를 유지하고 새 host mutation이 same-origin·host client-contract 검사를 그대로 통과하는지 회귀 검증
 
 복원은 현재 club의 host만 실행할 수 있다. browser가 보낸 내부 club header를 신뢰하지 않는다. 삭제·복원 query, lifecycle singleton, 멤버/게스트 current/upcoming, 공개 기록 query 모두 `deleted_at` 조건을 명시적으로 검증한다.
 
@@ -377,7 +377,7 @@ Server:
 - record revision restore 회귀
 - lifecycle·guest/public exposure 회귀
 
-Acceptance matrix는 Session lifecycle, UI/runtime state, Actor/authorization, Persistence/migration, Guest/public exposure를 선택한다. BFF에 새 path가 생기므로 route allowlist와 auth 회귀도 포함한다.
+Acceptance matrix는 Session lifecycle, UI/runtime state, Actor/authorization, Persistence/migration, Guest/public exposure를 선택한다. 새 host mutation path가 기존 generic BFF proxy의 same-origin·host client-contract 경계를 통과하므로 BFF·auth 회귀도 포함한다.
 
 구현 완료 전 최소 명령:
 
