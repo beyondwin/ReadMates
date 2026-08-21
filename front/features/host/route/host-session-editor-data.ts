@@ -7,6 +7,9 @@ import {
   hostSessionDetailQuery,
   hostSessionListQuery,
   hostSessionManualDispatchesQuery,
+  hostSessionTrashDetailQuery,
+  isHostSessionNotFoundError,
+  isHostSessionTrashExpiredError,
 } from "@/features/host/queries/host-session-queries";
 import {
   hostSessionRecordEditorQuery,
@@ -21,6 +24,7 @@ const EDITOR_HISTORY_PAGE_LIMIT = 30;
 
 export type HostSessionEditorRouteData = {
   sessionId: string;
+  mode: "active" | "trash";
 };
 
 export function hostSessionEditorLoaderFactory(client: QueryClient) {
@@ -33,8 +37,23 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
       throw new Error("Missing host session id");
     }
 
+    try {
+      await client.fetchQuery(hostSessionDetailQuery(params.sessionId, context));
+    } catch (error) {
+      if (!isHostSessionNotFoundError(error)) {
+        throw error;
+      }
+      try {
+        await client.fetchQuery(hostSessionTrashDetailQuery(params.sessionId, context));
+      } catch (trashError) {
+        if (!isHostSessionTrashExpiredError(trashError)) {
+          throw trashError;
+        }
+      }
+      return { sessionId: params.sessionId, mode: "trash" };
+    }
+
     await Promise.all([
-      client.fetchQuery(hostSessionDetailQuery(params.sessionId, context)),
       client.fetchQuery(hostSessionManualDispatchesQuery(
         { sessionId: params.sessionId, page: { limit: EDITOR_MANUAL_DISPATCH_PAGE_LIMIT } },
         context,
@@ -52,7 +71,7 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
       }, context)).catch(() => null),
     ]);
 
-    return { sessionId: params.sessionId };
+    return { sessionId: params.sessionId, mode: "active" };
   };
 }
 

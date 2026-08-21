@@ -22,7 +22,8 @@ export type HostSessionHistoryType =
   | "SESSION_REOPENED"
   | "SESSION_UNPUBLISHED"
   | "SESSION_RETURNED_TO_DRAFT"
-  | "SESSION_DELETED";
+  | "SESSION_DELETED"
+  | "SESSION_RESTORED";
 
 export const HOST_SESSION_REVERSE_REASON_CODES = [
   "ACCIDENTAL_TRANSITION",
@@ -264,6 +265,7 @@ export const HostSessionHistoryPageResponseSchema = z.object({
       "SESSION_UNPUBLISHED",
       "SESSION_RETURNED_TO_DRAFT",
       "SESSION_DELETED",
+      "SESSION_RESTORED",
     ]),
     createdAt: z.string(),
     actorMembershipId: z.string(),

@@ -31,6 +31,7 @@ const items: HostSessionLedgerItem[] = [
 ];
 
 const filters = {
+  view: "active",
   search: "",
   state: null,
   recordStatus: null,
@@ -87,6 +88,118 @@ describe("HostSessionLedger", () => {
       "href",
       "/app/host/sessions/new",
     );
+    expect(screen.getByRole("link", { name: "휴지통" })).toHaveAttribute("href", "?view=trash");
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+  });
+
+  it("hides active filters in trash view and restores a row inline", async () => {
+    const user = userEvent.setup();
+    const onRestore = vi.fn();
+    render(
+      <HostSessionLedger
+        items={[]}
+        trashItems={[
+          {
+            sessionId: "trashed-7",
+            sessionNumber: 7,
+            title: "휴지통 책",
+            state: "DRAFT",
+            deletedAtLabel: "삭제 2026.08.21 19:00",
+            remainingCopy: "남은 복원 기간 6일",
+          },
+        ]}
+        filters={{ ...filters, view: "trash" }}
+        nextCursor="trash-next"
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onRestore={onRestore}
+        trashHref="?view=trash"
+        activeHref="/app/host/sessions"
+      />,
+    );
+
+    expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: "세션 상태" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "새 세션 만들기" })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "세션 기록 장부" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions",
+    );
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getByText("휴지통 책")).toBeVisible();
+    expect(screen.getByText("삭제 2026.08.21 19:00")).toBeVisible();
+    expect(screen.getByText("남은 복원 기간 6일")).toBeVisible();
+    await user.click(screen.getAllByRole("button", { name: "7회차 복원" })[0]!);
+    expect(onRestore).toHaveBeenCalledWith("trashed-7");
+    expect(screen.getByRole("button", { name: "더 보기" })).toBeVisible();
+  });
+
+  it("disables expired trash restore and keeps 다시 시도 on other errors", async () => {
+    const user = userEvent.setup();
+    const onRetryRestore = vi.fn();
+    const { rerender } = render(
+      <HostSessionLedger
+        items={[]}
+        trashItems={[
+          {
+            sessionId: "expired-7",
+            sessionNumber: 7,
+            title: "만료된 책",
+            state: "OPEN",
+            deletedAtLabel: "삭제 2026.08.14 19:00",
+            remainingCopy: "오늘까지 복원할 수 있습니다.",
+            restoreDisabled: true,
+            restoreDisabledReason: "복원 기간이 지났습니다.",
+          },
+        ]}
+        filters={{ ...filters, view: "trash" }}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onRestore={vi.fn()}
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: "7회차 복원" })[0]).toBeDisabled();
+    expect(screen.getByText("복원 기간이 지났습니다.")).toBeVisible();
+
+    rerender(
+      <HostSessionLedger
+        items={[]}
+        trashItems={[
+          {
+            sessionId: "expired-7",
+            sessionNumber: 7,
+            title: "만료된 책",
+            state: "OPEN",
+            deletedAtLabel: "삭제 2026.08.14 19:00",
+            remainingCopy: "남은 복원 기간 2일",
+            restoreError: "모임을 복원하지 못했습니다.",
+            restoreConflict: {
+              openSessionHref: "/app/host/sessions/open-session",
+              message: "이미 진행 중인 모임이 있습니다. 그 모임을 마치거나 모임 전으로 되돌린 뒤 다시 시도하세요.",
+            },
+          },
+        ]}
+        filters={{ ...filters, view: "trash" }}
+        nextCursor={null}
+        loadingMore={false}
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        onRestore={vi.fn()}
+        onRetryRestore={onRetryRestore}
+      />,
+    );
+
+    expect(screen.getByText("만료된 책")).toBeVisible();
+    expect(screen.getByRole("link", { name: "진행 중인 모임 열기" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions/open-session",
+    );
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetryRestore).toHaveBeenCalledWith("expired-7");
   });
 
   it("uses incomplete and complete record actions when no draft exists", () => {

@@ -7,6 +7,10 @@ vi.mock("@/features/host/api/host-api", () => ({
   fetchHostSessionDeletionPreview: vi.fn(),
   fetchHostSessionScheduleDefaults: vi.fn(),
   fetchManualNotificationDispatches: vi.fn(),
+  fetchHostSessionTrashList: vi.fn(),
+  fetchHostSessionTrash: vi.fn(),
+  restoreHostSession: vi.fn(),
+  deleteHostSession: vi.fn(),
 }));
 
 import {
@@ -16,7 +20,14 @@ import {
   fetchHostSessionDeletionPreview,
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
+  fetchHostSessionTrashList,
+  fetchHostSessionTrash,
+  restoreHostSession,
 } from "@/features/host/api/host-api";
+import {
+  parseHostSessionDeletionResponse,
+  parseHostSessionTrashPage,
+} from "@/features/host/api/host-contracts";
 import { ReadmatesApiError } from "@/shared/api/errors";
 import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-defaults-model";
 import {
@@ -28,12 +39,17 @@ import {
   hostSessionListQuery,
   hostSessionScheduleDefaultsQuery,
   hostSessionManualDispatchesQuery,
+  hostSessionTrashDetailQuery,
+  hostSessionTrashListQuery,
   invalidateHostCurrentSession,
   invalidateHostSessionDashboard,
   invalidateHostSessionDetail,
   invalidateHostSessionLists,
   invalidateHostSessionManualDispatches,
   invalidateHostSessionSurface,
+  invalidateHostSessionTrash,
+  isHostSessionNotFoundError,
+  isHostSessionTrashExpiredError,
   resolveHostScheduleDefaultsLoadState,
 } from "./host-session-queries";
 
@@ -193,6 +209,76 @@ describe("host session query keys", () => {
     expect(options.gcTime).toBe(0);
   });
 
+  it("scopes trash list and detail keys by club slug", () => {
+    expect(hostSessionKeys.trashList({ limit: 50 }, { clubSlug: "reading-sai" })).toEqual([
+      "host",
+      "sessions",
+      "scope",
+      "reading-sai",
+      "trash",
+      { limit: 50, cursor: null },
+    ]);
+    expect(hostSessionKeys.trashDetail("session-7", { clubSlug: "reading-sai" })).toEqual([
+      "host",
+      "sessions",
+      "scope",
+      "reading-sai",
+      "trashDetail",
+      "session-7",
+    ]);
+  });
+
+  it("query functions call trash list, detail, and restore wrappers with scoped context", async () => {
+    vi.mocked(fetchHostSessionTrashList).mockResolvedValue({ items: [], nextCursor: null });
+    vi.mocked(fetchHostSessionTrash).mockResolvedValue(trashItem());
+    vi.mocked(restoreHostSession).mockResolvedValue(sessionDetail());
+
+    await runQuery(hostSessionTrashListQuery({ limit: 50 }, { clubSlug: "reading-sai" }));
+    await runQuery(hostSessionTrashDetailQuery("session-7", { clubSlug: "reading-sai" }));
+
+    expect(fetchHostSessionTrashList).toHaveBeenCalledWith(
+      { clubSlug: "reading-sai" },
+      { limit: 50 },
+    );
+    expect(fetchHostSessionTrash).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
+    await restoreHostSession("session-7", { clubSlug: "reading-sai" });
+    expect(restoreHostSession).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
+  });
+
+  it("parses DELETE trash payloads from trashed, not deleted", () => {
+    expect(parseHostSessionDeletionResponse({
+      sessionId: "session-7",
+      sessionNumber: 7,
+      title: "7회차 모임",
+      state: "DRAFT",
+      trashed: true,
+      deletedAt: "2026-08-21T10:00:00Z",
+      purgeAfter: "2026-08-28T10:00:00Z",
+      counts: emptyCounts(),
+    })).toMatchObject({
+      sessionId: "session-7",
+      trashed: true,
+      deletedAt: "2026-08-21T10:00:00Z",
+      purgeAfter: "2026-08-28T10:00:00Z",
+    });
+    expect(() => parseHostSessionDeletionResponse({
+      sessionId: "session-7",
+      sessionNumber: 7,
+      deleted: true,
+      counts: emptyCounts(),
+    })).toThrow();
+  });
+
+  it("parses trash list pages with cursor metadata", () => {
+    expect(parseHostSessionTrashPage({
+      items: [trashItem()],
+      nextCursor: "cursor-2",
+    })).toEqual({
+      items: [trashItem()],
+      nextCursor: "cursor-2",
+    });
+  });
+
   it("invalidates each host session surface with scoped keys", async () => {
     const client = {
       invalidateQueries: vi.fn().mockResolvedValue(undefined),
@@ -204,6 +290,7 @@ describe("host session query keys", () => {
     await invalidateHostSessionDashboard(client as never, { clubSlug: "reading-sai" });
     await invalidateHostSessionManualDispatches(client as never, { clubSlug: "reading-sai" });
     await invalidateHostSessionSurface(client as never, { clubSlug: "reading-sai" });
+    await invalidateHostSessionTrash(client as never, { clubSlug: "reading-sai" });
 
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: hostSessionKeys.lists({ clubSlug: "reading-sai" }),
@@ -223,6 +310,24 @@ describe("host session query keys", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: hostSessionKeys.scope({ clubSlug: "reading-sai" }),
     });
+    expect(client.invalidateQueries).toHaveBeenCalledWith({
+      queryKey: hostSessionKeys.trashRoot({ clubSlug: "reading-sai" }),
+    });
+  });
+});
+
+describe("host session trash error classification", () => {
+  it("treats only exact 404 as a missing active session", () => {
+    expect(isHostSessionNotFoundError(apiError(404))).toBe(true);
+  });
+
+  it.each([401, 403, 410, 500])("does not treat %s as a missing active session", (status) => {
+    expect(isHostSessionNotFoundError(apiError(status))).toBe(false);
+  });
+
+  it("treats 410 HOST_SESSION_TRASH_EXPIRED as restore expiry", () => {
+    expect(isHostSessionTrashExpiredError(apiError(410, "HOST_SESSION_TRASH_EXPIRED"))).toBe(true);
+    expect(isHostSessionTrashExpiredError(apiError(404))).toBe(false);
   });
 });
 
@@ -294,14 +399,64 @@ describe("resolveHostScheduleDefaultsLoadState", () => {
   });
 });
 
-function apiError(status: number) {
+function apiError(status: number, code = "TEST_ERROR") {
   return new ReadmatesApiError(
     {
-      code: "TEST_ERROR",
+      code,
       message: "test",
       status,
       fallback: false,
     },
-    new Response(JSON.stringify({ code: "TEST_ERROR", message: "test", status }), { status }),
+    new Response(JSON.stringify({ code, message: "test", status }), { status }),
   );
+}
+
+function emptyCounts() {
+  return {
+    participants: 0,
+    rsvpResponses: 0,
+    questions: 0,
+    checkins: 0,
+    oneLineReviews: 0,
+    longReviews: 0,
+    highlights: 0,
+    publications: 0,
+    feedbackReports: 0,
+    feedbackDocuments: 0,
+  };
+}
+
+function trashItem() {
+  return {
+    sessionId: "session-7",
+    sessionNumber: 7,
+    title: "7회차 모임",
+    state: "DRAFT" as const,
+    deletedAt: "2026-08-21T10:00:00Z",
+    purgeAfter: "2026-08-28T10:00:00Z",
+  };
+}
+
+function sessionDetail() {
+  return {
+    sessionId: "session-7",
+    sessionNumber: 7,
+    title: "7회차 모임",
+    bookTitle: "테스트 책",
+    bookAuthor: "테스트 저자",
+    bookLink: null,
+    bookImageUrl: null,
+    locationLabel: "온라인",
+    meetingUrl: null,
+    meetingPasscode: null,
+    date: "2026-05-20",
+    startTime: "20:00",
+    endTime: "22:00",
+    questionDeadlineAt: "2026-05-19T14:59:00Z",
+    visibility: "HOST_ONLY" as const,
+    publication: null,
+    state: "DRAFT" as const,
+    attendees: [],
+    feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
+  };
 }

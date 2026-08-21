@@ -3,6 +3,7 @@ import type {
   HostAttendanceResponse,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
+  HostSessionDetailResponse,
   SessionImportCommitResponse,
   SessionImportPreviewResponse,
   SessionImportRequest,
@@ -25,6 +26,7 @@ export type AttendanceWriteState = {
 export type HostSessionEditorActions = {
   loadDeletionPreview: (sessionId: string) => Promise<HostSessionDeletionPreviewResponse>;
   deleteSession: (sessionId: string) => Promise<HostSessionDeletionResponse>;
+  restoreSession: (sessionId: string) => Promise<HostSessionDetailResponse>;
   openSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   closeSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;
   publishSession: (sessionId: string) => Promise<HostSessionLifecycleResult>;

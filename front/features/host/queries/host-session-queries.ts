@@ -9,7 +9,10 @@ import {
   fetchHostSessionClosingStatus,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
+  fetchHostSessionTrash,
+  fetchHostSessionTrashList,
   fetchHostSessions,
+  restoreHostSession,
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
   openHostSession,
@@ -27,8 +30,11 @@ import type {
   CurrentSessionResponse,
   HostAttendanceUpdate,
   HostSessionClosingStatusResponse,
+  HostSessionDeletionResponse,
   HostSessionDetailResponse,
   HostSessionListPage,
+  HostSessionTrashItem,
+  HostSessionTrashPage,
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionScheduleDefaults,
@@ -102,6 +108,12 @@ export const hostSessionKeys = {
     [...hostSessionKeys.manualDispatchesRoot(context), normalizeManualDispatchesRequest(request)] as const,
   scheduleDefaults: (context?: ReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "scheduleDefaults"] as const,
+  trashRoot: (context?: ReadmatesApiContext) =>
+    [...hostSessionKeys.scope(context), "trash"] as const,
+  trashList: (page?: PageRequest, context?: ReadmatesApiContext) =>
+    [...hostSessionKeys.trashRoot(context), normalizePageRequest(page)] as const,
+  trashDetail: (sessionId: string, context?: ReadmatesApiContext) =>
+    [...hostSessionKeys.scope(context), "trashDetail", sessionId] as const,
 } as const;
 
 export function hostCurrentSessionQuery(context?: ReadmatesApiContext) {
@@ -191,6 +203,30 @@ export function hostSessionClosingStatusQuery(sessionId: string, context?: Readm
   });
 }
 
+export function hostSessionTrashListQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+  const normalized = normalizePageRequest(page);
+  return queryOptions<HostSessionTrashPage>({
+    queryKey: hostSessionKeys.trashList(page, context),
+    queryFn: () => fetchHostSessionTrashList(context, pageFromNormalizedPageRequest(normalized)),
+  });
+}
+
+export function hostSessionTrashDetailQuery(sessionId: string, context?: ReadmatesApiContext) {
+  return queryOptions<HostSessionTrashItem>({
+    queryKey: hostSessionKeys.trashDetail(sessionId, context),
+    queryFn: () => fetchHostSessionTrash(sessionId, context),
+  });
+}
+
+export function isHostSessionNotFoundError(error: unknown): boolean {
+  return isReadmatesApiError(error) && error.status === 404;
+}
+
+export function isHostSessionTrashExpiredError(error: unknown): boolean {
+  return isReadmatesApiError(error)
+    && (error.status === 410 || error.code === "HOST_SESSION_TRASH_EXPIRED");
+}
+
 export function hostSessionDeletionPreviewQuery(sessionId: string, context?: ReadmatesApiContext) {
   // Each click currently issues a fresh request; opt out of result retention so the
   // delete-preview UX continues to reflect the server state at click time even after
@@ -244,6 +280,21 @@ export function invalidateHostSessionManualDispatches(client: QueryClient, conte
 
 export function invalidateHostSessionSurface(client: QueryClient, context?: ReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.scope(context) });
+}
+
+export function invalidateHostSessionTrash(client: QueryClient, context?: ReadmatesApiContext) {
+  return client.invalidateQueries({ queryKey: hostSessionKeys.trashRoot(context) });
+}
+
+function toTrashItem(result: HostSessionDeletionResponse | HostSessionTrashItem): HostSessionTrashItem {
+  return {
+    sessionId: result.sessionId,
+    sessionNumber: result.sessionNumber,
+    title: result.title,
+    state: result.state,
+    deletedAt: result.deletedAt,
+    purgeAfter: result.purgeAfter,
+  };
 }
 
 function invalidateOk(response: Response, invalidate: () => Promise<unknown>) {
@@ -301,15 +352,29 @@ export function useUpdateHostSessionMutation(context?: ReadmatesApiContext) {
 export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (sessionId: string) => deleteHostSession(sessionId),
-    onSuccess: async (_result, sessionId) => {
+    mutationFn: (sessionId: string) => deleteHostSession(sessionId, context),
+    onSuccess: async (result, sessionId) => {
       client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
+      client.setQueryData(hostSessionKeys.trashDetail(sessionId, context), toTrashItem(result));
       await Promise.all([
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
         invalidateHostCurrentSession(client, context),
         invalidateHostSessionManualDispatches(client, context),
+        invalidateHostSessionTrash(client, context),
       ]);
+    },
+  });
+}
+
+export function useRestoreHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (sessionId: string) => restoreHostSession(sessionId, context),
+    onSuccess: async (detail, sessionId) => {
+      client.setQueryData(hostSessionKeys.detail(sessionId, context), detail);
+      client.removeQueries({ queryKey: hostSessionKeys.trashDetail(sessionId, context) });
+      await invalidateHostSessionSurface(client, context);
     },
   });
 }

@@ -20,6 +20,20 @@ type LedgerLinkProps = {
 
 export type HostSessionLedgerLinkComponent = ComponentType<LedgerLinkProps>;
 
+export type HostSessionLedgerTrashItem = {
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  state: HostSessionLedgerItem["state"];
+  deletedAtLabel: string;
+  remainingCopy: string;
+  restoreDisabled?: boolean;
+  restoreDisabledReason?: string | null;
+  restoreError?: string | null;
+  restoreConflict?: { openSessionHref: string; message: string } | null;
+  restoring?: boolean;
+};
+
 export type HostSessionLedgerProps = {
   items: HostSessionLedgerItem[];
   filters: HostSessionLedgerFilters;
@@ -33,6 +47,11 @@ export type HostSessionLedgerProps = {
   loadMoreError?: string | null;
   onRetry?: () => void;
   newSessionHref?: string;
+  trashItems?: HostSessionLedgerTrashItem[];
+  trashHref?: string;
+  activeHref?: string;
+  onRestore?: (sessionId: string) => void;
+  onRetryRestore?: (sessionId: string) => void;
 };
 
 function DefaultLink({ to, children, ...props }: LedgerLinkProps) {
@@ -267,6 +286,72 @@ function MobileLedger({
   );
 }
 
+function TrashLedger({
+  items,
+  onRestore,
+  onRetryRestore,
+  LinkComponent,
+}: {
+  items: HostSessionLedgerTrashItem[];
+  onRestore?: (sessionId: string) => void;
+  onRetryRestore?: (sessionId: string) => void;
+  LinkComponent: HostSessionLedgerLinkComponent;
+}) {
+  return (
+    <div className="stack" style={{ "--stack": "10px", minWidth: 0 } as React.CSSProperties}>
+      {items.map((item) => (
+        <article
+          key={item.sessionId}
+          data-session-id={item.sessionId}
+          className="m-card"
+          style={{ minWidth: 0, overflowWrap: "anywhere" }}
+        >
+          <div className="eyebrow">No.{item.sessionNumber} · {stateLabel(item.state)}</div>
+          <h2 className="h4 editorial" style={{ margin: "5px 0 2px", overflowWrap: "anywhere" }}>
+            {item.title}
+          </h2>
+          <div className="tiny" style={{ marginTop: 8 }}>{item.deletedAtLabel}</div>
+          <div className="tiny" style={{ marginTop: 4 }}>{item.remainingCopy}</div>
+          {item.restoreDisabledReason ? (
+            <p className="small" role="alert" style={{ margin: "10px 0 0" }}>{item.restoreDisabledReason}</p>
+          ) : null}
+          {item.restoreError ? (
+            <p className="small" role="alert" style={{ margin: "10px 0 0" }}>{item.restoreError}</p>
+          ) : null}
+          {item.restoreConflict ? (
+            <p className="small" style={{ margin: "10px 0 0" }}>
+              {item.restoreConflict.message}{" "}
+              <LinkComponent to={item.restoreConflict.openSessionHref}>
+                진행 중인 모임 열기
+              </LinkComponent>
+            </p>
+          ) : null}
+          <div className="row" style={{ gap: 8, marginTop: 12, flexWrap: "wrap" }}>
+            <button
+              className="btn btn-primary btn-sm"
+              type="button"
+              disabled={item.restoreDisabled || item.restoring}
+              aria-label={`${item.sessionNumber}회차 복원`}
+              onClick={() => onRestore?.(item.sessionId)}
+            >
+              복원
+            </button>
+            {item.restoreError && onRetryRestore ? (
+              <button
+                className="btn btn-ghost btn-sm"
+                type="button"
+                onClick={() => onRetryRestore(item.sessionId)}
+              >
+                다시 시도
+              </button>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
 export function HostSessionLedger({
   items,
   filters,
@@ -280,27 +365,63 @@ export function HostSessionLedger({
   loadMoreError = null,
   onRetry,
   newSessionHref = "/app/host/sessions/new",
+  trashItems = [],
+  trashHref = "?view=trash",
+  activeHref = "/app/host/sessions",
+  onRestore,
+  onRetryRestore,
 }: HostSessionLedgerProps) {
+  const trashView = filters.view === "trash";
+  const visibleItems = trashView ? trashItems : items;
+
   return (
     <div className="stack" style={{ "--stack": "16px", minWidth: 0 } as React.CSSProperties}>
       <div className="row-between" style={{ gap: 10, flexWrap: "wrap", minWidth: 0 }}>
         <span className="small" style={{ color: "var(--text-2)" }}>
-          회차별 기록과 저장된 초안을 확인합니다.
+          {trashView
+            ? "삭제된 모임을 남은 기간 동안 복원할 수 있습니다."
+            : "회차별 기록과 저장된 초안을 확인합니다."}
         </span>
-        <LinkComponent to={newSessionHref} className="btn btn-primary btn-sm">
-          새 세션 만들기
-        </LinkComponent>
+        <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
+          {trashView ? (
+            <LinkComponent to={activeHref} className="btn btn-quiet btn-sm">
+              세션 기록 장부
+            </LinkComponent>
+          ) : (
+            <>
+              <LinkComponent to={trashHref} className="btn btn-quiet btn-sm">
+                휴지통
+              </LinkComponent>
+              <LinkComponent to={newSessionHref} className="btn btn-primary btn-sm">
+                새 세션 만들기
+              </LinkComponent>
+            </>
+          )}
+        </div>
       </div>
-      <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
+      {trashView ? null : (
+        <LedgerFilters key={filters.search} filters={filters} onFiltersChange={onFiltersChange} />
+      )}
       {errorMessage ? (
         <div className="surface-quiet" role="alert" style={{ padding: 18 }}>
           <p className="small" style={{ margin: 0 }}>{errorMessage}</p>
           {onRetry ? <button className="btn btn-ghost btn-sm" type="button" onClick={onRetry}>다시 시도</button> : null}
         </div>
       ) : loading ? (
-        <div className="surface-quiet small" role="status" style={{ padding: 18 }}>세션 기록을 불러오는 중입니다.</div>
-      ) : items.length === 0 ? (
-        <div className="surface-quiet small" style={{ padding: 18 }}>조건에 맞는 세션 기록이 없습니다.</div>
+        <div className="surface-quiet small" role="status" style={{ padding: 18 }}>
+          {trashView ? "휴지통을 불러오는 중입니다." : "세션 기록을 불러오는 중입니다."}
+        </div>
+      ) : visibleItems.length === 0 ? (
+        <div className="surface-quiet small" style={{ padding: 18 }}>
+          {trashView ? "휴지통이 비어 있습니다." : "조건에 맞는 세션 기록이 없습니다."}
+        </div>
+      ) : trashView ? (
+        <TrashLedger
+          items={trashItems}
+          onRestore={onRestore}
+          onRetryRestore={onRetryRestore}
+          LinkComponent={LinkComponent}
+        />
       ) : (
         <>
           <DesktopLedger items={items} LinkComponent={LinkComponent} />

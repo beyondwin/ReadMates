@@ -45,7 +45,8 @@ export type HostSessionHistoryItem = {
     | "SESSION_REOPENED"
     | "SESSION_UNPUBLISHED"
     | "SESSION_RETURNED_TO_DRAFT"
-    | "SESSION_DELETED";
+    | "SESSION_DELETED"
+    | "SESSION_RESTORED";
   changedFields: readonly string[];
   revisionId: string | null;
   revisionVersion: number | null;
@@ -142,7 +143,8 @@ const historyTypeLabels: Record<HostSessionHistoryItem["type"], string> = {
   SESSION_REOPENED: "다시 진행 중으로",
   SESSION_UNPUBLISHED: "공개 취소",
   SESSION_RETURNED_TO_DRAFT: "모임 전으로 되돌리기",
-  SESSION_DELETED: "모임 삭제",
+  SESSION_DELETED: "휴지통으로 이동",
+  SESSION_RESTORED: "모임 복원",
 };
 
 const changedFieldLabels: Record<string, string> = {

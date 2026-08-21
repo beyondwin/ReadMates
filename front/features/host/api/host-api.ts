@@ -26,6 +26,8 @@ import type {
   HostNotificationStatus,
   HostSessionDeletionPreviewResponse,
   HostSessionDeletionResponse,
+  HostSessionTrashItem,
+  HostSessionTrashPage,
   HostSessionClosingStatusResponse,
   HostSessionDetailResponse,
   HostSessionAccessScopeRequest,
@@ -57,6 +59,9 @@ import {
   HostSessionVisibilityUpdateResponseSchema,
   parseHostAttendanceResponse,
   parseHostSessionDetailResponse,
+  parseHostSessionDeletionResponse,
+  parseHostSessionTrashItem,
+  parseHostSessionTrashPage,
   parseHostMemberListPage,
   parseHostNotificationDeliveryListResponse,
   parseHostInvitationListPage,
@@ -251,6 +256,30 @@ export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApi
   return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, undefined, context).then(parseHostSessionDetailResponse);
 }
 
+export function fetchHostSessionTrashList(context?: ReadmatesApiContext, page?: PageRequest) {
+  return readmatesFetch<HostSessionTrashPage>(
+    `/api/host/sessions/trash${pagingSearchParams(page)}`,
+    undefined,
+    context,
+  ).then(parseHostSessionTrashPage);
+}
+
+export function fetchHostSessionTrash(sessionId: string, context?: ReadmatesApiContext) {
+  return readmatesFetch<HostSessionTrashItem>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/trash`,
+    undefined,
+    context,
+  ).then(parseHostSessionTrashItem);
+}
+
+export function restoreHostSession(sessionId: string, context?: ReadmatesApiContext) {
+  return readmatesFetch<HostSessionDetailResponse>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/restore`,
+    { method: "POST" },
+    context,
+  ).then(parseHostSessionDetailResponse);
+}
+
 export function fetchHostSessionClosingStatus(sessionId: string, context?: ReadmatesApiContext) {
   return readmatesFetch<HostSessionClosingStatusResponse>(
     `/api/host/sessions/${encodeURIComponent(sessionId)}/closing-status`,
@@ -286,10 +315,15 @@ export function fetchHostSessionDeletionPreview(
   );
 }
 
-export function deleteHostSession(sessionId: string): Promise<HostSessionDeletionResponse> {
-  return readmatesFetch<HostSessionDeletionResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, {
-    method: "DELETE",
-  });
+export function deleteHostSession(
+  sessionId: string,
+  context?: ReadmatesApiContext,
+): Promise<HostSessionDeletionResponse> {
+  return readmatesFetch<HostSessionDeletionResponse>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}`,
+    { method: "DELETE" },
+    context,
+  ).then(parseHostSessionDeletionResponse);
 }
 
 export async function saveHostSessionAttendance(

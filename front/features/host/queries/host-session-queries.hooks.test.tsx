@@ -20,6 +20,9 @@ vi.mock("@/features/host/api/host-api", () => ({
   unpublishHostSession: vi.fn(),
   updateHostSession: vi.fn(),
   fetchHostSessionScheduleDefaults: vi.fn(),
+  fetchHostSessionTrash: vi.fn(),
+  fetchHostSessionTrashList: vi.fn(),
+  restoreHostSession: vi.fn(),
 }));
 
 import {
@@ -280,7 +283,11 @@ describe("host session mutation hooks", () => {
     vi.mocked(deleteHostSession).mockResolvedValue({
       sessionId: "session-7",
       sessionNumber: 7,
-      deleted: true,
+      title: "7회차 모임",
+      state: "DRAFT",
+      trashed: true,
+      deletedAt: "2026-08-21T10:00:00Z",
+      purgeAfter: "2026-08-28T10:00:00Z",
       counts: {
         participants: 0,
         rsvpResponses: 0,
@@ -302,7 +309,7 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync("session-7");
     });
 
-    expect(deleteHostSession).toHaveBeenCalledWith("session-7");
+    expect(deleteHostSession).toHaveBeenCalledWith("session-7", context);
     expect(client.getQueryData(keys.detail)).toBeUndefined();
     expect(client.getQueryState(keys.detail)).toBeUndefined();
     expectInvalidated(client, [

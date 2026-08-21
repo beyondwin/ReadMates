@@ -1,3 +1,4 @@
+import type { Ref } from "react";
 import type { HostSessionWorkspaceView } from "@/features/host/model/host-session-workspace-model";
 import type { HostSessionEditorLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
 import { DefaultLinkComponent } from "@/features/host/ui/session-editor/session-editor-links";
@@ -19,6 +20,7 @@ export function WorkspaceHeader({
   historyOpen,
   onOpenBasic,
   onOpenHistory,
+  headingRef,
   LinkComponent = DefaultLinkComponent,
 }: {
   header: WorkspaceHeaderModel;
@@ -27,6 +29,7 @@ export function WorkspaceHeader({
   historyOpen: boolean;
   onOpenBasic: () => void;
   onOpenHistory: () => void;
+  headingRef?: Ref<HTMLHeadingElement>;
   LinkComponent?: HostSessionEditorLinkComponent;
 }) {
   const meta = [header.date, header.time, header.location].filter(Boolean).join(" · ");
@@ -43,7 +46,13 @@ export function WorkspaceHeader({
       ) : null}
       <div className="rm-host-session-workspace__identity">
         {numberLabel ? <span className="rm-host-session-workspace__number">{numberLabel}</span> : null}
-        <h1 className="h1 editorial rm-host-session-workspace__title">{header.title}</h1>
+        <h1
+          ref={headingRef}
+          tabIndex={-1}
+          className="h1 editorial rm-host-session-workspace__title"
+        >
+          {header.title}
+        </h1>
       </div>
       {meta ? (
         <p className="small rm-host-session-workspace__meta">{meta}</p>

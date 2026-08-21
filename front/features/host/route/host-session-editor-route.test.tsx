@@ -5,6 +5,16 @@ import { createMemoryRouter, MemoryRouter, Router } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { StrictMode, useState } from "react";
 
+const loaderApiMocks = vi.hoisted(() => ({
+  fetchHostSessionDetail: vi.fn(),
+  fetchHostSessionTrash: vi.fn(),
+  fetchHostSessions: vi.fn(),
+  fetchManualNotificationDispatches: vi.fn(),
+  fetchHostSessionRecordEditor: vi.fn(),
+  fetchHostSessionHistory: vi.fn(),
+  fetchHostSessionRecordLedger: vi.fn(),
+}));
+
 const routeMocks = vi.hoisted(() => ({
   apply: vi.fn(),
   rebase: vi.fn(),
@@ -115,6 +125,29 @@ vi.mock("@/features/host/api/host-session-recovery-api", () => ({
   restoreHostSessionChange: routeMocks.restoreChange,
 }));
 
+vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/api/host-api")>()),
+  fetchHostSessionDetail: loaderApiMocks.fetchHostSessionDetail,
+  fetchHostSessionTrash: loaderApiMocks.fetchHostSessionTrash,
+  fetchHostSessions: loaderApiMocks.fetchHostSessions,
+  fetchManualNotificationDispatches: loaderApiMocks.fetchManualNotificationDispatches,
+}));
+
+vi.mock("@/features/host/api/host-session-record-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/api/host-session-record-api")>()),
+  fetchHostSessionRecordEditor: loaderApiMocks.fetchHostSessionRecordEditor,
+  fetchHostSessionHistory: loaderApiMocks.fetchHostSessionHistory,
+  fetchHostSessionRecordLedger: loaderApiMocks.fetchHostSessionRecordLedger,
+}));
+
+vi.mock("./host-loader-auth", () => ({
+  requireHostLoaderAuth: vi.fn().mockResolvedValue({
+    authenticated: true,
+    role: "HOST",
+    membershipStatus: "ACTIVE",
+  }),
+}));
+
 vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/host/queries/host-session-queries")>()),
   invalidateHostSessionRecordSurfaces: routeMocks.invalidateRecordSurfaces,
@@ -122,6 +155,7 @@ vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) =
   useCommitHostSessionImportMutation: () => ({ mutateAsync: routeMocks.commitImport }),
   useCreateHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useDeleteHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
+  useRestoreHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useOpenHostSessionMutation: () => ({ mutateAsync: routeMocks.openSession }),
   usePublishHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useReopenHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
@@ -211,10 +245,12 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
   ) : null,
 }));
 
+import { ReadmatesApiError } from "@/shared/api/errors";
 import {
   EditHostSessionRecordWorkflow,
   NewHostSessionRoute,
 } from "./host-session-editor-route";
+import { hostSessionEditorLoaderFactory } from "./host-session-editor-data";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
 import { hostSessionRecordKeys } from "@/features/host/queries/host-session-record-queries";
 import { hostSessionKeys } from "@/features/host/queries/host-session-queries";
@@ -1621,6 +1657,105 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(navigation.onChange).toHaveBeenCalledWith({ panel: "history", source: "manual" });
   });
 });
+
+function loaderApiError(status: number, code = "TEST_ERROR") {
+  return new ReadmatesApiError(
+    {
+      code,
+      message: "test",
+      status,
+      fallback: false,
+    },
+    new Response(JSON.stringify({ code, message: "test", status }), { status }),
+  );
+}
+
+function trashDetail() {
+  return {
+    sessionId: "session-1",
+    sessionNumber: 7,
+    title: "7회차 모임",
+    state: "DRAFT" as const,
+    trashed: true as const,
+    deletedAt: "2026-08-21T10:00:00Z",
+    purgeAfter: "2026-08-28T10:00:00Z",
+    counts: {
+      participants: 0,
+      rsvpResponses: 0,
+      questions: 0,
+      checkins: 0,
+      oneLineReviews: 0,
+      longReviews: 0,
+      highlights: 0,
+      publications: 0,
+      feedbackReports: 0,
+      feedbackDocuments: 0,
+    },
+  };
+}
+
+describe("hostSessionEditorLoaderFactory trash fallback", () => {
+  beforeEach(() => {
+    loaderApiMocks.fetchHostSessionDetail.mockReset();
+    loaderApiMocks.fetchHostSessionTrash.mockReset();
+    loaderApiMocks.fetchHostSessions.mockReset().mockResolvedValue({ items: [], nextCursor: null });
+    loaderApiMocks.fetchManualNotificationDispatches.mockReset().mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    loaderApiMocks.fetchHostSessionRecordEditor.mockReset().mockResolvedValue(recordEditor);
+    loaderApiMocks.fetchHostSessionHistory.mockReset().mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    loaderApiMocks.fetchHostSessionRecordLedger.mockReset().mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+    });
+  });
+
+  function loaderArgs() {
+    return {
+      params: { sessionId: "session-1", clubSlug: "reading-sai" },
+      request: new Request("https://readmates.test/clubs/reading-sai/app/host/sessions/session-1"),
+    };
+  }
+
+  it("returns mode trash only when active detail is an exact 404", async () => {
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(404, "RESOURCE_NOT_FOUND"));
+    loaderApiMocks.fetchHostSessionTrash.mockResolvedValue(trashDetail());
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).resolves.toEqual({
+      sessionId: "session-1",
+      mode: "trash",
+    });
+    expect(loaderApiMocks.fetchHostSessionTrash).toHaveBeenCalledWith(
+      "session-1",
+      { clubSlug: "reading-sai" },
+    );
+    expect(loaderApiMocks.fetchHostSessionRecordEditor).not.toHaveBeenCalled();
+    expect(loaderApiMocks.fetchHostSessionHistory).not.toHaveBeenCalled();
+    expect(loaderApiMocks.fetchManualNotificationDispatches).not.toHaveBeenCalled();
+  });
+
+  it.each([401, 403, 500])("does not fetch trash when active detail is %s", async (status) => {
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(status));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({
+      status,
+    });
+    expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
+    expect(loaderApiMocks.fetchHostSessionRecordEditor).not.toHaveBeenCalled();
+  });
+});
+
 
 describe("host session editor route navigation", () => {
   beforeEach(() => {

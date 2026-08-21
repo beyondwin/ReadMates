@@ -90,6 +90,14 @@ const hostSessionEditorTestActions = {
         cache: "no-store",
       }),
     ),
+  restoreSession: async (sessionId) =>
+    readJsonOrThrow(
+      await fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/restore`, {
+        method: "POST",
+        headers: jsonHeaders(),
+        cache: "no-store",
+      }),
+    ),
   openSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   closeSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   publishSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
@@ -2164,7 +2172,11 @@ describe("HostSessionEditor", () => {
         json: vi.fn().mockResolvedValue({
           sessionId: "open-session-7",
           sessionNumber: 7,
-          deleted: true,
+          title: "7회차 모임",
+          state: "OPEN",
+          trashed: true,
+          deletedAt: "2026-08-21T10:00:00Z",
+          purgeAfter: "2026-08-28T10:00:00Z",
           counts: deletionPreview.counts,
         }),
       });
@@ -2206,10 +2218,12 @@ describe("HostSessionEditor", () => {
         method: "DELETE",
       })),
     );
-    expect(location.href).toBe("/app/host/sessions/new");
+    expect(location.href).toBe("");
+    expect(screen.getByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" }).length).toBeGreaterThan(0);
   });
 
-  it("keeps delete redirects inside the scoped host route", async () => {
+  it("keeps the workspace URL after moving a session to trash", async () => {
     const location = { href: "", pathname: "/clubs/reading-sai/app/host/sessions/open-session-7/edit" };
     const fetchMock = vi
       .fn()
@@ -2222,7 +2236,11 @@ describe("HostSessionEditor", () => {
         json: vi.fn().mockResolvedValue({
           sessionId: "open-session-7",
           sessionNumber: 7,
-          deleted: true,
+          title: "7회차 모임",
+          state: "OPEN",
+          trashed: true,
+          deletedAt: "2026-08-21T10:00:00Z",
+          purgeAfter: "2026-08-28T10:00:00Z",
           counts: deletionPreview.counts,
         }),
       });
@@ -2242,7 +2260,8 @@ describe("HostSessionEditor", () => {
     await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
-    expect(location.href).toBe("/clubs/reading-sai/app/host/sessions/new");
+    expect(location.href).toBe("");
+    expect(screen.getByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
   });
 
   it("keeps keyboard focus inside the delete modal and restores focus when Escape closes", async () => {
@@ -2320,7 +2339,11 @@ describe("HostSessionEditor", () => {
         json: vi.fn().mockResolvedValue({
           sessionId: "draft-session-7",
           sessionNumber: 7,
-          deleted: true,
+          title: "7회차 모임 · 테스트 책",
+          state: "DRAFT",
+          trashed: true,
+          deletedAt: "2026-08-21T10:00:00Z",
+          purgeAfter: "2026-08-28T10:00:00Z",
           counts: deletionPreview.counts,
         }),
       });
@@ -2358,7 +2381,8 @@ describe("HostSessionEditor", () => {
         }),
       ),
     );
-    expect(location.href).toBe("/app/host");
+    expect(location.href).toBe("");
+    expect(screen.getByRole("heading", { level: 1, name: "7회차 모임 · 테스트 책" })).toBeVisible();
     confirmSpy.mockRestore();
   });
 

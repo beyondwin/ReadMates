@@ -346,7 +346,7 @@ describe("SessionHistoryPanel", () => {
       />,
     );
 
-    expect(screen.getByText("모임 삭제")).toBeVisible();
+    expect(screen.getByText("휴지통으로 이동")).toBeVisible();
     expect(screen.getByText("예정 → 삭제")).toBeVisible();
     expect(screen.getByText("빈 모임 삭제")).toBeVisible();
     expect(screen.queryByText("EMPTY_SESSION_DELETED")).not.toBeInTheDocument();

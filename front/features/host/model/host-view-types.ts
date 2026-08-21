@@ -474,10 +474,22 @@ export type HostSessionDeletionPreviewResponse = {
   blockers?: ReadonlyArray<HostSessionDeletionBlocker>;
 };
 
-export type HostSessionDeletionResponse = {
+export type HostSessionTrashItem = {
   sessionId: string;
   sessionNumber: number;
-  deleted: true;
+  title: string;
+  state: SessionState;
+  deletedAt: string;
+  purgeAfter: string;
+};
+
+export type HostSessionTrashPage = {
+  items: HostSessionTrashItem[];
+  nextCursor: string | null;
+};
+
+export type HostSessionDeletionResponse = HostSessionTrashItem & {
+  trashed: true;
   counts: HostSessionDeletionCounts;
 };
 

@@ -3,7 +3,10 @@ import type { PublicSiteVisibility, SessionAccessScope } from "./session-exposur
 
 export type HostSessionLedgerRecordStatus = "NOT_STARTED" | "INCOMPLETE" | "COMPLETE";
 
+export type HostSessionLedgerView = "active" | "trash";
+
 export type HostSessionLedgerFilters = {
+  view: HostSessionLedgerView;
   search: string;
   state: SessionState | null;
   recordStatus: HostSessionLedgerRecordStatus | null;
@@ -60,18 +63,29 @@ export function normalizeHostSessionLedgerFilters(params: URLSearchParams): Host
   const state = params.get("state");
   const recordStatus = params.get("recordStatus");
   const needsAttention = params.get("needsAttention");
+  const view = params.get("view") === "trash" ? "trash" : "active";
 
   return {
-    search: params.get("search")?.trim().replace(/\s+/g, " ") ?? "",
-    state: SESSION_STATES.has(state as SessionState) ? state as SessionState : null,
-    recordStatus: RECORD_STATUSES.has(recordStatus as HostSessionLedgerRecordStatus)
-      ? recordStatus as HostSessionLedgerRecordStatus
-      : null,
-    needsAttention: needsAttention === "true" ? true : needsAttention === "false" ? false : null,
+    view,
+    search: view === "trash" ? "" : params.get("search")?.trim().replace(/\s+/g, " ") ?? "",
+    state: view === "trash"
+      ? null
+      : SESSION_STATES.has(state as SessionState) ? state as SessionState : null,
+    recordStatus: view === "trash"
+      ? null
+      : RECORD_STATUSES.has(recordStatus as HostSessionLedgerRecordStatus)
+        ? recordStatus as HostSessionLedgerRecordStatus
+        : null,
+    needsAttention: view === "trash"
+      ? null
+      : needsAttention === "true" ? true : needsAttention === "false" ? false : null,
   };
 }
 
 export function toHostSessionLedgerSearch(filters: HostSessionLedgerFilters) {
+  if (filters.view === "trash") {
+    return "?view=trash";
+  }
   const params = new URLSearchParams();
   const search = filters.search.trim().replace(/\s+/g, " ");
   if (search) {
@@ -88,6 +102,48 @@ export function toHostSessionLedgerSearch(filters: HostSessionLedgerFilters) {
   }
   const query = params.toString();
   return query ? `?${query}` : "";
+}
+
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+export function hostSessionTrashRemainingCopy(purgeAfter: string, now = new Date()): string {
+  const purge = Date.parse(purgeAfter);
+  if (Number.isNaN(purge)) {
+    return "남은 복원 기간을 확인할 수 없습니다.";
+  }
+  const days = Math.ceil((purge - now.getTime()) / MS_PER_DAY);
+  if (days <= 0) {
+    return "오늘까지 복원할 수 있습니다.";
+  }
+  return `남은 복원 기간 ${days}일`;
+}
+
+export function hostSessionTrashDeletedAtLabel(deletedAt: string) {
+  const date = new Date(deletedAt);
+  if (Number.isNaN(date.getTime())) {
+    return "삭제 시각을 확인할 수 없습니다.";
+  }
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(date);
+  const part = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((candidate) => candidate.type === type)?.value;
+  const [year, month, day, hour, minute] = [
+    part("year"),
+    part("month"),
+    part("day"),
+    part("hour"),
+    part("minute"),
+  ];
+  return year && month && day && hour && minute
+    ? `삭제 ${year}.${month}.${day} ${hour}:${minute}`
+    : "삭제 시각을 확인할 수 없습니다.";
 }
 
 export function hostSessionLedgerBadges(

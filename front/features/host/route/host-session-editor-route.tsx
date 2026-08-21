@@ -32,8 +32,21 @@ import type {
 } from "@/features/host/api/host-session-record-contracts";
 import type {
   HostSessionDetailResponse,
+  HostSessionTrashItem,
   ManualNotificationDispatchListItem,
 } from "@/features/host/api/host-contracts";
+import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
+import {
+  hostSessionTrashDeletedAtLabel,
+  hostSessionTrashRemainingCopy,
+} from "@/features/host/model/host-session-ledger-model";
+import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lifecycle-model";
+import { isReadmatesApiError } from "@/shared/api/errors";
+import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
+import {
+  WorkspaceTrashTombstone,
+  type WorkspaceTrashRestoreConflict,
+} from "@/features/host/ui/session-workspace/workspace-trash-tombstone";
 import {
   buildHostSessionWorkspaceUrl,
   parseHostSessionWorkspaceLocation,
@@ -73,6 +86,9 @@ import {
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
   hostSessionKeys,
+  hostSessionTrashDetailQuery,
+  isHostSessionNotFoundError,
+  isHostSessionTrashExpiredError,
   classifyScheduleDefaultsError,
   hostSessionScheduleDefaultsQuery,
   invalidateHostSessionManualDispatches,
@@ -84,6 +100,7 @@ import {
   useCreateHostSessionMutation,
   useDeleteHostSessionMutation,
   useOpenHostSessionMutation,
+  useRestoreHostSessionMutation,
   usePublishHostSessionMutation,
   useReopenHostSessionMutation,
   useReturnHostSessionToDraftMutation,
@@ -339,6 +356,104 @@ function HostSessionEditorQueryState({
   );
 }
 
+function HostSessionTrashTombstoneRoute({
+  sessionId,
+  clubSlug,
+  trash,
+  expired,
+  restoreSession,
+  LinkComponent,
+  onRestored,
+}: {
+  sessionId: string;
+  clubSlug?: string;
+  trash: HostSessionTrashItem | null;
+  expired: boolean;
+  restoreSession: (sessionId: string) => Promise<HostSessionDetailResponse>;
+  LinkComponent?: HostSessionEditorLinkComponent;
+  onRestored: () => void;
+}) {
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const [restoring, setRestoring] = useState(false);
+  const [restoreSuccess, setRestoreSuccess] = useState(false);
+  const [restoreDisabled, setRestoreDisabled] = useState(expired);
+  const [restoreDisabledReason, setRestoreDisabledReason] = useState<string | null>(
+    expired ? "복원 기간이 지났습니다." : null,
+  );
+  const [restoreError, setRestoreError] = useState<string | null>(null);
+  const [restoreConflict, setRestoreConflict] = useState<WorkspaceTrashRestoreConflict | null>(null);
+
+  const openSessionHref = (openSessionId: string) => {
+    const href = hostMeetingHref(openSessionId);
+    return clubSlug
+      ? scopedAppLinkTarget(`/clubs/${encodeURIComponent(clubSlug)}/app`, href)
+      : href;
+  };
+
+  const runRestore = async () => {
+    if (restoreDisabled || restoring) {
+      return;
+    }
+    setRestoring(true);
+    setRestoreError(null);
+    setRestoreConflict(null);
+    try {
+      await restoreSession(sessionId);
+      setRestoreSuccess(true);
+      headingRef.current?.focus();
+      onRestored();
+      queueMicrotask(() => {
+        document.querySelector<HTMLElement>(".rm-host-session-workspace__title")?.focus();
+      });
+    } catch (error) {
+      if (isHostSessionTrashExpiredError(error)) {
+        setRestoreDisabled(true);
+        setRestoreDisabledReason("복원 기간이 지났습니다.");
+        return;
+      }
+      if (isReadmatesApiError(error) && error.code === "SESSION_OPEN_ALREADY_EXISTS" && error.openSessionId) {
+        setRestoreConflict({
+          openSessionHref: openSessionHref(error.openSessionId),
+          message: openAlreadyExistsMessage(),
+        });
+        return;
+      }
+      setRestoreError("모임을 복원하지 못했습니다.");
+    } finally {
+      setRestoring(false);
+    }
+  };
+
+  return (
+    <WorkspaceTrashTombstone
+      sessionId={sessionId}
+      sessionNumber={trash?.sessionNumber ?? 0}
+      title={trash?.title ?? "모임"}
+      deletedAtLabel={trash ? hostSessionTrashDeletedAtLabel(trash.deletedAt) : "삭제 시각을 확인할 수 없습니다."}
+      remainingCopy={trash ? hostSessionTrashRemainingCopy(trash.purgeAfter) : "복원 기간이 지났습니다."}
+      restoreDisabled={restoreDisabled}
+      restoreDisabledReason={restoreDisabledReason}
+      restoreError={restoreError}
+      restoreConflict={restoreConflict}
+      restoring={restoring}
+      restoreSuccess={restoreSuccess}
+      headingRef={headingRef}
+      onRestore={() => {
+        void runRestore();
+      }}
+      onRetry={() => {
+        void runRestore();
+      }}
+      listHref={
+        clubSlug
+          ? scopedAppLinkTarget(`/clubs/${encodeURIComponent(clubSlug)}/app`, "/app/host/sessions?view=trash")
+          : "/app/host/sessions?view=trash"
+      }
+      LinkComponent={LinkComponent}
+    />
+  );
+}
+
 function useHostSessionEditorActions(
   context: ReadmatesApiContext,
   onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>,
@@ -347,6 +462,7 @@ function useHostSessionEditorActions(
   const { mutateAsync: createSession } = useCreateHostSessionMutation(context);
   const { mutateAsync: updateSession } = useUpdateHostSessionMutation(context);
   const { mutateAsync: deleteSession } = useDeleteHostSessionMutation(context);
+  const { mutateAsync: restoreSession } = useRestoreHostSessionMutation(context);
   const { mutateAsync: openSession } = useOpenHostSessionMutation(context);
   const { mutateAsync: closeSession } = useCloseHostSessionMutation(context);
   const { mutateAsync: publishSession } = usePublishHostSessionMutation(context);
@@ -372,6 +488,7 @@ function useHostSessionEditorActions(
     loadDeletionPreview: (sessionId) =>
       queryClient.fetchQuery(hostSessionDeletionPreviewQuery(sessionId, context)),
     deleteSession: (sessionId) => deleteSession(sessionId),
+    restoreSession: (sessionId) => restoreSession(sessionId),
     openSession: (sessionId) => runLifecycle(() => openSession(sessionId), sessionId),
     closeSession: (sessionId) => runLifecycle(() => closeSession(sessionId), sessionId),
     publishSession: (sessionId) => runLifecycle(() => publishSession(sessionId), sessionId),
@@ -400,6 +517,7 @@ function useHostSessionEditorActions(
     context,
     createSession,
     deleteSession,
+    restoreSession,
     openSession,
     publishSession,
     queryClient,
@@ -484,17 +602,72 @@ export function EditHostSessionRoute({
     [clubSlug, context, onSessionRecordsChanged, queryClient],
   );
   const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
-  const sessionQuery = useQuery(hostSessionDetailQuery(sessionId, context));
-  const dispatchesQuery = useQuery(hostSessionManualDispatchesQuery(
-    { sessionId, page: { limit: EDITOR_MANUAL_DISPATCH_PAGE_LIMIT } },
-    context,
-  ));
-  const recordEditorQuery = useQuery(hostSessionRecordEditorQuery(sessionId, context));
-  const historyQuery = useQuery(hostSessionRecordHistoryQuery(
-    sessionId,
-    { limit: EDITOR_HISTORY_PAGE_LIMIT },
-    context,
-  ));
+  const [restored, setRestored] = useState(false);
+  const loaderTrash = (loaderData.mode ?? "active") === "trash" && !restored;
+  const sessionQuery = useQuery({
+    ...hostSessionDetailQuery(sessionId, context),
+    enabled: !loaderTrash,
+  });
+  const trashFromDetailMiss = !restored && isHostSessionNotFoundError(sessionQuery.error);
+  const trashQuery = useQuery({
+    ...hostSessionTrashDetailQuery(sessionId, context),
+    enabled: loaderTrash || trashFromDetailMiss,
+    retry: false,
+  });
+  const showTrash = !restored && (
+    loaderTrash
+    || trashFromDetailMiss
+    || Boolean(trashQuery.data)
+    || isHostSessionTrashExpiredError(trashQuery.error)
+  );
+  const activeQueriesEnabled = !showTrash;
+  const dispatchesQuery = useQuery({
+    ...hostSessionManualDispatchesQuery(
+      { sessionId, page: { limit: EDITOR_MANUAL_DISPATCH_PAGE_LIMIT } },
+      context,
+    ),
+    enabled: activeQueriesEnabled,
+  });
+  const recordEditorQuery = useQuery({
+    ...hostSessionRecordEditorQuery(sessionId, context),
+    enabled: activeQueriesEnabled,
+  });
+  const historyQuery = useQuery({
+    ...hostSessionRecordHistoryQuery(
+      sessionId,
+      { limit: EDITOR_HISTORY_PAGE_LIMIT },
+      context,
+    ),
+    enabled: activeQueriesEnabled,
+  });
+
+  if (showTrash) {
+    if (trashQuery.isPending && !trashQuery.data && !isHostSessionTrashExpiredError(trashQuery.error)) {
+      return <HostSessionEditorQueryState status="loading" hideTitle />;
+    }
+    if (trashQuery.isError && !isHostSessionTrashExpiredError(trashQuery.error) && !trashQuery.data) {
+      return (
+        <HostSessionEditorQueryState
+          status="error"
+          hideTitle
+          onRetry={() => {
+            void trashQuery.refetch();
+          }}
+        />
+      );
+    }
+    return (
+      <HostSessionTrashTombstoneRoute
+        sessionId={sessionId}
+        clubSlug={clubSlug}
+        trash={trashQuery.data ?? null}
+        expired={isHostSessionTrashExpiredError(trashQuery.error)}
+        restoreSession={actions.restoreSession}
+        LinkComponent={LinkComponent}
+        onRestored={() => setRestored(true)}
+      />
+    );
+  }
 
   if (!sessionQuery.data || !recordEditorQuery.data) {
     if (sessionQuery.isError || recordEditorQuery.isError) {

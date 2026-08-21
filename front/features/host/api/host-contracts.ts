@@ -671,10 +671,22 @@ export type HostSessionDeletionPreviewResponse = {
   blockers?: ReadonlyArray<HostSessionDeletionBlocker>;
 };
 
-export type HostSessionDeletionResponse = {
+export type HostSessionTrashItem = {
   sessionId: string;
   sessionNumber: number;
-  deleted: true;
+  title: string;
+  state: SessionState;
+  deletedAt: string;
+  purgeAfter: string;
+};
+
+export type HostSessionTrashPage = {
+  items: HostSessionTrashItem[];
+  nextCursor: string | null;
+};
+
+export type HostSessionDeletionResponse = HostSessionTrashItem & {
+  trashed: true;
   counts: HostSessionDeletionCounts;
 };
 
@@ -952,4 +964,50 @@ export function parseSessionImportPreviewResponse(value: unknown): SessionImport
     return SessionImportPreviewResponseSchema.parse(value) as SessionImportPreviewResponse;
   }
   return value as SessionImportPreviewResponse;
+}
+
+const sessionStateSchema = z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]);
+
+export const HostSessionTrashItemSchema = z.object({
+  sessionId: z.string(),
+  sessionNumber: z.number(),
+  title: z.string(),
+  state: sessionStateSchema,
+  deletedAt: z.string(),
+  purgeAfter: z.string(),
+});
+
+const HostSessionDeletionCountsSchema = z.object({
+  participants: z.number(),
+  rsvpResponses: z.number(),
+  questions: z.number(),
+  checkins: z.number(),
+  oneLineReviews: z.number(),
+  longReviews: z.number(),
+  highlights: z.number(),
+  publications: z.number(),
+  feedbackReports: z.number(),
+  feedbackDocuments: z.number(),
+});
+
+export const HostSessionDeletionResponseSchema = HostSessionTrashItemSchema.extend({
+  trashed: z.literal(true),
+  counts: HostSessionDeletionCountsSchema,
+});
+
+export const HostSessionTrashPageSchema = z.object({
+  items: z.array(HostSessionTrashItemSchema),
+  nextCursor: z.string().nullable(),
+});
+
+export function parseHostSessionTrashItem(value: unknown): HostSessionTrashItem {
+  return HostSessionTrashItemSchema.parse(value);
+}
+
+export function parseHostSessionTrashPage(value: unknown): HostSessionTrashPage {
+  return HostSessionTrashPageSchema.parse(value);
+}
+
+export function parseHostSessionDeletionResponse(value: unknown): HostSessionDeletionResponse {
+  return HostSessionDeletionResponseSchema.parse(value) as HostSessionDeletionResponse;
 }

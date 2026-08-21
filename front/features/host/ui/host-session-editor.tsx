@@ -14,6 +14,7 @@ import {
   type AttendanceStatus,
   type HostSessionDeletionBlocker,
   type HostSessionDeletionPreviewResponse,
+  type HostSessionDeletionResponse,
   type HostSessionDetailResponse,
   type ManualNotificationDispatchListItem,
   type SessionImportPreviewResponse,
@@ -33,6 +34,11 @@ import type {
   HostSessionWorkspacePanel,
 } from "@/features/host/model/host-session-workspace-navigation";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
+import {
+  hostSessionTrashDeletedAtLabel,
+  hostSessionTrashRemainingCopy,
+} from "@/features/host/model/host-session-ledger-model";
+import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lifecycle-model";
 import {
   buildHostSessionEditorOverview,
   hasAppliedSessionRecord,
@@ -67,6 +73,7 @@ import {
   type ReadmatesReturnTarget,
 } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
+import { isReadmatesApiError } from "@/shared/api/errors";
 import { rsvpLabel } from "@/shared/ui/readmates-display";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
 import { AttendancePanel } from "./session-editor/attendance-panel";
@@ -101,6 +108,10 @@ import {
   type HostSessionRecordApplyReview,
 } from "./session-editor/session-record-apply-dialog";
 import { HostSessionWorkspace } from "./session-workspace/host-session-workspace";
+import {
+  WorkspaceTrashTombstone,
+  type WorkspaceTrashRestoreConflict,
+} from "./session-workspace/workspace-trash-tombstone";
 import type {
   WorkspacePendingUndo,
   WorkspaceRestoreNotice,
@@ -293,6 +304,23 @@ export default function HostSessionEditor({
   const [sessionImportCommitResult, setSessionImportCommitResult] = useState<SessionImportCommitResult | null>(null);
   const [sessionImportStatus, setSessionImportStatus] = useState<"idle" | "previewing" | "ready" | "committing" | "error">("idle");
   const [sessionImportError, setSessionImportError] = useState<string | null>(null);
+  const [trashedSession, setTrashedSession] = useState<HostSessionDeletionResponse | null>(null);
+  const [trashRestoreState, setTrashRestoreState] = useState<{
+    restoring: boolean;
+    success: boolean;
+    disabled: boolean;
+    disabledReason: string | null;
+    error: string | null;
+    conflict: WorkspaceTrashRestoreConflict | null;
+  }>({
+    restoring: false,
+    success: false,
+    disabled: false,
+    disabledReason: null,
+    error: null,
+    conflict: null,
+  });
+  const workspaceHeadingRef = useRef<HTMLHeadingElement>(null);
   const [visitedPanels, setVisitedPanels] = useState<Set<HostSessionWorkspacePanel>>(
     () => new Set(
       session
@@ -587,10 +615,17 @@ export default function HostSessionEditor({
     setDeleteSubmitting(true);
 
     try {
-      await actions.deleteSession(session.sessionId);
-
-      const deletedDraft = (displaySession?.state ?? session.state) === "DRAFT";
-      globalThis.location.href = scopedHostRedirectHref(deletedDraft ? "/app/host" : "/app/host/sessions/new");
+      const result = await actions.deleteSession(session.sessionId);
+      setDeleteModalOpen(false);
+      setTrashedSession(result);
+      setTrashRestoreState({
+        restoring: false,
+        success: false,
+        disabled: false,
+        disabledReason: null,
+        error: null,
+        conflict: null,
+      });
     } catch (error) {
       const failure = hostSessionDeletionFailure(error);
       if (failure.code === "SESSION_DELETE_BLOCKED" || failure.blockers.length > 0) {
@@ -600,7 +635,69 @@ export default function HostSessionEditor({
     } finally {
       setDeleteSubmitting(false);
     }
-  }, [actions, applyDeletionBlockers, deletePreview, deleteSubmitting, displaySession, session]);
+  }, [actions, applyDeletionBlockers, deletePreview, deleteSubmitting, session]);
+
+  const restoreTrashedSession = useCallback(async () => {
+    if (!trashedSession || trashRestoreState.restoring || trashRestoreState.disabled) {
+      return;
+    }
+    setTrashRestoreState((current) => ({
+      ...current,
+      restoring: true,
+      error: null,
+      conflict: null,
+    }));
+    try {
+      await actions.restoreSession(trashedSession.sessionId);
+      setTrashRestoreState((current) => ({ ...current, restoring: false, success: true }));
+      setTrashedSession(null);
+      flash("모임을 복원했습니다.");
+      queueMicrotask(() => {
+        document.querySelector<HTMLElement>(".rm-host-session-workspace__title")?.focus();
+      });
+    } catch (error) {
+      if (isReadmatesApiError(error) && (error.status === 410 || error.code === "HOST_SESSION_TRASH_EXPIRED")) {
+        setTrashRestoreState({
+          restoring: false,
+          success: false,
+          disabled: true,
+          disabledReason: "복원 기간이 지났습니다.",
+          error: null,
+          conflict: null,
+        });
+        return;
+      }
+      if (isReadmatesApiError(error) && error.code === "SESSION_OPEN_ALREADY_EXISTS" && error.openSessionId) {
+        setTrashRestoreState({
+          restoring: false,
+          success: false,
+          disabled: false,
+          disabledReason: null,
+          error: null,
+          conflict: {
+            openSessionHref: scopedHostSessionEditHref(error.openSessionId, clubSlug),
+            message: openAlreadyExistsMessage(),
+          },
+        });
+        return;
+      }
+      setTrashRestoreState({
+        restoring: false,
+        success: false,
+        disabled: false,
+        disabledReason: null,
+        error: "모임을 복원하지 못했습니다.",
+        conflict: null,
+      });
+    }
+  }, [
+    actions,
+    clubSlug,
+    flash,
+    trashRestoreState.disabled,
+    trashRestoreState.restoring,
+    trashedSession,
+  ]);
 
   const handleSubmit = useCallback(
     async (event: FormEvent<HTMLFormElement>) => {
@@ -1031,6 +1128,35 @@ export default function HostSessionEditor({
       requestLifecycleConfirm("publish");
     }
   }, [confirmLifecycle, displayedWorkspaceView.primaryAction.kind, lifecycleConfirm, requestLifecycleConfirm]);
+
+  if (trashedSession) {
+    return (
+      <main className="rm-host-session-editor">
+        <WorkspaceTrashTombstone
+          sessionId={trashedSession.sessionId}
+          sessionNumber={trashedSession.sessionNumber}
+          title={trashedSession.title}
+          deletedAtLabel={hostSessionTrashDeletedAtLabel(trashedSession.deletedAt)}
+          remainingCopy={hostSessionTrashRemainingCopy(trashedSession.purgeAfter)}
+          restoreDisabled={trashRestoreState.disabled}
+          restoreDisabledReason={trashRestoreState.disabledReason}
+          restoreError={trashRestoreState.error}
+          restoreConflict={trashRestoreState.conflict}
+          restoring={trashRestoreState.restoring}
+          restoreSuccess={trashRestoreState.success}
+          headingRef={workspaceHeadingRef}
+          onRestore={() => {
+            void restoreTrashedSession();
+          }}
+          onRetry={() => {
+            void restoreTrashedSession();
+          }}
+          listHref={scopedHostRedirectHref("/app/host/sessions?view=trash")}
+          LinkComponent={LinkComponent}
+        />
+      </main>
+    );
+  }
 
   return (
     <main className="rm-host-session-editor">

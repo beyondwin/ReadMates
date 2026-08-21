@@ -103,13 +103,37 @@ function hostMemberListItem(avatarKey: unknown = "banana-green-book") {
 }
 
 function stubFetch() {
-  const fetchMock = vi.fn().mockImplementation((url: string) =>
+  const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) =>
     Promise.resolve(jsonResponse(
       url.includes("/visibility") || url.includes("/access-scope")
         ? { session: hostSessionDetail(), composer: null }
         : url.includes("/attendance")
           ? { sessionId: "session-7", count: 0 }
-          : { items: [], nextCursor: null },
+          : init?.method === "DELETE"
+            ? {
+                sessionId: "session-7",
+                sessionNumber: 7,
+                title: "함께 읽기",
+                state: "OPEN",
+                trashed: true,
+                deletedAt: "2026-08-21T10:00:00Z",
+                purgeAfter: "2026-08-28T10:00:00Z",
+                counts: {
+                  participants: 0,
+                  rsvpResponses: 0,
+                  questions: 0,
+                  checkins: 0,
+                  oneLineReviews: 0,
+                  longReviews: 0,
+                  highlights: 0,
+                  publications: 0,
+                  feedbackReports: 0,
+                  feedbackDocuments: 0,
+                },
+              }
+            : url.includes("/restore")
+              ? hostSessionDetail()
+              : { items: [], nextCursor: null },
     )));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;

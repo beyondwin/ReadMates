@@ -4,6 +4,8 @@ import {
   hostSessionLedgerActionLabel,
   hostSessionLedgerBadges,
   hostSessionLedgerModifiedAtLabel,
+  hostSessionTrashDeletedAtLabel,
+  hostSessionTrashRemainingCopy,
   normalizeHostSessionLedgerFilters,
   toHostSessionLedgerSearch,
   type HostSessionLedgerItem,
@@ -16,6 +18,7 @@ describe("host session ledger model", () => {
     ));
 
     expect(filters).toEqual({
+      view: "active",
       search: "Moby Dick",
       state: null,
       recordStatus: "INCOMPLETE",
@@ -24,6 +27,36 @@ describe("host session ledger model", () => {
     expect(toHostSessionLedgerSearch(filters)).toBe(
       "?search=Moby+Dick&recordStatus=INCOMPLETE&needsAttention=true",
     );
+  });
+
+  it("uses view=trash as the canonical trash URL and omits active filters", () => {
+    const filters = normalizeHostSessionLedgerFilters(new URLSearchParams(
+      "view=trash&search=Moby&state=OPEN&recordStatus=INCOMPLETE&needsAttention=true",
+    ));
+
+    expect(filters).toEqual({
+      view: "trash",
+      search: "",
+      state: null,
+      recordStatus: null,
+      needsAttention: null,
+    });
+    expect(toHostSessionLedgerSearch(filters)).toBe("?view=trash");
+    expect(toHostSessionLedgerSearch({
+      view: "active",
+      search: "",
+      state: null,
+      recordStatus: null,
+      needsAttention: null,
+    })).toBe("");
+  });
+
+  it("derives remaining-day copy from purgeAfter without deciding eligibility", () => {
+    const now = new Date("2026-08-21T10:00:00Z");
+    expect(hostSessionTrashRemainingCopy("2026-08-28T10:00:00Z", now)).toBe("남은 복원 기간 7일");
+    expect(hostSessionTrashRemainingCopy("2026-08-21T12:00:00Z", now)).toBe("남은 복원 기간 1일");
+    expect(hostSessionTrashRemainingCopy("2026-08-21T09:00:00Z", now)).toBe("오늘까지 복원할 수 있습니다.");
+    expect(hostSessionTrashDeletedAtLabel("2026-08-21T10:00:00+09:00")).toBe("삭제 2026.08.21 10:00");
   });
 
   it("exposes explicit needs-attention, draft, and readiness badges", () => {

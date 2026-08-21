@@ -1,8 +1,11 @@
 import type { QueryClient } from "@tanstack/react-query";
 import type { LoaderFunctionArgs } from "react-router";
-import type { HostSessionRecordLedgerPage } from "@/features/host/api/host-contracts";
+import type { HostSessionRecordLedgerPage, HostSessionTrashPage } from "@/features/host/api/host-contracts";
 import type { HostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";
 import { normalizeHostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";
+import {
+  hostSessionTrashListQuery,
+} from "@/features/host/queries/host-session-queries";
 import {
   hostSessionRecordLedgerQuery,
 } from "@/features/host/queries/host-session-record-queries";
@@ -14,6 +17,7 @@ export const HOST_SESSION_LEDGER_PAGE_LIMIT = 50;
 export type HostSessionLedgerRouteData = {
   filters: HostSessionLedgerFilters;
   page: HostSessionRecordLedgerPage | null;
+  trashPage: HostSessionTrashPage | null;
 };
 
 export function hostSessionLedgerFiltersFromRequest(request?: Request) {
@@ -32,9 +36,16 @@ export function hostSessionLedgerLoaderFactory(client: QueryClient) {
       page: { limit: HOST_SESSION_LEDGER_PAGE_LIMIT },
     };
 
+    if (filters.view === "trash") {
+      const trashPage = await client.fetchQuery(
+        hostSessionTrashListQuery({ limit: HOST_SESSION_LEDGER_PAGE_LIMIT }, context),
+      ).catch(() => null);
+      return { filters, page: null, trashPage };
+    }
+
     const page = await client.fetchQuery(hostSessionRecordLedgerQuery(request, context))
       .catch(() => null);
 
-    return { filters, page };
+    return { filters, page, trashPage: null };
   };
 }
