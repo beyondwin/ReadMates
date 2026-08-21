@@ -14,7 +14,7 @@ ReadMates는 여러 정기 독서모임의 공개 소개, 멤버 세션 준비, 
 | 클럽 게스트 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records` | 로그인하지 않은 게스트 | `ACTIVE + PUBLIC` 클럽에서 `GUEST_READABLE` 현재·예정 세션과 기록을 읽습니다. 개인 화면은 preview, 설정·알림·피드백은 정식 멤버 안내, 호스트 route는 거절합니다. 공개 사이트의 `PUBLIC_RECORD` 배치와는 별도 표면입니다. |
 | 로그인 후 진입 | `/app`, `/clubs/:slug/app`, 등록된 club host의 `/app` | 로그인 사용자 | 가입 클럽이 하나면 해당 클럽 앱으로 이동하고, 여러 개면 클럽 선택 화면을 보여주며, 선택한 클럽 context로 앱에 진입 |
 | 멤버 앱 | `/clubs/:slug/app`, `/clubs/:slug/app/pending`, `/clubs/:slug/app/session/current`, `/clubs/:slug/app/notes`, `/clubs/:slug/app/archive`, `/clubs/:slug/app/sessions/:sessionId`, `/clubs/:slug/app/feedback/:sessionId`, `/clubs/:slug/app/feedback/:sessionId/print`, `/clubs/:slug/app/me`, `/clubs/:slug/app/me/records`, `/clubs/:slug/app/me/settings`, `/clubs/:slug/app/notifications`, `/clubs/:slug/app/notifications/settings`, 등록된 club host의 `/app/**` | 둘러보기 멤버(`VIEWER`), 정식 멤버, 호스트 | 현재 세션 확인, 게스트와 멤버에게 보이는 예정 세션 확인, 둘러보기 멤버 승인 안내, 정식 멤버의 RSVP·읽은 분량·질문·서평, 아카이브, 참석 회차 피드백 문서, 개인 기록과 계정·멤버십 정보, 알림 설정과 알림함을 제공합니다. |
-| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/operations`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | `/app/host`는 지금 다루는 모임의 모임 전·진행 중·모임 후 장부입니다. `/app/host/operations`는 전체 주의 목록·AI 기본값·클럽 준비도·알림 상태를 독립 카드로 보여 줍니다. 모임 canonical 경로는 `/sessions/:sessionId`이고 `/edit`와 `/closing`은 그 경로로 redirect합니다. 다음 책 여러 권 미리 넣기, 공개 범위 설정, 게스트와 멤버에게 보이기, 참석 확정, 모임 마치기, `정리본 올리기`로 staged 초안 가져오기·검토·적용·revision 복원, 기록 공개, 과거 모임 검색, 초대 관리, 멤버 상태와 표시 이름 관리, 알림 발송 운영 |
+| 호스트 앱 | `/clubs/:slug/app/host`, `/clubs/:slug/app/host/operations`, `/clubs/:slug/app/host/notifications`, `/clubs/:slug/app/host/members`, `/clubs/:slug/app/host/invitations`, `/clubs/:slug/app/host/sessions`, `/clubs/:slug/app/host/sessions/new`, `/clubs/:slug/app/host/sessions/:sessionId`, 등록된 club host의 `/app/host/**` | 현재 클럽의 호스트 | `/app/host`는 지금 다루는 모임의 모임 전·진행 중·모임 후 장부이며, `OPEN`/`DRAFT`가 있으면 그 모임의 Focus Deck `/sessions/:sessionId`로 이어집니다. `/edit`와 `/closing`도 같은 경로로 redirect합니다. `/app/host/operations`는 전체 주의 목록·AI 기본값·클럽 준비도·알림 상태를 독립 카드로 보여 줍니다. 다음 책 여러 권 미리 넣기, 공개 범위 설정, 게스트와 멤버에게 보이기, 참석 확정, 모임 마치기, `정리본 올리기`로 staged 초안 가져오기·검토·적용·revision 복원, 기록 공개, 변경 되돌리기와 7일 휴지통, 과거 모임 검색, 초대 관리, 멤버 상태와 표시 이름 관리, 알림 발송 운영 |
 | 플랫폼 관리 | `/admin`, `/admin/today`, `/admin/health`, `/admin/notifications`, `/admin/clubs`, `/admin/clubs/:clubId`, `/admin/support`, `/admin/ai-ops`, `/admin/audit`, `/admin/analytics` | platform admin | `/admin/today`의 내구 운영 케이스 ledger에서 클럽 공개 readiness·domain·첫 호스트, 알림 실패, AI job 이상, 회차 마감 위험을 우선순위 queue와 inspector로 확인하고 acknowledge·snooze·엄격한 resolve 검증을 수행합니다. 그 밖에 클럽 생성, 클럽 목록 확인, 공개/비공개 상태 관리, 공개 소개 정보 관리, 등록형 domain alias 요청과 상태 확인, 첫 호스트 온보딩 상태 확인, 운영 health와 알림 outbox/delivery 상태 확인, 클럽 운영 readiness 집계, 제한된 support access grant 관리, AI job 운영 조회와 강제 취소, 통합 감사 ledger 조회를 수행합니다. `/admin/analytics`는 활성 멤버, 세션 완료율, RSVP 응답률, AI 비용/세션, 알림 도달률을 7/30/90일 window와 series/benchmark로 보여주는 aggregate-only 운영 분석 표면입니다. 세션/멤버/알림 발송 같은 클럽 내부 운영은 기본적으로 호스트 앱 책임이고, platform admin 표면은 aggregate/read-only 진단과 감사 가능한 복구 작업만 다룹니다. |
 
 ## 프런트엔드 route-first 경계
@@ -246,7 +246,7 @@ lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight fut
 ### Mixed / Workflow-side
 - `admin.operations` — 네 운영 source의 allowlist signal을 case/event/source-freshness ledger로 조정하고, 낙관적 version을 가진 lifecycle mutation과 exact-source resolve 검증을 수행합니다. Application layer는 source adapter, JDBC, Micrometer, Spring Web detail이 아니라 outbound port에 의존합니다.
 - `feedback` — 문서 업로드 mutation + 조회를 함께 보유합니다.
-- `sessionrecord` — `/app/host/sessions` 장부와 editor/history API가 기본 정보·출석의 metadata-only audit, 공개 기록 공통 draft, immutable applied revision, restore-to-draft를 소유합니다. 적용 전 member/public live projection은 변경하지 않습니다.
+- `sessionrecord` — `/app/host/sessions` 장부와 editor/history API가 기본 정보·출석의 복구 가능한 before/after snapshot, 공개 기록 공통 draft, immutable applied revision, restore-to-draft를 소유합니다. 적용 전 member/public live projection은 변경하지 않습니다. 세션 행의 활성 조회는 `active_sessions` projection을 사용합니다.
 - `sessionimport` — 호스트 세션 편집기의 preview는 검증 전용 read path이고 commit은 공개 요약, 공개 범위, 하이라이트, 한줄평, 피드백 문서를 `sessionrecord` 공통 draft에 원자적으로 저장합니다. live 반영은 별도의 검토·알림 결정·apply 단계입니다.
 - `aigen` — 외부 LLM provider, Redis job handoff, Kafka worker, commit/recovery orchestration을 포함합니다. AI 결과 commit은 `sessionrecord` 공통 draft에 저장하고 live 반영을 수행하지 않습니다. Application layer는 provider SDK, Redis, JDBC, Kafka detail이 아니라 outbound port에 의존합니다.
 
@@ -258,11 +258,11 @@ lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight fut
 
 ## Flyway migration 불변성
 
-운영 schema의 source of truth는 `server/src/main/resources/db/mysql/migration/`이다. 현재 catalog는 `V1`, `V9`~`V48`의 41개 versioned SQL이며 `V2`~`V8` gap은 의도적으로 유지한다. `V48`은 기존 migration을 수정하지 않고 관리자 알림 재실행의 exact target과 confirmation receipt schema를 additive하게 추가한다.
+운영 schema의 source of truth는 `server/src/main/resources/db/mysql/migration/`이다. 현재 catalog는 `V1`, `V9`~`V51`의 44개 versioned SQL이며 `V2`~`V8` gap은 의도적으로 유지한다. `V48`은 관리자 알림 재실행 receipt, `V50`은 호스트 세션 변경 snapshot, `V51`은 휴지통 메타데이터와 `active_sessions` view를 기존 migration을 수정하지 않고 additive하게 추가한다.
 
 과거 migration은 두 개의 보완 통제로 보호한다. `scripts/check-flyway-migration-immutability.py`는 명시한 trusted base ref의 merge base에 존재하던 migration을 현재 index와 worktree까지 비교해 수정·삭제·rename·이동을 merge 전에 차단한다. CI는 pull request의 base SHA와 `main` push의 before SHA를 사용하고, 비교 job에 complete Git history를 제공한다. Flyway는 적용된 database의 `flyway_schema_history` checksum을 startup에 검증해 repository gate 이후의 runtime drift를 다시 차단한다.
 
-위반을 `flyway repair`, baseline 증가, 과거 파일 복원 없는 삭제·rename, 낮거나 재사용한 version으로 우회하지 않는다. checker가 보고한 base 최고 version보다 큰 새 `V{N}__{lower_snake_case_description}.sql` forward-only migration으로 보정한다. Testcontainers는 clean install과 populated V42/V44 schema에서 V48까지의 upgrade를 유지하고, 합성 checksum fixture는 변조 거부와 정상 successor 적용을 검증한다.
+위반을 `flyway repair`, baseline 증가, 과거 파일 복원 없는 삭제·rename, 낮거나 재사용한 version으로 우회하지 않는다. checker가 보고한 base 최고 version보다 큰 새 `V{N}__{lower_snake_case_description}.sql` forward-only migration으로 보정한다. Testcontainers는 clean install과 populated V42/V44 schema에서 V51까지의 upgrade를 유지하고, 합성 checksum fixture는 변조 거부와 정상 successor 적용을 검증한다.
 
 ## 인증과 세션
 
@@ -286,7 +286,7 @@ Spring은 `/api/**` 요청에서 `X-Readmates-Bff-Secret`을 검사할 수 있�
 
 Mutating method인 `POST`, `PUT`, `PATCH`, `DELETE`는 `Origin` 또는 `Referer`가 `READMATES_ALLOWED_ORIGINS` 또는 `READMATES_APP_BASE_URL`에서 파생된 허용 origin에 포함되어야 합니다.
 
-Production은 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`로 mutating `/api/host/**`에 현재 client contract를 추가로 요구합니다. 새 browser bundle은 `X-Readmates-Client-Contract: v2`를 선언하고 Pages Functions는 정확한 선언만 새 upstream header로 재생성합니다. BFF가 값을 무조건 부여하지 않으므로 구 browser + 새 BFF, 새 browser + 구 BFF, 구 browser + 구 BFF는 모두 새 backend에서 409로 fail closed하고 새 browser + 새 BFF만 통과합니다. 이 header는 인증이나 권한을 대신하지 않으며 BFF secret, same-origin 검증, session, club-scoped HOST 권한을 모두 통과해야 합니다.
+Production은 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`로 mutating `/api/host/**`에 현재 client contract를 추가로 요구합니다. 새 browser bundle은 `X-Readmates-Client-Contract: v2`를 선언하고 Pages Functions는 정확한 선언만 새 upstream header로 재생성합니다. BFF가 값을 무조건 부여하지 않으므로 구 browser + 새 BFF, 새 browser + 구 BFF, 구 browser + 구 BFF는 모두 새 backend에서 409로 fail closed하고 새 browser + 새 BFF만 통과합니다. 이 header는 인증이나 권한을 대신하지 않으며 BFF secret, same-origin 검증, session, club-scoped HOST 권한을 모두 통과해야 합니다. 호스트 변경 복원(`POST /api/host/sessions/{sessionId}/changes/{changeId}/restore`)과 휴지통 복원(`POST /api/host/sessions/{sessionId}/restore`)도 같은 generic `/api/bff/**` proxy를 타며, BFF path allowlist나 Functions 전용 구현은 두지 않습니다.
 
 클럽 context header도 BFF 신뢰 경계 안에 있습니다. Spring은 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 browser input으로 취급하지 않고, BFF secret을 통과한 요청에서만 context resolve 입력으로 사용합니다. 허용 origin은 primary auth/app origin, `https://readmates.pages.dev`, 등록된 active club host를 명시적으로 포함해야 하며 wildcard suffix로 넓게 열지 않습니다.
 
@@ -357,7 +357,7 @@ ReadMates의 사용자 상태는 club membership의 status와 role을 함께 봅
 
 ReadMates는 클럽별로 하나의 현재 `OPEN` 세션과 여러 개의 예정 `DRAFT` 세션을 함께 다룹니다. 호스트가 새 세션을 만들면 기본 상태는 `DRAFT`, canonical app access는 `HOST_ONLY`, public-site placement는 `HIDDEN`입니다. 앱 열람과 공개 사이트 배치는 서로 독립된 두 축입니다.
 
-호스트 홈 `/app/host`는 지금 다루는 한 모임의 운영 장부입니다. 운영자가 보는 단계는 모임 전(`DRAFT`), 진행 중(`OPEN`), 모임 후(`CLOSED` 또는 `PUBLISHED`)이며, 서버 상태 이름은 `DRAFT`/`OPEN`/`CLOSED`/`PUBLISHED`를 유지합니다. 모임 화면 canonical 경로는 `/clubs/:slug/app/host/sessions/:sessionId`(등록 host의 `/app/host/sessions/:sessionId`)이고, `/edit`와 `/closing`은 그 경로로 redirect합니다. 새 모임 폼은 `GET /api/host/sessions/schedule-defaults`가 최근 최대 10모임의 반복 일정 값(시간·장소·접속 정보·질문 마감 오프셋·`accessScope`)을 채우며, 책 제목은 채우지 않습니다.
+호스트 홈 `/app/host`는 지금 다루는 한 모임의 운영 장부입니다. 운영자가 보는 단계는 모임 전(`DRAFT`), 진행 중(`OPEN`), 모임 후(`CLOSED` 또는 `PUBLISHED`)이며, 서버 상태 이름은 `DRAFT`/`OPEN`/`CLOSED`/`PUBLISHED`를 유지합니다. 특정 모임 canonical 경로는 `/clubs/:slug/app/host/sessions/:sessionId`(등록 host의 `/app/host/sessions/:sessionId`)의 Focus Deck workspace입니다. `/edit`와 `/closing`은 그 경로로 redirect하고, 호스트 홈 loader는 `OPEN` 또는 `DRAFT`가 있으면 같은 경로로 이어집니다. 새 모임 폼은 `GET /api/host/sessions/schedule-defaults`가 최근 최대 10모임의 반복 일정 값(시간·장소·접속 정보·질문 마감 오프셋·`accessScope`)을 채우며, 책 제목은 채우지 않습니다.
 
 - `sessions.access_scope`: `HOST_ONLY | GUEST_READABLE`. `GUEST_READABLE`은 익명 게스트 앱, `VIEWER`, 정식 멤버와 호스트의 공통 읽기 후보입니다.
 - `public_session_publications.site_visibility`: `HIDDEN | PUBLIC_RECORD`. `PUBLIC_RECORD`는 `CLOSED` 또는 `PUBLISHED`에서만 저장할 수 있고, 실제 공개 사이트 query는 `PUBLISHED + PUBLIC_RECORD`만 반환합니다.
@@ -382,9 +382,26 @@ Canonical source of truth는 `access_scope`와 `site_visibility`입니다. V45�
 
 호스트는 `/api/host/sessions/{sessionId}/unpublish`, `/reopen`, `/return-to-draft`로 한 단계씩만 되돌릴 수 있습니다. `/unpublish`는 `PUBLISHED`를 `CLOSED`로 바꾸고 publication row와 `site_visibility`는 유지합니다. 공개 사이트는 `PUBLISHED + PUBLIC_RECORD`만 반환하므로 목록에서 내려갑니다. `/reopen`은 `CLOSED`를 `OPEN`으로 복원하고, `PUBLIC_RECORD`면 같은 트랜잭션에서 `HIDDEN`으로 내립니다. 참석자 row는 다시 만들지 않습니다. 같은 클럽에 다른 `OPEN`이 있으면 `/reopen`과 `/open` 모두 거절합니다. `/reopen`은 대상 세션 존재와 클럽 소유를 먼저 확인하고, 실제 `CLOSED → OPEN` 후보일 때만 다른 `OPEN` 충돌을 검사합니다. 없거나 다른 클럽의 세션은 `404 SESSION_NOT_FOUND`이고, `PUBLISHED`/`DRAFT`는 `409 SESSION_REOPEN_NOT_ALLOWED`입니다. `/return-to-draft`는 `OPEN`을 `DRAFT`로 환원합니다. 세 명령 모두 기록·참석·알림 데이터를 삭제하지 않고, 기대 상태에서만 바꾸므로 다른 트랜잭션이 먼저 옮긴 상태를 덮어쓰지 않습니다.
 
-호스트는 기록 revision이나 알림 결정 이력이 없는 `DRAFT`를 `DELETE /api/host/sessions/{sessionId}`로 지울 수 있으며, 이 삭제는 내구 이력을 남기지 않습니다. 같은 내구 이력 조건의 `OPEN` 삭제도 유지합니다. `CLOSED`와 `PUBLISHED`는 삭제할 수 없습니다.
+호스트는 기록 revision이나 알림 결정 이력이 없는 `DRAFT`와 같은 내구 이력 조건의 `OPEN`을 `DELETE /api/host/sessions/{sessionId}`로 휴지통에 넣을 수 있습니다. `CLOSED`와 `PUBLISHED`는 삭제할 수 없습니다. 허용된 삭제는 즉시 물리 삭제하지 않고 `deleted_at`, `deleted_by_membership_id`, 서버 UTC 기준 `purge_after = deleted_at + 7일`을 저장하며, child row와 기록은 만료 정리 전까지 보존합니다. 삭제 직후 같은 모임 URL은 tombstone을 보여 주고, 목록 `?view=trash`와 `GET /api/host/sessions/trash`, `GET /api/host/sessions/{sessionId}/trash`로 복구할 수 있습니다. `POST /api/host/sessions/{sessionId}/restore`는 보존된 `DRAFT`/`OPEN` 상태로 되돌립니다. `OPEN`을 복원할 때 같은 클럽에 다른 `OPEN`이 있으면 `409 SESSION_OPEN_ALREADY_EXISTS`와 `openSessionId`로 거절합니다. `purge_after`가 지났거나 물리 정리 뒤 최신 lifecycle이 `DELETED`이면 `410 HOST_SESSION_TRASH_EXPIRED`입니다. bounded scheduler(`readmates.session.trash.purge-fixed-delay` 기본 1시간, batch 기본 50·최대 500)가 `for update skip locked`로 만료 행만 기존 FK 순서로 지우고, lifecycle/AI audit는 남깁니다.
 
-호스트 앱의 `/edit`와 `/closing`은 모임 canonical 경로 `/clubs/:slug/app/host/sessions/:sessionId`로 redirect합니다. 모임 후 단계는 같은 장부에서 출석 수정, `정리본 올리기`, 기록 공개를 다룹니다. 서버의 `sessionclosing` slice는 새 영속 상태나 DB migration 없이 기존 세션·공개 기록·피드백 문서·알림 outbox/inbox 데이터를 읽어 checklist, next action, Host/Member/Public surface 상태, evidence ledger를 계산합니다.
+정상 조회는 `active_sessions` view(`sessions` 중 `deleted_at is null`)만 사용합니다. 호스트 목록·상세, 멤버 current/upcoming/archive/notes, 게스트 browse, 공개 기록, 알림 계획, AI 대상, 관리자 집계는 휴지통 행을 숨깁니다. raw `from sessions`/`join sessions`는 `HostSessionDeletionQueries`와 `HostSessionWriteQueries`의 회차 번호 할당 쿼리 `select coalesce(max(number), 0) + 1 from sessions where club_id = ?`만 허용하며 `ActiveSessionProjectionArchitectureTest`가 강제합니다. 기존 세션 write는 `deleted_at is null`을 요구합니다.
+
+특정 모임 화면은 `front/src/app/host-routes/meeting-route-element.tsx`가 `EditHostSessionRoute`를 조립하는 단일 Focus Deck workspace입니다. 순수 화면 모델은 `features/host/model/host-session-workspace-model.ts`, URL 해석은 `host-session-workspace-navigation.ts`, 표시는 `features/host/ui/session-workspace/`가 소유합니다. 화면 상태 표기는 `모임 작성 중`/`멤버와 준비 중`/`기록 정리 중`/`공개 완료`이고, 날짜는 권장 작업 우선순위만 바꿉니다. 페이지 수준 `개요/기본 정보/출석/기록/변경 기록` tablist와 특정 모임 안의 단계 rail은 두지 않습니다. 기존 `section` query는 탭이 아니라 같은 화면의 작업/panel deep link입니다.
+
+| query | 동작 |
+| --- | --- |
+| query 없음 또는 `section=overview` | 계산된 지금 할 일 |
+| `section=basic` | `모임 정보` panel |
+| `section=attendance` | 출석 작업 |
+| `section=records` | 기록 작업 |
+| `section=records&source=json` 또는 `records=json` | 정리본 올리기 |
+| `section=records&source=ai` 또는 `aigen=1` | AI 초안 보조 작업 |
+| `section=history` | `변경 내역` panel |
+| 잘못된 값 | 지금 할 일 |
+
+`초안 만들기` source tab은 기록 panel 안에만 남습니다. 기본 정보·출석 저장은 `changeId`·`kind`·`undoAvailable` receipt를 반환하고, 실행 취소는 이 식별자로 `GET/POST /api/host/sessions/{sessionId}/changes/{changeId}/restore-preview|restore`를 호출합니다. 복원은 과거 audit를 고치지 않고 새 변경을 만들며, preview의 `expectedCurrentHash`(현재 필드 값의 canonical JSON SHA-256, 소문자 64 hex)가 commit 시점과 다르면 `409 HOST_SESSION_RESTORE_STALE`로 중단합니다. 복원은 완전한 before/after snapshot이 있을 때만 허용합니다. `meetingUrl`과 `meetingPasscode`는 DB snapshot에 보관할 수 있지만 preview·history·로그는 `sensitive=true`와 값 `null`로 redaction합니다. 기록 revision 복원은 기존처럼 live를 덮어쓰지 않고 새 draft를 만듭니다.
+
+호스트 앱의 `/edit`와 `/closing`은 모임 canonical 경로 `/clubs/:slug/app/host/sessions/:sessionId`로 redirect합니다. 모임 후 단계는 같은 Focus Deck에서 출석 수정, `정리본 올리기`, 기록 공개를 다룹니다. 서버의 `sessionclosing` slice는 새 영속 상태나 DB migration 없이 기존 세션·공개 기록·피드백 문서·알림 outbox/inbox 데이터를 읽어 checklist, next action, Host/Member/Public surface 상태, evidence ledger를 계산합니다.
 
 로그인 audience의 멤버 홈은 `/api/sessions/upcoming`, 익명 audience의 scoped guest app은 `/api/public/clubs/{slug}/browse/sessions/upcoming`을 사용합니다. 두 경로 모두 `DRAFT + GUEST_READABLE`인 같은 클럽 세션을 반환하며 public-site placement를 요구하지 않습니다. 공개 클럽에 `OPEN + GUEST_READABLE` current session이 없으면 guest current API는 `404`가 아니라 `{currentSession:null}`을 반환해 정상 empty state를 표시하고, 존재하지 않거나 비공개·비활성인 클럽만 `404`로 숨깁니다. `GUEST`와 `VIEWER`는 읽을 수 있지만 RSVP/체크인/질문/서평 쓰기와 `/api/host/**` 운영 도구는 사용할 수 없습니다.
 
@@ -406,7 +423,7 @@ Canonical source of truth는 `access_scope`와 `site_visibility`입니다. V45�
 
 범위가 있는 목록 endpoint는 cursor 기반 page object를 반환합니다. 공통 응답 필드는 `{ "items": [...], "nextCursor": string | null }`이고, 다음 page가 없으면 `nextCursor`는 `null`입니다. Endpoint에 따라 `/api/me/notifications`의 `unreadCount`처럼 목록 전체 상태를 나타내는 추가 field가 붙을 수 있습니다. Request query는 endpoint별 기본값과 최대값을 둔 `limit`, `cursor`를 사용합니다.
 
-이 contract를 따르는 목록은 guest browse의 upcoming/notes/archive, archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`, platform admin의 `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/audit/events`입니다. Guest cursor는 opaque payload에 club slug와 exact key set을 포함해 다른 club에서 재사용하거나 key가 더해진 cursor를 거절합니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
+이 contract를 따르는 목록은 guest browse의 upcoming/notes/archive, archive의 `/api/archive/sessions`, `/api/archive/me/questions`, `/api/archive/me/reviews`, notes의 `/api/notes/sessions`, `/api/notes/feed`, feedback의 `/api/feedback-documents/me`, host의 `/api/host/sessions`, `/api/host/sessions/trash`, `/api/host/members`, `/api/host/members/viewers`, `/api/host/members/pending-approvals`, `/api/host/invitations`, notification의 `/api/me/notifications`, `/api/host/notifications/items`, `/api/host/notifications/events`, `/api/host/notifications/deliveries`, `/api/host/notifications/manual/dispatches`, `/api/host/notifications/test-mail/audit`, platform admin의 `/api/admin/notifications/events`, `/api/admin/notifications/deliveries`, `/api/admin/audit/events`입니다. Guest cursor는 opaque payload에 club slug와 exact key set을 포함해 다른 club에서 재사용하거나 key가 더해진 cursor를 거절합니다. `GET /api/host/notifications/manual/options`도 멤버 선택 목록을 같은 cursor page shape로 반환합니다. 예를 들어 `GET /api/host/members/pending-approvals?limit=2`는 pending viewer approval 목록의 첫 page를 반환하고, 다음 page는 응답의 `nextCursor`를 `cursor` query로 넘겨 요청합니다.
 
 위 scoped endpoint에는 legacy array response contract가 없습니다. 프런트엔드 loader와 route action은 `items`를 누적하고 `nextCursor`로 명시적인 더보기 control을 보여줘야 하며, 새 scoped 목록 API도 같은 공통 page field를 사용합니다.
 
