@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { beforeEach, vi, describe, expect, it } from "vitest";
 import { createMemoryRouter, MemoryRouter, Router } from "react-router";
 import { RouterProvider } from "react-router/dom";
@@ -13,6 +14,8 @@ const loaderApiMocks = vi.hoisted(() => ({
   fetchHostSessionRecordEditor: vi.fn(),
   fetchHostSessionHistory: vi.fn(),
   fetchHostSessionRecordLedger: vi.fn(),
+  deleteHostSession: vi.fn(),
+  restoreHostSession: vi.fn(),
 }));
 
 const routeMocks = vi.hoisted(() => ({
@@ -59,7 +62,28 @@ vi.mock("react-router", async (importOriginal) => ({
 vi.mock("@/features/host/ui/host-session-editor", () => ({
   default: (props: Record<string, unknown>) => {
     routeMocks.capturedProps = props;
-    return <div>record workflow route ready</div>;
+    const session = props.session as { sessionId: string } | undefined;
+    const actions = props.actions as {
+      deleteSession?: (sessionId: string) => Promise<unknown>;
+    } | undefined;
+    const onSessionTrashed = props.onSessionTrashed as ((trash: unknown) => void) | undefined;
+    return (
+      <div>
+        record workflow route ready
+        {session && actions?.deleteSession ? (
+          <button
+            type="button"
+            onClick={() => {
+              void actions.deleteSession?.(session.sessionId).then((result) => {
+                onSessionTrashed?.(result);
+              });
+            }}
+          >
+            route-delete-session
+          </button>
+        ) : null}
+      </div>
+    );
   },
 }));
 
@@ -131,6 +155,8 @@ vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
   fetchHostSessionTrash: loaderApiMocks.fetchHostSessionTrash,
   fetchHostSessions: loaderApiMocks.fetchHostSessions,
   fetchManualNotificationDispatches: loaderApiMocks.fetchManualNotificationDispatches,
+  deleteHostSession: loaderApiMocks.deleteHostSession,
+  restoreHostSession: loaderApiMocks.restoreHostSession,
 }));
 
 vi.mock("@/features/host/api/host-session-record-api", async (importOriginal) => ({
@@ -154,8 +180,6 @@ vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) =
   useCloseHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useCommitHostSessionImportMutation: () => ({ mutateAsync: routeMocks.commitImport }),
   useCreateHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
-  useDeleteHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
-  useRestoreHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useOpenHostSessionMutation: () => ({ mutateAsync: routeMocks.openSession }),
   usePublishHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
   useReopenHostSessionMutation: () => ({ mutateAsync: vi.fn() }),
@@ -248,6 +272,7 @@ vi.mock("@/features/host/route/host-notification-composer-controller", () => ({
 import { ReadmatesApiError } from "@/shared/api/errors";
 import {
   EditHostSessionRecordWorkflow,
+  EditHostSessionRoute,
   NewHostSessionRoute,
 } from "./host-session-editor-route";
 import { hostSessionEditorLoaderFactory } from "./host-session-editor-data";
@@ -1753,6 +1778,112 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     });
     expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
     expect(loaderApiMocks.fetchHostSessionRecordEditor).not.toHaveBeenCalled();
+  });
+});
+
+function renderEditSessionRoute(
+  client: QueryClient,
+  loaderData: { sessionId: string; mode: "active" | "trash" },
+) {
+  const router = createMemoryRouter([
+    {
+      path: "/",
+      loader: () => loaderData,
+      Component: EditHostSessionRoute,
+    },
+  ]);
+  return render(
+    <QueryClientProvider client={client}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>,
+  );
+}
+
+describe("EditHostSessionRoute trash ownership", () => {
+  const context = { clubSlug: "club-a" };
+
+  beforeEach(() => {
+    loaderApiMocks.fetchHostSessionDetail.mockReset();
+    loaderApiMocks.fetchHostSessionTrash.mockReset();
+    loaderApiMocks.fetchHostSessions.mockReset().mockResolvedValue({ items: [], nextCursor: null });
+    loaderApiMocks.fetchManualNotificationDispatches.mockReset().mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    loaderApiMocks.fetchHostSessionRecordEditor.mockReset().mockResolvedValue(recordEditor);
+    loaderApiMocks.fetchHostSessionHistory.mockReset().mockResolvedValue({
+      items: [],
+      nextCursor: null,
+    });
+    loaderApiMocks.fetchHostSessionRecordLedger.mockReset().mockResolvedValue({
+      items: [],
+      nextCursor: null,
+      summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+    });
+    loaderApiMocks.deleteHostSession.mockReset();
+    loaderApiMocks.restoreHostSession.mockReset();
+  });
+
+  it("announces restore success after returning from a trash loader tombstone", async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const restored = sessionDetail();
+    client.setQueryData(hostSessionKeys.trashDetail("session-1", context), {
+      sessionId: "session-1",
+      sessionNumber: 7,
+      title: "7회차 모임",
+      state: "DRAFT",
+      deletedAt: "2026-08-21T10:00:00Z",
+      purgeAfter: "2026-08-28T10:00:00Z",
+    });
+    client.setQueryData(hostSessionRecordKeys.editor("session-1", context), recordEditor);
+    loaderApiMocks.fetchHostSessionTrash.mockResolvedValue(trashDetail());
+    loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(restored);
+    loaderApiMocks.restoreHostSession.mockResolvedValue(restored);
+
+    renderEditSessionRoute(client, { sessionId: "session-1", mode: "trash" });
+
+    expect(await screen.findByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    await user.click(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" })[0]!);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("모임을 복원했습니다.");
+    expect(await screen.findByText("record workflow route ready")).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("모임을 복원했습니다.");
+  });
+
+  it("keeps a single tombstone after delete and preserves restore errors", async () => {
+    const user = userEvent.setup();
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+    const active = sessionDetail();
+    client.setQueryData(hostSessionKeys.detail("session-1", context), active);
+    client.setQueryData(hostSessionRecordKeys.editor("session-1", context), recordEditor);
+    loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(active);
+    loaderApiMocks.fetchHostSessionTrash.mockResolvedValue(trashDetail());
+    loaderApiMocks.deleteHostSession.mockResolvedValue(trashDetail());
+    loaderApiMocks.restoreHostSession.mockRejectedValue(
+      loaderApiError(500, "INTERNAL_ERROR"),
+    );
+
+    renderEditSessionRoute(client, { sessionId: "session-1", mode: "active" });
+
+    expect(await screen.findByText("record workflow route ready")).toBeVisible();
+    await user.click(screen.getByRole("button", { name: "route-delete-session" }));
+
+    expect(await screen.findByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(screen.queryByText("record workflow route ready")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+
+    await user.click(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" })[0]!);
+    expect(await screen.findByRole("alert")).toHaveTextContent("모임을 복원하지 못했습니다.");
+    expect(screen.getByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("모임을 복원하지 못했습니다.");
+    expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
   });
 });
 

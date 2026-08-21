@@ -54,8 +54,8 @@ describe("host session ledger model", () => {
   it("derives remaining-day copy from purgeAfter without deciding eligibility", () => {
     const now = new Date("2026-08-21T10:00:00Z");
     expect(hostSessionTrashRemainingCopy("2026-08-28T10:00:00Z", now)).toBe("남은 복원 기간 7일");
-    expect(hostSessionTrashRemainingCopy("2026-08-21T12:00:00Z", now)).toBe("남은 복원 기간 1일");
-    expect(hostSessionTrashRemainingCopy("2026-08-21T09:00:00Z", now)).toBe("오늘까지 복원할 수 있습니다.");
+    expect(hostSessionTrashRemainingCopy("2026-08-21T12:00:00Z", now)).toBe("오늘까지 복원할 수 있습니다.");
+    expect(hostSessionTrashRemainingCopy("2026-08-21T09:00:00Z", now)).toBe("남은 복원 기간이 없습니다.");
     expect(hostSessionTrashDeletedAtLabel("2026-08-21T10:00:00+09:00")).toBe("삭제 2026.08.21 10:00");
   });
 

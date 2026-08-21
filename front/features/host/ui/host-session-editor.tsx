@@ -222,6 +222,7 @@ export default function HostSessionEditor({
   hostDashboardReturnTarget = defaultHostDashboardReturnTarget,
   readmatesReturnState = defaultReadmatesReturnState,
   onSessionRecordsChanged,
+  onSessionTrashed,
   recordWorkflow,
   navigation,
   scheduleDefaults,
@@ -239,6 +240,7 @@ export default function HostSessionEditor({
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
   onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>;
+  onSessionTrashed?: (trash: HostSessionDeletionResponse) => void;
   recordWorkflow?: HostSessionRecordWorkflow;
   navigation: {
     location: HostSessionWorkspaceLocation;
@@ -617,6 +619,10 @@ export default function HostSessionEditor({
     try {
       const result = await actions.deleteSession(session.sessionId);
       setDeleteModalOpen(false);
+      if (onSessionTrashed) {
+        onSessionTrashed(result);
+        return;
+      }
       setTrashedSession(result);
       setTrashRestoreState({
         restoring: false,
@@ -635,7 +641,7 @@ export default function HostSessionEditor({
     } finally {
       setDeleteSubmitting(false);
     }
-  }, [actions, applyDeletionBlockers, deletePreview, deleteSubmitting, session]);
+  }, [actions, applyDeletionBlockers, deletePreview, deleteSubmitting, onSessionTrashed, session]);
 
   const restoreTrashedSession = useCallback(async () => {
     if (!trashedSession || trashRestoreState.restoring || trashRestoreState.disabled) {

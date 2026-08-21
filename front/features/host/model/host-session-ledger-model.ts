@@ -111,8 +111,12 @@ export function hostSessionTrashRemainingCopy(purgeAfter: string, now = new Date
   if (Number.isNaN(purge)) {
     return "남은 복원 기간을 확인할 수 없습니다.";
   }
-  const days = Math.ceil((purge - now.getTime()) / MS_PER_DAY);
-  if (days <= 0) {
+  const remainingMs = purge - now.getTime();
+  if (remainingMs <= 0) {
+    return "남은 복원 기간이 없습니다.";
+  }
+  const days = Math.ceil(remainingMs / MS_PER_DAY);
+  if (days <= 1) {
     return "오늘까지 복원할 수 있습니다.";
   }
   return `남은 복원 기간 ${days}일`;

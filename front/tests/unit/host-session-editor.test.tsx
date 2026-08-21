@@ -2264,6 +2264,50 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
   });
 
+  it("hands the tombstone to the parent after delete when onSessionTrashed is provided", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue(deletionPreview),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          sessionId: "open-session-7",
+          sessionNumber: 7,
+          title: "7회차 모임",
+          state: "OPEN",
+          trashed: true,
+          deletedAt: "2026-08-21T10:00:00Z",
+          purgeAfter: "2026-08-28T10:00:00Z",
+          counts: deletionPreview.counts,
+        }),
+      });
+    vi.stubGlobal("fetch", fetchMock);
+    const onSessionTrashed = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <HostSessionEditorForTest
+        session={openSession}
+        initialLocation={{ panel: "basic", source: "manual" }}
+        onSessionTrashed={onSessionTrashed}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "세션 삭제" }));
+    const dialog = await screen.findByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    await user.click(within(dialog).getByRole("button", { name: "목록에서 지우기" }));
+
+    await waitFor(() => expect(onSessionTrashed).toHaveBeenCalledWith(expect.objectContaining({
+      sessionId: "open-session-7",
+      trashed: true,
+    })));
+    expect(screen.queryByRole("heading", { level: 1, name: "7회차 모임" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "방금 삭제한 모임 복구" })).not.toBeInTheDocument();
+  });
+
   it("keeps keyboard focus inside the delete modal and restores focus when Escape closes", async () => {
     const fetchMock = vi.fn().mockResolvedValueOnce({
       ok: true,

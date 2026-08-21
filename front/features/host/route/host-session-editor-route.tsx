@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   useBlocker,
   useLoaderData,
@@ -31,6 +31,7 @@ import type {
   SessionRecordSnapshot,
 } from "@/features/host/api/host-session-record-contracts";
 import type {
+  HostSessionDeletionResponse,
   HostSessionDetailResponse,
   HostSessionTrashItem,
   ManualNotificationDispatchListItem,
@@ -375,7 +376,6 @@ function HostSessionTrashTombstoneRoute({
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const [restoring, setRestoring] = useState(false);
-  const [restoreSuccess, setRestoreSuccess] = useState(false);
   const [restoreDisabled, setRestoreDisabled] = useState(expired);
   const [restoreDisabledReason, setRestoreDisabledReason] = useState<string | null>(
     expired ? "복원 기간이 지났습니다." : null,
@@ -399,8 +399,6 @@ function HostSessionTrashTombstoneRoute({
     setRestoreConflict(null);
     try {
       await restoreSession(sessionId);
-      setRestoreSuccess(true);
-      headingRef.current?.focus();
       onRestored();
       queueMicrotask(() => {
         document.querySelector<HTMLElement>(".rm-host-session-workspace__title")?.focus();
@@ -436,7 +434,6 @@ function HostSessionTrashTombstoneRoute({
       restoreError={restoreError}
       restoreConflict={restoreConflict}
       restoring={restoring}
-      restoreSuccess={restoreSuccess}
       headingRef={headingRef}
       onRestore={() => {
         void runRestore();
@@ -603,19 +600,22 @@ export function EditHostSessionRoute({
   );
   const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
   const [restored, setRestored] = useState(false);
+  const [ownedTrash, setOwnedTrash] = useState<HostSessionTrashItem | null>(null);
+  const [restoreAnnouncement, setRestoreAnnouncement] = useState<string | null>(null);
   const loaderTrash = (loaderData.mode ?? "active") === "trash" && !restored;
   const sessionQuery = useQuery({
     ...hostSessionDetailQuery(sessionId, context),
     enabled: !loaderTrash,
   });
-  const trashFromDetailMiss = !restored && isHostSessionNotFoundError(sessionQuery.error);
+  const trashFromDetailMiss = !restored && ownedTrash === null && isHostSessionNotFoundError(sessionQuery.error);
   const trashQuery = useQuery({
     ...hostSessionTrashDetailQuery(sessionId, context),
-    enabled: loaderTrash || trashFromDetailMiss,
+    enabled: loaderTrash || trashFromDetailMiss || ownedTrash !== null,
     retry: false,
   });
   const showTrash = !restored && (
     loaderTrash
+    || ownedTrash !== null
     || trashFromDetailMiss
     || Boolean(trashQuery.data)
     || isHostSessionTrashExpiredError(trashQuery.error)
@@ -641,37 +641,51 @@ export function EditHostSessionRoute({
     enabled: activeQueriesEnabled,
   });
 
+  const announce = (node: ReactNode) => (
+    <>
+      {restoreAnnouncement ? (
+        <div role="status" aria-live="polite">{restoreAnnouncement}</div>
+      ) : null}
+      {node}
+    </>
+  );
+
   if (showTrash) {
-    if (trashQuery.isPending && !trashQuery.data && !isHostSessionTrashExpiredError(trashQuery.error)) {
-      return <HostSessionEditorQueryState status="loading" hideTitle />;
+    const trash = ownedTrash ?? trashQuery.data ?? null;
+    if (!trash && trashQuery.isPending && !isHostSessionTrashExpiredError(trashQuery.error)) {
+      return announce(<HostSessionEditorQueryState status="loading" hideTitle />);
     }
-    if (trashQuery.isError && !isHostSessionTrashExpiredError(trashQuery.error) && !trashQuery.data) {
-      return (
+    if (!trash && trashQuery.isError && !isHostSessionTrashExpiredError(trashQuery.error)) {
+      return announce(
         <HostSessionEditorQueryState
           status="error"
           hideTitle
           onRetry={() => {
             void trashQuery.refetch();
           }}
-        />
+        />,
       );
     }
-    return (
+    return announce(
       <HostSessionTrashTombstoneRoute
         sessionId={sessionId}
         clubSlug={clubSlug}
-        trash={trashQuery.data ?? null}
+        trash={trash}
         expired={isHostSessionTrashExpiredError(trashQuery.error)}
         restoreSession={actions.restoreSession}
         LinkComponent={LinkComponent}
-        onRestored={() => setRestored(true)}
-      />
+        onRestored={() => {
+          setRestoreAnnouncement("모임을 복원했습니다.");
+          setOwnedTrash(null);
+          setRestored(true);
+        }}
+      />,
     );
   }
 
   if (!sessionQuery.data || !recordEditorQuery.data) {
     if (sessionQuery.isError || recordEditorQuery.isError) {
-      return (
+      return announce(
         <HostSessionEditorQueryState
           status="error"
           hideTitle
@@ -681,13 +695,13 @@ export function EditHostSessionRoute({
               recordEditorQuery.refetch(),
             ]);
           }}
-        />
+        />,
       );
     }
-    return <HostSessionEditorQueryState status="loading" hideTitle />;
+    return announce(<HostSessionEditorQueryState status="loading" hideTitle />);
   }
 
-  return (
+  return announce(
     <EditHostSessionRecordWorkflow
       session={sessionQuery.data}
       recordEditor={recordEditorQuery.data}
@@ -707,8 +721,18 @@ export function EditHostSessionRoute({
       hostDashboardReturnTarget={hostDashboardReturnTarget}
       readmatesReturnState={readmatesReturnState}
       onSessionRecordsChanged={handleSessionRecordsChanged}
+      onSessionTrashed={(trash) => {
+        setOwnedTrash({
+          sessionId: trash.sessionId,
+          sessionNumber: trash.sessionNumber,
+          title: trash.title,
+          state: trash.state,
+          deletedAt: trash.deletedAt,
+          purgeAfter: trash.purgeAfter,
+        });
+      }}
       navigation={navigation}
-    />
+    />,
   );
 }
 
@@ -727,6 +751,7 @@ export function EditHostSessionRecordWorkflow({
   hostDashboardReturnTarget,
   readmatesReturnState,
   onSessionRecordsChanged,
+  onSessionTrashed,
   navigation = {
     location: { panel: "focus", source: "manual" },
     onChange: () => undefined,
@@ -746,6 +771,7 @@ export function EditHostSessionRecordWorkflow({
   hostDashboardReturnTarget?: ReadmatesReturnTarget;
   readmatesReturnState?: (target: ReadmatesReturnTarget) => ReadmatesReturnState;
   onSessionRecordsChanged: (sessionId: string) => void | Promise<void>;
+  onSessionTrashed?: (trash: HostSessionDeletionResponse) => void;
   navigation?: {
     location: HostSessionWorkspaceLocation;
     onChange: (next: HostSessionWorkspaceLocation) => void;
@@ -1229,6 +1255,7 @@ export function EditHostSessionRecordWorkflow({
         hostDashboardReturnTarget={hostDashboardReturnTarget}
         readmatesReturnState={readmatesReturnState}
         onSessionRecordsChanged={onSessionRecordsChanged}
+        onSessionTrashed={onSessionTrashed}
         navigation={navigation}
         recordWorkflow={{
           editor: recordEditor,
