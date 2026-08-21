@@ -22,6 +22,7 @@ import java.util.UUID
 @Repository
 class JdbcHostActionNotificationAdapter(
     private val jdbcTemplate: JdbcTemplate,
+    private val sessionGuard: SessionScopedNotificationGuard,
 ) : HostActionNotificationPort {
     override fun countTargets(
         clubId: UUID,
@@ -136,9 +137,10 @@ class JdbcHostActionNotificationAdapter(
         liveRevision: Long,
         eventId: UUID?,
         now: OffsetDateTime,
-    ): StoredHostActionDecision =
-        findDecision(preview.id)
-            ?: insertDecision(preview, decision, liveRevision, eventId, now)
+    ): StoredHostActionDecision {
+        sessionGuard.lockExisting(preview.clubId, preview.sessionId)
+        return findDecision(preview.id) ?: insertDecision(preview, decision, liveRevision, eventId, now)
+    }
 
     private fun insertDecision(
         preview: HostActionNotificationPreviewRecord,

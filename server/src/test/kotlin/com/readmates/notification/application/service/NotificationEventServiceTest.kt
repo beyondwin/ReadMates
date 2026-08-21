@@ -1,11 +1,14 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.NotificationApplicationError
+import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.HostNotificationEvent
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.notification.application.port.out.NotificationEventOutboxPort
 import com.readmates.notification.domain.NotificationEventOutboxStatus
 import com.readmates.notification.domain.NotificationEventType
@@ -74,6 +77,39 @@ class NotificationEventServiceTest {
         }.isInstanceOf(HostActionNotificationException::class.java)
             .extracting("error")
             .isEqualTo(HostActionNotificationError.DUPLICATE_EVENT)
+    }
+
+    @Test
+    fun `host confirmed missing session is a typed not found`() {
+        val service = NotificationEventService(RecordingEventOutbox(throwMissingSession = true))
+
+        assertThatThrownBy {
+            service.recordSessionRecordUpdated(
+                clubId = UUID.randomUUID(),
+                sessionId = UUID.randomUUID(),
+                sessionNumber = 8,
+                bookTitle = "기록 테스트",
+                revision = 4,
+            )
+        }.isInstanceOf(HostActionNotificationException::class.java)
+            .extracting("error")
+            .isEqualTo(HostActionNotificationError.SESSION_NOT_FOUND)
+    }
+
+    @Test
+    fun `automatic missing session uses the notification not found taxonomy`() {
+        val service = NotificationEventService(RecordingEventOutbox(throwMissingSession = true))
+
+        assertThatThrownBy {
+            service.recordNextBookPublished(
+                clubId = UUID.randomUUID(),
+                sessionId = UUID.randomUUID(),
+                sessionNumber = 7,
+                bookTitle = "테스트 책",
+            )
+        }.isInstanceOf(NotificationApplicationException::class.java)
+            .extracting("error")
+            .isEqualTo(NotificationApplicationError.NOTIFICATION_NOT_FOUND)
     }
 
     @Test
@@ -227,6 +263,7 @@ private data class RecordedEvent(
 
 private class RecordingEventOutbox(
     private val enqueueResult: Boolean = true,
+    private val throwMissingSession: Boolean = false,
 ) : NotificationEventOutboxPort {
     val recorded = mutableListOf<RecordedEvent>()
     val reminderDates = mutableListOf<LocalDate>()
@@ -249,6 +286,7 @@ private class RecordingEventOutbox(
         payload: NotificationEventPayload,
         dedupeKey: String,
     ): Boolean {
+        if (throwMissingSession) throw NotificationSessionNotFoundException()
         if (!enqueueResult) return false
         recorded += RecordedEvent(eventId, clubId, eventType, aggregateType, aggregateId, payload, dedupeKey)
         return true

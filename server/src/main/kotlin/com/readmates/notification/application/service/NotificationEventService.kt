@@ -1,8 +1,11 @@
 package com.readmates.notification.application.service
 
+import com.readmates.notification.application.NotificationApplicationError
+import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.notification.application.model.RecordHostConfirmedNotificationEventCommand
 import com.readmates.notification.application.port.`in`.RecordHostConfirmedNotificationEventUseCase
 import com.readmates.notification.application.port.`in`.RecordNotificationEventUseCase
@@ -105,12 +108,12 @@ class NotificationEventService(
     ): UUID {
         val eventId = UUID.randomUUID()
         val inserted =
-            eventOutboxPort.enqueueEvent(
+            enqueueSessionEvent(
+                confirmed = true,
                 eventId = eventId,
                 clubId = clubId,
                 eventType = eventType,
-                aggregateType = SESSION_AGGREGATE_TYPE,
-                aggregateId = sessionId,
+                sessionId = sessionId,
                 payload =
                     NotificationEventPayload(
                         sessionId = sessionId,
@@ -136,11 +139,11 @@ class NotificationEventService(
         bookTitle: String,
         documentVersion: Int,
     ) {
-        eventOutboxPort.enqueueEvent(
+        enqueueSessionEvent(
+            confirmed = false,
             clubId = clubId,
             eventType = NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED,
-            aggregateType = SESSION_AGGREGATE_TYPE,
-            aggregateId = sessionId,
+            sessionId = sessionId,
             payload =
                 NotificationEventPayload(
                     sessionId = sessionId,
@@ -162,11 +165,11 @@ class NotificationEventService(
         sessionNumber: Int,
         bookTitle: String,
     ) {
-        eventOutboxPort.enqueueEvent(
+        enqueueSessionEvent(
+            confirmed = false,
             clubId = clubId,
             eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-            aggregateType = SESSION_AGGREGATE_TYPE,
-            aggregateId = sessionId,
+            sessionId = sessionId,
             payload =
                 NotificationEventPayload(
                     sessionId = sessionId,
@@ -187,11 +190,11 @@ class NotificationEventService(
         bookTitle: String,
         authorMembershipId: UUID,
     ) {
-        eventOutboxPort.enqueueEvent(
+        enqueueSessionEvent(
+            confirmed = false,
             clubId = clubId,
             eventType = NotificationEventType.REVIEW_PUBLISHED,
-            aggregateType = SESSION_AGGREGATE_TYPE,
-            aggregateId = sessionId,
+            sessionId = sessionId,
             payload =
                 NotificationEventPayload(
                     sessionId = sessionId,
@@ -233,4 +236,44 @@ class NotificationEventService(
             dedupeKey = "ai-generation-ready:$jobId",
         )
     }
+
+    private fun enqueueSessionEvent(
+        confirmed: Boolean,
+        eventId: UUID? = null,
+        clubId: UUID,
+        eventType: NotificationEventType,
+        sessionId: UUID,
+        payload: NotificationEventPayload,
+        dedupeKey: String,
+    ): Boolean =
+        try {
+            if (eventId == null) {
+                eventOutboxPort.enqueueEvent(
+                    clubId = clubId,
+                    eventType = eventType,
+                    aggregateType = SESSION_AGGREGATE_TYPE,
+                    aggregateId = sessionId,
+                    payload = payload,
+                    dedupeKey = dedupeKey,
+                )
+            } else {
+                eventOutboxPort.enqueueEvent(
+                    eventId = eventId,
+                    clubId = clubId,
+                    eventType = eventType,
+                    aggregateType = SESSION_AGGREGATE_TYPE,
+                    aggregateId = sessionId,
+                    payload = payload,
+                    dedupeKey = dedupeKey,
+                )
+            }
+        } catch (_: NotificationSessionNotFoundException) {
+            if (confirmed) {
+                throw HostActionNotificationException(HostActionNotificationError.SESSION_NOT_FOUND)
+            }
+            throw NotificationApplicationException(
+                NotificationApplicationError.NOTIFICATION_NOT_FOUND,
+                "Notification session is missing",
+            )
+        }
 }

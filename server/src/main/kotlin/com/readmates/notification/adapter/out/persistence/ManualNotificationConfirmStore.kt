@@ -35,8 +35,9 @@ internal class ManualNotificationConfirmStore(
     audienceQueries: ManualNotificationAudienceQueries,
     previewStore: ManualNotificationPreviewStore,
     rows: ManualNotificationDispatchRows,
+    sessionGuard: SessionScopedNotificationGuard,
 ) {
-    private val writer = ManualNotificationConfirmWriter(jdbcTemplate, objectMapper, eventsTopic)
+    private val writer = ManualNotificationConfirmWriter(jdbcTemplate, objectMapper, eventsTopic, sessionGuard)
     private val confirmation =
         ManualNotificationConfirmation(
             jdbcTemplate = jdbcTemplate,
@@ -270,6 +271,7 @@ private class ManualNotificationConfirmWriter(
     private val jdbcTemplate: JdbcTemplate,
     private val objectMapper: ObjectMapper,
     private val eventsTopic: String,
+    private val sessionGuard: SessionScopedNotificationGuard,
 ) {
     fun insertManualDispatch(
         clubId: UUID,
@@ -279,6 +281,7 @@ private class ManualNotificationConfirmWriter(
         targetSnapshot: ManualNotificationTargetSnapshot,
         resend: Boolean,
     ): ManualNotificationStoredDispatch {
+        sessionGuard.lockExisting(clubId, selection.sessionId)
         val eventId = UUID.randomUUID()
         val dispatchId = requireNotNull(payload.manualDispatch?.id) { "Manual dispatch payload id is required" }
         insertOutbox(
@@ -307,6 +310,7 @@ private class ManualNotificationConfirmWriter(
         payload: NotificationEventPayload,
         dedupeKey: String,
     ) {
+        sessionGuard.lockExisting(clubId, selection.sessionId)
         jdbcTemplate.update(
             """
             insert into notification_event_outbox (

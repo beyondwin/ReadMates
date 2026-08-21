@@ -111,11 +111,14 @@ enum class HostActionNotificationError {
     AUDIENCE_EMPTY,
     INVALID_DECISION,
     DUPLICATE_EVENT,
+    SESSION_NOT_FOUND,
 }
 
 class HostActionNotificationException(
     val error: HostActionNotificationError,
 ) : RuntimeException(error.name)
+
+class NotificationSessionNotFoundException : RuntimeException("Notification session is missing")
 
 enum class ManualNotificationAudience {
     ALL_ACTIVE_MEMBERS,

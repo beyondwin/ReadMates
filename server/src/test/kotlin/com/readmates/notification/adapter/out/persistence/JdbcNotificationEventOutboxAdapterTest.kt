@@ -4,6 +4,7 @@ import com.readmates.notification.application.config.NotificationRuntimeProperti
 import com.readmates.notification.application.model.NotificationEventMessage
 import com.readmates.notification.application.model.NotificationEventOutboxItem
 import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.notification.application.port.out.NotificationDeliveryBacklogPort
 import com.readmates.notification.application.port.out.NotificationEventOutboxBacklogPort
 import com.readmates.notification.application.port.out.NotificationEventPublisherPort
@@ -14,6 +15,7 @@ import com.readmates.notification.domain.NotificationEventType
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.slf4j.MDC
@@ -53,11 +55,14 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
     );
     delete from sessions
     where id in (
+      '00000000-0000-0000-0000-000000000201',
       '00000000-0000-0000-0000-000000009501',
       '00000000-0000-0000-0000-000000009510',
       '00000000-0000-0000-0000-000000009511',
       '00000000-0000-0000-0000-000000009512'
     );
+    delete from sessions
+    where club_id = '00000000-0000-0000-0000-000000000101';
     delete from memberships
     where id = '00000000-0000-0000-0000-000000000801';
     delete from memberships
@@ -192,6 +197,44 @@ class JdbcNotificationEventOutboxAdapterTest(
 
         assertThat(inserted).isTrue()
         assertThat(eventIdForDedupeKey("event-outbox-caller-id")).isEqualTo(eventId.toString())
+    }
+
+    @Test
+    fun `session aggregate enqueue rejects a missing parent session`() {
+        insertClub()
+        jdbcTemplate.update("delete from sessions where id = ? and club_id = ?", sessionId.toString(), clubId.toString())
+
+        assertThatThrownBy {
+            adapter.enqueueEvent(
+                clubId = clubId,
+                eventType = NotificationEventType.SESSION_RECORD_UPDATED,
+                aggregateType = "SESSION",
+                aggregateId = sessionId,
+                payload = NotificationEventPayload(sessionId = sessionId, sessionNumber = 7, bookTitle = "기록"),
+                dedupeKey = "event-outbox-missing-session",
+            )
+        }.isInstanceOf(NotificationSessionNotFoundException::class.java)
+        assertThat(eventRows()).isZero()
+    }
+
+    @Test
+    fun `non-session aggregate enqueue does not require a live session`() {
+        insertClub()
+        jdbcTemplate.update("delete from sessions where id = ? and club_id = ?", sessionId.toString(), clubId.toString())
+        val jobId = UUID.fromString("00000000-0000-0000-0000-000000000121")
+
+        val inserted =
+            adapter.enqueueEvent(
+                clubId = clubId,
+                eventType = NotificationEventType.AI_GENERATION_READY,
+                aggregateType = "AI_GENERATION_JOB",
+                aggregateId = jobId,
+                payload = NotificationEventPayload(sessionId = sessionId, jobId = jobId),
+                dedupeKey = "event-outbox-ai-job",
+            )
+
+        assertThat(inserted).isTrue()
+        assertThat(eventRows()).isEqualTo(1)
     }
 
     @Test
@@ -717,6 +760,18 @@ class JdbcNotificationEventOutboxAdapterTest(
             """.trimIndent(),
             clubId.toString(),
         )
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author,
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
+            )
+            values (?, ?, 1, '아웃박스 테스트 회차', 'Outbox Patterns', '테스트 저자',
+                    '2026-05-01', '19:00:00', '21:00:00', '온라인', '2026-04-30 19:00:00', 'OPEN', 'MEMBER')
+            """.trimIndent(),
+            sessionId.toString(),
+            clubId.toString(),
+        )
     }
 
     private fun <T> runConcurrently(
@@ -920,6 +975,7 @@ private fun assertTypedEventClaimLeaseBoundaries(
             objectMapper = objectMapper,
             eventsTopic = TEST_NOTIFICATION_EVENTS_TOPIC,
             runtimeProperties = notificationRuntimeProperties(lease),
+            sessionGuard = SessionScopedNotificationGuard(jdbcTemplate),
         )
     val expiredId =
         enqueueConfiguredLeaseEvent(adapter, jdbcTemplate, clubId, sessionId, "expired", "Expired Configured Lease")

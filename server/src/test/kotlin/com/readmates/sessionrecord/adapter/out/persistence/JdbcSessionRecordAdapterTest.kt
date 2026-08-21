@@ -20,16 +20,77 @@ import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.DuplicateKeyException
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import java.nio.file.Files
+import java.nio.file.Path
 import java.time.LocalDateTime
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Tag("integration")
 class JdbcSessionRecordAdapterTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val codec: SessionRecordSnapshotCodec,
+    @param:Autowired private val transactionManager: PlatformTransactionManager,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val adapter = JdbcSessionRecordAdapter(jdbcTemplate, codec)
+    private val transactionTemplate = TransactionTemplate(transactionManager)
+
+    @Test
+    fun `lockEditor takes a parent session row lock before insertAppliedRevision`() {
+        val source = applyStoreSource()
+        val lockEditorIndex = source.indexOf("fun lockEditor(")
+        val parentLockIndex = source.indexOf("loadLive(host, sessionId, forUpdate = true)")
+        val insertIndex = source.indexOf("fun insertAppliedRevision(")
+        assertThat(lockEditorIndex).isGreaterThanOrEqualTo(0)
+        assertThat(parentLockIndex).isGreaterThan(lockEditorIndex)
+        assertThat(insertIndex).isGreaterThan(parentLockIndex)
+    }
+
+    @Test
+    fun `lockEditor holds the parent session row for later revision insert`() {
+        val fixture = fixture("parent-lock")
+        val held = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val editor =
+                executor.submit {
+                    transactionTemplate.execute {
+                        assertThat(adapter.lockEditor(fixture.host, fixture.sessionId)).isNotNull()
+                        held.countDown()
+                        check(release.await(10, TimeUnit.SECONDS))
+                    }
+                }
+            check(held.await(10, TimeUnit.SECONDS))
+            val blocked =
+                executor.submit<String> {
+                    requireNotNull(
+                        transactionTemplate.execute<String> { _ ->
+                            jdbcTemplate
+                                .query(
+                                    "select id from sessions where id = ? and club_id = ? for update",
+                                    { rs, _ -> rs.getString("id") },
+                                    fixture.sessionId.toString(),
+                                    fixture.host.clubId.toString(),
+                                ).single()
+                        },
+                    )
+                }
+            assertThatThrownBy { blocked.get(250, TimeUnit.MILLISECONDS) }
+                .isInstanceOf(TimeoutException::class.java)
+            release.countDown()
+            assertThat(blocked.get(10, TimeUnit.SECONDS)).isEqualTo(fixture.sessionId.toString())
+            editor.get(10, TimeUnit.SECONDS)
+        } finally {
+            executor.shutdownNow()
+        }
+    }
 
     @Test
     fun `draft rows are club scoped and round trip canonical JSON with one active draft`() {
@@ -654,6 +715,15 @@ class JdbcSessionRecordAdapterTest(
             appliedAt,
         )
         return id
+    }
+
+    private fun applyStoreSource(): String {
+        val sourceRoot =
+            listOf(Path.of("src/main/kotlin"), Path.of("server/src/main/kotlin"))
+                .first(Files::exists)
+        return Files.readString(
+            sourceRoot.resolve("com/readmates/sessionrecord/adapter/out/persistence/JdbcSessionRecordApplyStore.kt"),
+        )
     }
 
     private data class Fixture(

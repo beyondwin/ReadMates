@@ -39,6 +39,8 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
+import java.nio.file.Files
+import java.nio.file.Path
 import java.sql.Connection
 import java.sql.DriverManager
 import java.sql.SQLException
@@ -110,6 +112,16 @@ class JdbcManualNotificationDispatchAdapterTest(
             role = MembershipRole.HOST,
             membershipStatus = MembershipStatus.ACTIVE,
         )
+
+    @Test
+    fun `confirmation locks the session row before insertOutbox`() {
+        val source = confirmStoreSource()
+        val lockIndex =
+            source.indexOf("findSessionContext(input.clubId, input.selection.sessionId, forUpdate = true)")
+        val insertIndex = source.indexOf("writer.insertOutbox(")
+        assertThat(lockIndex).isGreaterThanOrEqualTo(0)
+        assertThat(insertIndex).isGreaterThan(lockIndex)
+    }
 
     @Test
     fun `findSessionContext returns session metadata and feedback document state`() {
@@ -1060,6 +1072,15 @@ class JdbcManualNotificationDispatchAdapterTest(
         } finally {
             restorePreference(changedMembershipId, originalPreference)
         }
+    }
+
+    private fun confirmStoreSource(): String {
+        val sourceRoot =
+            listOf(Path.of("src/main/kotlin"), Path.of("server/src/main/kotlin"))
+                .first(Files::exists)
+        return Files.readString(
+            sourceRoot.resolve("com/readmates/notification/adapter/out/persistence/ManualNotificationConfirmStore.kt"),
+        )
     }
 
     private fun insertManualDispatchFixture(identitySeed: String = "manual-dispatch-list") =

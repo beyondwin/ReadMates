@@ -4,6 +4,7 @@ package com.readmates.sessionrecord.adapter.`in`.web
 
 import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
+import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.sessionrecord.application.model.InvalidHostSessionHistoryCursorException
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
@@ -57,6 +58,14 @@ class SessionRecordErrorHandler {
                 )
         }
 
+    @ExceptionHandler(NotificationSessionNotFoundException::class)
+    fun handleNotificationSessionNotFound(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            HttpStatus.NOT_FOUND,
+            "SESSION_RECORD_NOT_FOUND",
+            "요청한 세션 기록을 찾을 수 없습니다.",
+        )
+
     @ExceptionHandler(HostActionNotificationException::class)
     fun handleNotification(error: HostActionNotificationException): ResponseEntity<ApiErrorResponse> =
         when (error.error) {
@@ -68,6 +77,12 @@ class SessionRecordErrorHandler {
                 conflict("NOTIFICATION_PREVIEW_ALREADY_CONSUMED", "이미 사용된 알림 확인입니다.")
             HostActionNotificationError.DUPLICATE_EVENT ->
                 conflict("NOTIFICATION_DUPLICATE_EVENT", "동일한 알림 이벤트가 이미 생성되었습니다.")
+            HostActionNotificationError.SESSION_NOT_FOUND ->
+                apiErrorResponse(
+                    HttpStatus.NOT_FOUND,
+                    "SESSION_RECORD_NOT_FOUND",
+                    "요청한 세션 기록을 찾을 수 없습니다.",
+                )
             HostActionNotificationError.CONFIRMATION_REQUIRED,
             HostActionNotificationError.PREVIEW_NOT_FOUND,
             HostActionNotificationError.PREVIEW_MISMATCH,

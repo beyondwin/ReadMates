@@ -2,6 +2,7 @@ package com.readmates.notification.adapter.`in`.web
 
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
+import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import org.springframework.http.HttpStatus
@@ -17,6 +18,14 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
     ],
 )
 class NotificationErrorHandler {
+    @ExceptionHandler(NotificationSessionNotFoundException::class)
+    fun handleNotificationSessionNotFound(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.NOT_FOUND,
+            code = NotificationApplicationError.NOTIFICATION_NOT_FOUND.name,
+            message = "알림 정보를 찾을 수 없습니다.",
+        )
+
     @ExceptionHandler(NotificationApplicationException::class)
     @Suppress("MaxLineLength")
     fun handleNotificationApplicationException(exception: NotificationApplicationException): ResponseEntity<ApiErrorResponse> {

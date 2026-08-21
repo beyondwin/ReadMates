@@ -4,6 +4,7 @@ package com.readmates.sessionrecord.adapter.`in`.web
 
 import com.readmates.notification.application.model.HostActionNotificationError
 import com.readmates.notification.application.model.HostActionNotificationException
+import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
 import org.assertj.core.api.Assertions.assertThat
@@ -39,6 +40,16 @@ class SessionRecordErrorHandlerTest {
             "NOTIFICATION_PREVIEW_ALREADY_CONSUMED",
         )
         assertNotificationError(HostActionNotificationError.DUPLICATE_EVENT, "NOTIFICATION_DUPLICATE_EVENT")
+        val missingSession =
+            handler.handleNotification(
+                HostActionNotificationException(HostActionNotificationError.SESSION_NOT_FOUND),
+            )
+        assertThat(missingSession.statusCode.value()).isEqualTo(404)
+        assertThat(missingSession.body?.code).isEqualTo("SESSION_RECORD_NOT_FOUND")
+        val missingParent = handler.handleNotificationSessionNotFound()
+        assertThat(missingParent.statusCode.value()).isEqualTo(404)
+        assertThat(missingParent.body?.code).isEqualTo("SESSION_RECORD_NOT_FOUND")
+        assertThat(NotificationSessionNotFoundException().message).isEqualTo("Notification session is missing")
     }
 
     @Test

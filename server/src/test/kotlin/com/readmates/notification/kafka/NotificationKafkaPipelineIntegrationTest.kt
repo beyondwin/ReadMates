@@ -7,6 +7,7 @@ import com.readmates.notification.adapter.out.kafka.NotificationKafkaConfigurati
 import com.readmates.notification.adapter.out.kafka.NotificationKafkaProperties
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationDeliveryAdapter
 import com.readmates.notification.adapter.out.persistence.JdbcNotificationEventOutboxAdapter
+import com.readmates.notification.adapter.out.persistence.SessionScopedNotificationGuard
 import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.ManualNotificationAudience
 import com.readmates.notification.application.model.ManualNotificationRequestedChannels
@@ -555,7 +556,13 @@ class NotificationKafkaPipelineIntegrationTest(
             runtimeProperties: NotificationRuntimeProperties,
         ): JdbcNotificationEventOutboxAdapter {
             val topic = eventsTopic
-            return JdbcNotificationEventOutboxAdapter(jdbcTemplate, objectMapper, topic, runtimeProperties)
+            return JdbcNotificationEventOutboxAdapter(
+                jdbcTemplate,
+                objectMapper,
+                topic,
+                runtimeProperties,
+                SessionScopedNotificationGuard(jdbcTemplate),
+            )
         }
 
         @Bean

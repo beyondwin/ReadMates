@@ -29,6 +29,7 @@ class JdbcManualNotificationDispatchAdapter(
         "\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}",
     )
     eventsTopic: String,
+    sessionGuard: SessionScopedNotificationGuard,
 ) : ManualNotificationDispatchPort {
     private val rows = ManualNotificationDispatchRows
     private val readQueries = ManualNotificationDispatchReadQueries(jdbcTemplate, rows)
@@ -43,6 +44,7 @@ class JdbcManualNotificationDispatchAdapter(
             audienceQueries = audienceQueries,
             previewStore = previewStore,
             rows = rows,
+            sessionGuard = sessionGuard,
         )
 
     override fun findSessionContext(

@@ -34,6 +34,7 @@ import java.util.UUID
 import kotlin.math.max
 
 private const val MAX_EVENT_LAST_ERROR_LENGTH = 500
+private const val SESSION_AGGREGATE_TYPE = "SESSION"
 
 @Repository
 class JdbcNotificationEventOutboxAdapter(
@@ -41,10 +42,12 @@ class JdbcNotificationEventOutboxAdapter(
     private val objectMapper: ObjectMapper,
     @param:Value("\${readmates.notifications.kafka.events-topic:readmates.notification.events.v1}") private val eventsTopic: String,
     runtimeProperties: NotificationRuntimeProperties,
+    private val sessionGuard: SessionScopedNotificationGuard,
 ) : NotificationEventOutboxPort {
     private val payloadType = objectMapper.typeFactory.constructType(NotificationEventPayload::class.java)
     private val claimLeaseMicroseconds = runtimeProperties.worker.claimLeaseMicroseconds
 
+    @Transactional
     override fun enqueueEvent(
         clubId: UUID,
         eventType: NotificationEventType,
@@ -63,7 +66,27 @@ class JdbcNotificationEventOutboxAdapter(
             dedupeKey = dedupeKey,
         )
 
+    @Transactional
     override fun enqueueEvent(
+        eventId: UUID,
+        clubId: UUID,
+        eventType: NotificationEventType,
+        aggregateType: String,
+        aggregateId: UUID,
+        payload: NotificationEventPayload,
+        dedupeKey: String,
+    ): Boolean {
+        if (aggregateType == SESSION_AGGREGATE_TYPE) {
+            sessionGuard.lockExisting(clubId, aggregateId)
+        }
+        return insertOutboxEvent(eventId, clubId, eventType, aggregateType, aggregateId, payload, dedupeKey)
+    }
+
+    @Transactional
+    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int =
+        sessionGuard.lockReminderCandidates(targetDate).sumOf { candidate -> insertReminder(candidate, targetDate) }
+
+    private fun insertOutboxEvent(
         eventId: UUID,
         clubId: UUID,
         eventType: NotificationEventType,
@@ -105,8 +128,10 @@ class JdbcNotificationEventOutboxAdapter(
             false
         }
 
-    @Transactional
-    override fun enqueueSessionReminderDue(targetDate: LocalDate): Int =
+    private fun insertReminder(
+        candidate: SessionReminderCandidate,
+        targetDate: LocalDate,
+    ): Int =
         jdbcTemplate.update(
             """
             insert ignore into notification_event_outbox (
@@ -122,36 +147,36 @@ class JdbcNotificationEventOutboxAdapter(
               status,
               dedupe_key
             )
-            select
+            values (
               uuid(),
-              sessions.club_id,
+              ?,
               'SESSION_REMINDER_DUE',
               ?,
               'SESSION',
-              sessions.id,
+              ?,
               json_object(
-                'sessionId', sessions.id,
-                'sessionNumber', sessions.number,
-                'bookTitle', sessions.book_title,
+                'sessionId', ?,
+                'sessionNumber', ?,
+                'bookTitle', ?,
                 'targetDate', ?
               ),
               ?,
-              sessions.club_id,
+              ?,
               'PENDING',
-              concat('session-reminder:', ?, ':', sessions.id)
-            from sessions
-            join club_notification_policies
-              on club_notification_policies.club_id = sessions.club_id
-             and club_notification_policies.session_reminder_enabled = true
-            where sessions.session_date = ?
-              and sessions.state in ('DRAFT', 'OPEN')
-              and sessions.visibility in ('MEMBER', 'PUBLIC')
+              concat('session-reminder:', ?, ':', ?)
+            )
             """.trimIndent(),
+            candidate.clubId.dbString(),
             currentRequestId(),
+            candidate.sessionId.dbString(),
+            candidate.sessionId.dbString(),
+            candidate.sessionNumber,
+            candidate.bookTitle,
             targetDate.toString(),
             eventsTopic,
+            candidate.clubId.dbString(),
             targetDate.toString(),
-            targetDate,
+            candidate.sessionId.dbString(),
         )
 
     @Transactional
