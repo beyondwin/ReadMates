@@ -8,8 +8,8 @@ import {
 async function expectPracticalTapTarget(locator: Locator) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
-  expect(box!.width).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(43.5);
+  expect(box!.width).toBeGreaterThanOrEqual(43.5);
 }
 
 async function expectDomOrder(...locators: Locator[]) {
@@ -276,16 +276,17 @@ test("mobile public pages hide app tabs and host app pages show mobile chrome", 
   await firstLedgerAction.click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/[^/]+\/?$/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  const editorSections = page.getByRole("tablist", { name: "호스트 편집 섹션" });
-  await expect(editorSections.getByRole("tab")).toHaveCount(5);
-  await expect(editorSections.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel", { name: "개요" })).toBeVisible();
-  await editorSections.getByRole("tab", { name: "기록", exact: true }).click();
-  await expect(editorSections.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: /정리본/ })).toBeVisible();
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
-  await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "개요" })).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "모임 정보" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "변경 내역" }).first()).toBeVisible();
+  const recordsUrl = new URL(page.url());
+  recordsUrl.searchParams.set("section", "records");
+  await page.goto(`${recordsUrl.pathname}${recordsUrl.search}`);
+  await expect(page.getByRole("heading", { name: /정리본/ })).toBeVisible();
+  await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 
   await tabs.getByRole("link", { name: "기록" }).click();

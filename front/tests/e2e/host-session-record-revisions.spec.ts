@@ -33,17 +33,64 @@ async function loginHost(page: Page) {
 
 async function openRecordEditor(page: Page) {
   await page.goto(`${HOST_PATH}/sessions/${recordSessionId}`);
-  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel", { name: "개요" })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
 }
 
-async function openEditorSection(page: Page, name: "기본 정보" | "출석" | "기록" | "변경 기록") {
-  const section = page.getByRole("tab", { name, exact: true });
-  await section.click();
-  await expect(section).toHaveAttribute("aria-selected", "true");
+async function openEditorSection(
+  page: Page,
+  name: "개요" | "기본 정보" | "출석" | "기록" | "변경 기록",
+) {
+  const current = new URL(page.url());
+  const section = name === "개요"
+    ? null
+    : name === "기본 정보"
+      ? "basic"
+      : name === "출석"
+        ? "attendance"
+        : name === "기록"
+          ? "records"
+          : "history";
+  if (section) {
+    current.searchParams.set("section", section);
+    if (section !== "records") {
+      current.searchParams.delete("source");
+    }
+  } else {
+    current.searchParams.delete("section");
+    current.searchParams.delete("source");
+  }
+  const next = `${current.pathname}${current.search}`;
+  const now = `${new URL(page.url()).pathname}${new URL(page.url()).search}`;
+  if (now !== next) {
+    await page.goto(next);
+  }
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+  if (name === "개요") {
+    await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+    return;
+  }
+  if (name === "기본 정보") {
+    await expect(page.getByLabel("세션 제목")).toBeVisible();
+    return;
+  }
+  if (name === "변경 기록") {
+    await expect(page.getByRole("dialog", { name: "변경 내역" })).toBeVisible();
+    return;
+  }
+  const panelId = name === "출석" ? "workspace-panel-attendance" : "workspace-panel-records";
+  const panel = page.locator(`#${panelId}`);
+  await expect(panel).toBeVisible();
+  await expect(panel.getByRole("button", { name: "접기" })).toBeVisible();
+}
+
+async function expectAppliedRecord(page: Page, summary: string, draftCopy: string) {
+  await openEditorSection(page, "기록");
+  await expect(page.getByRole("region", { name: "멤버에게 보이는 기록" })).toContainText(summary);
+  await expect(page.getByRole("region", { name: "작성 중" })).toContainText(draftCopy);
 }
 
 async function fetchHostSession(page: Page, sessionId: string): Promise<HostSessionDetailResponse> {
@@ -78,7 +125,7 @@ async function reviewAndApply(page: Page) {
       response.url().includes(`/host/sessions/${recordSessionId}/record-apply-preview`) &&
       response.ok(),
   );
-  await page.getByRole("button", { name: "반영 전 확인" }).click();
+  await page.getByRole("button", { name: "반영 전 확인" }).filter({ visible: true }).first().click();
   expect((await previewResponse).ok()).toBe(true);
   const dialog = page.getByRole("dialog", { name: "반영 전 확인" });
   await expect(dialog).toBeVisible();
@@ -182,10 +229,11 @@ test("1. host finds and opens a past session at the default overview", async ({ 
   await page.getByLabel("책 제목").fill(RECORD_BOOK);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.getByRole("button", { name: "세션 문서 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("heading", { name: "지금 다루는 모임" })).toBeVisible();
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Revision Workflow Session" })).toBeVisible();
   recordSessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
   expect(recordSessionId).not.toBe("");
 
@@ -228,8 +276,8 @@ where id = '${recordSessionId}';
   await rowAction.click();
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tabpanel", { name: "개요" })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   const overviewScreenshot = await page.screenshot({
     path: testInfo.outputPath("overview-1280x900.png"),
     fullPage: true,
@@ -251,7 +299,7 @@ test("2. basic information and attendance save immediately with metadata-only au
       response.url().includes(`/host/sessions/${recordSessionId}`) &&
       response.ok(),
   );
-  await page.getByRole("button", { name: "기본 정보 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "기본 정보 저장" }).click();
   expect((await basicSave).ok()).toBe(true);
 
   await openEditorSection(page, "출석");
@@ -357,13 +405,13 @@ test("4. stale draft requires an exact live metadata review before apply", async
       response.url().includes(`/host/sessions/${recordSessionId}`) &&
       response.ok(),
   );
-  await page.getByRole("button", { name: "기본 정보 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "기본 정보 저장" }).click();
   expect((await basicSave).ok()).toBe(true);
 
   await page.reload();
   await openEditorSection(page, "기록");
   await expect(page.getByText(/세션 기본 정보 또는 현재 적용본이 변경되어/)).toBeVisible();
-  const reviewButton = page.getByRole("button", { name: "반영 전 확인" });
+  const reviewButton = page.locator("#workspace-panel-records").getByRole("button", { name: "반영 전 확인" });
   await expect(reviewButton).toBeDisabled();
   const staleScreenshot = await page.screenshot({
     path: testInfo.outputPath("records-stale-1280x900.png"),
@@ -408,9 +456,7 @@ test("5. apply then composer skip creates a revision without a notification even
   await expect.poll(() => readSessionRecordRevisionCount(recordSessionId)).toBeGreaterThan(before);
   expect(await readNotificationEventCount(recordSessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
   expect(await readNotificationEventCount(recordSessionId, "SESSION_RECORD_UPDATED")).toBe(0);
-  await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("region", { name: "현재 적용본" })).toContainText(RECORD_SUMMARY);
-  await expect(page.getByRole("region", { name: "작업 중인 초안" })).toContainText("준비된 초안이 없습니다");
+  await expectAppliedRecord(page, RECORD_SUMMARY, "준비된 초안 없음");
 });
 
 test("6. apply then composer confirm creates exactly one session-record event", async ({ page }) => {
@@ -427,9 +473,7 @@ test("6. apply then composer confirm creates exactly one session-record event", 
   await page.getByRole("button", { name: "발송 확인" }).click();
   expect(await readHostActionDecision(recordSessionId)).toBeNull();
   await expect.poll(() => readNotificationEventCount(recordSessionId, "SESSION_RECORD_UPDATED")).toBe(1);
-  await expect(page.getByRole("tab", { name: "개요" })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("region", { name: "현재 적용본" })).toContainText(UPDATED_SUMMARY);
-  await expect(page.getByRole("region", { name: "작업 중인 초안" })).toContainText("준비된 초안이 없습니다");
+  await expectAppliedRecord(page, UPDATED_SUMMARY, "준비된 초안 없음");
 });
 
 test("7. restoring an immutable version creates a draft without changing the applied version", async ({ page }, testInfo) => {
@@ -463,9 +507,7 @@ test("7. restoring an immutable version creates a draft without changing the app
   expect((await restoreResponse).ok()).toBe(true);
   await waitForDraftSaved(page);
   expect(await readSessionRecordRevisionCount(recordSessionId)).toBe(before);
-  await openEditorSection(page, "개요");
-  await expect(page.getByRole("region", { name: "현재 적용본" })).toContainText(UPDATED_SUMMARY);
-  await expect(page.getByRole("region", { name: "작업 중인 초안" })).toContainText("작성 방식 · 과거 버전에서 생성");
+  await expectAppliedRecord(page, UPDATED_SUMMARY, "작성 방식 · 과거 버전에서 생성");
 });
 
 test("8. 320px host record navigation and confirmation sheet remain accessible", async ({ page }, testInfo) => {
@@ -482,34 +524,16 @@ where id = '${recordSessionId}';
   await page.getByRole("searchbox", { name: "세션 기록 검색" }).fill(RECORD_BOOK);
   await page.getByRole("button", { name: "검색" }).click();
   await page.getByRole("link", { name: new RegExp(`^${recordSessionNumber}회차`) }).first().click();
-  const sectionNav = page.getByRole("tablist", { name: "호스트 편집 섹션" });
-  const sectionTabs = sectionNav.getByRole("tab");
-  await expect(sectionTabs).toHaveCount(5);
-  await expect(sectionTabs.locator("[data-mobile-label]")).toHaveText(["개요", "기본", "출석", "기록", "변경"]);
-  const sectionNavMetrics = await sectionNav.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-  }));
-  expect(sectionNavMetrics.scrollWidth).toBeLessThanOrEqual(sectionNavMetrics.clientWidth);
-  const tabBoxes = await sectionTabs.evaluateAll((tabs) => tabs.map((tab) => {
-    const box = tab.getBoundingClientRect();
-    const style = getComputedStyle(tab);
-    return { width: box.width, height: box.height, justifyContent: style.justifyContent };
-  }));
-  expect(Math.max(...tabBoxes.map((box) => box.width)) - Math.min(...tabBoxes.map((box) => box.width)))
-    .toBeLessThanOrEqual(1);
-  expect(tabBoxes.every((box) => box.height >= 44 && box.justifyContent === "center")).toBe(true);
-  const mobileMetadata = page.getByRole("group", { name: "모바일 세션 상태" });
-  await expect(mobileMetadata).toBeVisible();
-  await expect(mobileMetadata.getByText("호스트 전용")).toHaveCount(1);
-  const metadataLines = await mobileMetadata.locator(":scope > *").evaluateAll((items) =>
-    new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
-  );
-  expect(metadataLines).toBe(1);
-
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "개요" })).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+  await expect(page.getByRole("button", { name: "모임 정보" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "변경 내역" }).first()).toBeVisible();
   const overviewPanel = page.locator(".rm-host-session-workspace__focus");
   await expect(overviewPanel).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await openEditorSection(page, "기록");
+  await expect(page.getByRole("region", { name: "멤버에게 보이는 기록" })).toBeVisible();
   await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   const refreshDraft = page.getByRole("button", { name: "최신 정보 확인 완료" });
@@ -530,14 +554,11 @@ where id = '${recordSessionId}';
     + "https://example.test/public-safe/very-long-segment-without-breaks/세션-기록";
   await page.getByLabel("공개 요약").fill(longMobileSummary);
   await waitForDraftSaved(page);
-  await expect(page.getByRole("button", { name: "반영 전 확인" })).toBeEnabled();
-  const stickyAction = page.getByRole("region", { name: "반영 전 확인" });
-  const appNav = page.getByRole("navigation", { name: "앱 탭" });
-  const [stickyBox, appNavBox] = await Promise.all([stickyAction.boundingBox(), appNav.boundingBox()]);
-  expect(stickyBox).not.toBeNull();
-  expect(appNavBox).not.toBeNull();
-  expect(stickyBox!.y + stickyBox!.height).toBeLessThanOrEqual(appNavBox!.y);
-  await page.getByRole("button", { name: "반영 전 확인" }).click();
+  const reviewButton = page.locator("#workspace-panel-records").getByRole("button", { name: "반영 전 확인" });
+  await expect(reviewButton).toBeEnabled();
+  await expect(page.getByRole("navigation", { name: "앱 탭" })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+  await reviewButton.click();
 
   const dialog = page.getByRole("dialog", { name: "반영 전 확인" });
   const sheet = page.getByTestId("host-action-dialog-sheet");
@@ -560,22 +581,10 @@ where id = '${recordSessionId}';
 
   await page.setViewportSize({ width: 390, height: 844 });
   await openRecordEditor(page);
-  await expect(overviewPanel).toHaveCSS("padding-left", "16px");
-  await expect(overviewPanel).toHaveCSS("padding-right", "16px");
-  const wideMobileMetadata = page.getByRole("group", { name: "모바일 세션 상태" });
-  const wideDesktopMetadata = page.locator('[aria-label="데스크톱 세션 상태"]');
-  await expect(wideMobileMetadata).toHaveCSS("display", "flex");
-  await expect(wideMobileMetadata).toHaveCSS("gap", "5px");
-  await expect(wideDesktopMetadata).toHaveCSS("display", "none");
-  const wideMetadataLines = await wideMobileMetadata.locator(":scope > *").evaluateAll((items) =>
-    new Set(items.map((item) => Math.round(item.getBoundingClientRect().top))).size,
-  );
-  expect(wideMetadataLines).toBe(1);
-  const wideSectionTabs = page.getByRole("tablist", { name: "호스트 편집 섹션" }).getByRole("tab");
-  await expect(wideSectionTabs).toHaveCount(5);
-  for (const tab of await wideSectionTabs.all()) {
-    await expect(tab).toBeVisible();
-  }
+  await expect(overviewPanel).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "모임 정보" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "변경 내역" }).first()).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const overviewScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-editor-overview-390x844.png"),
@@ -583,7 +592,7 @@ where id = '${recordSessionId}';
   });
   expect(overviewScreenshot.byteLength).toBeGreaterThan(10_000);
   await openEditorSection(page, "기록");
-  await page.getByRole("button", { name: "반영 전 확인" }).click();
+  await page.getByRole("button", { name: "반영 전 확인" }).filter({ visible: true }).first().click();
   await expect(dialog).toBeVisible();
   const wideMobileBox = await sheet.boundingBox();
   expect(wideMobileBox).not.toBeNull();
@@ -600,11 +609,9 @@ where id = '${recordSessionId}';
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await openRecordEditor(page);
-  const desktopMetadata = page.getByRole("group", { name: "데스크톱 세션 상태" });
-  const desktopMobileMetadata = page.locator('[aria-label="모바일 세션 상태"]');
-  await expect(desktopMetadata).toHaveCSS("display", "grid");
-  await expect(desktopMetadata).toHaveCSS("gap", "10px");
-  await expect(desktopMobileMetadata).toHaveCSS("display", "none");
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
   const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-editor-overview-1280x900.png"),
     fullPage: true,
@@ -613,42 +620,14 @@ where id = '${recordSessionId}';
 
   await page.setViewportSize({ width: 240, height: 720 });
   await openRecordEditor(page);
-  const narrowSectionNav = page.getByRole("tablist", { name: "호스트 편집 섹션" });
-  const narrowTabs = narrowSectionNav.getByRole("tab");
-  const narrowMetrics = await narrowSectionNav.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-    overflowX: getComputedStyle(element).overflowX,
-  }));
-  expect(narrowMetrics.overflowX).toBe("auto");
-  expect(narrowMetrics.scrollWidth).toBeGreaterThanOrEqual(narrowMetrics.clientWidth);
-  const narrowTabGeometry = await narrowTabs.evaluateAll((tabs) => tabs.map((tab) => {
-    const tabBox = tab.getBoundingClientRect();
-    const label = tab.querySelector<HTMLElement>("[data-mobile-label]");
-    if (!label) throw new Error("mobile tab label missing");
-    const labelBox = label.getBoundingClientRect();
-    return {
-      left: tabBox.left,
-      right: tabBox.right,
-      width: tabBox.width,
-      height: tabBox.height,
-      labelLeft: labelBox.left,
-      labelRight: labelBox.right,
-    };
-  }));
-  expect(narrowTabGeometry.every((tab) => tab.width >= 44 && tab.height >= 44)).toBe(true);
-  expect(narrowTabGeometry.every((tab) => (
-    tab.labelLeft >= tab.left - 0.5 && tab.labelRight <= tab.right + 0.5
-  ))).toBe(true);
-  expect(narrowTabGeometry.slice(1).every((tab, index) => (
-    tab.left >= narrowTabGeometry[index].right - 0.5
-  ))).toBe(true);
-  if (narrowMetrics.scrollWidth > narrowMetrics.clientWidth) {
-    await narrowSectionNav.evaluate((element) => element.scrollTo({ left: element.scrollWidth }));
-    expect(await narrowSectionNav.evaluate((element) => element.scrollLeft)).toBeGreaterThan(0);
-  } else {
-    expect(await narrowSectionNav.evaluate((element) => element.scrollLeft)).toBe(0);
-  }
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  const secondary = page.locator(".rm-host-session-workspace__secondary");
+  await expect(secondary.getByRole("button", { name: "모임 정보" })).toBeVisible();
+  await expect(secondary.getByRole("button", { name: "변경 내역" })).toBeVisible();
+  const secondaryBox = await secondary.boundingBox();
+  expect(secondaryBox).not.toBeNull();
+  expect(secondaryBox!.x).toBeGreaterThanOrEqual(0);
+  expect(secondaryBox!.x + secondaryBox!.width).toBeLessThanOrEqual(240);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   const narrowScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-editor-tabs-240x720.png"),

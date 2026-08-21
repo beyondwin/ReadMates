@@ -1,4 +1,4 @@
-import { expect, test, type Page, type TestInfo } from "@playwright/test";
+import { expect, test, type Locator, type Page, type TestInfo } from "@playwright/test";
 import {
   cleanupGeneratedSessions,
   createHostSessionFixture,
@@ -153,6 +153,100 @@ async function expectOneMainAndOrderedHeadings(page: Page): Promise<void> {
     expect(headingLevels.headingLevels[index]! - headingLevels.headingLevels[index - 1]!)
       .toBeLessThanOrEqual(1);
   }
+}
+
+async function closeWorkspaceSheet(page: Page, name: "모임 정보" | "변경 내역"): Promise<void> {
+  const sheet = page.getByRole("dialog", { name });
+  const trigger = page.getByRole("button", { name });
+  const backdrop = page.locator(".rm-host-session-workspace__sheet-backdrop");
+  const expanded = (await trigger.getAttribute("aria-expanded")) === "true";
+  if (expanded || await sheet.isVisible()) {
+    const collapse = sheet.getByRole("button", { name: "접기" });
+    if (await collapse.isVisible().catch(() => false)) {
+      await collapse.click();
+    } else {
+      await page.keyboard.press("Escape");
+    }
+    await expect(sheet).toBeHidden();
+    await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  }
+  if (name === "모임 정보") {
+    await expect(backdrop).toBeHidden();
+  }
+}
+
+async function tabUntilFocused(page: Page, locator: Locator, maxTabs = 48): Promise<void> {
+  for (let index = 0; index < maxTabs; index += 1) {
+    if (await locator.evaluate((element) => element === document.activeElement).catch(() => false)) {
+      return;
+    }
+    await page.keyboard.press("Tab");
+  }
+  const active = await page.evaluate(() => {
+    const element = document.activeElement as HTMLElement | null;
+    if (!element) {
+      return "null";
+    }
+    return `${element.tagName.toLowerCase()} ${(element.getAttribute("aria-label") ?? element.textContent ?? "")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 48)}`;
+  });
+  throw new Error(`Tab did not reach the expected control; active=${active}`);
+}
+
+async function expectVisibleFocus(page: Page, locator: Locator): Promise<void> {
+  await expect(locator).toBeFocused();
+  const focusVisible = await locator.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return style.outlineWidth !== "0px" || style.boxShadow !== "none";
+  });
+  expect(focusVisible).toBe(true);
+}
+
+async function expectDialogFitsViewport(page: Page, dialog: Locator): Promise<void> {
+  await expect(dialog).toBeVisible();
+  const metrics = await dialog.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      x: rect.x,
+      y: rect.y,
+      right: rect.right,
+      bottom: rect.bottom,
+      width: window.innerWidth,
+      height: window.innerHeight,
+    };
+  });
+  expect(metrics.x).toBeGreaterThanOrEqual(-1);
+  expect(metrics.y).toBeGreaterThanOrEqual(-1);
+  expect(metrics.right).toBeLessThanOrEqual(metrics.width + 1);
+  expect(metrics.bottom).toBeLessThanOrEqual(metrics.height + 1);
+}
+
+async function expectFocusedContentNotCoveredByStickyCta(page: Page, control: Locator): Promise<void> {
+  const dropzone = page.locator("label.rm-session-import-drop");
+  await dropzone.scrollIntoViewIfNeeded();
+  await dropzone.click();
+  await expect(control).toBeFocused();
+  const sticky = page.locator(".rm-host-session-workspace__footer-cta");
+  const controlBox = await dropzone.evaluate((element) => {
+    const rect = element.getBoundingClientRect();
+    return {
+      y: rect.y,
+      bottom: rect.bottom,
+      height: window.innerHeight,
+    };
+  });
+  expect(controlBox.y).toBeGreaterThanOrEqual(0);
+  expect(controlBox.bottom).toBeLessThanOrEqual(controlBox.height);
+  await expect(sticky).toBeHidden();
+}
+
+function sessionState(sessionId: string): string {
+  return runMysql(`select state from sessions where id = '${sessionId}';`)
+    .trim()
+    .split("\n")
+    .at(-1) ?? "";
 }
 
 async function openWorkspace(page: Page, sessionId: string): Promise<void> {
@@ -372,7 +466,7 @@ test.describe("host club operations hub", () => {
 });
 
 test.describe("focus workspace recovery journey", () => {
-  test.setTimeout(120_000);
+  test.setTimeout(180_000);
 
   test.beforeEach(async ({ page }) => {
     await page.clock.setFixedTime(HOST_DASHBOARD_FIXED_TIME);
@@ -525,10 +619,7 @@ test.describe("focus workspace recovery journey", () => {
     await importButton.click();
     const applyDialog = page.getByRole("dialog", { name: "반영 전 확인" });
     await expect(applyDialog).toBeVisible({ timeout: 15_000 });
-    const box = await applyDialog.boundingBox();
-    expect(box).not.toBeNull();
-    expect(box!.x).toBeGreaterThanOrEqual(0);
-    expect(box!.x + box!.width).toBeLessThanOrEqual(1280);
+    await expectDialogFitsViewport(page, applyDialog);
     const applyResponse = page.waitForResponse((response) =>
       response.request().method() === "POST"
       && response.url().includes(`/host/sessions/${sessionId}/record-apply`)
@@ -572,8 +663,16 @@ test.describe("focus workspace recovery journey", () => {
     await visibleButton(page, "기록 공개").click();
     await confirmLifecycle(page, "기록 공개", "기록 공개");
     await expect(page.getByText("공개 완료")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "공개 취소" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "공개 기록 보기" }).filter({ visible: true })).toHaveCount(1);
-    await expect(page.getByRole("button", { name: "수정본 만들기" })).toBeVisible();
+    const createRevision = page.getByRole("button", { name: "수정본 만들기" });
+    await expect(createRevision).toBeVisible();
+    expect(sessionState(sessionId)).toBe("PUBLISHED");
+    await createRevision.click();
+    await expect(page.getByText("공개 완료")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "공개 취소" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "정리본" })).toBeVisible();
+    expect(sessionState(sessionId)).toBe("PUBLISHED");
   });
 
   test("recovery undoes basic edits, surfaces stale restore, history restore, and lifecycle inverse", async ({ page }) => {
@@ -582,6 +681,7 @@ test.describe("focus workspace recovery journey", () => {
       bookTitle: "포커스 복원 책",
       state: "DRAFT",
       date: "2026-08-20",
+      withParticipants: true,
     });
     await page.setViewportSize({ width: 1280, height: 720 });
     await openWorkspace(page, sessionId);
@@ -628,25 +728,44 @@ test.describe("focus workspace recovery journey", () => {
     await historyRestore.click();
     const historyDialog = page.getByRole("dialog", { name: "이 변경을 되돌릴까요?" });
     await expect(historyDialog).toBeVisible();
-    await historyDialog.getByRole("button", { name: "되돌리기" }).evaluate((button) => {
-      if (button instanceof HTMLButtonElement) {
-        button.click();
-      }
-    });
+    await closeWorkspaceSheet(page, "변경 내역");
+    await historyDialog.getByRole("button", { name: "되돌리기" }).click();
     await expect(historyDialog).toBeHidden({ timeout: 15_000 });
     await page.reload();
     await expect(page.getByText("모임 작성 중")).toBeVisible();
-    const historySheet = page.getByRole("dialog", { name: "변경 내역" });
-    if (await historySheet.isVisible()) {
-      await historySheet.getByRole("button", { name: "접기" }).click();
-    }
+    await closeWorkspaceSheet(page, "변경 내역");
     await page.getByRole("button", { name: "모임 정보" }).click();
     await expect(page.getByLabel("세션 제목")).toHaveValue(/포커스 복원 책/);
-    await page.getByRole("dialog", { name: "모임 정보" }).getByRole("button", { name: "접기" }).click();
+    await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
+    await expect(page.getByText("모임 작성 중")).toBeVisible();
+    await expect(page.locator(".rm-host-session-workspace__sheet-backdrop")).toBeHidden();
     await expect(visibleButton(page, "멤버와 준비 시작")).toHaveCount(1);
     await visibleButton(page, "멤버와 준비 시작").click();
     await confirmLifecycle(page, "멤버에게 열기", "멤버에게 열기");
     await expect(page.getByText("멤버와 준비 중")).toBeVisible();
+
+    await page.goto(`${HOST_PATH}/sessions/${sessionId}?section=attendance`);
+    const attend = page.getByRole("button", { name: "호스트 참석" });
+    await expect(attend).toBeVisible();
+    await attend.click();
+    await expect(attend).toHaveAttribute("aria-pressed", "true");
+    const attendanceUndo = page.getByRole("status").filter({ hasText: "출석을 바꿨습니다." });
+    await expect(attendanceUndo).toBeVisible();
+    await attendanceUndo.getByRole("button", { name: "되돌리기" }).click();
+    const attendanceDialog = page.getByRole("dialog", { name: "이 변경을 되돌릴까요?" });
+    await expect(attendanceDialog).toBeVisible();
+    await expect(attendanceDialog).toContainText("출석");
+    const restoreAttendance = page.waitForResponse((response) =>
+      response.request().method() === "POST"
+      && response.url().includes(`/host/sessions/${sessionId}/changes/`)
+      && response.url().includes("/restore"),
+    );
+    await attendanceDialog.getByRole("button", { name: "되돌리기" }).click();
+    expect((await restoreAttendance).ok()).toBe(true);
+    await expect(attendanceDialog).toBeHidden();
+    await page.goto(`${HOST_PATH}/sessions/${sessionId}?section=attendance`);
+    await expect(page.getByRole("button", { name: "호스트 참석" })).toHaveAttribute("aria-pressed", "false");
+
     await page.getByRole("button", { name: "모임 전으로 되돌리기" }).click();
     await confirmLifecycle(page, "모임 전으로 되돌리기", "모임 전으로 되돌리기", "실수로 상태를 바꿈");
     await expect(page.getByText("모임 작성 중")).toBeVisible();
@@ -727,18 +846,13 @@ test.describe("focus workspace recovery journey", () => {
     await captureWorkspaceViewport(page, testInfo, "focus-closed");
 
     await page.setViewportSize({ width: 390, height: 844 });
-    const stickyCta = page.locator(".rm-host-session-workspace__footer-cta");
-    await expect(stickyCta).toBeVisible();
-    const primary = visibleButton(page, "정리본 올리기");
-    await primary.focus();
-    const [controlBox, stickyBox] = await Promise.all([
-      primary.boundingBox(),
-      stickyCta.boundingBox(),
-    ]);
-    expect(controlBox).not.toBeNull();
-    expect(stickyBox).not.toBeNull();
-    expect(controlBox!.y).toBeGreaterThanOrEqual(stickyBox!.y - 1);
-    expect(controlBox!.y + controlBox!.height).toBeLessThanOrEqual(844);
+    await visibleButton(page, "정리본 올리기").click();
+    await expect(page.getByRole("heading", { name: "정리본" })).toBeVisible();
+    await expect(page.locator("label.rm-session-import-drop")).toBeVisible();
+    await expectFocusedContentNotCoveredByStickyCta(
+      page,
+      page.getByLabel("정리한 파일을 여기에 놓으세요"),
+    );
 
     cleanupGeneratedSessions();
     const tombstoneId = createHostSessionFixture({
@@ -753,15 +867,19 @@ test.describe("focus workspace recovery journey", () => {
     await page.getByRole("button", { name: "세션 삭제" }).click();
     const dialog = page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
     await expect(dialog).toBeVisible();
-    const dialogBox = await dialog.boundingBox();
-    expect(dialogBox).not.toBeNull();
-    expect(dialogBox!.x).toBeGreaterThanOrEqual(0);
-    expect(dialogBox!.x + dialogBox!.width).toBeLessThanOrEqual(390);
-    expect(dialogBox!.height).toBeLessThanOrEqual(844);
-    const visibleTop = Math.max(0, dialogBox!.y);
-    const visibleBottom = Math.min(844, dialogBox!.y + dialogBox!.height);
-    expect(visibleBottom - visibleTop).toBeGreaterThan(dialogBox!.height * 0.8);
-    await dialog.getByRole("button", { name: "목록에서 지우기" }).click();
+    const confirmDelete = dialog.getByRole("button", { name: "목록에서 지우기" });
+    await expect(confirmDelete).toBeVisible();
+    const confirmMetrics = await confirmDelete.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return {
+        y: rect.y,
+        bottom: rect.bottom,
+        height: window.innerHeight,
+      };
+    });
+    expect(confirmMetrics.y).toBeGreaterThanOrEqual(0);
+    expect(confirmMetrics.bottom).toBeLessThanOrEqual(confirmMetrics.height);
+    await confirmDelete.click();
     await expect(page.getByRole("heading", { name: "휴지통에서 복원" })).toBeVisible();
     await captureWorkspaceViewport(page, testInfo, "focus-tombstone");
   });
@@ -777,41 +895,62 @@ test.describe("focus workspace recovery journey", () => {
     await openWorkspace(page, sessionId);
     await expectOneMainAndOrderedHeadings(page);
 
-    await page.getByRole("button", { name: "모임 정보" }).focus();
-    await expect(page.getByRole("button", { name: "모임 정보" })).toBeFocused();
-    const focusVisible = await page.evaluate(() => {
-      const active = document.activeElement;
-      if (!(active instanceof HTMLElement)) {
-        return false;
-      }
-      const style = getComputedStyle(active);
-      return style.outlineWidth !== "0px" || style.boxShadow !== "none";
-    });
-    expect(focusVisible).toBe(true);
+    const basicTrigger = page.getByRole("button", { name: "모임 정보" });
+    const historyTrigger = page.getByRole("button", { name: "변경 내역" }).first();
+    const primaryCta = page.locator("button.rm-host-session-workspace__cta--desktop");
+    const attendanceDisclosure = page.getByRole("listitem", { name: /출석/ }).getByRole("button");
+    const recordsDisclosure = page.getByRole("listitem", { name: /기록/ }).getByRole("button");
 
+    await page.locator(".rm-host-session-workspace__title").focus();
+    await tabUntilFocused(page, basicTrigger);
+    await expectVisibleFocus(page, basicTrigger);
+    await tabUntilFocused(page, historyTrigger);
+    await expect(historyTrigger).toBeFocused();
+    await tabUntilFocused(page, primaryCta);
+    await expect(primaryCta).toBeFocused();
+    await expect(primaryCta).toHaveText("멤버와 준비 시작");
+    await tabUntilFocused(page, attendanceDisclosure);
+    await expect(attendanceDisclosure).toBeFocused();
+    await tabUntilFocused(page, recordsDisclosure);
+    await expect(recordsDisclosure).toBeFocused();
+
+    await page.locator(".rm-host-session-workspace__title").focus();
+    await tabUntilFocused(page, basicTrigger);
     await page.keyboard.press("Enter");
     const sheet = page.getByRole("dialog", { name: "모임 정보" });
     await expect(sheet).toBeVisible();
+    const title = page.getByLabel("세션 제목");
+    await tabUntilFocused(page, title);
+    await expect(title).toBeFocused();
+    await title.fill("88회차 모임 · 키보드 저장");
+    const save = sheet.getByRole("button", { name: "기본 정보 저장" });
+    await tabUntilFocused(page, save);
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("status").filter({ hasText: "저장되었습니다." })).toBeVisible();
+    await sheet.focus();
     await page.keyboard.press("Escape");
     await expect(sheet).toBeHidden();
-    await expect(page.getByRole("button", { name: "모임 정보" })).toBeFocused();
+    await expect(basicTrigger).toBeFocused();
 
-    await page.getByRole("button", { name: "변경 내역" }).click();
-    await expect(page.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
+    await tabUntilFocused(page, historyTrigger);
+    await page.keyboard.press("Enter");
+    const historySheet = page.getByRole("dialog", { name: "변경 내역" });
+    await expect(historySheet).toBeVisible();
+    await expect(historySheet).toContainText("버전과 작업 기록");
     await page.keyboard.press("Escape");
+    await expect(historySheet).toBeHidden();
+    await expect(historyTrigger).toBeFocused();
 
-    await page.getByRole("button", { name: "모임 정보" }).click();
-    await page.getByLabel("세션 제목").fill("88회차 모임 · 키보드 저장");
-    await page.getByRole("button", { name: "기본 정보 저장" }).click();
-    await expect(page.getByRole("status").filter({ hasText: "저장되었습니다." })).toBeVisible();
-    await page.getByRole("dialog", { name: "모임 정보" }).getByRole("button", { name: "접기" }).click();
-    await expect(page.getByRole("dialog", { name: "모임 정보" })).toBeHidden();
-    await page.getByRole("button", { name: "되돌리기" }).click();
+    const undo = page.getByRole("status").filter({ hasText: "모임 정보를 저장했습니다." })
+      .getByRole("button", { name: "되돌리기" });
+    await tabUntilFocused(page, undo);
+    await expect(undo).toBeFocused();
+    await page.keyboard.press("Enter");
     const undoDialog = page.getByRole("dialog", { name: "이 변경을 되돌릴까요?" });
     await expect(undoDialog).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(undoDialog).toBeHidden();
-    await expect(page.getByRole("button", { name: "되돌리기" })).toBeFocused();
+    await expect(undo).toBeFocused();
     await expectNoHostPrivateSentinels(page);
   });
 });

@@ -277,29 +277,28 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
   ).toBe(true);
 }
 
+async function expectRecordsPanelOpen(page: Page): Promise<void> {
+  const recordsPanel = page.locator("#workspace-panel-records");
+  await expect(recordsPanel).toBeVisible();
+  const toggle = recordsPanel.getByRole("button", { name: /^(열기|접기)$/ });
+  if ((await toggle.getAttribute("aria-expanded")) !== "true") {
+    await toggle.click();
+  }
+  await expect(recordsPanel.getByRole("button", { name: "접기" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /정리본/ })).toBeVisible();
+}
+
 async function expectMobileEditorChrome(page: Page): Promise<void> {
-  const sectionNav = page.getByRole("tablist", { name: "호스트 편집 섹션" });
-  const sectionTabs = sectionNav.getByRole("tab");
-  await expect(sectionTabs).toHaveCount(5);
-  await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("tab", { name: "개요" })).toHaveCount(0);
   await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
-  await expect(page.locator('[role="tabpanel"]:visible')).toHaveCount(1);
-  const sectionNavMetrics = await sectionNav.evaluate((element) => ({
-    clientWidth: element.clientWidth,
-    scrollWidth: element.scrollWidth,
-  }));
-  expect(sectionNavMetrics.scrollWidth).toBeLessThanOrEqual(sectionNavMetrics.clientWidth);
+  await expect(page.getByRole("button", { name: "모임 정보" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "변경 내역" }).first()).toBeVisible();
+  await expectRecordsPanelOpen(page);
 
   const appNav = page.getByRole("navigation", { name: "앱 탭" });
-  const stickyAction = page.getByRole("region", { name: "반영 전 확인" });
-  const [appNavBox, stickyBox] = await Promise.all([
-    appNav.boundingBox(),
-    stickyAction.boundingBox(),
-  ]);
-  expect(appNavBox).not.toBeNull();
-  expect(stickyBox).not.toBeNull();
-  expect(stickyBox!.y + stickyBox!.height).toBeLessThanOrEqual(appNavBox!.y);
+  await expect(appNav).toBeVisible();
   await expectNoHorizontalOverflow(page);
 }
 
@@ -368,8 +367,8 @@ test("host captures public-safe session record preview evidence on desktop and m
     `/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?section=records&source=json`,
   );
   await expectCanonicalRecordsJsonUrl(page);
-  await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("heading", { name: /정리본/ })).toBeVisible();
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expectRecordsPanelOpen(page);
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible({ timeout: 15000 });
   const previewPost = page.waitForResponse(
     (response) =>
@@ -428,11 +427,7 @@ test("host captures public-safe session record preview evidence on desktop and m
 
   await page.setViewportSize({ width: 390, height: 844 });
   await dismissApplyReviewIfOpen(page, 1_000);
-  const recordsTab = page.getByRole("tab", { name: "기록", exact: true });
-  await expect(recordsTab).toBeVisible();
-  if ((await recordsTab.getAttribute("aria-selected")) !== "true") {
-    await recordsTab.click();
-  }
+  await expectRecordsPanelOpen(page);
   await expectSavedManualDraftPublicSafe(page, 1_000);
   await expectMobileEditorChrome(page);
   const mobileScreenshot = await page.screenshot({
@@ -498,7 +493,9 @@ test("legacy records=json URL canonicalizes once and opens the JSON source", asy
   await page.goto(`/clubs/${CLUB_SLUG}/app/host/sessions/${SESSION_ID}?records=json`);
 
   await expectCanonicalRecordsJsonUrl(page);
-  await expect(page.getByRole("tab", { name: "기록", exact: true })).toHaveAttribute("aria-selected", "true");
-  await expect(page.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expectRecordsPanelOpen(page);
+  await expect(page.getByRole("tablist", { name: "초안 만들기" }).getByRole("tab", { name: "정리본 올리기" }))
+    .toHaveAttribute("aria-selected", "true");
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toBeVisible();
 });
