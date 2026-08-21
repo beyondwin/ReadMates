@@ -8,8 +8,8 @@ import {
 async function expectPracticalTapTarget(locator: Locator) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(43.5);
-  expect(box!.width).toBeGreaterThanOrEqual(43.5);
+  expect(box!.height).toBeGreaterThanOrEqual(44);
+  expect(box!.width).toBeGreaterThanOrEqual(44);
 }
 
 async function expectDomOrder(...locators: Locator[]) {

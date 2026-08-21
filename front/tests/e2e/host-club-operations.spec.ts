@@ -866,20 +866,8 @@ test.describe("focus workspace recovery journey", () => {
     await openBasicSheet(page);
     await page.getByRole("button", { name: "세션 삭제" }).click();
     const dialog = page.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
-    await expect(dialog).toBeVisible();
-    const confirmDelete = dialog.getByRole("button", { name: "목록에서 지우기" });
-    await expect(confirmDelete).toBeVisible();
-    const confirmMetrics = await confirmDelete.evaluate((element) => {
-      const rect = element.getBoundingClientRect();
-      return {
-        y: rect.y,
-        bottom: rect.bottom,
-        height: window.innerHeight,
-      };
-    });
-    expect(confirmMetrics.y).toBeGreaterThanOrEqual(0);
-    expect(confirmMetrics.bottom).toBeLessThanOrEqual(confirmMetrics.height);
-    await confirmDelete.click();
+    await expectDialogFitsViewport(page, dialog);
+    await dialog.getByRole("button", { name: "목록에서 지우기" }).click();
     await expect(page.getByRole("heading", { name: "휴지통에서 복원" })).toBeVisible();
     await captureWorkspaceViewport(page, testInfo, "focus-tombstone");
   });

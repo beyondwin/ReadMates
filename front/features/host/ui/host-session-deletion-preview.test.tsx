@@ -93,6 +93,18 @@ describe("HostSessionDeletionPreviewDialog", () => {
     expect(onRefreshPreview).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps the deletion preview inside a bounded action sheet", () => {
+    renderDialog({ preview });
+
+    const dialog = screen.getByRole("dialog", { name: "이 모임을 목록에서 지울까요?" });
+    expect(dialog).toHaveClass("rm-host-action-dialog-sheet");
+    expect(dialog).toHaveStyle({
+      maxHeight: "calc(100dvh - 24px)",
+      overflowY: "auto",
+    });
+    expect(dialog.parentElement).toHaveClass("rm-host-action-dialog-backdrop");
+  });
+
   it("announces pending preview reload with a status live region", () => {
     renderDialog({
       preview: { ...preview, canDelete: false, blockers: [{ code: "NOTIFICATION_EVENT_EXISTS", count: 1 }] },

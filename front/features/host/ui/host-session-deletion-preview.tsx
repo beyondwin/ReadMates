@@ -109,15 +109,11 @@ export function HostSessionDeletionPreviewDialog({
 
   return (
     <div
-      role="presentation"
-      style={{
-        position: "fixed",
-        inset: 0,
-        background: "rgba(22, 24, 29, 0.46)",
-        zIndex: 70,
-        display: "grid",
-        placeItems: "center",
-        padding: "20px",
+      className="rm-host-action-dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !submitting) {
+          onClose();
+        }
       }}
     >
       <div
@@ -125,10 +121,16 @@ export function HostSessionDeletionPreviewDialog({
         role="dialog"
         aria-modal="true"
         aria-labelledby="delete-session-title"
-        className="surface"
+        className="rm-host-action-dialog-sheet stack"
         tabIndex={-1}
         onKeyDown={handleKeyDown}
-        style={{ width: "min(460px, 100%)", padding: "24px" }}
+        style={{
+          "--stack": "14px",
+          width: "min(460px, 100%)",
+          maxWidth: "100%",
+          maxHeight: "calc(100dvh - 24px)",
+          overflowY: "auto",
+        } as CSSProperties}
       >
         <h2 id="delete-session-title" style={{ margin: 0 }}>
           이 모임을 목록에서 지울까요?

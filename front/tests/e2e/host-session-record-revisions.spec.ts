@@ -31,6 +31,24 @@ async function loginHost(page: Page) {
   await loginWithGoogleFixture(page, "host@example.com");
 }
 
+async function closeWorkspaceSheets(page: Page) {
+  for (const name of ["모임 정보", "변경 내역"] as const) {
+    const trigger = page.getByRole("button", { name }).first();
+    const sheet = page.getByRole("dialog", { name });
+    if ((await trigger.getAttribute("aria-expanded")) !== "true" && !(await sheet.isVisible())) {
+      continue;
+    }
+    const collapse = sheet.getByRole("button", { name: "접기" });
+    if (await collapse.isVisible().catch(() => false)) {
+      await collapse.click();
+    } else if (await sheet.isVisible()) {
+      await sheet.focus();
+      await page.keyboard.press("Escape");
+    }
+    await expect(sheet).toBeHidden();
+  }
+}
+
 async function openRecordEditor(page: Page) {
   await page.goto(`${HOST_PATH}/sessions/${recordSessionId}`);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
@@ -44,43 +62,31 @@ async function openEditorSection(
   page: Page,
   name: "개요" | "기본 정보" | "출석" | "기록" | "변경 기록",
 ) {
-  const current = new URL(page.url());
-  const section = name === "개요"
-    ? null
-    : name === "기본 정보"
-      ? "basic"
-      : name === "출석"
-        ? "attendance"
-        : name === "기록"
-          ? "records"
-          : "history";
-  if (section) {
-    current.searchParams.set("section", section);
-    if (section !== "records") {
-      current.searchParams.delete("source");
-    }
-  } else {
-    current.searchParams.delete("section");
-    current.searchParams.delete("source");
-  }
-  const next = `${current.pathname}${current.search}`;
-  const now = `${new URL(page.url()).pathname}${new URL(page.url()).search}`;
-  if (now !== next) {
-    await page.goto(next);
-  }
-  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
-  if (name === "개요") {
-    await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
-    return;
-  }
   if (name === "기본 정보") {
+    const trigger = page.getByRole("button", { name: "모임 정보" });
+    if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+      await closeWorkspaceSheets(page);
+      await trigger.click();
+    }
     await expect(page.getByLabel("세션 제목")).toBeVisible();
     return;
   }
   if (name === "변경 기록") {
+    const trigger = page.getByRole("button", { name: "변경 내역" }).first();
+    if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+      await closeWorkspaceSheets(page);
+      await trigger.click();
+    }
     await expect(page.getByRole("dialog", { name: "변경 내역" })).toBeVisible();
     return;
   }
+  await closeWorkspaceSheets(page);
+  if (name === "개요") {
+    await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+    return;
+  }
+  const progressName = name === "출석" ? /출석/ : /^기록 /;
+  await page.getByRole("listitem", { name: progressName }).getByRole("button").click();
   const panelId = name === "출석" ? "workspace-panel-attendance" : "workspace-panel-records";
   const panel = page.locator(`#${panelId}`);
   await expect(panel).toBeVisible();
@@ -505,6 +511,13 @@ test("7. restoring an immutable version creates a draft without changing the app
   );
   await restoreDialog.getByRole("button", { name: "작업 초안 만들기" }).click();
   expect((await restoreResponse).ok()).toBe(true);
+  const historySheet = page.getByRole("dialog", { name: "변경 내역" });
+  if (await historySheet.isVisible()) {
+    await historySheet.focus();
+    await page.keyboard.press("Escape");
+  }
+  await expect(historySheet).toBeHidden();
+  await openEditorSection(page, "기록");
   await waitForDraftSaved(page);
   expect(await readSessionRecordRevisionCount(recordSessionId)).toBe(before);
   await expectAppliedRecord(page, UPDATED_SUMMARY, "작성 방식 · 과거 버전에서 생성");
@@ -532,7 +545,8 @@ where id = '${recordSessionId}';
   const overviewPanel = page.locator(".rm-host-session-workspace__focus");
   await expect(overviewPanel).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await openEditorSection(page, "기록");
+  await page.getByRole("listitem", { name: /^기록 / }).getByRole("button").click();
+  await expect(page.locator("#workspace-panel-records").getByRole("button", { name: "접기" })).toBeVisible();
   await expect(page.getByRole("region", { name: "멤버에게 보이는 기록" })).toBeVisible();
   await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();

@@ -6866,6 +6866,8 @@ a.rm-recent-record__destination:hover {
   background: var(--bg);
   box-shadow: 0 24px 80px rgb(20 18 15 / 24%);
   padding: 22px;
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
 }
 
 @media (max-width: 600px) {
@@ -6876,9 +6878,10 @@ a.rm-recent-record__destination:hover {
 
   .rm-host-action-dialog-sheet {
     width: 100% !important;
-    max-height: calc(100dvh - 16px) !important;
+    max-height: min(86dvh, calc(100dvh - 16px - env(safe-area-inset-bottom, 0px))) !important;
+    overflow-y: auto;
     border-radius: var(--r-3) var(--r-3) 0 0;
-    padding: 18px 12px max(18px, env(safe-area-inset-bottom));
+    padding: 18px 12px max(18px, env(safe-area-inset-bottom, 0px));
   }
 }
 
