@@ -1,6 +1,7 @@
 package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionScheduleDefaults
+import com.readmates.session.application.PreviousOnlineMeeting
 import com.readmates.session.application.requireHost
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.shared.db.dbString
@@ -9,6 +10,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.util.UUID
 
 private const val SCHEDULE_DEFAULTS_SAMPLE_LIMIT = 10
 
@@ -43,6 +45,33 @@ internal class HostSessionScheduleDefaultsQueries {
                 host.clubId.dbString(),
                 SCHEDULE_DEFAULTS_SAMPLE_LIMIT,
             )
-        return HostSessionScheduleDefaultsPolicy.from(samples)
+        return HostSessionScheduleDefaultsPolicy.from(
+            samples,
+            loadPreviousOnlineMeeting(jdbcTemplate, host.clubId),
+        )
     }
+
+    private fun loadPreviousOnlineMeeting(
+        jdbcTemplate: JdbcTemplate,
+        clubId: UUID,
+    ): PreviousOnlineMeeting? =
+        jdbcTemplate
+            .query(
+                """
+                select meeting_url, meeting_passcode
+                from sessions
+                where club_id = ?
+                  and meeting_url is not null
+                  and trim(meeting_url) <> ''
+                order by session_date desc, number desc
+                limit 1
+                """.trimIndent(),
+                { resultSet, _ ->
+                    PreviousOnlineMeeting(
+                        meetingUrl = resultSet.getString("meeting_url").trim(),
+                        meetingPasscode = resultSet.getString("meeting_passcode")?.trim()?.takeIf(String::isNotEmpty),
+                    )
+                },
+                clubId.dbString(),
+            ).firstOrNull()
 }

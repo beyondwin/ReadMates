@@ -42,7 +42,7 @@ export function upcomingBookCreateFormValues(input: UpcomingBookCreateInput): Ho
   const fallback = defaultHostSessionFormValues();
   const startTime = input.startTime.trim() || fallback.startTime;
   const locationLabel = input.locationLabel.trim() || fallback.locationLabel;
-  const endTime = input.endTime.trim() || BUILTIN_SCHEDULE_DEFAULTS.endTime;
+  const endTime = input.endTime.trim() || BUILTIN_SCHEDULE_DEFAULTS.automatic.endTime;
   return {
     ...fallback,
     title: input.bookTitle,

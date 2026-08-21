@@ -1,5 +1,8 @@
 package com.readmates.session.adapter.`in`.web
 
+import com.fasterxml.jackson.annotation.JsonInclude
+import com.readmates.session.application.HostSessionAutomaticScheduleDefaults
+import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.shared.security.CurrentMember
@@ -75,6 +78,55 @@ data class HostSessionRequest(
             meetingPasscode = meetingPasscode,
             accessScope = accessScope,
         )
+}
+
+data class PreviousOnlineMeetingResponse(
+    val meetingUrl: String,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val meetingPasscode: String?,
+)
+
+data class HostSessionScheduleDefaultsResponse(
+    val automatic: HostSessionAutomaticScheduleDefaults,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val previousOnlineMeeting: PreviousOnlineMeetingResponse?,
+    val hints: List<String>,
+    val startTime: String,
+    val endTime: String,
+    val locationLabel: String,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val meetingUrl: String?,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val meetingPasscode: String?,
+    val accessScope: SessionAccessScope,
+    val suggestedDate: String?,
+    val questionDeadlineOffsetDays: Long,
+) {
+    companion object {
+        fun from(defaults: HostSessionScheduleDefaults): HostSessionScheduleDefaultsResponse {
+            val automatic = defaults.automatic
+            val previous =
+                defaults.previousOnlineMeeting?.let { meeting ->
+                    PreviousOnlineMeetingResponse(
+                        meetingUrl = meeting.meetingUrl,
+                        meetingPasscode = meeting.meetingPasscode,
+                    )
+                }
+            return HostSessionScheduleDefaultsResponse(
+                automatic = automatic,
+                previousOnlineMeeting = previous,
+                hints = defaults.hints,
+                startTime = automatic.startTime,
+                endTime = automatic.endTime,
+                locationLabel = automatic.locationLabel,
+                meetingUrl = previous?.meetingUrl,
+                meetingPasscode = previous?.meetingPasscode,
+                accessScope = automatic.accessScope,
+                suggestedDate = automatic.suggestedDate,
+                questionDeadlineOffsetDays = automatic.questionDeadlineOffsetDays,
+            )
+        }
+    }
 }
 
 private fun isHttpsUrlOrBlank(value: String?): Boolean {

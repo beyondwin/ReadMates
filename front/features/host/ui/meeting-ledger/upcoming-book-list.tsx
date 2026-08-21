@@ -66,14 +66,14 @@ export function UpcomingBookList({
     }
     return {
       ...applyScheduleDefaults(draft, scheduleDefaults),
-      accessScope: accessScopeTouched ? draft.accessScope : scheduleDefaults.accessScope,
+      accessScope: accessScopeTouched ? draft.accessScope : scheduleDefaults.automatic.accessScope,
     };
   }, [accessScopeTouched, draft, scheduleDefaults]);
 
   function expandForm() {
     setError(null);
     setAccessScopeTouched(false);
-    setDraft(blankForm(scheduleDefaults?.accessScope ?? defaultAccessScope));
+    setDraft(blankForm(scheduleDefaults?.automatic.accessScope ?? defaultAccessScope));
     setExpanded((open) => !open);
   }
 
@@ -99,11 +99,11 @@ export function UpcomingBookList({
         meetingUrl: form.meetingUrl,
         meetingPasscode: form.meetingPasscode,
         accessScope: form.accessScope,
-        questionDeadlineOffsetDays: scheduleDefaults?.questionDeadlineOffsetDays ?? 1,
+        questionDeadlineOffsetDays: scheduleDefaults?.automatic.questionDeadlineOffsetDays ?? 1,
       });
       setExpanded(false);
       setAccessScopeTouched(false);
-      setDraft(blankForm(scheduleDefaults?.accessScope ?? defaultAccessScope));
+      setDraft(blankForm(scheduleDefaults?.automatic.accessScope ?? defaultAccessScope));
     } catch {
       setError("모임을 넣지 못했습니다.");
     }

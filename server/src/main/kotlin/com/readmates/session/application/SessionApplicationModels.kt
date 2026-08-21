@@ -200,15 +200,23 @@ data class HostSessionListQuery(
     val needsAttention: Boolean? = null,
 )
 
-data class HostSessionScheduleDefaults(
+data class HostSessionAutomaticScheduleDefaults(
     val startTime: String,
     val endTime: String,
     val locationLabel: String,
-    val meetingUrl: String?,
-    val meetingPasscode: String?,
     val accessScope: SessionAccessScope,
     val suggestedDate: String?,
     val questionDeadlineOffsetDays: Long,
+)
+
+data class PreviousOnlineMeeting(
+    val meetingUrl: String,
+    val meetingPasscode: String?,
+)
+
+data class HostSessionScheduleDefaults(
+    val automatic: HostSessionAutomaticScheduleDefaults,
+    val previousOnlineMeeting: PreviousOnlineMeeting?,
     val hints: List<String>,
 )
 

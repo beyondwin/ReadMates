@@ -679,17 +679,12 @@ export type HostSessionDeletionResponse = {
   counts: HostSessionDeletionCounts;
 };
 
-export type HostSessionScheduleDefaults = {
-  startTime: string;
-  endTime: string;
-  locationLabel: string;
-  meetingUrl?: string | null;
-  meetingPasscode?: string | null;
-  accessScope: SessionAccessScope;
-  suggestedDate?: string | null;
-  questionDeadlineOffsetDays: number;
-  hints: string[];
-};
+export type {
+  HostSessionAutomaticScheduleDefaults,
+  HostSessionScheduleDefaults,
+  HostSessionScheduleDefaultsWire,
+  PreviousOnlineMeeting,
+} from "../model/host-schedule-defaults-state";
 
 export type HostSessionRequest = {
   title: string;

@@ -1,6 +1,8 @@
 package com.readmates.session.adapter.out.persistence
 
+import com.readmates.session.application.HostSessionAutomaticScheduleDefaults
 import com.readmates.session.application.HostSessionScheduleDefaults
+import com.readmates.session.application.PreviousOnlineMeeting
 import com.readmates.session.domain.SessionAccessScope
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -29,17 +31,22 @@ internal data class HostSessionScheduleSample(
 )
 
 internal object HostSessionScheduleDefaultsPolicy {
-    fun from(samples: List<HostSessionScheduleSample>): HostSessionScheduleDefaults {
+    fun from(
+        samples: List<HostSessionScheduleSample>,
+        previousOnlineMeeting: PreviousOnlineMeeting? = previousOnlineMeetingFrom(samples),
+    ): HostSessionScheduleDefaults {
         if (samples.isEmpty()) {
             return HostSessionScheduleDefaults(
-                startTime = DEFAULT_START_TIME,
-                endTime = DEFAULT_END_TIME,
-                locationLabel = DEFAULT_LOCATION,
-                meetingUrl = null,
-                meetingPasscode = null,
-                accessScope = SessionAccessScope.HOST_ONLY,
-                suggestedDate = null,
-                questionDeadlineOffsetDays = DEFAULT_DEADLINE_OFFSET_DAYS,
+                automatic =
+                    HostSessionAutomaticScheduleDefaults(
+                        startTime = DEFAULT_START_TIME,
+                        endTime = DEFAULT_END_TIME,
+                        locationLabel = DEFAULT_LOCATION,
+                        accessScope = SessionAccessScope.HOST_ONLY,
+                        suggestedDate = null,
+                        questionDeadlineOffsetDays = DEFAULT_DEADLINE_OFFSET_DAYS,
+                    ),
+                previousOnlineMeeting = previousOnlineMeeting,
                 hints = emptyList(),
             )
         }
@@ -48,30 +55,34 @@ internal object HostSessionScheduleDefaultsPolicy {
         val location =
             (majorityOrNull(samples.map { it.locationLabel.trim() }) ?: latest.locationLabel.trim())
                 .ifEmpty { DEFAULT_LOCATION }
-        val meeting = samples.firstNotNullOfOrNull(::meetingCopy)
         val accessScope = majorityOrNull(samples.map { it.accessScope }) ?: SessionAccessScope.HOST_ONLY
         val deadlineOffsets =
             samples.map { sample ->
                 ChronoUnit.DAYS.between(sample.questionDeadlineAt.toLocalDate(), sample.sessionDate)
             }
         return HostSessionScheduleDefaults(
-            startTime = time.first.format(TIME_FORMAT),
-            endTime = time.second.format(TIME_FORMAT),
-            locationLabel = location,
-            meetingUrl = meeting?.url,
-            meetingPasscode = meeting?.passcode,
-            accessScope = accessScope,
-            suggestedDate = suggestedDate(samples),
-            questionDeadlineOffsetDays = majorityOrNull(deadlineOffsets) ?: DEFAULT_DEADLINE_OFFSET_DAYS,
+            automatic =
+                HostSessionAutomaticScheduleDefaults(
+                    startTime = time.first.format(TIME_FORMAT),
+                    endTime = time.second.format(TIME_FORMAT),
+                    locationLabel = location,
+                    accessScope = accessScope,
+                    suggestedDate = suggestedDate(samples),
+                    questionDeadlineOffsetDays = majorityOrNull(deadlineOffsets) ?: DEFAULT_DEADLINE_OFFSET_DAYS,
+                ),
+            previousOnlineMeeting = previousOnlineMeeting,
             hints = listOf(TIME_HINT),
         )
     }
 
-    private fun meetingCopy(sample: HostSessionScheduleSample): MeetingCopy? {
+    internal fun previousOnlineMeetingFrom(samples: List<HostSessionScheduleSample>): PreviousOnlineMeeting? =
+        samples.firstNotNullOfOrNull(::meetingCopy)
+
+    private fun meetingCopy(sample: HostSessionScheduleSample): PreviousOnlineMeeting? {
         val url = sample.meetingUrl?.trim()?.takeIf(String::isNotEmpty) ?: return null
-        return MeetingCopy(
-            url = url,
-            passcode = sample.meetingPasscode?.trim()?.takeIf(String::isNotEmpty),
+        return PreviousOnlineMeeting(
+            meetingUrl = url,
+            meetingPasscode = sample.meetingPasscode?.trim()?.takeIf(String::isNotEmpty),
         )
     }
 
@@ -124,9 +135,4 @@ internal object HostSessionScheduleDefaultsPolicy {
             .firstOrNull { (_, count) -> count * 2 > n }
             ?.key
     }
-
-    private data class MeetingCopy(
-        val url: String,
-        val passcode: String?,
-    )
 }

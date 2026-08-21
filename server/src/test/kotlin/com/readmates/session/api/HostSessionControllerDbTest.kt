@@ -592,8 +592,8 @@ class HostSessionControllerDbTest(
             set start_time = '10:00:00',
                 end_time = '12:00:00',
                 location_label = '다른 클럽 장소',
-                meeting_url = 'https://meet.example.com/outside-club',
-                meeting_passcode = 'outside-club-passcode',
+                meeting_url = 'https://meeting.invalid/outside-club',
+                meeting_passcode = 'outside-room-code-2048',
                 access_scope = 'HOST_ONLY'
             where id = '00000000-0000-0000-0000-000000019777'
             """.trimIndent(),
@@ -605,13 +605,22 @@ class HostSessionControllerDbTest(
                     with(user("host@example.com"))
                 }.andExpect {
                     status { isOk() }
+                    jsonPath("$.automatic.startTime") { value("19:30") }
+                    jsonPath("$.automatic.endTime") { value("21:30") }
+                    jsonPath("$.automatic.locationLabel") { value("온라인") }
+                    jsonPath("$.automatic.accessScope") { value("GUEST_READABLE") }
+                    jsonPath("$.automatic.suggestedDate") { value("2026-05-13") }
+                    jsonPath("$.automatic.questionDeadlineOffsetDays") { value(1) }
+                    jsonPath("$.automatic.meetingUrl") { doesNotExist() }
+                    jsonPath("$.automatic.meetingPasscode") { doesNotExist() }
+                    jsonPath("$.previousOnlineMeeting") { doesNotExist() }
+                    jsonPath("$.hints[0]") { value("이전 모임과 같은 시간으로 넣었습니다.") }
                     jsonPath("$.startTime") { value("19:30") }
                     jsonPath("$.endTime") { value("21:30") }
                     jsonPath("$.locationLabel") { value("온라인") }
                     jsonPath("$.accessScope") { value("GUEST_READABLE") }
                     jsonPath("$.suggestedDate") { value("2026-05-13") }
                     jsonPath("$.questionDeadlineOffsetDays") { value(1) }
-                    jsonPath("$.hints[0]") { value("이전 모임과 같은 시간으로 넣었습니다.") }
                     jsonPath("$.meetingUrl") { doesNotExist() }
                     jsonPath("$.meetingPasscode") { doesNotExist() }
                     jsonPath("$.bookTitle") { doesNotExist() }
@@ -621,8 +630,10 @@ class HostSessionControllerDbTest(
                 .contentAsString
 
         assertThat(response).doesNotContain("10:00")
-        assertThat(response).doesNotContain("outside-club-passcode")
+        assertThat(response).doesNotContain("outside-room-code-2048")
+        assertThat(response).doesNotContain("meeting.invalid/outside-club")
         assertThat(response).doesNotContain("팩트풀니스")
+        assertThat(response).contains("\"automatic\"")
         assertThat(response).contains("\"startTime\"")
         assertThat(response).contains("\"endTime\"")
         assertThat(response).contains("\"locationLabel\"")
@@ -658,8 +669,16 @@ class HostSessionControllerDbTest(
             date = "2026-05-13",
             startTime = "19:30:00",
             endTime = "21:30:00",
-            meetingUrl = "https://meet.example.com/host-latest",
-            meetingPasscode = "host-form-pass",
+            meetingUrl = "https://meeting.invalid/older-room",
+            meetingPasscode = "older-room-code-2048",
+        )
+        insertHostScheduleSample(
+            number = 8,
+            date = "2026-05-20",
+            startTime = "19:30:00",
+            endTime = "21:30:00",
+            meetingUrl = "https://meeting.invalid/room",
+            meetingPasscode = "room-code-2048",
         )
 
         mockMvc
@@ -667,8 +686,44 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.meetingUrl") { value("https://meet.example.com/host-latest") }
-                jsonPath("$.meetingPasscode") { value("host-form-pass") }
+                jsonPath("$.automatic.startTime") { value("19:30") }
+                jsonPath("$.automatic.meetingUrl") { doesNotExist() }
+                jsonPath("$.automatic.meetingPasscode") { doesNotExist() }
+                jsonPath("$.previousOnlineMeeting.meetingUrl") { value("https://meeting.invalid/room") }
+                jsonPath("$.previousOnlineMeeting.meetingPasscode") { value("room-code-2048") }
+                jsonPath("$.meetingUrl") { value("https://meeting.invalid/room") }
+                jsonPath("$.meetingPasscode") { value("room-code-2048") }
+            }
+    }
+
+    @Test
+    fun `host schedule defaults do not guess passcode from a different meeting row`() {
+        insertHostScheduleSample(
+            number = 7,
+            date = "2026-05-13",
+            startTime = "19:30:00",
+            endTime = "21:30:00",
+            meetingUrl = "https://meeting.invalid/older-room",
+            meetingPasscode = "older-room-code-2048",
+        )
+        insertHostScheduleSample(
+            number = 8,
+            date = "2026-05-20",
+            startTime = "19:30:00",
+            endTime = "21:30:00",
+            meetingUrl = "https://meeting.invalid/room",
+            meetingPasscode = null,
+        )
+
+        mockMvc
+            .get("/api/host/sessions/schedule-defaults") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.previousOnlineMeeting.meetingUrl") { value("https://meeting.invalid/room") }
+                jsonPath("$.previousOnlineMeeting.meetingPasscode") { doesNotExist() }
+                jsonPath("$.meetingUrl") { value("https://meeting.invalid/room") }
+                jsonPath("$.meetingPasscode") { doesNotExist() }
             }
     }
 
@@ -697,6 +752,10 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
             }.andExpect {
                 status { isOk() }
+                jsonPath("$.automatic.startTime") { value("10:00") }
+                jsonPath("$.automatic.endTime") { value("12:00") }
+                jsonPath("$.automatic.locationLabel") { value("최근 장소") }
+                jsonPath("$.automatic.accessScope") { value("HOST_ONLY") }
                 jsonPath("$.startTime") { value("10:00") }
                 jsonPath("$.endTime") { value("12:00") }
                 jsonPath("$.locationLabel") { value("최근 장소") }

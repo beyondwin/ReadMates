@@ -1,4 +1,9 @@
-import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import {
+  readmatesFetch,
+  readmatesFetchResponse,
+  RECOVER_READ_SESSION_EXPIRY,
+  type ReadmatesApiContext,
+} from "@/shared/api/client";
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 import type {
@@ -27,7 +32,7 @@ import type {
   HostSessionListPage,
   HostSessionPublicationRequest,
   HostSessionRequest,
-  HostSessionScheduleDefaults,
+  HostSessionScheduleDefaultsWire,
   HostSessionVisibilityRequest,
   HostSessionVisibilityUpdateResult,
   ManualNotificationConfirmRequest,
@@ -56,6 +61,7 @@ import {
   parseHostInvitationListPage,
   parseSessionImportPreviewResponse,
 } from "./host-contracts";
+import { normalizeHostSessionScheduleDefaults } from "../model/host-schedule-defaults-state";
 import { buildSessionAccessScopeRequest } from "../model/session-exposure-model";
 import { pagingSearchParams, type PageRequest } from "@/shared/model/paging";
 
@@ -233,11 +239,12 @@ export function fetchHostSessions(context?: ReadmatesApiContext, page?: PageRequ
 }
 
 export function fetchHostSessionScheduleDefaults(context?: ReadmatesApiContext) {
-  return readmatesFetch<HostSessionScheduleDefaults>(
+  return readmatesFetch<HostSessionScheduleDefaultsWire>(
     "/api/host/sessions/schedule-defaults",
     undefined,
     context,
-  );
+    RECOVER_READ_SESSION_EXPIRY,
+  ).then(normalizeHostSessionScheduleDefaults);
 }
 
 export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApiContext) {

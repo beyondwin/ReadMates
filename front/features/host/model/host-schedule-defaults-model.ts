@@ -1,19 +1,11 @@
-import type { HostSessionScheduleDefaults } from "@/features/host/api/host-contracts";
+import {
+  BUILTIN_SCHEDULE_DEFAULTS,
+  type HostSessionScheduleDefaults,
+} from "./host-schedule-defaults-state";
 import type { SessionAccessScope } from "./session-exposure-model";
 
+export { BUILTIN_SCHEDULE_DEFAULTS };
 export type { HostSessionScheduleDefaults };
-
-export const BUILTIN_SCHEDULE_DEFAULTS: HostSessionScheduleDefaults = {
-  startTime: "20:00",
-  endTime: "22:00",
-  locationLabel: "온라인",
-  meetingUrl: null,
-  meetingPasscode: null,
-  accessScope: "HOST_ONLY",
-  suggestedDate: null,
-  questionDeadlineOffsetDays: 1,
-  hints: [],
-};
 
 export type HostScheduleFormValues = {
   bookTitle: string;
@@ -28,13 +20,11 @@ export type HostScheduleFormValues = {
 };
 
 const mappedFields = {
-  startTime: (defaults: HostSessionScheduleDefaults) => defaults.startTime,
-  endTime: (defaults: HostSessionScheduleDefaults) => defaults.endTime,
-  locationLabel: (defaults: HostSessionScheduleDefaults) => defaults.locationLabel,
-  date: (defaults: HostSessionScheduleDefaults) => defaults.suggestedDate,
-  meetingUrl: (defaults: HostSessionScheduleDefaults) => defaults.meetingUrl,
-  meetingPasscode: (defaults: HostSessionScheduleDefaults) => defaults.meetingPasscode,
-  accessScope: (defaults: HostSessionScheduleDefaults) => defaults.accessScope,
+  startTime: (defaults: HostSessionScheduleDefaults) => defaults.automatic.startTime,
+  endTime: (defaults: HostSessionScheduleDefaults) => defaults.automatic.endTime,
+  locationLabel: (defaults: HostSessionScheduleDefaults) => defaults.automatic.locationLabel,
+  date: (defaults: HostSessionScheduleDefaults) => defaults.automatic.suggestedDate,
+  accessScope: (defaults: HostSessionScheduleDefaults) => defaults.automatic.accessScope,
 } as const;
 
 function isEmptyField(value: unknown): boolean {

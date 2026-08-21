@@ -192,7 +192,7 @@ export function hostSessionEditorReducer(
         locationLabel: applied.locationLabel,
         meetingUrl: applied.meetingUrl,
         meetingPasscode: applied.meetingPasscode,
-        questionDeadlineOffsetDays: action.defaults.questionDeadlineOffsetDays,
+        questionDeadlineOffsetDays: action.defaults.automatic.questionDeadlineOffsetDays,
       };
     }
   }
@@ -239,7 +239,7 @@ export function initialHostSessionEditorState(
     locationLabel: applied?.locationLabel ?? values.locationLabel,
     meetingUrl: applied?.meetingUrl ?? values.meetingUrl,
     meetingPasscode: applied?.meetingPasscode ?? values.meetingPasscode,
-    questionDeadlineOffsetDays: init.scheduleDefaults?.questionDeadlineOffsetDays ?? 1,
+    questionDeadlineOffsetDays: init.scheduleDefaults?.automatic.questionDeadlineOffsetDays ?? 1,
     recordVisibility: initialRecordVisibility(session),
     summary: initialPublicationSummary(session),
     hasPublicationRecord: Boolean(session?.publication),

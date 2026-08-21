@@ -171,14 +171,18 @@ describe("UpcomingBookList", () => {
         onSaveAccessScope={vi.fn()}
         onCreateSession={onCreateSession}
         scheduleDefaults={{
-          startTime: "19:30",
-          endTime: "21:30",
-          locationLabel: "온라인",
-          meetingUrl: "https://meet.example.com/club",
-          meetingPasscode: "room-code",
-          accessScope: "GUEST_READABLE",
-          suggestedDate: "2026-06-11",
-          questionDeadlineOffsetDays: 1,
+          automatic: {
+            startTime: "19:30",
+            endTime: "21:30",
+            locationLabel: "온라인",
+            accessScope: "GUEST_READABLE",
+            suggestedDate: "2026-06-11",
+            questionDeadlineOffsetDays: 1,
+          },
+          previousOnlineMeeting: {
+            meetingUrl: "https://meeting.invalid/club",
+            meetingPasscode: "room-code-2048",
+          },
           hints: ["이전 모임과 같은 시간으로 넣었습니다."],
         }}
       />,
@@ -189,7 +193,7 @@ describe("UpcomingBookList", () => {
     expect(screen.getByLabelText("모임 날짜")).toHaveValue("2026-06-11");
     expect(screen.getByText("이전 모임과 같은 시간으로 넣었습니다.")).toBeInTheDocument();
     expect(screen.getByRole("switch", { name: "새 모임 멤버에게 보이기" })).toBeChecked();
-    expect(screen.queryByDisplayValue("room-code")).not.toBeInTheDocument();
+    expect(screen.queryByDisplayValue("room-code-2048")).not.toBeInTheDocument();
 
     await user.type(screen.getByLabelText("책 제목"), "새 책");
     await user.type(screen.getByLabelText("저자"), "새 저자");
@@ -202,8 +206,8 @@ describe("UpcomingBookList", () => {
       startTime: "19:30",
       endTime: "21:30",
       locationLabel: "온라인",
-      meetingUrl: "https://meet.example.com/club",
-      meetingPasscode: "room-code",
+      meetingUrl: "",
+      meetingPasscode: "",
       accessScope: "GUEST_READABLE",
       questionDeadlineOffsetDays: 1,
     });

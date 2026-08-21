@@ -88,7 +88,7 @@ export function HostMeetingLedger({
       onCreateSession={onCreateUpcomingSession}
       pending={upcomingPending}
       scheduleDefaults={scheduleDefaults}
-      defaultAccessScope={scheduleDefaults?.accessScope}
+      defaultAccessScope={scheduleDefaults?.automatic.accessScope}
       compact={active.phase === "after" && hasNextBooks}
     />
   ) : null;

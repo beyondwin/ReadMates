@@ -14,6 +14,7 @@ import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostAttendanceAuditTransition
 import com.readmates.session.application.HostAttendanceResponse
 import com.readmates.session.application.HostPublicationResponse
+import com.readmates.session.application.HostSessionAutomaticScheduleDefaults
 import com.readmates.session.application.HostSessionBasicAuditSnapshot
 import com.readmates.session.application.HostSessionDeletionAssessment
 import com.readmates.session.application.HostSessionDeletionCounts
@@ -351,8 +352,8 @@ class HostSessionServicesTest {
         val result = service.scheduleDefaults(host)
 
         assertEquals(host, port.scheduleDefaultsHost)
-        assertEquals("20:00", result.startTime)
-        assertEquals("22:00", result.endTime)
+        assertEquals("20:00", result.automatic.startTime)
+        assertEquals("22:00", result.automatic.endTime)
     }
 
     @Test
@@ -1695,14 +1696,16 @@ class HostSessionServicesTest {
         override fun scheduleDefaults(host: CurrentMember): HostSessionScheduleDefaults {
             scheduleDefaultsHost = host
             return HostSessionScheduleDefaults(
-                startTime = "20:00",
-                endTime = "22:00",
-                locationLabel = "온라인",
-                meetingUrl = null,
-                meetingPasscode = null,
-                accessScope = SessionAccessScope.HOST_ONLY,
-                suggestedDate = null,
-                questionDeadlineOffsetDays = 1,
+                automatic =
+                    HostSessionAutomaticScheduleDefaults(
+                        startTime = "20:00",
+                        endTime = "22:00",
+                        locationLabel = "온라인",
+                        accessScope = SessionAccessScope.HOST_ONLY,
+                        suggestedDate = null,
+                        questionDeadlineOffsetDays = 1,
+                    ),
+                previousOnlineMeeting = null,
                 hints = emptyList(),
             )
         }

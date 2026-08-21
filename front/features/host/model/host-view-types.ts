@@ -454,3 +454,9 @@ export type HostSessionDeletionPreviewResponse = {
   canDelete: boolean;
   counts: HostSessionDeletionCounts;
 };
+
+export type {
+  HostSessionAutomaticScheduleDefaults,
+  HostSessionScheduleDefaults,
+  PreviousOnlineMeeting,
+} from "./host-schedule-defaults-state";

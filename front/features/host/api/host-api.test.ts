@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import * as sessionExpiry from "@/shared/auth/session-expiry";
 import {
   closeHostSession,
   commitHostSessionImport,
@@ -322,6 +323,82 @@ describe("host api wrappers", () => {
     )).rejects.toMatchObject({
       name: "ZodError",
     });
+  });
+
+  it("normalizes nested schedule-default responses and ignores top-level meeting secrets", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      automatic: {
+        startTime: "19:30",
+        endTime: "21:30",
+        locationLabel: "온라인",
+        accessScope: "GUEST_READABLE",
+        suggestedDate: "2026-06-11",
+        questionDeadlineOffsetDays: 1,
+      },
+      previousOnlineMeeting: {
+        meetingUrl: "https://meeting.invalid/room",
+        meetingPasscode: "room-code-2048",
+      },
+      hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+      startTime: "18:00",
+      meetingUrl: "https://meeting.invalid/legacy",
+      meetingPasscode: "legacy-code",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchHostSessionScheduleDefaults({ clubSlug: "reading-sai" })).resolves.toEqual({
+      automatic: {
+        startTime: "19:30",
+        endTime: "21:30",
+        locationLabel: "온라인",
+        accessScope: "GUEST_READABLE",
+        suggestedDate: "2026-06-11",
+        questionDeadlineOffsetDays: 1,
+      },
+      previousOnlineMeeting: {
+        meetingUrl: "https://meeting.invalid/room",
+        meetingPasscode: "room-code-2048",
+      },
+      hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+    });
+  });
+
+  it("normalizes a flat legacy schedule-defaults server into nested automatic fields", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
+      startTime: "19:30",
+      endTime: "21:30",
+      locationLabel: "온라인",
+      meetingUrl: "https://meeting.invalid/room",
+      meetingPasscode: "room-code-2048",
+      accessScope: "GUEST_READABLE",
+      suggestedDate: "2026-06-11",
+      questionDeadlineOffsetDays: 1,
+      hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+    })));
+
+    await expect(fetchHostSessionScheduleDefaults()).resolves.toEqual({
+      automatic: {
+        startTime: "19:30",
+        endTime: "21:30",
+        locationLabel: "온라인",
+        accessScope: "GUEST_READABLE",
+        suggestedDate: "2026-06-11",
+        questionDeadlineOffsetDays: 1,
+      },
+      previousOnlineMeeting: {
+        meetingUrl: "https://meeting.invalid/room",
+        meetingPasscode: "room-code-2048",
+      },
+      hints: ["이전 모임과 같은 시간으로 넣었습니다."],
+    });
+  });
+
+  it("recovers a defaults-only 401 as a read session expiry", async () => {
+    const spy = vi.spyOn(sessionExpiry, "signalSessionExpired");
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+
+    await expect(fetchHostSessionScheduleDefaults()).rejects.toThrow("ReadMatesSessionExpiredError");
+    expect(spy).toHaveBeenCalledWith("read");
   });
 
   it("parses host invitation responses from raw Response objects", async () => {

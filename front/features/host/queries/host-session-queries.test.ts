@@ -132,14 +132,15 @@ describe("host session query keys", () => {
     vi.mocked(fetchHostSessionDeletionPreview).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     vi.mocked(fetchManualNotificationDispatches).mockResolvedValue({ items: [], nextCursor: null });
     vi.mocked(fetchHostSessionScheduleDefaults).mockResolvedValue({
-      startTime: "19:30",
-      endTime: "21:30",
-      locationLabel: "온라인",
-      meetingUrl: null,
-      meetingPasscode: null,
-      accessScope: "HOST_ONLY",
-      suggestedDate: "2026-06-11",
-      questionDeadlineOffsetDays: 1,
+      automatic: {
+        startTime: "19:30",
+        endTime: "21:30",
+        locationLabel: "온라인",
+        accessScope: "HOST_ONLY",
+        suggestedDate: "2026-06-11",
+        questionDeadlineOffsetDays: 1,
+      },
+      previousOnlineMeeting: null,
       hints: ["이전 모임과 같은 시간으로 넣었습니다."],
     });
 
@@ -170,11 +171,14 @@ describe("host session query keys", () => {
     vi.mocked(fetchHostSessionScheduleDefaults).mockRejectedValue(new Error("defaults-unavailable"));
 
     await expect(runQuery(hostSessionScheduleDefaultsQuery({ clubSlug: "reading-sai" }))).resolves.toMatchObject({
-      startTime: "20:00",
-      endTime: "22:00",
-      locationLabel: "온라인",
-      accessScope: "HOST_ONLY",
-      suggestedDate: null,
+      automatic: {
+        startTime: "20:00",
+        endTime: "22:00",
+        locationLabel: "온라인",
+        accessScope: "HOST_ONLY",
+        suggestedDate: null,
+      },
+      previousOnlineMeeting: null,
       hints: [],
     });
   });

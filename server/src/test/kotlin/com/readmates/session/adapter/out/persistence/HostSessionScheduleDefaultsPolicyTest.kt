@@ -16,14 +16,14 @@ class HostSessionScheduleDefaultsPolicyTest {
             List(7) { sample(start = "19:30:00", end = "21:30:00") } +
                 List(3) { sample(start = "20:00:00", end = "22:00:00") }
         val defaults = HostSessionScheduleDefaultsPolicy.from(samples)
-        assertEquals("19:30", defaults.startTime)
-        assertEquals("21:30", defaults.endTime)
+        assertEquals("19:30", defaults.automatic.startTime)
+        assertEquals("21:30", defaults.automatic.endTime)
     }
 
     @Test
     fun `leaves date empty when only one past meeting exists`() {
         val defaults = HostSessionScheduleDefaultsPolicy.from(listOf(sample(date = LocalDate.parse("2026-04-15"))))
-        assertNull(defaults.suggestedDate)
+        assertNull(defaults.automatic.suggestedDate)
     }
 
     @Test
@@ -35,14 +35,13 @@ class HostSessionScheduleDefaultsPolicyTest {
     @Test
     fun `empty samples use evening online host-only defaults`() {
         val defaults = HostSessionScheduleDefaultsPolicy.from(emptyList())
-        assertEquals("20:00", defaults.startTime)
-        assertEquals("22:00", defaults.endTime)
-        assertEquals("온라인", defaults.locationLabel)
-        assertNull(defaults.meetingUrl)
-        assertNull(defaults.meetingPasscode)
-        assertEquals(SessionAccessScope.HOST_ONLY, defaults.accessScope)
-        assertNull(defaults.suggestedDate)
-        assertEquals(1L, defaults.questionDeadlineOffsetDays)
+        assertEquals("20:00", defaults.automatic.startTime)
+        assertEquals("22:00", defaults.automatic.endTime)
+        assertEquals("온라인", defaults.automatic.locationLabel)
+        assertNull(defaults.previousOnlineMeeting)
+        assertEquals(SessionAccessScope.HOST_ONLY, defaults.automatic.accessScope)
+        assertNull(defaults.automatic.suggestedDate)
+        assertEquals(1L, defaults.automatic.questionDeadlineOffsetDays)
         assertEquals(emptyList<String>(), defaults.hints)
     }
 
@@ -52,8 +51,8 @@ class HostSessionScheduleDefaultsPolicyTest {
             List(5) { sample(start = "20:00:00", end = "22:00:00") } +
                 List(5) { sample(start = "19:30:00", end = "21:30:00") }
         val defaults = HostSessionScheduleDefaultsPolicy.from(samples)
-        assertEquals("20:00", defaults.startTime)
-        assertEquals("22:00", defaults.endTime)
+        assertEquals("20:00", defaults.automatic.startTime)
+        assertEquals("22:00", defaults.automatic.endTime)
     }
 
     @Test
@@ -62,29 +61,29 @@ class HostSessionScheduleDefaultsPolicyTest {
             listOf(
                 sample(meetingUrl = null, meetingPasscode = "ignored-secret"),
                 sample(
-                    meetingUrl = "https://meet.example.com/latest-with-url",
-                    meetingPasscode = "host-form-pass",
+                    meetingUrl = "https://meeting.invalid/latest-with-url",
+                    meetingPasscode = "room-code-2048",
                 ),
                 sample(
-                    meetingUrl = "https://meet.example.com/older",
-                    meetingPasscode = "older-pass",
+                    meetingUrl = "https://meeting.invalid/older",
+                    meetingPasscode = "older-room-code-2048",
                 ),
             )
         val defaults = HostSessionScheduleDefaultsPolicy.from(samples)
-        assertEquals("https://meet.example.com/latest-with-url", defaults.meetingUrl)
-        assertEquals("host-form-pass", defaults.meetingPasscode)
+        assertEquals("https://meeting.invalid/latest-with-url", defaults.previousOnlineMeeting?.meetingUrl)
+        assertEquals("room-code-2048", defaults.previousOnlineMeeting?.meetingPasscode)
     }
 
     @Test
     fun `does not guess passcode from a different row than the url`() {
         val samples =
             listOf(
-                sample(meetingUrl = "https://meet.example.com/latest-with-url", meetingPasscode = null),
-                sample(meetingUrl = "https://meet.example.com/older", meetingPasscode = "older-pass"),
+                sample(meetingUrl = "https://meeting.invalid/latest-with-url", meetingPasscode = null),
+                sample(meetingUrl = "https://meeting.invalid/older", meetingPasscode = "older-room-code-2048"),
             )
         val defaults = HostSessionScheduleDefaultsPolicy.from(samples)
-        assertEquals("https://meet.example.com/latest-with-url", defaults.meetingUrl)
-        assertNull(defaults.meetingPasscode)
+        assertEquals("https://meeting.invalid/latest-with-url", defaults.previousOnlineMeeting?.meetingUrl)
+        assertNull(defaults.previousOnlineMeeting?.meetingPasscode)
     }
 
     @Test
@@ -94,14 +93,14 @@ class HostSessionScheduleDefaultsPolicyTest {
                 List(6) { sample(accessScope = SessionAccessScope.GUEST_READABLE) } +
                     List(4) { sample(accessScope = SessionAccessScope.HOST_ONLY) },
             )
-        assertEquals(SessionAccessScope.GUEST_READABLE, majority.accessScope)
+        assertEquals(SessionAccessScope.GUEST_READABLE, majority.automatic.accessScope)
 
         val tied =
             HostSessionScheduleDefaultsPolicy.from(
                 List(5) { sample(accessScope = SessionAccessScope.GUEST_READABLE) } +
                     List(5) { sample(accessScope = SessionAccessScope.HOST_ONLY) },
             )
-        assertEquals(SessionAccessScope.HOST_ONLY, tied.accessScope)
+        assertEquals(SessionAccessScope.HOST_ONLY, tied.automatic.accessScope)
     }
 
     @Test
@@ -113,7 +112,7 @@ class HostSessionScheduleDefaultsPolicyTest {
                 sample(date = LocalDate.parse("2026-01-07")),
             )
         val defaults = HostSessionScheduleDefaultsPolicy.from(samples)
-        assertEquals("2026-02-18", defaults.suggestedDate)
+        assertEquals("2026-02-18", defaults.automatic.suggestedDate)
     }
 
     @Test
@@ -123,14 +122,14 @@ class HostSessionScheduleDefaultsPolicyTest {
                 List(7) { sample(date = LocalDate.parse("2026-04-15"), deadlineDaysBefore = 1) } +
                     List(3) { sample(date = LocalDate.parse("2026-04-15"), deadlineDaysBefore = 2) },
             )
-        assertEquals(1L, majority.questionDeadlineOffsetDays)
+        assertEquals(1L, majority.automatic.questionDeadlineOffsetDays)
 
         val tied =
             HostSessionScheduleDefaultsPolicy.from(
                 List(5) { sample(date = LocalDate.parse("2026-04-15"), deadlineDaysBefore = 1) } +
                     List(5) { sample(date = LocalDate.parse("2026-04-08"), deadlineDaysBefore = 3) },
             )
-        assertEquals(1L, tied.questionDeadlineOffsetDays)
+        assertEquals(1L, tied.automatic.questionDeadlineOffsetDays)
     }
 
     @Test

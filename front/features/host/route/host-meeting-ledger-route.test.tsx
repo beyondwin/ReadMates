@@ -19,14 +19,15 @@ const routeMocks = vi.hoisted(() => ({
   saveAccessScope: vi.fn(),
   openSession: vi.fn(),
   scheduleDefaults: {
-    startTime: "20:00",
-    endTime: "22:00",
-    locationLabel: "온라인",
-    meetingUrl: null as string | null,
-    meetingPasscode: null as string | null,
-    accessScope: "HOST_ONLY" as const,
-    suggestedDate: null as string | null,
-    questionDeadlineOffsetDays: 1,
+    automatic: {
+      startTime: "20:00",
+      endTime: "22:00",
+      locationLabel: "온라인",
+      accessScope: "HOST_ONLY" as const,
+      suggestedDate: null as string | null,
+      questionDeadlineOffsetDays: 1,
+    },
+    previousOnlineMeeting: null,
     hints: [] as string[],
   },
 }));
