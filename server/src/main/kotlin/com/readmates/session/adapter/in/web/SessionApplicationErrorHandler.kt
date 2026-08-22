@@ -12,6 +12,7 @@ import com.readmates.session.application.HostSessionRecordStagingRequiredExcepti
 import com.readmates.session.application.HostSessionReopenNotAllowedException
 import com.readmates.session.application.HostSessionRestoreStaleException
 import com.readmates.session.application.HostSessionReturnToDraftNotAllowedException
+import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.HostSessionUnpublishNotAllowedException
 import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.InvalidMembershipIdException
@@ -19,13 +20,18 @@ import com.readmates.session.application.InvalidQuestionSetException
 import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
+import com.readmates.session.application.model.HostListCursorStaleException
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionLifecycleReasonRequiredException
 import com.readmates.session.application.model.HostSessionTrashExpiredException
 import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
+import com.readmates.session.application.model.InvalidHostSessionListQueryException
 import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
+import com.readmates.shared.observability.RequestIdFilter
+import com.readmates.shared.paging.InvalidHostListCursorException
+import org.slf4j.MDC
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -136,12 +142,50 @@ class SessionApplicationErrorHandler {
             message = "세션 요청 값을 확인해 주세요.",
         )
 
-    @ExceptionHandler(InvalidHostSessionCursorException::class)
+    @ExceptionHandler(InvalidHostSessionCursorException::class, InvalidHostListCursorException::class)
     fun handleInvalidCursor(): ResponseEntity<ApiErrorResponse> =
         apiErrorResponse(
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_CURSOR",
             message = "커서가 현재 검색 조건과 일치하지 않습니다.",
+        )
+
+    @ExceptionHandler(InvalidHostSessionListQueryException::class)
+    fun handleInvalidListQuery(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "INVALID_REQUEST",
+            message = "세션 요청 값을 확인해 주세요.",
+        )
+
+    @ExceptionHandler(HostSessionRevisionConflictException::class)
+    fun handleRevisionConflict(ex: HostSessionRevisionConflictException): ResponseEntity<HostSessionRevisionConflictResponse> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(
+            HostSessionRevisionConflictResponse(
+                message = "다른 호스트가 모임을 먼저 저장했습니다. 최신 내용을 확인한 뒤 다시 적용하세요.",
+                status = HttpStatus.CONFLICT.value(),
+                current = ex.current.toBody(),
+                changedAt = ex.changedAt?.toString(),
+                changedByDisplay = ex.changedByDisplay,
+                traceId = MDC.get(RequestIdFilter.MDC_KEY),
+            ),
+        )
+
+    @ExceptionHandler(HostListCursorStaleException::class)
+    fun handleListCursorStale(ex: HostListCursorStaleException): ResponseEntity<HostListCursorStaleResponse> =
+        ResponseEntity.status(HttpStatus.CONFLICT).body(
+            HostListCursorStaleResponse(
+                message = "목록이 바뀌었습니다. 처음부터 다시 불러오세요.",
+                status = HttpStatus.CONFLICT.value(),
+                restartTarget =
+                    HostListRestartTargetBody(
+                        mode =
+                            ex.restartTarget.mode.name
+                                .lowercase(),
+                        states = ex.restartTarget.states,
+                    ),
+                traceId = MDC.get(RequestIdFilter.MDC_KEY),
+            ),
         )
 
     @ExceptionHandler(HostSessionLifecycleReasonRequiredException::class)

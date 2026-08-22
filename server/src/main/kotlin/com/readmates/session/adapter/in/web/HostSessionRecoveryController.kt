@@ -16,6 +16,9 @@ import org.springframework.web.bind.annotation.RestController
 
 data class HostSessionRestoreRequest(
     val expectedCurrentHash: String,
+    val expectedSessionRevision: Long? = null,
+    val expectedAttendanceRevision: Long? = null,
+    val membershipId: String? = null,
 )
 
 @RestController
@@ -49,6 +52,15 @@ class HostSessionRecoveryController(
             sessionId = parseHostSessionId(sessionId),
             changeId = parseHostSessionId(changeId),
             expectedCurrentHash = request.expectedCurrentHash,
+            expectedSessionRevision =
+                request.expectedSessionRevision?.let {
+                    com.readmates.session.application.model
+                        .ExpectedSessionRevision(
+                            it,
+                        )
+                },
+            expectedAttendanceRevision = request.expectedAttendanceRevision,
+            membershipId = request.membershipId?.let { parseHostSessionId(it) },
         ),
     )
 }

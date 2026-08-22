@@ -196,6 +196,14 @@ on duplicate key update
   visibility = values(visibility),
   access_scope = values(access_scope);
 
+insert into session_publication_versions (session_id, publication_revision)
+select id, 0 from sessions
+on duplicate key update publication_revision = session_publication_versions.publication_revision;
+
+insert into club_host_list_epochs (club_id, meeting_epoch, record_epoch)
+select id, 0, 0 from clubs
+on duplicate key update club_id = club_host_list_epochs.club_id;
+
 insert into session_feedback_documents (id, club_id, session_id, version, source_text, file_name, content_type, file_size)
 with seed as (
   select 701 as id_suffix, 1 as session_number, 1 as version, '251126 1차.md' as file_name, 'text/markdown' as content_type, '<!-- readmates-feedback:v1 -->

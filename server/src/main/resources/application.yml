@@ -117,6 +117,14 @@ readmates:
     ip-hash:
       base-secret: ${READMATES_IP_HASH_BASE_SECRET:}
       allow-empty-secret: false
+    host-list-cursor:
+      current-key: ${READMATES_HOST_LIST_CURSOR_CURRENT_KEY:}
+      current-key-version: ${READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION:1}
+      previous-key: ${READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY:}
+      previous-key-version: ${READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION:0}
+      ttl: 24h
+      previous-key-rollout-buffer: 24h
+      allow-empty-secret: false
   notifications:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
     sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:}

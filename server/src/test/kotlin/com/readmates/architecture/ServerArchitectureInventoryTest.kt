@@ -36,6 +36,36 @@ class ServerArchitectureInventoryTest {
     }
 
     @Test
+    fun `host list epoch mutations depend on listing port not adapter`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val forbidden = "import com.readmates.shared.listing.adapter"
+        val required = "import com.readmates.shared.listing.application.port.out.HostListEpochPort"
+        val owners =
+            listOf(
+                "com/readmates/session/application/service/HostSessionDraftCommandService.kt",
+                "com/readmates/session/application/service/HostSessionLifecycleService.kt",
+                "com/readmates/session/application/service/HostSessionTrashService.kt",
+                "com/readmates/session/application/service/HostSessionDeletionTransaction.kt",
+                "com/readmates/session/application/service/SessionMemberWriteService.kt",
+                "com/readmates/session/application/service/HostSessionPublicationService.kt",
+                "com/readmates/sessionrecord/application/service/SessionRecordDraftService.kt",
+                "com/readmates/sessionrecord/application/service/SessionRecordApplyService.kt",
+            )
+        owners.forEach { relative ->
+            val source = Files.readString(productionSourceRoot.resolve(relative))
+            assertThat(source).doesNotContain(forbidden)
+            assertThat(source).contains(required)
+        }
+        val adapter =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/shared/listing/adapter/out/persistence/JdbcHostListEpochAdapter.kt",
+                ),
+            )
+        assertThat(adapter).doesNotContain("import com.readmates.session.")
+    }
+
+    @Test
     fun `joined club summary test imports match corrected inventory exactly`() {
         val root = projectRoot()
         val testSourceRoot = root.resolve("server/src/test/kotlin")

@@ -14,6 +14,7 @@ import com.readmates.shared.security.CurrentMember
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
@@ -47,7 +48,10 @@ class HostSessionTrashController(
     fun restore(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = restoreTrashedHostSessionUseCase.restore(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody request: HostSessionExpectedRevisionRequest,
+    ) = restoreTrashedHostSessionUseCase.restore(
+        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
+    )
 }
 
 private fun requireValidTrashCursor(cursor: String?): String? {

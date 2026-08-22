@@ -262,7 +262,15 @@ class HostSessionRecoveryServiceTest {
         fun restoreCommand(
             hash: String,
             actor: CurrentMember = host(),
-        ) = RestoreHostSessionCommand(actor, SESSION_ID, CHANGE_ID, hash)
+        ) = RestoreHostSessionCommand(
+            actor,
+            SESSION_ID,
+            CHANGE_ID,
+            hash,
+            expectedSessionRevision =
+                com.readmates.session.application.model
+                    .ExpectedSessionRevision(0),
+        )
 
         val basicReceipt =
             HostSessionChangeReceipt(RESTORE_CHANGE_ID, HostSessionChangeKind.BASIC_INFO, true)

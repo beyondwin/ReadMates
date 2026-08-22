@@ -4,6 +4,7 @@ import com.readmates.session.application.HostSessionDeletionAssessment
 import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionDeletionNotAllowedException
 import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -12,6 +13,7 @@ import com.readmates.session.application.model.HostSessionTrashPage
 import com.readmates.session.application.model.HostSessionTrashPurgeTarget
 import com.readmates.session.application.model.HostSessionTrashRecord
 import com.readmates.session.application.model.HostSessionTrashResponse
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.requireHost
 import com.readmates.shared.db.dbString
@@ -79,17 +81,35 @@ class HostSessionDeletionQueries(
                 update sessions
                 set deleted_at = utc_timestamp(6),
                     deleted_by_membership_id = ?,
-                    purge_after = date_add(deleted_at, interval $HOST_SESSION_TRASH_RETENTION_DAYS day)
+                    purge_after = date_add(deleted_at, interval $HOST_SESSION_TRASH_RETENTION_DAYS day),
+                    session_revision = session_revision + 1
                 where id = ?
                   and club_id = ?
                   and deleted_at is null
                   and state in ('OPEN', 'DRAFT')
+                  and session_revision = ?
                 """.trimIndent(),
                 command.host.membershipId.dbString(),
                 command.sessionId.dbString(),
                 command.host.clubId.dbString(),
+                command.expectedSessionRevision?.value ?: -1,
             )
-        check(updated == 1)
+        if (updated == 0) {
+            val deleted =
+                jdbcTemplate
+                    .query(
+                        """
+                        select deleted_at is not null as trashed
+                        from sessions
+                        where id = ? and club_id = ?
+                        """.trimIndent(),
+                        { resultSet, _ -> resultSet.getBoolean("trashed") },
+                        command.sessionId.dbString(),
+                        command.host.clubId.dbString(),
+                    ).firstOrNull()
+            if (deleted == null || deleted) throw HostSessionNotFoundException()
+            staleOrMissing(command)
+        }
         return loadTrashRecord(command, lock = false) ?: error("trashed session was not readable")
     }
 
@@ -167,15 +187,22 @@ class HostSessionDeletionQueries(
                 update sessions
                 set deleted_at = null,
                     deleted_by_membership_id = null,
-                    purge_after = null
+                    purge_after = null,
+                    session_revision = session_revision + 1
                 where id = ?
                   and club_id = ?
                   and deleted_at is not null
                   and purge_after > utc_timestamp(6)
+                  and session_revision = ?
                 """.trimIndent(),
                 command.sessionId.dbString(),
                 command.host.clubId.dbString(),
+                command.expectedSessionRevision?.value ?: -1,
             )
+        if (updated == 0) {
+            val restorable = loadTrashRecord(command, lock = false)
+            if (restorable != null) staleOrMissing(command)
+        }
         return updated > 0
     }
 
@@ -253,6 +280,36 @@ class HostSessionDeletionQueries(
                 clubId.dbString(),
                 sessionId.dbString(),
             ).firstOrNull()
+
+    private fun staleOrMissing(command: HostSessionIdCommand): Nothing {
+        val conflict =
+            jdbcTemplate
+                .query(
+                    """
+                    select session_revision, exposure_revision, participant_set_revision, updated_at
+                    from sessions
+                    where id = ? and club_id = ?
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        HostSessionRevisionConflictException(
+                            current =
+                                SessionVersionVector(
+                                    sessionRevision = resultSet.getLong("session_revision"),
+                                    exposureRevision = resultSet.getLong("exposure_revision"),
+                                    participantSetRevision = resultSet.getLong("participant_set_revision"),
+                                    recordDraftRevision = null,
+                                    liveRecordRevision = null,
+                                    publicationRevision = 0,
+                                ),
+                            changedAt = resultSet.utcOffsetDateTime("updated_at").toInstant(),
+                            changedByDisplay = null,
+                        )
+                    },
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                ).firstOrNull()
+        throw conflict ?: HostSessionNotFoundException()
+    }
 
     private fun loadTrashRecord(
         command: HostSessionIdCommand,

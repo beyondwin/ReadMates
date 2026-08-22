@@ -4,7 +4,9 @@ import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.UpcomingSessionItem
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.ConfirmAttendanceCommand
+import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -15,6 +17,7 @@ import com.readmates.session.application.model.HostSessionTrashRecord
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
@@ -28,6 +31,7 @@ import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.time.Instant
 import java.util.UUID
 
 @Repository
@@ -64,6 +68,14 @@ class JdbcHostSessionWriteAdapter(
         } else {
             queries.list(jdbcTemplate, host, pageRequest, query)
         }
+
+    override fun listMode(
+        host: CurrentMember,
+        limit: Int,
+        query: CanonicalHostSessionListQuery,
+        evaluatedAt: Instant,
+        cursor: HostMeetingListTuple?,
+    ): HostMeetingListPageRead = queries.listMode(jdbcTemplate, host, limit, query, evaluatedAt, cursor)
 
     override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> = queries.upcoming(jdbcTemplate, member)
 

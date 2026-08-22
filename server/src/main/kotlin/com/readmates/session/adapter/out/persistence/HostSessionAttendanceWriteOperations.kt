@@ -28,11 +28,13 @@ internal class HostSessionAttendanceWriteOperations(
                 """
                 update session_participants
                 set attendance_status = ?,
+                    attendance_revision = attendance_revision + 1,
                     updated_at = utc_timestamp(6)
                 where session_id = ?
                   and club_id = ?
                   and membership_id = ?
                   and participation_status = 'ACTIVE'
+                  and (? is null or attendance_revision = ?)
                 """.trimIndent(),
                 object : BatchPreparedStatementSetter {
                     override fun setValues(
@@ -40,16 +42,33 @@ internal class HostSessionAttendanceWriteOperations(
                         index: Int,
                     ) {
                         val (membershipId, attendanceStatus) = entries[index]
+                        val expectedRevision = command.entries[index].expectedAttendanceRevision
                         preparedStatement.setString(1, attendanceStatus)
                         preparedStatement.setString(2, command.sessionId.dbString())
                         preparedStatement.setString(CLUB_ID_PARAMETER, command.host.clubId.dbString())
                         preparedStatement.setString(MEMBERSHIP_ID_PARAMETER, membershipId.dbString())
+                        if (expectedRevision == null) {
+                            preparedStatement.setObject(5, null)
+                            preparedStatement.setObject(6, null)
+                        } else {
+                            preparedStatement.setLong(5, expectedRevision)
+                            preparedStatement.setLong(6, expectedRevision)
+                        }
                     }
 
                     override fun getBatchSize(): Int = entries.size
                 },
             )
-        if (updated.any { count -> count == 0 }) throw HostSessionParticipantNotFoundException()
+        if (updated.any { count -> count == 0 }) {
+            if (command.entries.any { entry -> entry.expectedAttendanceRevision != null }) {
+                throw com.readmates.session.application.HostSessionRevisionConflictException(
+                    current = com.readmates.session.application.model.SessionVersionVector.INITIAL,
+                    changedAt = null,
+                    changedByDisplay = null,
+                )
+            }
+            throw HostSessionParticipantNotFoundException()
+        }
         return HostAttendanceResponse(
             sessionId = command.sessionId.toString(),
             count = command.entries.size,

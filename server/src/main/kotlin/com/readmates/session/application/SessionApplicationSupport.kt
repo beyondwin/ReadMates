@@ -60,6 +60,12 @@ class InvalidSessionExposureException : RuntimeException("Session exposure is in
 
 class InvalidHostSessionCursorException : RuntimeException("Invalid host session cursor")
 
+class HostSessionRevisionConflictException(
+    val current: com.readmates.session.application.model.SessionVersionVector,
+    val changedAt: java.time.Instant?,
+    val changedByDisplay: String?,
+) : RuntimeException("REVISION_CONFLICT")
+
 class HostSessionChangeNotRestorableException(
     val blockedReason: String,
 ) : RuntimeException("Host session change is not restorable")

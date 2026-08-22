@@ -203,6 +203,9 @@ data class HostSessionListQuery(
     val state: String? = null,
     val recordStatus: SessionRecordStatus? = null,
     val needsAttention: Boolean? = null,
+    val mode: String? = null,
+    val states: List<String>? = null,
+    val rawCursor: String? = null,
 )
 
 data class HostSessionAutomaticScheduleDefaults(

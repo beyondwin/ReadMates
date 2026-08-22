@@ -9,17 +9,25 @@ import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.UpcomingSessionItem
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostMeetingListMode
+import com.readmates.session.application.model.HostMeetingListTuple
+import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.requireHost
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.uuid
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneOffset
 import java.util.UUID
 
 internal class HostSessionQueries(
@@ -81,6 +89,120 @@ internal class HostSessionQueries(
                 scan.continuation?.let {
                     hostSessionCursor(it.number, it.id, queryKey, host.clubId)
                 },
+            summary = loadHostSessionLedgerSummary(jdbcTemplate, host),
+        )
+    }
+
+    @Suppress("LongMethod")
+    fun listMode(
+        jdbcTemplate: JdbcTemplate,
+        host: CurrentMember,
+        limit: Int,
+        query: CanonicalHostSessionListQuery,
+        evaluatedAt: Instant,
+        cursor: HostMeetingListTuple?,
+    ): HostMeetingListPageRead {
+        requireHost(host)
+        val evaluatedOn = evaluatedAt.atOffset(ZoneOffset.UTC).toLocalDate()
+        val conditions = mutableListOf("club_id = ?", "state in (${query.states.joinToString(",") { "?" }})")
+        val parameters = mutableListOf<Any>()
+        if (query.mode == HostMeetingListMode.MEETING) {
+            repeat(MEETING_ATTENTION_DATE_BINDS) { parameters += evaluatedOn }
+        }
+        parameters += host.clubId.dbString()
+        parameters.addAll(query.states)
+        query.search?.let { search ->
+            conditions += "(cast(number as char) = ? or lower(title) like ? or lower(book_title) like ?)"
+            parameters += search
+            parameters += "%$search%"
+            parameters += "%$search%"
+        }
+        query.recordStatus?.let { status ->
+            conditions += "computed_record_status = ?"
+            parameters += status.name
+        }
+        query.needsAttention?.let { attention ->
+            conditions += "needs_attention = ?"
+            parameters += if (attention) 1 else 0
+        }
+        cursor?.let { last ->
+            conditions += modeContinuation(query.mode)
+            parameters.addAll(continuationParameters(query.mode, last))
+        }
+        parameters += limit + 1
+        val rows =
+            jdbcTemplate.query(
+                """
+                select *
+                from (
+                  select
+                    ranked.*,
+                    case
+                      when computed_record_status <> 'COMPLETE' or has_draft then true
+                      else false
+                    end as needs_attention
+                  from (
+                    select
+                      facts.*,
+                      ${attentionRankSql(query.mode)} as attention_rank,
+                      $HOST_MEETING_STATE_RANK_SQL as state_rank,
+                      case
+                        when (
+                          (public_summary is not null and trim(public_summary) <> '')
+                          or highlight_count > 0
+                          or one_liner_count > 0
+                        ) and feedback_ready and not has_draft then 'COMPLETE'
+                        when (
+                          (public_summary is not null and trim(public_summary) <> '')
+                          or highlight_count > 0
+                          or one_liner_count > 0
+                          or feedback_ready
+                          or has_draft
+                        ) then 'INCOMPLETE'
+                        else 'NOT_STARTED'
+                      end as computed_record_status
+                    from (
+                      select
+                        ledger_facts.*,
+                        (
+                          select count(*)
+                          from session_participants
+                          where session_participants.session_id = ledger_facts.id
+                            and session_participants.club_id = ledger_facts.club_id
+                            and session_participants.participation_status = 'ACTIVE'
+                            and session_participants.rsvp_status = 'NO_RESPONSE'
+                        ) as pending_rsvp_count
+                      from (
+                        $HOST_SESSION_LEDGER_FACTS_SQL
+                      ) ledger_facts
+                    ) facts
+                  ) ranked
+                ) mode_facts
+                -- deleted_at excluded by active_sessions
+                where ${conditions.joinToString(" and ")}
+                order by ${modeOrder(query.mode)}
+                limit ?
+                """.trimIndent(),
+                { resultSet, _ ->
+                    ModeListRow(
+                        item = resultSet.toHostSessionListItem(),
+                        tuple =
+                            HostMeetingListTuple(
+                                attentionRank = resultSet.getInt("attention_rank"),
+                                meetingDate = resultSet.getObject("session_date", LocalDate::class.java),
+                                stateRank = resultSet.getInt("state_rank"),
+                                sessionNumber = resultSet.getInt("number"),
+                                sessionId = resultSet.uuid("id"),
+                            ),
+                    )
+                },
+                *parameters.toTypedArray(),
+            )
+        val visible = rows.take(limit)
+        return HostMeetingListPageRead(
+            items = visible.map { row -> row.item },
+            last = visible.lastOrNull()?.tuple,
+            hasMore = rows.size > limit,
             summary = loadHostSessionLedgerSummary(jdbcTemplate, host),
         )
     }
@@ -677,3 +799,117 @@ internal fun HostSessionListQuery.fingerprint(orderingVersion: String? = null): 
         .digest(parts.joinToString("\u0000").toByteArray(StandardCharsets.UTF_8))
         .joinToString("") { "%02x".format(it) }
 }
+
+private const val MEETING_ATTENTION_DATE_BINDS = 3
+private const val HOST_MEETING_DATE_SENTINEL_LAST = "9999-12-31"
+private const val HOST_RECORD_DATE_SENTINEL_LAST = "0001-01-01"
+
+private val HOST_MEETING_STATE_RANK_SQL =
+    """
+    case
+      when state in ('OPEN', 'CLOSED') then 0
+      else 1
+    end
+    """.trimIndent()
+
+private val HOST_MEETING_ATTENTION_RANK_SQL =
+    """
+    case
+      when state = 'OPEN' and (session_date is null or session_date <= ?) and pending_rsvp_count > 0 then 0
+      when state = 'OPEN' and (session_date is null or session_date <= ?) then 1
+      when state = 'OPEN' and pending_rsvp_count > 0 then 2
+      when state = 'OPEN' then 3
+      when session_date is null or session_date <= ? then 4
+      else 5
+    end
+    """.trimIndent()
+
+private val HOST_RECORD_ATTENTION_RANK_SQL =
+    """
+    case
+      when state = 'PUBLISHED' and has_draft then 0
+      when state = 'PUBLISHED' and (
+        not (
+          (public_summary is not null and trim(public_summary) <> '')
+          or highlight_count > 0
+          or one_liner_count > 0
+        ) or not feedback_ready or has_draft
+      ) then 1
+      when state = 'CLOSED' and has_draft then 2
+      when state = 'CLOSED' and (
+        not (
+          (public_summary is not null and trim(public_summary) <> '')
+          or highlight_count > 0
+          or one_liner_count > 0
+        ) or not feedback_ready or has_draft
+      ) then 3
+      when state = 'PUBLISHED' then 4
+      else 5
+    end
+    """.trimIndent()
+
+private fun attentionRankSql(mode: HostMeetingListMode): String =
+    if (mode == HostMeetingListMode.MEETING) HOST_MEETING_ATTENTION_RANK_SQL else HOST_RECORD_ATTENTION_RANK_SQL
+
+private fun modeOrder(mode: HostMeetingListMode): String =
+    if (mode == HostMeetingListMode.MEETING) {
+        "attention_rank asc, coalesce(session_date, '$HOST_MEETING_DATE_SENTINEL_LAST') asc, " +
+            "state_rank asc, number desc, id desc"
+    } else {
+        "attention_rank asc, coalesce(session_date, '$HOST_RECORD_DATE_SENTINEL_LAST') desc, " +
+            "state_rank asc, number desc, id desc"
+    }
+
+private fun modeContinuation(mode: HostMeetingListMode): String {
+    val dateExpr =
+        if (mode == HostMeetingListMode.MEETING) {
+            "coalesce(session_date, '$HOST_MEETING_DATE_SENTINEL_LAST')"
+        } else {
+            "coalesce(session_date, '$HOST_RECORD_DATE_SENTINEL_LAST')"
+        }
+    val dateCmp = if (mode == HostMeetingListMode.MEETING) ">" else "<"
+    return """
+        (
+          attention_rank > ?
+          or (attention_rank = ? and $dateExpr $dateCmp ?)
+          or (attention_rank = ? and $dateExpr = ? and state_rank > ?)
+          or (attention_rank = ? and $dateExpr = ? and state_rank = ? and number < ?)
+          or (attention_rank = ? and $dateExpr = ? and state_rank = ? and number = ? and id < ?)
+        )
+        """.trimIndent()
+}
+
+private fun continuationParameters(
+    mode: HostMeetingListMode,
+    last: HostMeetingListTuple,
+): List<Any> {
+    val cursorDate =
+        last.meetingDate
+            ?: if (mode == HostMeetingListMode.MEETING) {
+                LocalDate.parse(HOST_MEETING_DATE_SENTINEL_LAST)
+            } else {
+                LocalDate.parse(HOST_RECORD_DATE_SENTINEL_LAST)
+            }
+    return listOf(
+        last.attentionRank,
+        last.attentionRank,
+        cursorDate,
+        last.attentionRank,
+        cursorDate,
+        last.stateRank,
+        last.attentionRank,
+        cursorDate,
+        last.stateRank,
+        last.sessionNumber,
+        last.attentionRank,
+        cursorDate,
+        last.stateRank,
+        last.sessionNumber,
+        last.sessionId.dbString(),
+    )
+}
+
+private data class ModeListRow(
+    val item: HostSessionListItem,
+    val tuple: HostMeetingListTuple,
+)

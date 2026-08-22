@@ -52,7 +52,10 @@ class HostSessionRecoveryControllerDbTest(
                 .post("/api/host/sessions/$sessionId/changes/$changeId/restore") {
                     with(user("host@example.com"))
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"expectedCurrentHash":"${preview.get("expectedCurrentHash").asString()}"}"""
+                    content =
+                        """{"expectedCurrentHash":"${preview.get(
+                            "expectedCurrentHash",
+                        ).asString()}","expectedSessionRevision":${sessionRevision(sessionId)}}"""
                 }.andExpect {
                     status { isOk() }
                     jsonPath("$.kind") { value("BASIC_INFO") }
@@ -87,7 +90,7 @@ class HostSessionRecoveryControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedCurrentHash":"$hash"}"""
+                content = """{"expectedCurrentHash":"$hash","expectedSessionRevision":${sessionRevision(sessionId)}}"""
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("HOST_SESSION_RESTORE_STALE") }
@@ -231,6 +234,8 @@ class HostSessionRecoveryControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
             }.andExpect { status { isOk() } }
         return sessionId
     }
@@ -244,7 +249,7 @@ class HostSessionRecoveryControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = sessionJson(title)
+                content = sessionJson(title, expectedSessionRevision = sessionRevision(sessionId))
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.changeReceipt.changeId") { exists() }
@@ -262,7 +267,7 @@ class HostSessionRecoveryControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = sessionJson("7회차 · 테스트 책", MEETING_URL, MEETING_PASSCODE)
+                content = sessionJson("7회차 · 테스트 책", MEETING_URL, MEETING_PASSCODE, sessionRevision(sessionId))
             }.andExpect { status { isOk() } }
             .andReturn()
             .response
@@ -354,10 +359,18 @@ class HostSessionRecoveryControllerDbTest(
         )
     }
 
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select session_revision from sessions where id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
+
     private fun sessionJson(
         title: String,
         meetingUrl: String? = null,
         meetingPasscode: String? = null,
+        expectedSessionRevision: Long = 0,
     ): String {
         val meeting =
             if (meetingUrl == null) {
@@ -371,7 +384,8 @@ class HostSessionRecoveryControllerDbTest(
               "bookTitle": "테스트 책",
               "bookAuthor": "테스트 저자",
               "date": "2026-05-20",
-              "locationLabel": "온라인"$meeting
+              "locationLabel": "온라인"$meeting,
+              "expectedSessionRevision": $expectedSessionRevision
             }
             """.trimIndent()
     }

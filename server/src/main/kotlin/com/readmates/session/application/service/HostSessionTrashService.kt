@@ -23,6 +23,9 @@ import com.readmates.session.application.port.out.HostSessionLifecycleAuditPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.requireHost
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -35,6 +38,7 @@ class HostSessionTrashService(
     private val queryPort: HostSessionQueryPort,
     private val lifecycleAudit: HostSessionLifecycleAuditPort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
 ) : ListHostSessionTrashUseCase,
     GetHostSessionTrashUseCase,
     RestoreTrashedHostSessionUseCase,
@@ -70,6 +74,7 @@ class HostSessionTrashService(
         if (!deletionPort.restoreTrash(command)) {
             throw HostSessionTrashExpiredException()
         }
+        epochPort.bump(command.host.clubId, HostListEpochKind.MEETING, HostListEpochKind.RECORD)
         lifecycleAudit.record(
             HostSessionLifecycleAuditEntry(
                 host = command.host,

@@ -1,5 +1,6 @@
 package com.readmates.session.application.model
 
+import java.time.Instant
 import java.util.UUID
 
 data class SessionVersionVector(
@@ -41,6 +42,21 @@ data class SessionVersionVector(
             )
     }
 }
+
+data class ExpectedSessionRevision(
+    val value: Long,
+) {
+    init {
+        require(value >= 0) { "expectedSessionRevision must be non-negative" }
+    }
+}
+
+data class RevisionConflictResult(
+    val code: String = "REVISION_CONFLICT",
+    val current: SessionVersionVector,
+    val changedAt: Instant?,
+    val changedByDisplay: String?,
+)
 
 data class AttendanceVersion(
     val membershipId: UUID,

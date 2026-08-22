@@ -19,6 +19,9 @@ import com.readmates.sessionrecord.application.port.out.SessionRecordContentRepl
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
@@ -30,6 +33,7 @@ class SessionRecordApplyService(
     private val store: SessionRecordStorePort,
     private val codec: SessionRecordSnapshotCodec,
     private val replacer: ReplaceSessionRecordContentPort,
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
 ) : ApplySessionRecordUseCase {
     override fun preview(
         host: CurrentMember,
@@ -118,6 +122,7 @@ class SessionRecordApplyService(
         if (!store.deleteAppliedDraft(host, command.sessionId, command.expectedDraftRevision)) {
             throw draftStale()
         }
+        epochPort.bump(host.clubId, HostListEpochKind.RECORD)
         return result(revision, eventType)
     }
 

@@ -2,6 +2,7 @@ package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.InvalidHostSessionCursorException
+import com.readmates.session.application.model.ExpectedSessionRevision
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
@@ -81,10 +82,25 @@ class HostSessionController(
         @RequestParam(required = false) state: String?,
         @RequestParam(required = false) recordStatus: SessionRecordStatus?,
         @RequestParam(required = false) needsAttention: Boolean?,
+        @RequestParam(required = false) mode: String?,
+        @RequestParam(required = false) states: List<String>?,
     ) = hostSessionQueryUseCase.list(
         member,
-        PageRequest.cursor(limit, requireValidCursor(cursor), defaultLimit = 50, maxLimit = 100),
-        HostSessionListQuery(search, state, recordStatus, needsAttention),
+        PageRequest.cursor(
+            limit,
+            if (mode.isNullOrBlank() && states.isNullOrEmpty()) requireValidCursor(cursor) else null,
+            defaultLimit = 50,
+            maxLimit = 100,
+        ),
+        HostSessionListQuery(
+            search = search,
+            state = state,
+            recordStatus = recordStatus,
+            needsAttention = needsAttention,
+            mode = mode,
+            states = states,
+            rawCursor = cursor,
+        ),
     )
 
     @GetMapping("/schedule-defaults")
@@ -107,6 +123,7 @@ class HostSessionController(
             host = member,
             sessionId = parseHostSessionId(sessionId),
             session = request.toCommand(member),
+            expectedSessionRevision = request.requiredExpectedRevision(),
         ),
     )
 }

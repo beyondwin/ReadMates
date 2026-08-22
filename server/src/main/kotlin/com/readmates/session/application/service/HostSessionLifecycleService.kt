@@ -33,6 +33,9 @@ import com.readmates.sessionrecord.application.model.HostNotificationComposerCon
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import com.readmates.shared.observability.RequestIdFilter
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.slf4j.LoggerFactory
@@ -53,8 +56,9 @@ class HostSessionLifecycleService(
     private val lifecycleAudit: HostSessionLifecycleAuditPort = NoopHostSessionLifecycleAuditPort,
     private val metrics: HostSessionOperationalMetrics = HostSessionOperationalMetrics(SimpleMeterRegistry()),
     private val lifecycleProperties: HostSessionLifecycleProperties = HostSessionLifecycleProperties(),
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
     private val deletionTransaction: HostSessionDeletionTransaction =
-        HostSessionDeletionTransaction(deletionPort, lifecycleAudit),
+        HostSessionDeletionTransaction(deletionPort, lifecycleAudit, epochPort),
 ) : HostSessionLifecycleUseCase {
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
@@ -236,7 +240,12 @@ class HostSessionLifecycleService(
         write: (HostSessionIdCommand) -> HostSessionTransitionResult,
     ): HostSessionDetailResponse {
         val normalized = command.normalized(lifecycleProperties.requireReverseReason)
-        val idCommand = HostSessionIdCommand(normalized.host, normalized.sessionId)
+        val idCommand =
+            HostSessionIdCommand(
+                normalized.host,
+                normalized.sessionId,
+                normalized.expectedSessionRevision,
+            )
         val detail =
             transition(
                 command = idCommand,
@@ -262,6 +271,9 @@ class HostSessionLifecycleService(
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
         return recordTransitionFailure(command, action, requestId) {
             val result = write()
+            if (result.changed) {
+                epochPort.bump(command.host.clubId, *listEpochsForTransition(from, to).toTypedArray())
+            }
             val changeId =
                 if (result.changed) {
                     lifecycleAudit.record(
@@ -367,6 +379,17 @@ class HostSessionLifecycleService(
 
     private companion object {
         private val logger = LoggerFactory.getLogger(HostSessionLifecycleService::class.java)
+    }
+}
+
+private fun listEpochsForTransition(
+    from: String,
+    to: String,
+): Set<HostListEpochKind> {
+    val states = setOf(from, to)
+    return buildSet {
+        if (states.any { state -> state in setOf("DRAFT", "OPEN") }) add(HostListEpochKind.MEETING)
+        if (states.any { state -> state in setOf("CLOSED", "PUBLISHED") }) add(HostListEpochKind.RECORD)
     }
 }
 

@@ -11,6 +11,9 @@ import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.sessionrecord.application.port.`in`.ManageSessionRecordDraftUseCase
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.AuthenticatedClubActor
 import com.readmates.shared.security.CurrentMember
@@ -22,6 +25,7 @@ import java.util.UUID
 class SessionRecordDraftService(
     private val store: SessionRecordStorePort,
     private val codec: SessionRecordSnapshotCodec,
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
 ) : ManageSessionRecordDraftUseCase {
     override fun getEditor(
         host: AuthenticatedClubActor,
@@ -62,7 +66,9 @@ class SessionRecordDraftService(
             store.loadDraft(host, command.sessionId, forUpdate = true)
                 ?: throw draftStale()
         current.requireRevision(command.expectedDraftRevision)
-        return store.rebaseDraft(host, live, command.expectedDraftRevision) ?: throw draftStale()
+        return store.rebaseDraft(host, live, command.expectedDraftRevision)?.also {
+            epochPort.bump(host.clubId, HostListEpochKind.RECORD)
+        } ?: throw draftStale()
     }
 
     @Suppress("ThrowsCount")
@@ -78,7 +84,9 @@ class SessionRecordDraftService(
 
         if (current == null) {
             if (command.expectedDraftRevision != null) throw draftStale()
-            return store.insertDraft(host, live, command, encoded)
+            return store.insertDraft(host, live, command, encoded).also {
+                epochPort.bump(host.clubId, HostListEpochKind.RECORD)
+            }
         }
         if (requireExpectedRevision && current.draftRevision != command.expectedDraftRevision) throw draftStale()
         val updateCommand =
@@ -93,7 +101,9 @@ class SessionRecordDraftService(
             } else {
                 command.copy(expectedDraftRevision = current.draftRevision)
             }
-        return store.compareAndSetDraft(host, updateCommand, encoded) ?: throw draftStale()
+        return (store.compareAndSetDraft(host, updateCommand, encoded) ?: throw draftStale()).also {
+            epochPort.bump(host.clubId, HostListEpochKind.RECORD)
+        }
     }
 
     @Transactional
@@ -105,6 +115,7 @@ class SessionRecordDraftService(
         requireHost(host)
         requireLive(host, sessionId, forUpdate = true)
         if (!store.deleteDraft(host, sessionId, expectedDraftRevision)) throw draftStale()
+        epochPort.bump(host.clubId, HostListEpochKind.RECORD)
     }
 
     @Transactional
@@ -120,13 +131,14 @@ class SessionRecordDraftService(
                     SessionRecordError.REVISION_NOT_FOUND,
                     "Session record revision not found",
                 )
-        return store.insertRestoredDraft(
-            host = host,
-            live = live,
-            revision = revision,
-            expectedDraftRevision = command.expectedDraftRevision,
-            encoded = codec.encode(revision.snapshot),
-        ) ?: throw draftStale()
+        return store
+            .insertRestoredDraft(
+                host = host,
+                live = live,
+                revision = revision,
+                expectedDraftRevision = command.expectedDraftRevision,
+                encoded = codec.encode(revision.snapshot),
+            )?.also { epochPort.bump(host.clubId, HostListEpochKind.RECORD) } ?: throw draftStale()
     }
 
     private fun requireLive(

@@ -11,6 +11,9 @@ import com.readmates.session.application.port.out.HostSessionDraftPort
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -20,10 +23,12 @@ class HostSessionDraftCommandService(
     private val draftPort: HostSessionDraftPort,
     private val auditPort: HostSessionAuditPort = HostSessionAuditPort.Noop(),
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
 ) : HostSessionDraftUseCase {
     @Transactional
     override fun create(command: HostSessionCommand): CreatedSessionResponse {
         val created = draftPort.create(command)
+        epochPort.bump(command.host.clubId, HostListEpochKind.MEETING)
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
         return attachFirstPublicationComposer(command, created)
     }
@@ -46,6 +51,7 @@ class HostSessionDraftCommandService(
                 } else {
                     null
                 }
+            epochPort.bump(command.host.clubId, HostListEpochKind.MEETING, HostListEpochKind.RECORD)
             cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
             detail.copy(changeReceipt = receipt)
         }

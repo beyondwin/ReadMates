@@ -28,6 +28,7 @@ fun HostSessionCommand.createdVersionVector(): SessionVersionVector = SessionVer
 data class HostSessionIdCommand(
     val host: CurrentMember,
     val sessionId: UUID,
+    val expectedSessionRevision: ExpectedSessionRevision? = null,
 )
 
 const val MAX_REASON_NOTE_LENGTH = 500
@@ -37,6 +38,7 @@ data class HostSessionReverseCommand(
     val sessionId: UUID,
     val reasonCode: HostSessionLifecycleReasonCode?,
     val reasonNote: String?,
+    val expectedSessionRevision: ExpectedSessionRevision? = null,
 )
 
 fun HostSessionReverseCommand.normalized(requireReason: Boolean): HostSessionReverseCommand =
@@ -81,6 +83,7 @@ data class UpdateHostSessionCommand(
     val host: CurrentMember,
     val sessionId: UUID,
     val session: HostSessionCommand,
+    val expectedSessionRevision: ExpectedSessionRevision? = null,
 )
 
 data class UpdateHostSessionVisibilityCommand(
@@ -93,6 +96,7 @@ data class UpdateHostSessionVisibilityCommand(
 data class AttendanceEntryCommand(
     val membershipId: String,
     val attendanceStatus: String,
+    val expectedAttendanceRevision: Long? = null,
 )
 
 data class ConfirmAttendanceCommand(

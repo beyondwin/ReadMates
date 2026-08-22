@@ -31,6 +31,7 @@ internal class HostSessionDraftWriteOperations(
         queries.lockClub(host.clubId)
         val nextNumber = queries.nextSessionNumber(host.clubId)
         insertDraft(sessionId, nextNumber, command, values, exposure)
+        queries.insertPublicationVersion(sessionId)
         return createdResponse(sessionId, nextNumber, command, values, exposure)
     }
 
@@ -38,8 +39,8 @@ internal class HostSessionDraftWriteOperations(
         with(command) {
             requireHost(host)
             val values = policy.normalizeUpdate(session, queries.existingSchedule(host, sessionId))
-            val updated = updateDraft(host, sessionId, session, values)
-            if (updated == 0) throw HostSessionNotFoundException()
+            val updated = updateDraft(host, sessionId, session, values, queries.expectedRevision(expectedSessionRevision))
+            queries.throwIfStale(updated, host, sessionId)
             queries.detail(host, sessionId)
         }
 
@@ -129,6 +130,7 @@ internal class HostSessionDraftWriteOperations(
         sessionId: UUID,
         request: HostSessionCommand,
         values: NormalizedHostSessionWrite,
+        expectedRevision: Long,
     ): Int =
         jdbcTemplate.update(
             """
@@ -140,8 +142,10 @@ internal class HostSessionDraftWriteOperations(
                 location_label = case when ? then ? else location_label end,
                 meeting_url = case when ? then ? else meeting_url end,
                 meeting_passcode = case when ? then ? else meeting_passcode end,
-                question_deadline_at = ?, updated_at = utc_timestamp(6)
-            where id = ? and club_id = ? and deleted_at is null
+                question_deadline_at = ?,
+                session_revision = session_revision + 1,
+                updated_at = utc_timestamp(6)
+            where id = ? and club_id = ? and deleted_at is null and session_revision = ?
             """.trimIndent(),
             request.title,
             request.bookTitle,
@@ -162,6 +166,7 @@ internal class HostSessionDraftWriteOperations(
             values.questionDeadlineAt,
             sessionId.dbString(),
             host.clubId.dbString(),
+            expectedRevision,
         )
 
     private fun createdResponse(

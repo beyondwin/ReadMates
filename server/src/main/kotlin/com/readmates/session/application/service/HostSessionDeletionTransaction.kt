@@ -9,6 +9,9 @@ import com.readmates.session.application.model.HostSessionTrashResponse
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionLifecycleAuditPort
 import com.readmates.session.application.toTrashResponse
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -16,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional
 class HostSessionDeletionTransaction(
     private val deletionPort: HostSessionDeletionPort,
     private val lifecycleAudit: HostSessionLifecycleAuditPort,
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
 ) {
     @Transactional
     fun delete(command: HostSessionIdCommand): HostSessionTrashResponse {
@@ -23,6 +27,7 @@ class HostSessionDeletionTransaction(
         if (!assessment.canDelete) {
             throw HostSessionDeletionBlockedException(assessment.blockers)
         }
+        val trashed = deletionPort.moveToTrash(command, assessment.target)
         lifecycleAudit.record(
             HostSessionLifecycleAuditEntry(
                 host = command.host,
@@ -34,7 +39,7 @@ class HostSessionDeletionTransaction(
                 reasonNote = null,
             ),
         )
-        val trashed = deletionPort.moveToTrash(command, assessment.target)
+        epochPort.bump(command.host.clubId, HostListEpochKind.MEETING, HostListEpochKind.RECORD)
         return assessment.toTrashResponse(
             deletedAt = trashed.deletedAt.toString(),
             purgeAfter = trashed.purgeAfter.toString(),

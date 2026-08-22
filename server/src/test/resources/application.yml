@@ -6,6 +6,12 @@ readmates:
     ip-hash:
       base-secret: test-ip-hash-base-secret
       allow-empty-secret: false
+    host-list-cursor:
+      current-key: test-host-list-cursor-current-key
+      current-key-version: 1
+      previous-key: test-host-list-cursor-previous-key
+      previous-key-version: 0
+      allow-empty-secret: false
 
 spring:
   ai:

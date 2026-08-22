@@ -2,6 +2,7 @@
 
 package com.readmates.session.adapter.`in`.web
 
+import com.readmates.session.application.model.ExpectedSessionRevision
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionLifecycleReasonCode
 import com.readmates.session.application.model.HostSessionReverseCommand
@@ -43,19 +44,28 @@ class HostSessionLifecycleController(
     fun open(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = hostSessionLifecycleUseCase.open(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody request: HostSessionExpectedRevisionRequest,
+    ) = hostSessionLifecycleUseCase.open(
+        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
+    )
 
     @PostMapping("/{sessionId}/close")
     fun close(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = hostSessionLifecycleUseCase.close(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody request: HostSessionExpectedRevisionRequest,
+    ) = hostSessionLifecycleUseCase.close(
+        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
+    )
 
     @PostMapping("/{sessionId}/publish")
     fun publish(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = hostSessionLifecycleUseCase.publish(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody request: HostSessionExpectedRevisionRequest,
+    ) = hostSessionLifecycleUseCase.publish(
+        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
+    )
 
     @PostMapping("/{sessionId}/reopen")
     fun reopen(
@@ -88,12 +98,16 @@ class HostSessionLifecycleController(
     fun delete(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = hostSessionLifecycleUseCase.delete(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody request: HostSessionExpectedRevisionRequest,
+    ) = hostSessionLifecycleUseCase.delete(
+        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
+    )
 }
 
 data class HostSessionReverseRequest(
     val reasonCode: String? = null,
     val reasonNote: String? = null,
+    val expectedSessionRevision: Long? = null,
 )
 
 private fun HostSessionReverseRequest?.toCommand(
@@ -107,5 +121,9 @@ private fun HostSessionReverseRequest?.toCommand(
                 .takeIf(USER_SELECTABLE_LIFECYCLE_REASONS::contains)
                 ?: throw InvalidHostSessionLifecycleReasonException()
         }
-    return HostSessionReverseCommand(host, sessionId, parsed, this?.reasonNote)
+    val expected =
+        this?.expectedSessionRevision?.let(::ExpectedSessionRevision)
+            ?: throw com.readmates.session.application
+                .InvalidSessionScheduleException()
+    return HostSessionReverseCommand(host, sessionId, parsed, this.reasonNote, expected)
 }

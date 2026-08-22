@@ -70,31 +70,34 @@ class HostSessionRecoveryService(
         if (!HostSessionRestoreHashes.matches(command.expectedCurrentHash, evaluation.hashValues)) {
             throw HostSessionRestoreStaleException()
         }
-        val receipt = applyRestore(command.host, locked)
+        val receipt = applyRestore(command, locked)
         cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
         return receipt
     }
 
     private fun applyRestore(
-        host: CurrentMember,
+        command: RestoreHostSessionCommand,
         locked: HostSessionRestoreLock,
     ): HostSessionChangeReceipt =
         if (locked.change.kind == HostSessionChangeKind.ATTENDANCE) {
-            applyAttendanceRestore(host, locked)
+            applyAttendanceRestore(command, locked)
         } else {
-            applyBasicRestore(host, locked)
+            applyBasicRestore(command, locked)
         }
 
     private fun applyBasicRestore(
-        host: CurrentMember,
+        command: RestoreHostSessionCommand,
         locked: HostSessionRestoreLock,
     ): HostSessionChangeReceipt {
         val current = locked.current.basic ?: throw HostSessionChangeNotRestorableException(SNAPSHOT_UNAVAILABLE)
-        val command = locked.change.toUpdateCommand(host, current)
-        draftPort.update(command)
-        val after = auditPort.loadBasicSnapshot(host, locked.change.sessionId) ?: current
+        val expected =
+            command.expectedSessionRevision
+                ?: throw HostSessionRestoreStaleException()
+        val update = locked.change.toUpdateCommand(command.host, current).copy(expectedSessionRevision = expected)
+        draftPort.update(update)
+        val after = auditPort.loadBasicSnapshot(command.host, locked.change.sessionId) ?: current
         return auditPort.recordBasicUpdate(
-            host = host,
+            host = command.host,
             sessionId = locked.change.sessionId,
             before = current,
             after = after,
@@ -104,12 +107,26 @@ class HostSessionRecoveryService(
     }
 
     private fun applyAttendanceRestore(
-        host: CurrentMember,
+        command: RestoreHostSessionCommand,
         locked: HostSessionRestoreLock,
     ): HostSessionChangeReceipt {
-        attendancePort.confirmAttendance(locked.change.toAttendanceCommand(host))
+        val attendanceCommand = locked.change.toAttendanceCommand(command.host)
+        val withRevision =
+            attendanceCommand.copy(
+                entries =
+                    attendanceCommand.entries.map { entry ->
+                        entry.copy(
+                            expectedAttendanceRevision =
+                                command.expectedAttendanceRevision.takeIf {
+                                    command.membershipId == null ||
+                                        command.membershipId.toString() == entry.membershipId
+                                },
+                        )
+                    },
+            )
+        attendancePort.confirmAttendance(withRevision)
         return auditPort.recordAttendanceUpdate(
-            host = host,
+            host = command.host,
             sessionId = locked.change.sessionId,
             transitions = locked.change.restoreAttendanceTransitions(locked.current.attendance),
             restoredFromChangeId = locked.change.changeId,
