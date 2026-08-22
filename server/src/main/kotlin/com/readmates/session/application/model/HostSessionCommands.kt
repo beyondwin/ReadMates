@@ -103,6 +103,7 @@ data class UpdateParticipantAttendanceCommand(
     val membershipId: UUID,
     val status: ActualAttendanceStatus,
     val expectedAttendanceRevision: Long,
+    val expectedCurrentStatus: ActualAttendanceStatus? = null,
 ) {
     init {
         require(expectedAttendanceRevision >= 0) { "expectedAttendanceRevision must be non-negative" }
@@ -123,6 +124,7 @@ data class AttendanceEntryCommand(
     val membershipId: String,
     val attendanceStatus: String,
     val expectedAttendanceRevision: Long,
+    val expectedCurrentStatus: String? = null,
 ) {
     init {
         require(expectedAttendanceRevision >= 0) { "expectedAttendanceRevision must be non-negative" }

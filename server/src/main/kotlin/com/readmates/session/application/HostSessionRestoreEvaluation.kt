@@ -6,6 +6,7 @@ import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionRestoreItem
 import com.readmates.session.application.model.UpdateHostSessionCommand
+import com.readmates.session.application.port.out.AttendanceRestoreRow
 import com.readmates.session.application.port.out.HostSessionRecoverableChange
 import com.readmates.session.application.port.out.HostSessionRestoreCurrentState
 import com.readmates.shared.security.CurrentMember
@@ -78,7 +79,7 @@ internal fun HostSessionRecoverableChange.toUpdateCommand(
 
 internal fun HostSessionRecoverableChange.toAttendanceCommand(
     host: CurrentMember,
-    expectedAttendanceRevision: Long,
+    current: HostSessionRestoreCurrentState,
 ): ConfirmAttendanceCommand =
     ConfirmAttendanceCommand(
         host = host,
@@ -86,11 +87,22 @@ internal fun HostSessionRecoverableChange.toAttendanceCommand(
         entries =
             transitions
                 .sortedBy { it.membershipId }
-                .map { AttendanceEntryCommand(it.membershipId, it.from, expectedAttendanceRevision) },
+                .map { transition ->
+                    val membershipId = UUID.fromString(transition.membershipId)
+                    val row = current.attendance.getValue(membershipId)
+                    AttendanceEntryCommand(
+                        membershipId = transition.membershipId,
+                        attendanceStatus = transition.from,
+                        expectedAttendanceRevision = row.attendanceRevision,
+                        expectedCurrentStatus = row.status,
+                    )
+                },
     )
 
 @Suppress("MaxLineLength")
-internal fun HostSessionRecoverableChange.restoreAttendanceTransitions(current: Map<UUID, String>): List<HostAttendanceAuditTransition> =
+internal fun HostSessionRecoverableChange.restoreAttendanceTransitions(
+    current: Map<UUID, AttendanceRestoreRow>,
+): List<HostAttendanceAuditTransition> =
     transitions
         .sortedBy { it.membershipId }
         .mapNotNull { transition ->
@@ -98,7 +110,7 @@ internal fun HostSessionRecoverableChange.restoreAttendanceTransitions(current: 
                 runCatching { UUID.fromString(transition.membershipId) }.getOrNull() ?: return@mapNotNull null
             HostAttendanceAuditTransition(
                 membershipId = transition.membershipId,
-                from = current[membershipId] ?: return@mapNotNull null,
+                from = current[membershipId]?.status ?: return@mapNotNull null,
                 to = transition.from,
             )
         }
@@ -123,7 +135,7 @@ private fun HostSessionRecoverableChange.hashValues(current: HostSessionRestoreC
             .mapNotNull { transition ->
                 val membershipId =
                     runCatching { UUID.fromString(transition.membershipId) }.getOrNull() ?: return@mapNotNull null
-                membershipId.toString() to current.attendance[membershipId]
+                membershipId.toString() to current.attendance[membershipId]?.status
             }.toMap()
     } else {
         changedFields.associateWith { field -> current.basic?.valueOf(field) }
@@ -139,7 +151,7 @@ private fun HostSessionRecoverableChange.restoreItems(current: HostSessionRestor
                 HostSessionRestoreItem(
                     field = "attendanceStatus",
                     subjectId = membershipId,
-                    currentValue = membershipId?.let { current.attendance[it] },
+                    currentValue = membershipId?.let { current.attendance[it]?.status },
                     targetValue = transition.from,
                 )
             }

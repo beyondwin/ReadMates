@@ -116,18 +116,18 @@ class HostSessionRecoveryService(
         command: RestoreHostSessionCommand,
         locked: HostSessionRestoreLock,
     ): HostSessionChangeReceipt {
-        val expectedAttendanceRevision =
-            command.expectedAttendanceRevision ?: throw InvalidSessionScheduleException()
-        val attendanceCommand = locked.change.toAttendanceCommand(command.host, expectedAttendanceRevision)
+        val attendanceCommand = locked.change.toAttendanceCommand(command.host, locked.current)
         val scoped =
             if (command.membershipId == null) {
                 attendanceCommand
             } else {
+                val expectedAttendanceRevision =
+                    command.expectedAttendanceRevision ?: throw InvalidSessionScheduleException()
                 attendanceCommand.copy(
                     entries =
-                        attendanceCommand.entries.filter { entry ->
-                            entry.membershipId == command.membershipId.toString()
-                        },
+                        attendanceCommand.entries
+                            .filter { entry -> entry.membershipId == command.membershipId.toString() }
+                            .map { entry -> entry.copy(expectedAttendanceRevision = expectedAttendanceRevision) },
                 )
             }
         if (scoped.entries.isEmpty()) {

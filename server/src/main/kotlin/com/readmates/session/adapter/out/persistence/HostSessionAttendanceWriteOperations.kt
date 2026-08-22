@@ -54,6 +54,7 @@ internal class HostSessionAttendanceWriteOperations(
                     membershipId = policy.membershipId(entry.membershipId),
                     status = parseStatus(entry.attendanceStatus),
                     expectedAttendanceRevision = entry.expectedAttendanceRevision,
+                    expectedCurrentStatus = entry.expectedCurrentStatus?.let(::parseStatus),
                 )
             }
         if (rows.map { it.membershipId }.distinct().size != rows.size) {
@@ -96,7 +97,7 @@ internal class HostSessionAttendanceWriteOperations(
                 jdbcTemplate
                     .query(
                         """
-                        select membership_id, attendance_status, rsvp_status, attendance_revision, participation_status
+                        select membership_id, attendance_status, attendance_revision, participation_status
                         from session_participants
                         where session_id = ?
                           and club_id = ?
@@ -107,7 +108,6 @@ internal class HostSessionAttendanceWriteOperations(
                             LockedAttendanceRow(
                                 membershipId = membershipId,
                                 attendanceStatus = resultSet.getString("attendance_status"),
-                                rsvpStatus = resultSet.getString("rsvp_status"),
                                 attendanceRevision = resultSet.getLong("attendance_revision"),
                                 participationStatus = resultSet.getString("participation_status"),
                             )
@@ -127,13 +127,15 @@ internal class HostSessionAttendanceWriteOperations(
     ) {
         rows.forEach { row ->
             val current = locked[row.membershipId] ?: throwConflict(host, sessionId)
-            val rowHash =
-                "${current.membershipId}:${current.attendanceStatus}:" +
-                    "${current.attendanceRevision}:${current.rsvpStatus}"
-            if (rowHash.isBlank() ||
-                current.participationStatus != "ACTIVE" ||
-                current.attendanceRevision != row.expectedAttendanceRevision
-            ) {
+            if (current.participationStatus != "ACTIVE") {
+                throwConflict(host, sessionId)
+            }
+            val expectedStatus = row.expectedCurrentStatus?.name ?: current.attendanceStatus
+            val actualHash =
+                attendanceRowHash(current.membershipId, current.attendanceStatus, current.attendanceRevision)
+            val expectedHash =
+                attendanceRowHash(row.membershipId, expectedStatus, row.expectedAttendanceRevision)
+            if (actualHash != expectedHash) {
                 throwConflict(host, sessionId)
             }
         }
@@ -187,7 +189,12 @@ internal class HostSessionAttendanceWriteOperations(
 private data class LockedAttendanceRow(
     val membershipId: UUID,
     val attendanceStatus: String,
-    val rsvpStatus: String,
     val attendanceRevision: Long,
     val participationStatus: String,
 )
+
+private fun attendanceRowHash(
+    membershipId: UUID,
+    attendanceStatus: String,
+    attendanceRevision: Long,
+) = "$membershipId:$attendanceStatus:$attendanceRevision"

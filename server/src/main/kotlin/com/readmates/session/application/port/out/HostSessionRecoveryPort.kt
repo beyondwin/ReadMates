@@ -18,9 +18,14 @@ data class HostSessionRecoverableChange(
     val completeSnapshots: Boolean,
 )
 
+data class AttendanceRestoreRow(
+    val status: String,
+    val attendanceRevision: Long,
+)
+
 data class HostSessionRestoreCurrentState(
     val basic: HostSessionBasicAuditSnapshot?,
-    val attendance: Map<UUID, String>,
+    val attendance: Map<UUID, AttendanceRestoreRow>,
 )
 
 data class HostSessionRestoreLock(

@@ -2,12 +2,14 @@ package com.readmates.session.api
 
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.service.HostSessionAttendanceService
 import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.Timeout
@@ -217,6 +219,87 @@ class HostSessionAttendanceConcurrencyDbTest(
         assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")
         assertThat(rsvpStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("GOING")
         assertThat(meetingEpoch()).isEqualTo(epochBefore + 1)
+    }
+
+    @Test
+    fun `bulk history restore uses per-row revisions after independent edits`() {
+        val sessionId = openSession("일괄 복원 개정")
+        setRsvp(sessionId, HOST_MEMBERSHIP_ID, "GOING")
+        setRsvp(sessionId, MEMBER_MEMBERSHIP_ID, "MAYBE")
+        val changeId =
+            confirm(
+                sessionId,
+                listOf(
+                    row(HOST_MEMBERSHIP_ID, "ATTENDED", expectedRevision = 0),
+                    row(MEMBER_MEMBERSHIP_ID, "ABSENT", expectedRevision = 0),
+                ),
+            ).get("changeReceipt")
+                .get("changeId")
+                .asString()
+        confirm(sessionId, listOf(row(HOST_MEMBERSHIP_ID, "ABSENT", expectedRevision = 1)))
+        assertThat(attendanceRevision(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo(2)
+        assertThat(attendanceRevision(sessionId, MEMBER_MEMBERSHIP_ID)).isEqualTo(1)
+        val preview =
+            mockMvc
+                .get("/api/host/sessions/$sessionId/changes/$changeId/restore-preview") { withHost() }
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+        val epochBefore = meetingEpoch()
+        val auditBefore = countAudit(sessionId)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/changes/$changeId/restore") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "expectedCurrentHash":"${preview.get("expectedCurrentHash").asString()}",
+                      "expectedAttendanceRevision":1
+                    }
+                    """.trimIndent()
+            }.andExpect { status { isOk() } }
+
+        assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")
+        assertThat(attendanceStatus(sessionId, MEMBER_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")
+        assertThat(rsvpStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("GOING")
+        assertThat(rsvpStatus(sessionId, MEMBER_MEMBERSHIP_ID)).isEqualTo("MAYBE")
+        assertThat(meetingEpoch()).isEqualTo(epochBefore + 1)
+        assertThat(countAudit(sessionId)).isEqualTo(auditBefore + 1)
+    }
+
+    @Test
+    fun `attendance current row hash mismatch writes nothing`() {
+        val sessionId = openSession("출석 row hash")
+        setRsvp(sessionId, HOST_MEMBERSHIP_ID, "GOING")
+        val epochBefore = meetingEpoch()
+
+        assertThatThrownBy {
+            attendanceService.confirmAttendance(
+                ConfirmAttendanceCommand(
+                    host = host,
+                    sessionId = UUID.fromString(sessionId),
+                    entries =
+                        listOf(
+                            AttendanceEntryCommand(
+                                membershipId = HOST_MEMBERSHIP_ID,
+                                attendanceStatus = "ATTENDED",
+                                expectedAttendanceRevision = 0,
+                                expectedCurrentStatus = "ATTENDED",
+                            ),
+                        ),
+                ),
+            )
+        }.isInstanceOf(HostSessionRevisionConflictException::class.java)
+
+        assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")
+        assertThat(attendanceRevision(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo(0)
+        assertThat(rsvpStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("GOING")
+        assertThat(countAudit(sessionId)).isZero()
+        assertThat(meetingEpoch()).isEqualTo(epochBefore)
     }
 
     @Test

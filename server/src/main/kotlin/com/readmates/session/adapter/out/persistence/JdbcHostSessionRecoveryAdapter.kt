@@ -1,6 +1,7 @@
 package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionBasicAuditSnapshot
+import com.readmates.session.application.port.out.AttendanceRestoreRow
 import com.readmates.session.application.port.out.HostSessionRecoverableChange
 import com.readmates.session.application.port.out.HostSessionRecoveryPort
 import com.readmates.session.application.port.out.HostSessionRestoreCurrentState
@@ -139,7 +140,7 @@ class JdbcHostSessionRecoveryAdapter(
         sessionId: UUID,
         membershipIds: Set<UUID>,
         forUpdate: Boolean,
-    ): Map<UUID, String> {
+    ): Map<UUID, AttendanceRestoreRow> {
         if (membershipIds.isEmpty()) return emptyMap()
         val ordered = membershipIds.sortedBy { it.toString() }
         val placeholders = ordered.joinToString(",") { "?" }
@@ -148,7 +149,7 @@ class JdbcHostSessionRecoveryAdapter(
         return jdbcTemplate
             .query(
                 """
-                select membership_id, attendance_status
+                select membership_id, attendance_status, attendance_revision
                 from session_participants
                 where club_id = ?
                   and session_id = ?
@@ -157,7 +158,13 @@ class JdbcHostSessionRecoveryAdapter(
                 order by membership_id
                 $lock
                 """.trimIndent(),
-                { rs, _ -> UUID.fromString(rs.getString("membership_id")) to rs.getString("attendance_status") },
+                { rs, _ ->
+                    UUID.fromString(rs.getString("membership_id")) to
+                        AttendanceRestoreRow(
+                            status = rs.getString("attendance_status"),
+                            attendanceRevision = rs.getLong("attendance_revision"),
+                        )
+                },
                 *arguments.toTypedArray(),
             ).toMap()
     }
