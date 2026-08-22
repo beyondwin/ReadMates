@@ -1,14 +1,27 @@
 import { render, screen, fireEvent } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { useRef, useState, type RefObject } from "react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AdminOnboardingModal } from "./admin-onboarding-modal";
 
-function renderModal(props: { isDirty: boolean; onClose: () => void }) {
+function renderModal(props: {
+  isDirty: boolean;
+  onClose: () => void;
+  triggerRef?: RefObject<HTMLElement | null>;
+}) {
   return render(
-    <AdminOnboardingModal onRequestClose={props.onClose} isDirty={props.isDirty}>
+    <AdminOnboardingModal
+      onRequestClose={props.onClose}
+      isDirty={props.isDirty}
+      triggerRef={props.triggerRef}
+    >
       <div>wizard contents</div>
     </AdminOnboardingModal>,
   );
 }
+
+afterEach(() => {
+  document.body.style.overflow = "";
+});
 
 describe("AdminOnboardingModal", () => {
   it("renders children inside a dialog", () => {
@@ -52,10 +65,46 @@ describe("AdminOnboardingModal", () => {
 
   it("closes on backdrop click", () => {
     const onClose = vi.fn();
-    const { container } = renderModal({ isDirty: false, onClose });
-    const backdrop = container.querySelector(".admin-onboarding-modal__backdrop");
-    expect(backdrop).not.toBeNull();
-    fireEvent.click(backdrop!);
+    renderModal({ isDirty: false, onClose });
+    fireEvent.click(screen.getByTestId("admin-modal-dialog-backdrop"));
     expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
+  it("locks background scroll and restores the trigger through the shared dialog", () => {
+    const onClose = vi.fn();
+    document.body.style.overflow = "auto";
+
+    function Harness() {
+      const triggerRef = useRef<HTMLButtonElement>(null);
+      const [open, setOpen] = useState(true);
+      return (
+        <>
+          <button type="button" ref={triggerRef}>
+            새 클럽
+          </button>
+          {open ? (
+            <AdminOnboardingModal
+              isDirty={false}
+              triggerRef={triggerRef}
+              onRequestClose={() => {
+                onClose();
+                setOpen(false);
+              }}
+            >
+              <div>wizard contents</div>
+            </AdminOnboardingModal>
+          ) : null}
+        </>
+      );
+    }
+
+    render(<Harness />);
+
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(screen.getByRole("dialog", { name: "새 클럽" })).toHaveAttribute("aria-modal", "true");
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: "새 클럽" })).toHaveFocus();
+    expect(document.body.style.overflow).toBe("auto");
   });
 });

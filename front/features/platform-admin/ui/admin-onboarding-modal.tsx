@@ -1,14 +1,20 @@
-import { useEffect, useRef } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type RefObject } from "react";
+import { AdminModalDialog } from "./admin-modal-dialog";
 
 export type AdminOnboardingModalProps = {
   isDirty: boolean;
   onRequestClose: () => void;
   children: ReactNode;
+  triggerRef?: RefObject<HTMLElement | null>;
 };
 
-export function AdminOnboardingModal({ isDirty, onRequestClose, children }: AdminOnboardingModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+export function AdminOnboardingModal({
+  isDirty,
+  onRequestClose,
+  children,
+  triggerRef,
+}: AdminOnboardingModalProps) {
+  const fallbackTriggerRef = useRef<HTMLElement | null>(null);
 
   function requestClose() {
     if (isDirty) {
@@ -17,18 +23,6 @@ export function AdminOnboardingModal({ isDirty, onRequestClose, children }: Admi
     }
     onRequestClose();
   }
-
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.stopPropagation();
-        requestClose();
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDirty]);
 
   useEffect(() => {
     if (!isDirty) return;
@@ -40,53 +34,27 @@ export function AdminOnboardingModal({ isDirty, onRequestClose, children }: Admi
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
   }, [isDirty]);
 
-  useEffect(() => {
-    const node = dialogRef.current;
-    if (!node) return;
-    const focusables = node.querySelectorAll<HTMLElement>(
-      'a, button, input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
-    if (focusables.length > 0) {
-      focusables[0].focus();
-    }
-  }, []);
-
   return (
-    <div
+    <AdminModalDialog
+      titleId="admin-onboarding-modal-title"
+      triggerRef={triggerRef ?? fallbackTriggerRef}
+      onRequestClose={requestClose}
       className="admin-onboarding-modal"
-      role="presentation"
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
-          event.stopPropagation();
-          requestClose();
-        }
-      }}
     >
-      <div
-        className="admin-onboarding-modal__backdrop"
-        onClick={() => requestClose()}
-        aria-hidden="true"
-      />
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="admin-onboarding-modal-title"
-        className="admin-onboarding-modal__dialog"
-      >
-        <header className="admin-onboarding-modal__header">
-          <h1 id="admin-onboarding-modal-title" className="h2">새 클럽</h1>
-          <button
-            type="button"
-            className="admin-onboarding-modal__close"
-            onClick={() => requestClose()}
-            aria-label="닫기"
-          >
-            닫기
-          </button>
-        </header>
-        <div className="admin-onboarding-modal__body">{children}</div>
-      </div>
-    </div>
+      <header className="admin-onboarding-modal__header">
+        <h1 id="admin-onboarding-modal-title" className="h2">
+          새 클럽
+        </h1>
+        <button
+          type="button"
+          className="admin-onboarding-modal__close"
+          onClick={requestClose}
+          aria-label="닫기"
+        >
+          닫기
+        </button>
+      </header>
+      <div className="admin-onboarding-modal__body">{children}</div>
+    </AdminModalDialog>
   );
 }

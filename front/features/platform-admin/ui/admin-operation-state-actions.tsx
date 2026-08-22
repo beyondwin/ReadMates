@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+import { useRef, useState } from "react";
+import { AdminModalDialog } from "./admin-modal-dialog";
 
 type LifecycleAction = "ACKNOWLEDGE" | "SNOOZE" | "RESOLVE";
 
@@ -29,15 +30,7 @@ export function AdminOperationStateActions({
   onResolve,
 }: Props) {
   const [resolveOpen, setResolveOpen] = useState(false);
-
-  useEffect(() => {
-    if (!resolveOpen) return;
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === "Escape") setResolveOpen(false);
-    }
-    document.addEventListener("keydown", closeOnEscape);
-    return () => document.removeEventListener("keydown", closeOnEscape);
-  }, [resolveOpen]);
+  const resolveTriggerRef = useRef<HTMLElement | null>(null);
 
   function snooze(hours: number) {
     onSnooze(new Date(now().getTime() + hours * HOUR_MS).toISOString());
@@ -73,7 +66,13 @@ export function AdminOperationStateActions({
           </>
         ) : null}
         {allowedActions.includes("RESOLVE") ? (
-          <button type="button" className="btn btn-secondary" disabled={pending} onClick={() => setResolveOpen(true)}>
+          <button
+            ref={resolveTriggerRef}
+            type="button"
+            className="btn btn-secondary"
+            disabled={pending}
+            onClick={() => setResolveOpen(true)}
+          >
             해결 확인
           </button>
         ) : null}
@@ -89,26 +88,22 @@ export function AdminOperationStateActions({
       ) : null}
 
       {resolveOpen ? (
-        <div
-          className="admin-operation-actions__backdrop"
-          data-testid="resolve-backdrop"
-          onMouseDown={(event) => {
-            if (event.target === event.currentTarget) setResolveOpen(false);
-          }}
+        <AdminModalDialog
+          titleId="resolve-title"
+          triggerRef={resolveTriggerRef}
+          onRequestClose={() => setResolveOpen(false)}
         >
-          <div className="admin-operation-actions__dialog" role="dialog" aria-modal="true" aria-labelledby="resolve-title">
-            <h4 id="resolve-title">해결 상태 확인</h4>
-            <p>현재 source를 다시 검증해 신호가 사라졌을 때만 해결됩니다.</p>
-            <div className="admin-operation-actions__dialog-buttons">
-              <button type="button" className="btn btn-secondary" onClick={() => setResolveOpen(false)}>
-                닫기
-              </button>
-              <button type="button" className="btn btn-primary" disabled={pending} onClick={confirmResolve}>
-                신호 재검증 후 해결
-              </button>
-            </div>
+          <h4 id="resolve-title">해결 상태 확인</h4>
+          <p>현재 source를 다시 검증해 신호가 사라졌을 때만 해결됩니다.</p>
+          <div className="admin-operation-actions__dialog-buttons">
+            <button type="button" className="btn btn-secondary" onClick={() => setResolveOpen(false)}>
+              닫기
+            </button>
+            <button type="button" className="btn btn-primary" disabled={pending} onClick={confirmResolve}>
+              신호 재검증 후 해결
+            </button>
           </div>
-        </div>
+        </AdminModalDialog>
       ) : null}
     </div>
   );

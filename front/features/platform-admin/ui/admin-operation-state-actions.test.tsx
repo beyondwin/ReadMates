@@ -36,7 +36,7 @@ describe("AdminOperationStateActions", () => {
   it.each([
     ["닫기 버튼", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "닫기" }))],
     ["Escape", async (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}")],
-    ["backdrop", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByTestId("resolve-backdrop"))],
+    ["backdrop", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByTestId("admin-modal-dialog-backdrop"))],
   ])("does not resolve when the confirmation is dismissed by %s", async (_label, dismiss) => {
     const user = userEvent.setup();
     const { props } = renderActions();
@@ -57,6 +57,25 @@ describe("AdminOperationStateActions", () => {
     await user.click(screen.getByRole("button", { name: "신호 재검증 후 해결" }));
 
     expect(props.onResolve).toHaveBeenCalledOnce();
+  });
+
+  it("opens the resolve confirm on the shared dialog with initial and restored focus", async () => {
+    const user = userEvent.setup();
+    const { props } = renderActions();
+    const trigger = screen.getByRole("button", { name: "해결 확인" });
+
+    await user.click(trigger);
+
+    const dialog = screen.getByRole("dialog", { name: "해결 상태 확인" });
+    expect(dialog).toHaveAttribute("aria-modal", "true");
+    expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
+    expect(document.body.style.overflow).toBe("hidden");
+
+    await user.keyboard("{Escape}");
+
+    expect(props.onResolve).not.toHaveBeenCalled();
+    expect(trigger).toHaveFocus();
+    expect(document.body.style.overflow).toBe("");
   });
 
   it("disables every lifecycle control while a mutation is pending", () => {
