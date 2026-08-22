@@ -4,6 +4,7 @@ import com.readmates.session.application.HostSessionChangeNotRestorableException
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionRestoreHashes
 import com.readmates.session.application.HostSessionRestoreStaleException
+import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.evaluate
 import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionChangeReceipt
@@ -25,6 +26,9 @@ import com.readmates.session.application.toAttendanceCommand
 import com.readmates.session.application.toUpdateCommand
 import com.readmates.session.application.transitionMembershipIds
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -36,6 +40,7 @@ class HostSessionRecoveryService(
     private val draftPort: HostSessionDraftPort,
     private val attendancePort: HostSessionAttendancePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
 ) : PreviewHostSessionRestoreUseCase,
     RestoreHostSessionUseCase {
     @Transactional(readOnly = true)
@@ -95,6 +100,7 @@ class HostSessionRecoveryService(
                 ?: throw HostSessionRestoreStaleException()
         val update = locked.change.toUpdateCommand(command.host, current).copy(expectedSessionRevision = expected)
         draftPort.update(update)
+        epochPort.bump(command.host.clubId, HostListEpochKind.MEETING, HostListEpochKind.RECORD)
         val after = auditPort.loadBasicSnapshot(command.host, locked.change.sessionId) ?: current
         return auditPort.recordBasicUpdate(
             host = command.host,
@@ -110,6 +116,8 @@ class HostSessionRecoveryService(
         command: RestoreHostSessionCommand,
         locked: HostSessionRestoreLock,
     ): HostSessionChangeReceipt {
+        val expectedAttendanceRevision =
+            command.expectedAttendanceRevision ?: throw InvalidSessionScheduleException()
         val attendanceCommand = locked.change.toAttendanceCommand(command.host)
         val withRevision =
             attendanceCommand.copy(
@@ -117,13 +125,16 @@ class HostSessionRecoveryService(
                     attendanceCommand.entries.map { entry ->
                         entry.copy(
                             expectedAttendanceRevision =
-                                command.expectedAttendanceRevision.takeIf {
+                                expectedAttendanceRevision.takeIf {
                                     command.membershipId == null ||
                                         command.membershipId.toString() == entry.membershipId
                                 },
                         )
                     },
             )
+        if (withRevision.entries.none { entry -> entry.expectedAttendanceRevision != null }) {
+            throw InvalidSessionScheduleException()
+        }
         attendancePort.confirmAttendance(withRevision)
         return auditPort.recordAttendanceUpdate(
             host = command.host,

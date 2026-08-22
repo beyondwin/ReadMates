@@ -61,11 +61,8 @@ internal class HostSessionAttendanceWriteOperations(
             )
         if (updated.any { count -> count == 0 }) {
             if (command.entries.any { entry -> entry.expectedAttendanceRevision != null }) {
-                throw com.readmates.session.application.HostSessionRevisionConflictException(
-                    current = com.readmates.session.application.model.SessionVersionVector.INITIAL,
-                    changedAt = null,
-                    changedByDisplay = null,
-                )
+                throw queries.revisionConflict(command.host, command.sessionId)
+                    ?: HostSessionParticipantNotFoundException()
             }
             throw HostSessionParticipantNotFoundException()
         }

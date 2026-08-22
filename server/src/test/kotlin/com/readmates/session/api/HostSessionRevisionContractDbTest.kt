@@ -166,6 +166,44 @@ class HostSessionRevisionContractDbTest(
         val auditBefore = countAudit(sessionId, "ATTENDANCE_UPDATED")
         val revisionBefore = attendanceRevision(sessionId, HOST_MEMBERSHIP_ID)
 
+        val conflict =
+            mockMvc
+                .post("/api/host/sessions/$sessionId/changes/$changeId/restore") {
+                    withHost()
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "expectedCurrentHash":"$hash",
+                          "membershipId":"$HOST_MEMBERSHIP_ID",
+                          "expectedAttendanceRevision":0
+                        }
+                        """.trimIndent()
+                }.andExpect {
+                    status { isConflict() }
+                    jsonPath("$.code") { value("REVISION_CONFLICT") }
+                }.andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+        assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("ABSENT")
+        assertThat(attendanceRevision(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo(revisionBefore)
+        assertThat(countAudit(sessionId, "ATTENDANCE_UPDATED")).isEqualTo(auditBefore)
+        assertThat(conflict.get("current").get("sessionRevision").asLong()).isEqualTo(sessionRevision(sessionId))
+        assertThat(conflict.get("current").get("sessionRevision").asLong()).isGreaterThan(0)
+        assertThat(conflict.get("changedAt").isNull).isFalse()
+    }
+
+    @Test
+    fun `attendance undo without expected revision is rejected and writes nothing`() {
+        val sessionId = createDraft("출석 복원 필수 개정")
+        open(sessionId, expectedRevision = 0)
+        val changeId = confirmAttendance(sessionId, HOST_MEMBERSHIP_ID, "ABSENT")
+        val preview = previewRestore(sessionId, changeId)
+        val hash = preview.get("expectedCurrentHash").asString()
+        val auditBefore = countAudit(sessionId, "ATTENDANCE_UPDATED")
+        val revisionBefore = attendanceRevision(sessionId, HOST_MEMBERSHIP_ID)
+
         mockMvc
             .post("/api/host/sessions/$sessionId/changes/$changeId/restore") {
                 withHost()
@@ -174,17 +212,64 @@ class HostSessionRevisionContractDbTest(
                     """
                     {
                       "expectedCurrentHash":"$hash",
-                      "membershipId":"$HOST_MEMBERSHIP_ID",
-                      "expectedAttendanceRevision":0
+                      "membershipId":"$HOST_MEMBERSHIP_ID"
                     }
                     """.trimIndent()
             }.andExpect {
-                status { isConflict() }
-                jsonPath("$.code") { value("REVISION_CONFLICT") }
+                status { isBadRequest() }
             }
         assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("ABSENT")
         assertThat(attendanceRevision(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo(revisionBefore)
         assertThat(countAudit(sessionId, "ATTENDANCE_UPDATED")).isEqualTo(auditBefore)
+    }
+
+    @Test
+    fun `trashed sessions stay not found instead of revision conflict`() {
+        val sessionId = createDraft("휴지통 개정 404")
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = revisionJson(0)
+            }.andExpect { status { isOk() } }
+        val trashedRevision = sessionRevision(sessionId)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = sessionJson("휴지통 패치", expectedRevision = trashedRevision)
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("SESSION_NOT_FOUND") }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = revisionJson(0)
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("SESSION_NOT_FOUND") }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = revisionJson(trashedRevision)
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("SESSION_NOT_FOUND") }
+            }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = revisionJson(trashedRevision)
+            }.andExpect {
+                status { isNotFound() }
+                jsonPath("$.code") { value("SESSION_NOT_FOUND") }
+            }
     }
 
     private fun createDraft(title: String): String {

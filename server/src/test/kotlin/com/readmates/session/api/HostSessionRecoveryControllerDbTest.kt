@@ -42,6 +42,8 @@ class HostSessionRecoveryControllerDbTest(
     fun `host previews and restores a basic change without overwriting newer work`() {
         val sessionId = createDraftSession()
         val changeId = patchTitle(sessionId, "복원 대상 제목")
+        val meetingEpochBefore = listEpoch("meeting_epoch")
+        val recordEpochBefore = listEpoch("record_epoch")
         val preview = previewRestore(sessionId, changeId)
 
         assertThat(preview.get("canRestore").booleanValue()).isTrue()
@@ -76,6 +78,8 @@ class HostSessionRecoveryControllerDbTest(
                 restore.get("changeId").asString(),
             )
         assertThat(lineage).isEqualTo(changeId)
+        assertThat(listEpoch("meeting_epoch")).isGreaterThan(meetingEpochBefore)
+        assertThat(listEpoch("record_epoch")).isGreaterThan(recordEpochBefore)
     }
 
     @Test
@@ -159,7 +163,14 @@ class HostSessionRecoveryControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedCurrentHash":"${preview.get("expectedCurrentHash").asString()}"}"""
+                content =
+                    """
+                    {
+                      "expectedCurrentHash":"${preview.get("expectedCurrentHash").asString()}",
+                      "membershipId":"$HOST_MEMBERSHIP_ID",
+                      "expectedAttendanceRevision":${attendanceRevision(sessionId, HOST_MEMBERSHIP_ID)}
+                    }
+                    """.trimIndent()
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.kind") { value("ATTENDANCE") }
@@ -366,6 +377,27 @@ class HostSessionRecoveryControllerDbTest(
             sessionId,
         ) ?: 0
 
+    private fun attendanceRevision(
+        sessionId: String,
+        membershipId: String,
+    ): Long =
+        jdbcTemplate.queryForObject(
+            """
+            select attendance_revision from session_participants
+            where session_id = ? and membership_id = ?
+            """.trimIndent(),
+            Long::class.java,
+            sessionId,
+            membershipId,
+        ) ?: 0
+
+    private fun listEpoch(column: String): Long =
+        jdbcTemplate.queryForObject(
+            "select $column from club_host_list_epochs where club_id = ?",
+            Long::class.java,
+            CLUB_ID,
+        ) ?: 0
+
     private fun sessionJson(
         title: String,
         meetingUrl: String? = null,
@@ -400,6 +432,7 @@ class HostSessionRecoveryControllerDbTest(
     }
 
     private companion object {
+        const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
         const val OUTSIDE_CLUB_ID = "00000000-0000-0000-0000-000000000002"
         const val OUTSIDE_USER_ID = "00000000-0000-0000-0000-00000000a101"

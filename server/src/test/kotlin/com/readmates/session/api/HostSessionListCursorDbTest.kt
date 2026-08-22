@@ -10,6 +10,8 @@ import com.readmates.shared.listing.application.model.HostListEpochKind
 import com.readmates.shared.paging.HostListCursorSigner
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
+import org.junit.jupiter.api.Assertions.fail
+import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
@@ -62,6 +64,11 @@ class HostSessionListCursorDbTest(
             .builder()
             .findAndAddModules()
             .build()
+
+    @BeforeEach
+    fun wipeGeneratedSessions() {
+        cleanupGenerated()
+    }
 
     @Test
     fun `mode states and state are mutually exclusive and states are canonicalized`() {
@@ -307,41 +314,117 @@ class HostSessionListCursorDbTest(
     }
 
     @Test
-    fun `snapshot race after epoch read never mixes old epoch with new rows`() {
-        val first = createInState("스냅샷 이전", "DRAFT", "2026-09-20")
-        createInState("스냅샷 다음", "DRAFT", "2026-09-21")
+    fun `record epoch mutation between pages returns stale without partial data`() {
+        HostListEpochInventory.sources
+            .filter {
+                it.modes.contains(HostListEpochInventory.Mode.RECORD) &&
+                    it.kinds.contains(HostListEpochKind.RECORD)
+            }.forEach { source ->
+                cleanupGenerated()
+                createInState("기록 하나", "CLOSED", "2026-09-11")
+                createInState("기록 둘", "CLOSED", "2026-09-12")
+                val page = listPage("record", limit = 1)
+                val cursorNode = page.get("nextCursor")
+                val cursor = cursorNode.asString()
+                check(!cursorNode.isNull && cursor.isNotBlank() && cursor != "null") {
+                    "record continuation missing for ${source.sqlToken}; items=${sessionIds(page)}"
+                }
+                val epochBefore = listEpoch("record_epoch")
+                mutateRegisteredSource(source)
+                assertThat(listEpoch("record_epoch"))
+                    .`as`("record epoch after %s", source.sqlToken)
+                    .isGreaterThan(epochBefore)
+                mockMvc
+                    .get("/api/host/sessions") {
+                        withHost()
+                        param("mode", "record")
+                        param("search", "CursorListBook")
+                        param("limit", "1")
+                        param("cursor", cursor)
+                    }.andExpect {
+                        status { isConflict() }
+                        jsonPath("$.code") { value("LIST_CURSOR_STALE") }
+                        jsonPath("$.items") { doesNotExist() }
+                    }
+            }
+    }
+
+    @Test
+    fun `basic change restore between pages is list cursor stale`() {
+        createInState("복원 페이지 하나", "DRAFT", "2026-09-13")
+        createInState("복원 페이지 둘", "DRAFT", "2026-09-14")
+        val sessionId = createInState("복원 대상", "DRAFT", "2026-09-15")
+        val changeId = patchTitleReturningChangeId(sessionId, "복원 전 제목")
         val cursor = listPage("meeting", limit = 1).get("nextCursor").asString()
+        restoreBasicChange(sessionId, changeId)
+        mockMvc
+            .get("/api/host/sessions") {
+                withHost()
+                param("mode", "meeting")
+                param("search", "CursorListBook")
+                param("limit", "1")
+                param("cursor", cursor)
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("LIST_CURSOR_STALE") }
+                jsonPath("$.items") { doesNotExist() }
+            }
+    }
+
+    @Test
+    fun `snapshot race after epoch read never mixes old epoch with new rows`() {
+        createInState("스냅샷 이전", "DRAFT", "2026-09-20", bookTitle = SNAP_RACE_BOOK)
+        val continuation = createInState("스냅샷 다음", "DRAFT", "2026-09-21", bookTitle = SNAP_RACE_BOOK)
+        val cursor = listPage("meeting", limit = 1, search = SNAP_RACE_BOOK).get("nextCursor").asString()
         val pool = Executors.newFixedThreadPool(2)
         SNAPSHOT_PROBE.enabled = true
         SNAPSHOT_ENTERED.reset()
         SNAPSHOT_RELEASE.reset()
         try {
             val query =
-                pool.submit<Int> {
-                    mockMvc
-                        .get("/api/host/sessions") {
-                            withHost()
-                            param("mode", "meeting")
-                            param("search", "CursorListBook")
-                            param("limit", "1")
-                            param("cursor", cursor)
-                        }.andReturn()
-                        .response
-                        .status
+                pool.submit<Pair<Int, String>> {
+                    val response =
+                        mockMvc
+                            .get("/api/host/sessions") {
+                                withHost()
+                                param("mode", "meeting")
+                                param("search", SNAP_RACE_BOOK)
+                                param("limit", "1")
+                                param("cursor", cursor)
+                            }.andReturn()
+                            .response
+                    response.status to response.contentAsString
                 }
             check(SNAPSHOT_ENTERED.await(5, TimeUnit.SECONDS))
             jdbcTemplate.update(
                 "update sessions set title = ? where id = ?",
                 "스냅샷 변경",
-                first,
+                continuation,
             )
             jdbcTemplate.update(
                 "update club_host_list_epochs set meeting_epoch = meeting_epoch + 1 where club_id = ?",
                 CLUB_ID,
             )
             SNAPSHOT_RELEASE.countDown()
-            val status = query.get(10, TimeUnit.SECONDS)
-            assertThat(status).isIn(200, 409)
+            val (status, bodyJson) = query.get(10, TimeUnit.SECONDS)
+            val body = jsonMapper.readTree(bodyJson)
+            when (status) {
+                200 -> {
+                    val items = body.get("items")
+                    assertThat(items.size()).isGreaterThan(0)
+                    val titles = (0 until items.size()).map { items.get(it).get("title").asString() }
+                    val ids = (0 until items.size()).map { items.get(it).get("sessionId").asString() }
+                    assertThat(titles).doesNotContain("스냅샷 변경")
+                    if (continuation in ids) {
+                        assertThat(titles).contains("스냅샷 다음")
+                    }
+                }
+                409 -> {
+                    assertThat(body.get("code").asString()).isEqualTo("LIST_CURSOR_STALE")
+                    assertThat(body.get("items")).isNull()
+                }
+                else -> fail("unexpected status $status")
+            }
         } finally {
             SNAPSHOT_PROBE.enabled = false
             SNAPSHOT_RELEASE.countDown()
@@ -355,19 +438,37 @@ class HostSessionListCursorDbTest(
             source.sqlToken == "sessions.title" || source.sqlToken == "sessions.book_title" ||
                 source.sqlToken == "sessions.session_date" ->
                 patchTitle(sessionId, "변경 ${source.sqlToken}")
-            source.sqlToken == "sessions.state" || source.sqlToken == "attention_rank" ->
+            source.sqlToken == "sessions.state" || source.sqlToken == "attention_rank" -> {
                 open(sessionId)
-            source.sqlToken == "deleted_at" -> trash(sessionId)
-            source.kinds.contains(HostListEpochKind.RECORD) -> {
-                jdbcTemplate.update("update sessions set state = 'CLOSED' where id = ?", sessionId)
-                insertRecordDraft(sessionId)
+                if (source.kinds.contains(HostListEpochKind.RECORD)) {
+                    close(sessionId)
+                }
             }
-            else ->
-                jdbcTemplate.update(
-                    "update club_host_list_epochs set meeting_epoch = meeting_epoch + 1, record_epoch = record_epoch + 1 where club_id = ?",
-                    CLUB_ID,
-                )
+            source.sqlToken == "deleted_at" -> trash(sessionId)
+            else -> bumpEpochs(source.kinds)
         }
+    }
+
+    private fun listEpoch(column: String): Long =
+        jdbcTemplate.queryForObject(
+            "select $column from club_host_list_epochs where club_id = ?",
+            Long::class.java,
+            CLUB_ID,
+        ) ?: 0
+
+    private fun bumpEpochs(kinds: Set<HostListEpochKind>) {
+        if (kinds.isEmpty()) return
+        jdbcTemplate.update(
+            """
+            update club_host_list_epochs
+            set meeting_epoch = meeting_epoch + ?,
+                record_epoch = record_epoch + ?
+            where club_id = ?
+            """.trimIndent(),
+            if (HostListEpochKind.MEETING in kinds) 1 else 0,
+            if (HostListEpochKind.RECORD in kinds) 1 else 0,
+            CLUB_ID,
+        )
     }
 
     private fun createInState(
@@ -375,8 +476,9 @@ class HostSessionListCursorDbTest(
         state: String,
         date: String?,
         withDraft: Boolean = false,
+        bookTitle: String = LIST_BOOK,
     ): String {
-        val sessionId = createDraft(title, date ?: "2026-09-01")
+        val sessionId = createDraft(title, date ?: "2026-09-01", bookTitle)
         if (date != null) {
             jdbcTemplate.update("update sessions set session_date = ? where id = ?", date, sessionId)
         }
@@ -404,6 +506,7 @@ class HostSessionListCursorDbTest(
     private fun createDraft(
         title: String,
         date: String = "2026-09-01",
+        bookTitle: String = LIST_BOOK,
     ): String {
         val body =
             mockMvc
@@ -414,7 +517,7 @@ class HostSessionListCursorDbTest(
                         """
                         {
                           "title": "$title",
-                          "bookTitle": "CursorListBook",
+                          "bookTitle": "$bookTitle",
                           "bookAuthor": "목록 저자",
                           "date": "$date",
                           "locationLabel": "온라인"
@@ -431,6 +534,56 @@ class HostSessionListCursorDbTest(
         sessionId: String,
         title: String,
     ) {
+        patchTitleReturningChangeId(sessionId, title)
+    }
+
+    private fun patchTitleReturningChangeId(
+        sessionId: String,
+        title: String,
+    ): String {
+        val revision =
+            jdbcTemplate.queryForObject(
+                "select session_revision from sessions where id = ?",
+                Long::class.java,
+                sessionId,
+            ) ?: 0
+        val body =
+            mockMvc
+                .patch("/api/host/sessions/$sessionId") {
+                    withHost()
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "title": "$title",
+                          "bookTitle": "$LIST_BOOK",
+                          "bookAuthor": "목록 저자",
+                          "date": "2026-09-16",
+                          "expectedSessionRevision": $revision
+                        }
+                        """.trimIndent()
+                }.andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+        return body.get("changeReceipt").get("changeId").asString()
+    }
+
+    private fun restoreBasicChange(
+        sessionId: String,
+        changeId: String,
+    ) {
+        val hash =
+            mockMvc
+                .get("/api/host/sessions/$sessionId/changes/$changeId/restore-preview") { withHost() }
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+                .get("expectedCurrentHash")
+                .asString()
         val revision =
             jdbcTemplate.queryForObject(
                 "select session_revision from sessions where id = ?",
@@ -438,19 +591,10 @@ class HostSessionListCursorDbTest(
                 sessionId,
             ) ?: 0
         mockMvc
-            .patch("/api/host/sessions/$sessionId") {
+            .post("/api/host/sessions/$sessionId/changes/$changeId/restore") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    """
-                    {
-                      "title": "$title",
-                      "bookTitle": "CursorListBook",
-                      "bookAuthor": "목록 저자",
-                      "date": "2026-09-16",
-                      "expectedSessionRevision": $revision
-                    }
-                    """.trimIndent()
+                content = """{"expectedCurrentHash":"$hash","expectedSessionRevision":$revision}"""
             }.andExpect { status { isOk() } }
     }
 
@@ -463,6 +607,21 @@ class HostSessionListCursorDbTest(
             ) ?: 0
         mockMvc
             .post("/api/host/sessions/$sessionId/open") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":$revision}"""
+            }.andExpect { status { isOk() } }
+    }
+
+    private fun close(sessionId: String) {
+        val revision =
+            jdbcTemplate.queryForObject(
+                "select session_revision from sessions where id = ?",
+                Long::class.java,
+                sessionId,
+            ) ?: 0
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
                 content = """{"expectedSessionRevision":$revision}"""
@@ -506,13 +665,14 @@ class HostSessionListCursorDbTest(
         mode: String,
         limit: Int,
         cursor: String? = null,
+        search: String = LIST_BOOK,
     ): JsonNode {
         val result =
             mockMvc
                 .get("/api/host/sessions") {
                     withHost()
                     param("mode", mode)
-                    param("search", "CursorListBook")
+                    param("search", search)
                     param("limit", limit.toString())
                     if (cursor != null) param("cursor", cursor)
                 }.andExpect { status { isOk() } }
@@ -613,6 +773,8 @@ class HostSessionListCursorDbTest(
     private companion object {
         const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
+        const val LIST_BOOK = "CursorListBook"
+        const val SNAP_RACE_BOOK = "SnapRaceBook"
         val SNAPSHOT_ENTERED = ResettableLatch()
         val SNAPSHOT_RELEASE = ResettableLatch()
         val SNAPSHOT_PROBE = SnapshotListReadProbe()

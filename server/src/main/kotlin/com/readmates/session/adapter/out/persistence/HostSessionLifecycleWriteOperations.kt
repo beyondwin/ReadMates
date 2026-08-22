@@ -218,7 +218,7 @@ internal class HostSessionLifecycleWriteOperations(
                     """
                     select session_revision
                     from sessions
-                    where id = ? and club_id = ?
+                    where id = ? and club_id = ? and deleted_at is null
                     """.trimIndent(),
                     { resultSet, _ -> resultSet.getLong("session_revision") },
                     command.sessionId.dbString(),

@@ -31,6 +31,8 @@ object HostListEpochInventory {
         "server/src/main/kotlin/com/readmates/sessionrecord/application/service/SessionRecordApplyService.kt"
     private const val PUBLICATION =
         "server/src/main/kotlin/com/readmates/session/application/service/HostSessionPublicationService.kt"
+    private const val RECOVERY =
+        "server/src/main/kotlin/com/readmates/session/application/service/HostSessionRecoveryService.kt"
 
     private val bothModes = setOf(Mode.MEETING, Mode.RECORD)
     private val bothKinds = setOf(HostListEpochKind.MEETING, HostListEpochKind.RECORD)
@@ -38,9 +40,9 @@ object HostListEpochInventory {
     val sources: List<Source> =
         listOf(
             source("sessions.state", bothModes, bothKinds, LIFECYCLE, TRASH),
-            source("sessions.session_date", bothModes, bothKinds, DRAFT),
-            source("sessions.title", bothModes, bothKinds, DRAFT),
-            source("sessions.book_title", bothModes, bothKinds, DRAFT),
+            source("sessions.session_date", bothModes, bothKinds, DRAFT, RECOVERY),
+            source("sessions.title", bothModes, bothKinds, DRAFT, RECOVERY),
+            source("sessions.book_title", bothModes, bothKinds, DRAFT, RECOVERY),
             source("sessions.number", bothModes, setOf(HostListEpochKind.MEETING), DRAFT),
             source("sessions.id", bothModes, setOf(HostListEpochKind.MEETING), DRAFT),
             source("attention_rank", setOf(Mode.MEETING), setOf(HostListEpochKind.MEETING), LIFECYCLE, MEMBER),

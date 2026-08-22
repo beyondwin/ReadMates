@@ -217,6 +217,7 @@ internal class HostSessionWriteQueries(
                       on publication.session_id = sessions.id
                     where sessions.id = ?
                       and sessions.club_id = ?
+                      and sessions.deleted_at is null
                     """.trimIndent(),
                     { resultSet, _ ->
                         HostSessionRevisionConflictException(
