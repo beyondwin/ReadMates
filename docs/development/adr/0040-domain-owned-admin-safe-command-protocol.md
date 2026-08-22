@@ -1,0 +1,181 @@
+# ADR-0040: 플랫폼 어드민 mutation을 도메인 소유 safe-command protocol로 실행
+
+- 상태: Proposed
+- 결정일: 2026-08-22
+- 작성자: 플랫폼 운영·보안·서버
+- 관련: ADR-0001, ADR-0009, ADR-0012, ADR-0028, ADR-0029, ADR-0030, ADR-0033, ADR-0037, ADR-0039,
+  `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`,
+  `server/src/main/kotlin/com/readmates/notification/application/service/AdminNotificationReplayService.kt:35-151`,
+  `server/src/main/kotlin/com/readmates/admin/operations/application/service/AdminOperationCaseService.kt:88-239`,
+  `server/src/main/kotlin/com/readmates/club/application/service/SupportAccessGrantService.kt:52-153`,
+  `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminClubRegistryService.kt:39-89`,
+  `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingService.kt:62-195`,
+  `server/src/main/kotlin/com/readmates/aigen/application/service/AiGenerationOpsService.kt:146-223`,
+  `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt:121-136`
+
+## 컨텍스트
+
+Platform admin mutation은 도메인별 성숙도가 다르다. Notification replay는 durable preview, actor binding,
+selection hash, TTL, reason, locked confirm, atomic receipt를 갖춘다. Operation case lifecycle은
+`expectedVersion` CAS, source revalidation, case event의 원자성을 갖지만 response-loss receipt와 global
+audit 편입이 없다.
+
+Support grant는 OWNER와 expiry/reason을 검사하지만 preview, version, idempotency receipt, active-duplicate
+database constraint가 없고 grant write와 audit write가 하나의 transaction으로 결속되지 않는다. Club
+metadata/public visibility, onboarding, domain command도 capability와 일부 transaction은 있으나 pinned
+preview, revision, receipt, 완전한 audit가 없다. AI force-cancel/retry는 role/status CAS와 content-free
+success audit만 있고 client revision, reason, preview, idempotency와 cross-store effect reconciliation이 없다.
+
+Browser mutation은 same-origin BFF를 지나 Spring으로 전달된다. BFF secret, Origin/Referer, active
+platform admin, application capability가 모두 필요하지만 endpoint별 CSRF matcher와 통합 테스트가 빠지면
+정상 BFF POST가 403이 되거나 near-miss path가 의도와 다르게 허용될 수 있다. `ROLE_PLATFORM_ADMIN`은
+route gate일 뿐 개별 command authority가 아니다.
+
+모든 mutation에 무거운 preview를 강제하면 acknowledge 같은 가역적 운영 action의 사용성이 나빠진다.
+반대로 외부 provider나 공개·권한 변경을 단순 confirm dialog로 처리하면 response loss, 부분 성공,
+중복 실행, audit 분리에 취약하다. 영향과 복구 난이도를 반영하는 공통 안전 등급이 필요하다.
+
+## 결정
+
+Platform admin mutation은 임의 action name을 받는 범용 endpoint가 아니라 club, notification, AI,
+support, admin operations 등 실제 business invariant를 소유한 application service의 typed command로
+제공한다. Command는 다음 세 안전 등급으로 분류한다.
+
+- **L1 — 가역적 lifecycle·derived refresh**: capability, domain-appropriate concurrency guard
+  (expected version, CAS, lease 또는 monotonic observation token), 필요한 source 재검증, domain state와
+  event history의 원자적 기록이 필수다. Case acknowledge/snooze/resolve와 domain recheck가 여기에 해당한다.
+- **L2 — 권한·공개·대상 변경**: L1에 durable preview, impact review, final confirm, idempotency receipt,
+  immutable audit를 추가한다. Support grant, club onboarding의 origin DB 변경, public visibility,
+  대상이 고정된 recovery가 여기에 해당한다.
+- **L3 — provider·cross-store effect**: L2에 origin mutation receipt, outbox 또는 convergence attempt
+  ledger, 동일 receipt 기반 resume를 추가한다. AI recovery, invitation delivery, 이메일·알림 replay,
+  public convergence가 여기에 해당한다.
+
+한 command가 여러 effect를 가지면 가장 높은 등급을 적용한다. 예를 들어 onboarding의 club·host DB
+변경은 L2지만 commit 이후 invitation email 전달까지 포함한 전체 workflow는 L3이며 origin receipt와
+invitation delivery convergence가 같은 workflow identity로 연결된다.
+
+L2/L3 preview는 opaque preview ID, canonical request 또는 selection hash, target identity,
+domain-appropriate concurrency token, safe before/after·영향·차단·제외 정보 중 해당 command에 의미 있는
+summary, actor/capability snapshot, 짧은 expiry를 고정한다. 의미 없는 0 count나 boilerplate reason을
+만들지 않는다. Preview는 mutation이나 provider effect를 실행하지 않는다.
+
+Confirm은 preview ID, canonical hash, domain concurrency token, idempotency key와 domain policy상 필요한
+reason category·bounded/redacted note를 요구한다. Application service는 active actor, current capability,
+target identity, preview expiry/consumption, concurrency token, 필요한 source freshness를 다시 확인한다.
+하나라도 바뀌면 fail closed하고 최신 preview를 다시 검토하게 하며 자동 재실행하지 않는다.
+
+Idempotency scope는 최소
+`(platformAdminUserId, commandType, targetIdentity, idempotencyKey)`다. 같은 key와 같은 canonical
+request는 저장된 receipt를 반환하고 같은 key의 다른 request는 conflict로 거절한다. Response loss 뒤
+재시도는 새 mutation, 새 audit receipt, 새 provider effect를 만들지 않는다.
+
+Canonical request identity는 ADR-0028의 versioned canonical HMAC 정책을 재사용한다. DTO validation과
+default 적용 뒤 operation별 schema가 Unicode, field/collection order, null·omitted·default 의미를 고정한다.
+Raw canonical payload나 평문 SHA digest를 저장하지 않고 server secret-keyed HMAC digest, canonical schema
+version, digest key version만 저장한다. 이전 key는 참조 receipt의 retention과 rollout buffer가 끝난 뒤에만
+폐기하며 reference 확인이 불가능하면 retirement를 fail closed한다.
+
+Response-loss 재호출에서는 같은 actor·command·target·key·request의 completed receipt lookup을
+preview expired/consumed rejection보다 먼저 수행한다. Receipt lookup도 현재 active platform admin과
+해당 receipt의 read capability를 다시 검사한다. Capability를 잃은 actor에게 sensitive receipt metadata를
+반환하지 않는다.
+
+MySQL 내부 mutation, immutable receipt, audit/outbox는 business orchestration owner의 한 transaction
+또는 하나의 atomic persistence capability에서 결속한다. External provider 호출은 DB transaction 안에서
+수행하지 않으며 commit된 convergence ID에 append-only attempt를 기록한다. Partial/failed/unknown 결과는
+대상별 outcome과 retry eligibility를 보존하고 같은 receipt/convergence identity로 resume한다.
+
+Receipt와 audit에는 actor ID와 당시 role/capability, immutable target identity, before/after state와
+version, reason category와 redacted reason, result와 safe error code, preview/receipt/convergence identity를
+기록한다. 이메일, invitation token, transcript, prompt/completion, private member content, provider raw
+error, secret은 기록하지 않는다. Global audit ledger는 모든 L1 lifecycle event와 L2/L3 receipt를 조회할
+수 있어야 하며 domain-local history만 존재하는 상태를 통합 감사로 표현하지 않는다.
+
+Preview와 operational idempotency ownership row는 bounded retention과 안전한 cleanup을 가진다. Immutable
+receipt는 삭제 가능한 target resource에 destructive FK를 두지 않고 redacted immutable target ID snapshot을
+보존한다. Receipt 보존 기간과 접근 권한은 audit 정책과 일치시킨다.
+
+Browser mutation은 same-origin BFF만 사용한다. BFF는 path를 정규화하고 browser가 보낸 내부 인증
+header를 폐기한 뒤 server-only secret과 canonical Origin/Referer를 붙인다. Spring은 secret,
+allowlisted origin, active platform admin과 command capability를 모두 다시 검사한다. BFF trust 검증 뒤
+exact method/path만 CSRF 예외로 등록하며 near-miss method/path는 계속 보호한다. UI capability는 server
+projection에서 파생하지만 server 재검사를 대체하지 않는다.
+
+ADR-0037 emergency public takedown은 L3의 특수 command다. Host receipt를 재사용하지 않고 해당 ADR의
+별도 capability, generation, convergence 계약을 따른다.
+
+Notification replay confirm은 eligible event를 origin outbox mutation으로 확정한 receipt를 반환한다.
+이 성공은 실제 delivery 완료를 뜻하지 않는다. 이후 delivery attempt와 outcome은 같은 workflow identity의
+L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로 resume한다.
+
+## 근거
+
+- 영향이 작은 lifecycle action을 과도하게 방해하지 않으면서 공개·권한·provider mutation을 강하게 잠근다.
+- Domain service가 authorization, eligibility, transaction, retry, redaction을 계속 소유한다.
+- Preview와 confirm 사이의 stale state, 같은 key의 다른 요청, response loss를 명시적으로 처리한다.
+- DB mutation과 audit가 갈라지거나 provider effect가 중복되는 실패 모드를 줄인다.
+- UI, BFF, Spring security 중 하나만 믿지 않는 defense-in-depth를 유지한다.
+- Notification replay의 검증된 atomic preview/receipt 계약을 다른 위험 command의 기준으로 확장한다.
+
+## 대안
+
+| 대안 | 기각 이유 |
+| --- | --- |
+| 범용 `/api/admin/execute`와 action registry | Business invariant와 authorization, transaction owner가 중앙 dispatcher로 새어 나온다. |
+| 모든 mutation에 같은 preview-confirm | L1 운영 lifecycle까지 불필요하게 느려지고 반복 확인이 경고 무시를 만든다. |
+| Browser confirm dialog만 추가 | stale state, duplicate request, response loss, audit atomicity를 해결하지 못한다. |
+| Role만 검사 | 같은 role 안의 capability, active 상태, 민감 정보 접근 차이를 표현하지 못한다. |
+| Provider 호출을 DB transaction 안에서 실행 | 긴 transaction과 불확실한 외부 결과 때문에 atomicity를 얻지 못한다. |
+| Timeout 뒤 새 idempotency key로 재시도 | 이미 성공한 mutation과 외부 effect를 중복할 수 있다. |
+| Domain-local audit만 유지 | 운영자가 한 ledger에서 사건과 command 결과를 재구성할 수 없다. |
+
+## 결과
+
+긍정적:
+- Admin command의 최소 안전 요건과 구현·review checklist가 명확해진다.
+- Conflict, duplicate, partial, response loss가 정상적인 domain outcome으로 모델링된다.
+- Audit와 receipt가 실제 mutation에 원자적으로 결속되고 privacy allowlist를 공유한다.
+- 새 mutation endpoint가 BFF와 Spring security 경계를 빠뜨리기 어려워진다.
+
+부정적/감수한 비용:
+- Preview/receipt persistence, canonical hashing, expiry cleanup, reconciliation query가 추가된다.
+- L3 command는 origin transaction과 provider convergence를 나눠 구현해야 한다.
+- 기존 support, club, AI endpoint는 additive compatibility와 migration이 필요하다.
+- Global audit union과 privacy projection을 확장해야 한다.
+
+## 검증
+
+- L1은 allowed transition, domain concurrency guard의 success/conflict, source revalidation,
+  state+history atomicity를 unit·integration test한다.
+- L2/L3는 preview expiry/consumption, actor·capability loss, target/revision drift, reason validation을
+  test한다.
+- Same-key/same-request는 같은 receipt를 반환하고 same-key/different-request는 conflict인지 확인한다.
+- Canonicalization schema, null/default/Unicode/collection order, HMAC key rotation과 old-key retirement를
+  test한다.
+- Response loss 재호출이 mutation, receipt, audit, provider effect를 중복하지 않는지 integration test한다.
+- Completed receipt lookup이 expired/consumed preview rejection보다 우선하고 active actor/read capability를
+  잃으면 sensitive metadata가 반환되지 않는지 확인한다.
+- Partial failure가 대상별 outcome·skipped count·retry eligibility를 보존하는지 확인한다.
+- MySQL write와 receipt/audit/outbox 중 하나가 실패하면 전체 origin transaction이 rollback되는지 확인한다.
+- External provider failure/resume가 같은 convergence ID와 append-only attempt를 사용하는지 확인한다.
+- Trusted BFF without Spring CSRF token 성공, missing/invalid secret·origin·active actor·capability 거절,
+  exact path만 CSRF 예외이고 near-miss path는 보호되는지 full security chain으로 확인한다.
+- DTO, receipt, audit, log, telemetry에 금지된 private content와 provider raw error가 없는지 검사한다.
+- Global audit ledger에서 L1 event와 L2/L3 receipt를 actor·target·outcome으로 찾을 수 있는지 확인한다.
+- Background polling과 load-more가 command concurrency token을 바꾸거나 pending action을 실행하지 않는지,
+  Escape·backdrop·navigation·browser back이 confirm request를 0건 만드는지 확인한다.
+- Source-driven reopen만 가능하고 operator 임의 reopen command가 없는지 확인한다.
+- Concurrent support grant create가 DB constraint와 idempotency로 하나의 origin mutation만 만드는지 확인한다.
+- Flyway clean/upgrade, ADR-0009 Zod DTO fixture, compatibility endpoint의 duplicate-effect 방지를 검증한다.
+- Global audit의 role/capability별 redaction과 admin frontend의 host mutation client 비의존을 확인한다.
+
+## 후속 작업
+
+- 현재 mutation을 L1/L2/L3로 inventory하고 필요한 migration과 compatibility route를 implementation plan에
+  분리한다.
+- AI POST CSRF/BFF 통합 경로를 characterization RED test로 먼저 확정한다.
+- Support active duplicate constraint와 grant/audit atomicity를 migration으로 보강한다.
+- Club public visibility를 generic metadata PATCH에서 typed command로 분리한다.
+- Code, migration, integration/security tests, global audit와 active architecture가 일치한 뒤 `Accepted`로
+  승격한다.
