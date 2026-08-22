@@ -3340,6 +3340,11 @@ class MySqlFlywayMigrationTest(
             "exposure_revision",
             "participant_set_revision",
         )
+        assertThat(columns(jdbcTemplate, "active_sessions")).contains(
+            "session_revision",
+            "exposure_revision",
+            "participant_set_revision",
+        )
         assertThat(columns(jdbcTemplate, "sessions")).doesNotContain(
             "record_draft_revision",
             "live_record_revision",

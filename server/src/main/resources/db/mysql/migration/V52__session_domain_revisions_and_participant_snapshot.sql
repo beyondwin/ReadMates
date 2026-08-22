@@ -6,6 +6,9 @@ alter table sessions
   add constraint sessions_exposure_revision_check check (exposure_revision >= 0),
   add constraint sessions_participant_set_revision_check check (participant_set_revision >= 0);
 
+create or replace view active_sessions as
+  select * from sessions where deleted_at is null;
+
 alter table session_participants
   add column attendance_revision bigint not null default 0,
   add constraint session_participants_attendance_revision_check check (attendance_revision >= 0);
