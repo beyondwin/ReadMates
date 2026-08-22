@@ -107,6 +107,11 @@ sealed class CanonicalMutationPayload {
             require(schemaVersion > 0) { "schemaVersion must be positive" }
         }
 
+        override fun toString(): String =
+            "SessionFields(operation=$operation, title=$title, bookTitle=$bookTitle, bookAuthor=$bookAuthor, " +
+                "date=$date, startTime=$startTime, endTime=$endTime, accessScope=$accessScope, " +
+                "schemaVersion=$schemaVersion)"
+
         companion object {
             fun applyDefaults(
                 operation: HostMutationOperation,
@@ -196,6 +201,8 @@ sealed class CanonicalMutationPayload {
         init {
             require(schemaVersion > 0) { "schemaVersion must be positive" }
         }
+
+        override fun toString(): String = "Reverse(operation=$operation, reasonCode=$reasonCode, schemaVersion=$schemaVersion)"
     }
 
     data class Exposure(

@@ -204,6 +204,33 @@ class MutationCanonicalizationTest {
     }
 
     @Test
+    fun `canonical session payload toString never includes url passcode reason note or hmac secret`() {
+        val payload =
+            sessionFields(
+                meetingUrl = SENSITIVE_URL,
+                meetingPasscode = SENSITIVE_PASSCODE,
+            )
+        val reverse =
+            CanonicalMutationPayload.Reverse(
+                reasonCode = "OPERATIONAL_RECOVERY",
+                reasonNote = SENSITIVE_REASON_NOTE,
+            )
+        val rendered = listOf(payload.toString(), reverse.toString(), "$payload $reverse")
+        rendered.forEach { text ->
+            assertThat(text).doesNotContain(
+                SENSITIVE_URL,
+                SENSITIVE_PASSCODE,
+                SENSITIVE_REASON_NOTE,
+                CURRENT_KEY,
+            )
+        }
+        assertThat(payload.meetingUrl).isEqualTo(SENSITIVE_URL)
+        assertThat(payload.meetingPasscode).isEqualTo(SENSITIVE_PASSCODE)
+        assertThat(reverse.reasonNote).isEqualTo(SENSITIVE_REASON_NOTE)
+        assertSameDigest(service.digest(payload), service.digest(payload))
+    }
+
+    @Test
     fun `production like blank hmac secret fails closed`() {
         val env = MockEnvironment()
         val blank = MutationIdempotencyProperties(currentKey = "", allowEmptySecret = false)
@@ -338,6 +365,7 @@ class MutationCanonicalizationTest {
         const val CURRENT_KEY = "test-mutation-identity-current-key"
         const val SENSITIVE_URL = "https://meet.example.com/private-room"
         const val SENSITIVE_PASSCODE = "room-passcode-value"
+        const val SENSITIVE_REASON_NOTE = "passcode was room-passcode-value"
         val TEST_PROPERTIES =
             MutationIdempotencyProperties(
                 currentKey = CURRENT_KEY,
