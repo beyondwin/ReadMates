@@ -1,5 +1,6 @@
 package com.readmates.auth.api
 
+import com.readmates.auth.adapter.out.persistence.JdbcMemberApprovalStoreAdapter
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.service.AuthSessionService
@@ -37,6 +38,7 @@ class HostMemberApprovalControllerTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val memberApprovalService: MemberApprovalService,
+    @param:Autowired private val memberApprovalStore: JdbcMemberApprovalStoreAdapter,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdMembershipIds = linkedSetOf<String>()
@@ -47,6 +49,7 @@ class HostMemberApprovalControllerTest(
     @AfterEach
     fun cleanupCreatedRows() {
         try {
+            deleteWhereIn("session_participant_change_audit", "session_id", createdSessionIds)
             deleteWhereIn("session_participants", "membership_id", createdMembershipIds)
             deleteWhereIn("session_participants", "session_id", createdSessionIds)
             deleteWhereIn("sessions", "id", createdSessionIds)
@@ -138,6 +141,25 @@ class HostMemberApprovalControllerTest(
                 membershipId,
             ) ?: 0
         assertEquals(0, participantCount)
+    }
+
+    @Test
+    fun `leftover addToCurrentOpenSession cannot change an open snapshot`() {
+        val sessionId = createOpenSession()
+        val membershipId = insertViewerMember(uniqueEmail("viewer.leftover.autoadd"), "Leftover Auto Add")
+        val revisionBefore = participantSetRevision(sessionId)
+        val epochBefore = meetingEpoch()
+        val auditBefore = participantAuditCount(sessionId)
+
+        memberApprovalStore.addToCurrentOpenSession(
+            UUID.fromString("00000000-0000-0000-0000-000000000001"),
+            UUID.fromString(membershipId),
+        )
+
+        assertEquals(0, participantCount(sessionId, membershipId))
+        assertEquals(revisionBefore, participantSetRevision(sessionId))
+        assertEquals(epochBefore, meetingEpoch())
+        assertEquals(auditBefore, participantAuditCount(sessionId))
     }
 
     @Test
@@ -511,6 +533,43 @@ class HostMemberApprovalControllerTest(
             clubSlug = "reading-sai",
             capabilities = capabilities,
         )
+
+    private fun participantCount(
+        sessionId: String,
+        membershipId: String,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from session_participants
+            where session_id = ?
+              and membership_id = ?
+            """.trimIndent(),
+            Int::class.java,
+            sessionId,
+            membershipId,
+        ) ?: 0
+
+    private fun participantSetRevision(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select participant_set_revision from sessions where id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
+
+    private fun meetingEpoch(): Long =
+        jdbcTemplate.queryForObject(
+            "select meeting_epoch from club_host_list_epochs where club_id = ?",
+            Long::class.java,
+            "00000000-0000-0000-0000-000000000001",
+        ) ?: 0
+
+    private fun participantAuditCount(sessionId: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from session_participant_change_audit where session_id = ?",
+            Int::class.java,
+            sessionId,
+        ) ?: 0
 
     private fun deleteWhereIn(
         tableName: String,
