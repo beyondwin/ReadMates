@@ -76,7 +76,7 @@ export function AdminTodayLedger({
         description: "새로운 신호가 생기면 여기에 나타납니다.",
       };
   const failedSources = view.sources
-    .filter((source) => source.status !== "AVAILABLE")
+    .filter((source) => isFetchFailedTodaySource(source.status))
     .map((source): AdminStateSource => ({
       id: source.sourceType,
       label: source.sourceLabel,
@@ -228,8 +228,12 @@ function hasActiveTodayFilters(filters: AdminTodayFilters): boolean {
   return Boolean(filters.state || filters.severity || filters.source || filters.assignee);
 }
 
+function isFetchFailedTodaySource(status: AdminOperationsView["sources"][number]["status"]): boolean {
+  return status === "PARTIAL" || status === "UNAVAILABLE";
+}
+
 function deriveTodayPageState(view: AdminOperationsView): AdminPageState {
-  if (!view.allSourcesAvailable) return "partial";
+  if (view.sources.some((source) => isFetchFailedTodaySource(source.status))) return "partial";
   if (view.items.length === 0) return "empty";
   return "ready";
 }

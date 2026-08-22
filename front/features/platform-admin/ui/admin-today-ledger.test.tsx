@@ -7,6 +7,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
 import type {
   AdminOperationCaseView,
+  AdminOperationSourceFreshnessView,
   AdminOperationsView,
 } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminTodayLedger } from "./admin-today-ledger";
@@ -84,6 +85,60 @@ function populatedView(
   };
 }
 
+function sourceView(
+  overrides: Partial<AdminOperationSourceFreshnessView> &
+    Pick<AdminOperationSourceFreshnessView, "sourceType" | "status" | "sourceLabel" | "statusLabel" | "message">,
+): AdminOperationSourceFreshnessView {
+  return {
+    generatedAt: "2026-08-04T10:00:00Z",
+    lastSuccessfulAt: overrides.status === "AVAILABLE" ? "2026-08-04T10:00:00Z" : "2026-08-04T09:20:00Z",
+    authoritative: overrides.status === "AVAILABLE",
+    canRetry: overrides.status === "UNAVAILABLE",
+    ...overrides,
+  };
+}
+
+const disabledClosingRisk = sourceView({
+  sourceType: "CLOSING_RISK",
+  status: "DISABLED",
+  lastSuccessfulAt: null,
+  authoritative: false,
+  sourceLabel: "회차 마감",
+  statusLabel: "비활성",
+  message: "비활성",
+  canRetry: false,
+});
+
+const unavailableAiJob = sourceView({
+  sourceType: "AI_JOB",
+  status: "UNAVAILABLE",
+  sourceLabel: "AI 작업",
+  statusLabel: "확인 불가",
+  message: "확인 불가 · 마지막 정상 18:20",
+  canRetry: true,
+});
+
+const partialNotification = sourceView({
+  sourceType: "NOTIFICATION",
+  status: "PARTIAL",
+  sourceLabel: "알림",
+  statusLabel: "일부 확인 불가",
+  message: "일부 확인 불가 · 마지막 정상 18:40",
+  canRetry: false,
+});
+
+function emptyQueueView(
+  sources: readonly AdminOperationSourceFreshnessView[],
+): AdminOperationsView {
+  const allSourcesAvailable = sources.every((source) => source.status === "AVAILABLE");
+  return {
+    ...emptyView,
+    sources: [...sources],
+    allSourcesAvailable,
+    sourceStatusLabel: allSourcesAvailable ? "전체 신호 정상" : "일부 신호 확인 불가",
+  };
+}
+
 function stubMatchMedia(matches: boolean | ((query: string) => boolean)) {
   const matchMedia = vi.fn().mockImplementation((query: string) => ({
     matches: typeof matches === "function" ? matches(query) : matches,
@@ -149,6 +204,94 @@ describe("AdminTodayLedger", () => {
     expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "필터 지우기" }));
     expect(onClearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it("keeps true empty when the only inactive source is DISABLED", () => {
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={emptyQueueView([disabledClosingRisk])}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("지금은 처리할 운영 케이스가 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("새로운 신호가 생기면 여기에 나타납니다.")).toBeInTheDocument();
+    expect(screen.getByText("비활성")).toBeInTheDocument();
+    expect(screen.queryByText("일부만 확인됨")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "필터 지우기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps filtered empty and filter-clear when DISABLED is present", async () => {
+    const user = userEvent.setup();
+    const onClearFilters = vi.fn();
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={emptyQueueView([disabledClosingRisk])}
+          filters={{ state: "open", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+          onClearFilters={onClearFilters}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("필터를 바꾸면 다른 케이스를 볼 수 있습니다.")).toBeInTheDocument();
+    expect(screen.getByText("비활성")).toBeInTheDocument();
+    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
+    expect(screen.queryByText("일부만 확인됨")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "필터 지우기" }));
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it("stays fail-closed partial when an empty queue has an UNAVAILABLE source", () => {
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={emptyQueueView([unavailableAiJob, disabledClosingRisk])}
+          filters={{ state: "open", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+          onClearFilters={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("일부만 확인됨")).toBeInTheDocument();
+    expect(screen.getByText("확인 불가 · 마지막 정상 18:20")).toBeInTheDocument();
+    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
+    expect(screen.queryByText("조건에 맞는 운영 케이스가 없습니다")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "필터 지우기" })).not.toBeInTheDocument();
+  });
+
+  it("stays fail-closed partial when an empty queue has a PARTIAL source", () => {
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={emptyQueueView([partialNotification])}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("일부만 확인됨")).toBeInTheDocument();
+    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
   });
 
   it("uses the shared 768px contract for mobile drill-in instead of stacked columns", () => {
