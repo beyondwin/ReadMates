@@ -71,12 +71,22 @@ class HostSessionRecoveryService(
                 resourceSlot = command.changeId.toString(),
                 idempotencyKey = command.idempotencyKey,
                 payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_RESTORE),
-                mutate = { HostMutationOutcome(command.sessionId, restoreOnce(command)) },
+                mutate = {
+                    val restored = restoreOnce(command)
+                    HostMutationOutcome(
+                        resourceId = command.sessionId,
+                        result = restored,
+                        receiptId = restored.changeId,
+                    )
+                },
                 replay = { record, _ ->
+                    val change =
+                        recoveryPort.loadChange(command.host, command.sessionId, record.receiptId)
+                            ?: throw HostSessionNotFoundException()
                     HostSessionChangeReceipt(
                         changeId = record.receiptId,
-                        kind = HostSessionChangeKind.BASIC_INFO,
-                        undoAvailable = false,
+                        kind = change.kind,
+                        undoAvailable = true,
                     )
                 },
             )

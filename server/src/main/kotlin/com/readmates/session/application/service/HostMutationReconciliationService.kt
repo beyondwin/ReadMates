@@ -55,7 +55,7 @@ class HostMutationReconciliationService(
                 val record =
                     receipts.find(command.host.clubId, receiptId)
                         ?: return HostMutationReconciliationResult.NotExecuted
-                val current = projectionPort.loadProjection(command.host, record.resourceId)
+                val current = projectionPort.loadProjection(command.host, record.resourceId, includeTrashed = true)
                 HostMutationReconciliationResult.Committed(
                     receipt = record.toResult(current ?: record.redactedProjection()),
                     current = current,
@@ -92,7 +92,7 @@ private fun HostMutationReceiptRecord.redactedProjection(): HostProjectionSnapsh
         startTime = "",
         endTime = "",
         locationLabel = "",
-        state = "DELETED",
+        state = "GONE",
         versions = resultingVersions,
         accessScope = SessionAccessScope.HOST_ONLY,
         siteVisibility = PublicSiteVisibility.HIDDEN,

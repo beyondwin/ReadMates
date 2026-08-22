@@ -88,7 +88,7 @@ data class ExpectedPublicationRevision(
     }
 }
 
-class MutationPendingException : RuntimeException("MUTATION_PENDING")
+typealias MutationPendingException = com.readmates.shared.mutation.application.model.MutationPendingException
 
 class HostMutationNotAuthorizedException : RuntimeException("HOST_MUTATION_NOT_AUTHORIZED")
 

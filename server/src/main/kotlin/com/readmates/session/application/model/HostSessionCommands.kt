@@ -32,6 +32,8 @@ data class HostSessionIdCommand(
     val expectedSessionRevision: ExpectedSessionRevision? = null,
     val expectedParticipantSetRevision: Long? = null,
     val expectedAttendanceSnapshotId: String? = null,
+    val expectedPublishVector: PublicationVersionVector? = null,
+    val expectedCorrectionVector: CorrectionPublicationVersionVector? = null,
     val idempotencyKey: String? = null,
 )
 

@@ -9,6 +9,7 @@ interface HostSessionProjectionPort {
     fun loadProjection(
         host: CurrentMember,
         sessionId: UUID,
+        includeTrashed: Boolean = false,
     ): HostProjectionSnapshot?
 
     fun loadVersionVector(

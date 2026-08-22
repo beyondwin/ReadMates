@@ -82,7 +82,40 @@ class HostSessionLifecycleController(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.publish(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
+    ) = if (body.has("idempotencyKey")) {
+        val envelope = envelopes.publishVector(body)
+        val expected = envelope.expected.toExpected()
+        hostSessionLifecycleUseCase.publish(
+            HostSessionIdCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                expectedSessionRevision = ExpectedSessionRevision(expected.sessionRevision),
+                expectedPublishVector = expected,
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    } else {
+        hostSessionLifecycleUseCase.publish(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
+    }
+
+    @PostMapping("/{sessionId}/correction-publish")
+    fun correctionPublish(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+        @RequestBody body: JsonNode,
+    ): Any {
+        val envelope = envelopes.correctionPublishVector(body)
+        val expected = envelope.expected.toExpected()
+        return hostSessionLifecycleUseCase.correctionPublish(
+            HostSessionIdCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                expectedSessionRevision = ExpectedSessionRevision(expected.sessionRevision),
+                expectedCorrectionVector = expected,
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 
     @PostMapping("/{sessionId}/reopen")
     fun reopen(

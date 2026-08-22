@@ -280,6 +280,57 @@ class HostSessionRecordControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "idempotencyKey": "key-apply-dup-0001",
+                      "expected": {"draftRevision":1,"liveRevision":0},
+                      "command": {"applyRequestId":"$applyRequestId","expectedDraftHash":"$draftHash"}
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.revisionId") { value(firstRevisionId) }
+            }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "idempotencyKey": "key-apply-dup-0001",
+                      "expected": {"draftRevision":1,"liveRevision":0},
+                      "command": {"applyRequestId":"$applyRequestId","expectedDraftHash":"$draftHash"}
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.revisionId") { value(firstRevisionId) }
+            }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "idempotencyKey": "key-apply-dup-0001",
+                      "expected": {"draftRevision":1,"liveRevision":0},
+                      "command": {"applyRequestId":"00000000-0000-0000-0000-000000000999","expectedDraftHash":"$draftHash"}
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("IDEMPOTENCY_KEY_REUSED") }
+            }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
                 content = applyBody
             }.andExpect {
                 status { isOk() }

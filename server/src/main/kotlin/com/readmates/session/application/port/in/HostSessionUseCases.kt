@@ -29,6 +29,8 @@ interface HostSessionLifecycleUseCase {
 
     fun publish(command: HostSessionIdCommand): HostSessionDetailResponse
 
+    fun correctionPublish(command: HostSessionIdCommand): HostSessionDetailResponse
+
     fun reopen(command: HostSessionReverseCommand): HostSessionDetailResponse
 
     fun unpublish(command: HostSessionReverseCommand): HostSessionDetailResponse

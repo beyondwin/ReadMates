@@ -118,16 +118,25 @@ class MutationCanonicalizationTest {
 
     @Test
     fun `ordered record entries preserve order`() {
+        val applyRequestId = UUID.fromString("aaaaaaaa-0000-4000-8000-000000000124")
         val firstThenSecond =
             CanonicalMutationPayload.RecordApply(
+                applyRequestId = applyRequestId,
                 entryKeys = listOf("opening", "discussion"),
             )
         val reversed =
             CanonicalMutationPayload.RecordApply(
+                applyRequestId = applyRequestId,
                 entryKeys = listOf("discussion", "opening"),
             )
         assertDifferentDigest(service.digest(firstThenSecond), service.digest(reversed))
         assertSameDigest(service.digest(firstThenSecond), service.digest(firstThenSecond.copy()))
+        assertDifferentDigest(
+            service.digest(firstThenSecond),
+            service.digest(
+                firstThenSecond.copy(applyRequestId = UUID.fromString("bbbbbbbb-0000-4000-8000-000000000125")),
+            ),
+        )
     }
 
     @Test

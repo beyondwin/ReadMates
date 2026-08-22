@@ -3,7 +3,6 @@ package com.readmates.session.application.service
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.model.HostMutationReceiptRecord
 import com.readmates.session.application.model.HostProjectionSnapshot
-import com.readmates.session.application.model.MutationPendingException
 import com.readmates.session.application.model.NotificationDecision
 import com.readmates.session.application.port.out.HostMutationReceiptPort
 import com.readmates.session.application.port.out.HostSessionProjectionPort
@@ -11,6 +10,7 @@ import com.readmates.shared.mutation.application.model.CanonicalMutationPayload
 import com.readmates.shared.mutation.application.model.HostMutationOperation
 import com.readmates.shared.mutation.application.model.MutationClaimResult
 import com.readmates.shared.mutation.application.model.MutationIdentity
+import com.readmates.shared.mutation.application.model.MutationPendingException
 import com.readmates.shared.mutation.application.service.MutationIdempotencyService
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
@@ -23,6 +23,7 @@ data class HostMutationOutcome<T>(
     val projection: HostProjectionSnapshot? = null,
     val notificationDecision: NotificationDecision = NotificationDecision.NOT_SENT,
     val dispatchReceiptId: UUID? = null,
+    val receiptId: UUID? = null,
 )
 
 @Service
@@ -68,7 +69,7 @@ class HostSessionMutationCoordinator(
                         ?: throw HostSessionNotFoundException()
                 val record =
                     HostMutationReceiptRecord(
-                        receiptId = UUID.randomUUID(),
+                        receiptId = outcome.receiptId ?: UUID.randomUUID(),
                         clubId = host.clubId,
                         actorMembershipId = host.membershipId,
                         operation = operation.name,

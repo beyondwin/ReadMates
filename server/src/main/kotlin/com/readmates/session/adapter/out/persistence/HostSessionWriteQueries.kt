@@ -387,6 +387,7 @@ internal class HostSessionWriteQueries(
     fun loadProjection(
         host: CurrentMember,
         sessionId: UUID,
+        includeTrashed: Boolean = false,
     ): HostProjectionSnapshot? =
         jdbcTemplate
             .query(
@@ -427,7 +428,7 @@ internal class HostSessionWriteQueries(
                  and public_session_publications.club_id = sessions.club_id
                 where sessions.id = ?
                   and sessions.club_id = ?
-                  and sessions.deleted_at is null
+                  and (? or sessions.deleted_at is null)
                 """.trimIndent(),
                 { resultSet, _ ->
                     val versions = resultSet.toVersionVector()
@@ -452,6 +453,7 @@ internal class HostSessionWriteQueries(
                 },
                 sessionId.dbString(),
                 host.clubId.dbString(),
+                includeTrashed,
             ).firstOrNull()
 
     fun expectedRevision(expected: ExpectedSessionRevision?): Long = expected?.value ?: -1

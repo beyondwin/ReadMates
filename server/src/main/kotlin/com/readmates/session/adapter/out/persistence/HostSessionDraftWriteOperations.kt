@@ -53,21 +53,47 @@ internal class HostSessionDraftWriteOperations(
         }
         val exposure = policy.visibilityExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
-        jdbcTemplate.update(
-            """
-            update sessions
-            set access_scope = ?,
-                visibility = ?,
-                updated_at = utc_timestamp(6)
-            where id = ?
-              and club_id = ?
-              and deleted_at is null
-            """.trimIndent(),
-            exposure.accessScope.name,
-            compatibility.sessionVisibility,
-            command.sessionId.dbString(),
-            command.host.clubId.dbString(),
-        )
+        val expectedExposure = command.expectedExposureRevision
+        val updated =
+            if (expectedExposure == null) {
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set access_scope = ?,
+                        visibility = ?,
+                        updated_at = utc_timestamp(6)
+                    where id = ?
+                      and club_id = ?
+                      and deleted_at is null
+                    """.trimIndent(),
+                    exposure.accessScope.name,
+                    compatibility.sessionVisibility,
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                )
+            } else {
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set access_scope = ?,
+                        visibility = ?,
+                        exposure_revision = exposure_revision + 1,
+                        updated_at = utc_timestamp(6)
+                    where id = ?
+                      and club_id = ?
+                      and deleted_at is null
+                      and exposure_revision = ?
+                    """.trimIndent(),
+                    exposure.accessScope.name,
+                    compatibility.sessionVisibility,
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                    expectedExposure,
+                )
+            }
+        if (expectedExposure != null) {
+            queries.throwIfStale(updated, command.host, command.sessionId)
+        }
         jdbcTemplate.update(
             """
             update public_session_publications

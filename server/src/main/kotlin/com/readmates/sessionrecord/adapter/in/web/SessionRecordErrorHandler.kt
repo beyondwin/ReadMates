@@ -11,6 +11,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import com.readmates.shared.mutation.application.model.IdempotencyKeyReusedException
+import com.readmates.shared.mutation.application.model.MutationPendingException
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -24,6 +25,14 @@ class SessionRecordErrorHandler {
             status = HttpStatus.CONFLICT,
             code = "IDEMPOTENCY_KEY_REUSED",
             message = "같은 요청 키로 다른 내용이 이미 처리되었습니다.",
+        )
+
+    @ExceptionHandler(MutationPendingException::class)
+    fun handleMutationPending(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "MUTATION_PENDING",
+            message = "같은 요청이 아직 처리 중입니다.",
         )
 
     @ExceptionHandler(InvalidHostSessionHistoryCursorException::class)

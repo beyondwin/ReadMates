@@ -34,6 +34,20 @@ internal class HostSessionPublicationWriteOperations(
             compatibility.publicationVisibility,
             compatibility.isPublic,
         )
+        command.expectedPublicationRevision?.let { expected ->
+            val bumped =
+                jdbcTemplate.update(
+                    """
+                    update session_publication_versions
+                    set publication_revision = publication_revision + 1
+                    where session_id = ?
+                      and publication_revision = ?
+                    """.trimIndent(),
+                    command.sessionId.dbString(),
+                    expected,
+                )
+            queries.throwIfStale(bumped, command.host, command.sessionId)
+        }
         return HostPublicationResponse(
             sessionId = command.sessionId.toString(),
             publicSummary = command.publicSummary,

@@ -43,6 +43,36 @@ data class SessionVersionVector(
     }
 }
 
+data class PublicationVersionVector(
+    val sessionRevision: Long,
+    val liveRecordRevision: Long,
+    val exposureRevision: Long,
+    val publicationRevision: Long,
+) {
+    init {
+        require(sessionRevision >= 0) { "sessionRevision must be non-negative" }
+        require(liveRecordRevision >= 0) { "liveRecordRevision must be non-negative" }
+        require(exposureRevision >= 0) { "exposureRevision must be non-negative" }
+        require(publicationRevision >= 0) { "publicationRevision must be non-negative" }
+    }
+}
+
+data class CorrectionPublicationVersionVector(
+    val sessionRevision: Long,
+    val recordDraftRevision: Long,
+    val liveRecordRevision: Long,
+    val exposureRevision: Long,
+    val publicationRevision: Long,
+) {
+    init {
+        require(sessionRevision >= 0) { "sessionRevision must be non-negative" }
+        require(recordDraftRevision > 0) { "recordDraftRevision must be positive" }
+        require(liveRecordRevision >= 0) { "liveRecordRevision must be non-negative" }
+        require(exposureRevision >= 0) { "exposureRevision must be non-negative" }
+        require(publicationRevision >= 0) { "publicationRevision must be non-negative" }
+    }
+}
+
 data class ExpectedSessionRevision(
     val value: Long,
 ) {

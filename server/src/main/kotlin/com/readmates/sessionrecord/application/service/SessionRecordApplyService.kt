@@ -26,6 +26,7 @@ import com.readmates.shared.mutation.application.model.CanonicalMutationPayload
 import com.readmates.shared.mutation.application.model.HostMutationOperation
 import com.readmates.shared.mutation.application.model.MutationClaimResult
 import com.readmates.shared.mutation.application.model.MutationIdentity
+import com.readmates.shared.mutation.application.model.MutationPendingException
 import com.readmates.shared.mutation.application.service.MutationIdempotencyService
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
@@ -71,7 +72,10 @@ class SessionRecordApplyService(
                 val claim =
                     idempotency.claim(
                         identity,
-                        CanonicalMutationPayload.RecordApply(entryKeys = listOf(command.expectedDraftHash)),
+                        CanonicalMutationPayload.RecordApply(
+                            applyRequestId = command.applyRequestId,
+                            entryKeys = listOf(command.expectedDraftHash),
+                        ),
                     )
             ) {
                 is MutationClaimResult.Replayed -> {
@@ -80,11 +84,7 @@ class SessionRecordApplyService(
                             ?: throw notFound()
                     return replay(host, command, completed)
                 }
-                is MutationClaimResult.InProgress ->
-                    throw SessionRecordException(
-                        SessionRecordError.INVALID_APPLY_CONTRACT,
-                        "Session record apply is pending",
-                    )
+                is MutationClaimResult.InProgress -> throw MutationPendingException()
                 is MutationClaimResult.Claimed -> Unit
             }
         }

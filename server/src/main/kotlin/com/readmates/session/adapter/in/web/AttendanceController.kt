@@ -25,6 +25,37 @@ data class AttendanceEntry(
 
 fun AttendanceEntry.toCommand(): AttendanceEntryCommand = AttendanceEntryCommand(membershipId, attendanceStatus, expectedAttendanceRevision)
 
+private fun bindExpectedAttendanceRows(
+    commandEntries: List<AttendanceEntry>,
+    expectedRows: List<ExpectedAttendanceRowBody>?,
+    envelope: Boolean,
+): List<AttendanceEntryCommand> {
+    if (!envelope || expectedRows.isNullOrEmpty()) {
+        return commandEntries.map { it.toCommand() }
+    }
+    val expectedByMembership =
+        expectedRows.associate { row ->
+            val membershipId = row.membershipId ?: throw InvalidSessionScheduleException()
+            val revision = row.attendanceRevision ?: throw InvalidSessionScheduleException()
+            membershipId to revision
+        }
+    val commandIds =
+        commandEntries.map { entry ->
+            runCatching { java.util.UUID.fromString(entry.membershipId) }.getOrElse { throw InvalidSessionScheduleException() }
+        }
+    if (commandIds.toSet() != expectedByMembership.keys || commandIds.size != expectedByMembership.size) {
+        throw InvalidSessionScheduleException()
+    }
+    return commandEntries.map { entry ->
+        val membershipId = java.util.UUID.fromString(entry.membershipId)
+        val expectedRevision = expectedByMembership.getValue(membershipId)
+        if (entry.expectedAttendanceRevision != expectedRevision) {
+            throw InvalidSessionScheduleException()
+        }
+        AttendanceEntryCommand(entry.membershipId, entry.attendanceStatus, expectedRevision)
+    }
+}
+
 @RestController
 @RequestMapping("/api/host/sessions/{sessionId}/attendance")
 class AttendanceController(
@@ -39,22 +70,23 @@ class AttendanceController(
         member: CurrentMember,
     ): Any {
         val envelope = envelopes.attendance(body)
-        val entries = envelope.command.entries ?: throw InvalidSessionScheduleException()
+        val commandEntries = envelope.command.entries ?: throw InvalidSessionScheduleException()
         val participantSetRevision =
             envelope.expected.participantSetRevision ?: expectedParticipantSetRevision
         if (body.has("idempotencyKey")) {
-            if (entries.size == 1 && envelope.expected.participantSetRevision != null) {
+            if (commandEntries.size == 1 && envelope.expected.participantSetRevision != null) {
                 throw InvalidSessionScheduleException()
             }
-            if (entries.size > 1 && envelope.expected.participantSetRevision == null) {
+            if (commandEntries.size > 1 && envelope.expected.participantSetRevision == null) {
                 throw InvalidSessionScheduleException()
             }
         }
+        val entries = bindExpectedAttendanceRows(commandEntries, envelope.expected.rows, body.has("idempotencyKey"))
         return confirmAttendanceUseCase.confirmAttendance(
             ConfirmAttendanceCommand(
                 host = member,
                 sessionId = parseHostSessionId(sessionId),
-                entries = entries.map { it.toCommand() },
+                entries = entries,
                 expectedParticipantSetRevision = participantSetRevision,
                 idempotencyKey = envelope.idempotencyKey,
             ),

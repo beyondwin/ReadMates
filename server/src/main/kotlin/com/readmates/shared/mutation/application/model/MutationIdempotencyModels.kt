@@ -73,6 +73,7 @@ enum class HostMutationOperation {
     SESSION_CLOSE,
     SESSION_REVERSE,
     SESSION_RECORD_APPLY,
+    SESSION_PUBLISH,
     SESSION_CORRECTION_PUBLISH,
     SESSION_TRASH,
     SESSION_RESTORE,
@@ -227,6 +228,7 @@ sealed class CanonicalMutationPayload {
     }
 
     data class RecordApply(
+        val applyRequestId: UUID,
         val entryKeys: List<String>,
         override val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
         override val operation: HostMutationOperation = HostMutationOperation.SESSION_RECORD_APPLY,
@@ -247,10 +249,13 @@ sealed class CanonicalMutationPayload {
                 HostMutationOperation.SESSION_CLOSE,
                 HostMutationOperation.SESSION_TRASH,
                 HostMutationOperation.SESSION_RESTORE,
+                HostMutationOperation.SESSION_PUBLISH,
                 HostMutationOperation.SESSION_CORRECTION_PUBLISH,
             )
     }
 }
+
+class MutationPendingException : RuntimeException("MUTATION_PENDING")
 
 class IdempotencyKeyReusedException : RuntimeException("IDEMPOTENCY_KEY_REUSED")
 

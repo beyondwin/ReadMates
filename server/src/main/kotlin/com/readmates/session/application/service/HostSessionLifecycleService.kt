@@ -6,8 +6,11 @@ import com.readmates.notification.application.model.ManualNotificationContentRev
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.HostSessionPublishNotAllowedException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
+import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
+import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
@@ -176,13 +179,31 @@ class HostSessionLifecycleService(
 
     @Transactional
     override fun publish(command: HostSessionIdCommand) =
-        transition(
+        executeLifecycle(
             command = command,
-            action = HostSessionLifecycleAction.PUBLISHED,
-            from = "CLOSED",
-            to = "PUBLISHED",
-            write = { lifecyclePort.publish(command) },
-        )
+            operation = HostMutationOperation.SESSION_PUBLISH,
+            payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_PUBLISH),
+        ) {
+            verifyPublishVector(command)
+            transition(
+                command = command,
+                action = HostSessionLifecycleAction.PUBLISHED,
+                from = "CLOSED",
+                to = "PUBLISHED",
+                write = { lifecyclePort.publish(command) },
+            )
+        }
+
+    @Transactional
+    override fun correctionPublish(command: HostSessionIdCommand) =
+        executeLifecycle(
+            command = command,
+            operation = HostMutationOperation.SESSION_CORRECTION_PUBLISH,
+            payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_CORRECTION_PUBLISH),
+        ) {
+            verifyCorrectionVector(command)
+            draftPort.lockVisibilitySnapshot(command).detail
+        }
 
     @Transactional
     override fun reopen(command: HostSessionReverseCommand) =
@@ -304,6 +325,41 @@ class HostSessionLifecycleService(
         recordFailedDeletion(command, requestId, failure)
         throw failure
     }
+
+    private fun verifyPublishVector(command: HostSessionIdCommand) {
+        val expected = command.expectedPublishVector ?: return
+        val current = currentVersions(command)
+        if (expected.sessionRevision != current.sessionRevision ||
+            expected.exposureRevision != current.exposureRevision ||
+            expected.publicationRevision != current.publicationRevision ||
+            expected.liveRecordRevision != (current.liveRecordRevision ?: 0L)
+        ) {
+            throw HostSessionRevisionConflictException(current, null, null)
+        }
+    }
+
+    private fun verifyCorrectionVector(command: HostSessionIdCommand) {
+        val expected = command.expectedCorrectionVector ?: throw InvalidSessionScheduleException()
+        val snapshot =
+            mutations?.loadProjection(command.host, command.sessionId)
+                ?: throw HostSessionNotFoundException()
+        if (snapshot.state != "PUBLISHED") {
+            throw HostSessionPublishNotAllowedException()
+        }
+        val current = snapshot.versions
+        if (expected.sessionRevision != current.sessionRevision ||
+            expected.exposureRevision != current.exposureRevision ||
+            expected.publicationRevision != current.publicationRevision ||
+            expected.liveRecordRevision != (current.liveRecordRevision ?: 0L) ||
+            expected.recordDraftRevision != (current.recordDraftRevision ?: 0L)
+        ) {
+            throw HostSessionRevisionConflictException(current, null, null)
+        }
+    }
+
+    private fun currentVersions(command: HostSessionIdCommand) =
+        mutations?.loadProjection(command.host, command.sessionId)?.versions
+            ?: throw HostSessionNotFoundException()
 
     private fun executeLifecycle(
         command: HostSessionIdCommand,

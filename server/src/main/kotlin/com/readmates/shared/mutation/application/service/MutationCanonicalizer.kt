@@ -50,7 +50,10 @@ object MutationCanonicalizer {
                 writer.writeString(payload.publicSummary)
                 writer.writeString(payload.siteVisibility)
             }
-            is CanonicalMutationPayload.RecordApply -> writer.writeOrderedStrings(payload.entryKeys)
+            is CanonicalMutationPayload.RecordApply -> {
+                writer.writeString(payload.applyRequestId.toString())
+                writer.writeOrderedStrings(payload.entryKeys)
+            }
         }
         return writer.toByteArray()
     }

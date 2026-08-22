@@ -37,6 +37,28 @@ class HostMutationEnvelopeReader(
             ExpectedSessionOnlyBody(body.path("expectedSessionRevision").asLongOrNull()) to Unit
         }
 
+    fun publishVector(body: JsonNode): HostMutationEnvelope<Unit, ExpectedPublishVectorBody> =
+        read(
+            body,
+            ExpectedPublishVectorBody::class.java,
+            Unit::class.java,
+            setOf("sessionRevision", "liveRecordRevision", "exposureRevision", "publicationRevision"),
+        ) { throw InvalidSessionScheduleException() }
+
+    fun correctionPublishVector(body: JsonNode): HostMutationEnvelope<Unit, ExpectedCorrectionPublishVectorBody> =
+        read(
+            body,
+            ExpectedCorrectionPublishVectorBody::class.java,
+            Unit::class.java,
+            setOf(
+                "sessionRevision",
+                "recordDraftRevision",
+                "liveRecordRevision",
+                "exposureRevision",
+                "publicationRevision",
+            ),
+        ) { throw InvalidSessionScheduleException() }
+
     fun close(body: JsonNode): HostMutationEnvelope<Unit, ExpectedCloseRevisionsBody> {
         val envelope =
             read(

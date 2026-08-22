@@ -107,6 +107,50 @@ data class ExpectedPublicationRevisionBody(
         ExpectedPublicationRevision(publicationRevision ?: throw InvalidSessionScheduleException())
 }
 
+data class ExpectedPublishVectorBody(
+    @field:NotNull @field:Min(0) val sessionRevision: Long? = null,
+    @field:NotNull @field:Min(0) val liveRecordRevision: Long? = null,
+    @field:NotNull @field:Min(0) val exposureRevision: Long? = null,
+    @field:NotNull @field:Min(0) val publicationRevision: Long? = null,
+) {
+    @JsonAnySetter
+    fun rejectUnknown(
+        name: String,
+        @Suppress("UNUSED_PARAMETER") value: Any?,
+    ): Unit = throw InvalidSessionScheduleException()
+
+    fun toExpected() =
+        com.readmates.session.application.model.PublicationVersionVector(
+            sessionRevision = sessionRevision ?: throw InvalidSessionScheduleException(),
+            liveRecordRevision = liveRecordRevision ?: throw InvalidSessionScheduleException(),
+            exposureRevision = exposureRevision ?: throw InvalidSessionScheduleException(),
+            publicationRevision = publicationRevision ?: throw InvalidSessionScheduleException(),
+        )
+}
+
+data class ExpectedCorrectionPublishVectorBody(
+    @field:NotNull @field:Min(0) val sessionRevision: Long? = null,
+    @field:NotNull @field:Min(1) val recordDraftRevision: Long? = null,
+    @field:NotNull @field:Min(0) val liveRecordRevision: Long? = null,
+    @field:NotNull @field:Min(0) val exposureRevision: Long? = null,
+    @field:NotNull @field:Min(0) val publicationRevision: Long? = null,
+) {
+    @JsonAnySetter
+    fun rejectUnknown(
+        name: String,
+        @Suppress("UNUSED_PARAMETER") value: Any?,
+    ): Unit = throw InvalidSessionScheduleException()
+
+    fun toExpected() =
+        com.readmates.session.application.model.CorrectionPublicationVersionVector(
+            sessionRevision = sessionRevision ?: throw InvalidSessionScheduleException(),
+            recordDraftRevision = recordDraftRevision ?: throw InvalidSessionScheduleException(),
+            liveRecordRevision = liveRecordRevision ?: throw InvalidSessionScheduleException(),
+            exposureRevision = exposureRevision ?: throw InvalidSessionScheduleException(),
+            publicationRevision = publicationRevision ?: throw InvalidSessionScheduleException(),
+        )
+}
+
 data class HostAttendanceCommandBody(
     @field:NotEmpty val entries: List<AttendanceEntry>? = null,
 )

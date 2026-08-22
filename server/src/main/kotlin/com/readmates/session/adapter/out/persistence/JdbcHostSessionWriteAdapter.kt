@@ -163,7 +163,8 @@ class JdbcHostSessionWriteAdapter(
     override fun loadProjection(
         host: CurrentMember,
         sessionId: UUID,
-    ): HostProjectionSnapshot? = writeQueries.loadProjection(host, sessionId)
+        includeTrashed: Boolean,
+    ): HostProjectionSnapshot? = writeQueries.loadProjection(host, sessionId, includeTrashed)
 
     override fun loadVersionVector(
         host: CurrentMember,
