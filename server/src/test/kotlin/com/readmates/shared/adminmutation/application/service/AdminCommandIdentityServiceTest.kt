@@ -253,10 +253,14 @@ class AdminCommandIdentityServiceTest {
     @Test
     fun `digest dto and logs never include raw reason email idempotency key or canonical request`() {
         val payload = request(reason = SENSITIVE_REASON, email = SENSITIVE_EMAIL)
-        val digest = service().digest(identity(idempotencyKey = SENSITIVE_IDEMPOTENCY_KEY), payload)
+        val commandIdentity = identity(idempotencyKey = SENSITIVE_IDEMPOTENCY_KEY)
+        val digest = service().digest(commandIdentity, payload)
         val rendered = digest.toString()
+        val identityRendered = commandIdentity.toString()
         val logText = capturedLogText()
 
+        assertThat(commandIdentity.idempotencyKey).isEqualTo(SENSITIVE_IDEMPOTENCY_KEY)
+        assertThat(identityRendered).doesNotContain(SENSITIVE_IDEMPOTENCY_KEY)
         assertThat(rendered).doesNotContain(
             SENSITIVE_REASON,
             SENSITIVE_EMAIL,
@@ -274,6 +278,20 @@ class AdminCommandIdentityServiceTest {
         )
         assertThat(hex(digest.requestHmac)).doesNotContain(SENSITIVE_REASON, SENSITIVE_EMAIL)
         assertThat(hex(digest.idempotencyKeyHmac)).doesNotContain(SENSITIVE_IDEMPOTENCY_KEY)
+    }
+
+    @Test
+    fun `properties toString and validate messages never include hmac secrets`() {
+        val configured = properties(currentKey = CURRENT_KEY, previousKey = PREVIOUS_KEY)
+        val rendered = configured.toString()
+        assertThat(rendered).doesNotContain(CURRENT_KEY, PREVIOUS_KEY)
+        assertThat(rendered).contains("currentKeyVersion=1", "previousKeyVersion=0")
+
+        val env = MockEnvironment()
+        assertThatThrownBy { properties(currentKey = "").validate(env) }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageNotContaining(CURRENT_KEY)
+            .hasMessageNotContaining(PREVIOUS_KEY)
     }
 
     @Test

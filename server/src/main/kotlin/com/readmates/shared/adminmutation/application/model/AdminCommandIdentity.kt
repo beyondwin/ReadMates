@@ -13,7 +13,11 @@ data class PlatformAdminCommandIdentity(
     val targetType: String,
     val targetId: String,
     val idempotencyKey: String,
-)
+) {
+    override fun toString(): String =
+        "PlatformAdminCommandIdentity(platformAdminUserId=$platformAdminUserId, " +
+            "commandType=$commandType, targetType=$targetType, targetId=$targetId)"
+}
 
 data class AdminCommandDigest(
     val schemaVersion: String,

@@ -65,6 +65,11 @@ data class AdminCommandIdentityProperties(
         }
     }
 
+    override fun toString(): String =
+        "AdminCommandIdentityProperties(currentKeyVersion=$currentKeyVersion, " +
+            "previousKeyVersion=$previousKeyVersion, currentKeyConfigured=${currentKey.isNotBlank()}, " +
+            "previousKeyConfigured=${previousKey.isNotBlank()}, allowEmptySecret=$allowEmptySecret)"
+
     private companion object {
         private val log = LoggerFactory.getLogger(AdminCommandIdentityProperties::class.java)
     }
