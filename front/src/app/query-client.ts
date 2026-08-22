@@ -1,9 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 import { ReadMatesSessionExpiredError } from "@/shared/api/client";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { installPlatformAdminAuthorityLossHandler } from "@/features/platform-admin/queries/platform-admin-queries";
 
 export function createReadmatesQueryClient(): QueryClient {
-  return new QueryClient({
+  const queryClient = new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 30_000,
@@ -20,4 +21,6 @@ export function createReadmatesQueryClient(): QueryClient {
       },
     },
   });
+  installPlatformAdminAuthorityLossHandler(queryClient);
+  return queryClient;
 }

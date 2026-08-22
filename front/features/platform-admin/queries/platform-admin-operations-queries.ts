@@ -100,6 +100,7 @@ export function platformAdminOperationCaseQuery(caseId: string) {
 export function useAcknowledgeAdminOperationCaseMutation() {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: adminOperationsKeys.all,
     mutationFn: ({ caseId, expectedVersion }: VersionedCaseMutation) =>
       acknowledgeAdminOperationCase(caseId, expectedVersion),
     onSuccess: (_response, variables) =>
@@ -113,6 +114,7 @@ export function useAcknowledgeAdminOperationCaseMutation() {
 export function useSnoozeAdminOperationCaseMutation() {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: adminOperationsKeys.all,
     mutationFn: ({ caseId, expectedVersion, snoozedUntil }: SnoozeCaseMutation) =>
       snoozeAdminOperationCase(caseId, expectedVersion, snoozedUntil),
     onSuccess: (_response, variables) =>
@@ -126,6 +128,7 @@ export function useSnoozeAdminOperationCaseMutation() {
 export function useResolveAdminOperationCaseMutation() {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: adminOperationsKeys.all,
     mutationFn: ({ caseId, expectedVersion }: VersionedCaseMutation) =>
       resolveAdminOperationCase(caseId, expectedVersion),
     onSuccess: (_response, variables) =>

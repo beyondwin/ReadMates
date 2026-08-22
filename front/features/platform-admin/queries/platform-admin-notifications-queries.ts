@@ -54,6 +54,7 @@ export function platformAdminNotificationDeliveriesQuery(filters?: AdminNotifica
 
 export function usePreviewAdminNotificationReplayMutation() {
   return useMutation({
+    mutationKey: platformAdminNotificationsKeys.all,
     mutationFn: (filter: AdminNotificationReplayFilter = {}) => previewAdminNotificationReplay(filter),
   });
 }
@@ -61,6 +62,7 @@ export function usePreviewAdminNotificationReplayMutation() {
 export function useConfirmAdminNotificationReplayMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: platformAdminNotificationsKeys.all,
     mutationFn: (request: AdminNotificationReplayConfirmRequest) => confirmAdminNotificationReplay(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminNotificationsKeys.all }),
   });

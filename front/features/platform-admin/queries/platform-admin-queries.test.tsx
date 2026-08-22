@@ -2,12 +2,15 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { ReadMatesSessionExpiredError } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type {
   PlatformAdminClub,
   PlatformAdminDomainResponse,
   PlatformAdminSummaryResponse,
   SupportAccessGrantResponse,
 } from "@/features/platform-admin/api/platform-admin-contracts";
+import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
 
 vi.mock("@/features/platform-admin/api/platform-admin-api", () => ({
   checkPlatformAdminDomainProvisioning: vi.fn(),
@@ -20,6 +23,10 @@ vi.mock("@/features/platform-admin/api/platform-admin-api", () => ({
   updatePlatformAdminClub: vi.fn(),
 }));
 
+vi.mock("@/features/platform-admin/api/platform-admin-capabilities-api", () => ({
+  fetchPlatformAdminCapabilities: vi.fn(),
+}));
+
 import {
   checkPlatformAdminDomainProvisioning,
   commitPlatformAdminOnboarding,
@@ -30,11 +37,15 @@ import {
   revokeSupportAccessGrant,
   updatePlatformAdminClub,
 } from "@/features/platform-admin/api/platform-admin-api";
+import { fetchPlatformAdminCapabilities } from "@/features/platform-admin/api/platform-admin-capabilities-api";
 import {
+  installPlatformAdminAuthorityLossHandler,
+  platformAdminCapabilitiesQuery,
   platformAdminClubsQuery,
   platformAdminKeys,
   platformAdminSummaryQuery,
   platformAdminSupportGrantsQuery,
+  purgePlatformAdminState,
   useCheckPlatformAdminDomainProvisioningMutation,
   useCommitPlatformAdminOnboardingMutation,
   useCreateSupportAccessGrantMutation,
@@ -64,6 +75,41 @@ const summary: PlatformAdminSummaryResponse = {
   domains: [],
   domainsRequiringAction: [],
 };
+
+const capabilities: PlatformAdminCapabilities = {
+  schemaVersion: 1,
+  role: "OWNER",
+  status: "ACTIVE",
+  capabilities: ["VIEW_TODAY", "VIEW_CLUBS", "CREATE_CLUB"],
+  generatedAt: "2026-08-22T00:00:00Z",
+};
+
+const memberQueryKey = ["current-session", "me"] as const;
+const publicQueryKey = ["public", "club"] as const;
+const memberSnapshot = { userId: "member-1" };
+const publicSnapshot = { slug: "reading-sai" };
+
+async function forbiddenError() {
+  return apiErrorFromResponse(
+    new Response(
+      JSON.stringify({
+        code: "PERMISSION_DENIED",
+        message: "이 작업을 수행할 권한이 없습니다.",
+        status: 403,
+      }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+}
+
+function seedAdminAndUnrelatedQueries(client: QueryClient) {
+  client.setQueryData(platformAdminKeys.summary(), summary);
+  client.setQueryData(platformAdminKeys.clubs(), { items: [club] });
+  client.setQueryData(platformAdminKeys.capabilities(), capabilities);
+  client.setQueryData([...platformAdminKeys.all, "operations", "cases"], { items: [] });
+  client.setQueryData(memberQueryKey, memberSnapshot);
+  client.setQueryData(publicQueryKey, publicSnapshot);
+}
 
 const activeDomain: PlatformAdminDomainResponse = {
   id: "domain-1",
@@ -114,6 +160,7 @@ async function runQuery(query: { queryFn?: (context: never) => unknown }) {
 beforeEach(() => {
   vi.mocked(fetchPlatformAdminSummary).mockReset();
   vi.mocked(fetchPlatformAdminClubs).mockReset();
+  vi.mocked(fetchPlatformAdminCapabilities).mockReset();
   vi.mocked(listSupportAccessGrantsByClub).mockReset();
   vi.mocked(checkPlatformAdminDomainProvisioning).mockReset();
   vi.mocked(commitPlatformAdminOnboarding).mockReset();
@@ -126,6 +173,7 @@ describe("platform admin query keys", () => {
   it("defines stable query keys", () => {
     expect(platformAdminKeys.summary()).toEqual(["platform-admin", "summary"]);
     expect(platformAdminKeys.clubs()).toEqual(["platform-admin", "clubs"]);
+    expect(platformAdminKeys.capabilities()).toEqual(["platform-admin", "capabilities"]);
     expect(platformAdminKeys.supportGrants("club-1")).toEqual([
       "platform-admin",
       "support-grants",
@@ -141,14 +189,17 @@ describe("platform admin query keys", () => {
   it("query functions call platform admin API wrappers", async () => {
     vi.mocked(fetchPlatformAdminSummary).mockResolvedValue(summary);
     vi.mocked(fetchPlatformAdminClubs).mockResolvedValue({ items: [club] });
+    vi.mocked(fetchPlatformAdminCapabilities).mockResolvedValue(capabilities);
     vi.mocked(listSupportAccessGrantsByClub).mockResolvedValue([grant]);
 
     await runQuery(platformAdminSummaryQuery());
     await runQuery(platformAdminClubsQuery());
+    await runQuery(platformAdminCapabilitiesQuery());
     await runQuery(platformAdminSupportGrantsQuery("club-1"));
 
     expect(fetchPlatformAdminSummary).toHaveBeenCalledOnce();
     expect(fetchPlatformAdminClubs).toHaveBeenCalledOnce();
+    expect(fetchPlatformAdminCapabilities).toHaveBeenCalledOnce();
     expect(listSupportAccessGrantsByClub).toHaveBeenCalledWith("club-1");
   });
 
@@ -246,5 +297,109 @@ describe("platform admin mutation cache behavior", () => {
     });
 
     expect(client.getQueryData<SupportAccessGrantResponse[]>(platformAdminKeys.supportGrants("club-1"))).toEqual([]);
+  });
+});
+
+describe("platform admin authority-loss purge", () => {
+  it("removes the entire platform-admin prefix without touching member or public queries", () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    seedAdminAndUnrelatedQueries(client);
+
+    purgePlatformAdminState(client);
+
+    expect(client.getQueryData(platformAdminKeys.summary())).toBeUndefined();
+    expect(client.getQueryData(platformAdminKeys.clubs())).toBeUndefined();
+    expect(client.getQueryData(platformAdminKeys.capabilities())).toBeUndefined();
+    expect(client.getQueryData([...platformAdminKeys.all, "operations", "cases"])).toBeUndefined();
+    expect(client.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+    expect(client.getQueryData(publicQueryKey)).toEqual(publicSnapshot);
+  });
+
+  it("purges the prefix when a platform-admin query sees 401 without clearing unrelated queries", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    installPlatformAdminAuthorityLossHandler(client);
+    seedAdminAndUnrelatedQueries(client);
+
+    await expect(
+      client.fetchQuery({
+        queryKey: [...platformAdminKeys.all, "probe"],
+        queryFn: async () => {
+          throw new ReadMatesSessionExpiredError();
+        },
+      }),
+    ).rejects.toBeInstanceOf(ReadMatesSessionExpiredError);
+
+    expect(client.getQueryData(platformAdminKeys.summary())).toBeUndefined();
+    expect(client.getQueryData(platformAdminKeys.capabilities())).toBeUndefined();
+    expect(client.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+    expect(client.getQueryData(publicQueryKey)).toEqual(publicSnapshot);
+  });
+
+  it("purges the prefix when a platform-admin query sees 403 without clearing unrelated queries", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    installPlatformAdminAuthorityLossHandler(client);
+    seedAdminAndUnrelatedQueries(client);
+    const error = await forbiddenError();
+
+    await expect(
+      client.fetchQuery({
+        queryKey: [...platformAdminKeys.all, "probe"],
+        queryFn: async () => {
+          throw error;
+        },
+      }),
+    ).rejects.toBe(error);
+
+    expect(client.getQueryData(platformAdminKeys.summary())).toBeUndefined();
+    expect(client.getQueryData([...platformAdminKeys.all, "operations", "cases"])).toBeUndefined();
+    expect(client.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+  });
+
+  it("purges the prefix when a platform-admin mutation sees 403", async () => {
+    const client = new QueryClient({
+      defaultOptions: { mutations: { retry: false } },
+    });
+    installPlatformAdminAuthorityLossHandler(client);
+    seedAdminAndUnrelatedQueries(client);
+    const error = await forbiddenError();
+
+    await expect(
+      client.getMutationCache().build(client, {
+        mutationKey: platformAdminKeys.all,
+        mutationFn: async () => {
+          throw error;
+        },
+      }).execute(),
+    ).rejects.toBe(error);
+
+    expect(client.getQueryData(platformAdminKeys.summary())).toBeUndefined();
+    expect(client.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+  });
+
+  it("does not purge platform-admin cache when an unrelated member query sees 403", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, gcTime: 0 } },
+    });
+    installPlatformAdminAuthorityLossHandler(client);
+    seedAdminAndUnrelatedQueries(client);
+    const error = await forbiddenError();
+
+    await expect(
+      client.fetchQuery({
+        queryKey: memberQueryKey,
+        queryFn: async () => {
+          throw error;
+        },
+      }),
+    ).rejects.toBe(error);
+
+    expect(client.getQueryData(platformAdminKeys.summary())).toEqual(summary);
+    expect(client.getQueryData(platformAdminKeys.capabilities())).toEqual(capabilities);
   });
 });

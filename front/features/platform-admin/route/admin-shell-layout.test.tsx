@@ -6,10 +6,16 @@ import type {
   PlatformAdminClubListResponse,
   PlatformAdminSummaryResponse,
 } from "@/features/platform-admin/model/platform-admin-domain-types";
+import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
 import type { AdminOperationCasesResponse } from "@/features/platform-admin/api/platform-admin-operations-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { ReadMatesSessionExpiredError } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import {
+  installPlatformAdminAuthorityLossHandler,
+  platformAdminCapabilitiesQuery,
   platformAdminClubsQuery,
+  platformAdminKeys,
   platformAdminSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
@@ -26,6 +32,10 @@ vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (im
   fetchAdminOperationCases: vi.fn(),
 }));
 
+vi.mock("@/features/platform-admin/api/platform-admin-capabilities-api", () => ({
+  fetchPlatformAdminCapabilities: vi.fn(),
+}));
+
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
 import { AdminShellLayout } from "./admin-shell-layout";
@@ -38,6 +48,61 @@ const summary: PlatformAdminSummaryResponse = {
 };
 
 const clubs: PlatformAdminClubListResponse = { items: [] };
+
+const ownerCapabilities: PlatformAdminCapabilities = {
+  schemaVersion: 1,
+  role: "OWNER",
+  status: "ACTIVE",
+  capabilities: [
+    "VIEW_TODAY",
+    "VIEW_CLUBS",
+    "VIEW_CLUB_OPERATIONS",
+    "VIEW_SERVICE_HEALTH",
+    "VIEW_NOTIFICATION_OPERATIONS",
+    "REPLAY_NOTIFICATIONS",
+    "VIEW_AI_OPERATIONS",
+    "MANAGE_AI_OPERATIONS",
+    "VIEW_SUPPORT",
+    "MANAGE_SUPPORT_ACCESS",
+    "VIEW_AUDIT",
+    "VIEW_SENSITIVE_AUDIT",
+    "VIEW_ANALYTICS",
+    "EXPORT_ANALYTICS",
+    "CREATE_CLUB",
+    "MANAGE_CLUBS",
+    "MANAGE_CLUB_DOMAINS",
+    "MANAGE_PLATFORM_ADMINS",
+  ],
+  generatedAt: "2026-08-22T00:00:00Z",
+};
+
+const supportViewCapabilities: PlatformAdminCapabilities["capabilities"] = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "VIEW_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "VIEW_AUDIT",
+  "VIEW_ANALYTICS",
+];
+
+const memberQueryKey = ["current-session", "me"] as const;
+const memberSnapshot = { userId: "member-1" };
+
+async function forbiddenError() {
+  return apiErrorFromResponse(
+    new Response(
+      JSON.stringify({
+        code: "PERMISSION_DENIED",
+        message: "이 작업을 수행할 권한이 없습니다.",
+        status: 403,
+      }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+}
 
 const operations: AdminOperationCasesResponse = {
   schema: "admin.operation_cases.v1",
@@ -85,18 +150,26 @@ const auth = {
 
 function renderShell(
   initialEntry: string,
-  opts: { auth?: typeof auth | null; operations?: AdminOperationCasesResponse } = {},
+  opts: {
+    auth?: typeof auth | null;
+    operations?: AdminOperationCasesResponse;
+    summary?: PlatformAdminSummaryResponse;
+    capabilities?: PlatformAdminCapabilities;
+  } = {},
 ) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
-  queryClient.setQueryData(platformAdminSummaryQuery().queryKey, summary);
+  installPlatformAdminAuthorityLossHandler(queryClient);
+  queryClient.setQueryData(platformAdminSummaryQuery().queryKey, opts.summary ?? summary);
   queryClient.setQueryData(platformAdminClubsQuery().queryKey, clubs);
+  queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, opts.capabilities ?? ownerCapabilities);
   queryClient.setQueryData(
     platformAdminOperationCasesQuery().queryKey,
     opts.operations ?? operations,
   );
-  return render(
+  queryClient.setQueryData(memberQueryKey, memberSnapshot);
+  const view = render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={[initialEntry]}>
         <Routes>
@@ -107,7 +180,8 @@ function renderShell(
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
-);
+  );
+  return { ...view, queryClient };
 }
 
 describe("AdminShellLayout", () => {
@@ -137,10 +211,12 @@ describe("AdminShellLayout", () => {
   it("preserves the shell and route content when an operations summary is unavailable", async () => {
     vi.mocked(fetchAdminOperationCases).mockRejectedValue(new Error("operations unavailable"));
     const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
     });
+    installPlatformAdminAuthorityLossHandler(queryClient);
     queryClient.setQueryData(platformAdminSummaryQuery().queryKey, summary);
     queryClient.setQueryData(platformAdminClubsQuery().queryKey, clubs);
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, ownerCapabilities);
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -230,5 +306,91 @@ describe("AdminShellLayout", () => {
       expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
       expect(assign).toHaveBeenCalledWith("/login?returnTo=%2Fadmin%2Fclubs%3Ffilter%3Dready%23top");
     });
+  });
+
+  it("hides create-club actions when the projection omits CREATE_CLUB even if summary role is OWNER", () => {
+    renderShell("/admin/today?onboarding=1", {
+      summary: { ...summary, platformRole: "OWNER" },
+      capabilities: {
+        schemaVersion: 1,
+        role: "OWNER",
+        status: "ACTIVE",
+        capabilities: supportViewCapabilities,
+        generatedAt: "2026-08-22T00:00:00Z",
+      },
+    });
+
+    expect(screen.queryByRole("link", { name: /새 클럽/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("OWNER", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
+  });
+
+  it("shows create-club actions from the returned list even if summary role is SUPPORT", () => {
+    renderShell("/admin/today", {
+      summary: { ...summary, platformRole: "SUPPORT" },
+      capabilities: {
+        schemaVersion: 1,
+        role: "SUPPORT",
+        status: "ACTIVE",
+        capabilities: [...supportViewCapabilities, "CREATE_CLUB"],
+        generatedAt: "2026-08-22T00:00:00Z",
+      },
+    });
+
+    expect(screen.getByRole("link", { name: /새 클럽/ })).toBeInTheDocument();
+    expect(screen.getByText("SUPPORT", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
+  });
+
+  it("purges platform-admin state and closes onboarding and workspace menus on 401", async () => {
+    const { queryClient } = renderShell("/admin/today?onboarding=1");
+    fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByRole("menu", { name: "내 ReadMates 공간" })).toBeInTheDocument();
+
+    await waitFor(async () => {
+      await queryClient
+        .fetchQuery({
+          queryKey: [...platformAdminKeys.all, "probe"],
+          queryFn: async () => {
+            throw new ReadMatesSessionExpiredError();
+          },
+        })
+        .catch(() => undefined);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByRole("menu", { name: "내 ReadMates 공간" })).not.toBeInTheDocument();
+    });
+    expect(queryClient.getQueryData(platformAdminKeys.summary())).toBeUndefined();
+    expect(queryClient.getQueryData(platformAdminKeys.capabilities())).toBeUndefined();
+    expect(queryClient.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+
+    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, ownerCapabilities);
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("purges platform-admin state and closes onboarding and workspace menus on 403", async () => {
+    const { queryClient } = renderShell("/admin/today?onboarding=1");
+    fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
+    const error = await forbiddenError();
+
+    await waitFor(async () => {
+      await queryClient
+        .fetchQuery({
+          queryKey: [...platformAdminKeys.all, "probe"],
+          queryFn: async () => {
+            throw error;
+          },
+        })
+        .catch(() => undefined);
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.queryByRole("menu", { name: "내 ReadMates 공간" })).not.toBeInTheDocument();
+    });
+    expect(queryClient.getQueryData(platformAdminKeys.clubs())).toBeUndefined();
+    expect(queryClient.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
   });
 });

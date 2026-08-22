@@ -1,5 +1,8 @@
 import { queryOptions, useMutation, useQueryClient, type QueryClient } from "@tanstack/react-query";
+import { ReadMatesSessionExpiredError } from "@/shared/api/client";
+import { isReadmatesApiError } from "@/shared/api/errors";
 import * as platformAdminApi from "@/features/platform-admin/api/platform-admin-api";
+import { fetchPlatformAdminCapabilities } from "@/features/platform-admin/api/platform-admin-capabilities-api";
 import {
   checkPlatformAdminDomainProvisioning,
   commitPlatformAdminOnboarding,
@@ -26,6 +29,7 @@ const PLATFORM_ADMIN_CACHE_GC_TIME_MS = 5 * 60 * 1000;
 
 export const platformAdminKeys = {
   all: ["platform-admin"] as const,
+  capabilities: () => [...platformAdminKeys.all, "capabilities"] as const,
   summary: () => [...platformAdminKeys.all, "summary"] as const,
   clubs: () => [...platformAdminKeys.all, "clubs"] as const,
   todayClosingRisks: () => [...platformAdminKeys.all, "today", "closing-risks"] as const,
@@ -33,6 +37,74 @@ export const platformAdminKeys = {
   supportGrantsRoot: () => [...platformAdminKeys.all, "support-grants"] as const,
   supportGrants: (clubId: string | null) => [...platformAdminKeys.supportGrantsRoot(), clubId] as const,
 } as const;
+
+const PLATFORM_ADMIN_MUTATION_KEY = [...platformAdminKeys.all, "mutation"] as const;
+const installedAuthorityLossHandlers = new WeakSet<QueryClient>();
+const authorityLossListeners = new Set<() => void>();
+
+export function platformAdminCapabilitiesQuery() {
+  return queryOptions({
+    queryKey: platformAdminKeys.capabilities(),
+    queryFn: fetchPlatformAdminCapabilities,
+  });
+}
+
+export function isPlatformAdminAuthorityLossError(error: unknown): boolean {
+  if (error instanceof ReadMatesSessionExpiredError) {
+    return true;
+  }
+  return isReadmatesApiError(error) && (error.status === 401 || error.status === 403);
+}
+
+export function subscribePlatformAdminAuthorityLoss(listener: () => void): () => void {
+  authorityLossListeners.add(listener);
+  return () => {
+    authorityLossListeners.delete(listener);
+  };
+}
+
+export function purgePlatformAdminState(queryClient: QueryClient): void {
+  void queryClient.cancelQueries({ queryKey: platformAdminKeys.all });
+  queryClient.removeQueries({ queryKey: platformAdminKeys.all });
+  for (const listener of authorityLossListeners) {
+    listener();
+  }
+}
+
+export function installPlatformAdminAuthorityLossHandler(queryClient: QueryClient): void {
+  if (installedAuthorityLossHandlers.has(queryClient)) {
+    return;
+  }
+  installedAuthorityLossHandlers.add(queryClient);
+
+  const queryCache = queryClient.getQueryCache();
+  const mutationCache = queryClient.getMutationCache();
+  const previousQueryOnError = queryCache.config.onError;
+  queryCache.config.onError = (error, query) => {
+    previousQueryOnError?.(error, query);
+    handlePlatformAdminAuthorityLoss(queryClient, error, query.queryKey);
+  };
+  const previousMutationOnError = mutationCache.config.onError;
+  mutationCache.config.onError = (error, variables, onMutateResult, mutation, context) => {
+    void previousMutationOnError?.(error, variables, onMutateResult, mutation, context);
+    handlePlatformAdminAuthorityLoss(queryClient, error, mutation.options.mutationKey);
+  };
+}
+
+function isPlatformAdminQueryKey(queryKey: readonly unknown[] | undefined): boolean {
+  return queryKey?.[0] === platformAdminKeys.all[0];
+}
+
+function handlePlatformAdminAuthorityLoss(
+  queryClient: QueryClient,
+  error: unknown,
+  queryKey: readonly unknown[] | undefined,
+): void {
+  if (!isPlatformAdminAuthorityLossError(error) || !isPlatformAdminQueryKey(queryKey)) {
+    return;
+  }
+  purgePlatformAdminState(queryClient);
+}
 
 export function platformAdminSummaryQuery() {
   return queryOptions({
@@ -148,6 +220,7 @@ export function useCheckPlatformAdminDomainProvisioningMutation() {
   const queryClient = useQueryClient();
   const summarySnapshot = queryClient.getQueryData<PlatformAdminSummaryResponse>(platformAdminKeys.summary());
   return useMutation({
+    mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: (domainId: string) => checkPlatformAdminDomainProvisioning(domainId),
     onSuccess: (domain) => {
       setRetainedQueryData(queryClient, platformAdminKeys.summary(), (summary: PlatformAdminSummaryResponse | undefined) =>
@@ -162,6 +235,7 @@ export function useCommitPlatformAdminOnboardingMutation() {
   const clubsSnapshot = queryClient.getQueryData<PlatformAdminClubListResponse>(platformAdminKeys.clubs());
   const summarySnapshot = queryClient.getQueryData<PlatformAdminSummaryResponse>(platformAdminKeys.summary());
   return useMutation({
+    mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: (request: PlatformAdminOnboardingRequest) => commitPlatformAdminOnboarding(request),
     onSuccess: (result) => {
       setRetainedQueryData(queryClient, platformAdminKeys.clubs(), (clubs: PlatformAdminClubListResponse | undefined) =>
@@ -182,6 +256,7 @@ export function useUpdatePlatformAdminClubMutation() {
   const queryClient = useQueryClient();
   const clubsSnapshot = queryClient.getQueryData<PlatformAdminClubListResponse>(platformAdminKeys.clubs());
   return useMutation({
+    mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: ({ clubId, request }: { clubId: string; request: UpdatePlatformAdminClubRequest }) =>
       updatePlatformAdminClub(clubId, request),
     onSuccess: (club) => {
@@ -196,6 +271,7 @@ export function useCreateSupportAccessGrantMutation(clubId: string | null) {
   const queryClient = useQueryClient();
   const grantsSnapshot = queryClient.getQueryData<SupportAccessGrantResponse[]>(platformAdminKeys.supportGrants(clubId));
   return useMutation({
+    mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: (request: CreateSupportAccessGrantRequest) => createSupportAccessGrant(request),
     onSuccess: (grant) => {
       setRetainedQueryData(queryClient, platformAdminKeys.supportGrants(clubId), (grants: SupportAccessGrantResponse[] | undefined) =>
@@ -209,6 +285,7 @@ export function useRevokeSupportAccessGrantMutation(clubId: string | null) {
   const queryClient = useQueryClient();
   const grantsSnapshot = queryClient.getQueryData<SupportAccessGrantResponse[]>(platformAdminKeys.supportGrants(clubId));
   return useMutation({
+    mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
     mutationFn: (grantId: string) => revokeSupportAccessGrant(grantId),
     onSuccess: (_result, grantId) => {
       setRetainedQueryData(queryClient, platformAdminKeys.supportGrants(clubId), (grants: SupportAccessGrantResponse[] | undefined) =>

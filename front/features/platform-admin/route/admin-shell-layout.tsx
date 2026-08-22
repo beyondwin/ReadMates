@@ -1,17 +1,20 @@
-import { type MouseEvent, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { type MouseEvent, useEffect, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import {
   adminOtherAccountLoginPath,
   adminWorkspaceAccountLabel,
   deriveAdminWorkspaceDestinations,
 } from "@/features/platform-admin/model/admin-workspace-switcher-model";
+import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
 import {
+  installPlatformAdminAuthorityLossHandler,
+  platformAdminCapabilitiesQuery,
   platformAdminClubsQuery,
   platformAdminSummaryQuery,
+  subscribePlatformAdminAuthorityLoss,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
-import { canDo } from "@/features/platform-admin/model/platform-admin-permissions";
 import { buildAdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminBreadcrumb } from "@/features/platform-admin/ui/admin-breadcrumb";
 import {
@@ -41,9 +44,19 @@ export function AdminShellLayout({ auth = null }: { auth?: AuthMeResponse | null
 }
 
 function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
-  const summaryQuery = useQuery(platformAdminSummaryQuery());
-  useQuery(platformAdminClubsQuery());
-  const operationsQuery = useQuery(platformAdminOperationCasesQuery({}, { active: true }));
+  const queryClient = useQueryClient();
+  const [authorityLost, setAuthorityLost] = useState(false);
+  const [workspaceMenuEpoch, setWorkspaceMenuEpoch] = useState(0);
+  const capabilitiesQuery = useQuery({
+    ...platformAdminCapabilitiesQuery(),
+    enabled: !authorityLost,
+  });
+  useQuery({ ...platformAdminSummaryQuery(), enabled: !authorityLost });
+  useQuery({ ...platformAdminClubsQuery(), enabled: !authorityLost });
+  const operationsQuery = useQuery({
+    ...platformAdminOperationCasesQuery({}, { active: true }),
+    enabled: !authorityLost,
+  });
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -53,15 +66,16 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const workspaceAccountLabel = adminWorkspaceAccountLabel(auth);
   const otherAccountLoginPath = adminOtherAccountLoginPath(location.pathname, location.search, location.hash);
 
-  const summary = summaryQuery.data;
-  const role = summary?.platformRole ?? "SUPPORT";
+  const capabilities = capabilitiesQuery.data;
+  const role = capabilities?.role ?? "SUPPORT";
+  const canCreateClub = capabilities != null && canAdmin(capabilities, "CREATE_CLUB");
   const commandStatus = deriveCommandStatus(
     operationsQuery.data,
     operationsQuery.isError,
   );
 
   const routePath = derivePathSegment(location.pathname);
-  const onboardingOpen = searchParams.get("onboarding") === "1" && canDo(role, "create_club");
+  const onboardingOpen = searchParams.get("onboarding") === "1" && canCreateClub;
 
   function closeOnboarding() {
     const next = new URLSearchParams(searchParams);
@@ -72,6 +86,24 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
     );
     setIsWizardDirty(false);
   }
+
+  useEffect(() => {
+    installPlatformAdminAuthorityLossHandler(queryClient);
+    return subscribePlatformAdminAuthorityLoss(() => {
+      setAuthorityLost(true);
+      setWorkspaceMenuEpoch((epoch) => epoch + 1);
+      setIsWizardDirty(false);
+      const next = new URLSearchParams(searchParams);
+      if (!next.has("onboarding")) {
+        return;
+      }
+      next.delete("onboarding");
+      navigate(
+        { pathname: location.pathname, search: next.toString() ? `?${next.toString()}` : "" },
+        { replace: true },
+      );
+    });
+  }, [location.pathname, navigate, queryClient, searchParams]);
 
   async function otherAccountLogin() {
     const response = await logoutCurrentSession();
@@ -91,7 +123,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
         <span className="admin-shell__wordmark">ReadMates · 운영</span>
         <AdminBreadcrumb routePath={routePath} extra={extra} />
         <div className="admin-shell__header-actions">
-          {canDo(role, "create_club") ? (
+          {canCreateClub ? (
             <Link
               to={{
                 pathname: location.pathname,
@@ -102,8 +134,9 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
               새 클럽
             </Link>
           ) : null}
-          <span className="admin-shell__role-badge">{role}</span>
+          {capabilities ? <span className="admin-shell__role-badge">{capabilities.role}</span> : null}
           <AdminWorkspaceSwitcher
+            key={workspaceMenuEpoch}
             accountLabel={workspaceAccountLabel}
             destinations={workspaceDestinations}
             onOtherAccountLogin={otherAccountLogin}

@@ -32,6 +32,7 @@ export function platformAdminSupportLedgerQuery(filters: { clubId?: string; gran
 export function useCreateAdminSupportGrantMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: platformAdminSupportKeys.all,
     mutationFn: (request: AdminSupportGrantRequest) => createAdminSupportGrant(request),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminSupportKeys.all }),
   });
@@ -40,6 +41,7 @@ export function useCreateAdminSupportGrantMutation() {
 export function useRevokeAdminSupportGrantMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: platformAdminSupportKeys.all,
     mutationFn: (grantId: string) => revokeAdminSupportGrant(grantId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminSupportKeys.all }),
   });

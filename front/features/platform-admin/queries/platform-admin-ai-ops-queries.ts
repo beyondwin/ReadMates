@@ -50,6 +50,7 @@ export function platformAdminAiOpsJobsQuery(filters?: PlatformAdminAiOpsFilters)
 export function useForceCancelPlatformAdminAiJobMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: platformAdminAiOpsKeys.all,
     mutationFn: (jobId: string) => forceCancelPlatformAdminAiJob(jobId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all }),
   });
@@ -58,6 +59,7 @@ export function useForceCancelPlatformAdminAiJobMutation() {
 export function useRetryCommitPlatformAdminAiJobMutation() {
   const queryClient = useQueryClient();
   return useMutation({
+    mutationKey: platformAdminAiOpsKeys.all,
     mutationFn: (jobId: string) => retryCommitPlatformAdminAiJob(jobId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminAiOpsKeys.all }),
   });

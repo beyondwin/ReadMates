@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { canDo, type AdminCapability } from "./platform-admin-permissions";
+import { canAdmin, canDo, type AdminCapability } from "./platform-admin-permissions";
+import type { PlatformAdminCapabilities } from "./platform-admin-capabilities";
 
 describe("canDo", () => {
   const allViews: AdminCapability[] = [
@@ -42,5 +43,29 @@ describe("canDo", () => {
     expect(canDo("SUPPORT", "revoke_support_grant")).toBe(false);
     expect(canDo("SUPPORT", "force_cancel_ai_job")).toBe(false);
     expect(canDo("SUPPORT", "check_domain_provisioning")).toBe(false);
+  });
+});
+
+describe("canAdmin", () => {
+  const projection = (role: PlatformAdminCapabilities["role"], capabilities: PlatformAdminCapabilities["capabilities"]): PlatformAdminCapabilities => ({
+    schemaVersion: 1,
+    role,
+    status: "ACTIVE",
+    capabilities,
+    generatedAt: "2026-08-22T00:00:00Z",
+  });
+
+  it("is a membership check on the returned capabilities list", () => {
+    expect(canAdmin(projection("OWNER", ["VIEW_TODAY", "VIEW_CLUBS"]), "CREATE_CLUB")).toBe(false);
+    expect(canAdmin(projection("SUPPORT", ["VIEW_TODAY", "CREATE_CLUB"]), "CREATE_CLUB")).toBe(true);
+  });
+
+  it("never infers an allowlist from role", () => {
+    const ownerWithoutMutations = projection("OWNER", ["VIEW_TODAY"]);
+    const supportWithManage = projection("SUPPORT", ["MANAGE_PLATFORM_ADMINS"]);
+
+    expect(canAdmin(ownerWithoutMutations, "MANAGE_PLATFORM_ADMINS")).toBe(false);
+    expect(canAdmin(supportWithManage, "MANAGE_PLATFORM_ADMINS")).toBe(true);
+    expect(canAdmin(supportWithManage, "VIEW_TODAY")).toBe(false);
   });
 });

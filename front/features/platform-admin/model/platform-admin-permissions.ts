@@ -1,5 +1,11 @@
 import type { PlatformAdminRole } from "@/features/platform-admin/model/platform-admin-domain-types";
 
+export {
+  canAdmin,
+  type PlatformAdminCapability,
+  type PlatformAdminCapabilities,
+} from "@/features/platform-admin/model/platform-admin-capabilities";
+
 export type AdminCapability =
   | "view_today"
   | "view_clubs"
