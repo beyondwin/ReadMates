@@ -11,7 +11,7 @@ const descriptor: AdminRouteDescriptor = {
   groupLabel: "감사/분석",
   slice: "S7",
   status: "coming_soon",
-  requiredCapability: "view_audit",
+  requiredCapability: "VIEW_AUDIT",
   comingSoon: {
     title: "Audit / Activity ledger",
     summary: "통합 ledger 요약 문장.",

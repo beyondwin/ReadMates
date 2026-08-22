@@ -1,5 +1,26 @@
 import { test, expect, type Page } from "@playwright/test";
 
+const OWNER_CAPABILITIES = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "REPLAY_NOTIFICATIONS",
+  "VIEW_AI_OPERATIONS",
+  "MANAGE_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "MANAGE_SUPPORT_ACCESS",
+  "VIEW_AUDIT",
+  "VIEW_SENSITIVE_AUDIT",
+  "VIEW_ANALYTICS",
+  "EXPORT_ANALYTICS",
+  "CREATE_CLUB",
+  "MANAGE_CLUBS",
+  "MANAGE_CLUB_DOMAINS",
+  "MANAGE_PLATFORM_ADMINS",
+] as const;
+
 async function loginWithDevShortcut(page: Page, accountName: string | RegExp) {
   await page.goto("/login");
   await Promise.all([
@@ -9,6 +30,22 @@ async function loginWithDevShortcut(page: Page, accountName: string | RegExp) {
     page.getByRole("button", { name: accountName }).click(),
   ]);
   await page.waitForURL(/\/(admin|app|clubs)\b/);
+}
+
+async function routePlatformAdminCapabilities(page: Page) {
+  await page.route("**/api/bff/api/admin/capabilities**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        schemaVersion: 1,
+        role: "OWNER",
+        status: "ACTIVE",
+        capabilities: [...OWNER_CAPABILITIES],
+        generatedAt: "2026-08-22T00:00:00Z",
+      }),
+    });
+  });
 }
 
 async function routePlatformAdminHostWorkspace(page: Page) {
@@ -149,19 +186,27 @@ async function routePlatformAdminHostWorkspace(page: Page) {
   });
 }
 
-test.describe("/admin shell", () => {
+function adminShellSuite() {
   test("admin-owner can navigate the full happy path", async ({ page }) => {
+    await routePlatformAdminCapabilities(page);
     await loginWithDevShortcut(page, "플랫폼 관리자 · OWNER");
     await page.waitForURL(/\/admin/);
 
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin\/today(?:\?.*)?$/);
     await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "오늘" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "클럽" })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("서비스", { exact: true })).toBeVisible();
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByText("검토", { exact: true })).toBeVisible();
+    await expect(page.getByText("Command")).toHaveCount(0);
+    await expect(page.getByRole("link", { name: "사건" })).toHaveCount(0);
+    await expect(page.getByRole("banner").getByRole("link", { name: "새 클럽" })).toHaveCount(0);
 
     await page.getByRole("link", { name: "클럽", exact: true }).click();
     await expect(page).toHaveURL(/\/admin\/clubs$/);
 
-    await page.getByRole("banner").getByRole("link", { name: "새 클럽" }).click();
+    await page.getByRole("main").getByRole("link", { name: "새 클럽" }).click();
     await expect(page).toHaveURL(/onboarding=1/);
     await expect(page.getByRole("dialog")).toBeVisible();
 
@@ -172,23 +217,20 @@ test.describe("/admin shell", () => {
     await expect(page).not.toHaveURL(/onboarding=1/);
   });
 
-  test("host account is returned to the member app from /admin", async ({ page }) => {
-    await loginWithDevShortcut(page, /호스트/);
-    await page.waitForURL(/\/app/);
-
-    await page.goto("/admin");
-    await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
-    await expect(page.getByRole("heading", { name: /호스트님/ })).toBeVisible();
-  });
-
   test("analytics route renders the ready analytics overview", async ({ page }) => {
+    await routePlatformAdminCapabilities(page);
     await loginWithDevShortcut(page, "플랫폼 관리자 · OWNER");
     await page.goto("/admin/analytics");
     await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
     await expect(page.getByText(/준비 중 · S8/)).toHaveCount(0);
+    await expect(page.getByRole("navigation", { name: "Admin 콘솔" }).getByRole("link", { name: "분석" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
   });
 
   test("platform admin with host membership can open host workspace from the admin header", async ({ page }) => {
+    await routePlatformAdminCapabilities(page);
     await loginWithDevShortcut(page, "플랫폼 관리자 · OWNER");
     await routePlatformAdminHostWorkspace(page);
 
@@ -196,12 +238,33 @@ test.describe("/admin shell", () => {
     await expect(page).toHaveURL(/\/admin\/today$/);
 
     await page.getByRole("button", { name: "내 공간" }).click();
-    await page.getByRole("link", { name: "읽는사이 호스트 공간" }).click();
+    await page.getByRole("menuitem", { name: "읽는사이 호스트 공간" }).click();
 
     await expect.poll(() => new URL(page.url()).pathname).toMatch(
       /\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/,
     );
     expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
     await expect(page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ })).toBeVisible();
+  });
+}
+
+test.describe("/admin shell", () => {
+  test.describe("desktop", () => {
+    test.use({ viewport: { width: 1280, height: 800 } });
+    adminShellSuite();
+  });
+
+  test.describe("mobile", () => {
+    test.use({ viewport: { width: 390, height: 844 } });
+    adminShellSuite();
+  });
+
+  test("host account is returned to the member app from /admin", async ({ page }) => {
+    await loginWithDevShortcut(page, /호스트/);
+    await page.waitForURL(/\/app/);
+
+    await page.goto("/admin");
+    await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
+    await expect(page.getByRole("heading", { name: /호스트님/ })).toBeVisible();
   });
 });

@@ -74,3 +74,23 @@ export function adminOtherAccountLoginPath(pathname: string, search: string, has
   const returnTo = safeRelativeReturnTo(`${pathname}${search}${hash}`);
   return loginPathForReturnTo(returnTo?.startsWith("/admin") ? returnTo : "/admin");
 }
+
+export function adminWorkspaceMenuIndex(
+  current: number,
+  length: number,
+  key: "ArrowDown" | "ArrowUp" | "Home" | "End",
+): number {
+  if (length <= 0) {
+    return 0;
+  }
+  if (key === "Home") {
+    return 0;
+  }
+  if (key === "End") {
+    return length - 1;
+  }
+  if (key === "ArrowDown") {
+    return (current + 1) % length;
+  }
+  return (current - 1 + length) % length;
+}

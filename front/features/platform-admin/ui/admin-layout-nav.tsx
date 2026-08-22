@@ -1,38 +1,74 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "react-router";
-import type { PlatformAdminRole } from "@/features/platform-admin/model/platform-admin-domain-types";
-import { canDo } from "@/features/platform-admin/model/platform-admin-permissions";
 import {
-  ADMIN_ROUTES,
+  ADMIN_SHELL_LAYOUT_MEDIA_QUERY,
+  isAdminAreaActive,
+  isAdminRouteActive,
+  visibleAdminNav,
   type AdminRouteDescriptor,
-  type AdminRouteGroup,
 } from "@/features/platform-admin/model/admin-route-catalog";
+import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
 
 export function AdminLayoutNav({
-  role,
+  capabilities,
   ariaLabel = "플랫폼 관리 메뉴",
 }: {
-  role: PlatformAdminRole;
+  capabilities: PlatformAdminCapabilities | null | undefined;
   ariaLabel?: string;
 }) {
   const location = useLocation();
-  const groups = useMemo(() => groupRoutes(ADMIN_ROUTES, role), [role]);
-  const currentPath = location.pathname;
+  const compact = useAdminShellCompactLayout();
+  const areas = useMemo(() => visibleAdminNav(capabilities), [capabilities]);
 
   return (
-    <nav className="admin-layout-nav" aria-label={ariaLabel}>
-      {groups.map((group) => (
-        <section key={group.id} className="admin-layout-nav__group">
-          <header className="admin-layout-nav__group-header">{group.label}</header>
-          <ul className="admin-layout-nav__items">
-            {group.routes.map((route) => (
-              <li key={route.path}>
-                <NavItem route={route} isActive={isRouteActive(currentPath, route.path)} />
+    <nav
+      className="admin-layout-nav"
+      aria-label={ariaLabel}
+      data-layout={compact ? "compact" : "wide"}
+    >
+      {areas.length > 0 ? (
+        <ul className="admin-layout-nav__areas">
+          {areas.map((area) => {
+            const areaActive = isAdminAreaActive(location.pathname, area);
+            return (
+              <li key={area.id}>
+                {area.href ? (
+                  <Link
+                    to={area.href}
+                    className={
+                      "admin-layout-nav__item" + (areaActive ? " admin-layout-nav__item--active" : "")
+                    }
+                    aria-current={areaActive ? "page" : undefined}
+                  >
+                    <span className="admin-layout-nav__item-label">{area.label}</span>
+                  </Link>
+                ) : (
+                  <>
+                    <span
+                      className={
+                        "admin-layout-nav__parent" + (areaActive ? " admin-layout-nav__parent--active" : "")
+                      }
+                      aria-current={areaActive ? "true" : undefined}
+                    >
+                      {area.label}
+                    </span>
+                    <ul className="admin-layout-nav__items">
+                      {area.children.map((route) => (
+                        <li key={route.path}>
+                          <NavItem
+                            route={route}
+                            isActive={isAdminRouteActive(location.pathname, route.path)}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
               </li>
-            ))}
-          </ul>
-        </section>
-      ))}
+            );
+          })}
+        </ul>
+      ) : null}
     </nav>
   );
 }
@@ -52,25 +88,23 @@ function NavItem({ route, isActive }: { route: AdminRouteDescriptor; isActive: b
   );
 }
 
-type GroupBucket = { id: AdminRouteGroup; label: string; routes: AdminRouteDescriptor[] };
+function useAdminShellCompactLayout(): boolean {
+  const [compact, setCompact] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia(ADMIN_SHELL_LAYOUT_MEDIA_QUERY).matches
+      : false,
+  );
 
-function groupRoutes(
-  routes: ReadonlyArray<AdminRouteDescriptor>,
-  role: PlatformAdminRole,
-): GroupBucket[] {
-  const visible = routes.filter((route) => canDo(role, route.requiredCapability));
-  const buckets = new Map<AdminRouteGroup, GroupBucket>();
-  for (const route of visible) {
-    const existing = buckets.get(route.group);
-    if (existing) {
-      existing.routes.push(route);
-    } else {
-      buckets.set(route.group, { id: route.group, label: route.groupLabel, routes: [route] });
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+      return;
     }
-  }
-  return [...buckets.values()];
-}
+    const media = window.matchMedia(ADMIN_SHELL_LAYOUT_MEDIA_QUERY);
+    const update = () => setCompact(media.matches);
+    update();
+    media.addEventListener?.("change", update);
+    return () => media.removeEventListener?.("change", update);
+  }, []);
 
-function isRouteActive(pathname: string, routePath: string): boolean {
-  return pathname === `/admin/${routePath}` || pathname.startsWith(`/admin/${routePath}/`);
+  return compact;
 }

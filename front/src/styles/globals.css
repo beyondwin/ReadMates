@@ -1103,6 +1103,7 @@ a.rm-recent-record__destination:hover {
 
 .admin-workspace-switcher__trigger {
   min-width: 76px;
+  min-height: 44px;
 }
 
 .admin-workspace-switcher__menu {
@@ -1134,6 +1135,7 @@ a.rm-recent-record__destination:hover {
 .admin-workspace-switcher__item {
   display: grid;
   gap: 6px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 8px;
   color: inherit;
@@ -1144,6 +1146,17 @@ a.rm-recent-record__destination:hover {
 .admin-workspace-switcher__item--primary {
   border-color: var(--accent);
   background: var(--bg-sub);
+}
+
+.admin-workspace-switcher__item:focus-visible,
+.admin-workspace-switcher__trigger:focus-visible,
+.admin-workspace-switcher__footer .btn:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+}
+
+.admin-workspace-switcher__footer .btn {
+  min-height: 44px;
 }
 
 .admin-workspace-switcher__club {
@@ -1221,20 +1234,10 @@ a.rm-recent-record__destination:hover {
 
 .admin-layout-nav {
   display: grid;
-  gap: 24px;
+  gap: 18px;
 }
 
-.admin-layout-nav__group {
-  display: grid;
-  gap: 8px;
-}
-
-.admin-layout-nav__group-header {
-  color: var(--text-4);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
+.admin-layout-nav__areas,
 .admin-layout-nav__items {
   display: grid;
   gap: 4px;
@@ -1243,9 +1246,35 @@ a.rm-recent-record__destination:hover {
   list-style: none;
 }
 
+.admin-layout-nav__areas {
+  gap: 18px;
+}
+
+.admin-layout-nav__areas > li {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-layout-nav__parent {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.admin-layout-nav__parent--active {
+  border-bottom: 1px solid var(--accent);
+}
+
+.admin-layout-nav__items {
+  padding-left: 10px;
+}
+
 .admin-layout-nav__item {
   display: flex;
-  min-height: 40px;
+  min-height: 44px;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
@@ -5892,15 +5921,24 @@ a.rm-recent-record__destination:hover {
     padding: 0 0 14px;
   }
 
-  .admin-layout-nav {
+  .admin-layout-nav,
+  .admin-layout-nav[data-layout="compact"] {
+    min-width: max-content;
+  }
+
+  .admin-layout-nav__areas,
+  .admin-layout-nav[data-layout="compact"] .admin-layout-nav__areas {
     grid-auto-flow: column;
     grid-auto-columns: minmax(136px, 1fr);
     align-items: start;
     min-width: max-content;
   }
 
-  .admin-layout-nav__item {
-    min-height: 38px;
+  .admin-layout-nav__item,
+  .admin-layout-nav__parent,
+  .admin-workspace-switcher__trigger,
+  .admin-workspace-switcher__item {
+    min-height: 44px;
   }
 
   .admin-health {
@@ -6091,7 +6129,7 @@ a.rm-recent-record__destination:hover {
       gap: 4px 7px;
     }
 
-    .admin-layout-nav {
+    .admin-layout-nav__areas {
       grid-auto-columns: minmax(120px, 1fr);
     }
   }
@@ -6722,7 +6760,6 @@ a.rm-recent-record__destination:hover {
 
 .admin-shell__role-badge,
 .admin-workspace-switcher__meta,
-.admin-layout-nav__group-header,
 .admin-layout-nav__pill,
 .platform-admin-domain-status,
 .admin-health-grid__stale,

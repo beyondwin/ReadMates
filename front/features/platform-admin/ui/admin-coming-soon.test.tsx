@@ -12,7 +12,7 @@ const descriptor: AdminRouteDescriptor = {
   groupLabel: "오늘/헬스",
   slice: "S2",
   status: "coming_soon",
-  requiredCapability: "view_health",
+  requiredCapability: "VIEW_SERVICE_HEALTH",
   comingSoon: {
     title: "Platform Ops Health",
     summary: "DB · Redis · Kafka · AI provider · outbox · deploy 신호를 한 화면에서 봅니다.",

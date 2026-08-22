@@ -3,6 +3,7 @@ import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import {
   adminOtherAccountLoginPath,
   adminWorkspaceAccountLabel,
+  adminWorkspaceMenuIndex,
   deriveAdminWorkspaceDestinations,
 } from "./admin-workspace-switcher-model";
 
@@ -133,5 +134,19 @@ describe("admin workspace switcher model", () => {
       "/login?returnTo=%2Fadmin%2Fclubs%3Ffilter%3Dready%23top",
     );
     expect(adminOtherAccountLoginPath("/clubs/reading-sai/app", "", "")).toBe("/login?returnTo=%2Fadmin");
+  });
+
+  it("derives destinations only from authenticated joined clubs", () => {
+    expect(deriveAdminWorkspaceDestinations({ joinedClubs: [] })).toEqual([]);
+    expect(deriveAdminWorkspaceDestinations(null)).toEqual([]);
+  });
+
+  it("moves workspace menu focus with arrows, Home, and End", () => {
+    expect(adminWorkspaceMenuIndex(0, 3, "ArrowDown")).toBe(1);
+    expect(adminWorkspaceMenuIndex(2, 3, "ArrowDown")).toBe(0);
+    expect(adminWorkspaceMenuIndex(0, 3, "ArrowUp")).toBe(2);
+    expect(adminWorkspaceMenuIndex(1, 3, "Home")).toBe(0);
+    expect(adminWorkspaceMenuIndex(0, 3, "End")).toBe(2);
+    expect(adminWorkspaceMenuIndex(0, 0, "ArrowDown")).toBe(0);
   });
 });

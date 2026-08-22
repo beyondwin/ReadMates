@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Routes, Route } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -201,7 +201,10 @@ describe("AdminShellLayout", () => {
       "전체 신호 정상 · 8건 활성 · 19:00 기준",
     );
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.getByText("Command")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
+    expect(screen.getByText("서비스")).toBeInTheDocument();
+    expect(screen.getByText("검토")).toBeInTheDocument();
+    expect(screen.queryByText("Command")).not.toBeInTheDocument();
     expect(screen.getByText("today content")).toBeInTheDocument();
     expect(screen.queryByText("조치 필요 클럽")).not.toBeInTheDocument();
     expect(screen.queryByText("공개 준비")).not.toBeInTheDocument();
@@ -231,7 +234,7 @@ describe("AdminShellLayout", () => {
     );
 
     expect(screen.getByText("today content")).toBeInTheDocument();
-    expect(screen.getByText("Command")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "오늘" })).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent(
         "운영 신호 확인 불가 · 잠시 후 다시 확인",
@@ -239,9 +242,9 @@ describe("AdminShellLayout", () => {
     });
   });
 
-  it("renders the new-club button for OWNER role", () => {
+  it("does not render a global header 새 클럽 CTA", () => {
     renderShell("/admin/today");
-    expect(screen.getByRole("link", { name: /새 클럽/ })).toBeInTheDocument();
+    expect(within(screen.getByRole("banner")).queryByRole("link", { name: "새 클럽" })).not.toBeInTheDocument();
   });
 
   it("keeps the operating wordmark and role badge", () => {
@@ -283,11 +286,11 @@ describe("AdminShellLayout", () => {
     expect(screen.queryByRole("link", { name: /멤버 공간/ })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
 
-    expect(screen.getByRole("link", { name: "읽는사이 호스트 공간" })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: "읽는사이 호스트 공간" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/host",
     );
-    expect(screen.getByRole("link", { name: "읽는사이 멤버 공간" })).toHaveAttribute(
+    expect(screen.getByRole("menuitem", { name: "읽는사이 멤버 공간" })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app",
     );
@@ -300,7 +303,7 @@ describe("AdminShellLayout", () => {
 
     renderShell("/admin/clubs?filter=ready#top");
     fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
-    fireEvent.click(screen.getByRole("button", { name: "다른 계정으로 로그인" }));
+    fireEvent.click(screen.getByRole("menuitem", { name: "다른 계정으로 로그인" }));
 
     await waitFor(() => {
       expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
@@ -320,13 +323,13 @@ describe("AdminShellLayout", () => {
       },
     });
 
-    expect(screen.queryByRole("link", { name: /새 클럽/ })).not.toBeInTheDocument();
+    expect(within(screen.getByRole("banner")).queryByRole("link", { name: "새 클럽" })).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText("OWNER", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
   });
 
-  it("shows create-club actions from the returned list even if summary role is SUPPORT", () => {
-    renderShell("/admin/today", {
+  it("keeps onboarding reachable from the query param when CREATE_CLUB is present", () => {
+    renderShell("/admin/clubs?onboarding=1", {
       summary: { ...summary, platformRole: "SUPPORT" },
       capabilities: {
         schemaVersion: 1,
@@ -337,8 +340,26 @@ describe("AdminShellLayout", () => {
       },
     });
 
-    expect(screen.getByRole("link", { name: /새 클럽/ })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "새 클럽" })).not.toBeInTheDocument();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("SUPPORT", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
+  });
+
+  it("renders empty navigation when the capability list is empty", () => {
+    renderShell("/admin/today", {
+      capabilities: {
+        schemaVersion: 1,
+        role: "SUPPORT",
+        status: "ACTIVE",
+        capabilities: [],
+        generatedAt: "2026-08-22T00:00:00Z",
+      },
+    });
+
+    const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
+    expect(within(nav).queryAllByRole("link")).toEqual([]);
+    expect(within(nav).queryByText("오늘")).not.toBeInTheDocument();
+    expect(within(nav).queryByText("지원")).not.toBeInTheDocument();
   });
 
   it("purges platform-admin state and closes onboarding and workspace menus on 401", async () => {
@@ -390,6 +411,9 @@ describe("AdminShellLayout", () => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       expect(screen.queryByRole("menu", { name: "내 ReadMates 공간" })).not.toBeInTheDocument();
     });
+    const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
+    expect(within(nav).queryAllByRole("link")).toEqual([]);
+    expect(within(nav).queryByText("지원")).not.toBeInTheDocument();
     expect(queryClient.getQueryData(platformAdminKeys.clubs())).toBeUndefined();
     expect(queryClient.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
   });

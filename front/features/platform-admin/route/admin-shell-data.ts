@@ -3,7 +3,6 @@ import type { LoaderFunctionArgs } from "react-router";
 import {
   installPlatformAdminAuthorityLossHandler,
   platformAdminCapabilitiesQuery,
-  platformAdminClubsQuery,
   platformAdminSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
 import { platformAdminOperationCasesQuery } from "@/features/platform-admin/queries/platform-admin-operations-queries";
@@ -19,7 +18,6 @@ export function adminShellLoaderFactory(queryClient: QueryClient) {
         staleTime: 0,
       }),
       queryClient.fetchQuery(platformAdminSummaryQuery()),
-      queryClient.fetchQuery(platformAdminClubsQuery()),
     ]);
     await queryClient.prefetchQuery(platformAdminOperationCasesQuery());
     return auth;

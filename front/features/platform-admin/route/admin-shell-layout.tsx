@@ -1,6 +1,6 @@
 import { type MouseEvent, useEffect, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
+import { Outlet, useLocation, useNavigate, useSearchParams } from "react-router";
 import {
   adminOtherAccountLoginPath,
   adminWorkspaceAccountLabel,
@@ -10,7 +10,6 @@ import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabil
 import {
   installPlatformAdminAuthorityLossHandler,
   platformAdminCapabilitiesQuery,
-  platformAdminClubsQuery,
   platformAdminSummaryQuery,
   subscribePlatformAdminAuthorityLoss,
 } from "@/features/platform-admin/queries/platform-admin-queries";
@@ -52,7 +51,6 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
     enabled: !authorityLost,
   });
   useQuery({ ...platformAdminSummaryQuery(), enabled: !authorityLost });
-  useQuery({ ...platformAdminClubsQuery(), enabled: !authorityLost });
   const operationsQuery = useQuery({
     ...platformAdminOperationCasesQuery({}, { active: true }),
     enabled: !authorityLost,
@@ -66,8 +64,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
   const workspaceAccountLabel = adminWorkspaceAccountLabel(auth);
   const otherAccountLoginPath = adminOtherAccountLoginPath(location.pathname, location.search, location.hash);
 
-  const capabilities = capabilitiesQuery.data;
-  const role = capabilities?.role ?? "SUPPORT";
+  const capabilities = capabilitiesQuery.data ?? null;
   const canCreateClub = capabilities != null && canAdmin(capabilities, "CREATE_CLUB");
   const commandStatus = deriveCommandStatus(
     operationsQuery.data,
@@ -123,17 +120,6 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
         <span className="admin-shell__wordmark">ReadMates · 운영</span>
         <AdminBreadcrumb routePath={routePath} extra={extra} />
         <div className="admin-shell__header-actions">
-          {canCreateClub ? (
-            <Link
-              to={{
-                pathname: location.pathname,
-                search: appendOnboardingQuery(searchParams),
-              }}
-              className="btn btn-primary btn-sm"
-            >
-              새 클럽
-            </Link>
-          ) : null}
           {capabilities ? <span className="admin-shell__role-badge">{capabilities.role}</span> : null}
           <AdminWorkspaceSwitcher
             key={workspaceMenuEpoch}
@@ -146,7 +132,7 @@ function AdminShellLayoutInner({ auth }: { auth: AuthMeResponse | null }) {
       <AdminCommandStatus {...commandStatus} />
       <div className="admin-shell__body">
         <aside className="admin-shell__nav">
-          <AdminLayoutNav role={role} ariaLabel="Admin 콘솔" />
+          <AdminLayoutNav capabilities={capabilities} ariaLabel="Admin 콘솔" />
         </aside>
         <main id="admin-main" className="admin-shell__main" tabIndex={-1}>
           <Outlet />
@@ -196,10 +182,4 @@ function derivePathSegment(pathname: string): string {
   if (!stripped) return "today";
   if (stripped.startsWith("clubs/") && stripped !== "clubs") return "clubs/:clubId";
   return stripped;
-}
-
-function appendOnboardingQuery(current: URLSearchParams): string {
-  const next = new URLSearchParams(current);
-  next.set("onboarding", "1");
-  return `?${next.toString()}`;
 }

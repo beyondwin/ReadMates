@@ -92,4 +92,29 @@ describe("adminShellLoaderFactory", () => {
     expect(fetchAdminOperationCases).toHaveBeenCalledOnce();
     expect(fetchPlatformAdminCapabilities).toHaveBeenCalledOnce();
   });
+
+  it("does not prefetch the platform club list for the shell", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    client.setQueryData(platformAdminSummaryQuery().queryKey, {
+      platformRole: "OWNER",
+      activeClubCount: 0,
+      domainActionRequiredCount: 0,
+      domainsRequiringAction: [],
+    });
+    vi.mocked(fetchAdminOperationCases).mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      generatedAt: "2026-08-04T10:00:00Z",
+      counts: { open: 0, critical: 0, assignedToMe: 0, snoozed: 0 },
+      sources: [],
+      items: [],
+      nextCursor: null,
+    });
+
+    await expect(adminShellLoaderFactory(client)()).resolves.toMatchObject({
+      authenticated: true,
+    });
+    expect(client.getQueryData(platformAdminClubsQuery().queryKey)).toBeUndefined();
+  });
 });
