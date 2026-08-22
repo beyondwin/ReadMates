@@ -563,6 +563,8 @@ class JdbcManualNotificationDispatchAdapterTest(
             assertThat(second.summary.expectedEmailCount).isEqualTo(snapshot.emailEligibleCount)
             assertThat(eventCount(first.eventId)).isEqualTo(1)
             assertThat(previewManualDispatchCount(previewId)).isEqualTo(1)
+            assertThat(first.summary).isNotNull
+            assertThat(second.manualDispatchId).isEqualTo(first.manualDispatchId)
         } finally {
             restoreMutableReplayState(mutableMembershipId, originalState)
         }

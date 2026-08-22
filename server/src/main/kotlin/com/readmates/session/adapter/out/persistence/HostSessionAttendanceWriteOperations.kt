@@ -29,7 +29,9 @@ internal class HostSessionAttendanceWriteOperations(
         if (rows.isEmpty()) {
             throw InvalidSessionScheduleException()
         }
-        val participantSetRevision = lockSession(command.host, command.sessionId)
+        val participantSetRevision =
+            queries.lockParticipantSetRevision(command.host, command.sessionId)
+                ?: throwConflict(command.host, command.sessionId)
         if (rows.size > 1) {
             val expectedSetRevision =
                 command.expectedParticipantSetRevision ?: throw InvalidSessionScheduleException()
@@ -38,7 +40,7 @@ internal class HostSessionAttendanceWriteOperations(
             }
         }
         val ordered = rows.sortedBy { it.membershipId.toString() }
-        val locked = lockRows(command.host, command.sessionId, ordered.map { it.membershipId })
+        val locked = queries.lockAttendanceRows(command.host, command.sessionId, ordered.map { it.membershipId })
         validateLocked(command.host, command.sessionId, ordered, locked)
         writeRows(command.host, command.sessionId, ordered)
         return HostAttendanceResponse(
@@ -66,58 +68,6 @@ internal class HostSessionAttendanceWriteOperations(
     private fun parseStatus(value: String): ActualAttendanceStatus =
         runCatching { ActualAttendanceStatus.valueOf(value) }
             .getOrElse { throw InvalidSessionScheduleException() }
-
-    private fun lockSession(
-        host: CurrentMember,
-        sessionId: UUID,
-    ): Long =
-        jdbcTemplate
-            .query(
-                """
-                select participant_set_revision
-                from sessions
-                where id = ?
-                  and club_id = ?
-                  and deleted_at is null
-                for update
-                """.trimIndent(),
-                { resultSet, _ -> resultSet.getLong("participant_set_revision") },
-                sessionId.dbString(),
-                host.clubId.dbString(),
-            ).firstOrNull() ?: throwConflict(host, sessionId)
-
-    private fun lockRows(
-        host: CurrentMember,
-        sessionId: UUID,
-        membershipIds: List<UUID>,
-    ): Map<UUID, LockedAttendanceRow> {
-        val ordered = membershipIds.distinct().sortedBy { it.toString() }
-        return ordered
-            .mapNotNull { membershipId ->
-                jdbcTemplate
-                    .query(
-                        """
-                        select membership_id, attendance_status, attendance_revision, participation_status
-                        from session_participants
-                        where session_id = ?
-                          and club_id = ?
-                          and membership_id = ?
-                        for update
-                        """.trimIndent(),
-                        { resultSet, _ ->
-                            LockedAttendanceRow(
-                                membershipId = membershipId,
-                                attendanceStatus = resultSet.getString("attendance_status"),
-                                attendanceRevision = resultSet.getLong("attendance_revision"),
-                                participationStatus = resultSet.getString("participation_status"),
-                            )
-                        },
-                        sessionId.dbString(),
-                        host.clubId.dbString(),
-                        membershipId.dbString(),
-                    ).firstOrNull()
-            }.associateBy { it.membershipId }
-    }
 
     private fun validateLocked(
         host: CurrentMember,
@@ -185,13 +135,6 @@ internal class HostSessionAttendanceWriteOperations(
         sessionId: UUID,
     ): Nothing = throw queries.revisionConflict(host, sessionId) ?: HostSessionParticipantNotFoundException()
 }
-
-private data class LockedAttendanceRow(
-    val membershipId: UUID,
-    val attendanceStatus: String,
-    val attendanceRevision: Long,
-    val participationStatus: String,
-)
 
 private fun attendanceRowHash(
     membershipId: UUID,

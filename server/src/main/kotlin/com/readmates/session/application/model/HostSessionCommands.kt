@@ -21,6 +21,7 @@ data class HostSessionCommand(
     val meetingUrl: String?,
     val meetingPasscode: String?,
     val accessScope: SessionAccessScope? = null,
+    val idempotencyKey: String? = null,
 )
 
 fun HostSessionCommand.createdVersionVector(): SessionVersionVector = SessionVersionVector.INITIAL
@@ -29,6 +30,9 @@ data class HostSessionIdCommand(
     val host: CurrentMember,
     val sessionId: UUID,
     val expectedSessionRevision: ExpectedSessionRevision? = null,
+    val expectedParticipantSetRevision: Long? = null,
+    val expectedAttendanceSnapshotId: String? = null,
+    val idempotencyKey: String? = null,
 )
 
 const val MAX_REASON_NOTE_LENGTH = 500
@@ -39,6 +43,7 @@ data class HostSessionReverseCommand(
     val reasonCode: HostSessionLifecycleReasonCode?,
     val reasonNote: String?,
     val expectedSessionRevision: ExpectedSessionRevision? = null,
+    val idempotencyKey: String? = null,
 )
 
 fun HostSessionReverseCommand.normalized(requireReason: Boolean): HostSessionReverseCommand =
@@ -84,6 +89,7 @@ data class UpdateHostSessionCommand(
     val sessionId: UUID,
     val session: HostSessionCommand,
     val expectedSessionRevision: ExpectedSessionRevision? = null,
+    val idempotencyKey: String? = null,
 )
 
 data class UpdateHostSessionVisibilityCommand(
@@ -91,6 +97,8 @@ data class UpdateHostSessionVisibilityCommand(
     val sessionId: UUID,
     val visibility: SessionRecordVisibility = SessionRecordVisibility.HOST_ONLY,
     val accessScope: SessionAccessScope? = null,
+    val expectedExposureRevision: Long? = null,
+    val idempotencyKey: String? = null,
 )
 
 enum class ActualAttendanceStatus {
@@ -136,6 +144,7 @@ data class ConfirmAttendanceCommand(
     val sessionId: UUID,
     val entries: List<AttendanceEntryCommand>,
     val expectedParticipantSetRevision: Long? = null,
+    val idempotencyKey: String? = null,
 )
 
 data class UpsertPublicationCommand(
@@ -144,4 +153,6 @@ data class UpsertPublicationCommand(
     val publicSummary: String,
     val visibility: SessionRecordVisibility = SessionRecordVisibility.HOST_ONLY,
     val siteVisibility: PublicSiteVisibility? = null,
+    val expectedPublicationRevision: Long? = null,
+    val idempotencyKey: String? = null,
 )

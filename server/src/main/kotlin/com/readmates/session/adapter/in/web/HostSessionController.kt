@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 data class HostSessionVisibilityRequest(
@@ -65,13 +66,19 @@ data class HostSessionAccessScopeRequest(
 class HostSessionController(
     private val hostSessionQueryUseCase: HostSessionQueryUseCase,
     private val hostSessionDraftUseCase: HostSessionDraftUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
 ) {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
-        @Valid @RequestBody request: HostSessionRequest,
+        @RequestBody body: JsonNode,
         member: CurrentMember,
-    ) = hostSessionDraftUseCase.create(request.toCommand(member))
+    ): Any {
+        val envelope = envelopes.create(body)
+        return hostSessionDraftUseCase.create(
+            envelope.command.toCommand(member).copy(idempotencyKey = envelope.idempotencyKey),
+        )
+    }
 
     @GetMapping
     fun list(
@@ -116,16 +123,20 @@ class HostSessionController(
     @PatchMapping("/{sessionId}")
     fun update(
         @PathVariable sessionId: String,
-        @Valid @RequestBody request: HostSessionRequest,
+        @RequestBody body: JsonNode,
         member: CurrentMember,
-    ) = hostSessionDraftUseCase.update(
-        UpdateHostSessionCommand(
-            host = member,
-            sessionId = parseHostSessionId(sessionId),
-            session = request.toCommand(member),
-            expectedSessionRevision = request.requiredExpectedRevision(),
-        ),
-    )
+    ): Any {
+        val envelope = envelopes.update(body)
+        return hostSessionDraftUseCase.update(
+            UpdateHostSessionCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                session = envelope.command.toCommand(member),
+                expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 }
 
 private fun requireValidCursor(cursor: String?): String? {

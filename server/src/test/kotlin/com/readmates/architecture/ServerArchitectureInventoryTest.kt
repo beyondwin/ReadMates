@@ -123,6 +123,15 @@ class ServerArchitectureInventoryTest {
                     )
                 }
         }
+        val confirmTest =
+            Files.readString(
+                projectRoot().resolve(
+                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcManualNotificationDispatchAdapterTest.kt",
+                ),
+            )
+        assertThat(confirmTest).doesNotContain("HostMutationReceipt")
+        assertThat(confirmTest).doesNotContain("HostMutationEnvelope")
+        assertThat(confirmTest).doesNotContain("session.application.model.NotificationDecision")
     }
 
     @Test

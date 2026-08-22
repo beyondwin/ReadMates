@@ -263,6 +263,23 @@ class HostSessionRecordControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "idempotencyKey": "key-apply-extra-0001",
+                      "expected": {"draftRevision":1,"liveRevision":0,"sessionRevision":0},
+                      "command": {"applyRequestId":"$applyRequestId","expectedDraftHash":"$draftHash"}
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("SESSION_RECORD_INVALID_APPLY_CONTRACT") }
+            }
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
                 content = applyBody
             }.andExpect {
                 status { isOk() }

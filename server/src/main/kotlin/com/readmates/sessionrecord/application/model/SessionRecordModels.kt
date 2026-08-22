@@ -132,6 +132,7 @@ data class ApplySessionRecordCommand(
     val expectedDraftRevision: Long,
     val expectedLiveRevision: Long,
     val expectedDraftHash: String,
+    val idempotencyKey: String? = null,
 ) {
     @Deprecated("Use content-only apply contract")
     constructor(

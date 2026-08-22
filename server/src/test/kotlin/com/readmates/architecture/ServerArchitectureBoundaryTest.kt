@@ -772,6 +772,31 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
+    fun `session sessionrecord and notification do not form forbidden feature edges`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.session..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.publication..")
+            .check(importedClasses)
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.sessionrecord..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.publication..")
+            .check(importedClasses)
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.notification..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.session..")
+            .check(importedClasses)
+    }
+
+    @Test
     fun `notification application does not depend on legacy notification outbox port`() {
         noClasses()
             .that()

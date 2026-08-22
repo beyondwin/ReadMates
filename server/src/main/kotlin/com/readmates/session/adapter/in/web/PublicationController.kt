@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PutMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 data class HostSessionPublicationRequest(
@@ -36,11 +37,20 @@ data class HostSessionPublicationRequest(
 @RequestMapping("/api/host/sessions/{sessionId}/publication")
 class PublicationController(
     private val upsertPublicationUseCase: UpsertPublicationUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
 ) {
     @PutMapping
     fun publish(
         @PathVariable sessionId: String,
-        @Valid @RequestBody request: HostSessionPublicationRequest,
+        @RequestBody body: JsonNode,
         member: CurrentMember,
-    ) = upsertPublicationUseCase.upsertPublication(request.toCommand(member, parseHostSessionId(sessionId)))
+    ): Any {
+        val envelope = envelopes.publication(body)
+        return upsertPublicationUseCase.upsertPublication(
+            envelope.command.toCommand(member, parseHostSessionId(sessionId)).copy(
+                expectedPublicationRevision = envelope.expected.publicationRevision,
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 }

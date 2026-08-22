@@ -67,6 +67,7 @@ internal class HostSessionLifecycleWriteOperations(
         requireHost(command.host)
         queries.requireActiveClubAndMembership(command.host.clubId, command.host.membershipId, hostRequired = true)
         val locked = queries.lockSession(command.host.clubId, command.sessionId) ?: throw HostSessionNotFoundException()
+        verifyCloseExpected(command)
         if (locked.state != "OPEN") {
             verifyRevision(command)
             policy.closeDecision(locked.state)
@@ -227,20 +228,25 @@ internal class HostSessionLifecycleWriteOperations(
         return false
     }
 
+    private fun verifyCloseExpected(command: HostSessionIdCommand) {
+        command.expectedParticipantSetRevision?.let { expected ->
+            val current =
+                queries.lockParticipantSetRevision(command.host, command.sessionId)
+                    ?: throw HostSessionNotFoundException()
+            if (current != expected) {
+                queries.throwIfStale(0, command.host, command.sessionId)
+            }
+        }
+        command.expectedAttendanceSnapshotId?.let { expected ->
+            if (queries.attendanceSnapshotId(command.host, command.sessionId) != expected) {
+                queries.throwIfStale(0, command.host, command.sessionId)
+            }
+        }
+    }
+
     private fun verifyRevision(command: HostSessionIdCommand) {
         val expected = queries.expectedRevision(command.expectedSessionRevision)
-        val current =
-            jdbcTemplate
-                .query(
-                    """
-                    select session_revision
-                    from sessions
-                    where id = ? and club_id = ? and deleted_at is null
-                    """.trimIndent(),
-                    { resultSet, _ -> resultSet.getLong("session_revision") },
-                    command.sessionId.dbString(),
-                    command.host.clubId.dbString(),
-                ).firstOrNull() ?: throw HostSessionNotFoundException()
+        val current = queries.sessionRevision(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         if (current != expected) {
             queries.throwIfStale(0, command.host, command.sessionId)
         }

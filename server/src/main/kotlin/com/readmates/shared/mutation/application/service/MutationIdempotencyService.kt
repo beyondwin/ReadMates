@@ -72,6 +72,9 @@ class MutationIdempotencyService(
         port.complete(identity, receiptId, clock.instant())
     }
 
+    @Transactional(readOnly = true)
+    fun lookup(identity: MutationIdentity): MutationIdempotencyPort.StoredRow? = port.find(identity)
+
     @Transactional
     override fun purgeExpired(limit: Int): Int {
         val now = clock.instant()

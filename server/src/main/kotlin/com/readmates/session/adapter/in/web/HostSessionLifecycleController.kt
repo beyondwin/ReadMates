@@ -19,12 +19,13 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
-import java.util.UUID
+import tools.jackson.databind.JsonNode
 
 @RestController
 @RequestMapping("/api/host/sessions")
 class HostSessionLifecycleController(
     private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
 ) {
     @PatchMapping("/{sessionId}/visibility")
     fun visibility(
@@ -36,57 +37,73 @@ class HostSessionLifecycleController(
     @PatchMapping("/{sessionId}/access-scope")
     fun accessScope(
         @PathVariable sessionId: String,
-        @Valid @RequestBody request: HostSessionAccessScopeRequest,
+        @RequestBody body: JsonNode,
         member: CurrentMember,
-    ) = hostSessionLifecycleUseCase.updateVisibility(request.toCommand(member, parseHostSessionId(sessionId)))
+    ): Any {
+        val envelope = envelopes.access(body)
+        val sessionIdValue = parseHostSessionId(sessionId)
+        return hostSessionLifecycleUseCase.updateVisibility(
+            envelope.command.toCommand(member, sessionIdValue).copy(
+                expectedExposureRevision = envelope.expected.exposureRevision,
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 
     @PostMapping("/{sessionId}/open")
     fun open(
         member: CurrentMember,
         @PathVariable sessionId: String,
-        @RequestBody request: HostSessionExpectedRevisionRequest,
-    ) = hostSessionLifecycleUseCase.open(
-        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
-    )
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.open(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
 
     @PostMapping("/{sessionId}/close")
     fun close(
         member: CurrentMember,
         @PathVariable sessionId: String,
-        @RequestBody request: HostSessionExpectedRevisionRequest,
-    ) = hostSessionLifecycleUseCase.close(
-        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
-    )
+        @RequestBody body: JsonNode,
+    ): Any {
+        val envelope = envelopes.close(body)
+        return hostSessionLifecycleUseCase.close(
+            HostSessionIdCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                expectedSessionRevision =
+                    envelope.expected.sessionRevision?.let(::ExpectedSessionRevision),
+                expectedParticipantSetRevision = envelope.expected.participantSetRevision,
+                expectedAttendanceSnapshotId = envelope.expected.attendanceSnapshotId,
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 
     @PostMapping("/{sessionId}/publish")
     fun publish(
         member: CurrentMember,
         @PathVariable sessionId: String,
-        @RequestBody request: HostSessionExpectedRevisionRequest,
-    ) = hostSessionLifecycleUseCase.publish(
-        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
-    )
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.publish(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
 
     @PostMapping("/{sessionId}/reopen")
     fun reopen(
         member: CurrentMember,
         @PathVariable sessionId: String,
-        @RequestBody(required = false) request: HostSessionReverseRequest?,
-    ) = hostSessionLifecycleUseCase.reopen(request.toCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.reopen(reverseCommand(member, sessionId, body))
 
     @PostMapping("/{sessionId}/unpublish")
     fun unpublish(
         member: CurrentMember,
         @PathVariable sessionId: String,
-        @RequestBody(required = false) request: HostSessionReverseRequest?,
-    ) = hostSessionLifecycleUseCase.unpublish(request.toCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.unpublish(reverseCommand(member, sessionId, body))
 
     @PostMapping("/{sessionId}/return-to-draft")
     fun returnToDraft(
         member: CurrentMember,
         @PathVariable sessionId: String,
-        @RequestBody(required = false) request: HostSessionReverseRequest?,
-    ) = hostSessionLifecycleUseCase.returnToDraft(request.toCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.returnToDraft(reverseCommand(member, sessionId, body))
 
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
@@ -98,10 +115,42 @@ class HostSessionLifecycleController(
     fun delete(
         member: CurrentMember,
         @PathVariable sessionId: String,
-        @RequestBody request: HostSessionExpectedRevisionRequest,
-    ) = hostSessionLifecycleUseCase.delete(
-        HostSessionIdCommand(member, parseHostSessionId(sessionId), request.toExpectedRevision()),
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.delete(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
+
+    private fun sessionCommand(
+        member: CurrentMember,
+        sessionId: String,
+        envelope: com.readmates.session.application.model.HostMutationEnvelope<Unit, ExpectedSessionOnlyBody>,
+    ) = HostSessionIdCommand(
+        host = member,
+        sessionId = parseHostSessionId(sessionId),
+        expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+        idempotencyKey = envelope.idempotencyKey,
     )
+
+    private fun reverseCommand(
+        member: CurrentMember,
+        sessionId: String,
+        body: JsonNode,
+    ): HostSessionReverseCommand {
+        val envelope = envelopes.reverse(body)
+        val parsed =
+            envelope.command.reasonCode?.let { raw ->
+                runCatching { HostSessionLifecycleReasonCode.valueOf(raw) }
+                    .getOrElse { throw InvalidHostSessionLifecycleReasonException() }
+                    .takeIf(USER_SELECTABLE_LIFECYCLE_REASONS::contains)
+                    ?: throw InvalidHostSessionLifecycleReasonException()
+            }
+        return HostSessionReverseCommand(
+            host = member,
+            sessionId = parseHostSessionId(sessionId),
+            reasonCode = parsed,
+            reasonNote = envelope.command.reasonNote,
+            expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+            idempotencyKey = envelope.idempotencyKey,
+        )
+    }
 }
 
 data class HostSessionReverseRequest(
@@ -109,21 +158,3 @@ data class HostSessionReverseRequest(
     val reasonNote: String? = null,
     val expectedSessionRevision: Long? = null,
 )
-
-private fun HostSessionReverseRequest?.toCommand(
-    host: CurrentMember,
-    sessionId: UUID,
-): HostSessionReverseCommand {
-    val parsed =
-        this?.reasonCode?.let { raw ->
-            runCatching { HostSessionLifecycleReasonCode.valueOf(raw) }
-                .getOrElse { throw InvalidHostSessionLifecycleReasonException() }
-                .takeIf(USER_SELECTABLE_LIFECYCLE_REASONS::contains)
-                ?: throw InvalidHostSessionLifecycleReasonException()
-        }
-    val expected =
-        this?.expectedSessionRevision?.let(::ExpectedSessionRevision)
-            ?: throw com.readmates.session.application
-                .InvalidSessionScheduleException()
-    return HostSessionReverseCommand(host, sessionId, parsed, this.reasonNote, expected)
-}

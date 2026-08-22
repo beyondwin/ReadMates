@@ -22,6 +22,11 @@ import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.listing.application.model.HostListEpochKind
 import com.readmates.shared.listing.application.port.out.HostListEpochPort
 import com.readmates.shared.listing.application.port.out.bump
+import com.readmates.shared.mutation.application.model.CanonicalMutationPayload
+import com.readmates.shared.mutation.application.model.HostMutationOperation
+import com.readmates.shared.mutation.application.model.MutationClaimResult
+import com.readmates.shared.mutation.application.model.MutationIdentity
+import com.readmates.shared.mutation.application.service.MutationIdempotencyService
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
@@ -34,6 +39,7 @@ class SessionRecordApplyService(
     private val codec: SessionRecordSnapshotCodec,
     private val replacer: ReplaceSessionRecordContentPort,
     private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
+    private val idempotency: MutationIdempotencyService? = null,
 ) : ApplySessionRecordUseCase {
     override fun preview(
         host: CurrentMember,
@@ -59,13 +65,39 @@ class SessionRecordApplyService(
         command: ApplySessionRecordCommand,
     ): SessionRecordApplyResult {
         requireHost(host)
+        val identity = applyIdentity(host, command)
+        if (identity != null && idempotency != null) {
+            when (
+                val claim =
+                    idempotency.claim(
+                        identity,
+                        CanonicalMutationPayload.RecordApply(entryKeys = listOf(command.expectedDraftHash)),
+                    )
+            ) {
+                is MutationClaimResult.Replayed -> {
+                    val completed =
+                        store.findApplyReceipt(host, command.sessionId, claim.receiptId)
+                            ?: throw notFound()
+                    return replay(host, command, completed)
+                }
+                is MutationClaimResult.InProgress ->
+                    throw SessionRecordException(
+                        SessionRecordError.INVALID_APPLY_CONTRACT,
+                        "Session record apply is pending",
+                    )
+                is MutationClaimResult.Claimed -> Unit
+            }
+        }
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId)?.let { completed ->
+            if (identity != null) {
+                idempotency?.complete(identity, command.applyRequestId)
+            }
             return replay(host, command, completed)
         }
         val editor =
             store.lockEditor(host, command.sessionId)
                 ?: throw notFound()
-        return applyLocked(host, command, editor)
+        return applyLocked(host, command, editor, identity)
     }
 
     @Suppress("LongMethod", "ThrowsCount")
@@ -73,8 +105,12 @@ class SessionRecordApplyService(
         host: CurrentMember,
         command: ApplySessionRecordCommand,
         editor: SessionRecordEditor,
+        identity: MutationIdentity? = null,
     ): SessionRecordApplyResult {
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId, forUpdate = true)?.let { completed ->
+            if (identity != null) {
+                idempotency?.complete(identity, command.applyRequestId)
+            }
             return replay(host, command, completed)
         }
         val draft = editor.draft ?: throw draftStale()
@@ -119,6 +155,9 @@ class SessionRecordApplyService(
         val encodedDraft = codec.encode(canonicalSnapshot)
         val revision = store.insertAppliedRevision(host, editor, encodedDraft)
         store.insertApplyReceipt(host, command, requestHash, eventType, revision)
+        if (identity != null) {
+            idempotency?.complete(identity, command.applyRequestId)
+        }
         if (!store.deleteAppliedDraft(host, command.sessionId, command.expectedDraftRevision)) {
             throw draftStale()
         }
@@ -193,6 +232,20 @@ class SessionRecordApplyService(
                         "Session record author attribution is ambiguous for $name",
                     )
             }
+
+    private fun applyIdentity(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+    ): MutationIdentity? {
+        val key = command.idempotencyKey ?: return null
+        return MutationIdentity(
+            clubId = host.clubId,
+            actorMembershipId = host.membershipId,
+            operation = HostMutationOperation.SESSION_RECORD_APPLY.name,
+            resourceSlot = command.sessionId.toString(),
+            idempotencyKey = key,
+        )
+    }
 
     private fun requireHost(host: CurrentMember) {
         if (!host.isHost) throw AccessDeniedException("Host role required")

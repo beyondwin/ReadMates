@@ -21,16 +21,22 @@ import com.readmates.session.application.InvalidSessionExposureException
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.model.HostListCursorStaleException
+import com.readmates.session.application.model.HostMutationNotAuthorizedException
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionLifecycleReasonRequiredException
 import com.readmates.session.application.model.HostSessionTrashExpiredException
 import com.readmates.session.application.model.InvalidHostSessionLifecycleReasonException
 import com.readmates.session.application.model.InvalidHostSessionListQueryException
+import com.readmates.session.application.model.MutationPendingException
 import com.readmates.shared.adapter.`in`.web.ApiErrorBlocker
 import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
 import com.readmates.shared.adapter.`in`.web.apiErrorResponse
+import com.readmates.shared.mutation.application.model.IdempotencyKeyReusedException
+import com.readmates.shared.mutation.application.model.InvalidMutationIdempotencyKeyException
+import com.readmates.shared.mutation.application.model.UnknownMutationOperationException
 import com.readmates.shared.observability.RequestIdFilter
 import com.readmates.shared.paging.InvalidHostListCursorException
+import jakarta.validation.ConstraintViolationException
 import org.slf4j.MDC
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -134,6 +140,7 @@ class SessionApplicationErrorHandler {
         InvalidMembershipIdException::class,
         InvalidSessionScheduleException::class,
         InvalidQuestionSetException::class,
+        ConstraintViolationException::class,
     )
     fun handleBadRequest(): ResponseEntity<ApiErrorResponse> =
         apiErrorResponse(
@@ -226,5 +233,37 @@ class SessionApplicationErrorHandler {
             status = HttpStatus.GONE,
             code = "HOST_SESSION_TRASH_EXPIRED",
             message = "복원 기간이 지났습니다.",
+        )
+
+    @ExceptionHandler(IdempotencyKeyReusedException::class)
+    fun handleIdempotencyReused(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "IDEMPOTENCY_KEY_REUSED",
+            message = "같은 요청 키로 다른 내용이 이미 처리되었습니다.",
+        )
+
+    @ExceptionHandler(InvalidMutationIdempotencyKeyException::class, UnknownMutationOperationException::class)
+    fun handleInvalidIdempotency(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "INVALID_REQUEST",
+            message = "세션 요청 값을 확인해 주세요.",
+        )
+
+    @ExceptionHandler(MutationPendingException::class)
+    fun handleMutationPending(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.CONFLICT,
+            code = "MUTATION_PENDING",
+            message = "같은 요청이 아직 처리 중입니다.",
+        )
+
+    @ExceptionHandler(HostMutationNotAuthorizedException::class)
+    fun handleMutationUnauthorized(): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.FORBIDDEN,
+            code = "PERMISSION_DENIED",
+            message = "권한이 없습니다.",
         )
 }

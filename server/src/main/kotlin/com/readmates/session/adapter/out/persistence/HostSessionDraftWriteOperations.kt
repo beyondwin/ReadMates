@@ -46,6 +46,11 @@ internal class HostSessionDraftWriteOperations(
 
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
         val locked = queries.lockExposure(command.host, command.sessionId)
+        command.expectedExposureRevision?.let { expected ->
+            if (locked.exposureRevision != expected) {
+                queries.throwIfStale(0, command.host, command.sessionId)
+            }
+        }
         val exposure = policy.visibilityExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
         jdbcTemplate.update(

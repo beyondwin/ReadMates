@@ -29,6 +29,7 @@ import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.listing.application.model.HostListEpochKind
 import com.readmates.shared.listing.application.port.out.HostListEpochPort
 import com.readmates.shared.listing.application.port.out.bump
+import com.readmates.shared.mutation.application.model.HostMutationOperation
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
@@ -41,6 +42,7 @@ class HostSessionRecoveryService(
     private val attendancePort: HostSessionAttendancePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
+    private val mutations: HostSessionMutationCoordinator? = null,
 ) : PreviewHostSessionRestoreUseCase,
     RestoreHostSessionUseCase {
     @Transactional(readOnly = true)
@@ -61,6 +63,29 @@ class HostSessionRecoveryService(
     @Transactional
     @Suppress("ThrowsCount")
     override fun restore(command: RestoreHostSessionCommand): HostSessionChangeReceipt {
+        val coordinator = mutations
+        if (coordinator != null) {
+            return coordinator.execute(
+                host = command.host,
+                operation = HostMutationOperation.SESSION_RESTORE,
+                resourceSlot = command.changeId.toString(),
+                idempotencyKey = command.idempotencyKey,
+                payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_RESTORE),
+                mutate = { HostMutationOutcome(command.sessionId, restoreOnce(command)) },
+                replay = { record, _ ->
+                    HostSessionChangeReceipt(
+                        changeId = record.receiptId,
+                        kind = HostSessionChangeKind.BASIC_INFO,
+                        undoAvailable = false,
+                    )
+                },
+            )
+        }
+        return restoreOnce(command)
+    }
+
+    @Suppress("ThrowsCount")
+    private fun restoreOnce(command: RestoreHostSessionCommand): HostSessionChangeReceipt {
         requireHost(command.host)
         if (!HostSessionRestoreHashes.isDigest(command.expectedCurrentHash)) {
             throw HostSessionRestoreStaleException()

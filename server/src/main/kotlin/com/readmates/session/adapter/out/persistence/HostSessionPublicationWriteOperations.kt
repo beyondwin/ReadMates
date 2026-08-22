@@ -17,6 +17,11 @@ internal class HostSessionPublicationWriteOperations(
         stagingRequired: Boolean,
     ): HostPublicationResponse {
         val locked = queries.lockExposure(command.host, command.sessionId)
+        command.expectedPublicationRevision?.let { expected ->
+            if (locked.publicationRevision != expected) {
+                queries.throwIfStale(0, command.host, command.sessionId)
+            }
+        }
         if (stagingRequired && command.siteVisibility == null) {
             queries.requireLegacyPublicationWriteAllowed(command.host, command.sessionId)
         }
