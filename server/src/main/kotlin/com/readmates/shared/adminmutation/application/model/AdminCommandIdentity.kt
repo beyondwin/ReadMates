@@ -1,0 +1,63 @@
+package com.readmates.shared.adminmutation.application.model
+
+import com.readmates.shared.security.RequestIdentityHmac
+import java.util.UUID
+
+const val ADMIN_COMMAND_IDENTITY_PURPOSE = "readmates:admin-command-identity:v1"
+
+const val ADMIN_COMMAND_SYNTHETIC_TARGET_NEW_CLUB = "new-club"
+
+data class PlatformAdminCommandIdentity(
+    val platformAdminUserId: UUID,
+    val commandType: String,
+    val targetType: String,
+    val targetId: String,
+    val idempotencyKey: String,
+)
+
+data class AdminCommandDigest(
+    val schemaVersion: String,
+    val digestKeyVersion: Int,
+    val idempotencyKeyHmac: ByteArray,
+    val requestHmac: ByteArray,
+) {
+    init {
+        require(schemaVersion.isNotBlank()) { "schemaVersion must not be blank" }
+        require(digestKeyVersion >= 0) { "digestKeyVersion must be non-negative" }
+        require(idempotencyKeyHmac.size == HMAC_SIZE) { "idempotencyKeyHmac must be 32 bytes" }
+        require(requestHmac.size == HMAC_SIZE) { "requestHmac must be 32 bytes" }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is AdminCommandDigest) return false
+        return schemaVersion == other.schemaVersion &&
+            digestKeyVersion == other.digestKeyVersion &&
+            RequestIdentityHmac.equal(idempotencyKeyHmac, other.idempotencyKeyHmac) &&
+            RequestIdentityHmac.equal(requestHmac, other.requestHmac)
+    }
+
+    override fun hashCode(): Int =
+        schemaVersion.hashCode() * 31 +
+            digestKeyVersion * 31 +
+            idempotencyKeyHmac.contentHashCode() * 31 +
+            requestHmac.contentHashCode()
+
+    override fun toString(): String =
+        "AdminCommandDigest(schemaVersion=$schemaVersion, digestKeyVersion=$digestKeyVersion, " +
+            "idempotencyKeyHmacSize=${idempotencyKeyHmac.size}, requestHmacSize=${requestHmac.size})"
+
+    private companion object {
+        const val HMAC_SIZE = 32
+    }
+}
+
+interface CanonicalAdminCommandRequest {
+    val schemaVersion: String
+
+    fun canonicalFields(): List<Pair<String, String>>
+}
+
+class DigestKeyUnavailableException : RuntimeException("DIGEST_KEY_UNAVAILABLE")
+
+class InvalidAdminCommandIdentityException : RuntimeException("INVALID_ADMIN_COMMAND_IDENTITY")

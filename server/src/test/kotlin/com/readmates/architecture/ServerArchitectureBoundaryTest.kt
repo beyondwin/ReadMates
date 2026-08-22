@@ -187,6 +187,7 @@ private val serverSlices =
             name = "shared",
             type = ServerSliceType.SHARED,
             inboundAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.shared.adminmutation.application.."),
         ),
     )
 

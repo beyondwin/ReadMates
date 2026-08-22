@@ -2,6 +2,13 @@ readmates:
   auth:
     return-state-secret: "test-return-state-secret-for-local-tests"
   bff-secret-required: false
+  admin:
+    command-identity:
+      current-key: test-admin-command-digest-current-key
+      current-key-version: 1
+      previous-key: test-admin-command-digest-previous-key
+      previous-key-version: 0
+      allow-empty-secret: false
   security:
     ip-hash:
       base-secret: test-ip-hash-base-secret

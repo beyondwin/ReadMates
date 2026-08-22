@@ -93,6 +93,12 @@ readmates:
         connect-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_CONNECT_TIMEOUT:500ms}
         connection-request-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_CONNECTION_REQUEST_TIMEOUT:500ms}
         read-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_READ_TIMEOUT:2000ms}
+    command-identity:
+      current-key: ${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY:}
+      current-key-version: ${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:1}
+      previous-key: ${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY:}
+      previous-key-version: ${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:0}
+      allow-empty-secret: false
   host-action-confirmation:
     required: false
   session:
