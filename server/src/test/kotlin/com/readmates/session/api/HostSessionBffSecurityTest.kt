@@ -16,9 +16,11 @@ import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequ
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.stream.Stream
 
@@ -769,3 +771,120 @@ data class RecordMutationCase(
     val path: String,
     val body: String?,
 )
+
+@SpringBootTest(
+    properties = [
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.bff-secret=test-bff-secret",
+        "readmates.allowed-origins=http://localhost:3000",
+        "readmates.security.host-write-client-contract.mode=SUPPORT_V2_V3",
+    ],
+)
+@AutoConfigureMockMvc
+@Tag("integration")
+class HostSessionBffClientContractSupportTest(
+    @param:Autowired private val mockMvc: MockMvc,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `support mode accepts v2 and v3 host mutation and rejects missing unknown before controller`() {
+        mockMvc.perform(hostAccessScopeRequest("v2")).andExpect(status().isNotFound)
+        mockMvc.perform(hostAccessScopeRequest("v3")).andExpect(status().isNotFound)
+        mockMvc
+            .perform(hostAccessScopeRequest(null))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("HOST_CLIENT_UPGRADE_REQUIRED"))
+        mockMvc
+            .perform(hostAccessScopeRequest("v9"))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("HOST_CLIENT_UPGRADE_REQUIRED"))
+    }
+
+    @Test
+    fun `support mode keeps host reads available without a client contract`() {
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect { status { isOk() } }
+    }
+}
+
+@SpringBootTest(
+    properties = [
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.bff-secret=test-bff-secret",
+        "readmates.allowed-origins=http://localhost:3000",
+        "readmates.security.host-write-client-contract.mode=ENFORCE_V3",
+    ],
+)
+@AutoConfigureMockMvc
+@Tag("integration")
+class HostSessionBffClientContractEnforceTest(
+    @param:Autowired private val mockMvc: MockMvc,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `enforce mode accepts v3 and rejects v2 missing unknown with 428 before controller`() {
+        mockMvc.perform(hostAccessScopeRequest("v3")).andExpect(status().isNotFound)
+        mockMvc
+            .perform(hostAccessScopeRequest("v2"))
+            .andExpect(status().isPreconditionRequired)
+            .andExpect(jsonPath("$.code").value("CLIENT_UPDATE_REQUIRED"))
+        mockMvc
+            .perform(hostAccessScopeRequest(null))
+            .andExpect(status().isPreconditionRequired)
+            .andExpect(jsonPath("$.code").value("CLIENT_UPDATE_REQUIRED"))
+        mockMvc
+            .perform(hostAccessScopeRequest("v9"))
+            .andExpect(status().isPreconditionRequired)
+            .andExpect(jsonPath("$.code").value("CLIENT_UPDATE_REQUIRED"))
+    }
+
+    @Test
+    fun `enforce mode rejects invalid secret and origin before client contract`() {
+        mockMvc
+            .perform(
+                request(
+                    HttpMethod.PATCH,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/access-scope",
+                ).with(user("host@example.com"))
+                    .header("X-Readmates-Client-Contract", "v2")
+                    .header("Origin", "http://localhost:3000")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"accessScope":"GUEST_READABLE"}"""),
+            ).andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(
+                request(
+                    HttpMethod.PATCH,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/access-scope",
+                ).with(user("host@example.com"))
+                    .header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    .header("X-Readmates-Client-Contract", "v3")
+                    .header("Origin", "https://evil.example.com")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"accessScope":"GUEST_READABLE"}"""),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `enforce mode keeps host reads available without a client contract`() {
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect { status { isOk() } }
+    }
+}
+
+private fun hostAccessScopeRequest(contract: String?) =
+    request(
+        HttpMethod.PATCH,
+        "/api/host/sessions/00000000-0000-0000-0000-000000009998/access-scope",
+    ).with(user("host@example.com"))
+        .header("X-Readmates-Bff-Secret", "test-bff-secret")
+        .header("Origin", "http://localhost:3000")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""{"accessScope":"GUEST_READABLE"}""")
+        .also { builder ->
+            contract?.let { builder.header("X-Readmates-Client-Contract", it) }
+        }

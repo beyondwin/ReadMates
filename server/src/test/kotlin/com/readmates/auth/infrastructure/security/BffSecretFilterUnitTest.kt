@@ -6,17 +6,28 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.auth.application.port.out.AllowedOriginPort
 import com.readmates.club.application.port.out.ActiveClubDomainPort
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
+import jakarta.servlet.FilterChain
+import jakarta.servlet.ServletRequest
+import jakarta.servlet.ServletResponse
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertThrows
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.mock.web.MockFilterChain
 import org.springframework.mock.web.MockHttpServletRequest
 import org.springframework.mock.web.MockHttpServletResponse
+import java.util.stream.Stream
 
+@Suppress("LargeClass")
 class BffSecretFilterUnitTest {
     @Test
     fun `blank bff secret fails at startup when required`() {
@@ -195,7 +206,7 @@ class BffSecretFilterUnitTest {
                         allowedOrigins = "https://app.example.com",
                         appBaseUrl = "http://localhost:3000",
                     ),
-                hostWriteClientContractRequired = true,
+                hostClientContractProperties = HostClientContractProperties(required = true),
             )
         val request =
             MockHttpServletRequest("POST", "/api/host/sessions/session-1/session-import/commit").apply {
@@ -226,7 +237,7 @@ class BffSecretFilterUnitTest {
                         allowedOrigins = "https://app.example.com",
                         appBaseUrl = "http://localhost:3000",
                     ),
-                hostWriteClientContractRequired = true,
+                hostClientContractProperties = HostClientContractProperties(required = true),
             )
         val request =
             MockHttpServletRequest("POST", "/api/host/sessions/session-1/session-import/commit").apply {
@@ -250,7 +261,7 @@ class BffSecretFilterUnitTest {
                 legacyExpectedSecret = "test-bff-secret",
                 bffSecretRequired = true,
                 allowedOriginPort = noopAllowedOriginPort(),
-                hostWriteClientContractRequired = true,
+                hostClientContractProperties = HostClientContractProperties(required = true),
             )
         val request =
             MockHttpServletRequest("POST", "/api/host/sessions").apply {
@@ -276,7 +287,7 @@ class BffSecretFilterUnitTest {
                         allowedOrigins = "https://app.example.com",
                         appBaseUrl = "http://localhost:3000",
                     ),
-                hostWriteClientContractRequired = true,
+                hostClientContractProperties = HostClientContractProperties(required = true),
             )
         val hostRead =
             MockHttpServletRequest("GET", "/api/host/sessions").apply {
@@ -311,7 +322,7 @@ class BffSecretFilterUnitTest {
                         allowedOrigins = "https://app.example.com",
                         appBaseUrl = "http://localhost:3000",
                     ),
-                hostWriteClientContractRequired = false,
+                hostClientContractProperties = HostClientContractProperties(required = false),
             )
         val request =
             MockHttpServletRequest("POST", "/api/host/sessions/session-1/session-import/commit").apply {
@@ -324,6 +335,201 @@ class BffSecretFilterUnitTest {
         filter.doFilter(request, response, MockFilterChain())
 
         assertEquals(200, response.status)
+    }
+
+    @Test
+    fun `legacy required false maps to disabled and required true maps to v2 only`() {
+        assertEquals(
+            HostClientContractMode.DISABLED,
+            HostClientContractProperties(required = false).effectiveMode(),
+        )
+        assertEquals(
+            HostClientContractMode.V2_ONLY,
+            HostClientContractProperties(required = true).effectiveMode(),
+        )
+        assertEquals(
+            HostClientContractMode.V2_ONLY,
+            HostClientContractProperties(required = true, mode = "  ").effectiveMode(),
+        )
+    }
+
+    @Test
+    fun `typed host client contract mode takes precedence over legacy required`() {
+        assertEquals(
+            HostClientContractMode.DISABLED,
+            HostClientContractProperties(required = true, mode = "DISABLED").effectiveMode(),
+        )
+        assertEquals(
+            HostClientContractMode.SUPPORT_V2_V3,
+            HostClientContractProperties(required = false, mode = "SUPPORT_V2_V3").effectiveMode(),
+        )
+        assertEquals(
+            HostClientContractMode.ENFORCE_V3,
+            HostClientContractProperties(required = true, mode = "enforce_v3").effectiveMode(),
+        )
+    }
+
+    @Test
+    fun `unknown typed host client contract mode fails closed`() {
+        val ex =
+            assertThrows(IllegalStateException::class.java) {
+                HostClientContractProperties(mode = "V4").effectiveMode()
+            }
+        assertThat(ex.message).contains("readmates.security.host-write-client-contract.mode")
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("hostClientContractMatrix")
+    fun `host write client contract matrix`(case: HostClientContractCase) {
+        val chain = InvocationTrackingFilterChain()
+        val response = MockHttpServletResponse()
+
+        hostFilter(case.mode).doFilter(hostMutation(case.header), response, chain)
+
+        assertEquals(case.expectedStatus, response.status)
+        assertEquals(case.chainInvoked, chain.invoked)
+        if (case.expectedCode == null) {
+            assertThat(response.contentAsString).isEmpty()
+        } else {
+            assertThat(response.contentType).startsWith(MediaType.APPLICATION_PROBLEM_JSON_VALUE)
+            assertThat(response.contentAsString)
+                .contains("\"code\":\"${case.expectedCode}\"")
+                .contains("\"status\":${case.expectedStatus}")
+                .doesNotContain("session-1")
+                .doesNotContain("/api/host")
+        }
+    }
+
+    @ParameterizedTest(name = "{0} keeps host reads and member mutations available")
+    @MethodSource("allHostClientContractModes")
+    fun `host client contract modes do not block host reads or member mutations`(mode: HostClientContractMode) {
+        val filter = hostFilter(mode)
+        val hostRead =
+            MockHttpServletRequest("GET", "/api/host/sessions").apply {
+                servletPath = "/api/host/sessions"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+            }
+        val memberMutation =
+            MockHttpServletRequest("POST", "/api/sessions/current/rsvp").apply {
+                servletPath = "/api/sessions/current/rsvp"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+                addHeader("Origin", "https://app.example.com")
+            }
+        val hostReadResponse = MockHttpServletResponse()
+        val memberMutationResponse = MockHttpServletResponse()
+        val hostReadChain = InvocationTrackingFilterChain()
+        val memberMutationChain = InvocationTrackingFilterChain()
+
+        filter.doFilter(hostRead, hostReadResponse, hostReadChain)
+        filter.doFilter(memberMutation, memberMutationResponse, memberMutationChain)
+
+        assertEquals(200, hostReadResponse.status)
+        assertEquals(200, memberMutationResponse.status)
+        assertTrue(hostReadChain.invoked)
+        assertTrue(memberMutationChain.invoked)
+    }
+
+    @Test
+    fun `invalid bff secret is rejected before enforce v3 client contract`() {
+        val chain = InvocationTrackingFilterChain()
+        val response = MockHttpServletResponse()
+        val request =
+            MockHttpServletRequest("POST", "/api/host/sessions").apply {
+                servletPath = "/api/host/sessions"
+                addHeader("X-Readmates-Bff-Secret", "wrong-secret")
+                addHeader("X-Readmates-Client-Contract", "v2")
+            }
+
+        hostFilter(HostClientContractMode.ENFORCE_V3).doFilter(request, response, chain)
+
+        assertEquals(401, response.status)
+        assertFalse(chain.invoked)
+        assertThat(response.contentAsString).doesNotContain("CLIENT_UPDATE_REQUIRED")
+    }
+
+    @Test
+    fun `forbidden origin is rejected before support v2 v3 client contract`() {
+        val chain = InvocationTrackingFilterChain()
+        val response = MockHttpServletResponse()
+        val request =
+            MockHttpServletRequest("POST", "/api/host/sessions").apply {
+                servletPath = "/api/host/sessions"
+                remoteAddr = "203.0.113.11"
+                addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+                addHeader("X-Readmates-Client-Contract", "v3")
+                addHeader("Origin", "https://evil.example.com")
+            }
+
+        hostFilter(HostClientContractMode.SUPPORT_V2_V3).doFilter(request, response, chain)
+
+        assertEquals(403, response.status)
+        assertFalse(chain.invoked)
+        assertThat(response.contentAsString).isEmpty()
+    }
+
+    @Test
+    fun `support and enforce modes record bounded generation metrics`() {
+        val registry = SimpleMeterRegistry()
+        val support = hostFilter(HostClientContractMode.SUPPORT_V2_V3, registry)
+        val enforce = hostFilter(HostClientContractMode.ENFORCE_V3, registry)
+
+        support.doFilter(hostMutation("v2"), MockHttpServletResponse(), MockFilterChain())
+        support.doFilter(hostMutation("v3"), MockHttpServletResponse(), MockFilterChain())
+        support.doFilter(hostMutation(null), MockHttpServletResponse(), MockFilterChain())
+        support.doFilter(hostMutation("v9"), MockHttpServletResponse(), MockFilterChain())
+        enforce.doFilter(hostMutation("v2"), MockHttpServletResponse(), MockFilterChain())
+        enforce.doFilter(hostMutation("v3"), MockHttpServletResponse(), MockFilterChain())
+
+        assertEquals(1.0, hostContractCount(registry, "v2", "support"))
+        assertEquals(1.0, hostContractCount(registry, "v3", "support"))
+        assertEquals(1.0, hostContractCount(registry, "missing", "support"))
+        assertEquals(1.0, hostContractCount(registry, "unknown", "support"))
+        assertEquals(1.0, hostContractCount(registry, "v2", "enforce"))
+        assertEquals(1.0, hostContractCount(registry, "v3", "enforce"))
+        assertThat(registry.meters.filter { meter -> meter.id.name == HOST_CLIENT_CONTRACT_METRIC })
+            .isNotEmpty
+        assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } }.toSet())
+            .containsExactlyInAnyOrder("generation", "mode")
+        assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.value } }.toSet())
+            .containsExactlyInAnyOrder("v2", "v3", "missing", "unknown", "support", "enforce")
+    }
+
+    @Test
+    fun `disabled and v2 only modes do not record residue metrics`() {
+        val registry = SimpleMeterRegistry()
+
+        hostFilter(HostClientContractMode.DISABLED, registry)
+            .doFilter(hostMutation("v2"), MockHttpServletResponse(), MockFilterChain())
+        hostFilter(HostClientContractMode.V2_ONLY, registry)
+            .doFilter(hostMutation("v2"), MockHttpServletResponse(), MockFilterChain())
+        hostFilter(HostClientContractMode.SUPPORT_V2_V3, registry)
+            .doFilter(
+                MockHttpServletRequest("GET", "/api/host/sessions").apply {
+                    servletPath = "/api/host/sessions"
+                    addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+                    addHeader("X-Readmates-Client-Contract", "v2")
+                },
+                MockHttpServletResponse(),
+                MockFilterChain(),
+            )
+
+        assertThat(registry.find(HOST_CLIENT_CONTRACT_METRIC).meters()).isEmpty()
+    }
+
+    @Test
+    fun `secret rejection does not record host client contract metrics`() {
+        val registry = SimpleMeterRegistry()
+        val request =
+            MockHttpServletRequest("POST", "/api/host/sessions").apply {
+                servletPath = "/api/host/sessions"
+                addHeader("X-Readmates-Bff-Secret", "wrong-secret")
+                addHeader("X-Readmates-Client-Contract", "v3")
+            }
+
+        hostFilter(HostClientContractMode.ENFORCE_V3, registry)
+            .doFilter(request, MockHttpServletResponse(), MockFilterChain())
+
+        assertThat(registry.find(HOST_CLIENT_CONTRACT_METRIC).meters()).isEmpty()
     }
 
     // --- New scenarios for REQ-R-003a-9 ---
@@ -548,6 +754,45 @@ class BffSecretFilterUnitTest {
         assertEquals(null, filter.aliasFor("nope"))
     }
 
+    private fun hostFilter(
+        mode: HostClientContractMode,
+        meterRegistry: SimpleMeterRegistry? = null,
+    ): BffSecretFilter =
+        BffSecretFilter(
+            configuredSecretsRaw = "",
+            legacyExpectedSecret = "test-bff-secret",
+            bffSecretRequired = true,
+            allowedOriginPort =
+                staticAllowedOriginPort(
+                    allowedOrigins = "https://app.example.com",
+                    appBaseUrl = "http://localhost:3000",
+                ),
+            hostClientContractProperties = HostClientContractProperties(mode = mode.name),
+            meterRegistry = meterRegistry,
+        )
+
+    private fun hostMutation(contract: String?): MockHttpServletRequest =
+        MockHttpServletRequest("POST", "/api/host/sessions").apply {
+            servletPath = "/api/host/sessions"
+            addHeader("X-Readmates-Bff-Secret", "test-bff-secret")
+            addHeader("Origin", "https://app.example.com")
+            if (contract != null) {
+                addHeader("X-Readmates-Client-Contract", contract)
+            }
+        }
+
+    private fun hostContractCount(
+        registry: SimpleMeterRegistry,
+        generation: String,
+        mode: String,
+    ): Double =
+        registry
+            .find(HOST_CLIENT_CONTRACT_METRIC)
+            .tag("generation", generation)
+            .tag("mode", mode)
+            .counter()
+            ?.count() ?: 0.0
+
     private fun noopAllowedOriginPort(): AllowedOriginPort =
         object : AllowedOriginPort {
             override fun isAllowed(origin: String) = false
@@ -566,6 +811,63 @@ class BffSecretFilterUnitTest {
             appBaseUrl = appBaseUrl,
             activeClubDomainPort = noopActiveClubDomainPort,
         )
+    }
+
+    companion object {
+        private const val HOST_CLIENT_CONTRACT_METRIC = "readmates.host.client_contract"
+
+        @JvmStatic
+        fun allHostClientContractModes(): Stream<HostClientContractMode> = HostClientContractMode.entries.stream()
+
+        @JvmStatic
+        fun hostClientContractMatrix(): Stream<Arguments> {
+            val upgrade = "HOST_CLIENT_UPGRADE_REQUIRED"
+            val update = "CLIENT_UPDATE_REQUIRED"
+            return listOf(
+                HostClientContractCase(HostClientContractMode.DISABLED, null, 200, null, true),
+                HostClientContractCase(HostClientContractMode.DISABLED, "v2", 200, null, true),
+                HostClientContractCase(HostClientContractMode.DISABLED, "v3", 200, null, true),
+                HostClientContractCase(HostClientContractMode.DISABLED, "v1", 200, null, true),
+                HostClientContractCase(HostClientContractMode.V2_ONLY, "v2", 200, null, true),
+                HostClientContractCase(HostClientContractMode.V2_ONLY, "v3", 409, upgrade, false),
+                HostClientContractCase(HostClientContractMode.V2_ONLY, null, 409, upgrade, false),
+                HostClientContractCase(HostClientContractMode.V2_ONLY, "v1", 409, upgrade, false),
+                HostClientContractCase(HostClientContractMode.SUPPORT_V2_V3, "v2", 200, null, true),
+                HostClientContractCase(HostClientContractMode.SUPPORT_V2_V3, "v3", 200, null, true),
+                HostClientContractCase(HostClientContractMode.SUPPORT_V2_V3, null, 409, upgrade, false),
+                HostClientContractCase(HostClientContractMode.SUPPORT_V2_V3, "v1", 409, upgrade, false),
+                HostClientContractCase(HostClientContractMode.ENFORCE_V3, "v3", 200, null, true),
+                HostClientContractCase(HostClientContractMode.ENFORCE_V3, "v2", 428, update, false),
+                HostClientContractCase(HostClientContractMode.ENFORCE_V3, null, 428, update, false),
+                HostClientContractCase(HostClientContractMode.ENFORCE_V3, "v1", 428, update, false),
+            ).stream().map { case -> Arguments.of(case) }
+        }
+    }
+}
+
+data class HostClientContractCase(
+    val mode: HostClientContractMode,
+    val header: String?,
+    val expectedStatus: Int,
+    val expectedCode: String?,
+    val chainInvoked: Boolean,
+) {
+    override fun toString(): String {
+        val headerLabel = header ?: "missing"
+        val outcome = if (chainInvoked) "allow" else expectedCode ?: expectedStatus.toString()
+        return "${mode.name} header=$headerLabel $outcome"
+    }
+}
+
+private class InvocationTrackingFilterChain : FilterChain {
+    var invoked: Boolean = false
+        private set
+
+    override fun doFilter(
+        request: ServletRequest?,
+        response: ServletResponse?,
+    ) {
+        invoked = true
     }
 }
 
