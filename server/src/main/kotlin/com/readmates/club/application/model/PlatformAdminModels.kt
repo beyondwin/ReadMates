@@ -5,8 +5,18 @@ import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
 import com.readmates.club.domain.PlatformAdminRole
+import java.text.Normalizer
 import java.time.OffsetDateTime
+import java.util.Locale
 import java.util.UUID
+
+typealias ClubLifecycleState = ClubStatus
+typealias PublicVisibility = ClubPublicVisibility
+typealias PlatformAdminDomainStatus = ClubDomainStatus
+
+const val PLATFORM_ADMIN_CLUB_LIST_DEFAULT_LIMIT = 100
+const val PLATFORM_ADMIN_CLUB_LIST_MAX_LIMIT = 100
+const val PLATFORM_ADMIN_CLUB_ADMIN_REVISION = 0
 
 data class PlatformAdminDashboardSummary(
     val platformRole: PlatformAdminRole,
@@ -65,8 +75,19 @@ val PlatformAdminClubDomain.manualAction: PlatformAdminDomainManualAction
             PlatformAdminDomainManualAction.NONE
         }
 
+data class PlatformAdminClubListQuery(
+    val search: String? = null,
+    val lifecycle: ClubLifecycleState? = null,
+    val visibility: PublicVisibility? = null,
+    val domainStatus: PlatformAdminDomainStatus? = null,
+    val onboardingState: FirstHostOnboardingState? = null,
+    val cursor: String? = null,
+    val limit: Int = PLATFORM_ADMIN_CLUB_LIST_DEFAULT_LIMIT,
+)
+
 data class PlatformAdminClubList(
     val items: List<PlatformAdminClubListItem>,
+    val nextCursor: String? = null,
 )
 
 data class PlatformAdminClubListItem(
@@ -88,6 +109,42 @@ enum class FirstHostOnboardingState {
     MISSING,
     INVITED,
     ASSIGNED,
+}
+
+data class PlatformAdminClubDetail(
+    val clubId: UUID,
+    val slug: String,
+    val name: String,
+    val tagline: String,
+    val about: String,
+    val adminRevision: Int,
+    val status: ClubStatus,
+    val publicVisibility: ClubPublicVisibility,
+    val domains: List<PlatformAdminClubDomain>,
+    val firstHostOnboardingState: FirstHostOnboardingState,
+    val domainCount: Int,
+    val domainActionRequiredCount: Int,
+    val notificationFailureCount: Int,
+    val aiFailureCount: Int,
+)
+
+object ClubRegistrySearch {
+    fun normalize(raw: String?): String? {
+        if (raw == null) {
+            return null
+        }
+        val nfc = Normalizer.normalize(raw, Normalizer.Form.NFC)
+        val collapsed = WHITESPACE.replace(nfc.trim(), " ").lowercase(Locale.ROOT)
+        return collapsed.takeIf { it.isNotEmpty() }
+    }
+
+    fun escapeLike(normalized: String): String =
+        normalized
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_")
+
+    private val WHITESPACE = Regex("\\s+")
 }
 
 data class UpdatePlatformAdminClubCommand(

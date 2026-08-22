@@ -20,6 +20,7 @@ import com.readmates.club.application.model.AdminTodayClosingRiskSnapshot
 import com.readmates.club.application.model.FirstHostOnboardingState
 import com.readmates.club.application.model.PlatformAdminClubList
 import com.readmates.club.application.model.PlatformAdminClubListItem
+import com.readmates.club.application.model.PlatformAdminClubListQuery
 import com.readmates.club.application.port.`in`.ListAdminTodayClosingRisksUseCase
 import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
 import com.readmates.club.domain.ClubPublicVisibility
@@ -476,10 +477,13 @@ private class FakeListPlatformAdminClubsUseCase(
 ) : ListPlatformAdminClubsUseCase {
     val observedAdmins = mutableListOf<PlatformActor>()
 
-    override fun listClubs(admin: PlatformActor): PlatformAdminClubList {
+    override fun listClubs(
+        admin: PlatformActor,
+        query: PlatformAdminClubListQuery,
+    ): PlatformAdminClubList {
         observedAdmins += admin
         error?.let { throw it }
-        return PlatformAdminClubList(items)
+        return PlatformAdminClubList(items.take(query.limit))
     }
 }
 

@@ -26,6 +26,7 @@ private val PLATFORM_ADMIN_ERROR_STATUSES: Map<PlatformAdminError, HttpStatus> =
     mapOf(
         PlatformAdminError.INVALID_DOMAIN to HttpStatus.BAD_REQUEST,
         PlatformAdminError.INVALID_CLUB to HttpStatus.BAD_REQUEST,
+        PlatformAdminError.INVALID_CURSOR to HttpStatus.BAD_REQUEST,
         PlatformAdminError.CLUB_NOT_FOUND to HttpStatus.NOT_FOUND,
         PlatformAdminError.CLUB_PUBLISH_NOT_ALLOWED to HttpStatus.CONFLICT,
         PlatformAdminError.CLUB_HOST_REQUIRED to HttpStatus.CONFLICT,

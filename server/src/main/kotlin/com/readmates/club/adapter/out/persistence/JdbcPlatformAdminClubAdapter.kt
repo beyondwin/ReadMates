@@ -2,18 +2,26 @@ package com.readmates.club.adapter.out.persistence
 
 import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
 import com.readmates.club.application.model.FirstHostOnboardingState
+import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_ADMIN_REVISION
+import com.readmates.club.application.model.PlatformAdminClubDetail
+import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.port.out.CreatePlatformAdminClubCommand
 import com.readmates.club.application.port.out.CreatePlatformAdminHostInvitationCommand
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
+import com.readmates.club.application.port.out.PlatformAdminClubRegistryQuery
+import com.readmates.club.application.port.out.PlatformAdminClubRegistryRow
 import com.readmates.club.application.port.out.PlatformAdminExistingUser
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPatch
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
+import com.readmates.club.domain.ClubDomainKind
+import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.toUtcLocalDateTime
+import com.readmates.shared.db.utcOffsetDateTimeOrNull
 import com.readmates.shared.db.uuid
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
@@ -28,13 +36,45 @@ class JdbcPlatformAdminClubAdapter(
 ) : LoadPlatformAdminClubsPort,
     UpdatePlatformAdminClubPort,
     PlatformAdminOnboardingPort {
-    override fun listClubs(limit: Int): List<PlatformAdminClubListItem> =
-        jdbcTemplate.query(CLUB_LIST_SQL, ::mapPlatformAdminClub, limit.coerceIn(1, MAX_CLUB_LIST_LIMIT))
+    override fun listClubs(query: PlatformAdminClubRegistryQuery): List<PlatformAdminClubRegistryRow> {
+        val prepared = PlatformAdminClubRegistrySql.listSql(query)
+        return jdbcTemplate.query(
+            prepared.sql,
+            ::mapPlatformAdminClubRow,
+            *prepared.arguments.toTypedArray(),
+        )
+    }
 
     override fun loadClub(clubId: UUID): PlatformAdminClubListItem? =
         jdbcTemplate
-            .query("$CLUB_BASE_SQL where clubs.id = ? limit 1", ::mapPlatformAdminClub, clubId.dbString())
+            .query(PlatformAdminClubRegistrySql.detailSql(), ::mapPlatformAdminClub, clubId.dbString())
             .firstOrNull()
+
+    override fun loadClubDetail(clubId: UUID): PlatformAdminClubDetail? {
+        val item = loadClub(clubId) ?: return null
+        val domains =
+            jdbcTemplate.query(
+                PlatformAdminClubRegistrySql.DOMAIN_LIST_SQL,
+                ::mapClubDomain,
+                clubId.dbString(),
+            )
+        return PlatformAdminClubDetail(
+            clubId = item.clubId,
+            slug = item.slug,
+            name = item.name,
+            tagline = item.tagline,
+            about = item.about,
+            adminRevision = PLATFORM_ADMIN_CLUB_ADMIN_REVISION,
+            status = item.status,
+            publicVisibility = item.publicVisibility,
+            domains = domains,
+            firstHostOnboardingState = item.firstHostOnboardingState,
+            domainCount = item.domainCount,
+            domainActionRequiredCount = item.domainActionRequiredCount,
+            notificationFailureCount = item.notificationFailureCount,
+            aiFailureCount = item.aiFailureCount,
+        )
+    }
 
     override fun activeHostCount(clubId: UUID): Int =
         jdbcTemplate.queryForObject(
@@ -198,70 +238,18 @@ class JdbcPlatformAdminClubAdapter(
     }
 
     private companion object {
-        private const val MAX_CLUB_LIST_LIMIT = 100
         private const val HOST_DISPLAY_NAME_MAX_LENGTH = 50
-
-        private const val CLUB_BASE_SQL = """
-            select
-              clubs.id,
-              clubs.slug,
-              clubs.name,
-              clubs.tagline,
-              clubs.about,
-              clubs.status,
-              clubs.public_visibility,
-              coalesce(domain_counts.domain_count, 0) as domain_count,
-              coalesce(domain_counts.action_required_count, 0) as domain_action_required_count,
-              coalesce(notification_failures.failure_count, 0) as notification_failure_count,
-              coalesce(ai_failures.failure_count, 0) as ai_failure_count,
-              case
-                when exists (
-                  select 1 from memberships
-                  where memberships.club_id = clubs.id
-                    and memberships.role = 'HOST'
-                    and memberships.status = 'ACTIVE'
-                ) then 'ASSIGNED'
-                when exists (
-                  select 1 from invitations
-                  where invitations.club_id = clubs.id
-                    and invitations.role = 'HOST'
-                    and invitations.status = 'PENDING'
-                    and invitations.expires_at >= utc_timestamp(6)
-                ) then 'INVITED'
-                else 'MISSING'
-              end as first_host_state
-            from clubs
-            left join (
-              select
-                club_id,
-                count(*) as domain_count,
-                sum(case when status = 'ACTION_REQUIRED' then 1 else 0 end) as action_required_count
-              from club_domains
-              group by club_id
-            ) domain_counts on domain_counts.club_id = clubs.id
-            left join (
-              select club_id, count(*) as failure_count
-              from notification_deliveries
-              where status in ('FAILED', 'DEAD')
-                and updated_at >= utc_timestamp(6) - interval 7 day
-              group by club_id
-            ) notification_failures on notification_failures.club_id = clubs.id
-            left join (
-              select club_id, count(*) as failure_count
-              from ai_generation_audit_log
-              where status = 'FAILED'
-                and created_at >= utc_timestamp(6) - interval 7 day
-              group by club_id
-            ) ai_failures on ai_failures.club_id = clubs.id
-        """
-
-        private const val CLUB_LIST_SQL = """
-            $CLUB_BASE_SQL
-            order by clubs.updated_at desc, clubs.created_at desc
-            limit ?
-        """
     }
 }
+
+private fun mapPlatformAdminClubRow(
+    resultSet: ResultSet,
+    rowNumber: Int,
+): PlatformAdminClubRegistryRow =
+    PlatformAdminClubRegistryRow(
+        item = mapPlatformAdminClub(resultSet, rowNumber),
+        normalizedName = resultSet.getString("normalized_name"),
+    )
 
 private fun mapPlatformAdminClub(
     resultSet: ResultSet,
@@ -280,4 +268,20 @@ private fun mapPlatformAdminClub(
         notificationFailureCount = resultSet.getInt("notification_failure_count"),
         aiFailureCount = resultSet.getInt("ai_failure_count"),
         firstHostOnboardingState = FirstHostOnboardingState.valueOf(resultSet.getString("first_host_state")),
+    )
+
+private fun mapClubDomain(
+    resultSet: ResultSet,
+    @Suppress("UNUSED_PARAMETER") rowNumber: Int,
+): PlatformAdminClubDomain =
+    PlatformAdminClubDomain(
+        id = resultSet.uuid("id"),
+        clubId = resultSet.uuid("club_id"),
+        hostname = resultSet.getString("hostname"),
+        kind = ClubDomainKind.valueOf(resultSet.getString("kind")),
+        status = ClubDomainStatus.valueOf(resultSet.getString("status")),
+        isPrimary = resultSet.getBoolean("is_primary"),
+        verifiedAt = resultSet.utcOffsetDateTimeOrNull("verified_at"),
+        lastCheckedAt = resultSet.utcOffsetDateTimeOrNull("last_checked_at"),
+        errorCode = resultSet.getString("provisioning_error_code"),
     )

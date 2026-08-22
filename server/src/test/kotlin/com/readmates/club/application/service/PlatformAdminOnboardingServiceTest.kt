@@ -4,6 +4,8 @@ import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.FirstHostOnboardingState
 import com.readmates.club.application.model.HostOnboardingResultKind
+import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_ADMIN_REVISION
+import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.PlatformAdminEmailDeliveryStatus
@@ -18,6 +20,8 @@ import com.readmates.club.application.port.out.CreatePlatformAdminHostInvitation
 import com.readmates.club.application.port.out.GeneratePlatformAdminInvitationTokenPort
 import com.readmates.club.application.port.out.GeneratedPlatformAdminInvitationToken
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
+import com.readmates.club.application.port.out.PlatformAdminClubRegistryQuery
+import com.readmates.club.application.port.out.PlatformAdminClubRegistryRow
 import com.readmates.club.application.port.out.PlatformAdminExistingUser
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
 import com.readmates.club.application.port.out.SendPlatformAdminHostInvitationEmailPort
@@ -258,12 +262,36 @@ private class FakePlatformAdminOnboardingPorts :
         createdInvitations += command
     }
 
-    override fun listClubs(limit: Int): List<PlatformAdminClubListItem> = createdClubs.map { toListItem(it) }
+    override fun listClubs(query: PlatformAdminClubRegistryQuery): List<PlatformAdminClubRegistryRow> =
+        createdClubs.map { command ->
+            val item = toListItem(command)
+            PlatformAdminClubRegistryRow(item, item.name.lowercase())
+        }
 
     override fun loadClub(clubId: UUID): PlatformAdminClubListItem? =
         createdClubs
             .firstOrNull { it.clubId == clubId }
             ?.let(::toListItem)
+
+    override fun loadClubDetail(clubId: UUID): PlatformAdminClubDetail? =
+        loadClub(clubId)?.let { item ->
+            PlatformAdminClubDetail(
+                clubId = item.clubId,
+                slug = item.slug,
+                name = item.name,
+                tagline = item.tagline,
+                about = item.about,
+                adminRevision = PLATFORM_ADMIN_CLUB_ADMIN_REVISION,
+                status = item.status,
+                publicVisibility = item.publicVisibility,
+                domains = emptyList(),
+                firstHostOnboardingState = item.firstHostOnboardingState,
+                domainCount = item.domainCount,
+                domainActionRequiredCount = item.domainActionRequiredCount,
+                notificationFailureCount = item.notificationFailureCount,
+                aiFailureCount = item.aiFailureCount,
+            )
+        }
 
     override fun activeHostCount(clubId: UUID): Int = 0
 

@@ -2,9 +2,15 @@
 
 package com.readmates.club.adapter.`in`.web
 
+import com.readmates.club.application.model.ClubLifecycleState
+import com.readmates.club.application.model.FirstHostOnboardingState
+import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_LIST_DEFAULT_LIMIT
+import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubList
 import com.readmates.club.application.model.PlatformAdminClubListItem
+import com.readmates.club.application.model.PlatformAdminClubListQuery
 import com.readmates.club.application.model.PlatformAdminDomainPreview
+import com.readmates.club.application.model.PlatformAdminDomainStatus
 import com.readmates.club.application.model.PlatformAdminEmailDeliveryResult
 import com.readmates.club.application.model.PlatformAdminFirstHostPreview
 import com.readmates.club.application.model.PlatformAdminHostOnboardingResult
@@ -15,8 +21,10 @@ import com.readmates.club.application.model.PlatformAdminOnboardingDomainInput
 import com.readmates.club.application.model.PlatformAdminOnboardingHostInput
 import com.readmates.club.application.model.PlatformAdminOnboardingPreview
 import com.readmates.club.application.model.PlatformAdminOnboardingResult
+import com.readmates.club.application.model.PublicVisibility
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
 import com.readmates.club.application.port.`in`.CommitPlatformAdminClubOnboardingUseCase
+import com.readmates.club.application.port.`in`.GetPlatformAdminClubUseCase
 import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
 import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubOnboardingUseCase
 import com.readmates.club.application.port.`in`.UpdatePlatformAdminClubUseCase
@@ -37,13 +45,28 @@ import java.util.UUID
 @RequestMapping("/api/admin/clubs")
 class PlatformAdminClubController(
     private val listPlatformAdminClubsUseCase: ListPlatformAdminClubsUseCase,
+    private val getPlatformAdminClubUseCase: GetPlatformAdminClubUseCase,
     private val updatePlatformAdminClubUseCase: UpdatePlatformAdminClubUseCase,
     private val previewOnboardingUseCase: PreviewPlatformAdminClubOnboardingUseCase,
     private val commitOnboardingUseCase: CommitPlatformAdminClubOnboardingUseCase,
 ) {
     @GetMapping
-    fun list(admin: CurrentPlatformAdmin): PlatformAdminClubListResponse =
-        PlatformAdminClubListResponse.from(listPlatformAdminClubsUseCase.listClubs(admin.toPlatformActor()))
+    fun list(
+        admin: CurrentPlatformAdmin,
+        request: PlatformAdminClubListRequest,
+    ): PlatformAdminClubListResponse =
+        PlatformAdminClubListResponse.from(
+            listPlatformAdminClubsUseCase.listClubs(admin.toPlatformActor(), request.toQuery()),
+        )
+
+    @GetMapping("/{clubId}")
+    fun get(
+        admin: CurrentPlatformAdmin,
+        @PathVariable clubId: UUID,
+    ): PlatformAdminClubDetailResponse =
+        PlatformAdminClubDetailResponse.from(
+            getPlatformAdminClubUseCase.getClub(admin.toPlatformActor(), clubId),
+        )
 
     @PostMapping("/onboarding/preview")
     fun previewOnboarding(
@@ -78,12 +101,37 @@ class PlatformAdminClubController(
         )
 }
 
+data class PlatformAdminClubListRequest(
+    val search: String? = null,
+    val lifecycle: ClubLifecycleState? = null,
+    val visibility: PublicVisibility? = null,
+    val domainStatus: PlatformAdminDomainStatus? = null,
+    val onboardingState: FirstHostOnboardingState? = null,
+    val cursor: String? = null,
+    val limit: Int? = null,
+) {
+    fun toQuery(): PlatformAdminClubListQuery =
+        PlatformAdminClubListQuery(
+            search = search,
+            lifecycle = lifecycle,
+            visibility = visibility,
+            domainStatus = domainStatus,
+            onboardingState = onboardingState,
+            cursor = cursor,
+            limit = limit ?: PLATFORM_ADMIN_CLUB_LIST_DEFAULT_LIMIT,
+        )
+}
+
 data class PlatformAdminClubListResponse(
     val items: List<PlatformAdminClubResponse>,
+    val nextCursor: String? = null,
 ) {
     companion object {
         fun from(list: PlatformAdminClubList): PlatformAdminClubListResponse =
-            PlatformAdminClubListResponse(list.items.map(PlatformAdminClubResponse::from))
+            PlatformAdminClubListResponse(
+                items = list.items.map(PlatformAdminClubResponse::from),
+                nextCursor = list.nextCursor,
+            )
     }
 }
 
@@ -100,6 +148,43 @@ data class UpdatePlatformAdminClubRequest(
             about = about,
             publicVisibility = publicVisibility,
         )
+}
+
+data class PlatformAdminClubDetailResponse(
+    val clubId: String,
+    val slug: String,
+    val name: String,
+    val tagline: String,
+    val about: String,
+    val adminRevision: Int,
+    val status: String,
+    val publicVisibility: String,
+    val domains: List<PlatformAdminDomainResponse>,
+    val firstHostOnboardingState: String,
+    val domainCount: Int,
+    val domainActionRequiredCount: Int,
+    val notificationFailureCount: Int,
+    val aiFailureCount: Int,
+) {
+    companion object {
+        fun from(detail: PlatformAdminClubDetail): PlatformAdminClubDetailResponse =
+            PlatformAdminClubDetailResponse(
+                clubId = detail.clubId.toString(),
+                slug = detail.slug,
+                name = detail.name,
+                tagline = detail.tagline,
+                about = detail.about,
+                adminRevision = detail.adminRevision,
+                status = detail.status.name,
+                publicVisibility = detail.publicVisibility.name,
+                domains = detail.domains.map(PlatformAdminDomainResponse::from),
+                firstHostOnboardingState = detail.firstHostOnboardingState.name,
+                domainCount = detail.domainCount,
+                domainActionRequiredCount = detail.domainActionRequiredCount,
+                notificationFailureCount = detail.notificationFailureCount,
+                aiFailureCount = detail.aiFailureCount,
+            )
+    }
 }
 
 data class PlatformAdminClubResponse(

@@ -1,5 +1,6 @@
 package com.readmates.performance
 
+import com.readmates.club.adapter.out.persistence.PlatformAdminClubRegistrySql
 import com.readmates.session.adapter.out.persistence.HOST_SESSION_LEDGER_FACTS_SQL
 import com.readmates.sessionclosing.adapter.out.persistence.SessionClosingStatusSql
 import com.readmates.support.MySqlExplainRow
@@ -29,6 +30,33 @@ class MySqlQueryPlanTest(
     @AfterEach
     fun cleanupLargeFixture() {
         largeFixture.cleanupAllPerformanceFixtures()
+    }
+
+    @Test
+    fun `platform admin club registry page uses status visibility index and bounded limit`() {
+        val plan =
+            jdbcTemplate.explain(
+                PlatformAdminClubRegistrySql.PAGE_PLAN_SQL.trimIndent(),
+                "ACTIVE",
+                "PRIVATE",
+                "alpha",
+                "alpha",
+                "00000000-0000-0000-0000-000000000001",
+                20,
+            )
+
+        plan.assertUsesIndexFor("clubs", "platform admin club registry cursor page")
+    }
+
+    @Test
+    fun `platform admin club detail lookup uses primary key`() {
+        val plan =
+            jdbcTemplate.explain(
+                PlatformAdminClubRegistrySql.DETAIL_PLAN_SQL.trimIndent(),
+                "00000000-0000-0000-0000-000000000001",
+            )
+
+        plan.assertUsesIndexFor("clubs", "platform admin club by-id detail")
     }
 
     @Test

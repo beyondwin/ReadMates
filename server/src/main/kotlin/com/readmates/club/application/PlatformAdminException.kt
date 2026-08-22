@@ -8,6 +8,7 @@ class PlatformAdminException(
 enum class PlatformAdminError {
     INVALID_DOMAIN,
     INVALID_CLUB,
+    INVALID_CURSOR,
     CLUB_NOT_FOUND,
     CLUB_PUBLISH_NOT_ALLOWED,
     CLUB_HOST_REQUIRED,

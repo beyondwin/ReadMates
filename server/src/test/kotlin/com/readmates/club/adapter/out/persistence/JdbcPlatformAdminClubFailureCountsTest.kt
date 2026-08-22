@@ -1,5 +1,6 @@
 package com.readmates.club.adapter.out.persistence
 
+import com.readmates.club.application.port.out.PlatformAdminClubRegistryQuery
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
@@ -71,7 +72,21 @@ class JdbcPlatformAdminClubFailureCountsTest(
         seedNotificationDeliveries()
         seedAiAuditRows()
 
-        val listed = adapter.listClubs(limit = 500).firstOrNull { it.clubId == UUID.fromString(CLUB_ID) }
+        val listed =
+            adapter
+                .listClubs(
+                    PlatformAdminClubRegistryQuery(
+                        search = "failure count club",
+                        lifecycle = null,
+                        visibility = null,
+                        domainStatus = null,
+                        onboardingState = null,
+                        afterNormalizedName = null,
+                        afterClubId = null,
+                        limit = 10,
+                    ),
+                ).firstOrNull { it.item.clubId == UUID.fromString(CLUB_ID) }
+                ?.item
 
         assertThat(listed).isNotNull
         assertThat(listed!!.notificationFailureCount).isEqualTo(2)

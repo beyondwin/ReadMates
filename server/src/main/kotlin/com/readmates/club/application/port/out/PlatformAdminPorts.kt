@@ -1,8 +1,13 @@
 package com.readmates.club.application.port.out
 
 import com.readmates.club.application.model.ClubDomainActualCheckResult
+import com.readmates.club.application.model.ClubLifecycleState
+import com.readmates.club.application.model.FirstHostOnboardingState
+import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubListItem
+import com.readmates.club.application.model.PlatformAdminDomainStatus
+import com.readmates.club.application.model.PublicVisibility
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.club.domain.ClubPublicVisibility
@@ -58,12 +63,30 @@ interface CheckClubDomainActualStatePort {
 }
 
 interface LoadPlatformAdminClubsPort {
-    fun listClubs(limit: Int): List<PlatformAdminClubListItem>
+    fun listClubs(query: PlatformAdminClubRegistryQuery): List<PlatformAdminClubRegistryRow>
 
     fun loadClub(clubId: UUID): PlatformAdminClubListItem?
 
+    fun loadClubDetail(clubId: UUID): PlatformAdminClubDetail?
+
     fun activeHostCount(clubId: UUID): Int
 }
+
+data class PlatformAdminClubRegistryQuery(
+    val search: String?,
+    val lifecycle: ClubLifecycleState?,
+    val visibility: PublicVisibility?,
+    val domainStatus: PlatformAdminDomainStatus?,
+    val onboardingState: FirstHostOnboardingState?,
+    val afterNormalizedName: String?,
+    val afterClubId: UUID?,
+    val limit: Int,
+)
+
+data class PlatformAdminClubRegistryRow(
+    val item: PlatformAdminClubListItem,
+    val normalizedName: String,
+)
 
 interface UpdatePlatformAdminClubPort {
     fun updateClub(
