@@ -68,6 +68,7 @@ import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.config.HostSessionLifecycleProperties
+import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
@@ -1731,7 +1732,13 @@ class HostSessionServicesTest {
                 lifecycleStateWriteCount += 1
             }
             return HostSessionTransitionResult(
-                detail = hostSessionDetail(command.sessionId).copy(state = "OPEN"),
+                detail =
+                    hostSessionDetail(command.sessionId).copy(
+                        state = "OPEN",
+                        accessScope = SessionAccessScope.GUEST_READABLE,
+                        visibility = SessionRecordVisibility.MEMBER,
+                        siteVisibility = PublicSiteVisibility.HIDDEN,
+                    ),
                 changed = openChanged,
             )
         }

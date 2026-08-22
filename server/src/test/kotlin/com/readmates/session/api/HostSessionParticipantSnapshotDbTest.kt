@@ -1,6 +1,7 @@
 package com.readmates.session.api
 
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.application.service.InvitationService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
@@ -34,6 +35,7 @@ class HostSessionParticipantSnapshotDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val authSessionService: AuthSessionService,
+    @param:Autowired private val invitationService: InvitationService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val jsonMapper =
         tools.jackson.databind.json.JsonMapper
@@ -44,6 +46,7 @@ class HostSessionParticipantSnapshotDbTest(
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
     private val createdSessionIds = linkedSetOf<String>()
+    private val createdInvitationEmails = linkedSetOf<String>()
 
     @AfterEach
     fun cleanupCreatedRows() {
@@ -60,6 +63,13 @@ class HostSessionParticipantSnapshotDbTest(
             deleteWhereIn("session_publication_versions", "session_id", createdSessionIds)
             deleteWhereIn("sessions", "id", createdSessionIds)
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
+            if (createdInvitationEmails.isNotEmpty()) {
+                val placeholders = createdInvitationEmails.joinToString(",") { "?" }
+                jdbcTemplate.update(
+                    "delete from invitations where invited_email in ($placeholders)",
+                    *createdInvitationEmails.toTypedArray(),
+                )
+            }
             deleteWhereIn("memberships", "id", createdMembershipIds)
             deleteWhereIn("users", "id", createdUserIds)
         } finally {
@@ -67,6 +77,7 @@ class HostSessionParticipantSnapshotDbTest(
             createdMembershipIds.clear()
             createdUserIds.clear()
             createdSessionIds.clear()
+            createdInvitationEmails.clear()
         }
     }
 
@@ -110,6 +121,34 @@ class HostSessionParticipantSnapshotDbTest(
         assertThat(participantSetRevision(sessionId)).isEqualTo(revisionAfterOpen + 1)
         assertThat(meetingEpoch()).isEqualTo(epochBeforeAdd + 1)
         assertThat(latestAudit(sessionId, joinedAfter)).containsExactly("REMOVED", "ACTIVE", revisionAfterOpen + 1)
+    }
+
+    @Test
+    fun `invitation accept after open stays out of the snapshot until an explicit add`() {
+        val sessionId = createDraft("초대 후 합류")
+        createdSessionIds += sessionId
+        open(sessionId, expectedRevision = 0)
+        val snapshotAfterOpen = activeMembershipIds(sessionId)
+        val revisionAfterOpen = participantSetRevision(sessionId)
+        val historical = insertActiveMember("snapshot.invite.history", "기존 응답 멤버")
+        addToCurrentSession(historical)
+        setHistoricalFacts(sessionId, historical, rsvp = "GOING", attendance = "ATTENDED")
+        removeFromCurrentSession(historical)
+        val revisionAfterHistory = participantSetRevision(sessionId)
+
+        val invited = acceptInvitationAfterOpen("snapshot.invite.after", applyToCurrentSession = true)
+
+        assertThat(activeMembershipIds(sessionId)).isEqualTo(snapshotAfterOpen)
+        assertThat(participationStatusOrNull(sessionId, invited)).isNull()
+        assertThat(participantSetRevision(sessionId)).isEqualTo(revisionAfterHistory)
+        assertThat(participationStatus(sessionId, historical)).isEqualTo("REMOVED")
+        assertThat(rsvpStatus(sessionId, historical)).isEqualTo("GOING")
+        assertThat(attendanceStatus(sessionId, historical)).isEqualTo("ATTENDED")
+        assertThat(revisionAfterOpen).isLessThan(revisionAfterHistory)
+
+        addToCurrentSession(invited)
+        assertThat(participationStatus(sessionId, invited)).isEqualTo("ACTIVE")
+        assertThat(activeMembershipIds(sessionId)).contains(invited)
     }
 
     @Test
@@ -359,6 +398,74 @@ class HostSessionParticipantSnapshotDbTest(
         createdMembershipIds += membershipId
         return membershipId
     }
+
+    private fun acceptInvitationAfterOpen(
+        prefix: String,
+        applyToCurrentSession: Boolean,
+    ): String {
+        val email = "$prefix.${UUID.randomUUID()}@example.com"
+        return acceptInvitationForEmail(email, "초대 합류", applyToCurrentSession)
+    }
+
+    private fun acceptInvitationForEmail(
+        email: String,
+        name: String,
+        applyToCurrentSession: Boolean,
+    ): String {
+        createdInvitationEmails += email
+        val token =
+            mockMvc
+                .post("/api/host/invitations") {
+                    cookie(hostCookie())
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "email":"$email",
+                          "name":"$name",
+                          "applyToCurrentSession":$applyToCurrentSession
+                        }
+                        """.trimIndent()
+                }.andExpect { status { isCreated() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .substringAfter("\"acceptUrl\":\"")
+                .substringBefore("\"")
+                .substringAfterLast("/")
+        invitationService.acceptGoogleInvitation(
+            rawToken = token,
+            googleSubjectId = "google-snapshot-invite-${UUID.randomUUID()}",
+            email = email,
+            displayName = name,
+            profileImageUrl = null,
+        )
+        val membershipId = membershipIdForEmail(email)
+        createdMembershipIds += membershipId
+        val userId =
+            jdbcTemplate.queryForObject(
+                "select user_id from memberships where id = ?",
+                String::class.java,
+                membershipId,
+            )
+        if (userId != null) createdUserIds += userId
+        return membershipId
+    }
+
+    private fun membershipIdForEmail(email: String): String =
+        jdbcTemplate.queryForObject(
+            """
+            select memberships.id
+            from memberships
+            join users on users.id = memberships.user_id
+            where users.email = ?
+            """.trimIndent(),
+            String::class.java,
+            email,
+        ) ?: error("missing membership")
 
     private fun insertViewerAndActivate(
         prefix: String,

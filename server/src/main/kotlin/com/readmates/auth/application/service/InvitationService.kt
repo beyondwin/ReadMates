@@ -196,9 +196,6 @@ class InvitationService(
             )
         }
 
-        if (invitation.applyToCurrentSession) {
-            invitationStore.addToCurrentOpenSessionIfSafe(invitation.clubId, membershipId)
-        }
         googleAccountStore.recordLastLogin(userId)
         return invitationStore.findCurrentMember(membershipId)
             ?: throw InvitationDomainException(

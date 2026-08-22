@@ -314,9 +314,19 @@ class HostSessionBffSecurityTest(
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
                 jsonPath("$.state") { value("OPEN") }
+                jsonPath("$.accessScope") { value("GUEST_READABLE") }
+                jsonPath("$.siteVisibility") { value("HIDDEN") }
+                jsonPath("$.visibility") { value("MEMBER") }
             }
 
         assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
+        assertEquals(
+            "GUEST_READABLE",
+            jdbcTemplate.queryForObject(
+                "select access_scope from sessions where id = '00000000-0000-0000-0000-000000009888'",
+                String::class.java,
+            ),
+        )
     }
 
     @Test
@@ -555,7 +565,7 @@ class HostSessionBffSecurityTest(
     }
 
     private fun createOpenSession() {
-        createSession(state = "OPEN", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
+        createSession(state = "OPEN", visibility = "MEMBER", accessScope = "GUEST_READABLE")
         jdbcTemplate.update(
             """
             insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)

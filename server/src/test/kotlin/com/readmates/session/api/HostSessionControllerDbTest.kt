@@ -1501,6 +1501,9 @@ class HostSessionControllerDbTest(
                 }.andExpect {
                     status { isOk() }
                     jsonPath("$.state") { value("OPEN") }
+                    jsonPath("$.accessScope") { value("GUEST_READABLE") }
+                    jsonPath("$.siteVisibility") { value("HIDDEN") }
+                    jsonPath("$.visibility") { value("MEMBER") }
                     jsonPath("$.changeReceipt.kind") { value("LIFECYCLE") }
                     jsonPath("$.changeReceipt.undoAvailable") { value(true) }
                     jsonPath("$.changeReceipt.changeId") { exists() }

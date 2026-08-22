@@ -175,7 +175,7 @@ class InvitationControllerDbTest(
     }
 
     @Test
-    fun `accepting invite with current session intent enabled creates participant when session is safe`() {
+    fun `accepting invite with current session intent enabled does not auto-add to an open snapshot`() {
         val token =
             createInvitation(
                 email = "intent.enabled@example.com",
@@ -193,7 +193,7 @@ class InvitationControllerDbTest(
         )
 
         assertEquals("ACTIVE", membershipStatus("intent.enabled@example.com"))
-        assertEquals(1, currentParticipantCount("intent.enabled@example.com"))
+        assertEquals(0, currentParticipantCount("intent.enabled@example.com"))
     }
 
     @Test
