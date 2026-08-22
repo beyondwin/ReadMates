@@ -4,7 +4,10 @@ import { defineConfig } from "vite";
 import { rewriteFrontendObservabilityProxyPath } from "./shared/observability/frontend-observability-paths";
 import { configureOAuthNavigationProxy } from "./shared/auth/oauth-vite-proxy";
 import { normalizedClubSlug } from "./shared/security/club-slug";
-import { applyHostClientContractProxyHeader } from "./shared/security/host-client-contract";
+import {
+  applyHostClientContractProxyHeader,
+  hostClientContractViteBypass,
+} from "./shared/security/host-client-contract";
 
 function normalizedClubSlugFromProxyPath(proxyPath: string | undefined) {
   if (!proxyPath) {
@@ -54,6 +57,7 @@ export default defineConfig({
             ? { "X-Readmates-Bff-Secret": process.env.READMATES_BFF_SECRET }
             : {}),
         },
+        bypass: (req, res) => hostClientContractViteBypass(req, res),
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq) => {
             applyHostClientContractProxyHeader(proxyReq);

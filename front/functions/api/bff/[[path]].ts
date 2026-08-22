@@ -16,6 +16,7 @@ import {
 import { normalizedClubSlug } from "../../../shared/security/club-slug";
 import {
   HOST_CLIENT_CONTRACT_HEADER,
+  HOST_CLIENT_UPGRADE_REQUIRED,
   acceptedHostClientContract,
   hostClientContractCapabilityFromEnv,
   type HostClientContractCapability,
@@ -153,9 +154,9 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   const capability = hostClientContractCapabilityFromEnv(context.env);
   if (!hasAcceptedHostWriteClientContract(context.request, upstreamPath, capability)) {
     return bffErrorResponse(
-      409,
-      "HOST_CLIENT_UPGRADE_REQUIRED",
-      "호스트 운영 화면을 최신 버전으로 새로고침해 주세요.",
+      HOST_CLIENT_UPGRADE_REQUIRED.status,
+      HOST_CLIENT_UPGRADE_REQUIRED.code,
+      HOST_CLIENT_UPGRADE_REQUIRED.message,
     );
   }
 
