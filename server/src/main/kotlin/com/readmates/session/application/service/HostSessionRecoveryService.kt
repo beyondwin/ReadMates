@@ -118,24 +118,28 @@ class HostSessionRecoveryService(
     ): HostSessionChangeReceipt {
         val expectedAttendanceRevision =
             command.expectedAttendanceRevision ?: throw InvalidSessionScheduleException()
-        val attendanceCommand = locked.change.toAttendanceCommand(command.host)
-        val withRevision =
-            attendanceCommand.copy(
-                entries =
-                    attendanceCommand.entries.map { entry ->
-                        entry.copy(
-                            expectedAttendanceRevision =
-                                expectedAttendanceRevision.takeIf {
-                                    command.membershipId == null ||
-                                        command.membershipId.toString() == entry.membershipId
-                                },
-                        )
-                    },
-            )
-        if (withRevision.entries.none { entry -> entry.expectedAttendanceRevision != null }) {
+        val attendanceCommand = locked.change.toAttendanceCommand(command.host, expectedAttendanceRevision)
+        val scoped =
+            if (command.membershipId == null) {
+                attendanceCommand
+            } else {
+                attendanceCommand.copy(
+                    entries =
+                        attendanceCommand.entries.filter { entry ->
+                            entry.membershipId == command.membershipId.toString()
+                        },
+                )
+            }
+        if (scoped.entries.isEmpty()) {
             throw InvalidSessionScheduleException()
         }
-        attendancePort.confirmAttendance(withRevision)
+        val withSetRevision =
+            scoped.copy(
+                expectedParticipantSetRevision =
+                    locked.participantSetRevision.takeIf { scoped.entries.size > 1 },
+            )
+        attendancePort.confirmAttendance(withSetRevision)
+        epochPort.bump(command.host.clubId, HostListEpochKind.MEETING)
         return auditPort.recordAttendanceUpdate(
             host = command.host,
             sessionId = locked.change.sessionId,

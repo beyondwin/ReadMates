@@ -26,6 +26,7 @@ data class HostSessionRestoreCurrentState(
 data class HostSessionRestoreLock(
     val change: HostSessionRecoverableChange,
     val current: HostSessionRestoreCurrentState,
+    val participantSetRevision: Long = 0,
 )
 
 interface HostSessionRecoveryPort {

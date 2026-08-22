@@ -120,7 +120,9 @@ class HostSessionRecoveryServiceTest {
             AttendanceEntryCommand(FIRST_MEMBER.toString(), "UNKNOWN", expectedAttendanceRevision = 0),
             AttendanceEntryCommand(SECOND_MEMBER.toString(), "UNKNOWN", expectedAttendanceRevision = 0),
         )
+        assertThat(fixture.attendance.confirmed?.expectedParticipantSetRevision).isEqualTo(0)
         assertThat(fixture.audit.attendanceRestoredFromChangeId).isEqualTo(CHANGE_ID)
+        assertThat(fixture.epochs.bumps).containsExactly(setOf(HostListEpochKind.MEETING))
     }
 
     @Test

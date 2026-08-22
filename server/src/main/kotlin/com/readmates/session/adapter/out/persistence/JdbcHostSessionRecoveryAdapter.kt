@@ -52,7 +52,22 @@ class JdbcHostSessionRecoveryAdapter(
             return null
         }
         val attendance = loadAttendance(host, sessionId, change.transitionMembershipIds(), forUpdate = true)
-        return HostSessionRestoreLock(change, HostSessionRestoreCurrentState(basic, attendance))
+        val participantSetRevision =
+            jdbcTemplate.queryForObject(
+                """
+                select participant_set_revision
+                from sessions
+                where id = ? and club_id = ? and deleted_at is null
+                """.trimIndent(),
+                Long::class.java,
+                sessionId.dbString(),
+                host.clubId.dbString(),
+            ) ?: 0
+        return HostSessionRestoreLock(
+            change,
+            HostSessionRestoreCurrentState(basic, attendance),
+            participantSetRevision,
+        )
     }
 
     private fun loadChangeRow(

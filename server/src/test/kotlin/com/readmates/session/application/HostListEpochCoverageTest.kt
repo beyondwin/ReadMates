@@ -59,6 +59,22 @@ class HostListEpochCoverageTest {
     }
 
     @Test
+    fun `attendance confirmation owns the meeting epoch when it contributes to attention`() {
+        val attendance =
+            read("server/src/main/kotlin/com/readmates/session/application/service/HostSessionAttendanceService.kt")
+        assertThat(attendance)
+            .contains("HostListEpochPort")
+            .contains("HostListEpochKind.MEETING")
+        assertThat(
+            HostListEpochInventory.sources
+                .filter { source -> source.sqlToken == "attention_rank" }
+                .flatMap { source -> source.mutationOwners },
+        ).anySatisfy { owner ->
+            assertThat(owner).endsWith("HostSessionAttendanceService.kt")
+        }
+    }
+
+    @Test
     fun `every registered mutation owner bumps the matching epoch in the same class`() {
         HostListEpochInventory.sources.forEach { source ->
             source.mutationOwners.forEach { owner ->

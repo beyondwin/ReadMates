@@ -332,7 +332,7 @@ class HostSessionRevisionContractDbTest(
             .post("/api/host/sessions/$sessionId/attendance") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content = """[{"membershipId":"$membershipId","attendanceStatus":"$status"}]"""
+                content = """[{"membershipId":"$membershipId","attendanceStatus":"$status","expectedAttendanceRevision":0}]"""
             }.andExpect { status { isOk() } }
             .andReturn()
             .response

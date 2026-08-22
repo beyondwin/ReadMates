@@ -913,6 +913,7 @@ class JdbcManualNotificationDispatchAdapterTest(
                                                 AttendanceEntryCommand(
                                                     membershipId = changedMembershipId.toString(),
                                                     attendanceStatus = changedAttendance,
+                                                    expectedAttendanceRevision = 0,
                                                 ),
                                             ),
                                     ),

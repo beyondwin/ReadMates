@@ -73,6 +73,9 @@ import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpoch
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
 import com.readmates.shared.observability.RequestIdFilter
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
@@ -394,7 +397,7 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand("membership-1", "ATTENDED")),
+                entries = listOf(AttendanceEntryCommand("membership-1", "ATTENDED", expectedAttendanceRevision = 0)),
             )
 
         val result = service.confirmAttendance(command)
@@ -506,7 +509,7 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED")),
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0)),
             )
 
         service.confirmAttendance(command)
@@ -535,9 +538,10 @@ class HostSessionServicesTest {
                 sessionId = sessionId,
                 entries =
                     listOf(
-                        AttendanceEntryCommand(firstId.toString(), "ATTENDED"),
-                        AttendanceEntryCommand(secondId.toString(), "ABSENT"),
+                        AttendanceEntryCommand(firstId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                        AttendanceEntryCommand(secondId.toString(), "ABSENT", expectedAttendanceRevision = 1),
                     ),
+                expectedParticipantSetRevision = 1,
             )
 
         val result = service.confirmAttendance(command)
@@ -560,13 +564,79 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED")),
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0)),
             )
 
         val result = service.confirmAttendance(command)
 
         assertThat(port.attendanceAuditTransitions).isEmpty()
         assertThat(result.changeReceipt).isNull()
+    }
+
+    @Test
+    fun `unknown attendance is a first-class correction status`() {
+        val port = RecordingHostSessionPorts()
+        val epochs = RecordingAttendanceEpochPort()
+        val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        port.attendanceStates = mapOf(membershipId to "ATTENDED")
+        val service = HostSessionAttendanceService(port, port, epochPort = epochs)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "UNKNOWN", expectedAttendanceRevision = 2)),
+            )
+
+        val result = service.confirmAttendance(command)
+
+        assertThat(port.attendanceAuditTransitions)
+            .containsExactly(HostAttendanceAuditTransition(membershipId.toString(), "ATTENDED", "UNKNOWN"))
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.MEETING))
+        assertThat(result.changeReceipt).isNotNull()
+    }
+
+    @Test
+    fun `attendance confirmation bumps meeting epoch once when status changes`() {
+        val port = RecordingHostSessionPorts()
+        val epochs = RecordingAttendanceEpochPort()
+        val firstId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        val secondId = UUID.fromString("00000000-0000-0000-0000-000000000402")
+        port.attendanceStates = mapOf(firstId to "UNKNOWN", secondId to "UNKNOWN")
+        val service = HostSessionAttendanceService(port, port, epochPort = epochs)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(firstId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                        AttendanceEntryCommand(secondId.toString(), "ABSENT", expectedAttendanceRevision = 0),
+                    ),
+                expectedParticipantSetRevision = 3,
+            )
+
+        service.confirmAttendance(command)
+
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.MEETING))
+    }
+
+    @Test
+    fun `idempotent attendance confirmation does not bump meeting epoch`() {
+        val port = RecordingHostSessionPorts()
+        val epochs = RecordingAttendanceEpochPort()
+        val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        port.attendanceStates = mapOf(membershipId to "ATTENDED")
+        val service = HostSessionAttendanceService(port, port, epochPort = epochs)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 4)),
+            )
+
+        service.confirmAttendance(command)
+
+        assertThat(epochs.bumps).isEmpty()
     }
 
     @Test
@@ -1965,6 +2035,19 @@ class HostSessionServicesTest {
                     ),
                 visibility = SessionRecordVisibility.HOST_ONLY,
             )
+    }
+
+    private class RecordingAttendanceEpochPort : HostListEpochPort {
+        val bumps = mutableListOf<Set<HostListEpochKind>>()
+
+        override fun load(clubId: UUID) = HostListEpoch(clubId, 0, 0)
+
+        override fun bump(
+            clubId: UUID,
+            kinds: Set<HostListEpochKind>,
+        ) {
+            bumps += kinds
+        }
     }
 
     private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {

@@ -93,16 +93,47 @@ data class UpdateHostSessionVisibilityCommand(
     val accessScope: SessionAccessScope? = null,
 )
 
+enum class ActualAttendanceStatus {
+    ATTENDED,
+    ABSENT,
+    UNKNOWN,
+}
+
+data class UpdateParticipantAttendanceCommand(
+    val membershipId: UUID,
+    val status: ActualAttendanceStatus,
+    val expectedAttendanceRevision: Long,
+) {
+    init {
+        require(expectedAttendanceRevision >= 0) { "expectedAttendanceRevision must be non-negative" }
+    }
+}
+
+data class BulkAttendanceCommand(
+    val rows: List<UpdateParticipantAttendanceCommand>,
+    val expectedParticipantSetRevision: Long,
+) {
+    init {
+        require(rows.isNotEmpty()) { "bulk attendance rows must not be empty" }
+        require(expectedParticipantSetRevision >= 0) { "expectedParticipantSetRevision must be non-negative" }
+    }
+}
+
 data class AttendanceEntryCommand(
     val membershipId: String,
     val attendanceStatus: String,
-    val expectedAttendanceRevision: Long? = null,
-)
+    val expectedAttendanceRevision: Long,
+) {
+    init {
+        require(expectedAttendanceRevision >= 0) { "expectedAttendanceRevision must be non-negative" }
+    }
+}
 
 data class ConfirmAttendanceCommand(
     val host: CurrentMember,
     val sessionId: UUID,
     val entries: List<AttendanceEntryCommand>,
+    val expectedParticipantSetRevision: Long? = null,
 )
 
 data class UpsertPublicationCommand(

@@ -76,14 +76,17 @@ internal fun HostSessionRecoverableChange.toUpdateCommand(
     )
 }
 
-internal fun HostSessionRecoverableChange.toAttendanceCommand(host: CurrentMember): ConfirmAttendanceCommand =
+internal fun HostSessionRecoverableChange.toAttendanceCommand(
+    host: CurrentMember,
+    expectedAttendanceRevision: Long,
+): ConfirmAttendanceCommand =
     ConfirmAttendanceCommand(
         host = host,
         sessionId = sessionId,
         entries =
             transitions
                 .sortedBy { it.membershipId }
-                .map { AttendanceEntryCommand(it.membershipId, it.from) },
+                .map { AttendanceEntryCommand(it.membershipId, it.from, expectedAttendanceRevision) },
     )
 
 @Suppress("MaxLineLength")

@@ -489,15 +489,21 @@ class HostDashboardControllerTest(
             }
 
         val attendees = findFirstTwoSessionAttendees(UUID.fromString(sessionId))
+        val participantSetRevision =
+            jdbcTemplate.queryForObject(
+                "select participant_set_revision from sessions where id = ?",
+                Long::class.java,
+                sessionId,
+            ) ?: 0
         mockMvc
-            .post("/api/host/sessions/$sessionId/attendance") {
+            .post("/api/host/sessions/$sessionId/attendance?expectedParticipantSetRevision=$participantSetRevision") {
                 with(user("host@example.com"))
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     """
                     [
-                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED" },
-                      { "membershipId": "${attendees.second}", "attendanceStatus": "ABSENT" }
+                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 },
+                      { "membershipId": "${attendees.second}", "attendanceStatus": "ABSENT", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
@@ -546,11 +552,12 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED" }
+                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
-                status { isNotFound() }
+                status { isConflict() }
+                jsonPath("$.code") { value("REVISION_CONFLICT") }
             }
 
         val attendanceStatus =
@@ -853,7 +860,7 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "ATTENDED" }
+                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
@@ -1073,7 +1080,7 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "LATE" }
+                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "LATE", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
@@ -1091,7 +1098,7 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": " ", "attendanceStatus": "ATTENDED" }
+                      { "membershipId": " ", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {

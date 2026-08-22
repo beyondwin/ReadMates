@@ -1155,7 +1155,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT"}]"""
+                content = """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]"""
             }.andExpect {
                 status { isOk() }
             }
@@ -1180,15 +1180,15 @@ class HostSessionControllerDbTest(
 
         val body =
             mockMvc
-                .post("/api/host/sessions/$sessionId/attendance") {
+                .post("/api/host/sessions/$sessionId/attendance?expectedParticipantSetRevision=0") {
                     with(user("host@example.com"))
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
                     content =
                         """
                         [
-                          {"membershipId":"$secondMembershipId","attendanceStatus":"ATTENDED"},
-                          {"membershipId":"$firstMembershipId","attendanceStatus":"ABSENT"}
+                          {"membershipId":"$secondMembershipId","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},
+                          {"membershipId":"$firstMembershipId","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}
                         ]
                         """.trimIndent()
                 }.andExpect {
