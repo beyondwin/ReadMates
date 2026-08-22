@@ -125,6 +125,17 @@ readmates:
       ttl: 24h
       previous-key-rollout-buffer: 24h
       allow-empty-secret: false
+  mutation:
+    idempotency:
+      current-key: ${READMATES_MUTATION_IDENTITY_CURRENT_KEY:}
+      current-key-version: ${READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION:1}
+      previous-key: ${READMATES_MUTATION_IDENTITY_PREVIOUS_KEY:}
+      previous-key-version: ${READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION:0}
+      retention: 24h
+      previous-key-rollout-buffer: 24h
+      purge-fixed-delay: ${READMATES_MUTATION_IDEMPOTENCY_PURGE_FIXED_DELAY:1h}
+      purge-batch-size: ${READMATES_MUTATION_IDEMPOTENCY_PURGE_BATCH_SIZE:50}
+      allow-empty-secret: false
   notifications:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
     sender-name: ${READMATES_NOTIFICATION_SENDER_NAME:}

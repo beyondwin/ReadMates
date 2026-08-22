@@ -9,6 +9,13 @@ readmates:
       previous-key: test-host-list-cursor-previous-key
       previous-key-version: 0
       allow-empty-secret: false
+  mutation:
+    idempotency:
+      current-key: test-mutation-identity-current-key
+      current-key-version: 1
+      previous-key: test-mutation-identity-previous-key
+      previous-key-version: 0
+      allow-empty-secret: false
   aigen:
     enabled: false
     mock: false

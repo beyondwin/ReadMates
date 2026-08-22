@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(10)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(11)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,9 +94,10 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("52")
+            assertThat(latestVersion).isEqualTo("53")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
+            assertV53IdempotencySchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -373,7 +374,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(8)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -385,9 +386,10 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("52")
+            assertThat(latestVersion).isEqualTo("53")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
+            assertV53IdempotencySchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1649,8 +1651,9 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("52")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("53")
             assertV52RevisionSchema(jdbc)
+            assertV53IdempotencySchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1749,9 +1752,10 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("52")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("53")
             assertV52RevisionSchema(upgradeJdbc)
+            assertV53IdempotencySchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertEquals(publicationCountBefore, countRows(upgradeJdbc, "public_session_publications"))
             assertEquals(5, sessionsWithoutPublication)
@@ -1800,6 +1804,7 @@ class MySqlFlywayMigrationTest(
     @Suppress("LongMethod")
     fun `mysql adds revision domains participant audit and application snapshot identity`() {
         assertV52RevisionSchema(jdbcTemplate)
+        assertV53IdempotencySchema(jdbcTemplate)
         val fixture = V52LiveRevisionFixture()
         try {
             insertV52RevisionClubGraph(
@@ -3454,6 +3459,66 @@ class MySqlFlywayMigrationTest(
                 Int::class.java,
             ),
         )
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV53IdempotencySchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "mutation_idempotency_keys")).containsExactlyInAnyOrder(
+            "club_id",
+            "actor_membership_id",
+            "operation",
+            "resource_slot",
+            "idempotency_key",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "status",
+            "receipt_id",
+            "created_at",
+            "updated_at",
+            "expires_at",
+        )
+        assertThat(columns(jdbcTemplate, "mutation_digest_key_state")).containsExactlyInAnyOrder(
+            "digest_key_version",
+            "last_referenced_at",
+            "unreferenced_since",
+        )
+        assertThat(columns(jdbcTemplate, "host_session_mutation_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "club_id",
+            "actor_membership_id",
+            "operation",
+            "resource_id",
+            "session_revision",
+            "exposure_revision",
+            "participant_set_revision",
+            "record_draft_revision",
+            "live_record_revision",
+            "publication_revision",
+            "notification_decision",
+            "dispatch_receipt_id",
+            "created_at",
+        )
+        val hmac = columnMetadata(jdbcTemplate, "mutation_idempotency_keys", "request_hmac")
+        assertThat(hmac["DATA_TYPE"].toString()).isEqualTo("binary")
+        assertThat(hmac["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+        assertThat(hmac["IS_NULLABLE"]).isEqualTo("NO")
+        assertEquals(
+            "club_id,actor_membership_id,operation,resource_slot,idempotency_key",
+            indexColumns(jdbcTemplate, "mutation_idempotency_keys", "PRIMARY"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, "mutation_idempotency_keys", "PRIMARY")).isZero()
+        assertThat(importedKeys(jdbcTemplate, "mutation_idempotency_keys")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "mutation_digest_key_state")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "host_session_mutation_receipts")).isEmpty()
+        assertThat(columns(jdbcTemplate, "mutation_idempotency_keys"))
+            .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
+        assertThat(columns(jdbcTemplate, "host_session_mutation_receipts"))
+            .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
+        assertThat(checkConstraintClause(jdbcTemplate, "mutation_idempotency_keys_status_check"))
+            .contains("IN_PROGRESS", "COMPLETED")
+        assertThat(checkConstraintClause(jdbcTemplate, "host_session_mutation_receipts_decision_check"))
+            .contains("NOT_SENT", "DISPATCH_REFERENCED")
     }
 
     @Suppress("LongMethod")

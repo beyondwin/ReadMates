@@ -186,7 +186,12 @@ private val serverSlices =
         ServerSlice(
             name = "shared",
             type = ServerSliceType.SHARED,
-            inboundAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.shared.adapter.in.web..",
+                    "com.readmates.shared.mutation.adapter.in.scheduling..",
+                ),
+            applicationPackages = listOf("com.readmates.shared.mutation.application.."),
         ),
     )
 
@@ -412,6 +417,7 @@ class ServerArchitectureBoundaryTest {
         assertTrue(inboundPackages.contains("com.readmates.notification.adapter.in.scheduler.."))
         assertTrue(inboundPackages.contains("com.readmates.admin.health.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.session.adapter.in.scheduling.."))
+        assertTrue(inboundPackages.contains("com.readmates.shared.mutation.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.adapter.in.security.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.infrastructure.security.."))
     }

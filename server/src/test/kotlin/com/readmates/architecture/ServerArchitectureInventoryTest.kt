@@ -68,6 +68,64 @@ class ServerArchitectureInventoryTest {
     }
 
     @Test
+    fun `mutation idempotency substrate stays shared and session receipts stay session owned`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val mutationRoot = productionSourceRoot.resolve("com/readmates/shared/mutation")
+        val mutationSources =
+            Files.walk(mutationRoot).use { paths ->
+                paths
+                    .filter { sourceFile ->
+                        Files.isRegularFile(sourceFile) && sourceFile.fileName.toString().endsWith(".kt")
+                    }.toList()
+            }
+        mutationSources.forEach { sourceFile ->
+            val source = Files.readString(sourceFile)
+            assertThat(source).doesNotContain("import com.readmates.session.")
+            assertThat(source).doesNotContain("import com.readmates.notification.")
+        }
+        val service =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/shared/mutation/application/service/MutationIdempotencyService.kt",
+                ),
+            )
+        assertThat(service).contains(
+            "import com.readmates.shared.mutation.application.port.out.MutationIdempotencyPort",
+        )
+        assertThat(service).doesNotContain("import com.readmates.shared.mutation.adapter")
+        val scheduler =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/shared/mutation/adapter/in/scheduling/MutationIdempotencyPurgeScheduler.kt",
+                ),
+            )
+        assertThat(scheduler).contains(
+            "import com.readmates.shared.mutation.application.port.`in`.PurgeExpiredMutationIdempotencyUseCase",
+        )
+        assertThat(scheduler).doesNotContain("import com.readmates.shared.mutation.application.service")
+        val receiptAdapter =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/session/adapter/out/persistence/JdbcHostMutationReceiptAdapter.kt",
+                ),
+            )
+        assertThat(receiptAdapter).doesNotContain("import com.readmates.notification")
+        val notificationRoot = productionSourceRoot.resolve("com/readmates/notification")
+        Files.walk(notificationRoot).use { paths ->
+            paths
+                .filter { sourceFile ->
+                    Files.isRegularFile(sourceFile) && sourceFile.fileName.toString().endsWith(".kt")
+                }.forEach { sourceFile ->
+                    val source = Files.readString(sourceFile)
+                    assertThat(source).doesNotContain("HostMutationReceipt")
+                    assertThat(source).doesNotContain(
+                        "import com.readmates.session.application.model.NotificationDecision",
+                    )
+                }
+        }
+    }
+
+    @Test
     fun `joined club summary test imports match corrected inventory exactly`() {
         val root = projectRoot()
         val testSourceRoot = root.resolve("server/src/test/kotlin")
