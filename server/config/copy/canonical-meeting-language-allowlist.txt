@@ -5,7 +5,6 @@
 # needle is a literal substring on a scanned hit line.
 # Blank lines and # comments are ignored.
 
-parser-storage-compatibility|com/readmates/sessionimport/application/service/SessionImportService.kt|회차 파일인데 현재 화면은|sessionimport|Remove when readmates-session-import:v1 number labels no longer use 회차
 parser-storage-compatibility|com/readmates/feedback/application/FeedbackDocumentParser.kt|독서모임|feedback|Remove when the feedback document heading contract is versioned off N차
 parser-storage-compatibility|com/readmates/archive/adapter/out/persistence/ArchiveRowMappers.kt|독서모임 ${sessionNumber}차 피드백|archive|Remove when generated feedback titles stop using the N차 heading contract
 parser-storage-compatibility|com/readmates/archive/adapter/out/persistence/JdbcArchiveDetailBatchReadAdapter.kt|독서모임 ${sessionNumber}차 피드백|archive|Remove when generated feedback titles stop using the N차 heading contract

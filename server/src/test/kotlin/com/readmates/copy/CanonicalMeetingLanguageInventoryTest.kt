@@ -3,12 +3,25 @@ package com.readmates.copy
 import com.readmates.archive.adapter.`in`.web.ArchiveErrorHandler
 import com.readmates.archive.application.ArchiveApplicationError
 import com.readmates.archive.application.ArchiveApplicationException
+import com.readmates.auth.domain.MembershipRole
 import com.readmates.notification.adapter.`in`.web.NotificationErrorHandler
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
+import com.readmates.notification.application.model.ManualNotificationDispatchList
+import com.readmates.notification.application.model.ManualNotificationMemberOption
+import com.readmates.notification.application.model.ManualNotificationRecentDispatch
+import com.readmates.notification.application.model.ManualNotificationSelection
 import com.readmates.notification.application.model.NotificationEmailTemplates
+import com.readmates.notification.application.model.NotificationEventPayload
+import com.readmates.notification.application.port.out.ManualNotificationConfirmAttempt
+import com.readmates.notification.application.port.out.ManualNotificationConfirmTransactionInput
+import com.readmates.notification.application.port.out.ManualNotificationDispatchPort
+import com.readmates.notification.application.port.out.ManualNotificationPreviewRecord
 import com.readmates.notification.application.port.out.ManualNotificationSessionContext
+import com.readmates.notification.application.port.out.ManualNotificationStoredDispatch
+import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.application.port.out.manualDispatchDisabledReason
+import com.readmates.notification.application.service.HostManualNotificationService
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.adapter.`in`.web.SessionApplicationErrorHandler
 import com.readmates.session.application.HostSessionCloseNotAllowedException
@@ -27,14 +40,30 @@ import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionDeletionBlockerCode
 import com.readmates.sessionimport.adapter.`in`.web.SessionImportErrorHandler
 import com.readmates.sessionimport.application.InvalidSessionImportException
+import com.readmates.sessionimport.application.model.SessionImportCommand
+import com.readmates.sessionimport.application.model.SessionImportFeedbackDocumentCommand
+import com.readmates.sessionimport.application.model.SessionImportPublicationCommand
+import com.readmates.sessionimport.application.model.SessionImportRecordCommand
+import com.readmates.sessionimport.application.model.SessionImportSessionCommand
+import com.readmates.sessionimport.application.model.SessionImportTarget
+import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
+import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
+import com.readmates.sessionimport.application.port.out.SessionImportWritePort
+import com.readmates.sessionimport.application.service.SessionImportService
 import com.readmates.sessionrecord.adapter.`in`.web.SessionRecordErrorHandler
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
+import com.readmates.shared.paging.CursorPage
+import com.readmates.shared.paging.PageRequest
+import com.readmates.shared.security.AuthenticatedClubActor
+import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import java.nio.file.Files
 import java.nio.file.Path
 import java.time.LocalDate
+import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.io.path.relativeTo
 
@@ -195,8 +224,68 @@ class CanonicalMeetingLanguageInventoryTest {
         ).isEqualTo("현재 피드백 문서가 있는 멤버와 준비 중 또는 지난 모임에서 발송할 수 있습니다.")
         assertThat(context().manualDispatchDisabledReason(NotificationEventType.SESSION_RECORD_UPDATED))
             .isEqualTo("반영된 모임 기록이 있어야 수정 알림을 보낼 수 있습니다.")
+        assertThat(context().manualDispatchDisabledReason(NotificationEventType.REVIEW_PUBLISHED))
+            .isEqualTo("새 서평 알림은 수동 발송하지 않습니다.")
         assertThat(context().manualDispatchDisabledReason(NotificationEventType.AI_GENERATION_READY))
             .isEqualTo("AI 모임 초안 완료 알림은 수동 발송하지 않습니다.")
+
+        val templates =
+            HostManualNotificationService(CopyInventoryManualPort())
+                .options(hostMember(), SESSION_ID, null, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
+                .templates
+        assertThat(templates.associate { it.eventType to it.label }).containsExactlyInAnyOrderEntriesOf(
+            mapOf(
+                NotificationEventType.NEXT_BOOK_PUBLISHED to "다음 책 확정",
+                NotificationEventType.SESSION_REMINDER_DUE to "모임 전날 리마인더",
+                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to "피드백 문서 등록",
+                NotificationEventType.SESSION_RECORD_UPDATED to "모임 기록 수정",
+            ),
+        )
+        templates.forEach { template ->
+            assertThat(template.label).doesNotContain("공개", "세션", "회차")
+        }
+        assertThat(hostManualNotificationTemplateLabels()).containsExactlyInAnyOrderEntriesOf(
+            mapOf(
+                NotificationEventType.NEXT_BOOK_PUBLISHED to "다음 책 확정",
+                NotificationEventType.SESSION_REMINDER_DUE to "모임 전날 리마인더",
+                NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED to "피드백 문서 등록",
+                NotificationEventType.REVIEW_PUBLISHED to "새 서평",
+                NotificationEventType.SESSION_RECORD_UPDATED to "모임 기록 수정",
+                NotificationEventType.AI_GENERATION_READY to "AI 모임 초안 완료",
+            ),
+        )
+    }
+
+    @Test
+    fun `generated import number mismatch uses folio ordinals`() {
+        val host = hostMember()
+        val sessionId = SESSION_ID
+        val target =
+            SessionImportTarget(
+                sessionId = sessionId,
+                clubId = host.clubId,
+                sessionNumber = 7,
+                bookTitle = "Book",
+                meetingDate = LocalDate.of(2026, 7, 23),
+                attendees = emptyList(),
+            )
+        val preview =
+            SessionImportService(CopyInventoryImportPort(target)).preview(
+                SessionImportCommand(
+                    host = host,
+                    sessionId = sessionId,
+                    recordVisibility = SessionRecordVisibility.MEMBER,
+                    format = "readmates-session-import:v1",
+                    session = SessionImportSessionCommand(8, "Book", LocalDate.of(2026, 7, 23)),
+                    publication = SessionImportPublicationCommand("Summary"),
+                    highlights = listOf(SessionImportRecordCommand("Member", "Highlight")),
+                    oneLineReviews = listOf(SessionImportRecordCommand("Member", "Review")),
+                    feedbackDocument = SessionImportFeedbackDocumentCommand("feedback.md", "# note"),
+                ),
+            )
+        val mismatch = preview.issues.single { it.code == "SESSION_NUMBER_MISMATCH" }
+        assertThat(mismatch.message).isEqualTo("No.8 파일인데 현재 화면은 No.7입니다.")
+        assertThat(mismatch.message).doesNotContain("회차", "세션")
     }
 
     @Test
@@ -219,6 +308,9 @@ class CanonicalMeetingLanguageInventoryTest {
         assertThat(reopen).contains("기록 정리 중")
         assertThat(nextBook.title).doesNotContain("공개")
         assertThat(record.emailBodyText).doesNotContain("공개")
+        hostManualNotificationTemplateLabels().values.forEach { label ->
+            assertThat(label).doesNotContain("공개", "세션", "회차")
+        }
     }
 
     @Test
@@ -294,6 +386,33 @@ class CanonicalMeetingLanguageInventoryTest {
     private fun com.readmates.notification.application.model.NotificationRenderedCopy.summarySurface(): String =
         listOf(title, body, emailSubject, emailBodyText).joinToString("\n")
 
+    private fun hostMember() =
+        CurrentMember(
+            userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+            clubId = CLUB_ID,
+            clubSlug = "reading-sai",
+            email = "host@example.com",
+            displayName = "Host",
+            accountName = "host",
+            role = MembershipRole.HOST,
+        )
+
+    private fun hostManualNotificationTemplateLabels(): Map<NotificationEventType, String> {
+        val source =
+            Files.readString(
+                projectRoot().resolve(
+                    "server/src/main/kotlin/com/readmates/notification/application/service/HostManualNotificationService.kt",
+                ),
+            )
+        return NotificationEventType.entries.associateWith { eventType ->
+            Regex("""NotificationEventType\.${eventType.name} -> "([^"]+)"""")
+                .findAll(source)
+                .map { it.groupValues[1] }
+                .last()
+        }
+    }
+
     private fun context(
         state: String = "DRAFT",
         visibility: String = "HOST_ONLY",
@@ -366,5 +485,90 @@ class CanonicalMeetingLanguageInventoryTest {
             val owner: String,
             val removalCondition: String,
         )
+    }
+
+    private class CopyInventoryManualPort : ManualNotificationDispatchPort {
+        override fun findSessionContext(
+            clubId: UUID,
+            sessionId: UUID,
+        ) = ManualNotificationSessionContext(
+            sessionId = SESSION_ID,
+            clubId = CLUB_ID,
+            sessionNumber = 8,
+            bookTitle = "Distributed Systems",
+            date = LocalDate.of(2026, 8, 22),
+            state = "DRAFT",
+            visibility = "MEMBER",
+            feedbackDocumentUploaded = false,
+        )
+
+        override fun listMembers(
+            clubId: UUID,
+            sessionId: UUID?,
+            search: String?,
+            pageRequest: PageRequest,
+        ) = CursorPage<ManualNotificationMemberOption>(emptyList(), null)
+
+        override fun listDispatches(
+            clubId: UUID,
+            sessionId: UUID?,
+            eventType: NotificationEventType?,
+            pageRequest: PageRequest,
+        ) = ManualNotificationDispatchList(emptyList(), null)
+
+        override fun validateMembershipEdits(
+            clubId: UUID,
+            membershipIds: Set<UUID>,
+        ) = error("unused")
+
+        override fun previewTargets(
+            clubId: UUID,
+            selection: ManualNotificationSelection,
+        ) = error("unused")
+
+        override fun recentDispatches(
+            clubId: UUID,
+            sessionId: UUID,
+            eventType: NotificationEventType,
+            contentRevision: String,
+        ): List<ManualNotificationRecentDispatch> = error("unused")
+
+        override fun insertPreview(
+            clubId: UUID,
+            hostMembershipId: UUID,
+            selectionHash: String,
+            targetSnapshotHash: String,
+            expiresAt: OffsetDateTime,
+        ): UUID = error("unused")
+
+        override fun findPreview(
+            id: UUID,
+            clubId: UUID,
+            hostMembershipId: UUID,
+        ): ManualNotificationPreviewRecord? = error("unused")
+
+        override fun confirmManualDispatch(input: ManualNotificationConfirmTransactionInput): ManualNotificationConfirmAttempt =
+            error("unused")
+
+        override fun insertManualDispatch(
+            clubId: UUID,
+            hostMembershipId: UUID,
+            selection: ManualNotificationSelection,
+            payload: NotificationEventPayload,
+            targetSnapshot: ManualNotificationTargetSnapshot,
+            resend: Boolean,
+        ): ManualNotificationStoredDispatch = error("unused")
+    }
+
+    private class CopyInventoryImportPort(
+        private val target: SessionImportTarget,
+    ) : SessionImportWritePort {
+        override fun loadTarget(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+        ): SessionImportTarget = target
+
+        override fun replaceRecords(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument =
+            error("unused")
     }
 }

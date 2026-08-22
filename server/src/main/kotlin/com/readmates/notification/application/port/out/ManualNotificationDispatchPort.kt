@@ -160,7 +160,7 @@ fun ManualNotificationSessionContext.manualDispatchDisabledReason(eventType: Not
             } else {
                 null
             }
-        NotificationEventType.REVIEW_PUBLISHED -> "서평 공개 알림은 수동 발송하지 않습니다."
+        NotificationEventType.REVIEW_PUBLISHED -> "새 서평 알림은 수동 발송하지 않습니다."
         NotificationEventType.SESSION_RECORD_UPDATED ->
             if (sessionRecordContentRevision == null) {
                 "반영된 모임 기록이 있어야 수정 알림을 보낼 수 있습니다."

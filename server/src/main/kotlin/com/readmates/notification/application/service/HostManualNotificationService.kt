@@ -298,10 +298,10 @@ class HostManualNotificationService(
 
     private fun manualTemplateLabel(eventType: NotificationEventType): String =
         when (eventType) {
-            NotificationEventType.NEXT_BOOK_PUBLISHED -> "다음 책 공개"
+            NotificationEventType.NEXT_BOOK_PUBLISHED -> "다음 책 확정"
             NotificationEventType.SESSION_REMINDER_DUE -> "모임 전날 리마인더"
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED -> "피드백 문서 등록"
-            NotificationEventType.REVIEW_PUBLISHED -> "서평 공개"
+            NotificationEventType.REVIEW_PUBLISHED -> "새 서평"
             NotificationEventType.SESSION_RECORD_UPDATED -> "모임 기록 수정"
             NotificationEventType.AI_GENERATION_READY -> "AI 모임 초안 완료"
         }

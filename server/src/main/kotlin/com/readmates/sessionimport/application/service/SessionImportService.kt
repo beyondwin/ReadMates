@@ -187,7 +187,7 @@ class SessionImportService(
             issues +=
                 SessionImportIssue(
                     "SESSION_NUMBER_MISMATCH",
-                    "${command.session.number}회차 파일인데 현재 화면은 ${target.sessionNumber}회차입니다.",
+                    "No.${command.session.number} 파일인데 현재 화면은 No.${target.sessionNumber}입니다.",
                 )
         }
         if (command.session.bookTitle.trim() != target.bookTitle) {
