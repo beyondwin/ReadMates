@@ -116,7 +116,7 @@ async function expectMemberSpaceSemanticOrder(page: Page) {
     recentReadings,
     shelf.getByRole("heading", { level: 2, name: "최근 독서 기록" }),
     shelf.getByRole("link", {
-      name: /responsive reading shelf 회차 기록/,
+      name: /responsive reading shelf 모임 기록/,
     }),
   );
   await expect(shelf.getByRole("link", { name: "기록 보기" })).toHaveCount(0);
@@ -288,7 +288,7 @@ test("member space keeps the profile-first semantic order and usable actions acr
 
   await page.emulateMedia({ reducedMotion: "reduce" });
   const firstRecent = page.getByRole("link", {
-    name: /responsive reading shelf 회차 기록/,
+    name: /responsive reading shelf 모임 기록/,
   });
   await firstRecent.hover();
   await expect(firstRecent.locator(".rm-recent-reading-row__arrow"))
@@ -410,7 +410,7 @@ test("club-scoped account and notification routes preserve navigation current st
   );
 
   const recentSession = page.getByRole("link", {
-    name: "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf 회차 기록",
+    name: "아주 긴 한국어 제목과 An exceptionally long English subtitle for a responsive reading shelf 모임 기록",
   });
   await expect(recentSession).toHaveAttribute(
     "href",
@@ -429,7 +429,7 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(page).toHaveURL(
     new RegExp(`${scopedAppPath}/archive\\?view=sessions$`),
   );
-  await expect(page.getByRole("button", { name: "세션" }))
+  await expect(page.getByRole("button", { name: "모임" }))
     .toHaveAttribute("aria-pressed", "true");
 
   await page.goto(`${scopedAppPath}/me`);

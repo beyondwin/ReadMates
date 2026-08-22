@@ -29,7 +29,7 @@ test("TopNav keeps the host retry control typographically aligned with destinati
   );
 
   const destinationLink = navigation.getByRole("link", { name: "멤버", exact: true });
-  const retryButton = navigation.getByRole("button", { name: "세션 다시 확인" });
+  const retryButton = navigation.getByRole("button", { name: "모임 다시 확인" });
   const [linkTypography, retryTypography] = await Promise.all(
     [destinationLink, retryButton].map((locator) =>
       locator.evaluate((element) => {

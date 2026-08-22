@@ -91,7 +91,7 @@ test("owner sees a safe closing-risk case and follows its host board link", asyn
 
   await page.goto("/admin/today?case=case-closing-risk");
 
-  await expect(page.getByRole("button", { name: /회차 마감이 완료되지 않았습니다/ })).toBeVisible();
+  await expect(page.getByRole("button", { name: /모임 마감이 완료되지 않았습니다/ })).toBeVisible();
   await expect(page.getByRole("link", { name: "마감 운영에서 확인" })).toHaveAttribute(
     "href",
     "/clubs/reading-room/app/host/sessions/session-closing/closing",

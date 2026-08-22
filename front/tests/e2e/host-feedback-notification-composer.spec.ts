@@ -343,12 +343,12 @@ test("draft commits stay silent and final apply composes without automatic dispa
   test.setTimeout(90_000);
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`${HOST_PATH}/sessions/new`);
-  await expect(page.getByLabel("세션 제목")).toBeVisible();
-  await page.getByLabel("세션 제목").fill("Feedback Composer Contract Session");
+  await expect(page.getByLabel("모임 제목")).toBeVisible();
+  await page.getByLabel("모임 제목").fill("Feedback Composer Contract Session");
   await page.getByLabel("책 제목").fill(RECORD_BOOK);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-08-20");
-  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
   const sessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
@@ -559,7 +559,7 @@ where id = '${stalePreviewPayload.previewId}';
   expect(concurrentApply.composer.contentRevision).toMatch(/^[0-9a-f]{64}$/);
   await page.getByRole("button", { name: "발송 확인" }).click();
   await expect(
-    page.getByText("알림 내용 또는 세션 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요."),
+    page.getByText("알림 내용 또는 모임 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요."),
   ).toBeVisible();
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);

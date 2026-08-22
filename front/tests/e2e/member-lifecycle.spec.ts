@@ -22,12 +22,12 @@ async function expectCanonicalMeetingUrl(page: Page) {
 
 async function createOpenSessionThroughUi(page: Page) {
   await page.goto("/app/host/sessions/new");
-  await expect(page.getByLabel("세션 제목")).toBeVisible();
-  await page.getByLabel("세션 제목").fill("7회차 모임 · 생명주기 테스트");
+  await expect(page.getByLabel("모임 제목")).toBeVisible();
+  await page.getByLabel("모임 제목").fill("7회차 모임 · 생명주기 테스트");
   await page.getByLabel("책 제목").fill(lifecycleBookTitle);
   await page.getByLabel("저자").fill("테스트 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
   const meetingUrl = page.url();
   await expectCanonicalMeetingUrl(page);
@@ -63,7 +63,7 @@ test("host confirms before closing a session from the editor overview", async ({
 
   await page.goto(meetingUrl);
   await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
-  const checkAttendance = page.getByRole("button", { name: "출석 확인하기" }).locator("visible=true");
+  const checkAttendance = page.getByRole("button", { name: "실제 출석 확인" }).locator("visible=true");
   const finish = page.getByRole("button", { name: "모임 마치기" }).locator("visible=true");
   await expect(checkAttendance.or(finish)).toBeVisible({ timeout: 10_000 });
   if (await checkAttendance.count()) {
@@ -120,11 +120,11 @@ test("host suspends member and member cannot save current session activity", asy
   await page.getByRole("tab", { name: "활성 멤버" }).click();
 
   const memberRow = page.getByRole("article").filter({ hasText: lifecycleMemberEmail });
-  await expect(memberRow).toContainText("이번 세션 참여");
+  await expect(memberRow).toContainText("이번 모임 참여");
 
   await memberRow.getByRole("button", { name: "정지" }).click();
   const dialog = page.getByRole("dialog", { name: /정지할까요/ });
-  await dialog.getByLabel("이번 세션부터 바로 정지").check();
+  await dialog.getByLabel("이번 모임부터 바로 정지").check();
 
   const suspendResponse = page.waitForResponse(
     (response) => response.url().includes("/api/bff/api/host/members/") && response.url().includes("/suspend") && response.status() === 200,

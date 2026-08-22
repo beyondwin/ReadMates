@@ -495,7 +495,7 @@ test.describe("focus workspace recovery journey", () => {
     await expectOneMainAndOrderedHeadings(page);
 
     await page.getByRole("button", { name: "모임 정보" }).click();
-    const title = page.getByLabel("세션 제목");
+    const title = page.getByLabel("모임 제목");
     await expect(title).toBeVisible();
     const preservedTitle = "실패한 저장에도 남는 제목";
     await title.fill(preservedTitle);
@@ -535,7 +535,7 @@ test.describe("focus workspace recovery journey", () => {
     await expect(visibleButton(page, "멤버 응답 확인하기")).toHaveCount(1);
     await visibleButton(page, "멤버 응답 확인하기").click();
     await expect(page.getByRole("heading", { name: "참석 응답" })).toBeVisible();
-    await expect(page.getByText("호스트 · RSVP 미응답")).toBeVisible();
+    await expect(page.getByText("참석 응답 미응답")).toBeVisible();
     await page.waitForTimeout(500);
     await expect(page.getByText("멤버와 준비 중")).toBeVisible();
     await expect(page.getByText("기록 정리 중")).toHaveCount(0);
@@ -557,8 +557,8 @@ test.describe("focus workspace recovery journey", () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openWorkspace(page, sessionId);
 
-    await expect(visibleButton(page, "출석 확인하기")).toHaveCount(1);
-    await visibleButton(page, "출석 확인하기").click();
+    await expect(visibleButton(page, "실제 출석 확인")).toHaveCount(1);
+    await visibleButton(page, "실제 출석 확인").click();
     const attend = page.getByRole("button", { name: "호스트 참석" });
     await expect(attend).toBeVisible();
     await page.route(`**/api/bff/api/host/sessions/${sessionId}/attendance**`, async (route) => {
@@ -658,19 +658,19 @@ test.describe("focus workspace recovery journey", () => {
       Number(editorAfterReload.body?.liveRevision ?? 0),
       JSON.stringify(editorAfterReload.body),
     ).toBeGreaterThan(0);
-    await expect(page.getByRole("heading", { name: "기록 공개" })).toBeVisible();
-    await expect(visibleButton(page, "기록 공개")).toHaveCount(1);
-    await visibleButton(page, "기록 공개").click();
-    await confirmLifecycle(page, "기록 공개", "기록 공개");
-    await expect(page.getByText("공개 완료")).toBeVisible();
-    await expect(page.getByRole("dialog", { name: "공개 취소" })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: "게스트·멤버 노트에 기록 게시" })).toBeVisible();
+    await expect(visibleButton(page, "게스트·멤버 노트에 기록 게시")).toHaveCount(1);
+    await visibleButton(page, "게스트·멤버 노트에 기록 게시").click();
+    await confirmLifecycle(page, "게스트·멤버 노트에 기록 게시", "게스트·멤버 노트에 기록 게시");
+    await expect(page.getByText("게스트·멤버 노트 게시 완료")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "게스트·멤버 노트에서 기록 내리기" })).toHaveCount(0);
     await expect(page.getByRole("link", { name: "공개 기록 보기" }).filter({ visible: true })).toHaveCount(1);
     const createRevision = page.getByRole("button", { name: "수정본 만들기" });
     await expect(createRevision).toBeVisible();
     expect(sessionState(sessionId)).toBe("PUBLISHED");
     await createRevision.click();
-    await expect(page.getByText("공개 완료")).toBeVisible();
-    await expect(page.getByRole("dialog", { name: "공개 취소" })).toHaveCount(0);
+    await expect(page.getByText("게스트·멤버 노트 게시 완료")).toBeVisible();
+    await expect(page.getByRole("dialog", { name: "게스트·멤버 노트에서 기록 내리기" })).toHaveCount(0);
     await expect(page.getByRole("heading", { name: "정리본" })).toBeVisible();
     expect(sessionState(sessionId)).toBe("PUBLISHED");
   });
@@ -687,7 +687,7 @@ test.describe("focus workspace recovery journey", () => {
     await openWorkspace(page, sessionId);
 
     await page.getByRole("button", { name: "모임 정보" }).click();
-    await page.getByLabel("세션 제목").fill("84회차 모임 · 저장된 복원 제목");
+    await page.getByLabel("모임 제목").fill("84회차 모임 · 저장된 복원 제목");
     await page.getByRole("button", { name: "기본 정보 저장" }).click();
     await expect(page.getByRole("status").filter({ hasText: "저장되었습니다." })).toBeVisible();
     await expect(page.getByRole("status").filter({ hasText: "모임 정보를 저장했습니다." })).toBeVisible();
@@ -735,7 +735,7 @@ test.describe("focus workspace recovery journey", () => {
     await expect(page.getByText("모임 작성 중")).toBeVisible();
     await closeWorkspaceSheet(page, "변경 내역");
     await page.getByRole("button", { name: "모임 정보" }).click();
-    await expect(page.getByLabel("세션 제목")).toHaveValue(/포커스 복원 책/);
+    await expect(page.getByLabel("모임 제목")).toHaveValue(/포커스 복원 책/);
     await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
     await expect(page.getByText("모임 작성 중")).toBeVisible();
     await expect(page.locator(".rm-host-session-workspace__sheet-backdrop")).toBeHidden();
@@ -907,7 +907,7 @@ test.describe("focus workspace recovery journey", () => {
     await page.keyboard.press("Enter");
     const sheet = page.getByRole("dialog", { name: "모임 정보" });
     await expect(sheet).toBeVisible();
-    const title = page.getByLabel("세션 제목");
+    const title = page.getByLabel("모임 제목");
     await tabUntilFocused(page, title);
     await expect(title).toBeFocused();
     await title.fill("88회차 모임 · 키보드 저장");

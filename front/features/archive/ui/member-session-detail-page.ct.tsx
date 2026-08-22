@@ -24,7 +24,7 @@ for (const viewport of [
       name: "10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?",
     });
     const interfaceHeading = scope.getByRole("heading", { name: "함께 남긴 질문", exact: true });
-    const recordHeading = scope.getByRole("heading", { name: "회차 하이라이트 · 1" });
+    const recordHeading = scope.getByRole("heading", { name: "모임 하이라이트 · 1" });
 
     await expect(scope).toBeVisible();
     await expect(summary).not.toHaveClass(/reading-editorial/);
