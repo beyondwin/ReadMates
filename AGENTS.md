@@ -27,7 +27,7 @@ Keep changes scoped to the touched feature and follow `docs/development/architec
 
 For architecture questions, impact analysis, or first-pass orientation across multiple surfaces, use `docs/development/project-map.md` as a navigation aid, then verify against the current code, tests, migrations, scripts, and `docs/development/architecture.md`.
 
-For spec or implementation-plan work, read `docs/development/project-map.md` and `docs/development/vertical-slice-checklist.md` before handing tasks to any executor.
+Before spec, implementation-plan, or direct implementation work, read the accepted/proposed decisions in `docs/development/adr/README.md` and record the ADR impact as `none`, `update`, `new`, or `supersede`. For spec or implementation-plan work, also read `docs/development/project-map.md` and `docs/development/vertical-slice-checklist.md` before handing tasks to any executor. Regardless of how many surfaces it touches, a durable product, technical, design, or operational decision that will constrain future work must have one focused ADR in `Proposed` before implementation, then move to `Accepted` only after code, tests, and active architecture agree. Routine implementation detail does not need an ADR. Never silently rewrite an accepted decision; supersede it with a new ADR and keep both indexed.
 
 Public repo safety matters: do not add real member data, secrets, deployment state, local absolute paths, private domains, OCIDs, or token-shaped examples. You may inspect local env or generated files when needed, but do not quote or persist their private values in docs, tests, commits, or final responses.
 

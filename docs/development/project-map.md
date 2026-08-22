@@ -10,8 +10,9 @@
 | 2 | Full source checkout의 repository-local contributor guidance(있는 경우)와 이 문서 | 작업 표면과 공유 request/authority/local-runtime 계약을 고릅니다. |
 | 3 | 실제 수정 경로와 관련 active docs | 현재 또는 예상 경로를 분류하고 frontend, server, design, docs 규칙을 읽습니다. |
 | 4 | 이 문서의 "변경 유형별 읽는 순서"와 `acceptance-matrix.md` | 어떤 active docs와 risk evidence를 먼저 볼지 좁힙니다. |
-| 5 | `docs/development/architecture.md` | 제품 route, BFF/auth, frontend/server 경계가 불명확하면 확인합니다. |
-| 6 | 최소 검증 명령 | 변경한 표면만 검증하고, 못 돌린 검증은 통과처럼 쓰지 않습니다. |
+| 5 | `docs/development/adr/README.md` | 반복 적용할 accepted/proposed 결정과 이번 작업의 ADR impact를 확인합니다. |
+| 6 | `docs/development/architecture.md` | 제품 route, BFF/auth, frontend/server 경계가 불명확하면 확인합니다. |
+| 7 | 최소 검증 명령 | 변경한 표면만 검증하고, 못 돌린 검증은 통과처럼 쓰지 않습니다. |
 
 ## Source Of Truth 우선순위
 
@@ -19,10 +20,11 @@
 | --- | --- | --- |
 | 1 | 현재 코드, 테스트, migrations, scripts | 실제 동작과 검증 명령의 기준입니다. |
 | 2 | `docs/development/architecture.md` | 제품/기술 경계와 active architecture 기준입니다. |
-| 3 | Full source checkout의 repository-local contributor guidance(있는 경우) | 작업 전 표면별 editing rules를 확인합니다. Clean public artifact는 이 도구를 요구하지 않습니다. |
-| 4 | `docs/development/*`, `docs/deploy/*`, `docs/operations/*` | 개발, 배포, 운영 절차의 active docs입니다. |
-| 5 | `docs/reports/*` | 작성 시점의 분석/진단 snapshot입니다. 현재 근거로 쓰기 전에 재검증합니다. |
-| 6 | `docs/superpowers/*` | 과거 design spec과 implementation plan archive입니다. 현재 동작 기준이 아닙니다. |
+| 3 | `docs/development/adr/*` | `Accepted`는 반복 판단의 결정 근거, `Proposed`는 아직 구현되지 않은 승인 방향입니다. 현재 동작은 위의 코드와 architecture로 재검증합니다. |
+| 4 | Full source checkout의 repository-local contributor guidance(있는 경우) | 작업 전 표면별 editing rules를 확인합니다. Clean public artifact는 이 도구를 요구하지 않습니다. |
+| 5 | `docs/development/*`, `docs/deploy/*`, `docs/operations/*` | 개발, 배포, 운영 절차의 active docs입니다. |
+| 6 | `docs/reports/*` | 작성 시점의 분석/진단 snapshot입니다. 현재 근거로 쓰기 전에 재검증합니다. |
+| 7 | `docs/superpowers/*` | 과거 design spec과 implementation plan archive입니다. 현재 동작 기준이 아닙니다. |
 
 ## 현재 프로젝트 표면
 
@@ -60,6 +62,7 @@
 | Server/persistence/migration | repository-local contributor guidance(있는 경우) -> `docs/development/architecture.md` -> migration/test docs | acceptance matrix와 `./scripts/server-ci-check.sh`를 선택하고, MySQL/Flyway evidence가 필요할 때 별도 `integrationTest` 범위를 판단합니다. |
 | Deploy/public-release/security | repository-local contributor guidance(있는 경우) -> deploy docs -> scripts/workflows 직접 확인 | public release candidate checks와 targeted safety scans를 우선합니다. |
 | Docs-only | repository-local contributor guidance(있는 경우) -> 관련 active docs | `git diff --check -- <changed-docs>`와 targeted public-safety scan을 실행합니다. |
+| Spec/implementation plan/direct implementation | ADR index -> project map -> vertical slice checklist when planning -> current architecture/code | ADR impact를 `none/update/new/supersede`로 기록하고 표면 수와 무관한 durable decision은 구현 전에 `Proposed` ADR로 분리합니다. |
 | Release readiness/residual risk | `docs/development/release-readiness-review.md` -> branch diff | 테스트 통과만으로 닫지 않고 CHANGELOG, CI/deploy, operator-facing change, public safety를 함께 봅니다. |
 
 Guest browsing vertical slice는 `front/features/guest-browse`의 audience-aware route/API/model/UI, `server/.../browse`의 anonymous-safe read slice, V45의 `sessions.access_scope`와 `public_session_publications.site_visibility`, 그리고 target-club OAuth join을 소유하는 `auth` slice로 구성됩니다. Public marketing route의 `PUBLIC_RECORD` projection과 guest app의 `GUEST_READABLE` projection을 같은 공개 범위로 합치지 않습니다. 기존 `visibility`/`is_public`은 한 릴리즈 dual-write compatibility일 뿐 새 app-access decision의 source of truth가 아닙니다.
@@ -69,6 +72,7 @@ Guest browsing vertical slice는 `front/features/guest-browse`의 audience-aware
 사용하는 planning 또는 execution tool과 무관하게 ReadMates handoff에는 다음을 남깁니다.
 
 - requirement와 task의 대응 관계;
+- 적용하거나 새로 만든 ADR, ADR impact, `Proposed → Accepted` 승격 조건;
 - task dependency와 예상 수정 파일;
 - frontend, BFF, server, migration, deploy, public-safety 중 실제 영향 표면;
 - focused acceptance command와 PR-level evidence;

@@ -8,6 +8,7 @@ Current source-of-truth order:
 
 - Current code, config, tests, migrations, and scripts: factual source of truth for behavior and commands.
 - `docs/development/architecture.md`: current product and technical boundaries when architecture or API behavior is unclear.
+- `docs/development/adr/README.md`: durable decision index. `Accepted` records constrain future judgment; `Proposed` records approved direction that is not yet current runtime behavior.
 
 - `README.md`: entry-point overview, concise product and architecture summary, and links to detailed docs.
 - `docs/development/`: local setup, testing, architecture, and contributor-facing technical guidance.
@@ -20,6 +21,8 @@ Current source-of-truth order:
 Documentation rules:
 
 - Cross-check factual claims against current code, config, tests, and scripts before editing.
+- For any durable product, technical, design, or operational decision, regardless of surface count, create or supersede one focused ADR and update both `docs/development/adr/README.md` and the derived `docs/development/technical-decisions.md` index. Do not use a historical spec as the only long-term decision record or add parallel decision prose to `technical-decisions.md`.
+- Keep ADR status honest: design-approved but unimplemented is `Proposed`; implementation plus active-doc/test alignment is `Accepted`.
 - Treat README as the entry point, not as an override for architecture, code, tests, deploy scripts, or release helpers.
 - Keep public-facing docs free of real member data, private domains, deployment state, local absolute paths, OCIDs, secrets, and token-shaped examples.
 - Use placeholders such as `https://api.example.com`, `<db-password>`, and `host@example.com`.
@@ -59,4 +62,4 @@ For deploy, public repository, release-candidate, or scanner documentation, also
 
 The private working tree may intentionally contain tracked historical planning notes under `docs/superpowers`; do not treat current-tree public-release scanner findings from that historical directory as a docs update regression unless the changed files introduced them.
 
-Done when changed docs match current source files or explicitly note uncertainty, public-safety constraints are preserved, `git diff --check -- <changed-docs>` has run or is reported as skipped, and the final response names any targeted safety or link scans performed.
+Done when changed docs match current source files or explicitly note uncertainty, ADR impact has been recorded for durable decisions, ADR status/indexes match the delivered state, public-safety constraints are preserved, `git diff --check -- <changed-docs>` has run or is reported as skipped, and the final response names any targeted safety or link scans performed.

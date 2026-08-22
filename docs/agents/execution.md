@@ -16,6 +16,16 @@ Read this for rules that apply across frontend, BFF, server, scripts, deploy, an
 - Name the expected edit surface and required guides before changing files.
 - Stop before editing when existing user changes overlap the expected files.
 - Treat current code, tests, migrations, scripts, and architecture as current truth; historical plans, reports, ignored tool state, and generated output are context only.
+- Read `docs/development/adr/README.md` before spec, implementation-plan, or direct implementation work. Record the impact as `none`, `update`, `new`, or `supersede` before implementation. Surface count is irrelevant: a durable product contract, architecture boundary, data/lifecycle meaning, security/reliability policy, reusable design-system rule, or operational policy belongs in an ADR even when it changes only one surface.
+
+## Decision Record Lifecycle
+
+- Use one ADR for one durable decision. Routine refactors, component-local choices, and reversible implementation details stay in code/tests or the implementation plan.
+- Create a `Proposed` ADR after the design decision is approved and before an implementation plan treats it as fixed.
+- An executor must cite the relevant ADR in the plan/task and verify that the implementation does not contradict another accepted ADR.
+- Move `Proposed` to `Accepted` only when code, tests, `docs/development/architecture.md`, and any affected guide describe the same contract. A docs-only proposal is not accepted runtime behavior.
+- If a decision changes, add a new ADR, mark the old one `Superseded by ADR-NNNN`, and update both ADR indexes. Do not erase the old context.
+- At handoff, report ADR impact and any ADR still `Proposed`; those are implementation obligations, not evidence of completion.
 
 ## Implementation And Artifacts
 
@@ -34,3 +44,4 @@ Read this for rules that apply across frontend, BFF, server, scripts, deploy, an
 - Run the smallest focused check first, then the canonical surface gate selected by `AGENTS.md` and `docs/development/acceptance-matrix.md`.
 - Report exact commands, automated evidence, manual evidence, skipped validation with reasons, and residual risk.
 - State whether evidence is repository-only, local-runtime, or live production evidence.
+- Confirm that ADR status and indexes match the delivered state; do not leave an implemented decision `Proposed` or an unimplemented decision `Accepted`.

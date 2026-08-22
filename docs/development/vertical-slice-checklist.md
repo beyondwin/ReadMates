@@ -4,6 +4,9 @@ Use this checklist when a change crosses frontend, BFF, server API, auth, persis
 
 ## 0. Handoff
 
+- ADR impact가 `none`, `update`, `new`, `supersede` 중 하나로 기록되어 있습니다.
+- 표면 수와 무관한 durable product·technical·design·operational decision은 구현 전에 한 결정당 한 `Proposed` ADR로 분리되어 있고, 관련 accepted ADR과 충돌하지 않습니다.
+- `Proposed → Accepted` 조건에 코드, 테스트, active architecture 동기화가 연결되어 있습니다.
 - Requirement마다 구현 task와 acceptance evidence가 연결되어 있습니다.
 - `acceptance-matrix.md`에서 선택한 row와 이유, 인접한 high-risk row를 제외한 이유가 기록되어 있습니다.
 - Task dependency와 예상 수정 파일이 명시되어 있습니다.
@@ -49,3 +52,10 @@ Use this checklist when a change crosses frontend, BFF, server API, auth, persis
 - Frontend behavior change: run the focused Vitest file and the smallest relevant route/component test.
 - API, auth, BFF, or user-flow change: run `pnpm --dir front test:e2e`.
 - Public release change: run `./scripts/build-public-release-candidate.sh` and `./scripts/public-release-check.sh .tmp/public-release-candidate`.
+
+## 6. Decision Closeout
+
+- 구현된 결정만 `Accepted`이고 아직 계획/설계 단계인 결정은 `Proposed`로 남아 있습니다.
+- 새 결정이 기존 결정을 바꾸면 기존 ADR은 삭제하지 않고 `Superseded by ADR-NNNN`으로 연결되어 있습니다.
+- `docs/development/adr/README.md`, `docs/development/technical-decisions.md`, `docs/development/architecture.md`가 delivered contract와 일치합니다.
+- 최종 handoff가 ADR 영향과 남은 `Proposed` ADR을 명시합니다.
