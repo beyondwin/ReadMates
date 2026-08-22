@@ -1,0 +1,75 @@
+package com.readmates.session.application.model
+
+import java.util.UUID
+
+data class SessionVersionVector(
+    val sessionRevision: Long,
+    val exposureRevision: Long,
+    val participantSetRevision: Long,
+    val recordDraftRevision: Long?,
+    val liveRecordRevision: Long?,
+    val publicationRevision: Long,
+) {
+    init {
+        require(sessionRevision >= 0) { "sessionRevision must be non-negative" }
+        require(exposureRevision >= 0) { "exposureRevision must be non-negative" }
+        require(participantSetRevision >= 0) { "participantSetRevision must be non-negative" }
+        require(recordDraftRevision == null || recordDraftRevision > 0) {
+            "recordDraftRevision must be null or positive"
+        }
+        require(liveRecordRevision == null || liveRecordRevision > 0) {
+            "liveRecordRevision must be null or positive"
+        }
+        require(publicationRevision >= 0) { "publicationRevision must be non-negative" }
+    }
+
+    fun snapshotIdentity(resourceId: UUID): ProjectionSnapshotIdentity =
+        ProjectionSnapshotIdentity.from(
+            resourceId,
+            this,
+        )
+
+    companion object {
+        val INITIAL =
+            SessionVersionVector(
+                sessionRevision = 0,
+                exposureRevision = 0,
+                participantSetRevision = 0,
+                recordDraftRevision = null,
+                liveRecordRevision = null,
+                publicationRevision = 0,
+            )
+    }
+}
+
+data class AttendanceVersion(
+    val membershipId: UUID,
+    val attendanceRevision: Long,
+) {
+    init {
+        require(attendanceRevision >= 0) { "attendanceRevision must be non-negative" }
+    }
+}
+
+data class ProjectionSnapshotIdentity(
+    val snapshotId: String,
+) {
+    init {
+        require(snapshotId.isNotBlank()) { "snapshotId must not be blank" }
+    }
+
+    companion object {
+        fun from(
+            resourceId: UUID,
+            versions: SessionVersionVector,
+        ): ProjectionSnapshotIdentity {
+            val draftToken = versions.recordDraftRevision?.toString() ?: "-"
+            val liveToken = versions.liveRecordRevision?.toString() ?: "-"
+            return ProjectionSnapshotIdentity(
+                snapshotId =
+                    "$resourceId:${versions.sessionRevision}:${versions.exposureRevision}:" +
+                        "${versions.participantSetRevision}:$draftToken:$liveToken:${versions.publicationRevision}",
+            )
+        }
+    }
+}

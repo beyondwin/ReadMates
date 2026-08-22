@@ -3,7 +3,9 @@ package com.readmates.session.adapter.`in`.web
 import com.fasterxml.jackson.annotation.JsonInclude
 import com.readmates.session.application.HostSessionAutomaticScheduleDefaults
 import com.readmates.session.application.HostSessionScheduleDefaults
+import com.readmates.session.application.model.AttendanceVersion
 import com.readmates.session.application.model.HostSessionCommand
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.constraints.AssertTrue
@@ -12,6 +14,7 @@ import jakarta.validation.constraints.Pattern
 import jakarta.validation.constraints.Size
 import java.net.URI
 import java.time.LocalDate
+import java.util.UUID
 
 data class HostSessionRequest(
     @field:NotBlank val title: String,
@@ -78,7 +81,55 @@ data class HostSessionRequest(
             meetingPasscode = meetingPasscode,
             accessScope = accessScope,
         )
+
+    fun createdVersionVector(): SessionVersionVector = SessionVersionVector.INITIAL
 }
+
+data class SessionVersionVectorBody(
+    val sessionRevision: Long,
+    val exposureRevision: Long,
+    val participantSetRevision: Long,
+    val recordDraftRevision: Long?,
+    val liveRecordRevision: Long?,
+    val publicationRevision: Long,
+) {
+    fun toModel() =
+        SessionVersionVector(
+            sessionRevision = sessionRevision,
+            exposureRevision = exposureRevision,
+            participantSetRevision = participantSetRevision,
+            recordDraftRevision = recordDraftRevision,
+            liveRecordRevision = liveRecordRevision,
+            publicationRevision = publicationRevision,
+        )
+}
+
+fun SessionVersionVector.toBody() =
+    SessionVersionVectorBody(
+        sessionRevision = sessionRevision,
+        exposureRevision = exposureRevision,
+        participantSetRevision = participantSetRevision,
+        recordDraftRevision = recordDraftRevision,
+        liveRecordRevision = liveRecordRevision,
+        publicationRevision = publicationRevision,
+    )
+
+data class AttendanceVersionBody(
+    val membershipId: UUID,
+    val attendanceRevision: Long,
+) {
+    fun toModel() =
+        AttendanceVersion(
+            membershipId = membershipId,
+            attendanceRevision = attendanceRevision,
+        )
+}
+
+fun AttendanceVersion.toBody() =
+    AttendanceVersionBody(
+        membershipId = membershipId,
+        attendanceRevision = attendanceRevision,
+    )
 
 data class PreviousOnlineMeetingResponse(
     val meetingUrl: String,

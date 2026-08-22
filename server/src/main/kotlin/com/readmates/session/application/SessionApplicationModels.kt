@@ -1,9 +1,11 @@
 package com.readmates.session.application
 
+import com.readmates.session.application.model.AttendanceVersion
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionTrashResponse
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
@@ -346,6 +348,26 @@ data class HostAttendanceResponse(
     val count: Int,
     val changeReceipt: HostSessionChangeReceipt? = null,
 )
+
+fun HostSessionListItem.toSessionVersionVector(
+    sessionRevision: Long,
+    exposureRevision: Long,
+    participantSetRevision: Long,
+    publicationRevision: Long,
+) = SessionVersionVector(
+    sessionRevision = sessionRevision,
+    exposureRevision = exposureRevision,
+    participantSetRevision = participantSetRevision,
+    recordDraftRevision = draftRevision,
+    liveRecordRevision = liveRevision.takeIf { it > 0 },
+    publicationRevision = publicationRevision,
+)
+
+fun HostSessionAttendee.toAttendanceVersion(attendanceRevision: Long) =
+    AttendanceVersion(
+        membershipId = UUID.fromString(membershipId),
+        attendanceRevision = attendanceRevision,
+    )
 
 data class HostPublicationResponse(
     val sessionId: String,

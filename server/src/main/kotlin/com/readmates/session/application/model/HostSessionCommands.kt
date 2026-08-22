@@ -23,6 +23,8 @@ data class HostSessionCommand(
     val accessScope: SessionAccessScope? = null,
 )
 
+fun HostSessionCommand.createdVersionVector(): SessionVersionVector = SessionVersionVector.INITIAL
+
 data class HostSessionIdCommand(
     val host: CurrentMember,
     val sessionId: UUID,
