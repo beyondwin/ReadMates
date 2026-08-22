@@ -550,7 +550,8 @@ class HostSessionControllerDbTest(
                       "bookTitle": "수정된 책",
                       "bookAuthor": "수정된 저자",
                       "date": "2026-05-21",
-                      "endTime": "20:00"
+                      "endTime": "20:00",
+                      "expectedSessionRevision": 0
                     }
                     """.trimIndent()
             }.andExpect {

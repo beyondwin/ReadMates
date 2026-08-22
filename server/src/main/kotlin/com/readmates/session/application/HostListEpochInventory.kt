@@ -32,6 +32,9 @@ object HostListEpochInventory {
     private const val PUBLICATION =
         "server/src/main/kotlin/com/readmates/session/application/service/HostSessionPublicationService.kt"
 
+    private val bothModes = setOf(Mode.MEETING, Mode.RECORD)
+    private val bothKinds = setOf(HostListEpochKind.MEETING, HostListEpochKind.RECORD)
+
     val sources: List<Source> =
         listOf(
             source("sessions.state", bothModes, bothKinds, LIFECYCLE, TRASH),
@@ -58,9 +61,6 @@ object HostListEpochInventory {
             source("pending_rsvp_count", setOf(Mode.MEETING), setOf(HostListEpochKind.MEETING), MEMBER),
             source("deleted_at", bothModes, bothKinds, DELETION, TRASH),
         )
-
-    private val bothModes = setOf(Mode.MEETING, Mode.RECORD)
-    private val bothKinds = setOf(HostListEpochKind.MEETING, HostListEpochKind.RECORD)
 
     private fun source(
         sqlToken: String,

@@ -14,6 +14,7 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
@@ -132,6 +133,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -188,6 +190,8 @@ class HostSessionBffSecurityTest(
             .with(user(username))
             .header("X-Readmates-Bff-Secret", "test-bff-secret")
             .header("Origin", "http://localhost:3000")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"expectedSessionRevision":${sessionRevision(sessionId)}}""")
 
         mockMvc.perform(restoreChange("recovery.viewer@example.com")).andExpect(status().isForbidden)
         mockMvc.perform(restoreSession("recovery.viewer@example.com")).andExpect(status().isForbidden)
@@ -209,6 +213,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect { status { isOk() } }
 
         mockMvc
@@ -216,6 +221,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -303,6 +309,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -321,6 +328,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -337,6 +345,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -354,6 +363,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -378,6 +388,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -402,6 +413,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -436,7 +448,8 @@ class HostSessionBffSecurityTest(
                       "bookTitle": "BFF 삭제 테스트 책",
                       "bookAuthor": "BFF 삭제 테스트 저자",
                       "date": "2026-07-01",
-                      "locationLabel": "온라인"
+                      "locationLabel": "온라인",
+                      "expectedSessionRevision": ${sessionRevision(SESSION_ID)}
                     }
                     """.trimIndent()
             }.andExpect { status { isOk() } }
@@ -669,6 +682,19 @@ class HostSessionBffSecurityTest(
             Int::class.java,
         ) ?: 0
 
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate
+            .query(
+                "select session_revision from sessions where id = ?",
+                { resultSet, _ -> resultSet.getLong("session_revision") },
+                sessionId,
+            ).firstOrNull() ?: 0
+
+    private fun MockHttpServletRequestDsl.withExpectedRevision(sessionId: String) {
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
+    }
+
     private companion object {
         private const val SESSION_ID = "00000000-0000-0000-0000-000000009888"
         private const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
@@ -760,7 +786,7 @@ class HostSessionBffSecurityTest(
                 RecordMutationCase(
                     HttpMethod.POST,
                     "/api/host/sessions/00000000-0000-0000-0000-000000009998/restore",
-                    null,
+                    """{"expectedSessionRevision":0}""",
                 ),
             )
     }

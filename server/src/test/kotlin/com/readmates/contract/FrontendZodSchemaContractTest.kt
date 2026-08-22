@@ -125,7 +125,7 @@ class FrontendZodSchemaContractTest
                         with(user("host@example.com"))
                         with(csrf())
                         contentType = MediaType.APPLICATION_JSON
-                        content = sessionJson("88회차 · 계약 복원 제목")
+                        content = sessionJson("88회차 · 계약 복원 제목", expectedSessionRevision = 0)
                     }.andExpect { status { isOk() } }
                     .andReturn()
                     .response.contentAsString
@@ -164,6 +164,8 @@ class FrontendZodSchemaContractTest
                 .delete("/api/host/sessions/$sessionId") {
                     with(user("host@example.com"))
                     with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
                 }.andExpect { status { isOk() } }
 
             val trashDetail =
@@ -567,16 +569,32 @@ class FrontendZodSchemaContractTest
                 ?: error("created session response did not include a sessionId")
         }
 
-        private fun sessionJson(title: String): String =
-            """
-            {
-              "title": "$title",
-              "bookTitle": "계약 복원 책",
-              "bookAuthor": "계약 복원 저자",
-              "date": "2026-07-20",
-              "locationLabel": "온라인"
-            }
-            """.trimIndent()
+        private fun sessionJson(
+            title: String,
+            expectedSessionRevision: Long? = null,
+        ): String {
+            val revisionField =
+                expectedSessionRevision
+                    ?.let { """, "expectedSessionRevision": $it""" }
+                    .orEmpty()
+            return """
+                {
+                  "title": "$title",
+                  "bookTitle": "계약 복원 책",
+                  "bookAuthor": "계약 복원 저자",
+                  "date": "2026-07-20",
+                  "locationLabel": "온라인"$revisionField
+                }
+                """.trimIndent()
+        }
+
+        private fun sessionRevision(sessionId: String): Long =
+            jdbcTemplate
+                .query(
+                    "select session_revision from sessions where id = ?",
+                    { resultSet, _ -> resultSet.getLong("session_revision") },
+                    sessionId,
+                ).firstOrNull() ?: 0
 
         private fun sessionCookieForUser(userId: String): Cookie {
             val issuedSession =

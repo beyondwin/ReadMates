@@ -243,6 +243,8 @@ class PublicControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
             }.andExpect {
                 status { isOk() }
             }
@@ -474,6 +476,14 @@ class PublicControllerDbTest(
             sessionId,
         )
     }
+
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate
+            .query(
+                "select session_revision from sessions where id = ?",
+                { resultSet, _ -> resultSet.getLong("session_revision") },
+                sessionId,
+            ).firstOrNull() ?: 0
 
     companion object {
         private const val MARK_MEMBER5_SESSION_SIX_ONE_LINER_SESSION_SQL = """
