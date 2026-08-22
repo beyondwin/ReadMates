@@ -1664,6 +1664,8 @@ a.rm-recent-record__destination:hover {
 .admin-today-ledger {
   display: grid;
   gap: 22px;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .admin-today-ledger__header {
@@ -1707,7 +1709,7 @@ a.rm-recent-record__destination:hover {
 }
 
 .admin-today-ledger__filter select {
-  min-height: 40px;
+  min-height: 44px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--surface);
@@ -1751,7 +1753,7 @@ a.rm-recent-record__destination:hover {
 
 .admin-today-ledger__columns {
   display: grid;
-  grid-template-columns: minmax(340px, 0.92fr) minmax(420px, 1.08fr);
+  grid-template-columns: minmax(0, 0.92fr) minmax(0, 1.08fr);
   gap: 28px;
   align-items: start;
 }
@@ -2102,17 +2104,7 @@ a.rm-recent-record__destination:hover {
   color: var(--danger);
 }
 
-@media (max-width: 1120px) {
-  .admin-today-ledger__columns {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .admin-operations-inspector {
-    position: static;
-  }
-}
-
-@media (max-width: 600px) {
+@media (max-width: 768px) {
   .admin-today-ledger {
     gap: 18px;
   }
@@ -2153,6 +2145,7 @@ a.rm-recent-record__destination:hover {
 
   .admin-operations-inspector {
     padding: 18px;
+    padding-bottom: calc(18px + env(safe-area-inset-bottom, 0px));
   }
 
   .admin-operations-inspector__facts div {
@@ -5993,10 +5986,6 @@ a.rm-recent-record__destination:hover {
     white-space: normal;
   }
 
-  .admin-today-ledger__columns {
-    grid-template-columns: 1fr;
-  }
-
   .admin-operations-inspector {
     position: static;
   }
@@ -9134,6 +9123,7 @@ a.rm-recent-record__destination:hover {
   display: grid;
   gap: 18px;
   min-width: 0;
+  overflow-x: clip;
 }
 
 .admin-page-frame__header {

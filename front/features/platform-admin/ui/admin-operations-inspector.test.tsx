@@ -77,6 +77,8 @@ describe("AdminOperationsInspector", () => {
     expect(screen.getByText("신호가 처음 감지됨")).toBeInTheDocument();
     expect(screen.getByText("상태 변경 기록")).toBeInTheDocument();
     expect(screen.queryByText("PRIVATE_HISTORY_CODE")).not.toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
+    expect(screen.getByRole("button", { name: "확인 처리" })).toBeInTheDocument();
   });
 
   it("shows the permission boundary without lifecycle controls for support", () => {
@@ -89,6 +91,7 @@ describe("AdminOperationsInspector", () => {
     expect(screen.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "해결 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("group", { name: "작업" })).not.toBeInTheDocument();
   });
 
   it("does not present a failed source attempt as successful freshness evidence", () => {

@@ -1,8 +1,42 @@
 import { expect, test, type Page, type Route } from "@playwright/test";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-admin-contracts";
+import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
 
 const GENERATED_AT = "2026-08-04T10:00:00Z";
+
+const OWNER_CAPABILITIES: readonly PlatformAdminCapability[] = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "REPLAY_NOTIFICATIONS",
+  "VIEW_AI_OPERATIONS",
+  "MANAGE_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "MANAGE_SUPPORT_ACCESS",
+  "VIEW_AUDIT",
+  "VIEW_SENSITIVE_AUDIT",
+  "VIEW_ANALYTICS",
+  "EXPORT_ANALYTICS",
+  "CREATE_CLUB",
+  "MANAGE_CLUBS",
+  "MANAGE_CLUB_DOMAINS",
+  "MANAGE_PLATFORM_ADMINS",
+];
+
+const SUPPORT_CAPABILITIES: readonly PlatformAdminCapability[] = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "VIEW_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "VIEW_AUDIT",
+  "VIEW_ANALYTICS",
+];
 
 function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
   const account = role.toLowerCase();
@@ -61,6 +95,13 @@ async function routePlatformAdminToday(page: Page, role: PlatformAdminRole): Pro
   };
 
   await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, platformAdminAuth(role)));
+  await page.route("**/api/bff/api/admin/capabilities**", (route) => json(route, 200, {
+    schemaVersion: 1,
+    role,
+    status: "ACTIVE",
+    capabilities: [...(role === "SUPPORT" ? SUPPORT_CAPABILITIES : OWNER_CAPABILITIES)],
+    generatedAt: "2026-08-22T00:00:00Z",
+  }));
   await page.route("**/api/bff/api/admin/summary", (route) => json(route, 200, {
     platformRole: role,
     activeClubCount: 2,
@@ -125,4 +166,40 @@ test("support can inspect a case without lifecycle controls", async ({ page }) =
   await expect(page.getByText("현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.")).toBeVisible();
   await expect(page.getByRole("button", { name: "확인 처리" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "해결 확인" })).toHaveCount(0);
+});
+
+test("768px uses mobile drill-in instead of stacked columns", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await routePlatformAdminToday(page, "OWNER");
+  await page.goto("/admin/today?case=case-notification");
+
+  await expect(page.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toHaveCount(0);
+  await expect(page.locator(".admin-today-ledger__columns")).toHaveCount(0);
+
+  await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
+  await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "작업" })).toBeVisible();
+
+  await page.getByRole("button", { name: "목록으로" }).click();
+  await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+  await expect(page).toHaveURL(/case=case-notification/);
+});
+
+test("320px completes the list-to-detail flow without horizontal page overflow", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 720 });
+  await routePlatformAdminToday(page, "OWNER");
+  await page.goto("/admin/today?case=case-notification");
+
+  await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(320);
+
+  await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "작업" })).toBeVisible();
+  await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth))
+    .toBeLessThanOrEqual(320);
 });

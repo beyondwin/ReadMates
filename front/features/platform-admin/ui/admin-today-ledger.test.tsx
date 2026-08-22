@@ -1,10 +1,17 @@
+import { readFileSync } from "node:fs";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { AdminOperationsView } from "@/features/platform-admin/model/platform-admin-operations-model";
+import { ADMIN_SHELL_LAYOUT_MEDIA_QUERY } from "@/features/platform-admin/model/admin-route-catalog";
+import type {
+  AdminOperationCaseView,
+  AdminOperationsView,
+} from "@/features/platform-admin/model/platform-admin-operations-model";
 import { AdminTodayLedger } from "./admin-today-ledger";
+
+const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
 
 const emptyView: AdminOperationsView = {
   generatedAt: "2026-08-04T10:00:00Z",
@@ -26,6 +33,68 @@ const emptyView: AdminOperationsView = {
   nextCursor: null,
 };
 
+function operationCase(overrides: Partial<AdminOperationCaseView> = {}): AdminOperationCaseView {
+  return {
+    id: "case-notification",
+    sourceType: "NOTIFICATION",
+    clubId: null,
+    state: "OPEN",
+    severity: "WARNING",
+    summaryCode: "NOTIFICATION_DELIVERY_FAILURE",
+    firstObservedAt: "2026-08-04T08:00:00Z",
+    lastObservedAt: "2026-08-04T09:55:00Z",
+    snoozedUntil: null,
+    resolvedAt: null,
+    assignedToMe: true,
+    reopenCount: 0,
+    version: 3,
+    impactCount: 2,
+    detailHref: "/admin/notifications?focus=delivery",
+    allowedActions: ["ACKNOWLEDGE", "SNOOZE", "RESOLVE"],
+    source: {
+      sourceType: "NOTIFICATION",
+      status: "AVAILABLE",
+      generatedAt: "2026-08-04T10:00:00Z",
+      lastSuccessfulAt: "2026-08-04T10:00:00Z",
+      authoritative: true,
+    },
+    summary: {
+      title: "알림 전달 실패가 반복되고 있습니다",
+      description: "같은 원인의 실패를 확인하세요.",
+    },
+    severityLabel: "경고",
+    stateLabel: "미확인",
+    sourceLabel: "알림",
+    impactLabel: "영향 2건",
+    ageLabel: "2시간 전",
+    ...overrides,
+  };
+}
+
+function populatedView(
+  selectedCase: AdminOperationCaseView = operationCase(),
+  overrides: Partial<AdminOperationsView> = {},
+): AdminOperationsView {
+  return {
+    ...emptyView,
+    items: [selectedCase],
+    selectedCase,
+    selectedCaseId: selectedCase.id,
+    ...overrides,
+  };
+}
+
+function stubMatchMedia(matches: boolean | ((query: string) => boolean)) {
+  const matchMedia = vi.fn().mockImplementation((query: string) => ({
+    matches: typeof matches === "function" ? matches(query) : matches,
+    media: query,
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+  }));
+  vi.stubGlobal("matchMedia", matchMedia);
+  return matchMedia;
+}
+
 describe("AdminTodayLedger", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
@@ -45,11 +114,105 @@ describe("AdminTodayLedger", () => {
       </MemoryRouter>,
     );
 
+    expect(screen.getByRole("region", { name: "오늘의 운영 케이스" })).toHaveClass("admin-page-frame");
     expect(screen.getByRole("heading", { name: "오늘의 운영 케이스" })).toBeInTheDocument();
     expect(screen.getByLabelText("운영 케이스 요약")).toHaveTextContent("활성 0건 · 긴급 0건 · 내 담당 0건");
     expect(screen.getByRole("combobox", { name: "상태 필터" })).toBeInTheDocument();
-    expect(screen.getByText("현재 조건에 맞는 운영 케이스가 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("지금은 처리할 운영 케이스가 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("새로운 신호가 생기면 여기에 나타납니다.")).toBeInTheDocument();
+    expect(screen.queryByText("현재 조건에 맞는 운영 케이스가 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "필터 지우기" })).not.toBeInTheDocument();
+    expect(container.querySelector(".admin-today-ledger__columns")).toBeNull();
+    expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
+  });
+
+  it("distinguishes a filtered empty queue from a true empty queue", async () => {
+    const user = userEvent.setup();
+    const onClearFilters = vi.fn();
+    render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={emptyView}
+          filters={{ state: "open", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+          onClearFilters={onClearFilters}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText("조건에 맞는 운영 케이스가 없습니다")).toBeInTheDocument();
+    expect(screen.getByText("필터를 바꾸면 다른 케이스를 볼 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("지금은 처리할 운영 케이스가 없습니다")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "필터 지우기" }));
+    expect(onClearFilters).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the shared 768px contract for mobile drill-in instead of stacked columns", () => {
+    const matchMedia = stubMatchMedia((query) => query.includes("768px"));
+    const { container } = render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView()}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
+    expect(ADMIN_SHELL_LAYOUT_MEDIA_QUERY).toBe("(max-width: 768px)");
+    expect(matchMedia).toHaveBeenCalledWith("(max-width: 768px)");
+    expect(matchMedia).not.toHaveBeenCalledWith("(max-width: 600px)");
+    expect(container.querySelector(".admin-today-ledger__columns")).toBeNull();
+    expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "운영 케이스 상세" })).not.toBeInTheDocument();
+  });
+
+  it("keeps desktop two-pane composition above 768px", () => {
+    stubMatchMedia(false);
+    const { container } = render(
+      <MemoryRouter>
+        <AdminTodayLedger
+          view={populatedView()}
+          filters={{ state: "", severity: "", source: "", assignee: "" }}
+          history={[]}
+          lifecycleControls={null}
+          onFilterChange={vi.fn()}
+          onSelectCase={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+
     expect(container.querySelector(".admin-today-ledger__columns")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
+  });
+
+  it("pins Today CSS to the 768px contract without stacking columns at tablet width", () => {
+    expect(GLOBALS_CSS).toContain(".admin-today-ledger");
+    expect(GLOBALS_CSS).toMatch(/\.admin-today-ledger[\s\S]*overflow-x:\s*(clip|hidden)/);
+    expect(GLOBALS_CSS).toMatch(
+      /\.admin-today-ledger__columns\s*\{[^}]*grid-template-columns:\s*minmax\(0,\s*[^)]+\)\s+minmax\(0,\s*[^)]+\)/,
+    );
+    const todayStackAt1120 = GLOBALS_CSS.match(
+      /@media \(max-width: 1120px\)\s*\{[\s\S]*?\.admin-today-ledger__columns[\s\S]*?\}/,
+    );
+    expect(todayStackAt1120).toBeNull();
+    expect(GLOBALS_CSS).not.toMatch(
+      /@media \(max-width: 600px\)[\s\S]{0,400}\.admin-today-ledger__/,
+    );
+    expect(GLOBALS_CSS).toMatch(
+      /@media \(max-width: 768px\)[\s\S]*\.admin-action-dock[\s\S]*env\(safe-area-inset-bottom/,
+    );
+    expect(GLOBALS_CSS).toMatch(
+      /\.admin-today-ledger__filter select[\s\S]*min-height:\s*44px/,
+    );
   });
 
   it("keeps partial-source cases interactive and retries only an unavailable source once", async () => {
@@ -154,7 +317,9 @@ describe("AdminTodayLedger", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByRole("status")).toHaveTextContent("일부 신호 확인 불가");
+    expect(screen.getByText("일부만 확인됨")).toBeInTheDocument();
+    expect(screen.getByText(/확인된 내용은 그대로 사용할 수 있습니다/)).toBeInTheDocument();
+    expect(screen.getByText("일부 신호 확인 불가")).toBeInTheDocument();
     expect(screen.getByText("일부 확인 불가 · 마지막 정상 18:40")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /알림 전달 실패/ })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "알림 다시 확인" })).not.toBeInTheDocument();

@@ -63,6 +63,16 @@ describe("AdminOperationsQueue", () => {
 
     await user.click(row);
     expect(onSelectCase).toHaveBeenCalledWith("case-notification");
+    expect(row).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("keeps filtered-empty copy local to the queue when no rows match", () => {
+    render(
+      <AdminOperationsQueue items={[]} selectedCaseId={null} onSelectCase={vi.fn()} />,
+    );
+
+    expect(screen.getByText("현재 조건에 맞는 운영 케이스가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("never renders an unknown raw summary code", () => {

@@ -107,6 +107,7 @@ describe("AdminOperationMobileDetail", () => {
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
     expect(screen.getByText(selected.id)).toHaveClass("admin-operation-wrap");
     expect(screen.getByRole("button", { name: "목록으로" })).toHaveFocus();
+    expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
 
     Object.defineProperty(window, "scrollX", { configurable: true, value: 0 });
     Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });

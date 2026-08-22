@@ -5,7 +5,66 @@ import type {
   AdminOperationCaseEvent,
   AdminOperationSourceFreshness,
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
+import type { PlatformAdminCapability } from "@/features/platform-admin/model/platform-admin-capabilities";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+
+const OWNER_CAPABILITIES: readonly PlatformAdminCapability[] = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "REPLAY_NOTIFICATIONS",
+  "VIEW_AI_OPERATIONS",
+  "MANAGE_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "MANAGE_SUPPORT_ACCESS",
+  "VIEW_AUDIT",
+  "VIEW_SENSITIVE_AUDIT",
+  "VIEW_ANALYTICS",
+  "EXPORT_ANALYTICS",
+  "CREATE_CLUB",
+  "MANAGE_CLUBS",
+  "MANAGE_CLUB_DOMAINS",
+  "MANAGE_PLATFORM_ADMINS",
+];
+
+const OPERATOR_CAPABILITIES: readonly PlatformAdminCapability[] = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "REPLAY_NOTIFICATIONS",
+  "VIEW_AI_OPERATIONS",
+  "MANAGE_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "VIEW_AUDIT",
+  "VIEW_SENSITIVE_AUDIT",
+  "VIEW_ANALYTICS",
+  "EXPORT_ANALYTICS",
+  "CREATE_CLUB",
+  "MANAGE_CLUBS",
+  "MANAGE_CLUB_DOMAINS",
+];
+
+const SUPPORT_CAPABILITIES: readonly PlatformAdminCapability[] = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "VIEW_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "VIEW_AUDIT",
+  "VIEW_ANALYTICS",
+];
+
+function capabilitiesFor(role: PlatformAdminRole): readonly PlatformAdminCapability[] {
+  if (role === "OWNER") return OWNER_CAPABILITIES;
+  if (role === "OPERATOR") return OPERATOR_CAPABILITIES;
+  return SUPPORT_CAPABILITIES;
+}
 
 const GENERATED_AT = "2026-08-04T10:00:00Z";
 const FORBIDDEN_TEXT = [
@@ -121,6 +180,13 @@ async function installOperationsHarness(
   const mutationBodies: Array<{ action: string; body: Record<string, unknown> }> = [];
 
   await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, platformAdminAuth(role)));
+  await page.route("**/api/bff/api/admin/capabilities**", (route) => json(route, 200, {
+    schemaVersion: 1,
+    role,
+    status: "ACTIVE",
+    capabilities: [...capabilitiesFor(role)],
+    generatedAt: "2026-08-22T00:00:00Z",
+  }));
   await page.route("**/api/bff/api/admin/summary", (route) => json(route, 200, {
     platformRole: role,
     activeClubCount: 2,
@@ -349,10 +415,28 @@ test("mobile presents list then detail then restores the list", async ({ page })
   await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
   await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
   await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toBeVisible();
+  await expect(page.getByRole("group", { name: "작업" })).toBeVisible();
 
   await page.getByRole("button", { name: "목록으로" }).click();
   await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page).toHaveURL(/case=case-notification/);
+  await expect(page).toHaveURL(/source=notification/);
+});
+
+test("768px uses drill-in rather than stacked columns", async ({ page }) => {
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await installOperationsHarness(page);
+  await page.goto("/admin/today?case=case-notification&source=notification");
+
+  await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
+  await expect(page.getByRole("region", { name: "운영 케이스 상세" })).toHaveCount(0);
+  await expect(page.locator(".admin-today-ledger__columns")).toHaveCount(0);
+
+  await page.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ }).click();
+  await expect(page.getByRole("button", { name: "목록으로" })).toBeFocused();
+  await expect(page.getByRole("group", { name: "작업" })).toBeVisible();
+  await page.getByRole("button", { name: "목록으로" }).click();
+  await expect(page.getByRole("region", { name: "운영 케이스 큐" })).toBeVisible();
   await expect(page).toHaveURL(/source=notification/);
 });
 
@@ -389,7 +473,9 @@ test("responsive command-center screenshots are non-empty and public-safe", asyn
   const viewports = [
     { name: "desktop", width: 1440, height: 1000 },
     { name: "compact", width: 900, height: 900 },
+    { name: "tablet", width: 768, height: 1024 },
     { name: "mobile", width: 390, height: 844 },
+    { name: "narrow", width: 320, height: 720 },
   ] as const;
 
   for (const viewport of viewports) {

@@ -8,12 +8,19 @@ import type {
   AdminOperationCaseDetailResponse,
   AdminOperationCasesResponse,
 } from "@/features/platform-admin/api/platform-admin-operations-contracts";
+import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
+import {
+  installPlatformAdminAuthorityLossHandler,
+  platformAdminCapabilitiesQuery,
+  platformAdminKeys,
+} from "@/features/platform-admin/queries/platform-admin-queries";
 import {
   adminOperationsKeys,
   platformAdminOperationCaseQuery,
   platformAdminOperationCasePagesQuery,
   platformAdminOperationCasesQuery,
 } from "@/features/platform-admin/queries/platform-admin-operations-queries";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminTodayRoute } from "./admin-today-route";
 
@@ -34,7 +41,35 @@ vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (im
   fetchAdminOperationCase: operationsApi.fetchDetail,
 }));
 
+vi.mock("@/features/platform-admin/api/platform-admin-capabilities-api", () => ({
+  fetchPlatformAdminCapabilities: vi.fn(),
+}));
+
+import { fetchPlatformAdminCapabilities } from "@/features/platform-admin/api/platform-admin-capabilities-api";
+
 const generatedAt = "2026-08-04T10:00:00Z";
+const memberQueryKey = ["current-session", "me"] as const;
+const memberSnapshot = { userId: "member-1" };
+
+const ownerCapabilities: PlatformAdminCapabilities = {
+  schemaVersion: 1,
+  role: "OWNER",
+  status: "ACTIVE",
+  capabilities: [
+    "VIEW_TODAY",
+    "VIEW_CLUBS",
+    "VIEW_CLUB_OPERATIONS",
+    "VIEW_SERVICE_HEALTH",
+    "VIEW_NOTIFICATION_OPERATIONS",
+    "VIEW_AI_OPERATIONS",
+    "VIEW_SUPPORT",
+    "VIEW_AUDIT",
+    "VIEW_ANALYTICS",
+    "CREATE_CLUB",
+    "MANAGE_CLUBS",
+  ],
+  generatedAt: "2026-08-22T00:00:00Z",
+};
 
 function operationCase(overrides: Partial<AdminOperationCase> = {}): AdminOperationCase {
   const sourceType = overrides.sourceType ?? "NOTIFICATION";
@@ -92,10 +127,19 @@ function detailResponse(item = operationCase()): AdminOperationCaseDetailRespons
   };
 }
 
+function seedCapabilities(
+  client: QueryClient,
+  capabilities: PlatformAdminCapabilities = ownerCapabilities,
+) {
+  client.setQueryData(platformAdminCapabilitiesQuery().queryKey, capabilities);
+}
+
 function seededClient(items = [operationCase()]) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
+  seedCapabilities(client);
+  client.setQueryData(memberQueryKey, memberSnapshot);
   client.setQueryData(platformAdminOperationCasesQuery().queryKey, listResponse(items));
   client.setQueryData(platformAdminOperationCasesQuery({ states: ["OPEN"] }).queryKey, listResponse(items));
   client.setQueryData(platformAdminOperationCasePagesQuery().queryKey, {
@@ -113,9 +157,12 @@ function seededClient(items = [operationCase()]) {
 }
 
 function freshClient() {
-  return new QueryClient({
+  const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
+  seedCapabilities(client);
+  client.setQueryData(memberQueryKey, memberSnapshot);
+  return client;
 }
 
 function LocationProbe() {
@@ -144,6 +191,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   operationsApi.fetchList.mockResolvedValue(listResponse());
   operationsApi.fetchDetail.mockResolvedValue(detailResponse());
+  vi.mocked(fetchPlatformAdminCapabilities).mockResolvedValue(ownerCapabilities);
 });
 
 describe("AdminTodayRoute", () => {
@@ -151,8 +199,10 @@ describe("AdminTodayRoute", () => {
     const { container } = renderRoute(seededClient(), "/admin/today?case=case-notification");
 
     expect(await screen.findByRole("heading", { name: "오늘의 운영 케이스" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "오늘의 운영 케이스" })).toHaveClass("admin-page-frame");
     expect(screen.getByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
+    expect(screen.getByRole("group", { name: "작업" })).toHaveClass("admin-action-dock");
     expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveAttribute("aria-pressed", "true");
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
@@ -270,6 +320,9 @@ describe("AdminTodayRoute", () => {
       "/admin/today?case=case-first&state=open&source=notification",
     );
     expect(screen.getByRole("button", { name: /알림 전달 실패/, pressed: true })).toBeInTheDocument();
+    expect(screen.getByLabelText("current location")).not.toHaveTextContent("@");
+    expect(screen.getByLabelText("current location")).not.toHaveTextContent("token");
+    expect(screen.getByLabelText("current location")).not.toHaveTextContent("ops-");
   });
 
   it("explains an active signal without mislabeling it as a version conflict", async () => {
@@ -375,5 +428,149 @@ describe("AdminTodayRoute", () => {
       "상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.",
     );
     expect(screen.queryByRole("button", { name: "확인 처리" })).not.toBeInTheDocument();
+  });
+
+  it("renders forbidden without fetching cases when VIEW_TODAY is missing", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    });
+    seedCapabilities(client, {
+      ...ownerCapabilities,
+      role: "SUPPORT",
+      capabilities: ["VIEW_CLUBS", "VIEW_AUDIT"],
+    });
+    client.setQueryData(memberQueryKey, memberSnapshot);
+
+    renderRoute(client);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요.",
+    );
+    expect(screen.getByRole("region", { name: "오늘의 운영 케이스" })).toHaveClass("admin-page-frame");
+    expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
+    expect(operationsApi.fetchList).not.toHaveBeenCalled();
+    expect(operationsApi.fetchDetail).not.toHaveBeenCalled();
+    expect(client.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+  });
+
+  it("renders unavailable without fetching cases when capabilities cannot be loaded", async () => {
+    vi.mocked(fetchPlatformAdminCapabilities).mockRejectedValue(
+      Object.assign(new Error("unavailable"), { status: 500, code: "UNAVAILABLE" }),
+    );
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    client.setQueryData(memberQueryKey, memberSnapshot);
+
+    renderRoute(client);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("운영 케이스를 불러오지 못했습니다");
+    expect(screen.getByRole("button", { name: "다시 시도" })).toBeInTheDocument();
+    expect(operationsApi.fetchList).not.toHaveBeenCalled();
+    expect(client.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+  });
+
+  it("renders unavailable with a retry when the list source fails with no cached cases", async () => {
+    const user = userEvent.setup();
+    operationsApi.fetchList.mockRejectedValue(
+      Object.assign(new Error("unavailable"), { status: 500, code: "UNAVAILABLE" }),
+    );
+    const client = freshClient();
+    renderRoute(client);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("운영 케이스를 불러오지 못했습니다");
+    expect(screen.getByText("잠시 뒤 다시 시도해 주세요.")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "운영 케이스 큐" })).not.toBeInTheDocument();
+
+    operationsApi.fetchList.mockResolvedValue(listResponse());
+    await user.click(screen.getByRole("button", { name: "다시 시도" }));
+
+    expect(await screen.findByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(operationsApi.fetchList).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps last-known-good cases when a background refresh fails", async () => {
+    const client = seededClient();
+    renderRoute(client, "/admin/today?case=case-notification");
+    expect(await screen.findByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toBeInTheDocument();
+
+    operationsApi.fetchList.mockRejectedValue(
+      Object.assign(new Error("unavailable"), { status: 503, code: "UNAVAILABLE" }),
+    );
+    await client.refetchQueries({ queryKey: adminOperationsKeys.lists() });
+
+    expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("region", { name: "운영 케이스 상세" })).toBeInTheDocument();
+    expect(screen.queryByText("운영 케이스를 불러오지 못했습니다")).not.toBeInTheDocument();
+  });
+
+  it("keeps the list usable when detail is independently unavailable", async () => {
+    const item = operationCase();
+    const client = seededClient([item]);
+    client.removeQueries({ queryKey: platformAdminOperationCaseQuery(item.id).queryKey });
+    operationsApi.fetchDetail.mockRejectedValue(
+      Object.assign(new Error("detail missing"), { status: 500, code: "UNAVAILABLE" }),
+    );
+
+    renderRoute(client, "/admin/today?case=case-notification");
+
+    expect(await screen.findByRole("region", { name: "운영 케이스 큐" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /알림 전달 실패가 반복되고 있습니다/ })).toBeEnabled();
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.",
+    );
+    expect(screen.queryByText("운영 케이스를 불러오지 못했습니다")).not.toBeInTheDocument();
+  });
+
+  it("announces success after a lifecycle mutation without starting mutation polling", async () => {
+    const user = userEvent.setup();
+    operationsApi.acknowledge.mockResolvedValue({
+      schema: "admin.operation_cases.v1",
+      ...operationCase({ state: "ACKNOWLEDGED", version: 4, allowedActions: ["SNOOZE", "RESOLVE"] }),
+    });
+    renderRoute(seededClient(), "/admin/today?case=case-notification");
+
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+
+    expect(await screen.findByText("케이스 상태를 반영했습니다.")).toBeInTheDocument();
+    expect(operationsApi.acknowledge).toHaveBeenCalledTimes(1);
+    expect(operationsApi.acknowledge).toHaveBeenCalledWith("case-notification", 3);
+  });
+
+  it("stops Today polling after 403 purge without clearing member queries", async () => {
+    const user = userEvent.setup();
+    const client = seededClient();
+    installPlatformAdminAuthorityLossHandler(client);
+    operationsApi.acknowledge.mockRejectedValue(
+      await apiErrorFromResponse(
+        new Response(
+          JSON.stringify({
+            code: "FORBIDDEN",
+            message: "이 작업을 수행할 권한이 없습니다.",
+            status: 403,
+          }),
+          { status: 403, headers: { "Content-Type": "application/json" } },
+        ),
+      ),
+    );
+    renderRoute(client, "/admin/today?case=case-notification");
+    await user.click(await screen.findByRole("button", { name: "확인 처리" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "현재 역할로 운영 케이스를 확인할 수 없습니다. 권한을 확인해 주세요.",
+    );
+    expect(client.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
+    expect(client.getQueryData(platformAdminKeys.capabilities())).toBeUndefined();
+    expect(operationsApi.fetchList).not.toHaveBeenCalled();
+    expect(operationsApi.fetchDetail).not.toHaveBeenCalled();
+
+    await waitFor(() => {
+      const pages = client.getQueryCache().findAll({ queryKey: adminOperationsKeys.lists() });
+      expect(pages.every((query) => query.isDisabled() || query.state.fetchStatus === "idle")).toBe(true);
+    });
+    expect(operationsApi.fetchList).not.toHaveBeenCalled();
   });
 });

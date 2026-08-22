@@ -36,6 +36,7 @@ export function AdminOperationsQueue({
               data-scroll-marker={item.id === selectedCaseId ? "selected" : undefined}
               key={item.id}
               aria-pressed={item.id === selectedCaseId}
+              aria-selected={item.id === selectedCaseId}
               aria-current={item.id === selectedCaseId ? "true" : undefined}
               onClick={() => onSelectCase(item.id)}
             >

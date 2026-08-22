@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import type { AdminOperationCaseView } from "@/features/platform-admin/model/platform-admin-operations-model";
+import { AdminActionDock } from "./admin-action-dock";
 
 type SafeHistoryEvent = {
   fromState: string | null;
@@ -119,23 +120,6 @@ export function AdminOperationsInspector({
         {SOURCE_DETAIL_LABELS[selectedCase.sourceType] ?? "운영 상세에서 확인"}
       </Link>
 
-      <div className="admin-operations-inspector__lifecycle" aria-label="케이스 상태 관리">
-        <h3 className="h3">상태 관리</h3>
-        {detailLoading ? <p role="status">최신 상태를 확인하고 있습니다.</p> : null}
-        {detailUnavailable && !permissionDenied ? (
-          <p role="alert">상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.</p>
-        ) : null}
-        {permissionDenied ? (
-          <p className="admin-operations-inspector__permission" role="alert">
-            상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.
-          </p>
-        ) : lifecycleControls ?? (
-          <p className="admin-operations-inspector__permission">
-            현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.
-          </p>
-        )}
-      </div>
-
       <div className="admin-operations-inspector__history">
         <h3 className="h3">케이스 이력</h3>
         {history.length === 0 ? (
@@ -151,6 +135,25 @@ export function AdminOperationsInspector({
               </li>
             ))}
           </ol>
+        )}
+      </div>
+
+      <div className="admin-operations-inspector__lifecycle" aria-label="케이스 상태 관리">
+        <h3 className="h3">상태 관리</h3>
+        {detailLoading ? <p role="status">최신 상태를 확인하고 있습니다.</p> : null}
+        {detailUnavailable && !permissionDenied ? (
+          <p role="alert">상세 이력을 불러오지 못했습니다. 목록 정보는 계속 확인할 수 있습니다.</p>
+        ) : null}
+        {permissionDenied ? (
+          <p className="admin-operations-inspector__permission" role="alert">
+            상태 변경 권한이 더 이상 유효하지 않습니다. 새로고침 후 권한을 확인해 주세요.
+          </p>
+        ) : lifecycleControls ? (
+          <AdminActionDock primary={lifecycleControls} />
+        ) : (
+          <p className="admin-operations-inspector__permission">
+            현재 역할은 상태 변경 없이 운영 근거만 확인할 수 있습니다.
+          </p>
         )}
       </div>
     </section>
