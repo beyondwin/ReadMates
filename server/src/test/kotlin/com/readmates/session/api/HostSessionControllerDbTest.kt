@@ -1634,7 +1634,7 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
-                jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
+                jsonPath("$.message") { value("요청한 작업이 현재 모임 상태와 충돌합니다.") }
                 jsonPath("$.status") { value(409) }
                 jsonPath("$.traceId") { isNotEmpty() }
                 jsonPath("$.length()") { value(4) }
@@ -1660,7 +1660,7 @@ class HostSessionControllerDbTest(
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
-                jsonPath("$.message") { value("요청한 작업이 현재 세션 상태와 충돌합니다.") }
+                jsonPath("$.message") { value("요청한 작업이 현재 모임 상태와 충돌합니다.") }
                 jsonPath("$.status") { value(409) }
                 jsonPath("$.traceId") { isNotEmpty() }
                 jsonPath("$.length()") { value(4) }

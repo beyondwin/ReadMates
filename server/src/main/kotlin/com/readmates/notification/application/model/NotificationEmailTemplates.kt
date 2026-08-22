@@ -38,7 +38,7 @@ object NotificationEmailTemplates {
         val ctaUrl = absoluteUrl(appBaseUrl, detail.deepLinkPath)
         val contextRows =
             listOf(
-                "회차" to "${sessionNumber}회차",
+                "모임" to meetingFolio(sessionNumber),
                 "책" to bookTitle,
                 detail.contextLabel to detail.context,
             )
@@ -89,7 +89,7 @@ object NotificationEmailTemplates {
                 용도: SMTP 발송 점검
                 범위: 테스트 메일
 
-                실제 알림은 회차, 책, 확인할 일을 함께 담아 발송됩니다.
+                실제 알림은 모임, 책, 확인할 일을 함께 담아 발송됩니다.
                 """.trimIndent(),
             emailBodyHtml =
                 htmlEmail(
@@ -105,7 +105,7 @@ object NotificationEmailTemplates {
                         ),
                     ctaLabel = null,
                     ctaUrl = null,
-                    closing = "실제 알림은 회차, 책, 확인할 일을 함께 담아 발송됩니다.",
+                    closing = "실제 알림은 모임, 책, 확인할 일을 함께 담아 발송됩니다.",
                     footer = "SMTP 발송 점검을 위한 테스트 메일입니다.",
                 ),
         )
@@ -123,66 +123,66 @@ object NotificationEmailTemplates {
             NotificationEventType.NEXT_BOOK_PUBLISHED ->
                 EventEmailDetail(
                     label = "next book",
-                    subject = "${sessionNumber}회차 책이 공개되었습니다",
-                    title = "${sessionNumber}회차 책이 공개되었습니다",
-                    summary = "다음 모임에서 함께 읽을 책이 정해졌습니다. 모임 전 회차 정보와 준비 내용을 확인해 주세요.",
+                    subject = "${meetingFolio(sessionNumber)} 책이 정해졌습니다",
+                    title = "${meetingFolio(sessionNumber)} 책이 정해졌습니다",
+                    summary = "다음 모임에서 함께 읽을 책이 정해졌습니다. 모임 전과 준비 내용을 확인해 주세요.",
                     contextLabel = "확인",
                     context = "일정과 준비 메모",
-                    ctaLabel = "회차 확인하기",
+                    ctaLabel = "모임 확인하기",
                     deepLinkPath = clubScopedAppHomePath(clubSlug),
-                    inAppBody = "${sessionNumber}회차 $bookTitle 책이 공개되었습니다.",
+                    inAppBody = "${meetingFolio(sessionNumber)} $bookTitle 책이 정해졌습니다.",
                 )
 
             NotificationEventType.SESSION_REMINDER_DUE ->
                 EventEmailDetail(
                     label = "session reminder",
-                    subject = "내일 ${sessionNumber}회차 모임이 있습니다",
-                    title = "내일 ${sessionNumber}회차 모임이 있습니다",
+                    subject = "내일 ${meetingSentence(sessionNumber)}이 있습니다",
+                    title = "내일 ${meetingSentence(sessionNumber)}이 있습니다",
                     summary = "모임 전에 질문과 읽은 분량, 참석 여부를 한 번 더 정리해 주세요.",
                     contextLabel = "준비",
                     context = "질문, 읽은 분량, 참석 상태",
                     ctaLabel = "모임 준비 확인하기",
                     deepLinkPath = clubScopedAppPath(clubSlug, "/session/current"),
-                    inAppBody = "내일 ${sessionNumber}회차 $bookTitle 모임이 있습니다.",
+                    inAppBody = "내일 ${meetingFolio(sessionNumber)} $bookTitle 모임이 있습니다.",
                 )
 
             NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
                 EventEmailDetail(
                     label = "feedback document",
-                    subject = "${sessionNumber}회차 피드백 문서가 올라왔습니다",
-                    title = "${sessionNumber}회차 피드백 문서가 올라왔습니다",
-                    summary = "참석한 회차의 정리와 다음 읽기에 참고할 내용을 확인해 주세요.",
+                    subject = "${meetingFolio(sessionNumber)} 피드백 문서가 올라왔습니다",
+                    title = "${meetingFolio(sessionNumber)} 피드백 문서가 올라왔습니다",
+                    summary = "참석한 모임의 정리와 다음 읽기에 참고할 내용을 확인해 주세요.",
                     contextLabel = "확인",
                     context = "피드백 문서와 모임 정리",
                     ctaLabel = "피드백 문서 확인하기",
                     deepLinkPath = clubScopedAppPath(clubSlug, "/feedback/$sessionId"),
-                    inAppBody = "${sessionNumber}회차 $bookTitle 피드백 문서가 올라왔습니다.",
+                    inAppBody = "${meetingFolio(sessionNumber)} $bookTitle 피드백 문서가 올라왔습니다.",
                 )
 
             NotificationEventType.SESSION_RECORD_UPDATED ->
                 EventEmailDetail(
                     label = "session record",
-                    subject = "${sessionNumber}회차 기록이 수정되었습니다",
-                    title = "${sessionNumber}회차 기록이 수정되었습니다",
-                    summary = "참석한 회차의 공개 기록이 수정되었습니다. 변경된 모임 기록을 확인해 주세요.",
+                    subject = "${meetingFolio(sessionNumber)} 모임 기록이 수정되었습니다",
+                    title = "${meetingFolio(sessionNumber)} 모임 기록이 수정되었습니다",
+                    summary = "참석한 모임의 기록이 수정되었습니다. 변경된 모임 기록을 확인해 주세요.",
                     contextLabel = "확인",
                     context = "수정된 모임 기록",
-                    ctaLabel = "회차 기록 확인하기",
+                    ctaLabel = "모임 기록 확인하기",
                     deepLinkPath = clubScopedAppPath(clubSlug, "/sessions/$sessionId"),
-                    inAppBody = "${sessionNumber}회차 $bookTitle 기록이 수정되었습니다.",
+                    inAppBody = "${meetingFolio(sessionNumber)} $bookTitle 기록이 수정되었습니다.",
                 )
 
             NotificationEventType.REVIEW_PUBLISHED ->
                 EventEmailDetail(
                     label = "new review",
-                    subject = "${sessionNumber}회차에 새 서평이 공개되었습니다",
-                    title = "${sessionNumber}회차에 새 서평이 공개되었습니다",
-                    summary = "같은 회차에 새 서평이 공개되었습니다. 함께 읽은 기록을 이어서 확인해 주세요.",
+                    subject = "${meetingSentence(sessionNumber)}에 새 서평이 올라왔습니다",
+                    title = "${meetingSentence(sessionNumber)}에 새 서평이 올라왔습니다",
+                    summary = "같은 모임에 새 서평이 올라왔습니다. 함께 읽은 기록을 이어서 확인해 주세요.",
                     contextLabel = "확인",
-                    context = "새로 공개된 서평",
+                    context = "새로 올라온 서평",
                     ctaLabel = "서평 확인하기",
                     deepLinkPath = clubScopedAppPath(clubSlug, "/notes?sessionId=$sessionId"),
-                    inAppBody = "${sessionNumber}회차 $bookTitle 에 새 서평이 공개되었습니다.",
+                    inAppBody = "${meetingFolio(sessionNumber)} $bookTitle 에 새 서평이 올라왔습니다.",
                 )
 
             // AI_GENERATION_READY (task 6.3): in-app only — title / inAppBody / deepLinkPath
@@ -193,14 +193,14 @@ object NotificationEmailTemplates {
             NotificationEventType.AI_GENERATION_READY ->
                 EventEmailDetail(
                     label = "ai generation ready",
-                    subject = "AI 회차 초안 준비가 완료되었습니다",
-                    title = "AI 회차 초안 준비가 완료되었습니다",
-                    summary = "AI 회차 초안 생성이 끝났습니다. 호스트 화면에서 결과를 확인해 주세요.",
+                    subject = "AI 모임 초안 준비가 완료되었습니다",
+                    title = "AI 모임 초안 준비가 완료되었습니다",
+                    summary = "AI 모임 초안 생성이 끝났습니다. 호스트 화면에서 결과를 확인해 주세요.",
                     contextLabel = "확인",
-                    context = "AI 회차 초안",
+                    context = "AI 모임 초안",
                     ctaLabel = "초안 확인하기",
                     deepLinkPath = clubScopedAppPath(clubSlug, "/session/$sessionId"),
-                    inAppBody = "AI 회차 초안 준비가 완료되었습니다. 결과를 확인해 주세요.",
+                    inAppBody = "AI 모임 초안 준비가 완료되었습니다. 결과를 확인해 주세요.",
                 )
         }
 
@@ -374,6 +374,10 @@ object NotificationEmailTemplates {
     }
 
     private fun String.ensureLeadingSlash(): String = if (startsWith("/")) this else "/$this"
+
+    private fun meetingFolio(sessionNumber: Int): String = "No.$sessionNumber"
+
+    private fun meetingSentence(sessionNumber: Int): String = "${sessionNumber}번째 모임"
 
     private fun labelForText(label: String): String = if (label == "확인") "확인할 일" else label
 

@@ -51,7 +51,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_DELETE_BLOCKED",
-            message = "적용 기록 또는 알림 이력이 있는 세션은 삭제할 수 없습니다.",
+            message = "적용 기록 또는 알림 이력이 있는 모임은 삭제할 수 없습니다.",
             blockers = ex.blockers.map { ApiErrorBlocker(it.code.name, it.count) },
         )
 
@@ -60,7 +60,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_DELETION_NOT_ALLOWED",
-            message = "초안 또는 진행 중인 세션만 삭제할 수 있습니다.",
+            message = "작성 중이거나 멤버와 준비 중인 모임만 삭제할 수 있습니다.",
         )
 
     @ExceptionHandler(HostSessionRecordStagingRequiredException::class)
@@ -68,7 +68,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_RECORD_STAGING_REQUIRED",
-            message = "종료된 세션 기록은 초안에서 수정한 뒤 적용해 주세요.",
+            message = "모임 기록은 기록 초안에서 수정한 뒤 기록에 반영해 주세요.",
         )
 
     @ExceptionHandler(InvalidSessionExposureException::class)
@@ -76,7 +76,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_EXPOSURE_INVALID",
-            message = "세션 공개 범위가 현재 세션 상태와 맞지 않습니다.",
+            message = "모임 보기 범위가 현재 모임 상태와 맞지 않습니다.",
         )
 
     @ExceptionHandler(OpenSessionAlreadyExistsException::class)
@@ -93,7 +93,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_REOPEN_NOT_ALLOWED",
-            message = "마감된 세션만 다시 열 수 있습니다.",
+            message = "기록 정리 중인 모임만 다시 열 수 있습니다.",
         )
 
     @ExceptionHandler(HostSessionUnpublishNotAllowedException::class)
@@ -101,7 +101,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_UNPUBLISH_NOT_ALLOWED",
-            message = "공개된 세션만 공개를 취소할 수 있습니다.",
+            message = "게스트·멤버 노트에 게시된 모임만 게시를 취소할 수 있습니다.",
         )
 
     @ExceptionHandler(HostSessionReturnToDraftNotAllowedException::class)
@@ -109,7 +109,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "SESSION_RETURN_TO_DRAFT_NOT_ALLOWED",
-            message = "진행 중인 세션만 예정으로 되돌릴 수 있습니다.",
+            message = "멤버와 준비 중인 모임만 작성 중으로 되돌릴 수 있습니다.",
         )
 
     @ExceptionHandler(
@@ -122,7 +122,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.CONFLICT,
             code = "CONFLICT",
-            message = "요청한 작업이 현재 세션 상태와 충돌합니다.",
+            message = "요청한 작업이 현재 모임 상태와 충돌합니다.",
         )
 
     @ExceptionHandler(
@@ -133,7 +133,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.NOT_FOUND,
             code = "SESSION_NOT_FOUND",
-            message = "요청한 세션을 찾을 수 없습니다.",
+            message = "요청한 모임을 찾을 수 없습니다.",
         )
 
     @ExceptionHandler(
@@ -146,7 +146,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_REQUEST",
-            message = "세션 요청 값을 확인해 주세요.",
+            message = "모임 요청 값을 확인해 주세요.",
         )
 
     @ExceptionHandler(InvalidHostSessionCursorException::class, InvalidHostListCursorException::class)
@@ -162,7 +162,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_REQUEST",
-            message = "세션 요청 값을 확인해 주세요.",
+            message = "모임 요청 값을 확인해 주세요.",
         )
 
     @ExceptionHandler(HostSessionRevisionConflictException::class)
@@ -248,7 +248,7 @@ class SessionApplicationErrorHandler {
         apiErrorResponse(
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_REQUEST",
-            message = "세션 요청 값을 확인해 주세요.",
+            message = "모임 요청 값을 확인해 주세요.",
         )
 
     @ExceptionHandler(MutationPendingException::class)

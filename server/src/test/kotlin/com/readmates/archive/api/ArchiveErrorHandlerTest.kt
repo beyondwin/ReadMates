@@ -19,7 +19,7 @@ class ArchiveErrorHandlerTest {
         assertThat(response.body).isEqualTo(
             ApiErrorResponse(
                 code = "SESSION_NOT_FOUND",
-                message = "요청한 세션을 찾을 수 없습니다.",
+                message = "요청한 모임을 찾을 수 없습니다.",
                 status = 404,
             ),
         )

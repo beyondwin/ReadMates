@@ -124,7 +124,7 @@ class JdbcNotificationDeliveryAdapterTest(
 
         val member1Notifications = memberNotificationAdapter.listForMembership(clubId, member1, limit = 10)
         assertThat(member1Notifications).hasSize(1)
-        assertThat(member1Notifications.single().title).isEqualTo("1회차 피드백 문서가 올라왔습니다")
+        assertThat(member1Notifications.single().title).isEqualTo("No.1 피드백 문서가 올라왔습니다")
         assertThat(member1Notifications.single().deepLinkPath)
             .isEqualTo("/clubs/reading-sai/app/feedback/$sessionId")
         assertThat(memberNotificationAdapter.unreadCount(clubId, member1)).isEqualTo(1)
@@ -165,7 +165,7 @@ class JdbcNotificationDeliveryAdapterTest(
         assertThat(deliveries).hasSize(6)
         assertThat(deliveries.filter { it.channel == NotificationChannel.EMAIL })
             .extracting<String?> { it.subject }
-            .containsOnly("1회차 피드백 문서가 올라왔습니다")
+            .containsOnly("No.1 피드백 문서가 올라왔습니다")
         assertThat(deliveries.filter { it.channel == NotificationChannel.EMAIL })
             .extracting<String?> { it.bodyHtml }
             .allSatisfy {
@@ -175,8 +175,8 @@ class JdbcNotificationDeliveryAdapterTest(
 
         val member1 = membershipIdForEmail("member1@example.com")
         val member1Notifications = memberNotificationAdapter.listForMembership(clubId, member1, limit = 10)
-        assertThat(member1Notifications.single().title).isEqualTo("1회차 피드백 문서가 올라왔습니다")
-        assertThat(member1Notifications.single().body).contains("1회차 팩트풀니스")
+        assertThat(member1Notifications.single().title).isEqualTo("No.1 피드백 문서가 올라왔습니다")
+        assertThat(member1Notifications.single().body).contains("No.1 팩트풀니스")
     }
 
     @Test
@@ -204,7 +204,7 @@ class JdbcNotificationDeliveryAdapterTest(
                     it.recipientMembershipId == member1 && it.channel == NotificationChannel.EMAIL
                 }
             assertThat(existingEmailDelivery.recipientEmail).isEqualTo("member1@example.com")
-            assertThat(existingEmailDelivery.subject).isEqualTo("1회차 피드백 문서가 올라왔습니다")
+            assertThat(existingEmailDelivery.subject).isEqualTo("No.1 피드백 문서가 올라왔습니다")
             assertThat(existingEmailDelivery.bodyText).contains("팩트풀니스")
             assertThat(existingEmailDelivery.bodyHtml).contains("/clubs/reading-sai/app/feedback/$sessionId")
         } finally {
@@ -345,7 +345,7 @@ class JdbcNotificationDeliveryAdapterTest(
         val activeMarked = deliveryAdapter.markDeliverySent(emailDeliveryId, claimed.lockedAt)
 
         assertThat(claimed.recipientEmail).isEqualTo("member1@example.com")
-        assertThat(claimed.subject).isEqualTo("1회차 피드백 문서가 올라왔습니다")
+        assertThat(claimed.subject).isEqualTo("No.1 피드백 문서가 올라왔습니다")
         assertThat(claimed.bodyText).contains("팩트풀니스")
         assertThat(claimed.bodyHtml).contains("/clubs/reading-sai/app/feedback/$sessionId")
         assertThat(claimed.createdAt).isEqualTo(createdAt)
@@ -485,10 +485,10 @@ class JdbcNotificationDeliveryAdapterTest(
                 deliveryAdapter.claimEmailDelivery(emailDeliveryId)!!
             }
 
-        assertThat(claimed.subject).isEqualTo("1회차 피드백 문서가 올라왔습니다")
-        assertThat(claimed.bodyText).contains("1회차", "팩트풀니스", "확인 링크:")
+        assertThat(claimed.subject).isEqualTo("No.1 피드백 문서가 올라왔습니다")
+        assertThat(claimed.bodyText).contains("No.1", "팩트풀니스", "확인 링크:")
         assertThat(claimed.bodyHtml).contains("feedback document", "피드백 문서 확인하기", "/clubs/reading-sai/app/feedback/$sessionId")
-        assertThat(claimed.bodyText).doesNotContain("99회차")
+        assertThat(claimed.bodyText).doesNotContain("99회차", "No.99")
         assertThat(claimed.bodyHtml).doesNotContain("변경된 책")
     }
 

@@ -36,6 +36,6 @@ class SessionImportErrorHandlerTest {
         assertThat(response.statusCode).isEqualTo(HttpStatus.BAD_REQUEST)
         assertThat(response.body!!.status).isEqualTo(400)
         assertThat(response.body!!.code).isEqualTo("INVALID_SESSION_IMPORT")
-        assertThat(response.body!!.message).isEqualTo("세션 import 파일을 확인해 주세요.")
+        assertThat(response.body!!.message).isEqualTo("모임 import 파일을 확인해 주세요.")
     }
 }

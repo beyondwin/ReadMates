@@ -395,7 +395,7 @@ class HostNotificationControllerTest(
                     status { isOk() }
                     jsonPath("$.id") { value("00000000-0000-0000-0000-000000009402") }
                     jsonPath("$.recipientEmail") { value("m***@example.com") }
-                    jsonPath("$.subject") { value("3회차 피드백 문서가 올라왔습니다") }
+                    jsonPath("$.subject") { value("No.3 피드백 문서가 올라왔습니다") }
                     jsonPath("$.status") { value("PENDING") }
                     jsonPath("$.metadata.sessionNumber") { value(3) }
                     jsonPath("$.metadata.bookTitle") { value("메타데이터 테스트 책") }

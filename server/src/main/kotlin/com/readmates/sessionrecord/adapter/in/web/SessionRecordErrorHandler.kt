@@ -47,24 +47,24 @@ class SessionRecordErrorHandler {
     fun handleSessionRecord(error: SessionRecordException): ResponseEntity<ApiErrorResponse> =
         when (error.error) {
             SessionRecordError.DRAFT_STALE ->
-                conflict("SESSION_RECORD_DRAFT_STALE", "세션 기록 초안이 변경되었습니다.")
+                conflict("SESSION_RECORD_DRAFT_STALE", "모임 기록 초안이 변경되었습니다.")
             SessionRecordError.LIVE_STALE ->
-                conflict("SESSION_RECORD_LIVE_STALE", "현재 세션 기록이 변경되었습니다.")
+                conflict("SESSION_RECORD_LIVE_STALE", "현재 모임 기록이 변경되었습니다.")
             SessionRecordError.PREVIEW_ALREADY_CONSUMED ->
                 conflict("NOTIFICATION_PREVIEW_ALREADY_CONSUMED", "이미 사용된 알림 확인입니다.")
             SessionRecordError.APPLY_REQUEST_ALREADY_USED ->
-                conflict("SESSION_RECORD_APPLY_REQUEST_ALREADY_USED", "이미 사용된 세션 기록 적용 요청입니다.")
+                conflict("SESSION_RECORD_APPLY_REQUEST_ALREADY_USED", "이미 사용된 모임 기록 반영 요청입니다.")
             SessionRecordError.INVALID_APPLY_CONTRACT ->
                 apiErrorResponse(
                     HttpStatus.BAD_REQUEST,
                     "SESSION_RECORD_INVALID_APPLY_CONTRACT",
-                    "세션 기록 적용 요청을 확인해 주세요.",
+                    "모임 기록 반영 요청을 확인해 주세요.",
                 )
             SessionRecordError.INVALID_RECORD ->
                 apiErrorResponse(
                     HttpStatus.UNPROCESSABLE_CONTENT,
                     "SESSION_RECORD_INVALID",
-                    "세션 기록 내용을 확인해 주세요.",
+                    "모임 기록 내용을 확인해 주세요.",
                 )
             SessionRecordError.SESSION_NOT_FOUND,
             SessionRecordError.REVISION_NOT_FOUND,
@@ -72,7 +72,7 @@ class SessionRecordErrorHandler {
                 apiErrorResponse(
                     HttpStatus.NOT_FOUND,
                     "SESSION_RECORD_NOT_FOUND",
-                    "요청한 세션 기록을 찾을 수 없습니다.",
+                    "요청한 모임 기록을 찾을 수 없습니다.",
                 )
         }
 
@@ -81,7 +81,7 @@ class SessionRecordErrorHandler {
         apiErrorResponse(
             HttpStatus.NOT_FOUND,
             "SESSION_RECORD_NOT_FOUND",
-            "요청한 세션 기록을 찾을 수 없습니다.",
+            "요청한 모임 기록을 찾을 수 없습니다.",
         )
 
     @ExceptionHandler(HostActionNotificationException::class)
@@ -99,7 +99,7 @@ class SessionRecordErrorHandler {
                 apiErrorResponse(
                     HttpStatus.NOT_FOUND,
                     "SESSION_RECORD_NOT_FOUND",
-                    "요청한 세션 기록을 찾을 수 없습니다.",
+                    "요청한 모임 기록을 찾을 수 없습니다.",
                 )
             HostActionNotificationError.CONFIRMATION_REQUIRED,
             HostActionNotificationError.PREVIEW_NOT_FOUND,

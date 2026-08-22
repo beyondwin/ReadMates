@@ -197,7 +197,7 @@ class HostManualNotificationServiceTest {
         val feedback = options.templates.single { it.eventType == NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED }
         assertThat(feedback.enabled).isFalse()
         assertThat(feedback.disabledReason)
-            .isEqualTo("현재 피드백 문서가 있는 열린 세션 또는 종료된 세션에서 발송할 수 있습니다.")
+            .isEqualTo("현재 피드백 문서가 있는 멤버와 준비 중 또는 지난 모임에서 발송할 수 있습니다.")
     }
 
     @Test
@@ -209,7 +209,7 @@ class HostManualNotificationServiceTest {
 
         val nextBook = options.templates.single { it.eventType == NotificationEventType.NEXT_BOOK_PUBLISHED }
         assertThat(nextBook.enabled).isFalse()
-        assertThat(nextBook.disabledReason).isEqualTo("멤버에게 공개된 예정 세션만 다음 책 알림을 보낼 수 있습니다.")
+        assertThat(nextBook.disabledReason).isEqualTo("멤버에게 보이는 예정 모임만 다음 책 알림을 보낼 수 있습니다.")
     }
 
     @Test
