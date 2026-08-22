@@ -24,23 +24,69 @@ data class CurrentPlatformAdmin(
 fun CurrentPlatformAdmin.toPlatformActor(): PlatformActor =
     PlatformActor(
         adminId = userId,
-        capabilities =
-            when (role) {
-                PlatformAdminRole.OWNER -> PlatformCapability.entries.toSet()
-                PlatformAdminRole.OPERATOR ->
-                    setOf(
-                        PlatformCapability.VIEW_CLUBS,
-                        PlatformCapability.VIEW_CLUB_OPERATIONS,
-                        PlatformCapability.CREATE_CLUB,
-                        PlatformCapability.MANAGE_CLUBS,
-                        PlatformCapability.MANAGE_CLUB_DOMAINS,
-                    )
-                PlatformAdminRole.SUPPORT ->
-                    setOf(
-                        PlatformCapability.VIEW_CLUBS,
-                        PlatformCapability.VIEW_CLUB_OPERATIONS,
-                    )
-            },
+        capabilities = platformCapabilitiesFor(role),
+    )
+
+private fun platformCapabilitiesFor(role: PlatformAdminRole): Set<PlatformCapability> =
+    when (role) {
+        PlatformAdminRole.OWNER -> OWNER_PLATFORM_CAPABILITIES
+        PlatformAdminRole.OPERATOR -> OPERATOR_PLATFORM_CAPABILITIES
+        PlatformAdminRole.SUPPORT -> SHARED_PLATFORM_VIEW_CAPABILITIES
+    }
+
+private val SHARED_PLATFORM_VIEW_CAPABILITIES =
+    setOf(
+        PlatformCapability.VIEW_TODAY,
+        PlatformCapability.VIEW_CLUBS,
+        PlatformCapability.VIEW_CLUB_OPERATIONS,
+        PlatformCapability.VIEW_SERVICE_HEALTH,
+        PlatformCapability.VIEW_NOTIFICATION_OPERATIONS,
+        PlatformCapability.VIEW_AI_OPERATIONS,
+        PlatformCapability.VIEW_SUPPORT,
+        PlatformCapability.VIEW_AUDIT,
+        PlatformCapability.VIEW_ANALYTICS,
+    )
+
+private val OPERATOR_PLATFORM_CAPABILITIES =
+    setOf(
+        PlatformCapability.VIEW_TODAY,
+        PlatformCapability.VIEW_CLUBS,
+        PlatformCapability.VIEW_CLUB_OPERATIONS,
+        PlatformCapability.VIEW_SERVICE_HEALTH,
+        PlatformCapability.VIEW_NOTIFICATION_OPERATIONS,
+        PlatformCapability.REPLAY_NOTIFICATIONS,
+        PlatformCapability.VIEW_AI_OPERATIONS,
+        PlatformCapability.MANAGE_AI_OPERATIONS,
+        PlatformCapability.VIEW_SUPPORT,
+        PlatformCapability.VIEW_AUDIT,
+        PlatformCapability.VIEW_SENSITIVE_AUDIT,
+        PlatformCapability.VIEW_ANALYTICS,
+        PlatformCapability.EXPORT_ANALYTICS,
+        PlatformCapability.CREATE_CLUB,
+        PlatformCapability.MANAGE_CLUBS,
+        PlatformCapability.MANAGE_CLUB_DOMAINS,
+    )
+
+private val OWNER_PLATFORM_CAPABILITIES =
+    setOf(
+        PlatformCapability.VIEW_TODAY,
+        PlatformCapability.VIEW_CLUBS,
+        PlatformCapability.VIEW_CLUB_OPERATIONS,
+        PlatformCapability.VIEW_SERVICE_HEALTH,
+        PlatformCapability.VIEW_NOTIFICATION_OPERATIONS,
+        PlatformCapability.REPLAY_NOTIFICATIONS,
+        PlatformCapability.VIEW_AI_OPERATIONS,
+        PlatformCapability.MANAGE_AI_OPERATIONS,
+        PlatformCapability.VIEW_SUPPORT,
+        PlatformCapability.MANAGE_SUPPORT_ACCESS,
+        PlatformCapability.VIEW_AUDIT,
+        PlatformCapability.VIEW_SENSITIVE_AUDIT,
+        PlatformCapability.VIEW_ANALYTICS,
+        PlatformCapability.EXPORT_ANALYTICS,
+        PlatformCapability.CREATE_CLUB,
+        PlatformCapability.MANAGE_CLUBS,
+        PlatformCapability.MANAGE_CLUB_DOMAINS,
+        PlatformCapability.MANAGE_PLATFORM_ADMINS,
     )
 
 data class CurrentUser(

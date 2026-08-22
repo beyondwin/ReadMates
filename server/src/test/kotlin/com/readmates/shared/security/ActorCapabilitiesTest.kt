@@ -83,35 +83,37 @@ class ActorCapabilitiesTest {
     }
 
     @Test
-    fun `owner maps to all platform capabilities`() {
+    fun `owner maps to explicit platform capability allowlist`() {
         val actor = currentPlatformAdmin(PlatformAdminRole.OWNER).toPlatformActor()
 
-        assertThat(actor.capabilities).containsExactlyInAnyOrderElementsOf(PlatformCapability.entries)
+        assertThat(actor.capabilities).containsExactlyInAnyOrderElementsOf(OWNER_PLATFORM_CAPABILITIES)
+        assertThat(actorSource(CURRENT_PLATFORM_ADMIN_SOURCE)).doesNotContain("PlatformCapability.entries")
     }
 
     @Test
     fun `operator maps to exactly operational platform capabilities`() {
         val actor = currentPlatformAdmin(PlatformAdminRole.OPERATOR).toPlatformActor()
 
-        assertThat(actor.capabilities)
-            .containsExactlyInAnyOrder(
-                PlatformCapability.VIEW_CLUBS,
-                PlatformCapability.VIEW_CLUB_OPERATIONS,
-                PlatformCapability.CREATE_CLUB,
-                PlatformCapability.MANAGE_CLUBS,
-                PlatformCapability.MANAGE_CLUB_DOMAINS,
-            )
+        assertThat(actor.capabilities).containsExactlyInAnyOrderElementsOf(OPERATOR_PLATFORM_CAPABILITIES)
     }
 
     @Test
     fun `support maps to exactly platform read capabilities`() {
         val actor = currentPlatformAdmin(PlatformAdminRole.SUPPORT).toPlatformActor()
 
-        assertThat(actor.capabilities)
-            .containsExactlyInAnyOrder(
-                PlatformCapability.VIEW_CLUBS,
-                PlatformCapability.VIEW_CLUB_OPERATIONS,
-            )
+        assertThat(actor.capabilities).containsExactlyInAnyOrderElementsOf(SUPPORT_PLATFORM_CAPABILITIES)
+    }
+
+    @Test
+    fun `platform actor capabilities never include club host or member authorities`() {
+        PlatformAdminRole.entries.forEach { role ->
+            val names =
+                currentPlatformAdmin(role)
+                    .toPlatformActor()
+                    .capabilities
+                    .map { it.name }
+            assertThat(names).doesNotContainAnyElementsOf(ClubCapability.entries.map { it.name })
+        }
     }
 
     @Test
@@ -152,15 +154,48 @@ class ActorCapabilitiesTest {
             role = role,
         )
 
-    private fun actorSource(): String =
-        listOf(
-            Path.of("src/main/kotlin/com/readmates/shared/security/Actors.kt"),
-            Path.of("server/src/main/kotlin/com/readmates/shared/security/Actors.kt"),
-        ).first(Files::exists).toFile().readText()
+    private fun actorSource(relativePath: String = ACTORS_SOURCE): String =
+        listOf(Path.of(relativePath), Path.of("server").resolve(relativePath))
+            .first(Files::exists)
+            .toFile()
+            .readText()
 
     private companion object {
         val USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000101")
         val MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000102")
         val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000103")
+        const val ACTORS_SOURCE = "src/main/kotlin/com/readmates/shared/security/Actors.kt"
+        const val CURRENT_PLATFORM_ADMIN_SOURCE =
+            "src/main/kotlin/com/readmates/shared/security/CurrentPlatformAdmin.kt"
+        val SHARED_PLATFORM_VIEW_CAPABILITIES =
+            setOf(
+                PlatformCapability.VIEW_TODAY,
+                PlatformCapability.VIEW_CLUBS,
+                PlatformCapability.VIEW_CLUB_OPERATIONS,
+                PlatformCapability.VIEW_SERVICE_HEALTH,
+                PlatformCapability.VIEW_NOTIFICATION_OPERATIONS,
+                PlatformCapability.VIEW_AI_OPERATIONS,
+                PlatformCapability.VIEW_SUPPORT,
+                PlatformCapability.VIEW_AUDIT,
+                PlatformCapability.VIEW_ANALYTICS,
+            )
+        val OPERATOR_PLATFORM_CAPABILITIES =
+            SHARED_PLATFORM_VIEW_CAPABILITIES +
+                setOf(
+                    PlatformCapability.REPLAY_NOTIFICATIONS,
+                    PlatformCapability.MANAGE_AI_OPERATIONS,
+                    PlatformCapability.VIEW_SENSITIVE_AUDIT,
+                    PlatformCapability.EXPORT_ANALYTICS,
+                    PlatformCapability.CREATE_CLUB,
+                    PlatformCapability.MANAGE_CLUBS,
+                    PlatformCapability.MANAGE_CLUB_DOMAINS,
+                )
+        val OWNER_PLATFORM_CAPABILITIES =
+            OPERATOR_PLATFORM_CAPABILITIES +
+                setOf(
+                    PlatformCapability.MANAGE_SUPPORT_ACCESS,
+                    PlatformCapability.MANAGE_PLATFORM_ADMINS,
+                )
+        val SUPPORT_PLATFORM_CAPABILITIES = SHARED_PLATFORM_VIEW_CAPABILITIES
     }
 }
