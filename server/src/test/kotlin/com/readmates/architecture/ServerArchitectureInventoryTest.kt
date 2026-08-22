@@ -57,6 +57,7 @@ class ServerArchitectureInventoryTest {
         assertThat(importingTests).containsExactly(
             "server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerTest.kt",
             "server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt",
+            "server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentPlatformAdminArgumentResolverTest.kt",
             "server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt",
             "server/src/test/kotlin/com/readmates/sessionclosing/adapter/in/web/HostSessionClosingControllerTest.kt",
         )

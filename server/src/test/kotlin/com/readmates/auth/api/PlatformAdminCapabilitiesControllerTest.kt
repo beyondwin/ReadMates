@@ -153,7 +153,7 @@ class PlatformAdminCapabilitiesControllerTest {
     private class StubCurrentPlatformAdminResolver(
         private val admin: CurrentPlatformAdmin,
     ) : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter): Boolean = parameter.parameterType == CurrentPlatformAdmin::class.java
+        override fun supportsParameter(parameter: MethodParameter): Boolean = isAdminParam(parameter)
 
         override fun resolveArgument(
             parameter: MethodParameter,
@@ -164,7 +164,7 @@ class PlatformAdminCapabilitiesControllerTest {
     }
 
     private object ForbiddenCurrentPlatformAdminResolver : HandlerMethodArgumentResolver {
-        override fun supportsParameter(parameter: MethodParameter): Boolean = parameter.parameterType == CurrentPlatformAdmin::class.java
+        override fun supportsParameter(parameter: MethodParameter): Boolean = isAdminParam(parameter)
 
         override fun resolveArgument(
             parameter: MethodParameter,
@@ -235,3 +235,5 @@ class PlatformAdminCapabilitiesControllerTest {
             Comparator.comparingInt { name -> PlatformCapability.valueOf(name).ordinal }
     }
 }
+
+private fun isAdminParam(p: MethodParameter): Boolean = p.parameterType == CurrentPlatformAdmin::class.java
