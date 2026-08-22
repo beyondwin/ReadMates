@@ -12,6 +12,7 @@ export type AdminModalDialogProps = {
   onRequestClose(): void;
   children: ReactNode;
   className?: string;
+  backdropTestId?: string;
 };
 
 const FOCUSABLE_SELECTOR = [
@@ -38,6 +39,7 @@ export function AdminModalDialog({
   onRequestClose,
   children,
   className,
+  backdropTestId = "admin-modal-dialog-backdrop",
 }: AdminModalDialogProps) {
   const overlayRef = useRef<HTMLDivElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
@@ -122,7 +124,7 @@ export function AdminModalDialog({
     <div ref={overlayRef} className="admin-modal-dialog" role="presentation">
       <div
         className="admin-modal-dialog__backdrop"
-        data-testid="admin-modal-dialog-backdrop"
+        data-testid={backdropTestId}
         aria-hidden="true"
         onClick={() => onRequestCloseRef.current()}
       />

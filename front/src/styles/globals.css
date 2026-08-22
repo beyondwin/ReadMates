@@ -9321,6 +9321,11 @@ a.rm-recent-record__destination:hover {
   gap: 8px;
 }
 
+.admin-modal-dialog__panel .btn,
+.admin-modal-dialog__panel button {
+  min-height: 44px;
+}
+
 @media (max-width: 768px) {
   .admin-page-frame__header,
   .admin-page-frame__action,
@@ -9362,6 +9367,12 @@ a.rm-recent-record__destination:hover {
     overflow: auto;
     border-radius: 14px 14px 0 0;
     padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .admin-modal-dialog__panel .btn,
+  .admin-modal-dialog__panel button {
+    width: 100%;
+    min-height: 44px;
   }
 }
 

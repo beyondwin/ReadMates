@@ -10,9 +10,11 @@ const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
 function DialogHarness({
   onRequestClose,
   children,
+  backdropTestId,
 }: {
   onRequestClose?: () => void;
   children?: ReactNode;
+  backdropTestId?: string;
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(true);
@@ -28,7 +30,12 @@ function DialogHarness({
       </button>
       <button type="button">바깥 작업</button>
       {open ? (
-        <AdminModalDialog titleId="admin-dialog-title" triggerRef={triggerRef} onRequestClose={close}>
+        <AdminModalDialog
+          titleId="admin-dialog-title"
+          triggerRef={triggerRef}
+          onRequestClose={close}
+          backdropTestId={backdropTestId}
+        >
           {children ?? (
             <>
               <h2 id="admin-dialog-title">확인</h2>
@@ -155,6 +162,28 @@ describe("AdminModalDialog", () => {
     expect(block).toContain("env(safe-area-inset-bottom");
     expect(block).toContain("overflow: auto");
     expect(block).toContain("prefers-reduced-motion: reduce");
+  });
+
+  it("defaults the backdrop test id and accepts a compatibility override", () => {
+    const { unmount } = render(<DialogHarness />);
+    expect(screen.getByTestId("admin-modal-dialog-backdrop")).toBeInTheDocument();
+    expect(screen.queryByTestId("resolve-backdrop")).not.toBeInTheDocument();
+    unmount();
+
+    render(<DialogHarness backdropTestId="resolve-backdrop" />);
+    expect(screen.getByTestId("resolve-backdrop")).toBeInTheDocument();
+    expect(screen.queryByTestId("admin-modal-dialog-backdrop")).not.toBeInTheDocument();
+  });
+
+  it("gives panel actions a 44px target and full width at 768px", () => {
+    const block = GLOBALS_CSS.slice(GLOBALS_CSS.indexOf(".admin-modal-dialog"));
+    expect(block).toMatch(
+      /\.admin-modal-dialog__panel \.btn,\s*\n\s*\.admin-modal-dialog__panel button \{\s*\n\s*min-height:\s*44px;/,
+    );
+    const mobile = block.slice(block.indexOf("@media (max-width: 768px)"));
+    expect(mobile).toMatch(
+      /\.admin-modal-dialog__panel \.btn,\s*\n\s*\.admin-modal-dialog__panel button \{\s*\n\s*width:\s*100%;\s*\n\s*min-height:\s*44px;/,
+    );
   });
 });
 

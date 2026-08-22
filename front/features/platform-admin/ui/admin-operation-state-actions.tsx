@@ -92,6 +92,7 @@ export function AdminOperationStateActions({
           titleId="resolve-title"
           triggerRef={resolveTriggerRef}
           onRequestClose={() => setResolveOpen(false)}
+          backdropTestId="resolve-backdrop"
         >
           <h4 id="resolve-title">해결 상태 확인</h4>
           <p>현재 source를 다시 검증해 신호가 사라졌을 때만 해결됩니다.</p>

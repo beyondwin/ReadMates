@@ -36,7 +36,7 @@ describe("AdminOperationStateActions", () => {
   it.each([
     ["닫기 버튼", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole("button", { name: "닫기" }))],
     ["Escape", async (user: ReturnType<typeof userEvent.setup>) => user.keyboard("{Escape}")],
-    ["backdrop", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByTestId("admin-modal-dialog-backdrop"))],
+    ["backdrop", async (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByTestId("resolve-backdrop"))],
   ])("does not resolve when the confirmation is dismissed by %s", async (_label, dismiss) => {
     const user = userEvent.setup();
     const { props } = renderActions();
@@ -69,6 +69,7 @@ describe("AdminOperationStateActions", () => {
     const dialog = screen.getByRole("dialog", { name: "해결 상태 확인" });
     expect(dialog).toHaveAttribute("aria-modal", "true");
     expect(screen.getByRole("button", { name: "닫기" })).toHaveFocus();
+    expect(screen.getByTestId("resolve-backdrop")).toBeInTheDocument();
     expect(document.body.style.overflow).toBe("hidden");
 
     await user.keyboard("{Escape}");
