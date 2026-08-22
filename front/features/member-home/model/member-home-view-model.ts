@@ -198,9 +198,9 @@ export function getMemberHomeNextReadingAction({
     return {
       state,
       label: READING_LOOP_LABELS[state],
-      message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
+      message: "모임을 읽고 공동 보드를 확인할 수 있어요.",
       href: "/app/session/current",
-      ctaLabel: "세션 읽기",
+      ctaLabel: "모임 읽기",
       pace: null,
     };
   }
@@ -213,7 +213,7 @@ export function getMemberHomeNextReadingAction({
       return {
         state,
         label: READING_LOOP_LABELS[state],
-        message: "RSVP를 먼저 선택해 주세요.",
+        message: "참석 응답을 먼저 선택해 주세요.",
         href: action.href,
         ctaLabel: action.label,
         pace,

@@ -58,7 +58,7 @@ describe("RecentReadingList", () => {
       name: "최근 독서 기록",
     }).querySelectorAll("li")).toHaveLength(3);
     expect(screen.getByRole("link", {
-      name: "샘플 도서 회차 기록",
+      name: "샘플 도서 모임 기록",
     })).toHaveAttribute("href", "/app/sessions/session-12");
     expect(screen.getAllByRole("link").filter((link) =>
       link.getAttribute("href")?.includes("/app/sessions/"),
@@ -70,7 +70,7 @@ describe("RecentReadingList", () => {
       link.getAttribute("href")?.endsWith("/app/me/records"),
     )).toBe(false);
     const readableRow = screen.getByRole("link", {
-      name: "샘플 도서 회차 기록",
+      name: "샘플 도서 모임 기록",
     });
     expect(readableRow).toHaveClass(
       "rm-recent-reading-row",
@@ -157,7 +157,7 @@ describe("RecentReadingList", () => {
     expect(allRecordsLink).toHaveClass("public-records-link");
     expect(allRecordsLink.querySelector("svg")).toBeNull();
     expect(screen.getByRole("link", {
-      name: "샘플 도서 회차 기록",
+      name: "샘플 도서 모임 기록",
     })).toBeVisible();
   });
 

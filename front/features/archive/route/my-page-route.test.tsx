@@ -136,13 +136,13 @@ describe("MyPageRoute", () => {
       "/clubs/reading-sai/app/archive?view=sessions",
     );
     expect(screen.getByRole("link", {
-      name: "최근 함께 읽은 책 회차 기록",
+      name: "최근 함께 읽은 책 모임 기록",
     })).toHaveAttribute(
       "href",
       "/clubs/reading-sai/app/sessions/session%20%2F%209",
     );
-    expect(screen.queryByRole("list", { name: "최근 참여 대상 회차" })).toBeNull();
-    expect(screen.queryByRole("link", { name: "이번 세션 보기" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "최근 참여 대상 모임" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "이번 모임 보기" })).toBeNull();
     expect(screen.queryByRole("button", { name: "로그아웃" })).toBeNull();
   });
 

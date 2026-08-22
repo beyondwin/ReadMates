@@ -24,7 +24,7 @@ export function FeedbackDocumentSection({
   return (
     <section id={sectionId} className="surface-quiet" style={{ padding: 16 } as CSSProperties}>
       <header className="row-between" style={{ marginBottom: 10 }}>
-        <h3 className="eyebrow" style={{ margin: 0 }}>회차 피드백 문서</h3>
+        <h3 className="eyebrow" style={{ margin: 0 }}>모임 피드백 문서</h3>
         <button
           type="button"
           className="btn btn-ghost btn-sm"

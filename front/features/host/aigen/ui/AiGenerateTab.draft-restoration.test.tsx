@@ -156,7 +156,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
 
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {

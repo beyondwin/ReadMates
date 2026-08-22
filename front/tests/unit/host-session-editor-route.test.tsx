@@ -81,10 +81,10 @@ vi.mock("@/features/host/ui/host-session-editor", async (importOriginal) => {
               props.actions.commitSessionImport("session-7", {
                 format: "readmates-session-import:v1",
                 session: { number: 7, bookTitle: "테스트 책", meetingDate: "2026-05-20" },
-                publication: { summary: "세션 요약" },
+                publication: { summary: "모임 요약" },
                 highlights: [],
                 oneLineReviews: [],
-                feedbackDocument: { fileName: "session-7.md", markdown: "# 세션 기록" },
+                feedbackDocument: { fileName: "session-7.md", markdown: "# 모임 기록" },
                 recordVisibility: "MEMBER",
               } as never)
             }
@@ -306,9 +306,9 @@ describe("EditHostSessionRoute query actions", () => {
     renderEditRoute(client);
 
     const status = screen.getByRole("status");
-    expect(status).toHaveTextContent("세션 기록 편집 정보를 불러오는 중입니다.");
+    expect(status).toHaveTextContent("모임 기록 편집 정보를 불러오는 중입니다.");
     expect(status.closest("main")).toHaveClass("rm-host-session-editor");
-    expect(screen.queryByRole("heading", { name: "세션 문서 편집" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "모임 문서 편집" })).not.toBeInTheDocument();
     expect(routeUnitMocks.capturedProps).toBeNull();
   });
 
@@ -323,7 +323,7 @@ describe("EditHostSessionRoute query actions", () => {
     renderEditRoute(client);
 
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      "세션 기록 편집 정보를 불러오지 못했습니다.",
+      "모임 기록 편집 정보를 불러오지 못했습니다.",
     );
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
 
@@ -399,8 +399,8 @@ describe("NewHostSessionRoute schedule defaults", () => {
 
     renderNewSessionRoute();
 
-    expect(screen.getByRole("heading", { name: "세션 문서 만들기" })).toBeVisible();
-    expect(screen.queryByText("세션 기록 편집 정보를 불러오는 중입니다.")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "모임 문서 만들기" })).toBeVisible();
+    expect(screen.queryByText("모임 기록 편집 정보를 불러오는 중입니다.")).not.toBeInTheDocument();
     expect(screen.getByLabelText("시작 시간")).toHaveValue("20:00");
     expect(screen.getByLabelText("장소")).toHaveValue("온라인");
     expect(screen.getByRole("status")).toHaveTextContent("기본 일정을 불러오는 중입니다.");
@@ -416,7 +416,7 @@ describe("NewHostSessionRoute schedule defaults", () => {
     });
     expect(screen.queryByText("기본 일정을 불러오지 못해 기본값을 사용합니다")).not.toBeInTheDocument();
     expect(screen.getByLabelText("시작 시간")).toHaveValue("20:00");
-    expect(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "모임 문서 저장" })[0]).toBeEnabled();
   });
 
   it.each([401, 403, 500])("shows a retryable warning for %s without blocking the editor", async (status) => {
@@ -428,8 +428,8 @@ describe("NewHostSessionRoute schedule defaults", () => {
     expect(alert).toHaveTextContent("기본 일정을 불러오지 못해 기본값을 사용합니다");
     expect(within(alert).getByRole("button", { name: "다시 시도" })).toBeVisible();
     expect(alert.closest("section")).toHaveAttribute("id", "host-editor-panel-basic-schedule");
-    expect(screen.getByLabelText("세션 제목")).toBeEnabled();
-    expect(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]).toBeEnabled();
+    expect(screen.getByLabelText("모임 제목")).toBeEnabled();
+    expect(screen.getAllByRole("button", { name: "모임 문서 저장" })[0]).toBeEnabled();
   });
 
   it("does not overwrite a cleared field when late defaults arrive", async () => {
@@ -462,10 +462,10 @@ describe("NewHostSessionRoute schedule defaults", () => {
     expect(screen.queryByText("room-code-2048")).not.toBeInTheDocument();
     expect(screen.getByLabelText("미팅 URL")).toHaveValue("");
 
-    await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
+    await user.type(screen.getByLabelText("모임 제목"), "No.7 모임 · 새 책");
     await user.type(screen.getByLabelText("책 제목"), "새 책");
     await user.type(screen.getByLabelText("저자"), "새 저자");
-    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "모임 문서 저장" })[0]!);
 
     await waitFor(() => expect(createHostSession).toHaveBeenCalledTimes(1));
     expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
@@ -490,10 +490,10 @@ describe("NewHostSessionRoute schedule defaults", () => {
 
     await user.clear(screen.getByLabelText("미팅 URL"));
     await user.clear(screen.getByLabelText("Passcode · 선택"));
-    await user.type(screen.getByLabelText("세션 제목"), "7회차 모임 · 새 책");
+    await user.type(screen.getByLabelText("모임 제목"), "No.7 모임 · 새 책");
     await user.type(screen.getByLabelText("책 제목"), "새 책");
     await user.type(screen.getByLabelText("저자"), "새 저자");
-    await user.click(screen.getAllByRole("button", { name: "세션 문서 저장" })[0]!);
+    await user.click(screen.getAllByRole("button", { name: "모임 문서 저장" })[0]!);
 
     await waitFor(() => expect(createHostSession).toHaveBeenCalledTimes(1));
     expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
@@ -517,6 +517,6 @@ describe("NewHostSessionRoute schedule defaults", () => {
       expect(screen.queryByText("기본 일정을 불러오지 못해 기본값을 사용합니다")).not.toBeInTheDocument();
     });
     expect(screen.getByLabelText("시작 시간")).toHaveValue("19:30");
-    expect(screen.getByRole("heading", { name: "세션 문서 만들기" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "모임 문서 만들기" })).toBeVisible();
   });
 });

@@ -6,7 +6,7 @@ describe("BasicSessionPanel", () => {
   it("renders book and schedule headings without tabpanel semantics", () => {
     render(
       <BasicSessionPanel
-        title="7회차 모임"
+        title="No.7 모임"
         bookTitle="테스트 책"
         bookAuthor="테스트 저자"
         bookLink=""
@@ -33,6 +33,6 @@ describe("BasicSessionPanel", () => {
     expect(screen.getByRole("heading", { name: "읽을 책" })).toBeVisible();
     expect(screen.getByRole("heading", { name: "모임 일정과 접속 정보" })).toBeVisible();
     expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
-    expect(screen.getByLabelText("세션 제목")).toHaveValue("7회차 모임");
+    expect(screen.getByLabelText("모임 제목")).toHaveValue("No.7 모임");
   });
 });

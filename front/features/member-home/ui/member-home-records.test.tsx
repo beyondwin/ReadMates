@@ -127,7 +127,7 @@ describe("member home record reflection cards", () => {
       "/assets/avatars/book-club/cloud-green-book.webp",
     );
     expect(container.querySelector(".rm-member-activity-card__author .rm-avatar-chip")).toHaveClass("rm-avatar-chip--artwork");
-    expect(screen.getByText("회차 하이라이트")).toBeVisible();
+    expect(screen.getByText("모임 하이라이트")).toBeVisible();
   });
 
   it("renders the desktop reflection card with record and feedback actions", () => {
@@ -223,14 +223,14 @@ describe("member home record reflection cards", () => {
     expect(mobile).toBeEmptyDOMElement();
   });
 
-  it("keeps unanswered RSVP prose sans while retaining numeric count semantics", () => {
+  it("keeps unanswered 참석 응답 prose sans while retaining numeric count semantics", () => {
     const { container } = render(
       <RosterSummary
         current={{
           currentSession: {
             sessionId: "session-8",
             sessionNumber: 8,
-            title: "8회차 모임",
+            title: "No.8 모임",
             bookTitle: "긴 제목의 다음 책",
             bookAuthor: "저자",
             bookLink: null,
@@ -270,7 +270,7 @@ describe("member home record reflection cards", () => {
     expect(container.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "roster");
   });
 
-  it("renders nine RSVP members as an ordered semantic roster", () => {
+  it("renders nine 참석 응답 members as an ordered semantic roster", () => {
     const attendees = Array.from({ length: 9 }, (_, index) => ({
       renderKey: `membership-${index + 1}`,
       avatarKey: index % 2 === 0 ? "cloud-green-book" : "banana-green-book",
@@ -286,7 +286,7 @@ describe("member home record reflection cards", () => {
           currentSession: {
             sessionId: "session-9",
             sessionNumber: 9,
-            title: "9회차 모임",
+            title: "No.9 모임",
             bookTitle: "공개 테스트 도서",
             bookAuthor: "저자",
             bookLink: null,
@@ -318,7 +318,7 @@ describe("member home record reflection cards", () => {
     const roster = container.querySelector(".rm-member-home-roster");
     expect(roster).toBeInTheDocument();
     expect(roster).toHaveAttribute("role", "list");
-    expect(roster).toHaveAttribute("aria-label", "RSVP 참석자");
+    expect(roster).toHaveAttribute("aria-label", "참석 응답 참석자");
     expect(roster?.querySelectorAll(".rm-member-home-roster__item")).toHaveLength(9);
     expect(
       Array.from(

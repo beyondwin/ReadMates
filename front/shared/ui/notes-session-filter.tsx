@@ -70,13 +70,13 @@ export function SessionRail({
   return (
     <div>
       <div className="row-between" style={{ alignItems: "baseline", marginBottom: "12px" }}>
-        <div className="eyebrow">세션별</div>
+        <div className="eyebrow">모임별</div>
         <span className="tiny mono" style={{ color: "var(--text-3)" }}>
           최근순
         </span>
       </div>
       <label className="rm-sr-only" htmlFor="notes-session-search">
-        세션 검색
+        모임 검색
       </label>
       <div style={{ position: "relative", marginBottom: "12px" }}>
         <span
@@ -136,7 +136,7 @@ export function SessionRail({
 function SelectorEmptyState() {
   return (
     <p className="small" style={{ color: "var(--text-2)", margin: 0, padding: "14px 0" }}>
-      표시할 세션 기록이 없습니다.
+      표시할 모임 기록이 없습니다.
     </p>
   );
 }
@@ -144,7 +144,7 @@ function SelectorEmptyState() {
 function SelectorSearchEmptyState() {
   return (
     <p className="small" style={{ color: "var(--text-2)", margin: 0, padding: "14px 0" }}>
-      일치하는 세션이 없습니다.
+      일치하는 모임이 없습니다.
     </p>
   );
 }
@@ -168,7 +168,7 @@ function SessionRow({
       className="rm-notes-session-link"
       to={sessionHref(session, filter)}
       aria-current={selected ? "page" : undefined}
-      aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 세션 보기`}
+      aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 모임 보기`}
       onClick={onClick}
       style={{
         display: "block",
@@ -227,7 +227,7 @@ export function MobileSessionPicker({
   return (
     <div className="mobile-only rm-notes-feed-page__mobile-picker">
       <div className="row-between" style={{ marginBottom: "10px" }}>
-        <span className="eyebrow">세션별</span>
+        <span className="eyebrow">모임별</span>
         <button type="button" className="btn btn-quiet btn-sm" onClick={onOpenAll} ref={allSessionsButtonRef}>
           전체 보기
         </button>
@@ -243,7 +243,7 @@ export function MobileSessionPicker({
             gap: "10px",
             scrollPaddingInline: 0,
           }}
-          aria-label="최근 세션"
+          aria-label="최근 모임"
         >
           {recentSessions.map((session) => {
             const selected = session.sessionId === selectedSessionId;
@@ -255,7 +255,7 @@ export function MobileSessionPicker({
                 className="rm-notes-session-link"
                 to={sessionHref(session, filter)}
                 aria-current={selected ? "page" : undefined}
-                aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 세션 보기`}
+                aria-label={`${noteSessionNumberLabel(session)} ${sessionBookTitle(session)} 모임 보기`}
                 style={{
                   width: mobileSessionCardWidth,
                   padding: "12px",
@@ -392,15 +392,15 @@ export function MobileSessionSheet({
       >
         <div className="row-between" style={{ padding: "18px 18px 12px", borderBottom: "1px solid var(--line-soft)" }}>
           <h2 id="notes-mobile-session-sheet-title" className="h3 editorial" style={{ margin: 0 }}>
-            세션 목록
+            모임 목록
           </h2>
-          <button type="button" className="btn btn-quiet btn-sm" aria-label="세션 목록 닫기" onClick={onClose} ref={closeButtonRef}>
+          <button type="button" className="btn btn-quiet btn-sm" aria-label="모임 목록 닫기" onClick={onClose} ref={closeButtonRef}>
             닫기
           </button>
         </div>
         <div style={{ padding: "14px 18px 18px" }}>
           <label className="rm-sr-only" htmlFor="notes-mobile-session-search">
-            세션 목록 검색
+            모임 목록 검색
           </label>
           <input
             id="notes-mobile-session-search"

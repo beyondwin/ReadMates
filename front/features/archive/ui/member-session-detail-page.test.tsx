@@ -11,7 +11,7 @@ import { MEMBER_READ_SURFACE_CAPABILITIES } from "@/shared/model/read-surface-ca
 const session: MemberArchiveSessionDetailResponse = {
   sessionId: "session-1",
   sessionNumber: 1,
-  title: "1회차 모임 · 테스트 책",
+  title: "No.1 모임 · 테스트 책",
   bookTitle: "테스트 책",
   bookAuthor: "테스트 저자",
   bookImageUrl: null,
@@ -68,8 +68,8 @@ describe("MemberSessionDetailUnavailablePage return context", () => {
       />,
     );
 
-    expect(screen.getAllByText("세션 없음").length).toBeGreaterThan(0);
-    expect(screen.getAllByText("지난 세션을 찾을 수 없습니다.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("모임 없음").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("지난 모임을 찾을 수 없습니다.").length).toBeGreaterThan(0);
   });
 
   it("opens feedback with the reflection return target directly", async () => {

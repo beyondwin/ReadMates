@@ -3,6 +3,7 @@ import type {
   HostSessionHistoryRecovery,
   HostSessionRestoreItem,
 } from "@/features/host/api/host-session-recovery-contracts";
+import { formatPublicationAction } from "@/shared/model/meeting-language";
 import { lifecycleReasonLabel } from "./host-session-lifecycle-model";
 import {
   recordVisibilityLabel,
@@ -138,9 +139,9 @@ const historyTypeLabels: Record<HostSessionHistoryItem["type"], string> = {
   NOTIFICATION_SKIPPED: "알림 보내지 않음",
   SESSION_OPENED: "멤버에게 열기",
   SESSION_CLOSED: "모임 마치기",
-  SESSION_PUBLISHED: "기록 공개",
+  SESSION_PUBLISHED: formatPublicationAction("publishMemberNotes"),
   SESSION_REOPENED: "다시 준비 중으로",
-  SESSION_UNPUBLISHED: "공개 취소",
+  SESSION_UNPUBLISHED: formatPublicationAction("removeMemberNotes"),
   SESSION_RETURNED_TO_DRAFT: "작성 중으로 되돌리기",
   SESSION_DELETED: "휴지통으로 이동",
   SESSION_RESTORED: "모임 복원",
@@ -210,7 +211,7 @@ export type HostSessionRestorePreviewItemView = {
 };
 
 const restoreFieldLabels: Record<string, string> = {
-  title: "세션 제목",
+  title: "모임 제목",
   bookTitle: "책 제목",
   bookAuthor: "저자",
   bookLink: "책 링크",
@@ -360,7 +361,7 @@ function historyStateLabel(state: string | null | undefined): string {
 }
 
 export function compactSessionLifecycleLabel(state: HostSessionState | null): string {
-  return state === null ? "새 예정 세션" : compactSessionLifecycleLabels[state];
+  return state === null ? "새 예정 모임" : compactSessionLifecycleLabels[state];
 }
 
 function buildDraftOverview(input: HostSessionEditorOverviewInput): HostSessionEditorOverview["draft"] {

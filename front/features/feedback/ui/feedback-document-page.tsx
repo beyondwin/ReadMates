@@ -137,7 +137,7 @@ function feedbackBackLabel(returnTarget: ReadmatesReturnTarget) {
   }
 
   if (returnTarget.href.startsWith("/app/sessions/")) {
-    return "세션";
+    return "모임";
   }
 
   if (returnTarget.href.startsWith("/app/archive")) {
@@ -307,7 +307,7 @@ export function FeedbackDocumentUnavailablePage({
                   ? copy.rule
                   : reason === "forbidden"
                     ? "active 정식 멤버로 확인된 계정만 문서 본문을 열람할 수 있습니다."
-                    : "문서가 등록되지 않은 회차는 본문을 표시하지 않습니다."}
+                    : "문서가 등록되지 않은 모임는 본문을 표시하지 않습니다."}
               </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>

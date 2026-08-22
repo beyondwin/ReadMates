@@ -166,7 +166,7 @@ export function MobileCurrentSessionBoard({
       <section className="rm-current-session-mobile__hero">
         <div className="m-row rm-current-session-mobile__hero-row">
           <div className="rm-current-session-mobile__hero-copy">
-            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
+            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 모임" />
             <h1 className="h2 editorial rm-current-session-mobile__title">{session.bookTitle}</h1>
             <div className="tiny" style={{ color: "var(--text-2)" }}>
               {session.bookAuthor}
@@ -206,7 +206,7 @@ export function MobileCurrentSessionBoard({
         <div
           className="m-seg"
           role="group"
-          aria-label="세션 보기"
+          aria-label="모임 보기"
           onKeyDown={(event) => handleMobileSessionTabKeyDown(event, mobileTab, onMobileTabChange, tabs)}
         >
           {tabs.map((tab) => (
@@ -225,7 +225,7 @@ export function MobileCurrentSessionBoard({
       </div>
 
       {memberNotice?.kind === "suspended" ? <MobileSuspendedMemberNotice message={memberNotice.message} /> : null}
-      {!canWrite ? <MobileReadOnlyNotice message={memberNotice?.message ?? "현재 세션은 읽기 전용입니다."} /> : null}
+      {!canWrite ? <MobileReadOnlyNotice message={memberNotice?.message ?? "현재 모임은 읽기 전용입니다."} /> : null}
 
       {mobileTab === "prep" ? (
         <ReadOnlyFieldset disabled={!canWrite}>

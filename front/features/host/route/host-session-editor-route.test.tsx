@@ -1304,7 +1304,7 @@ describe("EditHostSessionRecordWorkflow", () => {
       onConfirm: () => void;
     };
     expect(confirm.items[0]).toMatchObject({
-      label: "세션 제목",
+      label: "모임 제목",
       currentValue: "새 제목",
       sensitive: false,
     });
@@ -1699,7 +1699,7 @@ function trashDetail() {
   return {
     sessionId: "session-1",
     sessionNumber: 7,
-    title: "7회차 모임",
+    title: "No.7 모임",
     state: "DRAFT" as const,
     trashed: true as const,
     deletedAt: "2026-08-21T10:00:00Z",
@@ -1833,7 +1833,7 @@ describe("EditHostSessionRoute trash ownership", () => {
     client.setQueryData(hostSessionKeys.trashDetail("session-1", context), {
       sessionId: "session-1",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "DRAFT",
       deletedAt: "2026-08-21T10:00:00Z",
       purgeAfter: "2026-08-28T10:00:00Z",
@@ -1845,7 +1845,7 @@ describe("EditHostSessionRoute trash ownership", () => {
 
     renderEditSessionRoute(client, { sessionId: "session-1", mode: "trash" });
 
-    expect(await screen.findByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "No.7 모임" })).toBeVisible();
     await user.click(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" })[0]!);
 
     expect(await screen.findByRole("status")).toHaveTextContent("모임을 복원했습니다.");
@@ -1873,13 +1873,13 @@ describe("EditHostSessionRoute trash ownership", () => {
     expect(await screen.findByText("record workflow route ready")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "route-delete-session" }));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "No.7 모임" })).toBeVisible();
     expect(screen.queryByText("record workflow route ready")).not.toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 
     await user.click(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" })[0]!);
     expect(await screen.findByRole("alert")).toHaveTextContent("모임을 복원하지 못했습니다.");
-    expect(screen.getByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "No.7 모임" })).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("모임을 복원하지 못했습니다.");

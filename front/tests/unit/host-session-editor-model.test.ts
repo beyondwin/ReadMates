@@ -21,7 +21,7 @@ import {
 const session: HostSessionEditorSession = {
   sessionId: "session-1",
   sessionNumber: 1,
-  title: "1회차 모임 · 팩트풀니스",
+  title: "No.1 모임 · 팩트풀니스",
   bookTitle: "팩트풀니스",
   bookAuthor: "한스 로슬링",
   bookLink: "https://example.com/books/factfulness",
@@ -49,7 +49,7 @@ const session: HostSessionEditorSession = {
 };
 
 const formValues: HostSessionFormValues = {
-  title: "7회차 모임 · 새 책",
+  title: "No.7 모임 · 새 책",
   bookTitle: "새 책",
   bookAuthor: "새 저자",
   bookLink: "https://example.com/books/new-book",
@@ -82,7 +82,7 @@ describe("host session editor model", () => {
 
   it("hydrates edit-session form and side-panel helpers from session detail", () => {
     expect(hydrateHostSessionFormValues(session)).toEqual({
-      title: "1회차 모임 · 팩트풀니스",
+      title: "No.1 모임 · 팩트풀니스",
       bookTitle: "팩트풀니스",
       bookAuthor: "한스 로슬링",
       bookLink: "https://example.com/books/factfulness",
@@ -106,7 +106,7 @@ describe("host session editor model", () => {
     });
     expect(getDestructiveActionAvailability(session)).toEqual({
       canDelete: true,
-      guidance: "세션과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다.",
+      guidance: "모임과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다.",
     });
   });
 
@@ -173,7 +173,7 @@ describe("host session editor model", () => {
     });
     expect(getDestructiveActionAvailability({ state: "CLOSED" })).toEqual({
       canDelete: false,
-      guidance: "닫히거나 공개된 세션은 삭제할 수 없습니다.",
+      guidance: "닫히거나 공개된 모임은 삭제할 수 없습니다.",
     });
     expect(getDestructiveActionAvailability({ state: "DRAFT" })).toEqual({
       canDelete: true,
@@ -181,7 +181,7 @@ describe("host session editor model", () => {
     });
     expect(getDestructiveActionAvailability({ state: "PUBLISHED" })).toEqual({
       canDelete: false,
-      guidance: "닫히거나 공개된 세션은 삭제할 수 없습니다.",
+      guidance: "닫히거나 공개된 모임은 삭제할 수 없습니다.",
     });
   });
 });

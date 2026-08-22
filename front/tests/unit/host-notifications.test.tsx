@@ -94,7 +94,7 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
       label: "피드백 문서 등록",
       enabled: false,
-      disabledReason: "닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
+      disabledReason: "닫힌 모임의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
       defaultAudience: "CONFIRMED_ATTENDEES",
       allowedAudiences: ["CONFIRMED_ATTENDEES", "SESSION_PARTICIPANTS"],
       defaultChannels: "BOTH",
@@ -107,7 +107,7 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
 const hostSessionOpen = {
   sessionId: "session-open",
   sessionNumber: 9,
-  title: "9회차 모임",
+  title: "No.9 모임",
   bookTitle: "돈의 심리학",
   bookAuthor: "모건 하우절",
   bookImageUrl: null,
@@ -123,7 +123,7 @@ const hostSessionDraft = {
   ...hostSessionOpen,
   sessionId: "session-draft",
   sessionNumber: 10,
-  title: "10회차 모임",
+  title: "No.10 모임",
   bookTitle: "다음 책",
   date: "2026-08-19",
   state: "DRAFT",
@@ -133,7 +133,7 @@ const hostSessionCurrent: HostSessionListItem = {
   ...hostSessionOpen,
   sessionId: "session-1",
   sessionNumber: 8,
-  title: "8회차 모임",
+  title: "No.8 모임",
   bookTitle: "Example Book",
   bookAuthor: "Example Author",
   date: "2026-05-20",
@@ -790,7 +790,7 @@ describe("HostNotificationsRoute", () => {
     const previewButton = screen.getByRole("button", { name: "미리보기 열기" });
     expect(previewButton).not.toBeDisabled();
 
-    const sessionSelect = screen.getByLabelText("세션 선택");
+    const sessionSelect = screen.getByLabelText("모임 선택");
     await userEvent.selectOptions(sessionSelect, "session-draft");
 
     await waitFor(() => {
@@ -913,7 +913,7 @@ describe("HostNotificationsPage", () => {
     await user.click(screen.getByRole("radio", { name: "피드백 문서 등록" }));
     expect(screen.getByRole("radio", { name: "피드백 문서 등록" })).toBeChecked();
 
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
     view.rerender(
       <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
     );
@@ -943,7 +943,7 @@ describe("HostNotificationsPage", () => {
         contentRevision: `${index + 3}`.repeat(64),
         enabled: template.eventType !== "FEEDBACK_DOCUMENT_PUBLISHED",
         disabledReason: template.eventType === "FEEDBACK_DOCUMENT_PUBLISHED"
-          ? "이 세션에서는 사용할 수 없습니다."
+          ? "이 모임에서는 사용할 수 없습니다."
           : null,
       })),
     } satisfies ManualNotificationOptionsResponse;
@@ -966,7 +966,7 @@ describe("HostNotificationsPage", () => {
     );
 
     await user.click(screen.getByRole("radio", { name: "피드백 문서 등록" }));
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
     view.rerender(
       <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
     );
@@ -982,7 +982,7 @@ describe("HostNotificationsPage", () => {
 
     expect(screen.getAllByRole("radio", { name: /전체 활성 멤버/ })).toHaveLength(1);
     expect(screen.queryByRole("radio", { name: /추천 대상/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("radio", { name: "세션 참가자" }));
+    await user.click(screen.getByRole("radio", { name: "모임 참가자" }));
     await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
 
     expect(onPreviewManual).toHaveBeenCalledWith(expect.objectContaining({
@@ -1053,10 +1053,10 @@ describe("HostNotificationsPage", () => {
   it("renders a session selector instead of a raw session id field", () => {
     renderPage();
 
-    expect(screen.getByLabelText("세션 선택")).toHaveValue("session-1");
-    expect(screen.queryByLabelText("세션 ID")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("모임 선택")).toHaveValue("session-1");
+    expect(screen.queryByLabelText("모임 ID")).not.toBeInTheDocument();
     expect(screen.getByRole("option", {
-      name: "8회차 · Example Book · 2026-05-20",
+      name: "No.8 · Example Book · 2026-05-20",
     })).toBeInTheDocument();
     expect(screen.getByText(/진행 중.*게스트 공개.*피드백 문서 준비됨/)).toBeInTheDocument();
     expect(screen.queryByText(/OPEN|HOST_ONLY/)).not.toBeInTheDocument();
@@ -1069,7 +1069,7 @@ describe("HostNotificationsPage", () => {
       initialManualSelection: { sessionId: null, eventType: null },
     });
 
-    expect(screen.getByText("선택 가능한 세션이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("선택 가능한 모임이 없습니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "미리보기 열기" })).toBeDisabled();
   });
 
@@ -1079,7 +1079,7 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onLoadManualOptions });
 
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
 
     expect(onLoadManualOptions).toHaveBeenCalledWith("session-draft", undefined);
   });
@@ -1090,9 +1090,9 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onLoadManualOptions });
 
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("세션 정보를 불러오지 못했습니다.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("모임 정보를 불러오지 못했습니다.");
   });
 
   it("searches manual notification members and loads more", async () => {

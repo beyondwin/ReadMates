@@ -9,7 +9,7 @@ import {
 const session = {
   sessionId: "session-7",
   sessionNumber: 7,
-  title: "7회차 모임 · 테스트 책",
+  title: "No.7 모임 · 테스트 책",
   bookTitle: "테스트 책",
   bookAuthor: "테스트 저자",
   bookLink: null,
@@ -64,7 +64,7 @@ const noteFeedItems: MemberHomeNoteFeedItemView[] = [
     authorShortName: "수",
     avatarKey: "cloud-green-book",
     kind: "ONE_LINE_REVIEW",
-    text: "지난 세션 기록입니다.",
+    text: "지난 모임 기록입니다.",
   },
 ];
 
@@ -103,9 +103,9 @@ describe("member-home view model", () => {
     ).toMatchObject({
       state: "MEMBER_PREP_REQUIRED",
       label: "멤버 준비 필요",
-      message: "RSVP를 먼저 선택해 주세요.",
+      message: "참석 응답을 먼저 선택해 주세요.",
       href: "/app/session/current",
-      ctaLabel: "RSVP 하기",
+      ctaLabel: "참석 응답하기",
     });
 
     expect(
@@ -203,7 +203,7 @@ describe("member-home view model", () => {
   it("keeps no-session and viewer states read-safe", () => {
     expect(getMemberHomeNextReadingAction({ session: null, isViewer: false, canWrite: true })).toEqual({
       state: "NO_SESSION",
-      label: "세션 대기",
+      label: "모임 대기",
       message: "호스트가 모임을 열면 준비를 시작합니다.",
       href: null,
       ctaLabel: null,
@@ -212,10 +212,10 @@ describe("member-home view model", () => {
 
     expect(getMemberHomeNextReadingAction({ session, isViewer: true, canWrite: false })).toMatchObject({
       state: "SESSION_READY",
-      label: "세션 준비됨",
-      message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
+      label: "모임 준비됨",
+      message: "모임을 읽고 공동 보드를 확인할 수 있어요.",
       href: "/app/session/current",
-      ctaLabel: "세션 읽기",
+      ctaLabel: "모임 읽기",
     });
   });
 
@@ -233,10 +233,10 @@ describe("member-home view model", () => {
       }),
     ).toMatchObject({
       state: "SESSION_READY",
-      label: "세션 준비됨",
-      message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
+      label: "모임 준비됨",
+      message: "모임을 읽고 공동 보드를 확인할 수 있어요.",
       href: "/app/session/current",
-      ctaLabel: "세션 읽기",
+      ctaLabel: "모임 읽기",
     });
   });
 
@@ -254,10 +254,10 @@ describe("member-home view model", () => {
 
     expect(action).toMatchObject({
       state: "SESSION_READY",
-      label: "세션 준비됨",
-      message: "세션을 읽고 공동 보드를 확인할 수 있어요.",
+      label: "모임 준비됨",
+      message: "모임을 읽고 공동 보드를 확인할 수 있어요.",
       href: "/app/session/current",
-      ctaLabel: "세션 읽기",
+      ctaLabel: "모임 읽기",
     });
     expect(action.state).not.toBe("REFLECTION_DUE");
     expect(action.label).not.toBe("회고 필요");
@@ -358,7 +358,7 @@ describe("member-home view model", () => {
         authorShortName: "사",
         avatarKey: "banana-green-book",
         kind: "ONE_LINE_REVIEW",
-        text: "이전 세션 한줄평입니다.",
+        text: "이전 모임 한줄평입니다.",
       },
     ];
 

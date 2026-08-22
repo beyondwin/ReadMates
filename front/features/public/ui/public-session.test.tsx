@@ -35,7 +35,7 @@ describe("PublicSession showcase", () => {
     expect(container.querySelector(".public-note-highlight-row__quote")).not.toHaveClass("reading-editorial");
     expect(container.querySelector(".public-note-oneliner-card__quote")).toHaveClass("editorial");
     expect(container.querySelector(".public-note-oneliner-card__quote")).not.toHaveClass("reading-editorial");
-    expect(screen.getByRole("heading", { name: "회차 기록" })).not.toHaveClass("reading-editorial");
+    expect(screen.getByRole("heading", { name: "모임 기록" })).not.toHaveClass("reading-editorial");
     expect(screen.queryByText(/피드백 문서/)).toBeNull();
     expect(screen.queryByText("ADMIN_ROUTE")).toBeNull();
   });

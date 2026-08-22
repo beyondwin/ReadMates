@@ -33,7 +33,7 @@ describe("BookRecordRow", () => {
       name: "보이지 않는 도시들",
     })).toBeVisible();
     expect(within(row).getByRole("link", {
-      name: "회차 기록",
+      name: "모임 기록",
     })).toHaveAttribute("href", "/app/sessions/session-9");
     expect(within(row).getByRole("link", {
       name: "피드백 문서",

@@ -20,10 +20,10 @@ export function LifecyclePolicyDialog({
   const title = dialog.action === "suspend" ? `${dialog.member.displayName}님을 정지할까요?` : `${dialog.member.displayName}님을 탈퇴 처리할까요?`;
   const description =
     dialog.action === "suspend"
-      ? "정지하면 기존 기록은 유지되고, 새 RSVP/질문/체크인/리뷰 작성은 막힙니다."
+      ? "정지하면 기존 기록은 유지되고, 새 참석 응답/질문/체크인/리뷰 작성은 막힙니다."
       : '과거 기록은 보존되며, 다른 멤버에게는 작성자가 "탈퇴한 멤버"로 표시됩니다.';
-  const applyNowLabel = dialog.action === "suspend" ? "이번 세션부터 바로 정지" : "이번 세션에서 제외";
-  const nextSessionLabel = dialog.action === "suspend" ? "다음 세션부터 정지" : "다음 세션부터 제외";
+  const applyNowLabel = dialog.action === "suspend" ? "이번 모임부터 바로 정지" : "이번 모임에서 제외";
+  const nextSessionLabel = dialog.action === "suspend" ? "다음 모임부터 정지" : "다음 모임부터 제외";
   const confirmLabel = dialog.action === "suspend" ? "정지" : "탈퇴 처리";
   const dialogRef = useRef<HTMLDivElement>(null);
   const cancelButtonRef = useRef<HTMLButtonElement>(null);
@@ -109,7 +109,7 @@ export function LifecyclePolicyDialog({
         </p>
 
         <fieldset style={{ border: 0, padding: 0, margin: 0 }}>
-          <legend className="label">현재 세션 반영</legend>
+          <legend className="label">현재 모임 반영</legend>
           <div className="stack" style={{ "--stack": "10px" } as CSSProperties}>
             <label className="row" style={{ gap: 8, alignItems: "center" }}>
               <input

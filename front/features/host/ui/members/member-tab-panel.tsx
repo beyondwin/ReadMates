@@ -57,7 +57,7 @@ export function MemberTabPanel({
         <MemberList
           members={activeMembers}
           emptyText="활성 멤버가 없습니다."
-          sectionDescription="정식 멤버입니다. 이번 세션 참여 여부와 정지/탈퇴 처리를 함께 관리합니다."
+          sectionDescription="정식 멤버입니다. 이번 모임 참여 여부와 정지/탈퇴 처리를 함께 관리합니다."
           renderMeta={memberMeta}
           renderProfileAction={renderProfileAction}
           renderActions={(member) => {
@@ -131,7 +131,7 @@ export function MemberTabPanel({
         <MemberList
           members={suspendedMembers}
           emptyText="정지된 멤버가 없습니다."
-          sectionDescription="정지된 멤버는 기록은 보존되지만 새 RSVP, 질문, 체크인, 리뷰 작성이 제한됩니다."
+          sectionDescription="정지된 멤버는 기록은 보존되지만 새 참석 응답, 질문, 체크인, 리뷰 작성이 제한됩니다."
           renderMeta={joinedMeta}
           renderProfileAction={renderProfileAction}
           renderActions={(member) => {

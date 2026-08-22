@@ -271,7 +271,7 @@ describe("Feedback document routes", () => {
       await screen.findByRole("heading", { name: "피드백 문서는 active 정식 멤버에게만 열립니다." }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("둘러보기 멤버나 제한된 멤버는 세션 기록을 읽을 수 있지만, 회차 피드백 문서는 볼 수 없습니다."),
+      screen.getByText("둘러보기 멤버나 제한된 멤버는 모임 기록을 읽을 수 있지만, 모임 피드백 문서는 볼 수 없습니다."),
     ).toBeInTheDocument();
   });
 
@@ -303,7 +303,7 @@ describe("Feedback document routes", () => {
       await screen.findByRole("heading", { name: "피드백 문서는 active 정식 멤버에게만 열립니다." }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText("둘러보기 멤버나 제한된 멤버는 세션 기록을 읽을 수 있지만, 회차 피드백 문서는 볼 수 없습니다."),
+      screen.getByText("둘러보기 멤버나 제한된 멤버는 모임 기록을 읽을 수 있지만, 모임 피드백 문서는 볼 수 없습니다."),
     ).toBeInTheDocument();
     expect(printMock).not.toHaveBeenCalled();
   });
@@ -379,7 +379,7 @@ describe("Feedback document routes", () => {
       pathname: "/app/feedback/session-1",
       state: {
         readmatesReturnTo: "/app/sessions/session-1#feedback",
-        readmatesReturnLabel: "세션으로 돌아가기",
+        readmatesReturnLabel: "모임으로 돌아가기",
         readmatesReturnState: {
           readmatesReturnTo: "/app/archive?view=reviews",
           readmatesReturnLabel: "아카이브로",
@@ -388,9 +388,9 @@ describe("Feedback document routes", () => {
     });
 
     expect(await screen.findByRole("heading", { name: "독서모임 1차 피드백" })).toBeInTheDocument();
-    const returnLink = screen.getByRole("link", { name: "세션으로 돌아가기" });
+    const returnLink = screen.getByRole("link", { name: "모임으로 돌아가기" });
     expect(returnLink).toHaveAttribute("href", "/app/sessions/session-1#feedback");
-    expect(returnLink).toHaveTextContent("← 세션");
+    expect(returnLink).toHaveTextContent("← 모임");
 
     await user.click(returnLink);
 

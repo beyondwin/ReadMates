@@ -23,7 +23,7 @@ describe("hostSessionLifecycleResultFromResponse", () => {
     const notAllowed = await hostSessionLifecycleResultFromResponse(
       new Response(JSON.stringify({
         code: "SESSION_REOPEN_NOT_ALLOWED",
-        message: "마감된 세션만 다시 열 수 있습니다.",
+        message: "마감된 모임만 다시 열 수 있습니다.",
         status: 409,
       }), { status: 409 }),
     );
@@ -35,7 +35,7 @@ describe("hostSessionLifecycleResultFromResponse", () => {
     });
     expect(notAllowed).toEqual({
       ok: false,
-      message: "마감된 세션만 다시 열 수 있습니다.",
+      message: "마감된 모임만 다시 열 수 있습니다.",
       openSessionId: null,
     });
   });

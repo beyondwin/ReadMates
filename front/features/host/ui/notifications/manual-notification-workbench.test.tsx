@@ -50,7 +50,7 @@ const options: ManualNotificationOptionsResponse = {
 const sessions: HostSessionListItem[] = [{
   sessionId: "session-9",
   sessionNumber: 9,
-  title: "9회차 모임",
+  title: "No.9 모임",
   bookTitle: "Example Book",
   bookAuthor: "Example Author",
   bookImageUrl: null,
@@ -130,7 +130,7 @@ describe("ManualNotificationWorkbench", () => {
       .map((heading) => heading.textContent);
 
     expect(decisionHeadings).toEqual([
-      "대상 회차",
+      "대상 모임",
       "알림 종류",
       "대상과 채널",
     ]);

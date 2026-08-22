@@ -103,7 +103,7 @@ export function AdminTodayLedger({
             ["club_readiness", "클럽 준비"],
             ["notification", "알림"],
             ["ai_job", "AI 작업"],
-            ["closing_risk", "회차 마감"],
+            ["closing_risk", "모임 마감"],
           ]}
         />
         <label className="admin-today-ledger__assignee admin-operation-control--touch">

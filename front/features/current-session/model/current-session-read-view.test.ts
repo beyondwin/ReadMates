@@ -95,7 +95,7 @@ const guestResponse: GuestCurrentSessionReadSource = {
       {
         displayName: "알 수 없음",
         avatarKey: "unknown",
-        rsvpStatus: "NOT_A_RSVP",
+        rsvpStatus: "NOT_A_참석 응답",
         attendanceStatus: "NOT_AN_ATTENDANCE_STATUS",
       },
     ],

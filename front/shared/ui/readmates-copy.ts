@@ -8,7 +8,7 @@ export const READMATES_NAV_LABELS = {
   },
   member: {
     home: "홈",
-    currentSession: "이번 세션",
+    currentSession: "이번 모임",
     clubNotes: "클럽 노트",
     archive: "아카이브",
     notifications: "알림",
@@ -16,8 +16,8 @@ export const READMATES_NAV_LABELS = {
   },
   host: {
     operations: "운영",
-    sessionEditor: "세션 문서",
-    sessionRecords: "세션 기록",
+    sessionEditor: "모임 문서",
+    sessionRecords: "모임 기록",
     notifications: "알림 발송",
     invitations: "멤버 초대",
     memberApproval: "멤버 승인",
@@ -32,7 +32,7 @@ export const READMATES_WORKSPACE_LABELS = {
 
 export const READMATES_MOBILE_TAB_LABELS = {
   hostToday: "오늘",
-  hostSession: "세션",
+  hostSession: "모임",
   hostSessionPending: "확인 중",
   hostNotifications: "알림",
   hostMembers: "멤버",
@@ -48,7 +48,7 @@ export const READMATES_PRIMARY_NAV_LABELS = {
   },
   host: {
     today: "오늘",
-    session: "세션",
+    session: "모임",
     members: "멤버",
     records: "기록",
   },

@@ -194,7 +194,7 @@ describe("MemberSessionDetailPage", () => {
         ?.querySelector(".rm-avatar-chip"),
     ).toHaveAttribute("data-avatar-size-role", "dense");
 
-    expect(memberHeadings).toEqual(["요약", "회차 기록", "함께 남긴 질문", "공개 서평"]);
+    expect(memberHeadings).toEqual(["요약", "모임 기록", "함께 남긴 질문", "공개 서평"]);
     expect(guestHeadings).toEqual(memberHeadings);
     expect(memberMobileHeadings).toEqual(memberHeadings);
     expect(guestMobileHeadings).toEqual(memberHeadings);
@@ -255,7 +255,7 @@ describe("MemberSessionDetailPage", () => {
       />,
     );
 
-    expect(screen.getAllByText("지난 세션을 찾을 수 없습니다.")).toHaveLength(2);
+    expect(screen.getAllByText("지난 모임을 찾을 수 없습니다.")).toHaveLength(2);
   });
 
   it("redirects anonymous direct session-detail navigation to login with returnTo", async () => {
@@ -346,15 +346,15 @@ describe("MemberSessionDetailPage", () => {
     expect(returnLink).toHaveAttribute("href", "/app/archive?view=sessions");
     expect(returnLink).toHaveTextContent("← 아카이브");
     expect(returnLink.closest(".rm-session-detail-kicker")).toHaveTextContent(/^← 아카이브$/);
-    expect(desktop.queryByText("아카이브 세션 · No.01 · 2025.11.26")).not.toBeInTheDocument();
+    expect(desktop.queryByText("아카이브 모임 · No.01 · 2025.11.26")).not.toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "요약" })).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
+    expect(desktop.getByRole("link", { name: "모임 기록" })).toBeInTheDocument();
     expect(desktop.getByRole("link", { name: "함께 남긴 질문" })).toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "피드백" })).not.toBeInTheDocument();
     expect(desktop.queryByRole("link", { name: "내 기록" })).not.toBeInTheDocument();
     expect(desktop.queryAllByRole("heading", { name: "요약" })).toHaveLength(1);
-    expect(desktop.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
-    expect(desktop.getByRole("heading", { name: "회차 하이라이트 · 1" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "모임 기록" })).toBeInTheDocument();
+    expect(desktop.getByRole("heading", { name: "모임 하이라이트 · 1" })).toBeInTheDocument();
     const desktopHighlightRow = desktop
       .getByText("세계는 생각보다 나아지고 있지만, 우리의 감각은 느리게 따라온다.")
       .closest(".rm-session-highlight-row");
@@ -391,17 +391,17 @@ describe("MemberSessionDetailPage", () => {
     expect(mobileBadges).toContain("피드백 O");
     expect(mobileBadges).not.toContain("피드백 공개");
     expect(mobile.getByRole("group", { name: "No.01 · 비공개" })).toBeInTheDocument();
-    expect(mobile.getByRole("link", { name: "회차 기록" })).toBeInTheDocument();
+    expect(mobile.getByRole("link", { name: "모임 기록" })).toBeInTheDocument();
     expect(mobile.getByRole("link", { name: "질문" })).toBeInTheDocument();
     expect(mobile.queryByRole("link", { name: "피드백" })).not.toBeInTheDocument();
     expect(container.querySelector(".mobile-only .rm-session-detail-mobile-tabs")).not.toBeNull();
     expect(mobile.getByRole("link", { name: "요약" })).toHaveClass("rm-session-detail-mobile-tab");
-    expect(mobile.getByRole("link", { name: "회차 기록" })).toHaveClass("rm-session-detail-mobile-tab");
+    expect(mobile.getByRole("link", { name: "모임 기록" })).toHaveClass("rm-session-detail-mobile-tab");
     expect(mobile.getByRole("link", { name: "질문" })).toHaveClass("rm-session-detail-mobile-tab");
     expect(mobile.queryByRole("link", { name: "내 기록" })).not.toBeInTheDocument();
     expect(mobile.queryAllByRole("heading", { name: "요약" })).toHaveLength(1);
-    expect(mobile.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
-    const mobileHighlightHeading = mobile.getByRole("heading", { name: "회차 하이라이트 · 1" });
+    expect(mobile.getByRole("heading", { name: "모임 기록" })).toBeInTheDocument();
+    const mobileHighlightHeading = mobile.getByRole("heading", { name: "모임 하이라이트 · 1" });
     expect(mobileHighlightHeading).toHaveClass("h4");
     expect(mobileHighlightHeading).not.toHaveClass("small", "mono");
     const mobileHighlightRow = mobile
@@ -437,7 +437,7 @@ describe("MemberSessionDetailPage", () => {
       for (const readingNode of [summary, highlight, question, questionContext, oneLiner]) {
         expect(readingNode).not.toHaveClass("reading-editorial");
       }
-      expect(scope.getByRole("heading", { name: "회차 기록" })).not.toHaveClass("reading-editorial");
+      expect(scope.getByRole("heading", { name: "모임 기록" })).not.toHaveClass("reading-editorial");
     }
     expect(container).not.toHaveTextContent("Join the reading");
     expect(container).not.toHaveTextContent("하이라이트와 한줄평");
@@ -459,7 +459,7 @@ describe("MemberSessionDetailPage", () => {
     const { container } = renderDetail({
       ...readableSession,
       state: "CLOSED",
-      publicSummary: "멤버에게 보일 요약은 있지만 아직 공개 완료 전입니다.",
+      publicSummary: "멤버에게 보일 요약은 있지만 아직 게스트·멤버 노트 게시 완료 전입니다.",
     });
 
     expect(getDesktop(container).getByRole("group", { name: "No.01 · 비공개" })).toBeInTheDocument();
@@ -524,7 +524,7 @@ describe("MemberSessionDetailPage", () => {
           path: "/app/sessions/:sessionId",
           element: <MemberSessionDetailRoutePage />,
           loader: memberSessionDetailLoaderFactory(queryClient),
-          hydrateFallbackElement: <div>지난 세션 기록을 불러오는 중</div>,
+          hydrateFallbackElement: <div>지난 모임 기록을 불러오는 중</div>,
         },
       ],
       {
@@ -592,7 +592,7 @@ describe("MemberSessionDetailPage", () => {
           path: "/app/sessions/:sessionId",
           element: <MemberSessionDetailRoutePage />,
           loader: memberSessionDetailLoaderFactory(queryClient),
-          hydrateFallbackElement: <div>지난 세션 기록을 불러오는 중</div>,
+          hydrateFallbackElement: <div>지난 모임 기록을 불러오는 중</div>,
         },
         { path: "/app/feedback/:sessionId", element: <LocationStateEcho /> },
       ],
@@ -617,7 +617,7 @@ describe("MemberSessionDetailPage", () => {
     expect(screen.getByTestId("return-to")).toHaveTextContent(
       "/app/sessions/00000000-0000-0000-0000-000000000301",
     );
-    expect(screen.getByTestId("return-label")).toHaveTextContent("세션으로 돌아가기");
+    expect(screen.getByTestId("return-label")).toHaveTextContent("모임으로 돌아가기");
     expect(screen.getByTestId("nested-return-to")).toHaveTextContent("/app/archive?view=reviews");
     expect(screen.getByTestId("nested-return-label")).toHaveTextContent("아카이브로");
   });
@@ -678,7 +678,7 @@ describe("MemberSessionDetailPage", () => {
       },
     });
 
-    expect(screen.getAllByText("호스트가 피드백 문서를 등록하면 이 회차에서 확인할 수 있습니다.").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("호스트가 피드백 문서를 등록하면 이 모임에서 확인할 수 있습니다.").length).toBeGreaterThan(0);
     expect(screen.queryByRole("link", { name: "피드백 보기" })).not.toBeInTheDocument();
 
     const readonlyBadges = Array.from(container.querySelectorAll(".badge")).filter((badge) => badge.textContent === "피드백 없음");
@@ -756,7 +756,7 @@ describe("MemberSessionDetailPage", () => {
     });
 
     const desktop = getDesktop(container);
-    expect(desktop.getByRole("link", { name: "세션 문서 편집" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "모임 문서 편집" })).toHaveAttribute(
       "href",
       "/app/host/sessions/00000000-0000-0000-0000-000000000301/edit",
     );

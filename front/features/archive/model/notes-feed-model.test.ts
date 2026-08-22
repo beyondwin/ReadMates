@@ -13,7 +13,7 @@ describe("noteSessionSearchPlaceholder", () => {
   });
 
   it("uses a generic example when there are no sessions", () => {
-    expect(noteSessionSearchPlaceholder([])).toBe("책 제목 또는 세션 번호");
+    expect(noteSessionSearchPlaceholder([])).toBe("책 제목 또는 모임 번호");
   });
 });
 

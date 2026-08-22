@@ -30,7 +30,7 @@ import { formatMobileTodayLabel, rsvpLabel } from "@/shared/ui/readmates-display
 import { SessionTimingIdentity } from "@/shared/ui/session-identity";
 
 const quickLinks = [
-  { label: "피드백 문서", sub: "회차 피드백", href: "/app/archive?view=report", icon: "notes" },
+  { label: "피드백 문서", sub: "모임 피드백", href: "/app/archive?view=report", icon: "notes" },
   { label: "안내문", sub: "모임 가이드", href: "/about", icon: "sparkle" },
 ] satisfies Array<{
   label: string;
@@ -77,13 +77,13 @@ export default function MemberHome({
                       이번 달은 <span style={{ color: "var(--accent)" }}>{currentSession.bookTitle}</span>을 함께 읽어요.
                     </>
                   ) : (
-                    "다음 세션을 기다리고 있어요."
+                    "다음 모임을 기다리고 있어요."
                   )}
                 </h1>
                 <p className="body" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
                   {currentSession
                     ? `${currentSession.bookTitle} 준비 보드가 열려 있습니다. 질문은 최대 5개까지 남길 수 있어요.`
-                    : "호스트가 새 세션을 등록하면 준비 보드가 열립니다."}
+                    : "호스트가 새 모임을 등록하면 준비 보드가 열립니다."}
                 </p>
               </div>
             </div>
@@ -97,7 +97,7 @@ export default function MemberHome({
               canWrite={canWrite}
             />
 
-            <section aria-label="이번 세션">
+            <section aria-label="이번 모임">
               {widgetErrors?.current ? (
                 <MemberHomeWidgetFailure error={widgetErrors.current} onRetry={onRetry?.current} />
               ) : (
@@ -132,7 +132,7 @@ export default function MemberHome({
               </div>
               <div className="stack" style={{ "--stack": "24px" } as CSSProperties}>
                 <RosterSummary current={current} />
-                <section aria-label="예정 세션">
+                <section aria-label="예정 모임">
                   {widgetErrors?.upcoming ? (
                     <MemberHomeWidgetFailure error={widgetErrors.upcoming} onRetry={onRetry?.upcoming} />
                   ) : (
@@ -191,7 +191,7 @@ function HomeAnswerStrip({
           {session ? session.bookTitle : "다음 책을 기다리는 중"}
         </div>
         <p className="tiny" style={{ color: "var(--text-3)", margin: "6px 0 0" }}>
-          {session ? `${session.bookAuthor} · 현재 RSVP ${rsvpLabel(session.myRsvpStatus)}` : "새 세션이 열리면 이곳에 표시됩니다."}
+          {session ? `${session.bookAuthor} · 현재 참석 응답 ${rsvpLabel(session.myRsvpStatus)}` : "새 모임이 열리면 이곳에 표시됩니다."}
         </p>
       </div>
       <div className="surface-quiet rm-home-answer-strip__item">
@@ -257,14 +257,14 @@ function MobileMemberHome({
           안녕하세요, {memberName}님.
         </h1>
         <div className="small" style={{ color: "var(--text-2)", marginTop: 4 }}>
-          {session ? `다음 모임은 ${session.bookTitle}로 준비 중이에요.` : "다음 세션을 기다리고 있어요."}
+          {session ? `다음 모임은 ${session.bookTitle}로 준비 중이에요.` : "다음 모임을 기다리고 있어요."}
         </div>
         {isViewer ? <MobileViewerMemberHomeNotice /> : null}
       </section>
 
-      <section className="m-sec" aria-label="이번 세션">
+      <section className="m-sec" aria-label="이번 모임">
         <div className="m-eyebrow-row">
-          <span className="eyebrow">이번 세션</span>
+          <span className="eyebrow">이번 모임</span>
         </div>
         {widgetErrors?.current ? (
           <MemberHomeWidgetFailure error={widgetErrors.current} onRetry={onRetry?.current} />
@@ -289,7 +289,7 @@ function MobileMemberHome({
         pace={nextAction.pace}
         LinkComponent={LinkComponent}
       />
-      <section aria-label="예정 세션">
+      <section aria-label="예정 모임">
         {widgetErrors?.upcoming ? (
           <MemberHomeWidgetFailure error={widgetErrors.upcoming} onRetry={onRetry?.upcoming} />
         ) : (
@@ -318,7 +318,7 @@ function ViewerMemberHomeNotice() {
         둘러보기 멤버
       </p>
       <p className="body" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
-        세션 기록은 읽을 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.
+        모임 기록은 읽을 수 있어요. 정식 멤버가 되면 참석 응답, 읽기 진행률, 질문 작성 기능이 열립니다.
       </p>
     </section>
   );
@@ -331,7 +331,7 @@ function MobileViewerMemberHomeNotice() {
         둘러보기 멤버
       </p>
       <p className="small" style={{ margin: "6px 0 0", color: "var(--text-2)" }}>
-        세션 기록은 읽을 수 있어요. 정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.
+        모임 기록은 읽을 수 있어요. 정식 멤버가 되면 참석 응답, 읽기 진행률, 질문 작성 기능이 열립니다.
       </p>
     </div>
   );
@@ -370,7 +370,7 @@ function MobileUpcomingSessions({ upcomingSessions }: { upcomingSessions: Member
   return (
     <section className="m-sec">
       <div className="eyebrow" style={{ marginBottom: 12 }}>
-        예정 세션
+        예정 모임
       </div>
       <div className="rm-mobile-shortcuts">
         {upcomingSessions.slice(0, 4).map((session) => (

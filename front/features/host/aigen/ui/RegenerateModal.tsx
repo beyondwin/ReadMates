@@ -33,7 +33,7 @@ const ITEM_LABEL: Record<AiGenerationItem, string> = {
   summary: "요약",
   highlights: "하이라이트",
   oneLineReviews: "한줄평",
-  feedbackDocument: "회차 피드백 문서",
+  feedbackDocument: "모임 피드백 문서",
 };
 
 export function RegenerateModal({

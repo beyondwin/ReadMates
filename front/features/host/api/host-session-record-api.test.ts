@@ -35,7 +35,7 @@ function snapshot(): SessionRecordSnapshot {
     oneLineReviews: [],
     feedbackDocument: {
       fileName: "session-28.md",
-      title: "28회차 피드백",
+      title: "No.28 피드백",
       markdown: "# 피드백",
     },
   };

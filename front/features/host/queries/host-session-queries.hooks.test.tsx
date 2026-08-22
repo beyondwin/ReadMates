@@ -125,7 +125,7 @@ function expectFresh(client: QueryClient, entries: readonly CacheEntry[]) {
 }
 
 const sessionRequest: HostSessionRequest = {
-  title: "8회차 모임",
+  title: "No.8 모임",
   bookTitle: "다음 책",
   bookAuthor: "테스트 저자",
   date: "2026-06-20",
@@ -140,13 +140,13 @@ const importRequest: SessionImportRequest = {
     meetingDate: "2026-05-20",
   },
   publication: {
-    summary: "세션 요약",
+    summary: "모임 요약",
   },
   highlights: [],
   oneLineReviews: [],
   feedbackDocument: {
     fileName: "session-7.md",
-    markdown: "# 세션 기록",
+    markdown: "# 모임 기록",
   },
   recordVisibility: "MEMBER",
 };
@@ -283,7 +283,7 @@ describe("host session mutation hooks", () => {
     vi.mocked(deleteHostSession).mockResolvedValue({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "DRAFT",
       trashed: true,
       deletedAt: "2026-08-21T10:00:00Z",

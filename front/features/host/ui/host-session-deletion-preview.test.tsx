@@ -12,7 +12,7 @@ afterEach(() => {
 const preview: HostSessionDeletionPreviewResponse = {
   sessionId: "open-session-7",
   sessionNumber: 7,
-  title: "7회차 모임 · 테스트 책",
+  title: "No.7 모임 · 테스트 책",
   state: "OPEN",
   canDelete: true,
   counts: {

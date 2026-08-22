@@ -175,7 +175,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    expect(await screen.findByText("AI로 세션 기록 생성")).toBeInTheDocument();
+    expect(await screen.findByText("AI로 모임 기록 생성")).toBeInTheDocument();
     expect(screen.getByLabelText(/대본 파일/)).toBeInTheDocument();
     expect(mockedModels).toHaveBeenCalledWith("s1");
   });
@@ -270,7 +270,7 @@ describe("AiGenerateTab", () => {
     );
 
     // Wait for club default to populate so submit is enabled.
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
 
     const file = new File(["transcript body"], "transcript.txt", { type: "text/plain" });
     const fileInput = screen.getByLabelText(/대본 파일/) as HTMLInputElement;
@@ -312,7 +312,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
@@ -348,7 +348,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
@@ -447,7 +447,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
@@ -483,7 +483,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
@@ -526,7 +526,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
@@ -748,7 +748,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
@@ -779,7 +779,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });
@@ -827,7 +827,7 @@ describe("AiGenerateTab", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
       fireEvent.change(screen.getByLabelText(/대본 파일/), { target: { files: [file] } });

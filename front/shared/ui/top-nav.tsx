@@ -128,10 +128,10 @@ function hostLinks({
       pendingLabel: currentSessionStatus === "error" ? "다시 확인" : "확인 중",
       pendingAriaLabel:
         currentSessionStatus === "error"
-          ? "세션 다시 확인"
+          ? "모임 다시 확인"
           : currentSessionStatus === "retrying"
-            ? "세션 다시 확인 중"
-            : "세션 불러오는 중",
+            ? "모임 다시 확인 중"
+            : "모임 불러오는 중",
       retry,
       current: (pathname) =>
         pathname === "/app/host/sessions/new"

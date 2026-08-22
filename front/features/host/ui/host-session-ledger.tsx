@@ -9,6 +9,7 @@ import {
 } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
+import { formatMeetingOrdinal } from "@/shared/model/meeting-language";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
 
 type LedgerLinkProps = {
@@ -117,12 +118,12 @@ function LedgerFilters({
       }}
     >
       <label className="stack" style={{ "--stack": "6px", minWidth: 0 } as React.CSSProperties}>
-        <span className="tiny">세션 기록 검색</span>
+        <span className="tiny">모임 기록 검색</span>
         <span className="row" style={{ gap: 8, minWidth: 0 }}>
           <input
             className="input"
             type="search"
-            aria-label="세션 기록 검색"
+            aria-label="모임 기록 검색"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             style={{ minWidth: 0 }}
@@ -131,10 +132,10 @@ function LedgerFilters({
         </span>
       </label>
       <label className="stack" style={{ "--stack": "6px" } as React.CSSProperties}>
-        <span className="tiny">세션 상태</span>
+        <span className="tiny">모임 상태</span>
         <select
           className="input"
-          aria-label="세션 상태"
+          aria-label="모임 상태"
           value={filters.state ?? ""}
           onChange={(event) => onFiltersChange({
             ...filters,
@@ -195,12 +196,12 @@ function DesktopLedger({
   return (
     <div className="desktop-only rm-document-panel" style={{ overflowX: "auto" }}>
       <table
-        aria-label="세션 기록 장부"
+        aria-label="모임 기록 장부"
         style={{ width: "100%", minWidth: 820, borderCollapse: "collapse", textAlign: "left" }}
       >
         <thead>
           <tr>
-            {["회차", "책과 세션", "일정", "상태", "기록", "공개 범위", "마지막 수정", ""].map((label) => (
+            {["No.", "책과 모임", "일정", "상태", "기록", "공개 범위", "마지막 수정", ""].map((label) => (
               <th key={label} scope="col" className="tiny" style={{ padding: "13px 16px", borderBottom: "1px solid var(--line)" }}>
                 {label}
               </th>
@@ -229,7 +230,7 @@ function DesktopLedger({
                 <LinkComponent
                   to={sessionRecordHref(item.sessionId)}
                   className="btn btn-ghost btn-sm"
-                  aria-label={`${item.sessionNumber}회차 ${hostSessionLedgerActionLabel(item)}`}
+                  aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
                 >
                   {hostSessionLedgerActionLabel(item)}
                 </LinkComponent>
@@ -276,7 +277,7 @@ function MobileLedger({
           <LinkComponent
             to={sessionRecordHref(item.sessionId)}
             className="btn btn-primary"
-            aria-label={`${item.sessionNumber}회차 ${hostSessionLedgerActionLabel(item)}`}
+            aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
           >
             {hostSessionLedgerActionLabel(item)}
           </LinkComponent>
@@ -331,7 +332,7 @@ function TrashLedger({
               className="btn btn-primary btn-sm"
               type="button"
               disabled={item.restoreDisabled || item.restoring}
-              aria-label={`${item.sessionNumber}회차 복원`}
+              aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} 복원`}
               onClick={() => onRestore?.(item.sessionId)}
             >
               복원
@@ -380,12 +381,12 @@ export function HostSessionLedger({
         <span className="small" style={{ color: "var(--text-2)" }}>
           {trashView
             ? "삭제된 모임을 남은 기간 동안 복원할 수 있습니다."
-            : "회차별 기록과 저장된 초안을 확인합니다."}
+            : "모임별 기록과 저장된 초안을 확인합니다."}
         </span>
         <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
           {trashView ? (
             <LinkComponent to={activeHref} className="btn btn-quiet btn-sm">
-              세션 기록 장부
+              모임 기록 장부
             </LinkComponent>
           ) : (
             <>
@@ -393,7 +394,7 @@ export function HostSessionLedger({
                 휴지통
               </LinkComponent>
               <LinkComponent to={newSessionHref} className="btn btn-primary btn-sm">
-                새 세션 만들기
+                새 모임 만들기
               </LinkComponent>
             </>
           )}
@@ -409,11 +410,11 @@ export function HostSessionLedger({
         </div>
       ) : loading ? (
         <div className="surface-quiet small" role="status" style={{ padding: 18 }}>
-          {trashView ? "휴지통을 불러오는 중입니다." : "세션 기록을 불러오는 중입니다."}
+          {trashView ? "휴지통을 불러오는 중입니다." : "모임 기록을 불러오는 중입니다."}
         </div>
       ) : visibleItems.length === 0 ? (
         <div className="surface-quiet small" style={{ padding: 18 }}>
-          {trashView ? "휴지통이 비어 있습니다." : "조건에 맞는 세션 기록이 없습니다."}
+          {trashView ? "휴지통이 비어 있습니다." : "조건에 맞는 모임 기록이 없습니다."}
         </div>
       ) : trashView ? (
         <TrashLedger
@@ -455,13 +456,13 @@ export function HostSessionAttentionSummary({
 
   if (visibleItems.length === 0) {
     return hideEmpty ? null : (
-      <p className="rm-host-attention__empty">확인 필요한 세션 기록이 없습니다.</p>
+      <p className="rm-host-attention__empty">확인 필요한 모임 기록이 없습니다.</p>
     );
   }
 
   return (
     <>
-      <ol className="rm-host-attention" aria-label="확인 필요한 세션 기록">
+      <ol className="rm-host-attention" aria-label="확인 필요한 모임 기록">
         {visibleItems.map((item) => {
           const status = hostSessionLedgerBadges(item)[0] ?? {
             label: "기록 확인",
@@ -473,7 +474,7 @@ export function HostSessionAttentionSummary({
               <LinkComponent
                 to={sessionRecordHref(item.sessionId)}
                 className="rm-host-attention__row"
-                aria-label={`${item.sessionNumber}회차 기록 열기`}
+                aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} 기록 열기`}
               >
                 <span className="rm-host-attention__number ledger-number">No.{item.sessionNumber}</span>
                 <span className="rm-host-attention__copy">

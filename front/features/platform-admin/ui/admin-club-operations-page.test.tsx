@@ -43,7 +43,7 @@ describe("AdminClubOperationsPage", () => {
       "href",
       "/admin/notifications?clubId=club-1",
     );
-    expect(screen.queryByRole("button", { name: /RSVP|출석|세션 편집|발행/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /참석 응답|출석|모임 편집|발행/ })).not.toBeInTheDocument();
   });
 
   it("shows the 7-day notification failure count with a trend delta", () => {
@@ -139,7 +139,7 @@ describe("AdminClubOperationsPage", () => {
       "href",
       "/clubs/reading-sai/app/host/sessions/session-7/closing",
     );
-    expect(screen.queryByRole("button", { name: /발행|세션 종료|알림 발송|RSVP|출석/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /발행|모임 종료|알림 발송|참석 응답|출석/ })).not.toBeInTheDocument();
   });
 
   it("renders closing risk tracking labels and recently resolved rows", () => {
@@ -233,7 +233,7 @@ describe("AdminClubOperationsPage", () => {
     );
 
     expect(screen.getByRole("heading", { name: "클로징 확인 필요" })).toBeInTheDocument();
-    expect(screen.getByText("확인 필요한 회차 없음")).toBeInTheDocument();
+    expect(screen.getByText("확인 필요한 모임 없음")).toBeInTheDocument();
   });
 
   it("hides raw unknown closing risk codes behind safe fallback labels", () => {
@@ -297,6 +297,6 @@ describe("AdminClubOperationsPage", () => {
 
     expect(screen.getByText("No.05 · 책 5")).toBeInTheDocument();
     expect(screen.queryByText("No.06 · 책 6")).not.toBeInTheDocument();
-    expect(screen.getByText("외 1개 회차")).toBeInTheDocument();
+    expect(screen.getByText("외 1개 모임")).toBeInTheDocument();
   });
 });

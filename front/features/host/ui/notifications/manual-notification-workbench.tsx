@@ -11,6 +11,7 @@ import type {
   ManualNotificationPreviewRequest,
   ManualNotificationPreviewResponse,
 } from "@/features/host/model/host-view-types";
+import { formatMeetingOrdinal } from "@/shared/model/meeting-language";
 import { HostNotificationComposer } from "./host-notification-composer";
 import { HostNotificationComposerDialog } from "./host-notification-composer-dialog";
 import {
@@ -198,22 +199,22 @@ function ManualNotificationWorkbenchState({
           <header className="rm-notification-workbench__decision-heading">
             <span className="rm-notification-workbench__step">01</span>
             <div>
-              <h3 id="manual-notification-session-title">대상 회차</h3>
+              <h3 id="manual-notification-session-title">대상 모임</h3>
               <p>알림의 기준이 되는 모임</p>
             </div>
           </header>
           <div className="rm-notification-workbench__decision-control">
             {hostSessions.length === 0 ? (
               <div className="rm-notification-workbench__empty">
-                <p>선택 가능한 세션이 없습니다.</p>
+                <p>선택 가능한 모임이 없습니다.</p>
                 <a className="btn btn-quiet btn-sm" href="/app/host/sessions">
-                  세션 관리로 이동
+                  모임 관리로 이동
                 </a>
               </div>
             ) : (
               <>
                 <label className="label" htmlFor="manual-notification-session">
-                  세션 선택
+                  모임 선택
                 </label>
                 <select
                   id="manual-notification-session"
@@ -224,7 +225,7 @@ function ManualNotificationWorkbenchState({
                 >
                   {hostSessions.map((session) => (
                     <option key={session.sessionId} value={session.sessionId}>
-                      {session.sessionNumber}회차 · {session.bookTitle} · {session.date}
+                      {formatMeetingOrdinal(session.sessionNumber, "folio")} · {session.bookTitle} · {session.date}
                     </option>
                   ))}
                 </select>

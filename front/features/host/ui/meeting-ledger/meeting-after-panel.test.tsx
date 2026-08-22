@@ -39,7 +39,7 @@ describe("MeetingAfterPanel", () => {
     );
 
     expect(screen.queryByText("버전 0")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "기록 공개" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toBeEnabled();
   });
 
   it("offers package upload not a feedback textarea", () => {
@@ -58,12 +58,12 @@ describe("MeetingAfterPanel", () => {
       />,
     );
 
-    expect(primaryActionNames()).toEqual(["출석 수정", "정리본 올리기", "기록 공개"]);
+    expect(primaryActionNames()).toEqual(["출석 수정", "정리본 올리기", "게스트·멤버 노트에 기록 게시"]);
     expect(screen.queryByRole("button", { name: "AI로 생성" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "AI로 생성" })).not.toBeInTheDocument();
   });
 
-  it("disables 기록 공개 with a one-line reason when the summary is empty", () => {
+  it("disables 게스트·멤버 노트에 기록 게시 with a one-line reason when the summary is empty", () => {
     render(
       <MeetingAfterPanel
         state="CLOSED"
@@ -72,11 +72,11 @@ describe("MeetingAfterPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toBeDisabled();
     expect(screen.getByText("공개하려면 요약이 필요합니다")).toBeInTheDocument();
   });
 
-  it("disables 기록 공개 with a one-line reason when access is HOST_ONLY", () => {
+  it("disables 게스트·멤버 노트에 기록 게시 with a one-line reason when access is HOST_ONLY", () => {
     render(
       <MeetingAfterPanel
         state="CLOSED"
@@ -85,7 +85,7 @@ describe("MeetingAfterPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toBeDisabled();
     expect(screen.getByText("공개하려면 게스트와 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("공개하려면 요약이 필요합니다")).not.toBeInTheDocument();
   });
@@ -99,7 +99,7 @@ describe("MeetingAfterPanel", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "기록 공개" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toBeDisabled();
     expect(screen.getByText("공개하려면 게스트와 멤버에게 보이기로 바꿔 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("공개하려면 요약이 필요합니다")).not.toBeInTheDocument();
   });
@@ -164,9 +164,9 @@ describe("MeetingAfterPanel", () => {
 
     await user.click(screen.getByRole("button", { name: "정리본 올리기" }));
     expect(screen.getByRole("region", { name: "정리본 미리보기" })).toBeInTheDocument();
-    expect(screen.queryByText(/회차/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/세션/)).not.toBeInTheDocument();
-    expect(screen.getByText("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
+    expect(screen.queryByText(/모임/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/모임/)).not.toBeInTheDocument();
+    expect(screen.getByText("기록 보기 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "게스트와 멤버에게 보이기로 바꾸기" }));
     expect(onSetGuestReadable).toHaveBeenCalledTimes(1);
   });
@@ -269,7 +269,7 @@ describe("MeetingAfterPanel", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "출석 수정" }));
-    await user.click(screen.getByRole("button", { name: "기록 공개" }));
+    await user.click(screen.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" }));
     expect(onEditAttendance).toHaveBeenCalledTimes(1);
     expect(onPublish).toHaveBeenCalledTimes(1);
     expect(confirmSpy).not.toHaveBeenCalled();
@@ -284,8 +284,8 @@ describe("MeetingAfterPanel", () => {
       />,
     );
 
-    expect(screen.queryByText(/세션/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/회차/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/모임/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/모임/)).not.toBeInTheDocument();
     expect(screen.queryByText("기록 작업대")).not.toBeInTheDocument();
     expect(screen.queryByText("외부 JSON")).not.toBeInTheDocument();
     expect(screen.queryByText(/session-import/i)).not.toBeInTheDocument();

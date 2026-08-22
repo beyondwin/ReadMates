@@ -50,7 +50,7 @@ describe("MyReadingJourney", () => {
     renderJourney({ items: [item({ questionCount: 0, reviewCount: 0 })] });
 
     const row = screen.getByRole("article", { name: "9차 보이지 않는 도시들" });
-    const sessionLink = within(row).getByRole("link", { name: "회차 기록" });
+    const sessionLink = within(row).getByRole("link", { name: "모임 기록" });
     const feedbackLink = within(row).getByRole("link", { name: "피드백 문서" });
 
     expect(sessionLink).toHaveAttribute("href", "/app/sessions/session-9");

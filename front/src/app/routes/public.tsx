@@ -65,7 +65,7 @@ export function publicRoutes(queryClient: QueryClient): RouteObject {
       {
         path: "/sessions/:sessionId",
         errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 모임 기록을 불러오는 중" variant="public" />,
         lazy: async () => {
           const [{ default: PublicSessionPage }, { publicSessionLoaderFactory }] = await Promise.all([
             import("@/src/pages/public-session"),
@@ -113,7 +113,7 @@ export function publicRoutes(queryClient: QueryClient): RouteObject {
       {
         path: "/clubs/:clubSlug/sessions/:sessionId",
         errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 세션 기록을 불러오는 중" variant="public" />,
+        hydrateFallbackElement: <ReadmatesRouteLoading label="공개 모임 기록을 불러오는 중" variant="public" />,
         lazy: async () => {
           const [{ default: PublicSessionPage }, { publicSessionLoaderFactory }] = await Promise.all([
             import("@/src/pages/public-session"),

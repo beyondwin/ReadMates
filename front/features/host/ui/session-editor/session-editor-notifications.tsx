@@ -50,19 +50,19 @@ export function HostSessionNotificationActions({
       eventType: "NEXT_BOOK_PUBLISHED",
       label: "다음 책 공개",
       enabled: state === "DRAFT" && (visibility === "MEMBER" || visibility === "PUBLIC"),
-      disabledReason: "멤버에게 공개된 예정 세션만 다음 책 알림을 보낼 수 있습니다.",
+      disabledReason: "멤버에게 공개된 예정 모임만 다음 책 알림을 보낼 수 있습니다.",
     },
     {
       eventType: "SESSION_REMINDER_DUE",
       label: "모임 전날 리마인더",
       enabled: state === "DRAFT" || state === "OPEN",
-      disabledReason: "예정 또는 열린 세션만 리마인더를 보낼 수 있습니다.",
+      disabledReason: "예정 또는 열린 모임만 리마인더를 보낼 수 있습니다.",
     },
     {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
       label: "피드백 문서 등록",
       enabled: (state === "CLOSED" || state === "PUBLISHED") && feedbackDocumentUploaded,
-      disabledReason: "닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
+      disabledReason: "닫힌 모임의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
     },
   ];
 

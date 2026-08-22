@@ -301,7 +301,7 @@ function ArchiveMobileReviews({ reviews }: { reviews: ArchiveReviewItem[] }) {
               alignItems: "center",
               columnGap: 12,
             }}
-            aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
+            aria-label={`No.${review.sessionNumber} ${review.bookTitle} 모임으로`}
           >
             <div style={{ minWidth: 0 }}>
               <div className="tiny" style={{ color: "var(--text-3)" }}>
@@ -336,7 +336,7 @@ function ArchiveMobileQuestions({ questions }: { questions: ArchiveQuestionItem[
             state={archiveReturnState("questions")}
             className="m-card-quiet"
             style={{ display: "block" }}
-            aria-label={`Q${question.priority} ${question.bookTitle} 세션으로`}
+            aria-label={`Q${question.priority} ${question.bookTitle} 모임으로`}
           >
             <div className="tiny mono" style={{ color: "var(--text-3)" }}>
               Q{question.priority} · {formatDateOnlyLabel(question.date)}

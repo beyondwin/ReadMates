@@ -111,8 +111,8 @@ export function ClubAiDefaultsSection({
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
           {variant === "compact"
-            ? "새 세션 AI 생성에 적용할 기본값입니다."
-            : "새 세션 AI 생성에 사용할 기본 모델입니다. 호스트가 업로드 시 다른 모델로 바꿀 수도 있습니다."}
+            ? "새 모임 AI 생성에 적용할 기본값입니다."
+            : "새 모임 AI 생성에 사용할 기본 모델입니다. 호스트가 업로드 시 다른 모델로 바꿀 수도 있습니다."}
         </p>
       </header>
 

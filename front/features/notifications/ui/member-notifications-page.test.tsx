@@ -12,7 +12,7 @@ describe("MemberNotificationsPage", () => {
           items={[{
             id: "n1",
             eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
-            title: "7회차 모임 기록이 준비됐어요",
+            title: "No.7 모임 기록이 준비됐어요",
             body: "지난 모임의 기록과 피드백을 이어 읽을 수 있어요.",
             deepLinkPath: "/sessions/11111111-1111-1111-1111-111111111111",
             readAt: null,
@@ -24,7 +24,7 @@ describe("MemberNotificationsPage", () => {
     );
 
     const row = screen.getByRole("link", {
-      name: "읽지 않음 · 7회차 모임 기록이 준비됐어요 열기",
+      name: "읽지 않음 · No.7 모임 기록이 준비됐어요 열기",
     });
     expect(row).toHaveClass("rm-member-notifications-list__item");
     expect(row).toHaveAttribute(
@@ -55,7 +55,7 @@ describe("MemberNotificationsPage", () => {
         items={[{
           id: "n1",
           eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
-          title: "7회차 모임 기록이 준비됐어요",
+          title: "No.7 모임 기록이 준비됐어요",
           body: "지난 모임의 기록과 피드백을 이어 읽을 수 있어요.",
           deepLinkPath: "/sessions/11111111-1111-1111-1111-111111111111",
           readAt: null,
@@ -67,7 +67,7 @@ describe("MemberNotificationsPage", () => {
     );
 
     screen.getByRole("link", {
-      name: "읽지 않음 · 7회차 모임 기록이 준비됐어요 열기",
+      name: "읽지 않음 · No.7 모임 기록이 준비됐어요 열기",
     }).click();
 
     expect(onOpenNotification).toHaveBeenCalledWith(

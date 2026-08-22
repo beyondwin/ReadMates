@@ -31,7 +31,7 @@ import { SessionIdentity } from "@/shared/ui/session-identity";
 
 const segmentLinks = [
   { key: "summary", desktopLabel: "요약", mobileLabel: "요약" },
-  { key: "highlights", desktopLabel: "회차 기록", mobileLabel: "회차 기록" },
+  { key: "highlights", desktopLabel: "모임 기록", mobileLabel: "모임 기록" },
   { key: "questions", desktopLabel: "함께 남긴 질문", mobileLabel: "질문" },
   { key: "long-reviews", desktopLabel: "공개 서평", mobileLabel: "공개 서평" },
 ];
@@ -96,10 +96,10 @@ export function MemberSessionDetailUnavailablePage({
           <div className="container">
             <div className="surface-quiet" style={{ padding: 28, marginTop: 20 }}>
               <p className="eyebrow" style={{ margin: 0 }}>
-                세션 없음
+                모임 없음
               </p>
               <h1 className="h2 editorial" style={{ margin: "8px 0 0" }}>
-                지난 세션을 찾을 수 없습니다.
+                지난 모임을 찾을 수 없습니다.
               </h1>
               <p className="small" style={{ margin: "10px 0 0", color: "var(--text-2)" }}>
                 아카이브 목록에서 다시 확인해 주세요.
@@ -113,10 +113,10 @@ export function MemberSessionDetailUnavailablePage({
           <section className="m-sec">
             <div className="m-card-quiet">
               <p className="eyebrow" style={{ margin: 0 }}>
-                세션 없음
+                모임 없음
               </p>
               <h1 className="h3 editorial" style={{ margin: "8px 0 0" }}>
-                지난 세션을 찾을 수 없습니다.
+                지난 모임을 찾을 수 없습니다.
               </h1>
               <p className="small" style={{ margin: "10px 0 0", color: "var(--text-2)" }}>
                 아카이브 목록에서 다시 확인해 주세요.
@@ -195,7 +195,7 @@ function MemberSessionDetailDesktop({
                   <FeedbackMetaBadge feedbackDocument={session.feedbackDocument} />
                 ) : null}
               </div>
-              <nav className="rm-session-detail-section-nav" aria-label="세션 상세 섹션">
+              <nav className="rm-session-detail-section-nav" aria-label="모임 상세 섹션">
                 {segmentLinks.map((link) => (
                   <a key={link.key} href={`#${link.key}`}>
                     {link.desktopLabel}
@@ -219,7 +219,7 @@ function MemberSessionDetailDesktop({
                 <SummaryBlock summary={session.publicSummary} />
               </DesktopSection>
 
-              <DesktopSection id="highlights" title="회차 기록">
+              <DesktopSection id="highlights" title="모임 기록">
                 <SessionHighlights session={session} />
               </DesktopSection>
 
@@ -239,7 +239,7 @@ function MemberSessionDetailDesktop({
               <FeedbackStatusCard session={session} returnTarget={returnTarget} feedbackLockedAction={feedbackLockedAction} />
               {session.capabilities.canViewPersonalState && session.isHost ? (
                 <Link to={`/app/host/sessions/${encodeURIComponent(session.sessionId)}/edit`} className="btn btn-quiet btn-sm">
-                  세션 문서 편집
+                  모임 문서 편집
                 </Link>
               ) : null}
             </aside>
@@ -317,7 +317,7 @@ function MemberSessionDetailMobile({
         <FeedbackStatusCard session={session} returnTarget={returnTarget} feedbackLockedAction={feedbackLockedAction} mobile />
       </section>
 
-      <nav className="m-hscroll rm-session-detail-mobile-tabs" aria-label="세션 상세 모바일 섹션">
+      <nav className="m-hscroll rm-session-detail-mobile-tabs" aria-label="모임 상세 모바일 섹션">
         {segmentLinks.map((link) => (
           <a key={link.key} href={`#mobile-${link.key}`} className="m-chip rm-session-detail-mobile-tab">
             {link.mobileLabel}
@@ -333,7 +333,7 @@ function MemberSessionDetailMobile({
       </section>
 
       <section id="mobile-highlights" className="m-sec">
-        <MobileSectionTitle title="회차 기록" />
+        <MobileSectionTitle title="모임 기록" />
         <SessionHighlights session={session} mobile />
       </section>
 
@@ -382,7 +382,7 @@ function MobileSectionTitle({ title }: { title: string }) {
 
 function SummaryBlock({ summary }: { summary: string | null }) {
   if (!summary?.trim()) {
-    return <EmptyText message="아직 이 회차의 요약이 정리되지 않았습니다." />;
+    return <EmptyText message="아직 이 모임의 요약이 정리되지 않았습니다." />;
   }
 
   return (
@@ -413,10 +413,10 @@ function SessionHighlights({ session, mobile = false }: { session: SessionDetail
   if (!hasHighlights && !hasOneLiners) {
     return mobile ? (
       <div className="m-card-quiet">
-        <EmptyText message="아직 이 회차에 정리된 하이라이트나 한줄평이 없습니다." />
+        <EmptyText message="아직 이 모임에 정리된 하이라이트나 한줄평이 없습니다." />
       </div>
     ) : (
-      <EmptyPanel message="아직 이 회차에 정리된 하이라이트나 한줄평이 없습니다." />
+      <EmptyPanel message="아직 이 모임에 정리된 하이라이트나 한줄평이 없습니다." />
     );
   }
 
@@ -424,7 +424,7 @@ function SessionHighlights({ session, mobile = false }: { session: SessionDetail
     return (
       <div className="rm-mobile-record-list">
         {hasHighlights ? (
-          <RecordGroup title="회차 하이라이트" count={session.publicHighlights.length} mobile>
+          <RecordGroup title="모임 하이라이트" count={session.publicHighlights.length} mobile>
             <HighlightsList highlights={session.publicHighlights} />
           </RecordGroup>
         ) : null}
@@ -440,7 +440,7 @@ function SessionHighlights({ session, mobile = false }: { session: SessionDetail
   return (
     <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
       {hasHighlights ? (
-        <RecordGroup title="회차 하이라이트" count={session.publicHighlights.length}>
+        <RecordGroup title="모임 하이라이트" count={session.publicHighlights.length}>
           <HighlightsList highlights={session.publicHighlights} />
         </RecordGroup>
       ) : null}
@@ -457,10 +457,10 @@ function SessionQuestions({ session, mobile = false }: { session: SessionDetailR
   if (session.clubQuestions.length === 0) {
     return mobile ? (
       <div className="m-card-quiet">
-        <EmptyText message="아직 이 회차에 함께 남긴 질문이 없습니다." />
+        <EmptyText message="아직 이 모임에 함께 남긴 질문이 없습니다." />
       </div>
     ) : (
-      <EmptyPanel message="아직 이 회차에 함께 남긴 질문이 없습니다." />
+      <EmptyPanel message="아직 이 모임에 함께 남긴 질문이 없습니다." />
     );
   }
 
@@ -475,10 +475,10 @@ function SessionLongReviews({ session, mobile = false }: { session: SessionDetai
   if (session.publicLongReviews.length === 0) {
     return mobile ? (
       <div className="m-card-quiet">
-        <EmptyText message="아직 이 회차에 공개된 서평이 없습니다." />
+        <EmptyText message="아직 이 모임에 공개된 서평이 없습니다." />
       </div>
     ) : (
-      <EmptyPanel message="아직 이 회차에 공개된 서평이 없습니다." />
+      <EmptyPanel message="아직 이 모임에 공개된 서평이 없습니다." />
     );
   }
 
@@ -794,7 +794,7 @@ function FeedbackStatusCard({
       ? returnTarget
       : {
           href: appSessionHref(session.sessionId),
-          label: "세션으로 돌아가기",
+          label: "모임으로 돌아가기",
           state: readmatesReturnState(returnTarget),
         };
   const feedbackReturnState = readmatesReturnState(feedbackReturnTarget);

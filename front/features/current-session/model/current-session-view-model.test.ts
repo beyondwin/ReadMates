@@ -9,7 +9,7 @@ import {
 } from "@/shared/model/read-surface-capabilities";
 
 describe("getCurrentSessionReadingLoopSummary", () => {
-  it("summarizes active member prep when RSVP, reading progress, and questions are missing", () => {
+  it("summarizes active member prep when 참석 응답, reading progress, and questions are missing", () => {
     expect(
       getCurrentSessionReadingLoopSummary({
         rsvp: "NO_RESPONSE",
@@ -24,7 +24,7 @@ describe("getCurrentSessionReadingLoopSummary", () => {
     ).toEqual({
       state: "MEMBER_PREP_REQUIRED",
       label: "멤버 준비 필요",
-      body: "RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.",
+      body: "참석 응답을 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.",
     });
   });
 
@@ -40,7 +40,7 @@ describe("getCurrentSessionReadingLoopSummary", () => {
         sessionDate: "2026-06-04",
         today: new Date(2026, 4, 31),
       }).body,
-    ).toBe("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.");
+    ).toBe("참석 응답을 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.");
   });
 
   it("summarizes post-session reflection due when an active member has not written reviews", () => {
@@ -76,8 +76,8 @@ describe("getCurrentSessionReadingLoopSummary", () => {
       }),
     ).toEqual({
       state: "SESSION_READY",
-      label: "세션 준비됨",
-      body: "세션 내용을 읽고 공동 보드를 확인할 수 있습니다.",
+      label: "모임 준비됨",
+      body: "모임 내용을 읽고 공동 보드를 확인할 수 있습니다.",
     });
   });
 });

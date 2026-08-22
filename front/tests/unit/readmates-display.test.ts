@@ -66,7 +66,7 @@ describe("readmates display helpers", () => {
     expect(formatMobileTodayLabel(new Date("2026-04-23T03:00:00Z"))).toBe("4월 23일 (목)");
   });
 
-  it("labels RSVP statuses", () => {
+  it("labels 참석 응답 statuses", () => {
     expect(rsvpLabel("GOING")).toBe("참석");
     expect(rsvpLabel("MAYBE")).toBe("미정");
     expect(rsvpLabel("DECLINED")).toBe("불참");

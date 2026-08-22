@@ -324,9 +324,9 @@ function HostSessionEditorQueryState({
       {hideTitle ? null : (
         <section className="page-header-compact">
           <div className="container">
-            <div className="eyebrow">세션 운영 문서</div>
+            <div className="eyebrow">모임 운영 문서</div>
             <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-              세션 문서 편집
+              모임 문서 편집
             </h1>
           </div>
         </section>
@@ -335,12 +335,12 @@ function HostSessionEditorQueryState({
         <div className="container">
           {status === "loading" ? (
             <div className="surface-quiet small" role="status" style={{ padding: 18 }}>
-              세션 기록 편집 정보를 불러오는 중입니다.
+              모임 기록 편집 정보를 불러오는 중입니다.
             </div>
           ) : (
             <div className="surface-quiet stack" role="alert" style={{ padding: 18 }}>
               <p className="small" style={{ margin: 0 }}>
-                세션 기록 편집 정보를 불러오지 못했습니다.
+                모임 기록 편집 정보를 불러오지 못했습니다.
               </p>
               {onRetry ? (
                 <div>
@@ -892,7 +892,7 @@ export function EditHostSessionRecordWorkflow({
           }
           if (latest.draftLiveBaseStale) {
             setRebaseError(
-              "재확인 중 세션이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.",
+              "재확인 중 모임이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.",
             );
           }
         }
@@ -912,7 +912,7 @@ export function EditHostSessionRecordWorkflow({
       const code = apiErrorCode(error);
       setRebaseError(
         code === "SESSION_RECORD_DRAFT_STALE" || code === "SESSION_RECORD_LIVE_STALE"
-          ? "세션 또는 초안이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요."
+          ? "모임 또는 초안이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요."
           : "재확인 결과를 확인하지 못했습니다. 최신 상태를 불러온 뒤 다시 시도해 주세요.",
       );
     }

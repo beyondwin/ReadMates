@@ -113,8 +113,8 @@ describe("platform-admin-analytics-model", () => {
     const csv = buildAnalyticsCsv(overview);
 
     expect(csv).toContain("section,window,kpi,bucketStart,value,availability,clubSlug,clubName");
-    expect(csv).toContain("series,30d,세션 완료율,2026-05-01,75%,AVAILABLE,,");
-    expect(csv).toContain("series,30d,세션 완료율,2026-05-08,데이터 부족,NOT_ENOUGH_DATA,,");
+    expect(csv).toContain("series,30d,모임 완료율,2026-05-01,75%,AVAILABLE,,");
+    expect(csv).toContain("series,30d,모임 완료율,2026-05-08,데이터 부족,NOT_ENOUGH_DATA,,");
     expect(csv).toContain("benchmark,30d,,,,AVAILABLE,fiction,Fiction Club");
     expect(analyticsCsvFilename(overview)).toBe("readmates-admin-analytics-30d-2026-05-30.csv");
   });

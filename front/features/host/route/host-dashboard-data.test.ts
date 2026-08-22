@@ -49,7 +49,7 @@ function attentionItem(overrides: Record<string, unknown> = {}) {
   return {
     sessionId: "closed-1",
     sessionNumber: 12,
-    title: "12회차",
+    title: "No.12",
     bookTitle: "닫힌 책",
     bookAuthor: "저자",
     bookImageUrl: null,
@@ -136,7 +136,7 @@ describe("hostDashboardLoaderFactory", () => {
         items: [{
           sessionId: "open-1",
           sessionNumber: 8,
-          title: "8회차",
+          title: "No.8",
           bookTitle: "열린 책",
           bookAuthor: "저자",
           bookImageUrl: null,
@@ -182,7 +182,7 @@ describe("hostDashboardLoaderFactory", () => {
         items: [{
           sessionId: "draft-1",
           sessionNumber: 9,
-          title: "9회차",
+          title: "No.9",
           bookTitle: "다음 책",
           bookAuthor: "저자",
           bookImageUrl: null,

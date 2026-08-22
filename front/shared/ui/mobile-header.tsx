@@ -220,11 +220,11 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
   }
 
   if (pathname.startsWith("/app/host/sessions/new")) {
-    return variant === "host" ? "세션" : READMATES_NAV_LABELS.host.sessionEditor;
+    return variant === "host" ? "모임" : READMATES_NAV_LABELS.host.sessionEditor;
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {
-    return variant === "host" ? "세션" : READMATES_NAV_LABELS.host.sessionEditor;
+    return variant === "host" ? "모임" : READMATES_NAV_LABELS.host.sessionEditor;
   }
 
   if (variant === "host" && pathname === "/app/host/notifications") {
@@ -240,7 +240,7 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
   }
 
   if (pathname.startsWith("/app/sessions/")) {
-    return "지난 세션";
+    return "지난 모임";
   }
 
   if (pathname === "/app/session" || pathname.startsWith("/app/session/")) {

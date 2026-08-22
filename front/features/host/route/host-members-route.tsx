@@ -19,7 +19,7 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
             멤버 관리
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            멤버 상태와 이번 세션 참여 여부를 함께 확인합니다.
+            멤버 상태와 이번 모임 참여 여부를 함께 확인합니다.
           </p>
         </div>
       </section>

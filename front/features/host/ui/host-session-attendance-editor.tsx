@@ -74,7 +74,7 @@ export function HostSessionAttendanceEditor({
               {attendee.displayName}
             </span>
             <span className="small" style={{ color: rsvp === "미응답" ? "var(--warn)" : "var(--text-3)" }}>
-              RSVP {rsvp}
+              참석 응답 {rsvp}
             </span>
             <div
               className="row"

@@ -459,7 +459,7 @@ describe("HostMeetingLedgerRoute", () => {
       items: [{
         sessionId: "deep-1",
         sessionNumber: 2,
-        title: "2회차",
+        title: "No.2",
         bookTitle: "깊은 기록",
         bookAuthor: "저자",
         bookImageUrl: null,

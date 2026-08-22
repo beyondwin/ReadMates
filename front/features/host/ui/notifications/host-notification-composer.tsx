@@ -11,6 +11,7 @@ import type {
   ManualNotificationPreviewResponse,
   ManualNotificationRequestedChannels,
 } from "@/features/host/model/host-view-types";
+import { formatMeetingOrdinal } from "@/shared/model/meeting-language";
 import { ManualNotificationPreviewConfirmation } from "./manual-notification-preview";
 import {
   manualAudienceDescriptions,
@@ -128,7 +129,7 @@ export function HostNotificationComposer({
               className="small muted"
               style={{ margin: "6px 0 0", overflowWrap: "anywhere" }}
             >
-              {options.session.sessionNumber}회차 · {options.session.bookTitle}
+              {formatMeetingOrdinal(options.session.sessionNumber, "folio")} · {options.session.bookTitle}
               {template ? ` · ${template.label}` : ""}
             </p>
           ) : null}

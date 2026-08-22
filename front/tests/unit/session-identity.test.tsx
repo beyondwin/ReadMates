@@ -21,23 +21,23 @@ describe("SessionIdentity", () => {
       "rm-state--pending",
     );
     expect(screen.getByText("D-21")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
-    expect(screen.queryByText("이번 세션")).not.toBeInTheDocument();
+    expect(screen.queryByText("이번 모임")).not.toBeInTheDocument();
   });
 
   it("can append a compact current-session phase chip after d-day", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 22, 0, 0, 0));
 
-    render(<SessionTimingIdentity sessionNumber={7} date="2026-05-13" phaseLabel="이번 세션" />);
+    render(<SessionTimingIdentity sessionNumber={7} date="2026-05-13" phaseLabel="이번 모임" />);
 
-    expect(screen.getByLabelText("No.07 · D-21 · 이번 세션")).toBeVisible();
+    expect(screen.getByLabelText("No.07 · D-21 · 이번 모임")).toBeVisible();
     expect(screen.getByText("No.07")).toHaveClass(
       "rm-session-identity__chip",
       "rm-state",
       "rm-state--pending",
     );
     expect(screen.getByText("D-21")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
-    expect(screen.getByText("이번 세션")).toHaveClass("rm-session-identity__chip");
+    expect(screen.getByText("이번 모임")).toHaveClass("rm-session-identity__chip");
   });
 
   it("can render compact session timing in muted tone", () => {
@@ -68,9 +68,9 @@ describe("SessionIdentity", () => {
       />,
     );
 
-    expect(screen.getByLabelText("No.07 · 이번 세션 · 준비 중 · D-21")).toBeVisible();
+    expect(screen.getByLabelText("No.07 · 이번 모임 · 준비 중 · D-21")).toBeVisible();
     expect(screen.getByText("No.07")).toBeVisible();
-    expect(screen.getByText("이번 세션")).toBeVisible();
+    expect(screen.getByText("이번 모임")).toBeVisible();
     expect(screen.getByText("준비 중")).toBeVisible();
     expect(screen.getByText("D-21")).toBeVisible();
   });
@@ -86,9 +86,9 @@ describe("SessionIdentity", () => {
       />,
     );
 
-    expect(screen.getByLabelText("No.06 · 지난 회차 · 공개 · 문서 있음")).toBeVisible();
+    expect(screen.getByLabelText("No.06 · 지난 모임 · 공개 · 문서 있음")).toBeVisible();
     expect(screen.getByText("No.06")).toBeVisible();
-    expect(screen.getByText("지난 회차")).toBeVisible();
+    expect(screen.getByText("지난 모임")).toBeVisible();
     expect(screen.getByText("공개")).toHaveClass(
       "rm-session-identity__chip",
       "rm-session-identity__chip--dot",
@@ -111,7 +111,7 @@ describe("SessionIdentity", () => {
     );
 
     expect(screen.getByLabelText("No.06 · 공개 · 문서 있음")).toBeVisible();
-    expect(screen.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(screen.queryByText("지난 모임")).not.toBeInTheDocument();
     expect(screen.getByText("공개")).toBeVisible();
   });
 
@@ -129,7 +129,7 @@ describe("SessionIdentity", () => {
     );
 
     expect(screen.getByLabelText("No.06 · 공개")).toBeVisible();
-    expect(screen.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(screen.queryByText("지난 모임")).not.toBeInTheDocument();
     expect(screen.queryByText("문서 있음")).not.toBeInTheDocument();
   });
 
@@ -144,9 +144,9 @@ describe("SessionIdentity", () => {
       />,
     );
 
-    expect(screen.getByLabelText("No.08 · 예정 세션 · 예정")).toBeVisible();
+    expect(screen.getByLabelText("No.08 · 예정 모임 · 예정")).toBeVisible();
     expect(screen.getByText("No.08")).toBeVisible();
-    expect(screen.getByText("예정 세션")).toBeVisible();
+    expect(screen.getByText("예정 모임")).toBeVisible();
     expect(screen.getByText("예정")).toBeVisible();
   });
 });

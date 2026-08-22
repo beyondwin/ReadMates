@@ -40,7 +40,7 @@ describe("AdminAnalyticsOverviewView", () => {
     );
 
     expect(screen.getByRole("heading", { name: "분석" })).toBeInTheDocument();
-    expect(screen.getAllByText("세션 완료율").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getAllByText("모임 완료율").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("80%")).toBeInTheDocument();
     expect(screen.getAllByText("데이터 부족").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("클럽 비교에 충분한 데이터가 없습니다.")).toBeInTheDocument();

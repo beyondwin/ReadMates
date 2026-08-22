@@ -132,7 +132,7 @@ describe("AdminTodayLedger", () => {
           generatedAt: "2026-08-04T10:00:00Z",
           lastSuccessfulAt: null,
           authoritative: false,
-          sourceLabel: "회차 마감",
+          sourceLabel: "모임 마감",
           statusLabel: "비활성",
           message: "비활성",
           canRetry: false,
@@ -159,7 +159,7 @@ describe("AdminTodayLedger", () => {
     expect(screen.getByRole("button", { name: /알림 전달 실패/ })).toBeEnabled();
     expect(screen.queryByRole("button", { name: "알림 다시 확인" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "클럽 준비 다시 확인" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "회차 마감 다시 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "모임 마감 다시 확인" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "AI 작업 다시 확인" }));
 

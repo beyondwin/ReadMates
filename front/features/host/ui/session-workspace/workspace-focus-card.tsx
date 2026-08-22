@@ -38,7 +38,7 @@ const FOCUS_COPY: Record<string, WorkspaceFocusCopy> = {
     description: "저장된 초안을 기록에 반영합니다.",
   },
   PUBLISH_RECORD: {
-    title: "기록 공개",
+    title: "게스트·멤버 노트에 기록 게시",
     description: "멤버 노트·아카이브에 나갑니다.",
   },
   VIEW_PUBLIC_RECORD: {

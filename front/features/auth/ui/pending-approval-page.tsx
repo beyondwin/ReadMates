@@ -36,11 +36,11 @@ function copyForAuth(auth: AuthMeView): PendingStateCopy {
     return {
       eyebrow: "정식 멤버",
       title: "이미 멤버 공간이 열려 있습니다.",
-      body: "현재 계정은 정식 멤버 상태입니다. 홈으로 돌아가 이번 세션 준비와 개인 기록을 이어갈 수 있습니다.",
+      body: "현재 계정은 정식 멤버 상태입니다. 홈으로 돌아가 이번 모임 준비와 개인 기록을 이어갈 수 있습니다.",
       badge: "승인 완료",
       badgeClass: "badge-success",
       primary: { label: "멤버 홈으로", to: "/app" },
-      secondary: { label: "이번 세션 보기", to: "/app/session/current" },
+      secondary: { label: "이번 모임 보기", to: "/app/session/current" },
       note: "이 화면이 계속 보인다면 새로고침 후 다시 확인해 주세요.",
     };
   }
@@ -49,7 +49,7 @@ function copyForAuth(auth: AuthMeView): PendingStateCopy {
     return {
       eyebrow: "멤버십 제한",
       title: "현재 계정은 참여 기능이 잠시 닫혀 있습니다.",
-      body: "세션 기록은 읽을 수 있지만 RSVP, 체크인, 질문과 서평 작성은 호스트가 멤버십을 복구한 뒤 다시 열립니다.",
+      body: "모임 기록은 읽을 수 있지만 참석 응답, 체크인, 질문과 서평 작성은 호스트가 멤버십을 복구한 뒤 다시 열립니다.",
       badge: "제한됨",
       badgeClass: "badge-warning",
       primary: { label: "아카이브 둘러보기", to: "/app/archive" },
@@ -62,11 +62,11 @@ function copyForAuth(auth: AuthMeView): PendingStateCopy {
     return {
       eyebrow: "둘러보기 멤버",
       title: "기록은 읽을 수 있고, 참여 기능은 승인 뒤 열립니다.",
-      body: "초대 없이 Google로 로그인한 계정은 둘러보기 멤버로 시작합니다. 호스트가 정식 멤버로 전환하면 RSVP, 체크인, 질문과 서평 작성이 열립니다.",
+      body: "초대 없이 Google로 로그인한 계정은 둘러보기 멤버로 시작합니다. 호스트가 정식 멤버로 전환하면 참석 응답, 체크인, 질문과 서평 작성이 열립니다.",
       badge: "승인 대기",
       badgeClass: "badge-pending",
       primary: { label: "아카이브 둘러보기", to: "/app/archive" },
-      secondary: { label: "이번 세션 보기", to: "/app/session/current" },
+      secondary: { label: "이번 모임 보기", to: "/app/session/current" },
       note: "초대 링크를 받았다면 해당 링크에서 같은 Google 계정으로 수락해 주세요.",
     };
   }

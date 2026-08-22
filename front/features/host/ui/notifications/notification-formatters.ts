@@ -67,10 +67,10 @@ export const notificationLedgerTabs: Array<{ key: NotificationLedgerTab; label: 
 
 export const eventLabels: Record<HostNotificationEventType, string> = {
   NEXT_BOOK_PUBLISHED: "다음 책 공개",
-  SESSION_REMINDER_DUE: "세션 리마인더",
+  SESSION_REMINDER_DUE: "모임 리마인더",
   FEEDBACK_DOCUMENT_PUBLISHED: "피드백 문서 공개",
   REVIEW_PUBLISHED: "리뷰 공개",
-  SESSION_RECORD_UPDATED: "세션 기록 수정",
+  SESSION_RECORD_UPDATED: "모임 기록 수정",
 };
 
 export const notificationSourceLabels: Record<NotificationDispatchSource, string> = {

@@ -180,7 +180,7 @@ const otherSessionItem: NoteFeedItem = {
   authorShortName: "지",
   avatarKey: "cloud-green-book",
   kind: "QUESTION",
-  text: "팩트풀니스 질문은 선택된 세션 밖의 기록입니다.",
+  text: "팩트풀니스 질문은 선택된 모임 밖의 기록입니다.",
 };
 
 type NotesFeedPageRenderOptions = {
@@ -282,7 +282,7 @@ function removedLabel(...parts: string[]) {
 }
 
 function desktopRail() {
-  const search = screen.getByLabelText("세션 검색");
+  const search = screen.getByLabelText("모임 검색");
   const rail = search.closest("div")?.parentElement;
 
   expect(rail).not.toBeNull();
@@ -298,14 +298,14 @@ describe("NotesFeedPage", () => {
       renderNoteSessions: [noteSessions[3], noteSessions[0], noteSessions[1]],
     });
 
-    expect(screen.getByLabelText("세션 검색")).toHaveAttribute(
+    expect(screen.getByLabelText("모임 검색")).toHaveAttribute(
       "placeholder",
       "책 제목 또는 No.09",
     );
 
     await user.click(screen.getByRole("button", { name: "전체 보기" }));
 
-    expect(screen.getByLabelText("세션 목록 검색")).toHaveAttribute(
+    expect(screen.getByLabelText("모임 목록 검색")).toHaveAttribute(
       "placeholder",
       "책 제목 또는 No.09",
     );
@@ -319,9 +319,9 @@ describe("NotesFeedPage", () => {
       renderSelectedSession: null,
     });
 
-    expect(screen.getByLabelText("세션 검색")).toHaveAttribute(
+    expect(screen.getByLabelText("모임 검색")).toHaveAttribute(
       "placeholder",
-      "책 제목 또는 세션 번호",
+      "책 제목 또는 모임 번호",
     );
   });
 
@@ -340,11 +340,11 @@ describe("NotesFeedPage", () => {
     const selectedHeaderMeta = screen.getByLabelText("No.06 · 2026.04.15");
     expect(selectedHeaderMeta).toBeInTheDocument();
     expect(within(selectedHeaderMeta).getByText("No.06")).toHaveClass("rm-session-identity__number");
-    expect(screen.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
+    expect(screen.getByText("모임을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeInTheDocument();
     expect(screen.getByText("질문 4")).toBeInTheDocument();
     expect(screen.getByText("한줄평 5")).toBeInTheDocument();
     expect(screen.getByText("하이라이트 3")).toBeInTheDocument();
-    expect(screen.queryByLabelText("선택한 세션 기록 수")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("선택한 모임 기록 수")).not.toBeInTheDocument();
     expect(within(screen.getByLabelText("클럽 노트 필터")).getAllByRole("button").map((button) => button.textContent)).toEqual([
       "전체 12",
       "하이라이트 3",
@@ -395,7 +395,7 @@ describe("NotesFeedPage", () => {
     avatars.forEach((avatar) => {
       expect(avatar).toHaveAttribute("data-avatar-size-role", "author");
     });
-    const searchIcon = screen.getByLabelText("세션 검색").parentElement?.querySelector("svg");
+    const searchIcon = screen.getByLabelText("모임 검색").parentElement?.querySelector("svg");
     expect(searchIcon).toHaveAttribute("width", "20");
     expect(searchIcon).toHaveAttribute("height", "20");
     expect(screen.getByRole("heading", { name: "내 질문 · 1" })).toBeInTheDocument();
@@ -403,10 +403,10 @@ describe("NotesFeedPage", () => {
     expect(screen.queryByRole("heading", { name: "이번 달의 질문들" })).not.toBeInTheDocument();
     const rail = desktopRail();
 
-    expect(within(rail).getByText("세션별")).toBeInTheDocument();
+    expect(within(rail).getByText("모임별")).toBeInTheDocument();
     expect(within(rail).getByText("최근순")).toBeInTheDocument();
 
-    const selectedLink = within(rail).getByRole("link", { name: "No.06 가난한 찰리의 연감 세션 보기" });
+    const selectedLink = within(rail).getByRole("link", { name: "No.06 가난한 찰리의 연감 모임 보기" });
 
     expect(selectedLink).toHaveAttribute("href", "/app/notes?sessionId=session-6");
     expect(selectedLink).toHaveAttribute("aria-current", "page");
@@ -500,7 +500,7 @@ describe("NotesFeedPage", () => {
       "한줄평 0",
       "질문 0",
     ]);
-    expect(within(desktopRail()).getByRole("link", { name: "No.10 이전 응답 모양 세션 보기" })).toHaveTextContent("기록 0");
+    expect(within(desktopRail()).getByRole("link", { name: "No.10 이전 응답 모양 모임 보기" })).toHaveTextContent("기록 0");
   });
 
   it("omits empty note sections from the all filter", () => {
@@ -520,8 +520,8 @@ describe("NotesFeedPage", () => {
     });
 
     expect(screen.getByRole("heading", { name: "물고기는 존재하지 않는다" })).toBeInTheDocument();
-    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("이 세션에는 아직 공개된 기록이 없습니다.")).not.toBeInTheDocument();
+    expect(screen.getByText("이 모임에는 해당 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("이 모임에는 아직 공개된 기록이 없습니다.")).not.toBeInTheDocument();
   });
 
   it("uses router navigation for desktop and mobile session filter links", async () => {
@@ -530,15 +530,15 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6");
 
-    await user.click(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" }));
+    await user.click(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 모임 보기" }));
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-9");
 
-    const picker = container.querySelector('[aria-label="최근 세션"]');
+    const picker = container.querySelector('[aria-label="최근 모임"]');
 
     expect(picker).not.toBeNull();
 
-    await user.click(within(picker as HTMLElement).getByRole("link", { name: "No.08 도둑맞은 집중력 세션 보기" }));
+    await user.click(within(picker as HTMLElement).getByRole("link", { name: "No.08 도둑맞은 집중력 모임 보기" }));
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-8");
   });
@@ -551,14 +551,14 @@ describe("NotesFeedPage", () => {
 
     expect(screen.getByLabelText("current route")).toHaveTextContent("/app/notes?sessionId=session-6&filter=highlights");
     expect(screen.queryByText("AI-assisted")).not.toBeInTheDocument();
-    expect(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" })).toHaveAttribute(
+    expect(within(desktopRail()).getByRole("link", { name: "No.09 다정한 것이 살아남는다 모임 보기" })).toHaveAttribute(
       "href",
       "/app/notes?sessionId=session-9&filter=highlights",
     );
 
-    const picker = container.querySelector('[aria-label="최근 세션"]');
+    const picker = container.querySelector('[aria-label="최근 모임"]');
     expect(picker).not.toBeNull();
-    expect(within(picker as HTMLElement).getByRole("link", { name: "No.08 도둑맞은 집중력 세션 보기" })).toHaveAttribute(
+    expect(within(picker as HTMLElement).getByRole("link", { name: "No.08 도둑맞은 집중력 모임 보기" })).toHaveAttribute(
       "href",
       "/app/notes?sessionId=session-8&filter=highlights",
     );
@@ -607,7 +607,7 @@ describe("NotesFeedPage", () => {
 
       await user.click(
         within(desktopRail()).getByRole("link", {
-          name: "No.09 다정한 것이 살아남는다 세션 보기",
+          name: "No.09 다정한 것이 살아남는다 모임 보기",
         }),
       );
 
@@ -636,23 +636,23 @@ describe("NotesFeedPage", () => {
     renderNotesFeedPage();
 
     const rail = desktopRail();
-    const search = within(rail).getByLabelText("세션 검색");
+    const search = within(rail).getByLabelText("모임 검색");
 
     await user.type(search, "팩트");
 
-    expect(within(rail).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).toBeInTheDocument();
-    expect(within(rail).queryByRole("link", { name: "No.06 가난한 찰리의 연감 세션 보기" })).not.toBeInTheDocument();
+    expect(within(rail).getByRole("link", { name: "No.01 팩트풀니스 모임 보기" })).toBeInTheDocument();
+    expect(within(rail).queryByRole("link", { name: "No.06 가난한 찰리의 연감 모임 보기" })).not.toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, "No.06");
 
-    expect(within(rail).getByRole("link", { name: "No.06 가난한 찰리의 연감 세션 보기" })).toBeInTheDocument();
-    expect(within(rail).queryByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).not.toBeInTheDocument();
+    expect(within(rail).getByRole("link", { name: "No.06 가난한 찰리의 연감 모임 보기" })).toBeInTheDocument();
+    expect(within(rail).queryByRole("link", { name: "No.01 팩트풀니스 모임 보기" })).not.toBeInTheDocument();
 
     await user.clear(search);
     await user.type(search, "없는책");
 
-    expect(within(rail).getByText("일치하는 세션이 없습니다.")).toBeInTheDocument();
+    expect(within(rail).getByText("일치하는 모임이 없습니다.")).toBeInTheDocument();
     expect(within(rail).queryByRole("link")).not.toBeInTheDocument();
   });
 
@@ -660,45 +660,45 @@ describe("NotesFeedPage", () => {
     const user = userEvent.setup();
     const { container } = renderNotesFeedPage();
 
-    const picker = container.querySelector('[aria-label="최근 세션"]');
+    const picker = container.querySelector('[aria-label="최근 모임"]');
 
     expect(picker).not.toBeNull();
-    expect(within(picker as HTMLElement).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" })).toHaveAttribute(
+    expect(within(picker as HTMLElement).getByRole("link", { name: "No.09 다정한 것이 살아남는다 모임 보기" })).toHaveAttribute(
       "href",
       "/app/notes?sessionId=session-9",
     );
-    expect(within(picker as HTMLElement).getByRole("link", { name: "No.06 가난한 찰리의 연감 세션 보기" })).toHaveAttribute(
+    expect(within(picker as HTMLElement).getByRole("link", { name: "No.06 가난한 찰리의 연감 모임 보기" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(within(picker as HTMLElement).queryByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).not.toBeInTheDocument();
+    expect(within(picker as HTMLElement).queryByRole("link", { name: "No.01 팩트풀니스 모임 보기" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "전체 보기" }));
 
-    const dialog = screen.getByRole("dialog", { name: "세션 목록" });
+    const dialog = screen.getByRole("dialog", { name: "모임 목록" });
 
     expect(dialog).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "세션 목록 닫기" })).toBeInTheDocument();
-    expect(within(dialog).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).toHaveAttribute(
+    expect(within(dialog).getByRole("button", { name: "모임 목록 닫기" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "No.01 팩트풀니스 모임 보기" })).toHaveAttribute(
       "href",
       "/app/notes?sessionId=session-1",
     );
 
-    const sheetSearch = within(dialog).getByLabelText("세션 목록 검색");
+    const sheetSearch = within(dialog).getByLabelText("모임 목록 검색");
 
     await user.type(sheetSearch, "No.01");
 
-    expect(within(dialog).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).toBeInTheDocument();
-    expect(within(dialog).queryByRole("link", { name: "No.06 가난한 찰리의 연감 세션 보기" })).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("link", { name: "No.01 팩트풀니스 모임 보기" })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: "No.06 가난한 찰리의 연감 모임 보기" })).not.toBeInTheDocument();
 
     await user.clear(sheetSearch);
     await user.type(sheetSearch, "없는책");
 
-    expect(within(dialog).getByText("일치하는 세션이 없습니다.")).toBeInTheDocument();
+    expect(within(dialog).getByText("일치하는 모임이 없습니다.")).toBeInTheDocument();
 
-    await user.click(within(dialog).getByRole("button", { name: "세션 목록 닫기" }));
+    await user.click(within(dialog).getByRole("button", { name: "모임 목록 닫기" }));
 
-    expect(screen.queryByRole("dialog", { name: "세션 목록" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "모임 목록" })).not.toBeInTheDocument();
   });
 
   it("keeps an older selected session visible in the capped mobile recent picker", () => {
@@ -708,15 +708,15 @@ describe("NotesFeedPage", () => {
       renderSelectedSession: noteSessions[8],
     });
 
-    const picker = container.querySelector('[aria-label="최근 세션"]');
+    const picker = container.querySelector('[aria-label="최근 모임"]');
 
     expect(picker).not.toBeNull();
     expect(within(picker as HTMLElement).getAllByRole("link")).toHaveLength(8);
-    expect(within(picker as HTMLElement).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" })).toHaveAttribute(
+    expect(within(picker as HTMLElement).getByRole("link", { name: "No.01 팩트풀니스 모임 보기" })).toHaveAttribute(
       "aria-current",
       "page",
     );
-    expect(within(picker as HTMLElement).queryByRole("link", { name: "No.02 월든 세션 보기" })).not.toBeInTheDocument();
+    expect(within(picker as HTMLElement).queryByRole("link", { name: "No.02 월든 모임 보기" })).not.toBeInTheDocument();
   });
 
   it("left-aligns the selected session in the mobile recent picker", async () => {
@@ -745,11 +745,11 @@ describe("NotesFeedPage", () => {
         }),
       );
 
-      const picker = container.querySelector('[aria-label="최근 세션"]');
+      const picker = container.querySelector('[aria-label="최근 모임"]');
 
       expect(picker).not.toBeNull();
 
-      const selectedLink = within(picker as HTMLElement).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" });
+      const selectedLink = within(picker as HTMLElement).getByRole("link", { name: "No.01 팩트풀니스 모임 보기" });
 
       await waitFor(() => expect(scrollIntoView).toHaveBeenCalledTimes(1));
       expect(scrollIntoView.mock.contexts[0]).toBe(selectedLink);
@@ -774,10 +774,10 @@ describe("NotesFeedPage", () => {
     const opener = screen.getByRole("button", { name: "전체 보기" });
     await user.click(opener);
 
-    const dialog = screen.getByRole("dialog", { name: "세션 목록" });
-    const search = within(dialog).getByLabelText("세션 목록 검색");
-    const closeButton = within(dialog).getByRole("button", { name: "세션 목록 닫기" });
-    const lastSessionLink = within(dialog).getByRole("link", { name: "No.01 팩트풀니스 세션 보기" });
+    const dialog = screen.getByRole("dialog", { name: "모임 목록" });
+    const search = within(dialog).getByLabelText("모임 목록 검색");
+    const closeButton = within(dialog).getByRole("button", { name: "모임 목록 닫기" });
+    const lastSessionLink = within(dialog).getByRole("link", { name: "No.01 팩트풀니스 모임 보기" });
 
     await waitFor(() => expect(search).toHaveFocus());
 
@@ -792,7 +792,7 @@ describe("NotesFeedPage", () => {
 
     await user.keyboard("{Escape}");
 
-    await waitFor(() => expect(screen.queryByRole("dialog", { name: "세션 목록" })).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "모임 목록" })).not.toBeInTheDocument());
     expect(opener).toHaveFocus();
   });
 
@@ -804,8 +804,8 @@ describe("NotesFeedPage", () => {
       renderSelectedSession: null,
     });
 
-    expect(screen.getByText("아직 발행된 세션 기록이 없습니다.")).toBeInTheDocument();
-    expect(screen.getAllByText("표시할 세션 기록이 없습니다.").length).toBeGreaterThan(0);
+    expect(screen.getByText("아직 발행된 모임 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.getAllByText("표시할 모임 기록이 없습니다.").length).toBeGreaterThan(0);
   });
 
   it("shows the selected-session empty state when the selected session has no records", () => {
@@ -816,7 +816,7 @@ describe("NotesFeedPage", () => {
     });
 
     expect(screen.getByRole("heading", { name: "물고기는 존재하지 않는다" })).toBeInTheDocument();
-    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("이 모임에는 해당 기록이 없습니다.")).toBeInTheDocument();
   });
 
   it("shows the filter empty state when the selected session has records but not for the active filter", async () => {
@@ -828,8 +828,8 @@ describe("NotesFeedPage", () => {
 
     await user.click(screen.getByRole("button", { name: "하이라이트 3" }));
 
-    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("이 세션에는 아직 공개된 기록이 없습니다.")).not.toBeInTheDocument();
+    expect(screen.getByText("이 모임에는 해당 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("이 모임에는 아직 공개된 기록이 없습니다.")).not.toBeInTheDocument();
   });
 
   it("keeps feed filters scoped to the selected session items", async () => {
@@ -840,14 +840,14 @@ describe("NotesFeedPage", () => {
     expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
     expect(screen.getByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).toBeInTheDocument();
     expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
-    expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("팩트풀니스 질문은 선택된 모임 밖의 기록입니다.")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "질문 4" }));
 
     expect(screen.getByText("실패를 피하는 방식으로 의사결정을 점검한다면 무엇이 달라질까요?")).toBeInTheDocument();
     expect(screen.queryByText("실패할 곳을 피하는 방식으로 삶을 보는 질문이 좋았다.")).not.toBeInTheDocument();
     expect(screen.queryByText("문장마다 판단의 습관을 되묻게 만드는 장문 기록을 남겼다.")).not.toBeInTheDocument();
-    expect(screen.queryByText("팩트풀니스 질문은 선택된 세션 밖의 기록입니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("팩트풀니스 질문은 선택된 모임 밖의 기록입니다.")).not.toBeInTheDocument();
   });
 
   it("falls back to the first note session with records when no selected session id is supplied", () => {
@@ -860,7 +860,7 @@ describe("NotesFeedPage", () => {
     expect(screen.getByRole("heading", { name: "다정한 것이 살아남는다" })).toBeInTheDocument();
 
     const rail = desktopRail();
-    const selectedLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" });
+    const selectedLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 모임 보기" });
 
     expect(selectedLink).toHaveAttribute("aria-current", "page");
   });
@@ -874,10 +874,10 @@ describe("NotesFeedPage", () => {
 
     expect(screen.queryByRole("heading", { name: "다정한 것이 살아남는다" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "읽고 돌아오는 자리" })).toBeInTheDocument();
-    expect(screen.getByText("이 세션에는 해당 기록이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("이 모임에는 해당 기록이 없습니다.")).toBeInTheDocument();
 
     const rail = desktopRail();
-    const firstLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 세션 보기" });
+    const firstLink = within(rail).getByRole("link", { name: "No.09 다정한 것이 살아남는다 모임 보기" });
 
     expect(firstLink).not.toHaveAttribute("aria-current", "page");
   });

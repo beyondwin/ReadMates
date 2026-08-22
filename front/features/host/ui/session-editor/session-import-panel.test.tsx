@@ -46,7 +46,7 @@ describe("SessionImportPanelBody", () => {
     expect(within(review).getByText("확인 필요")).toBeInTheDocument();
     expect(within(review).getByText("작성자 1개 확인 필요")).toBeInTheDocument();
     expect(within(review).getByText("긴 이름을 가진 외부 작성자")).toBeInTheDocument();
-    expect(within(review).getByText("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
+    expect(within(review).getByText("기록 보기 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "작성 중에 넣기" })).toBeDisabled();
   });
 
@@ -98,7 +98,7 @@ describe("SessionImportPanelBody", () => {
 
     expect(screen.getByRole("region", { name: "정리본 미리보기" }))
       .toHaveStyle({ overflowWrap: "anywhere", minWidth: "0" });
-    expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
+    expect(screen.queryByText("모임 기록 완성")).not.toBeInTheDocument();
     expect(screen.queryByText("초안 저장 완료")).not.toBeInTheDocument();
   });
 
@@ -154,7 +154,7 @@ function preview({
   return {
     valid,
     session: { sessionNumber: 7, bookTitle: "E2E 책", meetingDate: "2026-05-16" },
-    publication: { summary: "공개 가능한 세션 요약입니다." },
+    publication: { summary: "공개 가능한 모임 요약입니다." },
     highlights,
     oneLineReviews,
     feedbackDocument: {

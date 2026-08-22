@@ -57,7 +57,7 @@ const LazyGuestSessionDetailContent = lazy(async () => ({
 // eslint-disable-next-line react-refresh/only-export-components
 function GuestSessionDetailContentBoundary(props: GuestSessionDetailContentProps) {
   return (
-    <Suspense fallback={<ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />}>
+    <Suspense fallback={<ArchiveRouteLoading label="지난 모임 기록을 불러오는 중" />}>
       <LazyGuestSessionDetailContent {...props} />
     </Suspense>
   );
@@ -186,7 +186,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedMemberRoute({
       path: "session/current",
       ErrorBoundary: CurrentSessionRouteError,
-      fallback: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      fallback: <ReadmatesRouteLoading label="모임을 불러오는 중" variant="member" />,
       guestLoader: guestCurrentSessionLoader,
       GuestCurrentSessionContent,
       load: async () => {
@@ -294,7 +294,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedMemberRoute({
       path: "sessions/:sessionId",
       errorElement: <ArchiveRouteError />,
-      fallback: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+      fallback: <ArchiveRouteLoading label="지난 모임 기록을 불러오는 중" />,
       guestLoader: guestArchiveDetailLoader,
       GuestSessionDetailContent: GuestSessionDetailContentBoundary,
       load: async () => {
@@ -349,7 +349,7 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
     ...(includeIndex ? [memberHomeRoute(false)] : []),
     {
       path: "session/current",
-      hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임을 불러오는 중" variant="member" />,
       loader: scoped
         ? scopedGuestRouteLoader(async () => (await import("@/features/current-session")).currentSessionLoaderFactory(queryClient))
         : undefined,
@@ -495,7 +495,7 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
     {
       path: "sessions/:sessionId",
       errorElement: <ArchiveRouteError />,
-      hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="지난 모임 기록을 불러오는 중" />,
       loader: scoped
         ? scopedGuestRouteLoader(async () => (await import("@/features/archive/route/member-session-detail-data")).memberSessionDetailLoaderFactory(queryClient))
         : undefined,

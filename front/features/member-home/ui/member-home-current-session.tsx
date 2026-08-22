@@ -87,7 +87,7 @@ function mobilePrepStepsFor(session: CurrentSession, canViewPersonalState: boole
       id: "feedback",
       label: "피드백",
       done: false,
-      hint: "세션 후",
+      hint: "모임 후",
     },
   ];
 }
@@ -303,7 +303,7 @@ export function MobileCurrentSessionCard({
       <div className="rm-member-session-card__head">
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="rm-member-session-card__meta-line">
-            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
+            <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 모임" />
           </div>
           <h2 className="h3 editorial rm-member-session-card__title">{bookTitle}</h2>
           <div className="tiny" style={{ color: "var(--text-2)" }}>
@@ -341,13 +341,13 @@ export function MobileCurrentSessionCard({
         </div>
         <div className="small" style={{ color: "var(--text-3)", marginTop: 12 }}>
           참석 {attendance.attended}/{attendance.total}
-          {canViewPersonalState ? ` · 현재 RSVP ${rsvpLabel(session.myRsvpStatus)}` : ""}
+          {canViewPersonalState ? ` · 현재 참석 응답 ${rsvpLabel(session.myRsvpStatus)}` : ""}
         </div>
         {isViewer ? (
           <div className="m-card-quiet" role="note" style={{ marginTop: 12 }}>
             <div className="eyebrow">둘러보기 멤버</div>
             <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-              정식 멤버가 되면 RSVP, 읽기 진행률, 질문 작성 기능이 열립니다.
+              정식 멤버가 되면 참석 응답, 읽기 진행률, 질문 작성 기능이 열립니다.
             </p>
           </div>
         ) : null}
@@ -356,7 +356,7 @@ export function MobileCurrentSessionCard({
           className={`btn ${canWrite ? "btn-primary" : "btn-quiet"} rm-member-session-card__primary`}
           LinkComponent={LinkComponent}
         >
-          세션 열기 <MobileIcon name="chevron-right" size={14} />
+          모임 열기 <MobileIcon name="chevron-right" size={14} />
         </Link>
         {meetingUrl ? (
           <a className="rm-member-session-card__meeting" href={meetingUrl} target="_blank" rel="noreferrer">
@@ -425,12 +425,12 @@ export function MobileTodayActions({
         </div>
         <div className="m-card-quiet" role="note" style={{ marginBottom: 10 }}>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            {nextActionMessage ?? "세션 기록은 읽을 수 있어요. 정식 멤버가 되면 참여 기능과 작성 기능이 열립니다."}
+            {nextActionMessage ?? "모임 기록은 읽을 수 있어요. 정식 멤버가 되면 참여 기능과 작성 기능이 열립니다."}
           </p>
         </div>
         <div className="m-action-grid">
           <MobileActionTile
-            label="세션 읽기"
+            label="모임 읽기"
             sub="준비 보드 보기"
             href="/app/session/current"
             icon="01"
@@ -474,7 +474,7 @@ export function MobileTodayActions({
       ) : null}
       <div className="m-action-grid">
         <MobileActionTile
-          label="RSVP"
+          label="참석 응답"
           sub={rsvpLabel(session.myRsvpStatus)}
           href="/app/session/current"
           icon="01"

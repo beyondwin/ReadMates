@@ -226,7 +226,7 @@ function ArchiveSessions({ sessions, canReadFeedback }: { sessions: ArchiveSessi
               {group.year}
             </h2>
             <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-              {group.list.length}개 세션
+              {group.list.length}개 모임
             </span>
           </div>
           <div className="stack" style={{ "--stack": "0px" } as CSSProperties}>
@@ -333,7 +333,7 @@ function ArchiveReviews({ reviews, reviewAuthorName }: { reviews: ArchiveReviewI
           className="rm-document-panel"
           to={appSessionHref(review.sessionId, "my-records")}
           state={archiveReturnState("reviews")}
-          aria-label={`No.${review.sessionNumber} ${review.bookTitle} 세션으로`}
+          aria-label={`No.${review.sessionNumber} ${review.bookTitle} 모임으로`}
           style={{
             display: "grid",
             gridTemplateRows: "auto auto auto auto",
@@ -384,7 +384,7 @@ function ArchiveQuestions({ questions }: { questions: ArchiveQuestionItem[] }) {
           key={`${question.sessionId}-${question.priority}-${question.text}`}
           to={appSessionHref(question.sessionId, "my-records")}
           state={archiveReturnState("questions")}
-          aria-label={`Q${question.priority} ${question.bookTitle} 세션으로`}
+          aria-label={`Q${question.priority} ${question.bookTitle} 모임으로`}
           style={{
             display: "block",
             padding: "24px 0",

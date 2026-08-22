@@ -150,7 +150,7 @@ function guestScopedFetchMock(input: RequestInfo | URL) {
       currentSession: {
         sessionId: "guest-session-current",
         sessionNumber: 12,
-        title: "게스트 현재 세션",
+        title: "게스트 현재 모임",
         bookTitle: "게스트 책",
         bookAuthor: "게스트 작가",
         bookLink: null,
@@ -732,7 +732,7 @@ describe("SPA router", () => {
       await screen.findByRole("heading", { name: "기록은 읽을 수 있고, 참여 기능은 승인 뒤 열립니다." }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute("href", "/app/archive");
-    expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute("href", "/app/session/current");
+    expect(screen.getByRole("link", { name: "이번 모임 보기" })).toHaveAttribute("href", "/app/session/current");
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/app/pending", expect.anything());
   });
 
@@ -1032,7 +1032,7 @@ describe("SPA router", () => {
             {
               sessionId: "session-6",
               sessionNumber: 6,
-              title: "6회차 모임 · 가난한 찰리의 연감",
+              title: "No.6 모임 · 가난한 찰리의 연감",
               bookTitle: "가난한 찰리의 연감",
               bookAuthor: "찰리 멍거",
               bookImageUrl: null,
@@ -1097,7 +1097,7 @@ describe("SPA router", () => {
             {
               sessionId: "session-6",
               sessionNumber: 6,
-              title: "6회차 모임 · 가난한 찰리의 연감",
+              title: "No.6 모임 · 가난한 찰리의 연감",
               bookTitle: "가난한 찰리의 연감",
               bookAuthor: "찰리 멍거",
               bookImageUrl: null,

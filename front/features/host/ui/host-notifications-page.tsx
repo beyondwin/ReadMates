@@ -226,7 +226,7 @@ export function HostNotificationsPage({
       const preview = await onPreviewManual(request);
       setManualPreview(preview);
     } catch {
-      setManualError("미리보기를 만들지 못했습니다. 세션과 대상 조건을 확인해 주세요.");
+      setManualError("미리보기를 만들지 못했습니다. 모임과 대상 조건을 확인해 주세요.");
     }
   };
 
@@ -252,7 +252,7 @@ export function HostNotificationsPage({
     try {
       return await onLoadManualOptions(sessionId, undefined);
     } catch (error) {
-      setManualError("세션 정보를 불러오지 못했습니다.");
+      setManualError("모임 정보를 불러오지 못했습니다.");
       throw error;
     }
   };

@@ -109,7 +109,7 @@ function renderHostLayout({
 }
 
 function expectSessionLinks(href: string) {
-  const links = screen.getAllByRole("link", { name: "세션" });
+  const links = screen.getAllByRole("link", { name: "모임" });
   expect(links).toHaveLength(2);
   for (const link of links) {
     expect(link).toHaveAttribute("href", href);
@@ -339,21 +339,21 @@ describe("AppRouteLayout host session navigation", () => {
       child: <main>host child</main>,
     });
 
-    expect(screen.getAllByLabelText("세션 불러오는 중")).toHaveLength(2);
+    expect(screen.getAllByLabelText("모임 불러오는 중")).toHaveLength(2);
 
     await act(async () => {
       initialRequest.resolve(jsonResponse({ title: "Unavailable" }, 503));
       await initialRequest.promise;
     });
 
-    const retryButtons = await screen.findAllByRole("button", { name: "세션 다시 확인" });
+    const retryButtons = await screen.findAllByRole("button", { name: "모임 다시 확인" });
     expect(retryButtons).toHaveLength(2);
-    expect(screen.queryByLabelText("세션 불러오는 중")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("모임 불러오는 중")).not.toBeInTheDocument();
 
     await user.click(retryButtons[0]);
 
-    expect(await screen.findAllByRole("button", { name: "세션 다시 확인 중" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "세션 다시 확인 중" })[0]).toBeDisabled();
+    expect(await screen.findAllByRole("button", { name: "모임 다시 확인 중" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "모임 다시 확인 중" })[0]).toBeDisabled();
 
     await act(async () => {
       retryRequest.resolve(jsonResponse({ currentSession: { sessionId: "session-9" } }));
@@ -540,7 +540,7 @@ describe("AppRouteLayout session expiry recovery", () => {
         return Promise.resolve(jsonResponse({
           sessionId: "session-7",
           sessionNumber: 7,
-          title: "검증할 세션",
+          title: "검증할 모임",
           bookTitle: "검증할 책",
           bookAuthor: "작가",
           bookImageUrl: null,
@@ -584,7 +584,7 @@ describe("AppRouteLayout session expiry recovery", () => {
     const detail = {
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "공개 세션",
+      title: "공개 모임",
       bookTitle: "책",
       bookAuthor: "작가",
       bookImageUrl: null,

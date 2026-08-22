@@ -43,7 +43,7 @@ export function AdminClubOperationsPage({ snapshot, supportGrantCount }: AdminCl
         <Metric label="활성 멤버" value={snapshot.memberActivity.activeCount} />
         <Metric label="호스트" value={snapshot.memberActivity.hostCount} />
         <Metric label="지원 grant" value={supportGrantCount} />
-        <Metric label="열린 세션" value={snapshot.sessionProgress.currentOpenCount} />
+        <Metric label="열린 모임" value={snapshot.sessionProgress.currentOpenCount} />
         <Metric label="알림 실패 (7일)" value={snapshot.notificationHealth.recentFailed7d} delta={notifDelta} />
       </div>
 
@@ -190,11 +190,11 @@ function ClosingRiskPanel({ snapshot }: { snapshot: AdminClubOperationsSnapshot 
           ))}
         </div>
       ) : (
-        <p className="admin-club-operations__closing-risk-empty muted">확인 필요한 회차 없음</p>
+        <p className="admin-club-operations__closing-risk-empty muted">확인 필요한 모임 없음</p>
       )}
 
       {overflowCount > 0 ? (
-        <p className="admin-club-operations__closing-risk-overflow tiny muted">외 {overflowCount}개 회차</p>
+        <p className="admin-club-operations__closing-risk-overflow tiny muted">외 {overflowCount}개 모임</p>
       ) : null}
 
       {resolvedItems.length > 0 ? (

@@ -40,7 +40,7 @@ describe("apiErrorFromResponse", () => {
     const response = new Response(
       JSON.stringify({
         code: "SESSION_DELETE_BLOCKED",
-        message: "적용 기록 또는 알림 이력이 있는 세션은 삭제할 수 없습니다.",
+        message: "적용 기록 또는 알림 이력이 있는 모임은 삭제할 수 없습니다.",
         status: 409,
         blockers: [
           { code: "RECORD_REVISION_EXISTS", count: 2, payload: "should-not-copy" },
@@ -89,7 +89,7 @@ describe("apiErrorFromResponse", () => {
     const response = new Response(
       JSON.stringify({
         code: "SESSION_DELETION_NOT_ALLOWED",
-        message: "초안 또는 진행 중인 세션만 삭제할 수 있습니다.",
+        message: "초안 또는 진행 중인 모임만 삭제할 수 있습니다.",
         status: 409,
         blockers: { code: "RECORD_REVISION_EXISTS", count: 1 },
       }),

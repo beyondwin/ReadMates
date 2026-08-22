@@ -256,7 +256,7 @@ export function MobileMemberActivity({
                   <div className="rm-member-activity-card__author">
                     <AvatarChip avatarKey={item.avatarKey} name={authorName} label="" sizeRole="author" />
                     <div className="rm-member-activity-card__author-copy">
-                      <div className="rm-member-activity-card__author-name">{authorName ?? "회차 하이라이트"}</div>
+                      <div className="rm-member-activity-card__author-name">{authorName ?? "모임 하이라이트"}</div>
                       <div className="rm-member-activity-card__book">{item.bookTitle}</div>
                     </div>
                   </div>
@@ -288,7 +288,7 @@ export function RosterSummary({ current }: { current: CurrentSessionReadPageData
             참석 현황 준비 중
           </div>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-            새 세션이 등록되면 RSVP와 참석 명단이 표시됩니다.
+            새 모임이 등록되면 참석 응답과 참석 명단이 표시됩니다.
           </p>
         </div>
       </section>
@@ -305,7 +305,7 @@ export function RosterSummary({ current }: { current: CurrentSessionReadPageData
             참석 현황 준비 중
           </div>
           <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-            참석 명단이 준비되면 RSVP 현황이 표시됩니다.
+            참석 명단이 준비되면 참석 응답 현황이 표시됩니다.
           </p>
         </div>
       </section>
@@ -318,7 +318,7 @@ export function RosterSummary({ current }: { current: CurrentSessionReadPageData
   return (
     <section>
       <div className="eyebrow" style={{ marginBottom: "10px" }}>
-        RSVP · 참석 명단
+        참석 응답 · 참석 명단
       </div>
       <div className="surface" style={{ padding: "20px" }}>
         <div className="row-between">
@@ -329,7 +329,7 @@ export function RosterSummary({ current }: { current: CurrentSessionReadPageData
             미응답 <span className="ledger-number">{noResponseCount}</span>
           </div>
         </div>
-        <div className="rm-member-home-roster" role="list" aria-label="RSVP 참석자">
+        <div className="rm-member-home-roster" role="list" aria-label="참석 응답 참석자">
           {attendees.map((member) => (
             <span className="rm-member-home-roster__item" role="listitem" key={member.renderKey}>
               <AvatarChip

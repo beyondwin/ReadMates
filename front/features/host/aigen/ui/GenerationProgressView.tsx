@@ -14,7 +14,7 @@ const STAGE_LABEL: Record<AiGenerationStage, string> = {
   GENERATING_SUMMARY: "요약 생성 중",
   GENERATING_HIGHLIGHTS: "하이라이트 생성 중",
   GENERATING_ONE_LINE_REVIEWS: "한줄평 생성 중",
-  GENERATING_FEEDBACK_DOCUMENT: "회차 피드백 작성 중",
+  GENERATING_FEEDBACK_DOCUMENT: "모임 피드백 작성 중",
   VALIDATING: "결과 검증 중",
   READY: "완료 정리 중",
 };

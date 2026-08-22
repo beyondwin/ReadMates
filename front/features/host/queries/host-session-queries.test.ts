@@ -122,7 +122,7 @@ describe("host session query keys", () => {
     vi.mocked(fetchHostSessionDetail).mockResolvedValue({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       bookTitle: "테스트 책",
       bookAuthor: "테스트 저자",
       bookLink: null,
@@ -143,7 +143,7 @@ describe("host session query keys", () => {
     vi.mocked(fetchHostSessionDeletionPreview).mockResolvedValue({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "OPEN",
       canDelete: true,
       counts: {
@@ -249,7 +249,7 @@ describe("host session query keys", () => {
     expect(parseHostSessionDeletionResponse({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "DRAFT",
       trashed: true,
       deletedAt: "2026-08-21T10:00:00Z",
@@ -430,7 +430,7 @@ function trashItem() {
   return {
     sessionId: "session-7",
     sessionNumber: 7,
-    title: "7회차 모임",
+    title: "No.7 모임",
     state: "DRAFT" as const,
     deletedAt: "2026-08-21T10:00:00Z",
     purgeAfter: "2026-08-28T10:00:00Z",
@@ -441,7 +441,7 @@ function sessionDetail() {
   return {
     sessionId: "session-7",
     sessionNumber: 7,
-    title: "7회차 모임",
+    title: "No.7 모임",
     bookTitle: "테스트 책",
     bookAuthor: "테스트 저자",
     bookLink: null,

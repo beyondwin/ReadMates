@@ -227,14 +227,14 @@ export function HostSessionLedgerRoute({
     <main style={{ minWidth: 0 }}>
       <section className="page-header-compact">
         <div className="container">
-          <div className="eyebrow">운영 · 세션 기록</div>
+          <div className="eyebrow">운영 · 모임 기록</div>
           <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-            {trashView ? "휴지통" : "세션 기록 장부"}
+            {trashView ? "휴지통" : "모임 기록 장부"}
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
             {trashView
               ? "삭제된 모임을 서버가 정한 기간 동안 복원할 수 있습니다."
-              : "과거와 예정 세션의 기록 상태, 초안, 공개 범위를 한곳에서 확인합니다."}
+              : "과거와 예정 모임의 기록 상태, 초안, 공개 범위를 한곳에서 확인합니다."}
           </p>
         </div>
       </section>
@@ -249,7 +249,7 @@ export function HostSessionLedgerRoute({
           errorMessage={
             trashView
               ? trashQuery.isError && !baseTrashPage ? "휴지통을 불러오지 못했습니다." : null
-              : query.isError && !basePage ? "세션 기록을 불러오지 못했습니다. 검색 조건은 유지됩니다." : null
+              : query.isError && !basePage ? "모임 기록을 불러오지 못했습니다. 검색 조건은 유지됩니다." : null
           }
           loadMoreError={loadMoreError}
           onFiltersChange={updateFilters}

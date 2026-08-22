@@ -258,9 +258,9 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("active@example.com · 정식 멤버")).toBeInTheDocument();
     expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("둘러보기");
     expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("활성");
-    expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("이번 세션");
-    expect(within(screen.getByText("멤버1").closest("article") as HTMLElement).getByText("이번 세션 참여")).toBeInTheDocument();
-    expect(within(screen.getByText("새").closest("article") as HTMLElement).getByText("이번 세션 미포함")).toBeInTheDocument();
+    expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("이번 모임");
+    expect(within(screen.getByText("멤버1").closest("article") as HTMLElement).getByText("이번 모임 참여")).toBeInTheDocument();
+    expect(within(screen.getByText("새").closest("article") as HTMLElement).getByText("이번 모임 미포함")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members?limit=50", expect.objectContaining({ cache: "no-store" }));
   });
 
@@ -280,7 +280,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.queryByText("@멤버1")).not.toBeInTheDocument();
     expect(activeRow.getByText("active@example.com · 정식 멤버")).toBeInTheDocument();
     expect(activeRow.getByText("활성")).toBeInTheDocument();
-    expect(activeRow.getByText("이번 세션 참여")).toBeInTheDocument();
+    expect(activeRow.getByText("이번 모임 참여")).toBeInTheDocument();
 
     const outsideArticle = screen.getByText("새").closest("article") as HTMLElement;
     const outsideRow = within(outsideArticle);
@@ -291,7 +291,7 @@ describe("HostMembersPage", () => {
     expect(outsideArticle.querySelector(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "member");
     expect(outsideRow.queryByText("@새")).not.toBeInTheDocument();
     expect(outsideRow.getByText("new@example.com · 정식 멤버")).toBeInTheDocument();
-    expect(outsideRow.getByText("이번 세션 미포함")).toBeInTheDocument();
+    expect(outsideRow.getByText("이번 모임 미포함")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "정지됨" }));
     const suspendedArticle = screen.getByText("정").closest("article") as HTMLElement;
@@ -300,7 +300,7 @@ describe("HostMembersPage", () => {
     expect(suspendedRow.queryByText("@정")).not.toBeInTheDocument();
     expect(suspendedRow.getByText("suspended@example.com · 정지됨 · 참여 2026.04.14")).toBeInTheDocument();
     expect(suspendedRow.getByText("정지")).toBeInTheDocument();
-    expect(suspendedRow.getByText("이번 세션 제외")).toBeInTheDocument();
+    expect(suspendedRow.getByText("이번 모임 제외")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "둘러보기 멤버" }));
     const pendingArticle = screen.getByText("둘").closest("article") as HTMLElement;
@@ -322,8 +322,8 @@ describe("HostMembersPage", () => {
     expect(inactiveRow.getByText("탈퇴")).toBeInTheDocument();
     expect(inactiveRow.getByText("기록 보존")).toBeInTheDocument();
     expect(inactiveRow.getAllByText("기록 보존")).toHaveLength(1);
-    expect(inactiveRow.queryByText("이번 세션 제외")).not.toBeInTheDocument();
-    expect(inactiveRow.queryByText("이번 세션 미포함")).not.toBeInTheDocument();
+    expect(inactiveRow.queryByText("이번 모임 제외")).not.toBeInTheDocument();
+    expect(inactiveRow.queryByText("이번 모임 미포함")).not.toBeInTheDocument();
     expect(inactiveRow.getByRole("button", { name: "이름 변경" })).toBeInTheDocument();
   });
 
@@ -383,11 +383,11 @@ describe("HostMembersPage", () => {
 
     expect(row.getByRole("button", { name: "정지" })).toBeDisabled();
     expect(row.getByRole("button", { name: "탈퇴 처리" })).toBeDisabled();
-    expect(row.getByRole("button", { name: "세션 제외" })).toBeDisabled();
+    expect(row.getByRole("button", { name: "모임 제외" })).toBeDisabled();
     expect(row.getByRole("button", { name: "이름 변경" })).toBeDisabled();
     expect(row.getByRole("button", { name: "정지" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(row.getByRole("button", { name: "탈퇴 처리" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
-    expect(row.getByRole("button", { name: "세션 제외" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(row.getByRole("button", { name: "모임 제외" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(row.getByRole("button", { name: "이름 변경" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(row.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(4);
 
@@ -403,7 +403,7 @@ describe("HostMembersPage", () => {
     renderHostMembersPage([removal.promise]);
 
     const row = within((await screen.findByText("멤버1")).closest("article") as HTMLElement);
-    await user.click(row.getByRole("button", { name: "세션 제외" }));
+    await user.click(row.getByRole("button", { name: "모임 제외" }));
 
     const editButton = row.getByRole("button", { name: "이름 변경" });
     expect(editButton).toBeDisabled();
@@ -874,7 +874,7 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("viewer@example.com · 요청 2026.04.20")).toBeInTheDocument();
     const inactiveViewerRow = within(screen.getByText("둘").closest("article") as HTMLElement);
     expect(inactiveViewerRow.getByText("기록 보존")).toBeInTheDocument();
-    expect(inactiveViewerRow.queryByText("이번 세션 미포함")).not.toBeInTheDocument();
+    expect(inactiveViewerRow.queryByText("이번 모임 미포함")).not.toBeInTheDocument();
   });
 
   it("removes the viewer row locally when activation succeeds but list refresh fails", async () => {
@@ -906,14 +906,14 @@ describe("HostMembersPage", () => {
     const activeRow = within(row as HTMLElement);
     expect(activeRow.getByRole("button", { name: "정지" })).toBeEnabled();
     expect(activeRow.getByRole("button", { name: "탈퇴 처리" })).toBeEnabled();
-    expect(activeRow.getByRole("button", { name: "세션 제외" })).toBeEnabled();
+    expect(activeRow.getByRole("button", { name: "모임 제외" })).toBeEnabled();
 
     await user.click(activeRow.getByRole("button", { name: "정지" }));
 
     const dialog = screen.getByRole("dialog", { name: "멤버1님을 정지할까요?" });
     expect(dialog).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "이번 세션부터 바로 정지" })).toBeChecked();
-    expect(screen.getByRole("radio", { name: "다음 세션부터 정지" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "이번 모임부터 바로 정지" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "다음 모임부터 정지" })).toBeInTheDocument();
   });
 
   it("keeps host lifecycle actions disabled without host-only helper copy", async () => {
@@ -957,7 +957,7 @@ describe("HostMembersPage", () => {
     const dialogView = within(dialog);
     const cancelButton = dialogView.getByRole("button", { name: "취소" });
     const confirmButton = dialogView.getByRole("button", { name: "정지" });
-    const applyNowRadio = dialogView.getByRole("radio", { name: "이번 세션부터 바로 정지" });
+    const applyNowRadio = dialogView.getByRole("radio", { name: "이번 모임부터 바로 정지" });
 
     expect(cancelButton).toHaveFocus();
 
@@ -1022,10 +1022,10 @@ describe("HostMembersPage", () => {
     const fetchMock = renderHostMembersPage([lifecycleResponse(removed), lifecycleResponse(added)]);
 
     let row = (await screen.findByText("멤버1")).closest("article");
-    await user.click(within(row as HTMLElement).getByRole("button", { name: "세션 제외" }));
+    await user.click(within(row as HTMLElement).getByRole("button", { name: "모임 제외" }));
 
     row = screen.getByText("새").closest("article");
-    await user.click(within(row as HTMLElement).getByRole("button", { name: "이번 세션 추가" }));
+    await user.click(within(row as HTMLElement).getByRole("button", { name: "이번 모임 추가" }));
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
@@ -1054,15 +1054,15 @@ describe("HostMembersPage", () => {
     expect(row).not.toBeNull();
     const activeRow = within(row as HTMLElement);
 
-    await user.click(activeRow.getByRole("button", { name: "세션 제외" }));
+    await user.click(activeRow.getByRole("button", { name: "모임 제외" }));
 
     expect(activeRow.getByRole("button", { name: "정지" })).toBeDisabled();
     expect(activeRow.getByRole("button", { name: "탈퇴 처리" })).toBeDisabled();
-    expect(activeRow.getByRole("button", { name: "세션 제외" })).toBeDisabled();
+    expect(activeRow.getByRole("button", { name: "모임 제외" })).toBeDisabled();
     expect(activeRow.getByRole("button", { name: "이름 변경" })).toBeDisabled();
     expect(activeRow.getByRole("button", { name: "정지" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(activeRow.getByRole("button", { name: "탈퇴 처리" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
-    expect(activeRow.getByRole("button", { name: "세션 제외" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
+    expect(activeRow.getByRole("button", { name: "모임 제외" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(activeRow.getByRole("button", { name: "이름 변경" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(activeRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(4);
 
@@ -1092,8 +1092,8 @@ describe("HostMembersPage", () => {
     expect(row).not.toBeNull();
     const activeRow = within(row as HTMLElement);
     expect(activeRow.getByText("locked@example.com · 정식 멤버")).toBeInTheDocument();
-    expect(activeRow.getByRole("button", { name: "세션 제외" })).toBeDisabled();
-    expect(activeRow.queryByRole("button", { name: "이번 세션 추가" })).not.toBeInTheDocument();
+    expect(activeRow.getByRole("button", { name: "모임 제외" })).toBeDisabled();
+    expect(activeRow.queryByRole("button", { name: "이번 모임 추가" })).not.toBeInTheDocument();
   });
 
   it("seeds the host members list through the route loader", async () => {

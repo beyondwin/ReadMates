@@ -130,7 +130,7 @@ describe("HostSessionWorkspace", () => {
     );
 
     expect(screen.getByText("멤버와 준비 중")).toBeVisible();
-    expect(screen.getAllByRole("button", { name: "출석 확인하기" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "실제 출석 확인" })).toHaveLength(2);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
     await user.click(within(screen.getByRole("listitem", { name: /출석/ })).getByRole("button"));
     expect(onLocationChange).toHaveBeenCalledWith({ panel: "attendance", source: "manual" });
@@ -169,7 +169,7 @@ describe("HostSessionWorkspace", () => {
     );
 
     expect(screen.getByText("기록 정리 중")).toBeVisible();
-    expect(screen.getAllByRole("button", { name: "기록 공개" })).toHaveLength(2);
+    expect(screen.getAllByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).toHaveLength(2);
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 
@@ -188,7 +188,7 @@ describe("HostSessionWorkspace", () => {
       />,
     );
 
-    const buttons = screen.getAllByRole("button", { name: "기록 공개" });
+    const buttons = screen.getAllByRole("button", { name: "게스트·멤버 노트에 기록 게시" });
     expect(buttons).toHaveLength(2);
     expect(buttons[0]).toBeDisabled();
     expect(buttons[1]).toBeDisabled();
@@ -212,7 +212,7 @@ describe("HostSessionWorkspace", () => {
       />,
     );
 
-    expect(screen.getByText("공개 완료")).toBeVisible();
+    expect(screen.getByText("게스트·멤버 노트 게시 완료")).toBeVisible();
     expect(screen.getAllByRole("link", { name: "공개 기록 보기" })).toHaveLength(2);
     expect(screen.getByRole("button", { name: "수정본 만들기" })).toBeVisible();
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
@@ -359,7 +359,7 @@ describe("HostSessionWorkspace", () => {
     function UndoConfirmHarness() {
       const [confirm, setConfirm] = useState<HostSessionWorkspaceProps["undoConfirm"]>({
         items: [
-          { key: "title", label: "세션 제목", currentValue: "새 제목", targetValue: "이전 제목", sensitive: false },
+          { key: "title", label: "모임 제목", currentValue: "새 제목", targetValue: "이전 제목", sensitive: false },
           { key: "meetingUrl", label: "미팅 URL", currentValue: null, targetValue: null, sensitive: true },
         ],
         submitting: false,
@@ -383,7 +383,7 @@ describe("HostSessionWorkspace", () => {
 
     const trigger = within(screen.getByRole("status")).getByRole("button", { name: "되돌리기" });
     const dialog = screen.getByRole("dialog", { name: "이 변경을 되돌릴까요?" });
-    expect(dialog).toHaveTextContent("세션 제목: 새 제목 → 이전 제목");
+    expect(dialog).toHaveTextContent("모임 제목: 새 제목 → 이전 제목");
     expect(dialog).toHaveTextContent("미팅 URL: 미리보기에 표시하지 않습니다");
     expect(screen.getByRole("button", { name: "취소" })).toHaveFocus();
 

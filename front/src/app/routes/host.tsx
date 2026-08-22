@@ -114,7 +114,7 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: "sessions",
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="세션 기록 장부를 불러오는 중" variant="host" />,
+      fallback: <ReadmatesRouteLoading label="모임 기록 장부를 불러오는 중" variant="host" />,
       load: async () => {
         const [{ HostSessionLedgerRouteElement: Component }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/session-ledger-route-element"),
@@ -253,7 +253,7 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: "sessions",
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="세션 기록 장부를 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 기록 장부를 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ HostSessionLedgerRouteElement }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/session-ledger-route-element"),

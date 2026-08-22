@@ -1,3 +1,10 @@
+import {
+  formatMeetingLifecycle,
+  formatPublicationAction,
+  MEETING_APPLY_LABEL,
+  MEETING_ATTENDANCE_LABEL,
+} from "@/shared/model/meeting-language";
+
 export type HostSessionWorkspacePanel = "focus" | "basic" | "attendance" | "records" | "history";
 
 export type HostSessionWorkspaceLocation = {
@@ -18,7 +25,7 @@ export type HostSessionWorkspaceInput = {
 };
 
 export type HostSessionWorkspaceView = {
-  statusLabel: "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "공개 완료";
+  statusLabel: "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "게스트·멤버 노트 게시 완료";
   primaryAction: { kind: string; label: string; panel: HostSessionWorkspacePanel };
   progress: ReadonlyArray<{ id: string; label: string; state: "done" | "current" | "next" }>;
   publicationReady: boolean;
@@ -41,16 +48,7 @@ export function buildHostSessionWorkspace(input: HostSessionWorkspaceInput): Hos
 function statusLabelFor(
   state: HostSessionWorkspaceInput["state"],
 ): HostSessionWorkspaceView["statusLabel"] {
-  switch (state) {
-    case "DRAFT":
-      return "모임 작성 중";
-    case "OPEN":
-      return "멤버와 준비 중";
-    case "CLOSED":
-      return "기록 정리 중";
-    case "PUBLISHED":
-      return "공개 완료";
-  }
+  return formatMeetingLifecycle(state, "host");
 }
 
 function resolvePrimaryAction(
@@ -88,7 +86,7 @@ function resolveOpenAction(
   }
 
   if (input.unknownAttendanceCount > 0) {
-    return { kind: "CHECK_ATTENDANCE", label: "출석 확인하기", panel: "attendance" };
+    return { kind: "CHECK_ATTENDANCE", label: `${MEETING_ATTENDANCE_LABEL} 확인`, panel: "attendance" };
   }
 
   return { kind: "FINISH_SESSION", label: "모임 마치기", panel: "focus" };
@@ -102,7 +100,7 @@ function resolveClosedAction(
     && !input.recordDraftStale
     && input.recordValidationIssueCount === 0
   ) {
-    return { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" };
+    return { kind: "PUBLISH_RECORD", label: formatPublicationAction("publishMemberNotes"), panel: "records" };
   }
   if (!input.hasRecordDraft) {
     return { kind: "UPLOAD_RECORD", label: "정리본 올리기", panel: "records" };
@@ -110,7 +108,7 @@ function resolveClosedAction(
   if (input.recordDraftStale || input.recordValidationIssueCount > 0) {
     return { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" };
   }
-  return { kind: "REVIEW_RECORD", label: "기록에 반영", panel: "records" };
+  return { kind: "REVIEW_RECORD", label: MEETING_APPLY_LABEL, panel: "records" };
 }
 
 function progressFor(

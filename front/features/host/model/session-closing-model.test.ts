@@ -69,8 +69,8 @@ describe("getSessionClosingBoardView", () => {
   it.each([
     [
       "CLOSE_SESSION",
-      "세션 종료 확인",
-      "열린 세션을 먼저 닫아야 기록 패키지와 알림 상태를 판단할 수 있습니다.",
+      "모임 종료 확인",
+      "열린 모임을 먼저 닫아야 기록 패키지와 알림 상태를 판단할 수 있습니다.",
     ],
     [
       "IMPORT_RECORDS",
@@ -79,7 +79,7 @@ describe("getSessionClosingBoardView", () => {
     ],
     [
       "PUBLISH_RECORDS",
-      "기록 공개 범위 확인",
+      "기록 보기 범위 확인",
       "멤버 또는 공개 표면에 기록을 열기 전 공개 범위를 점검해야 합니다.",
     ],
     [
@@ -114,7 +114,7 @@ describe("getSessionClosingBoardView", () => {
     const view = getSessionClosingBoardView({
       ...baseStatus,
       checklist: [
-        { id: "done", state: "DONE", label: "세션 종료", detail: "닫힘", href: "/app/host/sessions/s1/edit" },
+        { id: "done", state: "DONE", label: "모임 종료", detail: "닫힘", href: "/app/host/sessions/s1/edit" },
         { id: "needed", state: "ACTION_REQUIRED", label: "멤버 알림", detail: "대기", href: "/app/host/notifications" },
         { id: "blocked", state: "BLOCKED", label: "피드백 문서", detail: "확인 필요", href: null },
         { id: "na", state: "NOT_APPLICABLE", label: "공개 기록", detail: "비공개", href: null },

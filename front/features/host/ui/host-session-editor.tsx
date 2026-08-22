@@ -171,7 +171,7 @@ type HostSessionRecordWorkflow = {
   onReverseLifecycle?: () => void;
 };
 
-const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
+const emptyManagementMessage = "모임을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
 
 async function runSessionLifecycleAction(
   actions: HostSessionEditorActions,
@@ -415,11 +415,11 @@ export default function HostSessionEditor({
     returnTarget,
     readmatesReturnState,
   );
-  const editorTitle = isNewSession ? "세션 문서 만들기" : null;
+  const editorTitle = isNewSession ? "모임 문서 만들기" : null;
   const basicSaveLabel = saveState === "saving"
     ? "기본 정보를 저장하는 중"
     : isNewSession
-      ? "세션 문서 저장"
+      ? "모임 문서 저장"
       : "기본 정보 저장";
   const showReturnLink =
     returnTarget.href !== hostDashboardReturnTarget.href || returnTarget.label !== hostDashboardReturnTarget.label;
@@ -1298,7 +1298,7 @@ export default function HostSessionEditor({
                     ? "기본 정보를 저장하고 있습니다."
                     : saveState === "saved"
                       ? isNewSession
-                        ? "저장되었습니다. 세션 문서 편집 화면으로 이동합니다."
+                        ? "저장되었습니다. 모임 문서 편집 화면으로 이동합니다."
                         : "저장되었습니다."
                       : saveState === "error"
                         ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
@@ -1506,7 +1506,7 @@ function MemberResponseSummary({
         <ul className="stack" style={{ "--stack": "8px", margin: 0, padding: 0, listStyle: "none" } as CSSProperties}>
           {active.map((attendee) => (
             <li key={attendee.membershipId} className="small">
-              {attendee.displayName} · RSVP {rsvpLabel(attendee.rsvpStatus)}
+              {attendee.displayName} · 참석 응답 {rsvpLabel(attendee.rsvpStatus)}
             </li>
           ))}
         </ul>

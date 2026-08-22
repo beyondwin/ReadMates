@@ -62,7 +62,7 @@ describe("buildHostSessionWorkspace", () => {
       }),
     ).toMatchObject({
       statusLabel: "멤버와 준비 중",
-      primaryAction: { kind: "CHECK_ATTENDANCE", label: "출석 확인하기", panel: "attendance" },
+      primaryAction: { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", panel: "attendance" },
     });
   });
 
@@ -167,7 +167,7 @@ describe("buildHostSessionWorkspace", () => {
       }),
     ).toMatchObject({
       statusLabel: "기록 정리 중",
-      primaryAction: { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" },
+      primaryAction: { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", panel: "records" },
       publicationReady: true,
     });
   });
@@ -183,7 +183,7 @@ describe("buildHostSessionWorkspace", () => {
       }),
     ).toMatchObject({
       statusLabel: "기록 정리 중",
-      primaryAction: { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" },
+      primaryAction: { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", panel: "records" },
       publicationReady: true,
     });
   });
@@ -199,7 +199,7 @@ describe("buildHostSessionWorkspace", () => {
       }),
     ).toMatchObject({
       statusLabel: "기록 정리 중",
-      primaryAction: { kind: "PUBLISH_RECORD", label: "기록 공개", panel: "records" },
+      primaryAction: { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", panel: "records" },
       publicationReady: false,
     });
   });
@@ -214,7 +214,7 @@ describe("buildHostSessionWorkspace", () => {
         publicationReady: true,
       }),
     ).toMatchObject({
-      statusLabel: "공개 완료",
+      statusLabel: "게스트·멤버 노트 게시 완료",
       primaryAction: { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", panel: "focus" },
     });
   });

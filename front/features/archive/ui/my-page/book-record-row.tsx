@@ -17,7 +17,7 @@ export function BookRecordRow({ item }: { item: MyJourneyItem }) {
       </div>
       <div className="rm-book-record-row__actions">
         <Link to={`/app/sessions/${encodeURIComponent(item.sessionId)}`}>
-          회차 기록
+          모임 기록
         </Link>
         {item.feedbackDocument.readable ? (
           <Link to={`/app/feedback/${encodeURIComponent(item.sessionId)}`}>

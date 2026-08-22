@@ -31,14 +31,14 @@ function statusBadgeClass(status: MembershipStatus) {
 
 function currentSessionBadge(member: HostMemberListItem) {
   if (member.currentSessionParticipationStatus === "ACTIVE") {
-    return { label: "이번 세션 참여", className: "badge badge-ok badge-dot" };
+    return { label: "이번 모임 참여", className: "badge badge-ok badge-dot" };
   }
 
   if (member.currentSessionParticipationStatus === "REMOVED") {
-    return { label: "이번 세션 제외", className: "badge badge-warn badge-dot" };
+    return { label: "이번 모임 제외", className: "badge badge-warn badge-dot" };
   }
 
-  return { label: "이번 세션 미포함", className: "badge" };
+  return { label: "이번 모임 미포함", className: "badge" };
 }
 
 export function MemberActionButton({
@@ -92,7 +92,7 @@ export function CurrentSessionAction({
   const isParticipating = member.currentSessionParticipationStatus === "ACTIVE";
   const path: HostMemberLifecyclePath = isParticipating ? "/current-session/remove" : "/current-session/add";
   const enabled = isParticipating ? member.canRemoveFromCurrentSession : member.canAddToCurrentSession;
-  const label = isParticipating ? "세션 제외" : "이번 세션 추가";
+  const label = isParticipating ? "모임 제외" : "이번 모임 추가";
   const rowPending = isMembershipPending(member.membershipId, pendingActions);
   const reasonId = `current-session-action-reason-${member.membershipId}`;
   const reason = rowPending ? memberActionPendingReason : !enabled ? disabledCurrentSessionReason(member, isParticipating) : null;
@@ -187,12 +187,12 @@ export function MemberList({
 
 function disabledCurrentSessionReason(member: HostMemberListItem, isParticipating: boolean) {
   if (isParticipating) {
-    return member.role === "HOST" ? null : "이 멤버는 현재 정책상 이번 세션에서 제외할 수 없습니다.";
+    return member.role === "HOST" ? null : "이 멤버는 현재 정책상 이번 모임에서 제외할 수 없습니다.";
   }
 
   if (member.status !== "ACTIVE") {
-    return "정식 활성 멤버만 이번 세션에 추가할 수 있습니다.";
+    return "정식 활성 멤버만 이번 모임에 추가할 수 있습니다.";
   }
 
-  return "현재 세션이 없거나 이미 다음 세션부터 반영되도록 처리되었습니다.";
+  return "현재 모임이 없거나 이미 다음 모임부터 반영되도록 처리되었습니다.";
 }

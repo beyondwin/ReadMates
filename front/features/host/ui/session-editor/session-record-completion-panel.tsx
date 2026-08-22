@@ -50,7 +50,7 @@ export function SessionRecordCompletionPanel({
     if (!canUseAigen || !sessionId || !clubSlug) {
       return (
         <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-          AI 생성은 세션 저장 후 사용할 수 있습니다. 외부 JSON은 계속 사용할 수 있습니다.
+          AI 생성은 모임 저장 후 사용할 수 있습니다. 외부 JSON은 계속 사용할 수 있습니다.
         </p>
       );
     }

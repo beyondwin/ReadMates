@@ -158,7 +158,7 @@ describe("readmatesFetchResponse", () => {
     const response = new Response(
       JSON.stringify({
         code: "SESSION_NOT_FOUND",
-        message: "요청한 세션을 찾을 수 없습니다.",
+        message: "요청한 모임을 찾을 수 없습니다.",
         status: 404,
       }),
       {
@@ -171,7 +171,7 @@ describe("readmatesFetchResponse", () => {
 
     await expect(readmatesFetch("/api/archive/sessions/missing")).rejects.toMatchObject({
       name: "ReadmatesApiError",
-      message: "요청한 세션을 찾을 수 없습니다.",
+      message: "요청한 모임을 찾을 수 없습니다.",
       status: 404,
       code: "SESSION_NOT_FOUND",
       fallback: false,
@@ -270,7 +270,7 @@ describe("readmatesFetchResponse", () => {
         new Response(
           JSON.stringify({
             code: "SESSION_NOT_FOUND",
-            message: "요청한 세션을 찾을 수 없습니다.",
+            message: "요청한 모임을 찾을 수 없습니다.",
             status: 404,
           }),
           {

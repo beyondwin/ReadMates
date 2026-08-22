@@ -234,7 +234,7 @@ describe("SPA AppRouteLayout", () => {
       "기록",
       "내 공간",
     ]);
-    expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
+    expect(within(tabs).queryByRole("link", { name: "모임" })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
 
     const appContent = document.querySelector(".app-content");
@@ -483,12 +483,12 @@ describe("SPA AppRouteLayout", () => {
     await waitFor(() => {
       expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
         "오늘",
-        "세션",
+        "모임",
         "멤버",
         "기록",
       ]);
     });
-    expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
+    expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute(
       "href",
       "/app/host/sessions/session-6",
     );
@@ -548,7 +548,7 @@ describe("SPA AppRouteLayout", () => {
     await waitFor(() => {
       expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
         "오늘",
-        "세션",
+        "모임",
         "멤버",
         "기록",
       ]);
@@ -595,8 +595,8 @@ describe("SPA AppRouteLayout", () => {
     ]);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
-    expect(within(tabs).getByLabelText("세션 불러오는 중")).toHaveAttribute("aria-disabled", "true");
+    expect(within(tabs).queryByRole("link", { name: "모임" })).not.toBeInTheDocument();
+    expect(within(tabs).getByLabelText("모임 불러오는 중")).toHaveAttribute("aria-disabled", "true");
     expect(within(tabs).getByText("확인 중")).toBeInTheDocument();
 
     currentSession.resolve(
@@ -608,7 +608,7 @@ describe("SPA AppRouteLayout", () => {
     );
 
     await waitFor(() => {
-      expect(within(tabs).getByRole("link", { name: "세션" })).toHaveAttribute(
+      expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute(
         "href",
         "/app/host/sessions/session-6",
       );
@@ -654,8 +654,8 @@ describe("SPA AppRouteLayout", () => {
     });
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).queryByRole("link", { name: "세션" })).not.toBeInTheDocument();
-    expect(await within(tabs).findByRole("button", { name: "세션 다시 확인" })).toBeEnabled();
+    expect(within(tabs).queryByRole("link", { name: "모임" })).not.toBeInTheDocument();
+    expect(await within(tabs).findByRole("button", { name: "모임 다시 확인" })).toBeEnabled();
   });
 
   it("renders a shell-aware member loading skeleton while auth is unresolved", () => {

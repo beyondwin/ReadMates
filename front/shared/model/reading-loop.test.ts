@@ -34,7 +34,7 @@ describe("reading-loop model", () => {
     ).toBe("HOST_SETUP_REQUIRED");
   });
 
-  it("detects member prep when RSVP, check-in, or questions are missing", () => {
+  it("detects member prep when 참석 응답, check-in, or questions are missing", () => {
     expect(
       deriveReadingLoopState({
         hasCurrentSession: true,
@@ -124,7 +124,7 @@ describe("reading-loop model", () => {
         missing: "RSVP",
       }),
     ).toEqual({
-      label: "RSVP 하기",
+      label: "참석 응답하기",
       href: "/app/session/current",
       target: "current-session" satisfies ReadingLoopActionTarget,
     });

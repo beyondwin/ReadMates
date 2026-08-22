@@ -19,7 +19,7 @@ function goingCount(session: CurrentSession) {
 function prepStepsFor(session: CurrentSession, canViewPersonalState: boolean) {
   if (!canViewPersonalState) {
     return [
-      { label: "RSVP", hint: "멤버 전용", done: false },
+      { label: "참석 응답", hint: "멤버 전용", done: false },
       { label: "읽기 진행률", hint: "멤버 전용", done: false },
       { label: "질문 작성", hint: "멤버 전용", done: false },
       { label: "피드백 문서", hint: "멤버 전용", done: false },
@@ -28,7 +28,7 @@ function prepStepsFor(session: CurrentSession, canViewPersonalState: boolean) {
 
   return [
     {
-      label: "RSVP",
+      label: "참석 응답",
       hint: rsvpLabel(session.myRsvpStatus),
       done: session.myRsvpStatus !== "NO_RESPONSE",
     },
@@ -44,7 +44,7 @@ function prepStepsFor(session: CurrentSession, canViewPersonalState: boolean) {
     },
     {
       label: "피드백 문서",
-      hint: "세션 후",
+      hint: "모임 후",
       done: false,
     },
   ];
@@ -113,7 +113,7 @@ export function PrepCard({
           />
           <div style={{ minWidth: 0, overflowWrap: "anywhere" }}>
             <div className="rm-prep-card__meta-line">
-              <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
+              <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 모임" />
             </div>
             <h2 className="h3 editorial rm-prep-card__title">{bookTitle}</h2>
             <p className="small" style={{ margin: "2px 0 0" }}>
@@ -134,7 +134,7 @@ export function PrepCard({
           {canViewPersonalState ? (
             <>
               <span aria-hidden> · </span>
-              <span>현재 RSVP: {rsvpLabel(session.myRsvpStatus)}</span>
+              <span>현재 참석 응답: {rsvpLabel(session.myRsvpStatus)}</span>
             </>
           ) : null}
         </p>
@@ -144,7 +144,7 @@ export function PrepCard({
               읽기 전용
             </p>
             <p className="small" style={{ margin: "6px 0 0" }}>
-              둘러보기 멤버는 세션을 읽을 수 있고, RSVP와 읽기 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다.
+              둘러보기 멤버는 모임을 읽을 수 있고, 참석 응답과 읽기 진행률, 질문, 서평 작성은 정식 멤버에게 열립니다.
             </p>
           </div>
         ) : null}
@@ -170,7 +170,7 @@ export function PrepCard({
           className={`btn ${canWrite ? "btn-primary" : "btn-quiet"} rm-prep-card__primary`}
           LinkComponent={LinkComponent}
         >
-          세션 열기
+          모임 열기
         </Link>
         {meetingUrl ? (
           <a className="btn btn-ghost rm-prep-card__secondary" href={meetingUrl} target="_blank" rel="noreferrer">

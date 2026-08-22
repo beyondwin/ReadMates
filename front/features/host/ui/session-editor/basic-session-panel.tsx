@@ -73,14 +73,14 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
         <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
           <div>
             <label className="label" htmlFor="session-title">
-              세션 제목
+              모임 제목
             </label>
             <input
               id="session-title"
               className="input"
               value={title}
               onChange={(event) => onTitleChange(event.target.value)}
-              placeholder="예: 8회차 모임 · 물고기는 존재하지 않는다"
+              placeholder="예: No.8 모임 · 물고기는 존재하지 않는다"
             />
           </div>
           <div className="grid-2">
@@ -252,7 +252,7 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
               placeholder="https://meet.google.com/..."
             />
             <div className="tiny" style={{ marginTop: "6px" }}>
-              저장 즉시 멤버의 홈과 세션 화면에 링크가 노출됩니다.
+              저장 즉시 멤버의 홈과 모임 화면에 링크가 노출됩니다.
             </div>
           </div>
           <div>
@@ -269,7 +269,7 @@ export const BasicSessionPanel = memo(function BasicSessionPanel({
           </div>
         </div>
         <div className="marginalia" style={{ marginTop: "12px" }}>
-          일정과 링크는 저장 즉시 멤버 홈과 현재 세션 화면에 반영됩니다. 자동 안내 발송은 아직 연결되지 않았습니다.
+          일정과 링크는 저장 즉시 멤버 홈과 현재 모임 화면에 반영됩니다. 자동 안내 발송은 아직 연결되지 않았습니다.
         </div>
         {previousMeetingOpen && previousOnlineMeeting && onAdoptPreviousOnlineMeeting ? (
           <PreviousOnlineMeetingDialog

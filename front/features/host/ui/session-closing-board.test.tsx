@@ -17,7 +17,7 @@ const view: SessionClosingBoardView = {
   checklist: [
     {
       id: "SESSION_CLOSED",
-      label: "세션 종료",
+      label: "모임 종료",
       detail: "닫힘",
       state: "DONE",
       stateLabel: "완료",
@@ -76,7 +76,7 @@ describe("SessionClosingBoard", () => {
     render(<SessionClosingBoard view={view} />);
 
     expect(screen.getByRole("heading", { name: "No.07 · E2E Book" })).toBeVisible();
-    expect(screen.getByText("이번 회차 다음 조치")).toBeVisible();
+    expect(screen.getByText("이번 모임 다음 조치")).toBeVisible();
     expect(screen.getByText("멤버가 지난 모임 회고로 돌아갈 알림 흐름이 아직 완성되지 않았습니다.")).toBeVisible();
     expect(screen.getByText("마감 단계")).toBeVisible();
     expect(screen.getByText("조치 필요")).toBeVisible();
