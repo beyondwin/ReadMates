@@ -31,6 +31,7 @@ class HostListEpochCoverageTest {
             "one_liner_count",
             "feedback_ready",
             "pending_rsvp_count",
+            "participation_status",
             "deleted_at",
         )
     }
@@ -43,6 +44,7 @@ class HostListEpochCoverageTest {
             "sessions.state",
             "sessions.session_date",
             "pending_rsvp_count",
+            "participation_status",
             "attention_rank",
         )
         assertThat(record.map { it.sqlToken }).contains(

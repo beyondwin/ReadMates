@@ -47,6 +47,7 @@ class ServerArchitectureInventoryTest {
                 "com/readmates/session/application/service/HostSessionTrashService.kt",
                 "com/readmates/session/application/service/HostSessionDeletionTransaction.kt",
                 "com/readmates/session/application/service/SessionMemberWriteService.kt",
+                "com/readmates/auth/application/service/MemberLifecycleService.kt",
                 "com/readmates/session/application/service/HostSessionPublicationService.kt",
                 "com/readmates/sessionrecord/application/service/SessionRecordDraftService.kt",
                 "com/readmates/sessionrecord/application/service/SessionRecordApplyService.kt",

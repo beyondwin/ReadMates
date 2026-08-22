@@ -3,6 +3,7 @@ package com.readmates.auth.adapter.out.persistence
 import com.readmates.auth.application.port.out.HostMemberListRow
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
+import com.readmates.auth.application.port.out.SessionParticipationChange
 import com.readmates.auth.domain.IllegalMemberStateTransitionException
 import com.readmates.auth.domain.MemberLifecycleStatus
 import com.readmates.auth.domain.MembershipRole
@@ -227,39 +228,45 @@ class JdbcMemberLifecycleStoreAdapter(
                 clubId.dbString(),
             ).firstOrNull()
 
+    override fun lockOpenSessionForUpdate(clubId: UUID): UUID? =
+        jdbcTemplate
+            .query(
+                """
+                select id
+                from sessions
+                where club_id = ?
+                  and deleted_at is null
+                  and state = 'OPEN'
+                order by number desc
+                limit 1
+                for update
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.uuid("id") },
+                clubId.dbString(),
+            ).firstOrNull()
+
     override fun addToCurrentSession(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    ) {
-        jdbcTemplate.update(
-            """
-            insert into session_participants (
-              id,
-              club_id,
-              session_id,
-              membership_id,
-              rsvp_status,
-              attendance_status,
-              participation_status
-            )
-            values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE')
-            on duplicate key update
-              participation_status = 'ACTIVE',
-              updated_at = utc_timestamp(6)
-            """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            clubId.dbString(),
-            sessionId.dbString(),
-            membershipId.dbString(),
-        )
-    }
+    ): SessionParticipationChange = applyParticipationStatus(clubId, sessionId, membershipId, SessionParticipationStatus.ACTIVE)
 
     override fun markRemovedFromCurrentSession(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    ) {
+    ): SessionParticipationChange = applyParticipationStatus(clubId, sessionId, membershipId, SessionParticipationStatus.REMOVED)
+
+    private fun applyParticipationStatus(
+        clubId: UUID,
+        sessionId: UUID,
+        membershipId: UUID,
+        afterStatus: SessionParticipationStatus,
+    ): SessionParticipationChange {
+        val beforeStatus = currentParticipationStatus(sessionId, membershipId)
+        val snapshotChanged =
+            (beforeStatus == SessionParticipationStatus.ACTIVE) !=
+                (afterStatus == SessionParticipationStatus.ACTIVE)
         jdbcTemplate.update(
             """
             insert into session_participants (
@@ -271,17 +278,75 @@ class JdbcMemberLifecycleStoreAdapter(
               attendance_status,
               participation_status
             )
-            values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'REMOVED')
+            values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', ?)
             on duplicate key update
-              participation_status = 'REMOVED',
+              participation_status = values(participation_status),
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             UUID.randomUUID().dbString(),
             clubId.dbString(),
             sessionId.dbString(),
             membershipId.dbString(),
+            afterStatus.name,
+        )
+        val revision =
+            if (snapshotChanged) {
+                incrementParticipantSetRevision(clubId, sessionId)
+            } else {
+                currentParticipantSetRevision(sessionId)
+            }
+        return SessionParticipationChange(
+            changed = snapshotChanged,
+            sessionId = sessionId,
+            membershipId = membershipId,
+            beforeStatus = beforeStatus ?: SessionParticipationStatus.REMOVED,
+            afterStatus = afterStatus,
+            participantSetRevision = revision,
         )
     }
+
+    private fun currentParticipationStatus(
+        sessionId: UUID,
+        membershipId: UUID,
+    ): SessionParticipationStatus? =
+        jdbcTemplate
+            .query(
+                """
+                select participation_status
+                from session_participants
+                where session_id = ?
+                  and membership_id = ?
+                """.trimIndent(),
+                { resultSet, _ -> SessionParticipationStatus.valueOf(resultSet.getString("participation_status")) },
+                sessionId.dbString(),
+                membershipId.dbString(),
+            ).firstOrNull()
+
+    private fun incrementParticipantSetRevision(
+        clubId: UUID,
+        sessionId: UUID,
+    ): Long {
+        jdbcTemplate.update(
+            """
+            update sessions
+            set participant_set_revision = participant_set_revision + 1,
+                updated_at = utc_timestamp(6)
+            where id = ?
+              and club_id = ?
+              and deleted_at is null
+            """.trimIndent(),
+            sessionId.dbString(),
+            clubId.dbString(),
+        )
+        return currentParticipantSetRevision(sessionId)
+    }
+
+    private fun currentParticipantSetRevision(sessionId: UUID): Long =
+        jdbcTemplate.queryForObject(
+            "select participant_set_revision from sessions where id = ?",
+            Long::class.java,
+            sessionId.dbString(),
+        ) ?: 0
 
     override fun findMembershipInClubForUpdate(
         clubId: UUID,

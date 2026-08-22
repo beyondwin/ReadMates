@@ -25,6 +25,8 @@ object HostListEpochInventory {
         "server/src/main/kotlin/com/readmates/session/application/service/HostSessionDeletionTransaction.kt"
     private const val MEMBER =
         "server/src/main/kotlin/com/readmates/session/application/service/SessionMemberWriteService.kt"
+    private const val AUTH_LIFECYCLE =
+        "server/src/main/kotlin/com/readmates/auth/application/service/MemberLifecycleService.kt"
     private const val RECORD_DRAFT =
         "server/src/main/kotlin/com/readmates/sessionrecord/application/service/SessionRecordDraftService.kt"
     private const val RECORD_APPLY =
@@ -60,7 +62,21 @@ object HostListEpochInventory {
             source("highlight_count", setOf(Mode.RECORD), setOf(HostListEpochKind.RECORD), RECORD_APPLY),
             source("one_liner_count", setOf(Mode.RECORD), setOf(HostListEpochKind.RECORD), MEMBER, RECORD_APPLY),
             source("feedback_ready", setOf(Mode.RECORD), setOf(HostListEpochKind.RECORD), RECORD_APPLY),
-            source("pending_rsvp_count", setOf(Mode.MEETING), setOf(HostListEpochKind.MEETING), MEMBER),
+            source(
+                "participation_status",
+                setOf(Mode.MEETING),
+                setOf(HostListEpochKind.MEETING),
+                LIFECYCLE,
+                AUTH_LIFECYCLE,
+            ),
+            source(
+                "pending_rsvp_count",
+                setOf(Mode.MEETING),
+                setOf(HostListEpochKind.MEETING),
+                MEMBER,
+                LIFECYCLE,
+                AUTH_LIFECYCLE,
+            ),
             source("deleted_at", bothModes, bothKinds, DELETION, TRASH),
         )
 

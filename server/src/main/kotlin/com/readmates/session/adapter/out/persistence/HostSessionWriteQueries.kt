@@ -13,9 +13,15 @@ import com.readmates.session.domain.SessionExposure
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.utcOffsetDateTime
 import com.readmates.shared.db.uuid
+import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import java.util.UUID
+
+internal data class LockedSessionRow(
+    val sessionId: UUID,
+    val state: String,
+)
 
 internal class HostSessionWriteQueries(
     private val jdbcTemplate: JdbcTemplate,
@@ -27,6 +33,86 @@ internal class HostSessionWriteQueries(
             String::class.java,
             clubId.dbString(),
         )
+    }
+
+    fun lockSession(
+        clubId: UUID,
+        sessionId: UUID,
+    ): LockedSessionRow? =
+        jdbcTemplate
+            .query(
+                """
+                select id, state
+                from sessions
+                where id = ?
+                  and club_id = ?
+                  and deleted_at is null
+                for update
+                """.trimIndent(),
+                { resultSet, _ ->
+                    LockedSessionRow(
+                        sessionId = resultSet.uuid("id"),
+                        state = resultSet.getString("state"),
+                    )
+                },
+                sessionId.dbString(),
+                clubId.dbString(),
+            ).firstOrNull()
+
+    fun lockCurrentOpenSession(clubId: UUID): LockedSessionRow? =
+        jdbcTemplate
+            .query(
+                """
+                select id, state
+                from sessions
+                where club_id = ?
+                  and deleted_at is null
+                  and state = 'OPEN'
+                order by number desc
+                limit 1
+                for update
+                """.trimIndent(),
+                { resultSet, _ ->
+                    LockedSessionRow(
+                        sessionId = resultSet.uuid("id"),
+                        state = resultSet.getString("state"),
+                    )
+                },
+                clubId.dbString(),
+            ).firstOrNull()
+
+    fun requireActiveClubAndMembership(
+        clubId: UUID,
+        membershipId: UUID,
+        hostRequired: Boolean,
+    ) {
+        val row =
+            jdbcTemplate
+                .query(
+                    """
+                    select clubs.status as club_status, memberships.role, memberships.status as membership_status
+                    from clubs
+                    join memberships on memberships.club_id = clubs.id
+                    where clubs.id = ?
+                      and memberships.id = ?
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        Triple(
+                            resultSet.getString("club_status"),
+                            resultSet.getString("role"),
+                            resultSet.getString("membership_status"),
+                        )
+                    },
+                    clubId.dbString(),
+                    membershipId.dbString(),
+                ).firstOrNull()
+                ?: throw AccessDeniedException("Approved active membership is required")
+        if (row.first != "ACTIVE" || row.third != "ACTIVE") {
+            throw AccessDeniedException("Approved active membership is required")
+        }
+        if (hostRequired && row.second != "HOST") {
+            throw AccessDeniedException("Host role required")
+        }
     }
 
     fun nextSessionNumber(clubId: UUID): Int =

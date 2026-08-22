@@ -100,7 +100,7 @@ class HostMemberApprovalControllerTest(
     }
 
     @Test
-    fun `host activates viewer member and adds them to current session`() {
+    fun `host activates viewer member without adding them to an already open snapshot`() {
         val hostCookie = sessionCookieForEmail("host@example.com")
         val sessionId = createOpenSession()
         val membershipId = insertViewerMember(uniqueEmail("viewer.activate"), "Viewer Activate")
@@ -125,20 +125,19 @@ class HostMemberApprovalControllerTest(
         assertEquals("ACTIVE", membership["status"])
         assertNotNull(membership["joined_at"])
 
-        val participant =
-            jdbcTemplate.queryForMap(
+        val participantCount =
+            jdbcTemplate.queryForObject(
                 """
-                select rsvp_status, attendance_status, participation_status
+                select count(*)
                 from session_participants
                 where session_id = ?
                   and membership_id = ?
                 """.trimIndent(),
+                Int::class.java,
                 sessionId,
                 membershipId,
-            )
-        assertEquals("NO_RESPONSE", participant["rsvp_status"])
-        assertEquals("UNKNOWN", participant["attendance_status"])
-        assertEquals("ACTIVE", participant["participation_status"])
+            ) ?: 0
+        assertEquals(0, participantCount)
     }
 
     @Test

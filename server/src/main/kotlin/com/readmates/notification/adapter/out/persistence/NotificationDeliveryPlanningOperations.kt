@@ -432,26 +432,20 @@ internal class NotificationDeliveryPlanningOperations(
             """
                 ManualNotificationAudience.SESSION_PARTICIPANTS ->
                     """
-                select memberships.id
-                from memberships
-                join session_participants on session_participants.membership_id = memberships.id
-                  and session_participants.club_id = memberships.club_id
-                  and session_participants.session_id = ?
+                select session_participants.membership_id as id
+                from session_participants
+                where session_participants.session_id = ?
+                  and session_participants.club_id = ?
                   and session_participants.participation_status = 'ACTIVE'
-                where memberships.club_id = ?
-                  and memberships.status = 'ACTIVE'
             """
                 ManualNotificationAudience.CONFIRMED_ATTENDEES ->
                     """
-                select memberships.id
-                from memberships
-                join session_participants on session_participants.membership_id = memberships.id
-                  and session_participants.club_id = memberships.club_id
-                  and session_participants.session_id = ?
+                select session_participants.membership_id as id
+                from session_participants
+                where session_participants.session_id = ?
+                  and session_participants.club_id = ?
                   and session_participants.participation_status = 'ACTIVE'
                   and session_participants.attendance_status = 'ATTENDED'
-                where memberships.club_id = ?
-                  and memberships.status = 'ACTIVE'
             """
                 ManualNotificationAudience.SELECTED_MEMBERS ->
                     return activeMembershipIds(jdbcTemplate, message.clubId, manual.selectedMembershipIds.orEmpty())

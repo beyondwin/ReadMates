@@ -16,6 +16,7 @@ import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.listing.application.model.HostListEpochKind
 import com.readmates.shared.listing.application.port.out.HostListEpochPort
 import com.readmates.shared.listing.application.port.out.bump
+import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 
@@ -31,41 +32,61 @@ class SessionMemberWriteService(
     SaveReviewUseCase {
     @Transactional
     override fun updateRsvp(command: UpdateRsvpCommand) =
-        writePort.updateRsvp(command).also {
-            epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
+        writeAfterLock(command.member) {
+            writePort.updateRsvp(command).also {
+                epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
+            }
         }
 
     @Transactional
     override fun saveCheckin(command: SaveCheckinCommand) =
-        writePort.saveCheckin(command).also {
-            epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
+        writeAfterLock(command.member) {
+            writePort.saveCheckin(command).also {
+                epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
+            }
         }
 
     @Transactional
     override fun saveQuestion(command: SaveQuestionCommand) =
-        writePort.saveQuestion(command).also {
-            epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
-            cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+        writeAfterLock(command.member) {
+            writePort.saveQuestion(command).also {
+                epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
+                cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+            }
         }
 
     @Transactional
     override fun replaceQuestions(command: ReplaceQuestionsCommand) =
-        writePort.replaceQuestions(command).also {
-            epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
-            cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+        writeAfterLock(command.member) {
+            writePort.replaceQuestions(command).also {
+                epochPort.bump(command.member.clubId, HostListEpochKind.MEETING)
+                cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+            }
         }
 
     @Transactional
     override fun saveOneLineReview(command: SaveOneLineReviewCommand) =
-        writePort.saveOneLineReview(command).also {
-            epochPort.bump(command.member.clubId, HostListEpochKind.RECORD)
-            cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+        writeAfterLock(command.member) {
+            writePort.saveOneLineReview(command).also {
+                epochPort.bump(command.member.clubId, HostListEpochKind.RECORD)
+                cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+            }
         }
 
     @Transactional
     override fun saveLongReview(command: SaveLongReviewCommand) =
-        writePort.saveLongReview(command).also {
-            epochPort.bump(command.member.clubId, HostListEpochKind.RECORD)
-            cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+        writeAfterLock(command.member) {
+            writePort.saveLongReview(command).also {
+                epochPort.bump(command.member.clubId, HostListEpochKind.RECORD)
+                cacheInvalidation.evictClubContentAfterCommit(command.member.clubId)
+            }
         }
+
+    private fun <T> writeAfterLock(
+        member: CurrentMember,
+        write: () -> T,
+    ): T {
+        writePort.lockOpenSession(member)
+        return write()
+    }
 }

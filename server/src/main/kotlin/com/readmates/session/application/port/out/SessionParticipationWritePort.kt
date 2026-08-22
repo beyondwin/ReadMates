@@ -12,8 +12,12 @@ import com.readmates.session.application.model.SaveLongReviewCommand
 import com.readmates.session.application.model.SaveOneLineReviewCommand
 import com.readmates.session.application.model.SaveQuestionCommand
 import com.readmates.session.application.model.UpdateRsvpCommand
+import com.readmates.shared.security.CurrentMember
+import java.util.UUID
 
 interface SessionParticipationWritePort {
+    fun lockOpenSession(member: CurrentMember): UUID
+
     fun updateRsvp(command: UpdateRsvpCommand): RsvpResult
 
     fun saveCheckin(command: SaveCheckinCommand): CheckinResult

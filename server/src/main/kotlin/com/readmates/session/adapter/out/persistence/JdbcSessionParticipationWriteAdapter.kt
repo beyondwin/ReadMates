@@ -17,6 +17,7 @@ import com.readmates.session.application.model.SaveQuestionCommand
 import com.readmates.session.application.model.UpdateRsvpCommand
 import com.readmates.session.application.port.out.SessionParticipationWritePort
 import com.readmates.shared.db.dbString
+import com.readmates.shared.db.uuid
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
@@ -34,6 +35,47 @@ private data class CurrentQuestionTarget(
 class JdbcSessionParticipationWriteAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : SessionParticipationWritePort {
+    override fun lockOpenSession(member: CurrentMember): UUID {
+        requireWritableMember(member)
+        val sessionId =
+            jdbcTemplate
+                .query(
+                    """
+                    select id
+                    from sessions
+                    where club_id = ?
+                      and deleted_at is null
+                      and state = 'OPEN'
+                    order by number desc
+                    limit 1
+                    for update
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.uuid("id") },
+                    member.clubId.dbString(),
+                ).firstOrNull() ?: throw CurrentSessionNotOpenException()
+        val authority =
+            jdbcTemplate
+                .query(
+                    """
+                    select clubs.status as club_status, memberships.status as membership_status
+                    from clubs
+                    join memberships on memberships.club_id = clubs.id
+                    where clubs.id = ?
+                      and memberships.id = ?
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        resultSet.getString("club_status") == "ACTIVE" &&
+                            resultSet.getString("membership_status") == "ACTIVE"
+                    },
+                    member.clubId.dbString(),
+                    member.membershipId.dbString(),
+                ).firstOrNull() == true
+        if (!authority) {
+            throw AccessDeniedException("Approved active membership is required")
+        }
+        return sessionId
+    }
+
     override fun updateRsvp(command: UpdateRsvpCommand): RsvpResult {
         val result = updateMemberRsvp(command.member, command.status)
         return RsvpResult(status = result.getValue("status"))
@@ -85,32 +127,25 @@ class JdbcSessionParticipationWriteAdapter(
         member: CurrentMember,
         status: String,
     ): Map<String, String> {
-        requireWritableMember(member)
+        val sessionId = lockOpenSession(member)
         val updated =
             jdbcTemplate.update(
                 """
                 update session_participants
                 set rsvp_status = ?,
                     updated_at = utc_timestamp(6)
-                where session_id = (
-                    select sessions.id
-                    from active_sessions sessions
-                    where sessions.club_id = ?
-                      and sessions.state = 'OPEN'
-                    order by sessions.number desc
-                    limit 1
-                  )
+                where session_id = ?
                   and membership_id = ?
                   and club_id = ?
                   and participation_status = 'ACTIVE'
                 """.trimIndent(),
                 status,
-                member.clubId.dbString(),
+                sessionId.dbString(),
                 member.membershipId.dbString(),
                 member.clubId.dbString(),
             )
         if (updated == 0) {
-            throwCurrentSessionWriteException(jdbcTemplate, member)
+            throwCurrentSessionWriteException(member, sessionId)
         }
 
         return mapOf("status" to status)
@@ -120,7 +155,7 @@ class JdbcSessionParticipationWriteAdapter(
         member: CurrentMember,
         readingProgress: Int,
     ): Map<String, Any> {
-        requireWritableMember(member)
+        val sessionId = lockOpenSession(member)
         val updated =
             jdbcTemplate.update(
                 """
@@ -133,20 +168,13 @@ class JdbcSessionParticipationWriteAdapter(
                 )
                 select
                   ?,
-                  current_session.club_id,
-                  current_session.id,
+                  session_participants.club_id,
+                  session_participants.session_id,
                   session_participants.membership_id,
                   ?
-                from (
-                  select id, club_id
-                  from active_sessions sessions
-                  where club_id = ?
-                    and state = 'OPEN'
-                  order by number desc
-                  limit 1
-                ) current_session
-                join session_participants on session_participants.session_id = current_session.id
-                  and session_participants.club_id = current_session.club_id
+                from session_participants
+                where session_participants.session_id = ?
+                  and session_participants.club_id = ?
                   and session_participants.membership_id = ?
                   and session_participants.participation_status = 'ACTIVE'
                 on duplicate key update
@@ -155,11 +183,12 @@ class JdbcSessionParticipationWriteAdapter(
                 """.trimIndent(),
                 UUID.randomUUID().dbString(),
                 readingProgress,
+                sessionId.dbString(),
                 member.clubId.dbString(),
                 member.membershipId.dbString(),
             )
         if (updated == 0) {
-            throwCurrentSessionWriteException(jdbcTemplate, member)
+            throwCurrentSessionWriteException(member, sessionId)
         }
 
         return mapOf("readingProgress" to readingProgress)
@@ -171,7 +200,7 @@ class JdbcSessionParticipationWriteAdapter(
         text: String,
         draftThought: String?,
     ): Map<String, Any?> {
-        requireWritableMember(member)
+        val sessionId = lockOpenSession(member)
         val updated =
             jdbcTemplate.update(
                 """
@@ -186,22 +215,15 @@ class JdbcSessionParticipationWriteAdapter(
                 )
                 select
                   ?,
-                  current_session.club_id,
-                  current_session.id,
+                  session_participants.club_id,
+                  session_participants.session_id,
                   session_participants.membership_id,
                   ?,
                   ?,
                   ?
-                from (
-                  select id, club_id
-                  from active_sessions sessions
-                  where club_id = ?
-                    and state = 'OPEN'
-                  order by number desc
-                  limit 1
-                ) current_session
-                join session_participants on session_participants.session_id = current_session.id
-                  and session_participants.club_id = current_session.club_id
+                from session_participants
+                where session_participants.session_id = ?
+                  and session_participants.club_id = ?
                   and session_participants.membership_id = ?
                   and session_participants.participation_status = 'ACTIVE'
                 on duplicate key update
@@ -213,11 +235,12 @@ class JdbcSessionParticipationWriteAdapter(
                 priority,
                 text,
                 draftThought,
+                sessionId.dbString(),
                 member.clubId.dbString(),
                 member.membershipId.dbString(),
             )
         if (updated == 0) {
-            throwCurrentSessionWriteException(jdbcTemplate, member)
+            throwCurrentSessionWriteException(member, sessionId)
         }
 
         return mapOf("priority" to priority, "text" to text, "draftThought" to draftThought)
@@ -228,7 +251,7 @@ class JdbcSessionParticipationWriteAdapter(
         member: CurrentMember,
         replacements: List<ReplaceQuestionCommandItem>,
     ): Map<String, Any> {
-        requireWritableMember(member)
+        val sessionId = lockOpenSession(member)
         val questions = replacements.map { it.copy(text = it.text.trim()) }
         if (
             questions.size > 5 ||
@@ -243,19 +266,12 @@ class JdbcSessionParticipationWriteAdapter(
                 .query(
                     """
                     select
-                      current_session.id as session_id,
-                      current_session.club_id as club_id,
+                      session_participants.session_id as session_id,
+                      session_participants.club_id as club_id,
                       session_participants.membership_id as membership_id
-                    from (
-                      select id, club_id
-                      from active_sessions sessions
-                      where club_id = ?
-                        and state = 'OPEN'
-                      order by number desc
-                      limit 1
-                    ) current_session
-                    join session_participants on session_participants.session_id = current_session.id
-                      and session_participants.club_id = current_session.club_id
+                    from session_participants
+                    where session_participants.session_id = ?
+                      and session_participants.club_id = ?
                       and session_participants.membership_id = ?
                       and session_participants.participation_status = 'ACTIVE'
                     """.trimIndent(),
@@ -266,9 +282,10 @@ class JdbcSessionParticipationWriteAdapter(
                             membershipId = resultSet.getString("membership_id"),
                         )
                     },
+                    sessionId.dbString(),
                     member.clubId.dbString(),
                     member.membershipId.dbString(),
-                ).firstOrNull() ?: throwCurrentSessionWriteException(jdbcTemplate, member)
+                ).firstOrNull() ?: throwCurrentSessionWriteException(member, sessionId)
 
         jdbcTemplate.update(
             """
@@ -321,22 +338,16 @@ class JdbcSessionParticipationWriteAdapter(
         member: CurrentMember,
         text: String,
     ): Map<String, String> {
-        requireWritableMember(member)
+        val sessionId = lockOpenSession(member)
         val updated =
             jdbcTemplate.update(
                 """
                 insert into one_line_reviews (id, club_id, session_id, membership_id, text, visibility)
-                select ?, current_session.club_id, current_session.id, session_participants.membership_id, ?, 'PUBLIC'
-                from (
-                  select id, club_id
-                  from active_sessions sessions
-                  where club_id = ?
-                    and state = 'OPEN'
-                  order by number desc
-                  limit 1
-                ) current_session
-                join session_participants on session_participants.session_id = current_session.id
-                  and session_participants.club_id = current_session.club_id
+                select ?, session_participants.club_id, session_participants.session_id,
+                       session_participants.membership_id, ?, 'PUBLIC'
+                from session_participants
+                where session_participants.session_id = ?
+                  and session_participants.club_id = ?
                   and session_participants.membership_id = ?
                   and session_participants.participation_status = 'ACTIVE'
                 on duplicate key update
@@ -346,11 +357,12 @@ class JdbcSessionParticipationWriteAdapter(
                 """.trimIndent(),
                 UUID.randomUUID().dbString(),
                 text,
+                sessionId.dbString(),
                 member.clubId.dbString(),
                 member.membershipId.dbString(),
             )
         if (updated == 0) {
-            throwCurrentSessionWriteException(jdbcTemplate, member)
+            throwCurrentSessionWriteException(member, sessionId)
         }
 
         return mapOf("text" to text)
@@ -360,25 +372,18 @@ class JdbcSessionParticipationWriteAdapter(
         member: CurrentMember,
         body: String,
     ): Map<String, String> {
-        requireWritableMember(member)
+        val sessionId = lockOpenSession(member)
         val target =
             jdbcTemplate
                 .query(
                     """
                     select
-                      current_session.id as session_id,
-                      current_session.club_id as club_id,
+                      session_participants.session_id as session_id,
+                      session_participants.club_id as club_id,
                       session_participants.membership_id as membership_id
-                    from (
-                      select id, club_id
-                      from active_sessions sessions
-                      where club_id = ?
-                        and state = 'OPEN'
-                      order by number desc
-                      limit 1
-                    ) current_session
-                    join session_participants on session_participants.session_id = current_session.id
-                      and session_participants.club_id = current_session.club_id
+                    from session_participants
+                    where session_participants.session_id = ?
+                      and session_participants.club_id = ?
                       and session_participants.membership_id = ?
                       and session_participants.participation_status = 'ACTIVE'
                     """.trimIndent(),
@@ -389,9 +394,10 @@ class JdbcSessionParticipationWriteAdapter(
                             membershipId = resultSet.getString("membership_id"),
                         )
                     },
+                    sessionId.dbString(),
                     member.clubId.dbString(),
                     member.membershipId.dbString(),
-                ).firstOrNull() ?: throwCurrentSessionWriteException(jdbcTemplate, member)
+                ).firstOrNull() ?: throwCurrentSessionWriteException(member, sessionId)
 
         if (body.isBlank()) {
             jdbcTemplate.update(
@@ -425,7 +431,7 @@ class JdbcSessionParticipationWriteAdapter(
                 body,
             )
         if (updated == 0) {
-            throwCurrentSessionWriteException(jdbcTemplate, member)
+            throwCurrentSessionWriteException(member, UUID.fromString(target.sessionId))
         }
 
         return mapOf("body" to body)
@@ -438,38 +444,31 @@ class JdbcSessionParticipationWriteAdapter(
     }
 
     private fun throwCurrentSessionWriteException(
-        jdbcTemplate: JdbcTemplate,
         member: CurrentMember,
+        sessionId: UUID,
     ): Nothing {
-        if (isRemovedFromCurrentOpenSession(jdbcTemplate, member)) {
+        if (isRemovedFromSession(member, sessionId)) {
             throw AccessDeniedException("Current session participation is required")
         }
         throw CurrentSessionNotOpenException()
     }
 
-    private fun isRemovedFromCurrentOpenSession(
-        jdbcTemplate: JdbcTemplate,
+    private fun isRemovedFromSession(
         member: CurrentMember,
+        sessionId: UUID,
     ): Boolean =
         jdbcTemplate
             .queryForObject(
                 """
                 select count(*)
                 from session_participants
-                where session_participants.session_id = (
-                    select sessions.id
-                    from active_sessions sessions
-                    where sessions.club_id = ?
-                      and sessions.state = 'OPEN'
-                    order by sessions.number desc
-                    limit 1
-                  )
+                where session_participants.session_id = ?
                   and session_participants.club_id = ?
                   and session_participants.membership_id = ?
                   and session_participants.participation_status = 'REMOVED'
                 """.trimIndent(),
                 Int::class.java,
-                member.clubId.dbString(),
+                sessionId.dbString(),
                 member.clubId.dbString(),
                 member.membershipId.dbString(),
             )?.let { it > 0 } ?: false

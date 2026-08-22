@@ -21,6 +21,15 @@ data class LifecycleMembershipRow(
     val status: MembershipStatus,
 )
 
+data class SessionParticipationChange(
+    val changed: Boolean,
+    val sessionId: UUID,
+    val membershipId: UUID,
+    val beforeStatus: SessionParticipationStatus,
+    val afterStatus: SessionParticipationStatus,
+    val participantSetRevision: Long,
+)
+
 data class HostMemberListRow(
     val membershipId: UUID,
     val userId: UUID,
@@ -67,17 +76,19 @@ interface MemberLifecycleStorePort {
 
     fun findCurrentOpenSessionId(clubId: UUID): UUID?
 
+    fun lockOpenSessionForUpdate(clubId: UUID): UUID?
+
     fun addToCurrentSession(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    )
+    ): SessionParticipationChange
 
     fun markRemovedFromCurrentSession(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    )
+    ): SessionParticipationChange
 
     fun findMembershipInClubForUpdate(
         clubId: UUID,

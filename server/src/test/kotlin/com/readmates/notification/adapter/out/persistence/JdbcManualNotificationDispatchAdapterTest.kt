@@ -245,6 +245,59 @@ class JdbcManualNotificationDispatchAdapterTest(
     }
 
     @Test
+    fun `SESSION_PARTICIPANTS uses the active participant snapshot and participant set revision`() {
+        val removedMembershipId = membershipId("member1@example.com")
+        val originalParticipation = participantStatus("participation_status", removedMembershipId)
+        val originalRevision =
+            jdbcTemplate.queryForObject(
+                "select participant_set_revision from sessions where id = ?",
+                Long::class.java,
+                sessionId.toString(),
+            ) ?: 0
+        try {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set participation_status = 'REMOVED'
+                where club_id = ? and session_id = ? and membership_id = ?
+                """.trimIndent(),
+                clubId.toString(),
+                sessionId.toString(),
+                removedMembershipId.toString(),
+            )
+            jdbcTemplate.update(
+                "update sessions set participant_set_revision = ? where id = ?",
+                originalRevision + 1,
+                sessionId.toString(),
+            )
+            val snapshot =
+                adapter.previewTargets(
+                    clubId,
+                    selection().copy(audience = ManualNotificationAudience.SESSION_PARTICIPANTS),
+                )
+            assertThat(snapshot.targetMembershipIds).doesNotContain(removedMembershipId)
+            assertThat(snapshot.audienceRevision).isEqualTo("participantSet:${originalRevision + 1}")
+        } finally {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set participation_status = ?
+                where club_id = ? and session_id = ? and membership_id = ?
+                """.trimIndent(),
+                originalParticipation,
+                clubId.toString(),
+                sessionId.toString(),
+                removedMembershipId.toString(),
+            )
+            jdbcTemplate.update(
+                "update sessions set participant_set_revision = ? where id = ?",
+                originalRevision,
+                sessionId.toString(),
+            )
+        }
+    }
+
+    @Test
     fun `previewTargets restricts selected members to active same club memberships`() {
         val selected = listOf(membershipId("member1@example.com"), membershipId("member2@example.com"))
         val foreignMembership = UUID.nameUUIDFromBytes("foreign-membership".toByteArray())
@@ -260,6 +313,56 @@ class JdbcManualNotificationDispatchAdapterTest(
 
         assertThat(snapshot.targetMembershipIds).containsExactlyInAnyOrderElementsOf(selected)
         assertThat(snapshot.finalTargetCount).isEqualTo(selected.size)
+    }
+
+    @Test
+    fun `CONFIRMED_ATTENDEES snapshot hash consumes attendance revisions`() {
+        val attendeeId = membershipId("host@example.com")
+        val originalRevision =
+            jdbcTemplate.queryForObject(
+                """
+                select attendance_revision
+                from session_participants
+                where session_id = ? and membership_id = ?
+                """.trimIndent(),
+                Long::class.java,
+                sessionId.toString(),
+                attendeeId.toString(),
+            ) ?: 0
+        val before =
+            adapter.previewTargets(
+                clubId,
+                selection().copy(audience = ManualNotificationAudience.CONFIRMED_ATTENDEES),
+            )
+        try {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set attendance_revision = attendance_revision + 1
+                where session_id = ? and membership_id = ?
+                """.trimIndent(),
+                sessionId.toString(),
+                attendeeId.toString(),
+            )
+            val after =
+                adapter.previewTargets(
+                    clubId,
+                    selection().copy(audience = ManualNotificationAudience.CONFIRMED_ATTENDEES),
+                )
+            assertThat(after.audienceRevision).isNotEqualTo(before.audienceRevision)
+            assertThat(after.snapshotHash()).isNotEqualTo(before.snapshotHash())
+        } finally {
+            jdbcTemplate.update(
+                """
+                update session_participants
+                set attendance_revision = ?
+                where session_id = ? and membership_id = ?
+                """.trimIndent(),
+                originalRevision,
+                sessionId.toString(),
+                attendeeId.toString(),
+            )
+        }
     }
 
     @Test

@@ -11,10 +11,16 @@ import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
+import com.readmates.auth.application.port.out.SessionParticipationChange
 import com.readmates.auth.application.toHostMemberListItem
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.session.application.port.out.SessionParticipantAuditPort
+import com.readmates.session.application.port.out.SessionParticipantChangeAuditEntry
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
 import com.readmates.shared.paging.CursorPage
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.ClubActor
@@ -27,6 +33,8 @@ import java.util.UUID
 class MemberLifecycleService(
     private val memberLifecycleStore: MemberLifecycleStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
+    private val participantAudit: SessionParticipantAuditPort = SessionParticipantAuditPort.Noop(),
 ) : ManageMemberLifecycleUseCase,
     LeaveMembershipUseCase {
     override fun listMembers(
@@ -58,7 +66,8 @@ class MemberLifecycleService(
             throw lifecycleConflict("Member could not be suspended")
         }
 
-        val policyResult = applyCurrentSessionPolicy(host.clubId, membershipId, request.currentSessionPolicy)
+        val policyResult =
+            applyCurrentSessionPolicy(host.membershipId, host.clubId, membershipId, request.currentSessionPolicy)
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
             currentSessionPolicyResult = policyResult,
@@ -104,7 +113,8 @@ class MemberLifecycleService(
             throw lifecycleConflict("Member could not be deactivated")
         }
 
-        val policyResult = applyCurrentSessionPolicy(host.clubId, membershipId, request.currentSessionPolicy)
+        val policyResult =
+            applyCurrentSessionPolicy(host.membershipId, host.clubId, membershipId, request.currentSessionPolicy)
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
             currentSessionPolicyResult = policyResult,
@@ -124,12 +134,16 @@ class MemberLifecycleService(
         }
 
         val openSessionId =
-            memberLifecycleStore.findCurrentOpenSessionId(host.clubId)
+            memberLifecycleStore.lockOpenSessionForUpdate(host.clubId)
                 ?: return MemberLifecycleResponse(
                     member = findHostMemberListItem(host, membershipId),
                     currentSessionPolicyResult = CurrentSessionPolicyResult.NOT_APPLICABLE,
                 )
-        memberLifecycleStore.addToCurrentSession(host.clubId, openSessionId, membershipId)
+        recordParticipationChange(
+            actorMembershipId = host.membershipId,
+            clubId = host.clubId,
+            change = memberLifecycleStore.addToCurrentSession(host.clubId, openSessionId, membershipId),
+        )
 
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
@@ -146,12 +160,16 @@ class MemberLifecycleService(
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         ensureMutableMembership(host, membershipId)
         val openSessionId =
-            memberLifecycleStore.findCurrentOpenSessionId(host.clubId)
+            memberLifecycleStore.lockOpenSessionForUpdate(host.clubId)
                 ?: return MemberLifecycleResponse(
                     member = findHostMemberListItem(host, membershipId),
                     currentSessionPolicyResult = CurrentSessionPolicyResult.NOT_APPLICABLE,
                 )
-        memberLifecycleStore.markRemovedFromCurrentSession(host.clubId, openSessionId, membershipId)
+        recordParticipationChange(
+            actorMembershipId = host.membershipId,
+            clubId = host.clubId,
+            change = memberLifecycleStore.markRemovedFromCurrentSession(host.clubId, openSessionId, membershipId),
+        )
 
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
@@ -180,6 +198,7 @@ class MemberLifecycleService(
 
         val policyResult =
             applyCurrentSessionPolicy(
+                actor.membershipId,
                 actor.clubId,
                 actor.membershipId,
                 request.currentSessionPolicy,
@@ -210,18 +229,43 @@ class MemberLifecycleService(
     }
 
     private fun applyCurrentSessionPolicy(
+        actorMembershipId: UUID,
         clubId: UUID,
         membershipId: UUID,
         policy: CurrentSessionPolicy,
     ): CurrentSessionPolicyResult {
         val openSessionId =
-            memberLifecycleStore.findCurrentOpenSessionId(clubId)
+            memberLifecycleStore.lockOpenSessionForUpdate(clubId)
                 ?: return CurrentSessionPolicyResult.NOT_APPLICABLE
         if (policy == CurrentSessionPolicy.NEXT_SESSION) {
             return CurrentSessionPolicyResult.DEFERRED
         }
-        memberLifecycleStore.markRemovedFromCurrentSession(clubId, openSessionId, membershipId)
+        recordParticipationChange(
+            actorMembershipId = actorMembershipId,
+            clubId = clubId,
+            change = memberLifecycleStore.markRemovedFromCurrentSession(clubId, openSessionId, membershipId),
+        )
         return CurrentSessionPolicyResult.APPLIED
+    }
+
+    private fun recordParticipationChange(
+        actorMembershipId: UUID,
+        clubId: UUID,
+        change: SessionParticipationChange,
+    ) {
+        if (!change.changed) return
+        participantAudit.record(
+            SessionParticipantChangeAuditEntry(
+                actorMembershipId = actorMembershipId,
+                clubId = clubId,
+                sessionId = change.sessionId,
+                membershipId = change.membershipId,
+                beforeStatus = change.beforeStatus,
+                afterStatus = change.afterStatus,
+                participantSetRevision = change.participantSetRevision,
+            ),
+        )
+        epochPort.bump(clubId, HostListEpochKind.MEETING)
     }
 
     private fun findHostMemberListItem(

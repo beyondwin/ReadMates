@@ -205,17 +205,33 @@ class MemberLifecycleServiceTest {
 
         override fun findCurrentOpenSessionId(clubId: UUID): UUID? = null
 
+        override fun lockOpenSessionForUpdate(clubId: UUID): UUID? = null
+
         override fun addToCurrentSession(
             clubId: UUID,
             sessionId: UUID,
             membershipId: UUID,
-        ) = Unit
+        ) = com.readmates.auth.application.port.out.SessionParticipationChange(
+            changed = false,
+            sessionId = sessionId,
+            membershipId = membershipId,
+            beforeStatus = SessionParticipationStatus.REMOVED,
+            afterStatus = SessionParticipationStatus.ACTIVE,
+            participantSetRevision = 0,
+        )
 
         override fun markRemovedFromCurrentSession(
             clubId: UUID,
             sessionId: UUID,
             membershipId: UUID,
-        ) = Unit
+        ) = com.readmates.auth.application.port.out.SessionParticipationChange(
+            changed = false,
+            sessionId = sessionId,
+            membershipId = membershipId,
+            beforeStatus = SessionParticipationStatus.ACTIVE,
+            afterStatus = SessionParticipationStatus.REMOVED,
+            participantSetRevision = 0,
+        )
 
         override fun findMembershipInClubForUpdate(
             clubId: UUID,
