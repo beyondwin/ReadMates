@@ -4,6 +4,27 @@ import type { PlatformAdminRole } from "@/features/platform-admin/api/platform-a
 import type { PlatformHealthSnapshotResponse } from "@/features/platform-admin/api/platform-admin-health-contracts";
 import { routeEmptyAdminOperations } from "./admin-operations-e2e-fixtures";
 
+const OWNER_CAPABILITIES = [
+  "VIEW_TODAY",
+  "VIEW_CLUBS",
+  "VIEW_CLUB_OPERATIONS",
+  "VIEW_SERVICE_HEALTH",
+  "VIEW_NOTIFICATION_OPERATIONS",
+  "REPLAY_NOTIFICATIONS",
+  "VIEW_AI_OPERATIONS",
+  "MANAGE_AI_OPERATIONS",
+  "VIEW_SUPPORT",
+  "MANAGE_SUPPORT_ACCESS",
+  "VIEW_AUDIT",
+  "VIEW_SENSITIVE_AUDIT",
+  "VIEW_ANALYTICS",
+  "EXPORT_ANALYTICS",
+  "CREATE_CLUB",
+  "MANAGE_CLUBS",
+  "MANAGE_CLUB_DOMAINS",
+  "MANAGE_PLATFORM_ADMINS",
+] as const;
+
 function platformAdminAuth(role: PlatformAdminRole): AuthMeResponse {
   const email = `${role.toLowerCase()}@example.com`;
   return {
@@ -34,6 +55,15 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
 
 async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Promise<void> {
   await routeEmptyAdminOperations(page);
+  await page.route("**/api/bff/api/admin/capabilities**", async (route) => {
+    await json(route, 200, {
+      schemaVersion: 1,
+      role,
+      status: "ACTIVE",
+      capabilities: [...OWNER_CAPABILITIES],
+      generatedAt: "2026-08-22T00:00:00Z",
+    });
+  });
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, platformAdminAuth(role));
   });
@@ -189,7 +219,7 @@ test("operator views /admin/health grid", async ({ page }) => {
 
   await page.goto("/admin/health");
 
-  await expect(page.getByRole("heading", { name: "Platform Health" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "서비스 건강" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Outbox backlog" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Kafka consumer lag" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Redis" })).toBeVisible();
@@ -198,7 +228,9 @@ test("operator views /admin/health grid", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "AI provider availability" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "최근 deploy" })).toBeVisible();
   await expect(page.getByText("readmates-api:dev-20260526")).toBeVisible();
-  await expect(page.getByText("redis_metrics_unavailable")).toBeVisible();
+  await expect(
+    page.locator("article", { hasText: "Redis" }).getByText("redis_metrics_unavailable"),
+  ).toBeVisible();
   await expect(
     page.locator("article", { hasText: "Outbox backlog" }).getByRole("link", { name: /자세히/ }),
   ).toHaveAttribute("href", "/admin/notifications?focus=outbox_backlog");

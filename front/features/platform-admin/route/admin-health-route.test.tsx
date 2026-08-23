@@ -111,34 +111,65 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshotResponse = {
   ],
 };
 
+function renderRoute() {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false, refetchInterval: false } },
+  });
+  return render(
+    <QueryClientProvider client={client}>
+      <MemoryRouter>
+        <AdminHealthRoute />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
+
 describe("AdminHealthRoute", () => {
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  it("renders the full health snapshot and deploy strip", async () => {
+  it("renders the full health snapshot and deploy strip under 서비스 건강", async () => {
     const fetchSpy = vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockResolvedValueOnce(HEALTH_SNAPSHOT);
-    const client = new QueryClient();
-    const { container } = render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <AdminHealthRoute />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
-    expect(screen.getByRole("heading", { name: "Platform Health" })).toBeInTheDocument();
-    expect(await screen.findByText("Outbox backlog")).toBeInTheDocument();
+    const { container } = renderRoute();
+    expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "서비스 건강" })).toHaveClass("admin-page-frame");
+    expect(await screen.findByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
     expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
-    expect(screen.getByText("Kafka consumer lag")).toBeInTheDocument();
-    expect(screen.getByText("Redis")).toBeInTheDocument();
-    expect(screen.getByText("DB pool")).toBeInTheDocument();
-    expect(screen.getByText("Notification dispatch success")).toBeInTheDocument();
-    expect(screen.getByText("AI provider availability")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Kafka consumer lag" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "DB pool" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Notification dispatch success" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "AI provider availability" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
+    expect(screen.getByText(/생성 시각/)).toBeInTheDocument();
     expect(screen.queryByText(/NaN/)).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Platform Health" })).not.toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalled();
+  });
+
+  it("shows a loading skeleton before the first snapshot arrives", () => {
+    vi.spyOn(api, "fetchPlatformAdminHealthSnapshot").mockImplementation(() => new Promise(() => {}));
+    renderRoute();
+
+    expect(screen.getByRole("heading", { name: "서비스 건강" })).toBeInTheDocument();
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-health-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Outbox backlog")).not.toBeInTheDocument();
+  });
+
+  it("retries one unavailable card through the existing snapshot query", async () => {
+    const user = userEvent.setup();
+    const fetchSpy = vi
+      .spyOn(api, "fetchPlatformAdminHealthSnapshot")
+      .mockResolvedValue(HEALTH_SNAPSHOT);
+    renderRoute();
+
+    expect(await screen.findByRole("heading", { name: "Redis" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Redis 다시 확인" }));
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
   });
 
   it("keeps the server stale state after a successful manual refetch", async () => {
@@ -152,16 +183,7 @@ describe("AdminHealthRoute", () => {
       .spyOn(api, "fetchPlatformAdminHealthSnapshot")
       .mockResolvedValueOnce(HEALTH_SNAPSHOT)
       .mockResolvedValueOnce(staleSnapshot);
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false, refetchInterval: false } },
-    });
-    render(
-      <QueryClientProvider client={client}>
-        <MemoryRouter>
-          <AdminHealthRoute />
-        </MemoryRouter>
-      </QueryClientProvider>,
-    );
+    renderRoute();
 
     expect(await screen.findByText("정상 갱신 완료")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "새로고침" }));

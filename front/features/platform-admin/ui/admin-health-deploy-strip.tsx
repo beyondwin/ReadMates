@@ -1,4 +1,7 @@
-import type { DeployAttemptStripEntry } from "@/features/platform-admin/model/platform-admin-health-model";
+import type {
+  DeployAttemptStripEntry,
+  HealthEvidenceState,
+} from "@/features/platform-admin/model/platform-admin-health-model";
 
 const STATUS_LABEL: Record<DeployAttemptStripEntry["finalStatus"], string> = {
   SUCCEEDED: "성공",
@@ -12,8 +15,22 @@ const STATUS_DOT_CLASS: Record<DeployAttemptStripEntry["finalStatus"], string> =
   RUNNING: "admin-health-deploy-strip__dot admin-health-deploy-strip__dot--running",
 };
 
-export function AdminHealthDeployStrip({ entries }: { entries: DeployAttemptStripEntry[] }) {
-  if (entries.length === 0) {
+export type AdminHealthDeployStripProps = {
+  entries: readonly DeployAttemptStripEntry[] | null;
+  evidenceState?: HealthEvidenceState;
+};
+
+export function AdminHealthDeployStrip({
+  entries,
+  evidenceState = entries && entries.length > 0 ? "ok" : "empty",
+}: AdminHealthDeployStripProps) {
+  if (evidenceState === "unavailable") {
+    return <p className="admin-health-deploy-strip__empty">배포 원장을 확인할 수 없습니다.</p>;
+  }
+  if (evidenceState === "disabled") {
+    return <p className="admin-health-deploy-strip__empty">배포 원장이 비활성입니다.</p>;
+  }
+  if (!entries || entries.length === 0 || evidenceState === "empty") {
     return <p className="admin-health-deploy-strip__empty">아직 기록된 배포가 없습니다.</p>;
   }
   return (

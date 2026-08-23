@@ -1,10 +1,16 @@
-import { render, screen } from "@testing-library/react";
+import { readFileSync } from "node:fs";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
-import type { PlatformHealthSnapshot } from "@/features/platform-admin/model/platform-admin-health-model";
+import type {
+  HealthCard,
+  PlatformHealthSnapshot,
+} from "@/features/platform-admin/model/platform-admin-health-model";
 import { AdminHealthGrid } from "@/features/platform-admin/ui/admin-health-grid";
+
+const GLOBALS_CSS = readFileSync("src/styles/globals.css", "utf8");
 
 const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   schema: "platform.health_snapshot.v1",
@@ -109,10 +115,36 @@ const HEALTH_SNAPSHOT: PlatformHealthSnapshot = {
   ],
 };
 
-function renderGrid(
-  props: Partial<ComponentProps<typeof AdminHealthGrid>> = {},
-) {
-  const defaultProps: ComponentProps<typeof AdminHealthGrid> = {
+function unavailableCard(overrides: Partial<HealthCard>): HealthCard {
+  return {
+    id: "outbox_backlog",
+    title: "Outbox backlog",
+    status: "UNKNOWN",
+    metric: null,
+    thresholds: null,
+    lastCheckedAt: "2026-05-26T00:00:00Z",
+    source: "IN_PROCESS",
+    drill: null,
+    reason: "provider_error",
+    deployStrip: null,
+    ...overrides,
+  };
+}
+
+function snapshotWith(cards: HealthCard[], overrides: Partial<PlatformHealthSnapshot> = {}): PlatformHealthSnapshot {
+  return {
+    ...HEALTH_SNAPSHOT,
+    ...overrides,
+    cards,
+  };
+}
+
+type GridProps = ComponentProps<typeof AdminHealthGrid> & {
+  onRetryCard?: (cardId: string) => void;
+};
+
+function renderGrid(props: Partial<GridProps> = {}) {
+  const defaultProps: GridProps = {
     snapshot: HEALTH_SNAPSHOT,
     loading: false,
     error: false,
@@ -124,7 +156,7 @@ function renderGrid(
       <AdminHealthGrid {...defaultProps} {...props} />
     </MemoryRouter>,
   );
-  return { onRefresh: defaultProps.onRefresh };
+  return { onRefresh: (props.onRefresh ?? defaultProps.onRefresh) as ReturnType<typeof vi.fn> };
 }
 
 describe("AdminHealthGrid", () => {
@@ -135,14 +167,23 @@ describe("AdminHealthGrid", () => {
   it("renders six health cards plus a separate deploy strip from the seven-card snapshot", () => {
     renderGrid();
 
-    expect(screen.getByText("Outbox backlog")).toBeInTheDocument();
-    expect(screen.getByText("Kafka consumer lag")).toBeInTheDocument();
-    expect(screen.getByText("Redis")).toBeInTheDocument();
-    expect(screen.getByText("DB pool")).toBeInTheDocument();
-    expect(screen.getByText("Notification dispatch success")).toBeInTheDocument();
-    expect(screen.getByText("AI provider availability")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "partial");
+    expect(screen.getByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Kafka consumer lag" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "DB pool" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Notification dispatch success" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "AI provider availability" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
+  });
+
+  it("labels generated-at separately from last successful refresh", () => {
+    renderGrid();
+
+    const generated = screen.getByText(/생성 시각/);
+    expect(generated.closest("time")).toHaveAttribute("datetime", "2026-05-26T00:00:00Z");
+    expect(screen.getByText(/정상 갱신/)).toBeInTheDocument();
   });
 
   it("calls the refresh callback", async () => {
@@ -179,5 +220,163 @@ describe("AdminHealthGrid", () => {
 
     expect(screen.getByText("정상 갱신 완료")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "요청 중" })).toBeDisabled();
+  });
+
+  it("keeps successful cards when a partial source is unavailable", () => {
+    renderGrid();
+
+    expect(screen.getByText("일부만 확인됨")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "partial");
+    const redis = screen.getByRole("article", { name: "Redis" });
+    expect(within(redis).getByText("확인 불가")).toBeInTheDocument();
+    expect(within(redis).queryByText("정상")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Outbox backlog" })).getByText("정상")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
+  });
+
+  it("keeps card evidence when every source is unavailable", () => {
+    renderGrid({
+      snapshot: snapshotWith(HEALTH_SNAPSHOT.cards.map((item) => unavailableCard({
+        id: item.id,
+        title: item.title,
+        source: item.source,
+        drill: item.drill,
+        deployStrip: null,
+      }))),
+    });
+
+    expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "unavailable");
+    expect(screen.getByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Redis" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
+    expect(screen.getAllByText("확인 불가").length).toBeGreaterThan(1);
+    expect(document.querySelector(".admin-health-card__pill--ok")).toBeNull();
+    expect(screen.queryByText("42 rows")).not.toBeInTheDocument();
+  });
+
+  it("treats disabled Redis, Kafka, and provider as absence, not page failure", () => {
+    renderGrid({
+      snapshot: snapshotWith([
+        ...HEALTH_SNAPSHOT.cards.filter((item) => (
+          item.id !== "redis"
+          && item.id !== "kafka_consumer_lag"
+          && item.id !== "ai_provider_availability"
+        )),
+        unavailableCard({
+          id: "redis",
+          title: "Redis",
+          reason: "redis_disabled",
+        }),
+        unavailableCard({
+          id: "kafka_consumer_lag",
+          title: "Kafka consumer lag",
+          source: "PROMETHEUS",
+          reason: "kafka_disabled",
+        }),
+        unavailableCard({
+          id: "ai_provider_availability",
+          title: "AI provider availability",
+          source: "PROMETHEUS",
+          reason: "provider_disabled",
+          drill: { kind: "ADMIN_ROUTE", target: "/admin/ai-ops" },
+        }),
+      ]),
+    });
+
+    expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "ready");
+    expect(screen.queryByText("일부만 확인됨")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Redis" })).getByText("비활성")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Kafka consumer lag" })).getByText("비활성")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "AI provider availability" })).getByText("비활성")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "Redis" })).queryByText("확인 불가")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Redis 다시 확인" })).not.toBeInTheDocument();
+  });
+
+  it("aggregates an all-disabled snapshot without a green ready claim", () => {
+    renderGrid({
+      snapshot: snapshotWith(HEALTH_SNAPSHOT.cards.map((item) => unavailableCard({
+        id: item.id,
+        title: item.title,
+        source: item.source,
+        reason: `${item.id}_disabled`,
+        deployStrip: null,
+      }))),
+    });
+
+    expect(screen.getByTestId("admin-health-grid")).toHaveAttribute("data-page-state", "disabled");
+    expect(screen.getByText("비활성 구성")).toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(document.querySelector(".admin-health-card__pill--ok")).toBeNull();
+    expect(screen.getByRole("heading", { name: "Outbox backlog" })).toBeInTheDocument();
+  });
+
+  it("shows missing deploy ledger evidence without a success history", () => {
+    renderGrid({
+      snapshot: snapshotWith(
+        HEALTH_SNAPSHOT.cards.map((item) => (
+          item.id === "deploy_attempts_strip"
+            ? unavailableCard({
+                id: "deploy_attempts_strip",
+                title: "Deploy attempts",
+                source: "FILE",
+                reason: "ledger_unavailable",
+              })
+            : item
+        )),
+      ),
+    });
+
+    expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
+    expect(screen.getByText("배포 원장을 확인할 수 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText(/readmates-api:dev-20260526/)).not.toBeInTheDocument();
+    expect(document.querySelector(".admin-health-deploy-strip__dot--ok")).toBeNull();
+  });
+
+  it("still surfaces a missing deploy ledger when the card is omitted", () => {
+    renderGrid({
+      snapshot: snapshotWith(HEALTH_SNAPSHOT.cards.filter((item) => item.id !== "deploy_attempts_strip")),
+    });
+
+    expect(screen.getByRole("heading", { name: "최근 deploy" })).toBeInTheDocument();
+    expect(screen.getByText("배포 원장을 확인할 수 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("성공")).not.toBeInTheDocument();
+  });
+
+  it("retries a single unavailable card without retrying disabled or ready cards", async () => {
+    const user = userEvent.setup();
+    const onRetryCard = vi.fn();
+    renderGrid({ onRetryCard });
+
+    await user.click(screen.getByRole("button", { name: "Redis 다시 확인" }));
+    expect(onRetryCard).toHaveBeenCalledTimes(1);
+    expect(onRetryCard).toHaveBeenCalledWith("redis");
+    expect(screen.queryByRole("button", { name: "Outbox backlog 다시 확인" })).not.toBeInTheDocument();
+  });
+
+  it("renders a loading skeleton instead of a ready grid", () => {
+    renderGrid({ snapshot: null, loading: true });
+
+    expect(screen.getByRole("status")).toBeInTheDocument();
+    expect(screen.getByTestId("admin-health-skeleton")).toBeInTheDocument();
+    expect(screen.queryByText("Outbox backlog")).not.toBeInTheDocument();
+    expect(screen.queryByText("정상")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("uses an alert for transport failure without leftover green cards", () => {
+    renderGrid({ snapshot: null, loading: false, error: true });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("스냅샷을 불러오지 못했습니다");
+    expect(screen.queryByText("정상")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("admin-health-skeleton")).not.toBeInTheDocument();
+  });
+
+  it("keeps health card actions on the 44px contract and stills the skeleton", () => {
+    expect(GLOBALS_CSS).toMatch(/\.admin-health-card__drill[\s\S]*min-height:\s*44px/);
+    expect(GLOBALS_CSS).toMatch(/\.admin-health-card__retry[\s\S]*min-height:\s*44px/);
+    expect(GLOBALS_CSS).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-health-card--skeleton[\s\S]*animation:\s*none/,
+    );
   });
 });

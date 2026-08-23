@@ -17,14 +17,34 @@ function entry(overrides: Partial<DeployAttemptStripEntry> = {}): DeployAttemptS
 
 describe("AdminHealthDeployStrip", () => {
   it("renders an empty message when no deploy entries exist", () => {
-    render(<AdminHealthDeployStrip entries={[]} />);
+    render(<AdminHealthDeployStrip entries={[]} evidenceState="empty" />);
 
     expect(screen.getByText("아직 기록된 배포가 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("배포 원장을 확인할 수 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("성공")).not.toBeInTheDocument();
+  });
+
+  it("does not treat a missing ledger as an empty success history", () => {
+    render(<AdminHealthDeployStrip entries={null} evidenceState="unavailable" />);
+
+    expect(screen.getByText("배포 원장을 확인할 수 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByText("아직 기록된 배포가 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("성공")).not.toBeInTheDocument();
+    expect(document.querySelector(".admin-health-deploy-strip__dot--ok")).toBeNull();
+  });
+
+  it("treats a disabled ledger as configured absence", () => {
+    render(<AdminHealthDeployStrip entries={null} evidenceState="disabled" />);
+
+    expect(screen.getByText("배포 원장이 비활성입니다.")).toBeInTheDocument();
+    expect(screen.queryByText("배포 원장을 확인할 수 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("성공")).not.toBeInTheDocument();
   });
 
   it("renders Korean labels for succeeded, failed, and running entries", () => {
     render(
       <AdminHealthDeployStrip
+        evidenceState="ok"
         entries={[
           entry({ finalStatus: "SUCCEEDED", attemptId: "deploy-dev-001" }),
           entry({ finalStatus: "FAILED", attemptId: "deploy-dev-000", imageTag: "readmates-api:previous" }),
@@ -39,7 +59,7 @@ describe("AdminHealthDeployStrip", () => {
   });
 
   it("uses attempt id, image tag, and started timestamp as visible row context", () => {
-    const { container } = render(<AdminHealthDeployStrip entries={[entry()]} />);
+    const { container } = render(<AdminHealthDeployStrip evidenceState="ok" entries={[entry()]} />);
 
     expect(screen.getByText(/deploy-dev-001/)).toBeInTheDocument();
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();

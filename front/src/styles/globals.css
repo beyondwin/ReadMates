@@ -2223,9 +2223,24 @@ a.rm-recent-record__destination:hover {
 }
 
 .admin-health-grid__refresh:focus-visible,
-.admin-health-card__drill:focus-visible {
+.admin-health-card__drill:focus-visible,
+.admin-health-card__retry:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 3px;
+}
+
+.admin-health-grid__notice {
+  display: grid;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg-sub);
+  padding: 14px 16px;
+}
+
+.admin-health-grid__notice-title,
+.admin-health-grid__notice p {
+  margin: 0;
 }
 
 .admin-health-grid__loading,
@@ -2309,8 +2324,17 @@ a.rm-recent-record__destination:hover {
   border-color: var(--danger);
 }
 
-.admin-health-card__pill--unknown {
+.admin-health-card__pill--unknown,
+.admin-health-card__pill--unavailable,
+.admin-health-card__pill--disabled,
+.admin-health-card__pill--empty {
   border-style: dashed;
+}
+
+.admin-health-card__pill--disabled,
+.admin-health-card__pill--empty,
+.admin-health-card__pill--unavailable {
+  color: var(--text-3);
 }
 
 .admin-health-card__body {
@@ -2345,9 +2369,52 @@ a.rm-recent-record__destination:hover {
   font-size: 12px;
 }
 
+.admin-health-card__meta {
+  display: grid;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+
+.admin-health-card__meta div {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, max-content) minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: baseline;
+}
+
+.admin-health-card__meta dt {
+  color: var(--text-3);
+  font-size: var(--type-size-supporting);
+  font-weight: 700;
+}
+
+.admin-health-card__meta dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.admin-health-card--compact .admin-health-card__metric-value {
+  font-size: 22px;
+}
+
+.admin-health-card--skeleton {
+  min-height: 148px;
+  border-style: dashed;
+  background:
+    linear-gradient(
+      90deg,
+      var(--bg-sub) 0%,
+      color-mix(in oklch, var(--paper-200), var(--bg-raised) 42%) 48%,
+      var(--bg-sub) 100%
+    );
+  background-size: 220% 100%;
+  animation: rm-skeleton-sheen 1.4s var(--ease-standard-refined) infinite;
+}
+
 .admin-health-card__reason {
-  border-left: 3px solid var(--accent);
-  padding-left: 10px;
+  border-top: 1px solid var(--accent);
+  padding-top: 10px;
   color: var(--text);
   overflow-wrap: anywhere;
 }
@@ -2359,13 +2426,28 @@ a.rm-recent-record__destination:hover {
   gap: 10px;
 }
 
-.admin-health-card__drill {
+.admin-health-card__drill,
+.admin-health-card__retry {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
   color: var(--text);
   font-size: 13px;
   font-weight: 800;
+}
+
+.admin-health-card__drill {
   text-decoration: underline;
   text-underline-offset: 3px;
   white-space: nowrap;
+}
+
+.admin-health-card__retry {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--bg-raised);
+  padding: 0 12px;
+  cursor: pointer;
 }
 
 .admin-health-deploy-strip {
@@ -6002,8 +6084,11 @@ a.rm-recent-record__destination:hover {
     grid-template-columns: 1fr;
   }
 
-  .admin-health-grid__refresh {
+  .admin-health-grid__refresh,
+  .admin-health-card__drill,
+  .admin-health-card__retry {
     width: 100%;
+    min-height: 44px;
   }
 
   .admin-notifications__header,
@@ -9371,7 +9456,8 @@ a.rm-recent-record__destination:hover {
   .admin-state-panel,
   .admin-action-dock,
   .admin-modal-dialog,
-  .admin-modal-dialog * {
+  .admin-modal-dialog *,
+  .admin-health-card--skeleton {
     animation: none;
     transition: none;
     scroll-behavior: auto;
