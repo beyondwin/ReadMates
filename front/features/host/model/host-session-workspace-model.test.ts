@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   buildHostMeetingWorkspace,
+  buildHostSessionWorkspace,
   type HostMeetingWorkspaceInput,
+  type HostSessionWorkspaceInput,
 } from "./host-session-workspace-model";
 
 const baseInput = {
@@ -215,6 +217,226 @@ describe("buildHostMeetingWorkspace", () => {
 
       expect(view.lifecycle).toBe("CLOSED");
       expect(view.primaryAction).toEqual(primaryAction);
+    },
+  );
+});
+
+const compatibilityBaseInput = {
+  meetingDate: "2026-08-21",
+  today: "2026-08-20",
+  unknownAttendanceCount: 0,
+  hasRecordDraft: false,
+  recordDraftStale: false,
+  recordValidationIssueCount: 0,
+  hasAppliedRecord: false,
+  publicationReady: false,
+} satisfies Omit<HostSessionWorkspaceInput, "state">;
+
+describe("HostSessionWorkspace view compatibility until B8", () => {
+  it("keeps the exact DRAFT CTA and focus location", () => {
+    expect(buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "DRAFT",
+    })).toMatchObject({
+      statusLabel: "모임 작성 중",
+      primaryAction: { kind: "OPEN_SESSION", label: "멤버와 준비 시작", panel: "focus" },
+    });
+  });
+
+  it("keeps the exact pre-meeting OPEN response CTA and focus location", () => {
+    expect(buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "OPEN",
+      meetingDate: "2026-08-21",
+      today: "2026-08-20",
+      unknownAttendanceCount: 2,
+    })).toMatchObject({
+      statusLabel: "멤버와 준비 중",
+      primaryAction: {
+        kind: "REVIEW_MEMBER_INPUT",
+        label: "멤버 응답 확인하기",
+        panel: "focus",
+      },
+    });
+  });
+
+  it("keeps attendance current on the meeting date", () => {
+    expect(buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "OPEN",
+      meetingDate: "2026-08-21",
+      today: "2026-08-21",
+      unknownAttendanceCount: 2,
+    })).toMatchObject({
+      statusLabel: "멤버와 준비 중",
+      primaryAction: { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", panel: "attendance" },
+    });
+  });
+
+  it("keeps the finish CTA at focus once attendance is known", () => {
+    expect(buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "OPEN",
+      meetingDate: "2026-08-21",
+      today: "2026-08-22",
+      unknownAttendanceCount: 0,
+    })).toMatchObject({
+      statusLabel: "멤버와 준비 중",
+      primaryAction: { kind: "FINISH_SESSION", label: "모임 마치기", panel: "focus" },
+    });
+  });
+
+  it("keeps invalid OPEN dates on the response-review fallback", () => {
+    expect(buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "OPEN",
+      meetingDate: "08/21/2026",
+      today: "not-a-date",
+      unknownAttendanceCount: 3,
+    })).toMatchObject({
+      statusLabel: "멤버와 준비 중",
+      primaryAction: {
+        kind: "REVIEW_MEMBER_INPUT",
+        label: "멤버 응답 확인하기",
+        panel: "focus",
+      },
+    });
+  });
+
+  it.each([
+    [
+      "no draft",
+      {},
+      { kind: "UPLOAD_RECORD", label: "정리본 올리기", panel: "records" },
+    ],
+    [
+      "stale draft",
+      { hasRecordDraft: true, recordDraftStale: true },
+      { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" },
+    ],
+    [
+      "invalid draft",
+      { hasRecordDraft: true, recordValidationIssueCount: 2 },
+      { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" },
+    ],
+    [
+      "valid draft",
+      { hasRecordDraft: true },
+      { kind: "REVIEW_RECORD", label: "기록에 반영", panel: "records" },
+    ],
+  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, { kind: string; label: string; panel: string }]>) (
+    "keeps the exact CLOSED %s CTA and records location",
+    (_name, overrides, primaryAction) => {
+      expect(buildHostSessionWorkspace({
+        ...compatibilityBaseInput,
+        ...overrides,
+        state: "CLOSED",
+      })).toMatchObject({
+        statusLabel: "기록 정리 중",
+        primaryAction,
+      });
+    },
+  );
+
+  it.each([
+    ["consumed draft", { hasRecordDraft: false, hasAppliedRecord: true, publicationReady: true }, true],
+    ["ready draft", { hasRecordDraft: true, hasAppliedRecord: true, publicationReady: true }, true],
+    ["applied but blocked", { hasRecordDraft: true, hasAppliedRecord: true, publicationReady: false }, false],
+  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, boolean]>) (
+    "keeps PUBLISH_RECORD for %s and preserves publication readiness",
+    (_name, overrides, publicationReady) => {
+      expect(buildHostSessionWorkspace({
+        ...compatibilityBaseInput,
+        ...overrides,
+        state: "CLOSED",
+      })).toMatchObject({
+        statusLabel: "기록 정리 중",
+        primaryAction: {
+          kind: "PUBLISH_RECORD",
+          label: "게스트·멤버 노트에 기록 게시",
+          panel: "records",
+        },
+        publicationReady,
+      });
+    },
+  );
+
+  it("keeps the exact PUBLISHED CTA and focus location", () => {
+    expect(buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "PUBLISHED",
+      hasRecordDraft: true,
+      hasAppliedRecord: true,
+      publicationReady: true,
+    })).toMatchObject({
+      statusLabel: "게스트·멤버 노트 게시 완료",
+      primaryAction: { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", panel: "focus" },
+    });
+  });
+
+  it("never returns an automatic compatibility lifecycle transition from dates", () => {
+    const view = buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "OPEN",
+      meetingDate: "2026-08-01",
+      today: "2026-08-21",
+      unknownAttendanceCount: 0,
+    });
+    expect(view.statusLabel).toBe("멤버와 준비 중");
+    expect(view.primaryAction.kind).toBe("FINISH_SESSION");
+    expect(view.primaryAction.kind).not.toMatch(/CLOSE|PUBLISH|OPEN_SESSION/);
+  });
+
+  it.each([
+    ["finish", "2026-08-22", 0],
+    ["attendance check", "2026-08-21", 1],
+  ])("keeps the exact attendance progress positions for %s", (_name, today, unknownAttendanceCount) => {
+    expect(buildHostSessionWorkspace({
+      ...compatibilityBaseInput,
+      state: "OPEN",
+      meetingDate: "2026-08-21",
+      today,
+      unknownAttendanceCount,
+    }).progress).toEqual([
+      { id: "basic", label: "기본 정보", state: "done" },
+      { id: "members", label: "멤버 준비", state: "done" },
+      { id: "attendance", label: "출석", state: "current" },
+      { id: "records", label: "기록", state: "next" },
+      { id: "publish", label: "공개", state: "next" },
+    ]);
+  });
+
+  it.each([
+    [
+      "DRAFT",
+      {},
+      ["current", "next", "next", "next", "next"],
+    ],
+    [
+      "CLOSED record work",
+      { state: "CLOSED", hasRecordDraft: true },
+      ["done", "done", "done", "current", "next"],
+    ],
+    [
+      "CLOSED publication",
+      { state: "CLOSED", hasRecordDraft: true, hasAppliedRecord: true },
+      ["done", "done", "done", "done", "current"],
+    ],
+    [
+      "PUBLISHED",
+      { state: "PUBLISHED", hasAppliedRecord: true },
+      ["done", "done", "done", "done", "done"],
+    ],
+  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, string[]]>) (
+    "keeps the exact compatibility progress positions for %s",
+    (_name, overrides, expectedStates) => {
+      const state = overrides.state ?? "DRAFT";
+      const view = buildHostSessionWorkspace({
+        ...compatibilityBaseInput,
+        ...overrides,
+        state,
+      });
+      expect(view.progress.map(({ state: progressState }) => progressState)).toEqual(expectedStates);
     },
   );
 });

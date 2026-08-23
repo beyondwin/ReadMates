@@ -1,9 +1,16 @@
 import type {
   HostMeetingLocation,
   HostMeetingTask,
+  HostSessionWorkspaceLocation,
+  HostSessionWorkspacePanel,
 } from "./host-session-workspace-model";
 
-export type { HostMeetingLocation, HostMeetingTask };
+export type {
+  HostMeetingLocation,
+  HostMeetingTask,
+  HostSessionWorkspaceLocation,
+  HostSessionWorkspacePanel,
+};
 
 const HOST_MEETING_TASKS: readonly HostMeetingTask[] = [
   "overview",
@@ -20,6 +27,18 @@ const HOST_MEETING_RECORD_SOURCES: readonly HostMeetingLocation["recordSource"][
   "json",
 ];
 
+const HOST_MEETING_OWNED_QUERY_KEYS = [
+  "task",
+  "section",
+  "source",
+  "records",
+  "aigen",
+] as const;
+
+type HostMeetingOwnedQueryKey = typeof HOST_MEETING_OWNED_QUERY_KEYS[number];
+
+type HostMeetingOwnedQueryEvidence = Record<HostMeetingOwnedQueryKey, string | null>;
+
 function overviewLocation(overviewEditOpen = false): HostMeetingLocation {
   return {
     task: "overview",
@@ -29,83 +48,206 @@ function overviewLocation(overviewEditOpen = false): HostMeetingLocation {
 }
 
 export function parseHostMeetingLocation(search: string): HostMeetingLocation {
-  const params = new URLSearchParams(search);
-  const section = params.get("section");
-  const requestedRecordSource = params.get("source");
+  const evidence = readOwnedQueryEvidence(search);
+  if (!evidence || evidence.task !== null) return overviewLocation();
 
-  if (
-    requestedRecordSource !== null
-    && !isHostMeetingRecordSource(requestedRecordSource)
-  ) {
+  const canonical = canonicalLocationFromEvidence(evidence);
+  if (!canonical) return overviewLocation();
+
+  const legacyLocations: HostMeetingLocation[] = [];
+  if (evidence.records === "json") {
+    legacyLocations.push(recordLocation("json"));
+  }
+  if (evidence.aigen === "1") {
+    legacyLocations.push(recordLocation("ai"));
+  }
+  if (legacyLocations.some((legacy) => !sameMeetingLocation(legacy, canonical))) {
     return overviewLocation();
   }
+  return canonical;
+}
 
-  if (section !== null) {
-    if (section === "basic") {
-      return overviewLocation(true);
-    }
-    if (!isHostMeetingTask(section)) {
-      return overviewLocation();
-    }
-    if (section !== "records") {
-      return {
-        task: section,
-        overviewEditOpen: false,
-        recordSource: "manual",
-      };
-    }
+function canonicalLocationFromEvidence(
+  evidence: HostMeetingOwnedQueryEvidence,
+): HostMeetingLocation | null {
+  if (evidence.section === null) {
+    if (evidence.source !== null) return null;
+    if (evidence.records === "json") return recordLocation("json");
+    if (evidence.aigen === "1") return recordLocation("ai");
+    return overviewLocation();
+  }
+  if (evidence.section === "basic") {
+    return evidence.source === null ? overviewLocation(true) : null;
+  }
+  if (!isHostMeetingTask(evidence.section)) return null;
+  if (evidence.section !== "records") {
+    return evidence.source === null
+      ? {
+          task: evidence.section,
+          overviewEditOpen: false,
+          recordSource: "manual",
+        }
+      : null;
+  }
+  return recordLocation(evidence.source ?? "manual");
+}
 
-    return {
-      task: "records",
-      overviewEditOpen: false,
-      recordSource: requestedRecordSource ?? "manual",
-    };
+function recordLocation(
+  recordSource: HostMeetingLocation["recordSource"],
+): HostMeetingLocation {
+  return {
+    task: "records",
+    overviewEditOpen: false,
+    recordSource,
+  };
+}
+
+function sameMeetingLocation(left: HostMeetingLocation, right: HostMeetingLocation): boolean {
+  return left.task === right.task
+    && left.overviewEditOpen === right.overviewEditOpen
+    && left.recordSource === right.recordSource;
+}
+
+function readOwnedQueryEvidence(search: string): HostMeetingOwnedQueryEvidence | null {
+  const evidence: HostMeetingOwnedQueryEvidence = {
+    task: null,
+    section: null,
+    source: null,
+    records: null,
+    aigen: null,
+  };
+  const seen = new Set<HostMeetingOwnedQueryKey>();
+
+  for (const [key, value] of new URLSearchParams(search)) {
+    if (!isOwnedQueryKey(key)) continue;
+    if (seen.has(key)) return null;
+    seen.add(key);
+    evidence[key] = value;
   }
 
-  if (params.get("aigen") === "1") {
-    return {
-      task: "records",
-      overviewEditOpen: false,
-      recordSource: "ai",
-    };
-  }
-  if (params.get("records") === "json") {
-    return {
-      task: "records",
-      overviewEditOpen: false,
-      recordSource: "json",
-    };
-  }
-  return overviewLocation();
+  if (evidence.section !== null && !isHostMeetingSection(evidence.section)) return null;
+  if (evidence.source !== null && !isHostMeetingRecordSource(evidence.source)) return null;
+  if (evidence.records !== null && evidence.records !== "json") return null;
+  if (evidence.aigen !== null && evidence.aigen !== "1") return null;
+  return evidence;
+}
+
+function isOwnedQueryKey(value: string): value is HostMeetingOwnedQueryKey {
+  return HOST_MEETING_OWNED_QUERY_KEYS.some((key) => key === value);
+}
+
+function isHostMeetingSection(value: string): boolean {
+  return value === "basic" || isHostMeetingTask(value);
 }
 
 export function buildHostMeetingUrl(
   currentUrl: string | URL,
   next: HostMeetingLocation,
 ): string {
-  const url = currentUrl instanceof URL
-    ? new URL(currentUrl.toString())
-    : new URL(currentUrl, "https://readmates.invalid");
-  const params = url.searchParams;
+  const current = readRawAppHref(currentUrl);
+  if (!current) return "/";
 
-  params.delete("section");
-  params.delete("source");
-  params.delete("aigen");
-  params.delete("records");
+  const unrelatedTokens = current.query === null
+    ? []
+    : current.query.split("&").filter((token) => !isOwnedQueryToken(token));
+  const canonicalTokens: string[] = [];
 
   if (next.task === "overview" && next.overviewEditOpen) {
-    params.set("section", "basic");
+    canonicalTokens.push("section=basic");
   } else if (next.task !== "overview") {
-    params.set("section", next.task);
+    canonicalTokens.push(`section=${next.task}`);
   }
   if (
     next.task === "records"
     && (next.recordSource === "ai" || next.recordSource === "json")
   ) {
-    params.set("source", next.recordSource);
+    canonicalTokens.push(`source=${next.recordSource}`);
   }
 
-  return `${url.pathname}${url.search}${url.hash}`;
+  const tokens = [...unrelatedTokens, ...canonicalTokens];
+  const query = tokens.length > 0 ? `?${tokens.join("&")}` : "";
+  return `${current.pathname}${query}${current.hash}`;
+}
+
+type RawAppHref = {
+  pathname: string;
+  query: string | null;
+  hash: string;
+};
+
+function readRawAppHref(currentUrl: string | URL): RawAppHref | null {
+  if (currentUrl instanceof URL) {
+    if (
+      !isHttpProtocol(currentUrl.protocol)
+      || currentUrl.username
+      || currentUrl.password
+    ) return null;
+    return splitRawAppHref(`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+  }
+  if (containsUnsafeHrefCharacters(currentUrl)) return null;
+  if (currentUrl.startsWith("/")) {
+    if (currentUrl.startsWith("//")) return null;
+    return splitRawAppHref(currentUrl);
+  }
+
+  const absolutePrefix = /^[A-Za-z][A-Za-z\d+.-]*:\/\//.exec(currentUrl);
+  if (!absolutePrefix) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(currentUrl);
+  } catch {
+    return null;
+  }
+  if (!isHttpProtocol(parsed.protocol) || parsed.username || parsed.password) return null;
+
+  const authorityStart = absolutePrefix[0].length;
+  const suffixStart = findAbsoluteSuffixStart(currentUrl, authorityStart);
+  const suffix = suffixStart === -1 ? "/" : currentUrl.slice(suffixStart);
+  return splitRawAppHref(suffix.startsWith("/") ? suffix : `/${suffix}`);
+}
+
+function splitRawAppHref(href: string): RawAppHref | null {
+  const hashStart = href.indexOf("#");
+  const hash = hashStart === -1 ? "" : href.slice(hashStart);
+  const beforeHash = hashStart === -1 ? href : href.slice(0, hashStart);
+  const queryStart = beforeHash.indexOf("?");
+  const pathname = queryStart === -1 ? beforeHash : beforeHash.slice(0, queryStart);
+  const query = queryStart === -1 ? null : beforeHash.slice(queryStart + 1);
+
+  if (!pathname.startsWith("/") || pathname.startsWith("//")) return null;
+  return { pathname, query, hash };
+}
+
+function findAbsoluteSuffixStart(value: string, authorityStart: number): number {
+  for (let index = authorityStart; index < value.length; index += 1) {
+    const character = value[index];
+    if (character === "/" || character === "?" || character === "#") return index;
+  }
+  return -1;
+}
+
+function isHttpProtocol(protocol: string): boolean {
+  return protocol === "http:" || protocol === "https:";
+}
+
+function containsUnsafeHrefCharacters(value: string): boolean {
+  for (const character of value) {
+    const codePoint = character.codePointAt(0) ?? 0;
+    if (character === "\\" || codePoint <= 0x1f || codePoint === 0x7f) return true;
+  }
+  return false;
+}
+
+function isOwnedQueryToken(token: string): boolean {
+  const equalsIndex = token.indexOf("=");
+  const rawKey = equalsIndex === -1 ? token : token.slice(0, equalsIndex);
+  let decodedKey: string;
+  try {
+    decodedKey = decodeURIComponent(rawKey.replace(/\+/g, " "));
+  } catch {
+    return false;
+  }
+  return isOwnedQueryKey(decodedKey);
 }
 
 function isHostMeetingTask(value: string): value is HostMeetingTask {
@@ -118,41 +260,38 @@ function isHostMeetingRecordSource(
   return HOST_MEETING_RECORD_SOURCES.some((source) => source === value);
 }
 
-/**
- * @deprecated Internal Task 5→8 compatibility only. New code uses
- * HostMeetingLocation and HostMeetingTask.
- */
-export type HostSessionWorkspacePanel = "focus" | "basic" | "attendance" | "records" | "history";
-
-/** @deprecated Internal Task 5→8 compatibility only. */
-export type HostSessionWorkspaceLocation = {
-  panel: HostSessionWorkspacePanel;
-  source: HostMeetingLocation["recordSource"];
-};
-
 /** @deprecated Internal Task 5→8 compatibility only. */
 export type HostSessionDraftSource = HostSessionWorkspaceLocation["source"];
 
 /** @deprecated Internal Task 5→8 compatibility only. */
 export function parseHostSessionWorkspaceLocation(search: string): HostSessionWorkspaceLocation {
-  const location = parseHostMeetingLocation(search);
-  if (location.task === "overview") {
-    return {
-      panel: location.overviewEditOpen ? "basic" : "focus",
-      source: "manual",
-    };
+  const evidence = readOwnedQueryEvidence(search);
+  if (!evidence || evidence.task !== null) return compatibilityDefaultLocation();
+
+  if (evidence.section !== null) {
+    if (evidence.section === "overview") return compatibilityDefaultLocation();
+    if (!isCompatibilityPanel(evidence.section)) return compatibilityDefaultLocation();
+    if (evidence.section !== "records") {
+      return { panel: evidence.section, source: "manual" };
+    }
+    return { panel: "records", source: evidence.source ?? "manual" };
   }
-  if (
-    location.task === "attendance"
-    || location.task === "records"
-    || location.task === "history"
-  ) {
-    return {
-      panel: location.task,
-      source: location.task === "records" ? location.recordSource : "manual",
-    };
-  }
+  if (evidence.aigen === "1") return { panel: "records", source: "ai" };
+  if (evidence.records === "json") return { panel: "records", source: "json" };
+  return compatibilityDefaultLocation();
+}
+
+function compatibilityDefaultLocation(): HostSessionWorkspaceLocation {
   return { panel: "focus", source: "manual" };
+}
+
+function isCompatibilityPanel(
+  value: string,
+): value is Exclude<HostSessionWorkspacePanel, "focus"> {
+  return value === "basic"
+    || value === "attendance"
+    || value === "records"
+    || value === "history";
 }
 
 /** @deprecated Internal Task 5→8 compatibility only. */
