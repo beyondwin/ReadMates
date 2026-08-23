@@ -1,5 +1,6 @@
 package com.readmates.architecture
 
+import com.readmates.publication.application.port.out.PublicConvergencePort
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
@@ -101,6 +102,11 @@ class ServerArchitectureInventoryTest {
             )
         assertThat(convergencePort)
             .doesNotContain("updateReceipt", "deleteReceipt", "updateEvent", "deleteEvent")
+        assertThat(
+            PublicConvergencePort::class.java.methods
+                .single { it.name == "appendEvent" }
+                .parameterCount,
+        ).isEqualTo(1)
     }
 
     @Test

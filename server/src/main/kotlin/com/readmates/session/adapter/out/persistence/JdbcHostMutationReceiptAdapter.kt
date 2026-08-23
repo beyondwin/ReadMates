@@ -183,6 +183,7 @@ class JdbcHostMutationReceiptAdapter(
         val PUBLIC_EFFECT_OPERATIONS =
             setOf(
                 "SESSION_EXPOSURE",
+                "SESSION_BASIC_SAVE",
                 "SESSION_PUBLICATION",
                 "SESSION_REVERSE",
                 "SESSION_RECORD_APPLY",

@@ -113,7 +113,8 @@ class HostMutationEnvelopeReader(
                         rows =
                             entries.map { entry ->
                                 ExpectedAttendanceRowBody(
-                                    membershipId = UUID.fromString(entry.membershipId),
+                                    membershipId =
+                                        parseAttendanceMembershipId(entry.membershipId),
                                     attendanceRevision = entry.expectedAttendanceRevision,
                                 )
                             },
@@ -260,3 +261,7 @@ class HostMutationEnvelopeReader(
 }
 
 private fun JsonNode.asLongOrNull(): Long? = if (isMissingNode || isNull) null else asLong()
+
+private fun parseAttendanceMembershipId(value: String): UUID =
+    runCatching { UUID.fromString(value) }
+        .getOrElse { throw InvalidSessionScheduleException() }

@@ -1170,6 +1170,24 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `legacy attendance array normalizes an invalid membership uuid to bad request`() {
+        createSessionSeven()
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/attendance") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    [{"membershipId":"not-a-uuid","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
+    }
+
+    @Test
     fun `attendance update persists sorted snapshots and returns a change receipt`() {
         createSessionSeven()
         val firstMembershipId = "00000000-0000-0000-0000-000000000201"

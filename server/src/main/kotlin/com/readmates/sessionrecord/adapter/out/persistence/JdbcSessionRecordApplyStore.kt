@@ -182,6 +182,7 @@ internal class JdbcSessionRecordApplyStore(
             .query(
                 """
                 select a.apply_request_id,
+                       a.id as apply_receipt_id,
                        a.host_membership_id,
                        a.expected_draft_revision,
                        a.expected_live_revision,
@@ -201,6 +202,7 @@ internal class JdbcSessionRecordApplyStore(
                 """.trimIndent(),
                 { rs, _ ->
                     SessionRecordApplyReceipt(
+                        receiptId = rs.uuid("apply_receipt_id"),
                         applyRequestId = rs.uuid("apply_request_id"),
                         hostMembershipId = rs.uuid("host_membership_id"),
                         expectedDraftRevision = rs.getLong("expected_draft_revision"),
@@ -223,6 +225,7 @@ internal class JdbcSessionRecordApplyStore(
         revision: SessionRecordRevision,
     ): SessionRecordApplyReceipt {
         val applyRequestId = requireNotNull(command.applyRequestId)
+        val receiptId = UUID.randomUUID()
         jdbcTemplate.update(
             """
             insert into session_record_apply_receipts (
@@ -231,7 +234,7 @@ internal class JdbcSessionRecordApplyStore(
               composer_event_type, revision_id
             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
-            UUID.randomUUID().dbString(),
+            receiptId.dbString(),
             applyRequestId.dbString(),
             host.clubId.dbString(),
             command.sessionId.dbString(),

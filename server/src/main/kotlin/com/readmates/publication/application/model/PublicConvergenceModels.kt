@@ -38,6 +38,15 @@ data class PublicConvergenceEvent(
     val resultCategory: String?,
 )
 
+data class AppendPublicConvergenceEventCommand(
+    val convergenceId: UUID,
+    val expectedAttemptNo: Int,
+    val expectedEventSeq: Int,
+    val status: ConvergenceAttemptStatus,
+    val observedAt: Instant,
+    val resultCategory: String?,
+)
+
 fun providerIdempotencyToken(
     convergenceId: UUID,
     attemptNo: Int,

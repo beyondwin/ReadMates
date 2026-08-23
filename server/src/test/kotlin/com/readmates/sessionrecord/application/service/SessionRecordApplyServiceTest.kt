@@ -458,6 +458,7 @@ private class FakeApplyStore(
     ) = com.readmates.sessionrecord.application.model
         .SessionRecordApplyReceipt(
             command.applyRequestId,
+            command.applyRequestId,
             host.membershipId,
             command.expectedDraftRevision,
             command.expectedLiveRevision,

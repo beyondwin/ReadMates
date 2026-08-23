@@ -19,7 +19,8 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
-private const val PUBLIC_CACHE_CONTROL = "public, max-age=60, must-revalidate"
+private const val PUBLIC_CLUB_CACHE_CONTROL = "public, max-age=120, must-revalidate"
+private const val PUBLIC_DETAIL_CACHE_CONTROL = "public, max-age=60, must-revalidate"
 
 @RestController
 @RequestMapping("/api/public")
@@ -40,7 +41,7 @@ class PublicController(
         val response = result.toResponse()
         return ResponseEntity
             .ok()
-            .header("Cache-Control", PUBLIC_CACHE_CONTROL)
+            .header("Cache-Control", PUBLIC_CLUB_CACHE_CONTROL)
             .eTag("public-club-${result.cacheGeneration}")
             .body(response)
     }
@@ -65,7 +66,7 @@ class PublicController(
         val response = result.toResponse()
         return ResponseEntity
             .ok()
-            .header("Cache-Control", PUBLIC_CACHE_CONTROL)
+            .header("Cache-Control", PUBLIC_DETAIL_CACHE_CONTROL)
             .eTag("public-session-${result.cacheGeneration}")
             .body(response)
     }

@@ -1,5 +1,6 @@
 package com.readmates.publication.application.port.out
 
+import com.readmates.publication.application.model.AppendPublicConvergenceEventCommand
 import com.readmates.publication.application.model.PublicConvergenceEvent
 import com.readmates.publication.application.model.PublicConvergenceWork
 import com.readmates.publication.application.model.PublicMutationConvergenceReceipt
@@ -13,11 +14,7 @@ interface PublicConvergencePort {
 
     fun loadWork(convergenceId: UUID): PublicConvergenceWork?
 
-    fun appendEvent(
-        publicationIdSnapshot: UUID,
-        sessionIdSnapshot: UUID,
-        event: PublicConvergenceEvent,
-    )
+    fun appendEvent(command: AppendPublicConvergenceEventCommand): PublicConvergenceEvent
 
     fun currentEvent(convergenceId: UUID): PublicConvergenceEvent?
 }

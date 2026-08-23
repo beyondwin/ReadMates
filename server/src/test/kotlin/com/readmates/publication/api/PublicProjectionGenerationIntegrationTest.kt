@@ -1,5 +1,7 @@
 package com.readmates.publication.api
 
+import com.readmates.publication.application.model.AppendPublicConvergenceEventCommand
+import com.readmates.publication.application.model.ConvergenceAttemptStatus
 import com.readmates.publication.application.port.out.PublicConvergencePort
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
@@ -10,6 +12,7 @@ import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.dao.DataAccessException
 import org.springframework.jdbc.core.JdbcTemplate
+import java.time.Instant
 import java.util.UUID
 
 @SpringBootTest(
@@ -20,7 +23,105 @@ import java.util.UUID
 @Tag("integration")
 class PublicProjectionGenerationIntegrationTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val convergencePort: PublicConvergencePort,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `convergence state machine advances only after a terminal event and starts the next attempt`() {
+        val fixture = convergenceFixture()
+
+        convergencePort.appendEvent(
+            command(fixture.convergenceId, 1, 0, ConvergenceAttemptStatus.PENDING, null),
+        )
+        assertThat(nextAttemptNo(fixture.convergenceId)).isEqualTo(1)
+
+        convergencePort.appendEvent(
+            command(fixture.convergenceId, 1, 1, ConvergenceAttemptStatus.FAILED, "TRANSIENT"),
+        )
+        assertThat(nextAttemptNo(fixture.convergenceId)).isEqualTo(2)
+
+        convergencePort.appendEvent(
+            command(fixture.convergenceId, 2, 0, ConvergenceAttemptStatus.PENDING, null),
+        )
+        assertThat(nextAttemptNo(fixture.convergenceId)).isEqualTo(2)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from public_convergence_events where convergence_id = ?",
+                Int::class.java,
+                fixture.convergenceId.toString(),
+            ),
+        ).isEqualTo(3)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                """
+                select count(*) from public_convergence_events
+                where convergence_id = ? and publication_id_snapshot = ? and session_id_snapshot = ?
+                """.trimIndent(),
+                Int::class.java,
+                fixture.convergenceId.toString(),
+                fixture.publicationId.toString(),
+                fixture.sessionId.toString(),
+            ),
+        ).isEqualTo(3)
+    }
+
+    @Test
+    fun `convergence state machine rejects a terminal event before pending`() {
+        val fixture = convergenceFixture()
+
+        assertThatThrownBy {
+            convergencePort.appendEvent(
+                command(fixture.convergenceId, 1, 1, ConvergenceAttemptStatus.SUCCEEDED, "PURGED"),
+            )
+        }.isInstanceOf(IllegalStateException::class.java)
+        assertThat(count("public_convergence_events", "convergence_id", fixture.convergenceId)).isZero()
+    }
+
+    @Test
+    fun `convergence state machine rejects an attempt gap`() {
+        val fixture = convergenceFixture()
+
+        assertThatThrownBy {
+            convergencePort.appendEvent(
+                command(fixture.convergenceId, 2, 0, ConvergenceAttemptStatus.PENDING, null),
+            )
+        }.isInstanceOf(IllegalStateException::class.java)
+        assertThat(count("public_convergence_events", "convergence_id", fixture.convergenceId)).isZero()
+    }
+
+    @Test
+    fun `convergence state machine rejects a noncanonical snapshot`() {
+        val fixture = convergenceFixture()
+
+        insertEvent(
+            fixture.convergenceId,
+            UUID.randomUUID(),
+            fixture.sessionId,
+            1,
+            0,
+            "PENDING",
+            null,
+        )
+
+        assertThatThrownBy {
+            convergencePort.appendEvent(
+                command(fixture.convergenceId, 1, 1, ConvergenceAttemptStatus.SUCCEEDED, "PURGED"),
+            )
+        }.isInstanceOf(IllegalStateException::class.java)
+        assertThat(count("public_convergence_events", "convergence_id", fixture.convergenceId)).isOne()
+    }
+
+    @Test
+    fun `convergence state machine rejects an orphan convergence id`() {
+        val orphan = UUID.randomUUID()
+
+        assertThatThrownBy {
+            convergencePort.appendEvent(
+                command(orphan, 1, 0, ConvergenceAttemptStatus.PENDING, null),
+            )
+        }.isInstanceOf(IllegalStateException::class.java)
+        assertThat(count("public_convergence_events", "convergence_id", orphan)).isZero()
+    }
+
     @Test
     fun `authoritative generation row records current origin state`() {
         val sessionId = UUID.randomUUID()
@@ -170,6 +271,29 @@ class PublicProjectionGenerationIntegrationTest(
         )
     }
 
+    private fun convergenceFixture(): ConvergenceFixture {
+        val publicationId = publicationId(BASELINE_SESSION_ID)
+        val convergenceId = UUID.randomUUID()
+        insertReceipt(UUID.randomUUID(), convergenceId, publicationId, BASELINE_SESSION_ID, 1)
+        insertWork(convergenceId)
+        return ConvergenceFixture(convergenceId, publicationId, BASELINE_SESSION_ID)
+    }
+
+    private fun command(
+        convergenceId: UUID,
+        attemptNo: Int,
+        eventSeq: Int,
+        status: ConvergenceAttemptStatus,
+        resultCategory: String?,
+    ) = AppendPublicConvergenceEventCommand(
+        convergenceId = convergenceId,
+        expectedAttemptNo = attemptNo,
+        expectedEventSeq = eventSeq,
+        status = status,
+        observedAt = Instant.parse("2026-08-22T12:00:00Z"),
+        resultCategory = resultCategory,
+    )
+
     private fun insertWork(convergenceId: UUID) {
         jdbcTemplate.update(
             """
@@ -179,6 +303,13 @@ class PublicProjectionGenerationIntegrationTest(
             convergenceId.toString(),
         )
     }
+
+    private fun nextAttemptNo(convergenceId: UUID): Int =
+        jdbcTemplate.queryForObject(
+            "select next_attempt_no from public_convergence_work where convergence_id = ?",
+            Int::class.java,
+            convergenceId.toString(),
+        ) ?: error("Convergence work is missing")
 
     private fun insertEvent(
         convergenceId: UUID,
@@ -254,4 +385,10 @@ class PublicProjectionGenerationIntegrationTest(
         private val BASELINE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         private val BASELINE_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000306")
     }
+
+    private data class ConvergenceFixture(
+        val convergenceId: UUID,
+        val publicationId: UUID,
+        val sessionId: UUID,
+    )
 }

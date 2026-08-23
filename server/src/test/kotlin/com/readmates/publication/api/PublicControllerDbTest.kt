@@ -38,6 +38,7 @@ class PublicControllerDbTest(
             .get("/api/public/club")
             .andExpect {
                 status { isOk() }
+                header { string("Cache-Control", "public, max-age=120, must-revalidate") }
                 jsonPath("$.clubName") { value("읽는사이") }
                 jsonPath("$.stats.sessions") { value(6) }
                 jsonPath("$.recentSessions[0].sessionNumber") { value(6) }
@@ -58,6 +59,7 @@ class PublicControllerDbTest(
             .get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
             .andExpect {
                 status { isOk() }
+                header { string("Cache-Control", "public, max-age=60, must-revalidate") }
                 jsonPath("$.sessionNumber") { value(6) }
                 jsonPath("$.bookTitle") { value("가난한 찰리의 연감") }
                 jsonPath("$.bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
