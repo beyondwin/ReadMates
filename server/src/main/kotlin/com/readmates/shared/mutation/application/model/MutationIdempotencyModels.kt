@@ -193,6 +193,29 @@ sealed class CanonicalMutationPayload {
         }
     }
 
+    data class CorrectionPublish(
+        val expectedSessionRevision: Long,
+        val expectedDraftRevision: Long,
+        val expectedLiveRevision: Long,
+        val expectedExposureRevision: Long,
+        val expectedPublicationRevision: Long,
+        override val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
+        override val operation: HostMutationOperation = HostMutationOperation.SESSION_CORRECTION_PUBLISH,
+    ) : CanonicalMutationPayload() {
+        init {
+            require(schemaVersion > 0) { "schemaVersion must be positive" }
+            require(
+                listOf(
+                    expectedSessionRevision,
+                    expectedDraftRevision,
+                    expectedLiveRevision,
+                    expectedExposureRevision,
+                    expectedPublicationRevision,
+                ).all { it >= 0 },
+            ) { "correction revisions must be non-negative" }
+        }
+    }
+
     data class Reverse(
         val reasonCode: String?,
         val reasonNote: String?,
@@ -254,7 +277,6 @@ sealed class CanonicalMutationPayload {
                 HostMutationOperation.SESSION_TRASH,
                 HostMutationOperation.SESSION_RESTORE,
                 HostMutationOperation.SESSION_PUBLISH,
-                HostMutationOperation.SESSION_CORRECTION_PUBLISH,
             )
     }
 }

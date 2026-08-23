@@ -35,6 +35,11 @@ interface SessionRecordReadStorePort {
 }
 
 interface SessionRecordApplyStorePort {
+    fun loadCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor? = null
+
     fun lockEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,

@@ -139,6 +139,7 @@ class HostSessionExposurePublicationDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `stale publish and correction preserve old live while correction commits every origin projection once`() {
         val sessionId = publishedSessionWithInitialRecord()
         val oldRevisionId = latestRevisionId(sessionId)
@@ -146,7 +147,28 @@ class HostSessionExposurePublicationDbTest(
 
         saveRecordDraft(sessionId, "corrected", "PUBLIC")
         val current = versions(sessionId)
-        assertCorrectionPreview(sessionId, current)
+        assertCorrectionPreview(sessionId, current, "GUEST_READABLE", "PUBLIC_RECORD", "PUBLIC")
+        val epochBeforeStale = recordEpoch()
+        val initialOriginTexts = originTexts(sessionId)
+        val initialRevisionCount = revisionCount(sessionId)
+        val initialApplyReceiptCount = applyReceiptCount(sessionId)
+        val initialPublishReceiptCount = operationReceiptCount(sessionId, "SESSION_PUBLISH")
+        val initialCorrectionReceiptCount = operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH")
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/publish") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-publish-stale-live-01",
+                        publishVector(current.copy(live = current.live + 1)),
+                        "{}",
+                    )
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("REVISION_CONFLICT") }
+            }
         mockMvc
             .post("/api/host/sessions/$sessionId/correction-publish") {
                 withHost()
@@ -164,8 +186,15 @@ class HostSessionExposurePublicationDbTest(
 
         assertThat(liveRecordRevision(sessionId)).isEqualTo(1)
         assertThat(publicSummary(sessionId)).isEqualTo("initial summary")
+        assertThat(originTexts(sessionId)).isEqualTo(initialOriginTexts)
         assertThat(revisionSnapshot(oldRevisionId)).isEqualTo(oldSnapshot)
+        assertThat(revisionCount(sessionId)).isEqualTo(initialRevisionCount)
         assertThat(recordDraftRevision(sessionId)).isEqualTo(1)
+        assertThat(applyReceiptCount(sessionId)).isEqualTo(initialApplyReceiptCount)
+        assertThat(operationReceiptCount(sessionId, "SESSION_PUBLISH")).isEqualTo(initialPublishReceiptCount)
+        assertThat(operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH"))
+            .isEqualTo(initialCorrectionReceiptCount)
+        assertThat(recordEpoch()).isEqualTo(epochBeforeStale)
 
         val epochBefore = recordEpoch()
         mockMvc
@@ -183,6 +212,7 @@ class HostSessionExposurePublicationDbTest(
         assertThat(recordEpoch()).isEqualTo(epochBefore + 1)
         assertThat(revisionCount(sessionId)).isEqualTo(2)
         assertThat(applyReceiptCount(sessionId)).isEqualTo(2)
+        assertThat(operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH")).isEqualTo(1)
         assertThat(revisionSnapshot(oldRevisionId)).isEqualTo(oldSnapshot)
         assertThat(publicSummary(sessionId)).isEqualTo("corrected summary")
         assertThat(originTexts(sessionId)).containsExactly("corrected highlight", "corrected one line")
@@ -221,6 +251,9 @@ class HostSessionExposurePublicationDbTest(
     private fun assertCorrectionPreview(
         sessionId: String,
         versions: Versions,
+        accessScope: String,
+        siteVisibility: String,
+        visibility: String,
     ) {
         mockMvc
             .get("/api/host/sessions/$sessionId/correction-publish-preview") {
@@ -234,8 +267,9 @@ class HostSessionExposurePublicationDbTest(
                 jsonPath("$.versions.exposureRevision") { value(versions.exposure) }
                 jsonPath("$.versions.publicationRevision") { value(versions.publication) }
                 jsonPath("$.versions.participantSetRevision") { doesNotExist() }
-                jsonPath("$.accessScope") { value("GUEST_READABLE") }
-                jsonPath("$.siteVisibility") { value("PUBLIC_RECORD") }
+                jsonPath("$.accessScope") { value(accessScope) }
+                jsonPath("$.siteVisibility") { value(siteVisibility) }
+                jsonPath("$.visibility") { value(visibility) }
             }
     }
 
@@ -367,6 +401,12 @@ class HostSessionExposurePublicationDbTest(
             }.andExpect { status { isOk() } }
     }
 
+    private fun publishVector(versions: Versions): String =
+        """
+        {"sessionRevision":${versions.session},"liveRecordRevision":${versions.live},
+        "exposureRevision":${versions.exposure},"publicationRevision":${versions.publication}}
+        """.trimIndent().replace("\n", "")
+
     private fun correctionVector(versions: Versions): String {
         val draft = requireNotNull(versions.draft)
         return """
@@ -458,6 +498,17 @@ class HostSessionExposurePublicationDbTest(
             sessionId,
         ) ?: 0
 
+    private fun operationReceiptCount(
+        sessionId: String,
+        operation: String,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from host_session_mutation_receipts where resource_id = ? and operation = ?",
+            Int::class.java,
+            sessionId,
+            operation,
+        ) ?: 0
+
     private fun originTexts(sessionId: String): List<String> =
         listOf(
             jdbcTemplate.queryForObject(
@@ -524,7 +575,7 @@ class HostSessionExposurePublicationDbTest(
         """.trimIndent()
 }
 
-private const val CLEANUP_EXPOSURE_PUBLICATION_SQL = """
+internal const val CLEANUP_EXPOSURE_PUBLICATION_SQL = """
     delete from session_record_apply_receipts
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (select id from sessions where club_id = '00000000-0000-0000-0000-000000000001' and number > 7);

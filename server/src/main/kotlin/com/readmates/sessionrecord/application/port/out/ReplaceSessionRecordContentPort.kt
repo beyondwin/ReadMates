@@ -20,6 +20,7 @@ data class SessionRecordContentReplacement(
     val source: SessionRecordDraftSource,
     val trustedAuthorBindings: Map<String, UUID>,
     val historicalAuthorBindings: Map<String, UUID>,
+    val allowHostOnlyVisibility: Boolean = false,
 )
 
 sealed interface SessionRecordContentReplacementResult {

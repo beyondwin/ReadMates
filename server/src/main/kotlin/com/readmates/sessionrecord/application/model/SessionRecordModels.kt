@@ -168,6 +168,63 @@ data class SessionRecordCorrectionEditor(
     val versions: SessionRecordCorrectionVersions,
 )
 
+enum class SessionRecordAccessScope {
+    HOST_ONLY,
+    GUEST_READABLE,
+}
+
+enum class SessionRecordSiteVisibility {
+    HIDDEN,
+    PUBLIC_RECORD,
+}
+
+data class SessionRecordAudienceProjection(
+    val accessScope: SessionRecordAccessScope,
+    val siteVisibility: SessionRecordSiteVisibility,
+    val visibility: SessionRecordVisibility,
+    val sessionCompatibilityVisibility: SessionRecordVisibility,
+    val publicationVisibility: SessionRecordVisibility,
+    val isPublic: Boolean,
+)
+
+fun SessionRecordVisibility.toAudienceProjection(state: String): SessionRecordAudienceProjection =
+    when (this) {
+        SessionRecordVisibility.HOST_ONLY ->
+            SessionRecordAudienceProjection(
+                accessScope = SessionRecordAccessScope.HOST_ONLY,
+                siteVisibility = SessionRecordSiteVisibility.HIDDEN,
+                visibility = SessionRecordVisibility.HOST_ONLY,
+                sessionCompatibilityVisibility =
+                    if (state == "PUBLISHED") SessionRecordVisibility.MEMBER else SessionRecordVisibility.HOST_ONLY,
+                publicationVisibility = SessionRecordVisibility.MEMBER,
+                isPublic = false,
+            )
+        SessionRecordVisibility.MEMBER ->
+            SessionRecordAudienceProjection(
+                accessScope = SessionRecordAccessScope.GUEST_READABLE,
+                siteVisibility = SessionRecordSiteVisibility.HIDDEN,
+                visibility = SessionRecordVisibility.MEMBER,
+                sessionCompatibilityVisibility = SessionRecordVisibility.MEMBER,
+                publicationVisibility = SessionRecordVisibility.MEMBER,
+                isPublic = false,
+            )
+        SessionRecordVisibility.PUBLIC ->
+            SessionRecordAudienceProjection(
+                accessScope = SessionRecordAccessScope.GUEST_READABLE,
+                siteVisibility = SessionRecordSiteVisibility.PUBLIC_RECORD,
+                visibility = SessionRecordVisibility.PUBLIC,
+                sessionCompatibilityVisibility = SessionRecordVisibility.PUBLIC,
+                publicationVisibility = SessionRecordVisibility.PUBLIC,
+                isPublic = true,
+            )
+    }
+
+data class SessionRecordCorrectionPreview(
+    val state: String,
+    val versions: SessionRecordCorrectionVersions,
+    val targetAudience: SessionRecordAudienceProjection,
+)
+
 sealed interface PublishSessionRecordCorrectionResult {
     data class Applied(
         val result: SessionRecordApplyResult,

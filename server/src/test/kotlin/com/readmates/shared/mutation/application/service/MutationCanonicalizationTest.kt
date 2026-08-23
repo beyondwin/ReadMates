@@ -140,6 +140,27 @@ class MutationCanonicalizationTest {
     }
 
     @Test
+    fun `correction publish identity binds exactly the five expected revisions`() {
+        val payload =
+            CanonicalMutationPayload.CorrectionPublish(
+                expectedSessionRevision = 1,
+                expectedDraftRevision = 2,
+                expectedLiveRevision = 3,
+                expectedExposureRevision = 4,
+                expectedPublicationRevision = 5,
+            )
+
+        assertSameDigest(service.digest(payload), service.digest(payload.copy()))
+        listOf(
+            payload.copy(expectedSessionRevision = 6),
+            payload.copy(expectedDraftRevision = 6),
+            payload.copy(expectedLiveRevision = 6),
+            payload.copy(expectedExposureRevision = 6),
+            payload.copy(expectedPublicationRevision = 6),
+        ).forEach { changed -> assertDifferentDigest(service.digest(payload), service.digest(changed)) }
+    }
+
+    @Test
     fun `bulk attendance memberships are set sorted`() {
         val membershipA = UUID.fromString("aaaaaaaa-0000-4000-8000-000000000001")
         val membershipB = UUID.fromString("bbbbbbbb-0000-4000-8000-000000000002")

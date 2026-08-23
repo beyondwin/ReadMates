@@ -13,6 +13,7 @@ import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCo
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
 import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionPreview
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.shared.paging.CursorPage
@@ -55,6 +56,11 @@ interface ManageSessionRecordDraftUseCase {
 }
 
 interface ApplySessionRecordUseCase {
+    fun previewCorrection(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): SessionRecordCorrectionPreview?
+
     fun preview(
         host: CurrentMember,
         command: PreviewSessionRecordApplyCommand,

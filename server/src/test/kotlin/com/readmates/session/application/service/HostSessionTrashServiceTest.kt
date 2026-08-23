@@ -283,7 +283,15 @@ class HostSessionTrashServiceTest {
         val audit = RecordingAudit()
         val cache = RecordingCache()
         val service = HostSessionTrashService(port, query, audit, cache)
-        val deletion = HostSessionLifecycleService(query, port, query, cache, lifecycleAudit = audit)
+        val deletion =
+            HostSessionLifecycleService(
+                query,
+                port,
+                query,
+                TestApplySessionRecordUseCaseStub,
+                cache,
+                lifecycleAudit = audit,
+            )
 
         fun withTrashed(
             state: String = "DRAFT",

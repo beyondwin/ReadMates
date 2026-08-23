@@ -96,9 +96,21 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
+import kotlin.reflect.full.primaryConstructor
 
 @Suppress("LargeClass")
 class HostSessionServicesTest {
+    @Test
+    fun `correction publisher is a mandatory production dependency`() {
+        val dependency =
+            requireNotNull(HostSessionLifecycleService::class.primaryConstructor)
+                .parameters
+                .single { parameter -> parameter.name == "correctionPublisher" }
+
+        assertThat(dependency.type.isMarkedNullable).isFalse()
+        assertThat(dependency.isOptional).isFalse()
+    }
+
     private val host =
         CurrentMember(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
@@ -148,7 +160,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates visibility update`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = UpdateHostSessionVisibilityCommand(host, UUID.randomUUID(), SessionRecordVisibility.MEMBER)
 
         service.updateVisibility(command)
@@ -163,7 +175,7 @@ class HostSessionServicesTest {
                 visibilityState = "CLOSED"
                 currentVisibility = SessionRecordVisibility.MEMBER
             }
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
 
         service.updateVisibility(
             UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.PUBLIC),
@@ -184,6 +196,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
@@ -207,6 +220,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
@@ -229,6 +243,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
             )
 
         val result =
@@ -253,6 +268,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
@@ -274,7 +290,7 @@ class HostSessionServicesTest {
                 currentVisibility = SessionRecordVisibility.HOST_ONLY
                 currentAccessScope = SessionAccessScope.HOST_ONLY
             }
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
 
         val result =
             service.updateVisibility(
@@ -309,7 +325,7 @@ class HostSessionServicesTest {
                         }
                     this.currentAccessScope = currentAccessScope
                 }
-            val service = HostSessionLifecycleService(port, port, port)
+            val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
 
             val result =
                 service.updateVisibility(
@@ -330,7 +346,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates open transition`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.open(command)
@@ -341,7 +357,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates close transition`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.close(command)
@@ -352,7 +368,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates publish transition`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.publish(command)
@@ -783,7 +799,7 @@ class HostSessionServicesTest {
                 publishChanged = false
             }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub, invalidation)
         val command = HostSessionIdCommand(host, sessionId)
 
         service.open(command)
@@ -802,7 +818,7 @@ class HostSessionServicesTest {
                 publishChanged = false
             }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub, invalidation)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -828,7 +844,7 @@ class HostSessionServicesTest {
                 openFailure = failure
             }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub, invalidation)
 
         captureHostSessionLogs().use { logs ->
             val thrown =
@@ -861,7 +877,7 @@ class HostSessionServicesTest {
     @Test
     fun `changed lifecycle transitions log club session and states only`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -902,7 +918,7 @@ class HostSessionServicesTest {
                 closeChanged = false
                 publishChanged = false
             }
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -1540,6 +1556,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 invalidation,
                 confirmationProperties,
                 audit,

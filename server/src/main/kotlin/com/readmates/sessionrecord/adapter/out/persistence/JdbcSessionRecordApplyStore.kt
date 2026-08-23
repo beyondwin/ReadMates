@@ -29,9 +29,15 @@ internal class JdbcSessionRecordApplyStore(
     override fun lockEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,
+    ): SessionRecordEditor? = editor(host, sessionId, forUpdate = true)
+
+    private fun editor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        forUpdate: Boolean,
     ): SessionRecordEditor? {
-        val live = readStore.loadLive(host, sessionId, forUpdate = true) ?: return null
-        val draft = readStore.loadDraft(host, sessionId, forUpdate = true)
+        val live = readStore.loadLive(host, sessionId, forUpdate = forUpdate) ?: return null
+        val draft = readStore.loadDraft(host, sessionId, forUpdate = forUpdate)
         return SessionRecordEditor(
             live = live,
             draft = draft,
@@ -47,8 +53,19 @@ internal class JdbcSessionRecordApplyStore(
     override fun lockCorrectionEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,
+    ): SessionRecordCorrectionEditor? = correctionEditor(host, sessionId, forUpdate = true)
+
+    override fun loadCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor? = correctionEditor(host, sessionId, forUpdate = false)
+
+    private fun correctionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        forUpdate: Boolean,
     ): SessionRecordCorrectionEditor? {
-        val editor = lockEditor(host, sessionId) ?: return null
+        val editor = editor(host, sessionId, forUpdate) ?: return null
         return jdbcTemplate
             .query(
                 """
@@ -57,6 +74,7 @@ internal class JdbcSessionRecordApplyStore(
                 from active_sessions s
                 left join session_publication_versions pv on pv.session_id = s.id
                 where s.id = ? and s.club_id = ?
+                ${if (forUpdate) "for update" else ""}
                 """.trimIndent(),
                 { rs, _ ->
                     SessionRecordCorrectionEditor(

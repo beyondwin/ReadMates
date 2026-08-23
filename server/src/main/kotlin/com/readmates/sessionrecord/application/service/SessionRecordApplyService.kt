@@ -12,12 +12,14 @@ import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
 import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
 import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
 import com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionPreview
 import com.readmates.sessionrecord.application.model.SessionRecordCorrectionVersions
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.toAudienceProjection
 import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
 import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
@@ -47,6 +49,25 @@ class SessionRecordApplyService(
     private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
     private val idempotency: MutationIdempotencyService? = null,
 ) : ApplySessionRecordUseCase {
+    @Transactional(readOnly = true)
+    override fun previewCorrection(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): SessionRecordCorrectionPreview? {
+        requireHost(host)
+        val correction = store.loadCorrectionEditor(host, sessionId) ?: throw notFound()
+        val draft = correction.editor.draft
+        return if (correction.state == "PUBLISHED" && draft != null) {
+            SessionRecordCorrectionPreview(
+                state = correction.state,
+                versions = correction.versions,
+                targetAudience = draft.snapshot.visibility.toAudienceProjection(correction.state),
+            )
+        } else {
+            null
+        }
+    }
+
     override fun preview(
         host: CurrentMember,
         command: PreviewSessionRecordApplyCommand,
@@ -132,10 +153,12 @@ class SessionRecordApplyService(
     ): PublishSessionRecordCorrectionResult {
         val draft = correction.editor.draft ?: throw draftStale()
         val requestHash = codec.encode(draft.snapshot).sha256
+        val targetAudience = draft.snapshot.visibility.toAudienceProjection(correction.state)
+        val liveAudience =
+            correction.editor.live.snapshot.visibility
+                .toAudienceProjection(correction.state)
         val exposureChanged =
-            draft.snapshot.visibility.isHostOnly() !=
-                correction.editor.live.snapshot.visibility
-                    .isHostOnly()
+            targetAudience.accessScope != liveAudience.accessScope
         val result =
             applyLocked(
                 host = host,
@@ -148,6 +171,7 @@ class SessionRecordApplyService(
                         expectedDraftHash = requestHash,
                     ),
                 editor = correction.editor,
+                allowHostOnlyVisibility = true,
                 afterReplacement = {
                     check(
                         store.bumpCorrectionProjectionRevisions(
@@ -169,6 +193,7 @@ class SessionRecordApplyService(
         command: ApplySessionRecordCommand,
         editor: SessionRecordEditor,
         identity: MutationIdentity? = null,
+        allowHostOnlyVisibility: Boolean = false,
         afterReplacement: () -> Unit = {},
     ): SessionRecordApplyResult {
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId, forUpdate = true)?.let { completed ->
@@ -205,6 +230,7 @@ class SessionRecordApplyService(
                     source = draft.source,
                     trustedAuthorBindings = trustedAuthorBindings,
                     historicalAuthorBindings = draft.historicalAuthorBindings(editor.live, trustedAuthorBindings),
+                    allowHostOnlyVisibility = allowHostOnlyVisibility,
                 ),
             )
         val canonicalSnapshot =
@@ -284,20 +310,6 @@ class SessionRecordApplyService(
         }
     }
 
-    private fun SessionRecordDraft.trustedAuthorBindings(): Map<String, UUID> =
-        (snapshot.highlights + snapshot.oneLineReviews)
-            .groupBy { it.authorDisplayName }
-            .mapValues { (name, entries) ->
-                entries
-                    .map { it.membershipId }
-                    .distinct()
-                    .singleOrNull()
-                    ?: throw SessionRecordException(
-                        SessionRecordError.INVALID_RECORD,
-                        "Session record author attribution is ambiguous for $name",
-                    )
-            }
-
     private fun applyIdentity(
         host: CurrentMember,
         command: ApplySessionRecordCommand,
@@ -313,8 +325,6 @@ class SessionRecordApplyService(
     }
 }
 
-private fun SessionRecordVisibility.isHostOnly(): Boolean = this == SessionRecordVisibility.HOST_ONLY
-
 private fun SessionRecordCorrectionVersions.conflictsWith(command: PublishSessionRecordCorrectionCommand): Boolean =
     sessionRevision != command.expectedSessionRevision ||
         recordDraftRevision != command.expectedDraftRevision ||
@@ -325,6 +335,20 @@ private fun SessionRecordCorrectionVersions.conflictsWith(command: PublishSessio
 private fun requireHost(host: CurrentMember) {
     if (!host.isHost) throw AccessDeniedException("Host role required")
 }
+
+private fun SessionRecordDraft.trustedAuthorBindings(): Map<String, UUID> =
+    (snapshot.highlights + snapshot.oneLineReviews)
+        .groupBy { it.authorDisplayName }
+        .mapValues { (name, entries) ->
+            entries
+                .map { it.membershipId }
+                .distinct()
+                .singleOrNull()
+                ?: throw SessionRecordException(
+                    SessionRecordError.INVALID_RECORD,
+                    "Session record author attribution is ambiguous for $name",
+                )
+        }
 
 private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
 
