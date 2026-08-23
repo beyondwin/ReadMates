@@ -436,6 +436,38 @@ describe("MemberSessionDetailPage", () => {
     }
   });
 
+  it("does not replace an unavailable member detail with the same stored last-safe pathname", async () => {
+    const unavailablePath = "/clubs/reading-sai/app/sessions/unreadable-session";
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:member", unavailablePath);
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify({
+          authenticated: true,
+          membershipId: "member-1",
+          role: "MEMBER",
+          membershipStatus: "ACTIVE",
+          approvalState: "ACTIVE",
+        }), { headers: { "Content-Type": "application/json" } }));
+      }
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await memberSessionDetailLoaderFactory(createTestQueryClient())({
+        params: { clubSlug: "reading-sai", sessionId: "unreadable-session" },
+        request: new Request(`https://app.readmates.example${unavailablePath}`),
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]);
+      throw new Error("Expected replacement redirect");
+    } catch (response) {
+      expect(response).toBeInstanceOf(Response);
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/archive");
+      expect((response as Response).headers.get("Location")).not.toBe(unavailablePath);
+    } finally {
+      window.sessionStorage.removeItem("readmates:last-safe-workspace-target:member");
+    }
+  });
+
   it("enriches legacy session detail highlights from the notes feed authors", () => {
     const enriched = enrichSessionDetailHighlightAuthors(
       {

@@ -154,6 +154,19 @@ function isSafeTargetForWorkspace(target: string, workspace: ClubWorkspace) {
   return workspaceFromCanonicalPath(target) === workspace && routeFamily(parsedAppPath(target).appPath, workspace) !== null;
 }
 
+function normalizedPathIdentity(target: string) {
+  const pathname = target.split(/[?#]/, 1)[0] ?? "";
+  const normalizedSegments = pathname.split("/").map((segment) => {
+    try {
+      return encodeURIComponent(decodeURIComponent(segment));
+    } catch {
+      return segment;
+    }
+  });
+  const normalizedPathname = normalizedSegments.join("/").replace(/\/+$/, "");
+  return normalizedPathname || "/";
+}
+
 export function resolveAuthorizedRoleSwitchTarget(input: {
   candidate: RoleSwitchCandidate;
   authorizedWorkspaces: ReadonlyArray<ClubWorkspace>;
@@ -199,6 +212,11 @@ export function resolveUnavailableDetailTarget(input: {
   const safeClubSlug = clubSlug ?? "";
   const fallback = safeFallback(safeClubSlug, workspace, family);
   const suffix = workspace === "host" ? appPath.replace(/^\/host/, "") : appPath;
+  const lastSafeTarget = input.lastSafeTarget ?? null;
+  const nonFailingLastSafeTarget =
+    lastSafeTarget !== null && normalizedPathIdentity(lastSafeTarget) !== normalizedPathIdentity(input.pathname)
+      ? lastSafeTarget
+      : null;
 
   return resolveAuthorizedRoleSwitchTarget({
     candidate: {
@@ -211,7 +229,7 @@ export function resolveUnavailableDetailTarget(input: {
     },
     authorizedWorkspaces: [workspace],
     correspondence: "unavailable",
-    lastSafeTarget: input.lastSafeTarget ?? null,
+    lastSafeTarget: nonFailingLastSafeTarget,
   });
 }
 

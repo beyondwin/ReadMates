@@ -1826,6 +1826,24 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
       window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
     }
   });
+
+  it("does not replace an unavailable host detail with the same stored last-safe pathname", async () => {
+    const unavailablePath = "/clubs/reading-sai/app/host/sessions/session-1";
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", unavailablePath);
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(403));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+      throw new Error("Expected replacement redirect");
+    } catch (response) {
+      expect(response).toBeInstanceOf(Response);
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("Location")).not.toBe(unavailablePath);
+    } finally {
+      window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
+    }
+  });
 });
 
 function renderEditSessionRoute(

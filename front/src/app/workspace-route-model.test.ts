@@ -4,6 +4,7 @@ import {
   candidateRoleSwitchTarget,
   canonicalizeCompatibilityEntry,
   resolveAuthorizedRoleSwitchTarget,
+  resolveUnavailableDetailTarget,
   workspaceFromCanonicalPath,
 } from "./workspace-route-model";
 
@@ -163,6 +164,59 @@ describe("workspace route model", () => {
         lastSafeTarget: "/clubs/other-club/app/me",
       }),
     ).toBe("/clubs/reading-sai/app/archive");
+  });
+
+  it.each([
+    [
+      "member exact",
+      "/clubs/reading-sai/app/sessions/meeting-7",
+      "/clubs/reading-sai/app/sessions/meeting-7",
+      "/clubs/reading-sai/app/archive",
+    ],
+    [
+      "member normalized",
+      "/clubs/reading-sai/app/sessions/meeting-7",
+      "/clubs/reading-sai/app/sessions/meeting-7/",
+      "/clubs/reading-sai/app/archive",
+    ],
+    [
+      "member query/hash",
+      "/clubs/reading-sai/app/sessions/meeting-7",
+      "/clubs/reading-sai/app/sessions/meeting-7?from=history#notes",
+      "/clubs/reading-sai/app/archive",
+    ],
+    [
+      "member percent-encoded",
+      "/clubs/reading-sai/app/sessions/meeting-7",
+      "/clubs/reading-sai/app/sessions/meeting%2D7",
+      "/clubs/reading-sai/app/archive",
+    ],
+    [
+      "host exact",
+      "/clubs/reading-sai/app/host/sessions/meeting-7",
+      "/clubs/reading-sai/app/host/sessions/meeting-7",
+      "/clubs/reading-sai/app/host",
+    ],
+    [
+      "host normalized",
+      "/clubs/reading-sai/app/host/sessions/meeting-7",
+      "/clubs/reading-sai/app/host/sessions/meeting-7/",
+      "/clubs/reading-sai/app/host",
+    ],
+    [
+      "host query/hash",
+      "/clubs/reading-sai/app/host/sessions/meeting-7",
+      "/clubs/reading-sai/app/host/sessions/meeting-7?section=record#draft",
+      "/clubs/reading-sai/app/host",
+    ],
+    [
+      "host percent-encoded",
+      "/clubs/reading-sai/app/host/sessions/meeting-7",
+      "/clubs/reading-sai/app/host/sessions/meeting%2D7",
+      "/clubs/reading-sai/app/host",
+    ],
+  ] as const)("rejects an unavailable %s detail as its own normalized last-safe target", (_workspace, pathname, lastSafeTarget, fallback) => {
+    expect(resolveUnavailableDetailTarget({ pathname, lastSafeTarget })).toBe(fallback);
   });
 
   it.each([
