@@ -11,8 +11,8 @@
 ## ADR impact
 
 - ADR-0023: `update` in implementation evidence. Correction confirmation now owns the exact session/draft/live/exposure/publication vector and origin projection transition.
-- ADR-0028: `update` in implementation evidence. Public origin eligibility now requires `PUBLISHED`, `GUEST_READABLE`, and `PUBLIC_RECORD` together.
-- ADR-0022: satisfied; the compatibility projection remains bounded to the existing V45 columns.
+- ADR-0022: `update` in implementation evidence. Origin eligibility and Notes member reads use the canonical lifecycle/access/site axes; public origin requires `PUBLISHED`, `GUEST_READABLE`, and `PUBLIC_RECORD` together.
+- ADR-0028: `update` in implementation evidence. Correction canonical identity, immutable feature-receipt binding, duplicate replay, and response-loss reconciliation share the session-record-owned receipt ID without storing the canonical request.
 - ADR-0033: satisfied; controllers parse/map only, while `HostSessionLifecycleService` owns the transaction and invokes the single session-record atomic capability.
 - No ADR status was promoted in this isolated task.
 
@@ -215,3 +215,150 @@ The full unit lane was run despite the quality gate:
 - A7 is not independently releasable as complete public-effect behavior. C1 must still prove convergence generation, BFF/CDN denial behavior, append-only convergence attempts, and the cache/convergence SLA before public-effect release claims are made.
 - The inherited server quality gate remains red even though A7 reduces detekt findings and adds no ktlint findings. That cross-cutting quality hardening must be closed separately before the overall branch can claim `server-ci-check.sh` GREEN.
 - No live runtime, deploy, CDN, BFF, cache, OAuth, or provider validation was performed in this isolated server task.
+
+## Fix round 1: review findings
+
+This round closes the one Critical and five Important A7 review findings without broadening the C1 boundary.
+
+- Notes privacy: all nine Notes session/list/feed/filter query gates now require `sessions.access_scope = 'GUEST_READABLE'` with the existing `PUBLISHED` lifecycle predicate. A public-to-`HOST_ONLY` correction immediately removes the session, question, existing highlight, and session-filtered results; private `draftThought` never appears before or after the correction. Existing member-visible fixtures now explicitly declare `GUEST_READABLE` instead of relying on incompatible legacy visibility values.
+- Preview/confirm exactness: correction preview returns typed `SESSION_RECORD_LIVE_STALE` when the draft's live metadata base is stale. No safe preview is returned for a vector that the unchanged confirm path would reject. Rebase produces a new draft revision, then preview and confirm use the same exact five-field vector successfully.
+- Ordinary apply lifecycle: `PUBLIC` import/apply intent maps DRAFT and OPEN to `GUEST_READABLE` plus `HIDDEN` and compatibility `MEMBER`; CLOSED and PUBLISHED map to `PUBLIC_RECORD` and compatibility `PUBLIC`. Correction remains separately allowed to apply `HOST_ONLY` while ordinary import retains its validation contract.
+- Exact publication envelope and semantic no-op: `expected.exposureRevision` is present if and only if `command.accessScope` is present. After locking, access and publication changes are detected independently. Repeated access/site/summary values do not bump their revisions or the record epoch; a combined repeated access plus changed publication bumps only publication and exactly one epoch. A new-key semantic no-op may create one immutable operational receipt, while exact replay retains that same single receipt and performs no domain write.
+- Receipt binding: correction uses one session-record-generated `applyRequestId` as the feature apply receipt ID, host mutation receipt ID, and operational idempotency completion link. Same key and five-field identity replay the linked effect once; a different identity conflicts; reconciliation returns the authoritative linked receipt without meeting URL, passcode, draft hash, or canonical request data.
+- Authorization evidence: anonymous access is `401`, an active non-host publication/correction is `403`, and a host addressing another club's access/publication/correction resource receives `404`. Each path compares the full live/history/draft/projection/revision/receipt/epoch fingerprint and commits nothing.
+- Production correction store capabilities no longer default to `null`/`false`. A semantic architecture assertion now requires the three correction methods to remain abstract, so every implementation must opt in explicitly.
+- Correction preview snapshot identity contains exactly session, record-draft, live-record, exposure, and publication revisions; participant-set revision is not silently included.
+
+### Acceptance matrix selection for fix round 1
+
+Selected:
+
+- Actor or authorization: anonymous, active non-host, host success, and cross-club denied paths with response status plus zero-write fingerprints.
+- Club context: access, publication, and correction commands are tested against a session owned by a different club.
+- Session lifecycle: the ordinary public-intent mapping is asserted across DRAFT, OPEN, CLOSED, and PUBLISHED; correction behavior is separately retained.
+- Guest/public exposure: canonical access/site axes, axis-specific expected revisions, semantic no-op behavior, and correction-driven withdrawal are covered.
+- Guest DTO privacy: Notes/public/reconciliation responses exclude private draft thoughts and meeting credentials.
+- Persistence or migration: locked semantic detection, receipt links, rollback/no-partial-write state, and V45-compatible fixture projections are covered in MySQL integration tests; no migration changed.
+
+Excluded:
+
+- BFF or OAuth, cursor collections, UI/runtime state: untouched by this server-origin fix.
+- Async/cache/provider release behavior: Redis invalidation regression is checked only for the existing origin hook. C1 convergence, BFF/CDN denial, cache propagation SLA, attempts, deployment, and provider validation remain explicitly excluded.
+
+### Fix-round TDD RED evidence
+
+Notes correction RED:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.session.api.HostSessionCorrectionSafetyDbTest --no-parallel --max-workers=1
+```
+
+- 3 tests completed, 1 failed: corrected `HOST_ONLY` content remained on Notes surfaces through the legacy visibility predicate.
+
+Preview/lifecycle/identity RED:
+
+```bash
+./server/gradlew -p server unitTest --tests com.readmates.session.domain.SessionExposureTest --tests com.readmates.sessionrecord.application.service.SessionRecordApplyServiceTest --tests com.readmates.session.application.model.HostSessionRevisionModelsTest --no-parallel --max-workers=1
+```
+
+- The first compile failed because the exact correction `snapshotIdentity` contract did not exist. The behavior tests then exposed the missing stale-preview rejection and DRAFT/OPEN public-placement lifecycle mapping.
+
+Publication exactness/no-op RED:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.session.api.HostSessionExposurePublicationDbTest --no-parallel --max-workers=1
+```
+
+- 5 tests completed, 2 failed: an extra exposure revision was accepted without an access axis, and repeated semantics still bumped revisions/epoch.
+
+Receipt bridge RED:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.session.api.HostSessionCorrectionSafetyDbTest --no-parallel --max-workers=1
+```
+
+- 4 tests completed, 1 failed: the host mutation receipt and session-record apply receipt used unrelated IDs.
+
+Correction capability RED:
+
+```bash
+./server/gradlew -p server architectureTest --tests 'com.readmates.architecture.ServerArchitectureBoundaryTest.session record boundaries use owned models and ports' --no-parallel --max-workers=1
+```
+
+- 1 test completed, 1 failed with all three correction store methods reported as defaulted instead of abstract.
+
+The new authorization tests were GREEN against the existing fail-closed security boundary; no production authorization bypass fix was necessary.
+
+### Fix-round GREEN evidence
+
+Focused unit and service bundle:
+
+```bash
+./server/gradlew -p server unitTest --tests com.readmates.session.domain.SessionExposureTest --tests com.readmates.session.application.model.HostSessionRevisionModelsTest --tests com.readmates.sessionrecord.application.service.SessionRecordApplyServiceTest --tests com.readmates.sessionrecord.application.service.SessionRecordDraftServiceTest --tests com.readmates.session.application.service.HostSessionServicesTest --no-parallel --max-workers=1
+```
+
+- PASS, 97/97: exposure 4, revision models 8, apply 15, draft 10, host services 60.
+
+Focused origin/privacy/authorization bundle:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.session.api.HostSessionCorrectionSafetyDbTest --tests com.readmates.session.api.HostSessionExposurePublicationDbTest --tests com.readmates.publication.api.PublicControllerDbTest --no-parallel --max-workers=1
+```
+
+- PASS, 24/24: correction 4, exposure/publication/auth 7, public origin 13.
+
+Notes/archive canonical-access regression:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.archive.api.ArchiveAndNotesDbTest --no-parallel --max-workers=1
+```
+
+- PASS, 31/31 after making the three intended member-visible fixtures explicitly `GUEST_READABLE`.
+
+Ordinary import/apply regression:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.sessionimport.api.HostSessionImportControllerDbTest --no-parallel --max-workers=1
+```
+
+- PASS, 8/8. The exact DRAFT/OPEN/CLOSED/PUBLISHED audience matrix is additionally asserted by `SessionExposureTest`.
+
+A6 idempotency/session-record regressions:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.session.api.HostSessionIdempotencyDbTest --tests com.readmates.sessionrecord.api.HostSessionRecordControllerDbTest --no-parallel --max-workers=1
+```
+
+- PASS, 18/18: idempotency 10, session record 8.
+
+Redis invalidation compatibility:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.shared.adapter.out.redis.RedisReadCacheInvalidationAdapterTest --no-parallel --max-workers=1
+```
+
+- PASS, 6/6.
+
+Focused correction-port architecture test:
+
+```bash
+./server/gradlew -p server architectureTest --tests 'com.readmates.architecture.ServerArchitectureBoundaryTest.session record boundaries use owned models and ports' --no-parallel --max-workers=1
+```
+
+- PASS, 1/1.
+
+All Testcontainers runs remained serial; existing services and containers were preserved.
+
+### Fix-round full gate, inherited comparison, and self-review
+
+```bash
+./scripts/server-ci-check.sh
+```
+
+- BLOCKED at the inherited detekt gate with 122 issues, exactly the pre-fix A7 HEAD count. The temporary implementation peak was 126; the four A7-local additions were removed, leaving no net A7 detekt debt.
+- `ktlintCheck` still reports the same inherited 13 findings, all in unchanged `CanonicalMeetingLanguageInventoryTest.kt`; A7 changed files report zero findings.
+- Full `architectureTest` executes 97 tests and has one inherited failure: `HostSessionQueryPort.kt` defaults `listMode` to `error("listMode is not implemented")`. Both that default and its detecting architecture test are present at fix-round base `5c47f27d`; the focused correction-port boundary is GREEN.
+
+Self-review confirmed that controllers only parse/map; preview rejects stale draft metadata before presenting an exact vector; semantic no-op detection happens under the same locks as revision validation; correction receipt generation remains inside the session-record feature; and denial tests inspect every origin table/epoch affected by A7. No raw meeting URL/passcode, canonical request, or private draft thought is persisted in new receipts or returned by new responses.
+
+The release boundary is unchanged: this round proves origin atomicity and privacy only. It does not implement or claim C1 convergence generation, append-only convergence attempts, BFF/CDN denial convergence, cache propagation SLA, runtime deployment, or provider validation.

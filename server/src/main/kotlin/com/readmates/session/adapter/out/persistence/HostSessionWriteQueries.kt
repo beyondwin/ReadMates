@@ -267,7 +267,9 @@ internal class HostSessionWriteQueries(
                        coalesce(publication.publication_revision, 0) as publication_revision,
                        public_session_publications.visibility as publication_visibility,
                        public_session_publications.site_visibility,
-                       public_session_publications.is_public
+                       public_session_publications.is_public,
+                       public_session_publications.public_summary,
+                       public_session_publications.id is not null as publication_exists
                 from active_sessions sessions
                 left join public_session_publications
                   on public_session_publications.club_id = sessions.club_id
@@ -293,6 +295,10 @@ internal class HostSessionWriteQueries(
                             ),
                         exposureRevision = resultSet.getLong("exposure_revision"),
                         publicationRevision = resultSet.getLong("publication_revision"),
+                        publicationExists = resultSet.getBoolean("publication_exists"),
+                        publicSummary = resultSet.getString("public_summary"),
+                        publicationVisibility = resultSet.getString("publication_visibility"),
+                        publicationIsPublic = resultSet.getBoolean("is_public"),
                     )
                 },
                 sessionId.dbString(),
@@ -591,4 +597,8 @@ internal data class LockedHostSessionExposure(
     val exposure: SessionExposure,
     val exposureRevision: Long,
     val publicationRevision: Long,
+    val publicationExists: Boolean,
+    val publicSummary: String?,
+    val publicationVisibility: String?,
+    val publicationIsPublic: Boolean,
 )

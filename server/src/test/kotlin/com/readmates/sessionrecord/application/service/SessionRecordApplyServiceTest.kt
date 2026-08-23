@@ -12,6 +12,8 @@ import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionVersions
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
@@ -168,6 +170,24 @@ class SessionRecordApplyServiceTest {
         }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
 
         assertTrue(fixture.store.receipts.isEmpty())
+        assertFalse(fixture.replacer.committed)
+        assertNotNull(fixture.store.draft)
+    }
+
+    @Test
+    fun `correction preview rejects a draft whose live metadata base is stale`() {
+        val fixture =
+            Fixture(
+                liveSessionUpdatedAt = TEST_NOW.plusSeconds(1),
+                draftBaseSessionUpdatedAt = TEST_NOW,
+            )
+
+        assertThrows(SessionRecordException::class.java) {
+            fixture.previewCorrection()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+
+        assertTrue(fixture.store.receipts.isEmpty())
+        assertTrue(fixture.store.revisions.isEmpty())
         assertFalse(fixture.replacer.committed)
         assertNotNull(fixture.store.draft)
     }
@@ -346,6 +366,8 @@ private class Fixture(
             PreviewSessionRecordApplyCommand(sessionId, draft.draftRevision, live.revision),
         )
 
+    fun previewCorrection() = service.previewCorrection(host, sessionId)
+
     fun apply(
         expectedDraftRevision: Long = draft.draftRevision,
         expectedLiveRevision: Long = live.revision,
@@ -430,8 +452,26 @@ private class FakeApplyStore(
         sessionId: UUID,
     ): SessionRecordEditor? {
         completed = completedAfterLock ?: completed
-        return SessionRecordEditor(live, draft, draftLiveBaseStale = false)
+        return editor()
     }
+
+    override fun loadCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor = correctionEditor()
+
+    override fun lockCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor = correctionEditor()
+
+    override fun bumpCorrectionProjectionRevisions(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedExposureRevision: Long,
+        expectedPublicationRevision: Long,
+        exposureChanged: Boolean,
+    ): Boolean = true
 
     override fun findCompletedApply(
         host: AuthenticatedClubActor,
@@ -548,6 +588,30 @@ private class FakeApplyStore(
         expectedDraftRevision: Long?,
         encoded: EncodedSessionRecordSnapshot,
     ) = draft
+
+    private fun editor() =
+        SessionRecordEditor(
+            live = live,
+            draft = draft,
+            draftLiveBaseStale =
+                draft?.let { it.baseLiveRevision != live.revision || it.baseSessionUpdatedAt != live.sessionUpdatedAt }
+                    ?: false,
+        )
+
+    private fun correctionEditor() =
+        SessionRecordCorrectionEditor(
+            state = "PUBLISHED",
+            editor = editor(),
+            versions =
+                SessionRecordCorrectionVersions(
+                    sessionRevision = 3,
+                    exposureRevision = 2,
+                    participantSetRevision = 1,
+                    recordDraftRevision = draft?.draftRevision,
+                    liveRecordRevision = live.revision,
+                    publicationRevision = 4,
+                ),
+        )
 
     private fun revision(
         host: AuthenticatedClubActor,

@@ -330,6 +330,24 @@ class SessionRecordDraftServiceTest {
                 )
             }
 
+        override fun loadCorrectionEditor(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+        ): com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor? = null
+
+        override fun lockCorrectionEditor(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+        ): com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor? = null
+
+        override fun bumpCorrectionProjectionRevisions(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            expectedExposureRevision: Long,
+            expectedPublicationRevision: Long,
+            exposureChanged: Boolean,
+        ): Boolean = false
+
         override fun findCompletedApply(
             host: AuthenticatedClubActor,
             previewId: UUID,

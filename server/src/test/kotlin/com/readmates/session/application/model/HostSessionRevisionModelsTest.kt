@@ -136,6 +136,14 @@ class HostSessionRevisionModelsTest {
     }
 
     @Test
+    fun `correction preview snapshot identity binds exactly the five correction revisions`() {
+        val vector = CorrectionPublicationVersionVector(3, 2, 5, 1, 6)
+
+        assertThat(vector.snapshotIdentity(resourceId).snapshotId)
+            .isEqualTo("$resourceId:3:2:5:1:6")
+    }
+
+    @Test
     fun `revision domains reject negative values`() {
         assertThrows<IllegalArgumentException> { sampleVector().copy(sessionRevision = -1) }
         assertThrows<IllegalArgumentException> { sampleVector().copy(exposureRevision = -1) }

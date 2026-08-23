@@ -1701,6 +1701,13 @@ private val sessionRecordCapabilityMethods =
             ),
     )
 
+private val requiredAbstractCorrectionStoreMethods =
+    setOf(
+        "loadCorrectionEditor",
+        "lockCorrectionEditor",
+        "bumpCorrectionProjectionRevisions",
+    )
+
 private val sessionRecordPersistenceUnitNames =
     listOf(
         "JdbcSessionRecordAdapter.kt",
@@ -1794,6 +1801,21 @@ private fun assertSessionRecordCapabilityBoundaries(portSource: String) {
             assertFalse(
                 Regex("""(?m)^\s*fun\s+""").containsMatchIn(composite),
                 "SessionRecordStorePort must declare no direct function",
+            )
+        },
+        {
+            val applyCapability = interfaceBody(portSource, "SessionRecordApplyStorePort").orEmpty()
+            val defaultedCorrectionMethods =
+                requiredAbstractCorrectionStoreMethods.filter { method ->
+                    val declaration =
+                        applyCapability
+                            .substringAfter("fun $method(", missingDelimiterValue = "")
+                            .substringBefore("\n    fun ")
+                    declaration.substringAfterLast(')').contains('=')
+                }
+            assertTrue(
+                defaultedCorrectionMethods.isEmpty(),
+                "Production correction store capabilities must be abstract: $defaultedCorrectionMethods",
             )
         },
     )

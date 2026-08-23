@@ -17,6 +17,7 @@ import com.readmates.publication.application.port.out.LoadPublishedPublicDataPor
 import com.readmates.publication.application.service.PublicQueryService
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostPublicationWriteResult
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.service.HostSessionPublicationService
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
@@ -538,10 +539,15 @@ class RedisReadCacheInvalidationAdapterTest(
 
 private class SuccessfulPublicationPort : HostSessionPublicationPort {
     override fun upsertPublication(command: UpsertPublicationCommand) =
-        HostPublicationResponse(
-            sessionId = command.sessionId.toString(),
-            publicSummary = command.publicSummary,
-            visibility = command.visibility,
+        HostPublicationWriteResult(
+            response =
+                HostPublicationResponse(
+                    sessionId = command.sessionId.toString(),
+                    publicSummary = command.publicSummary,
+                    visibility = command.visibility,
+                ),
+            exposureChanged = true,
+            publicationChanged = true,
         )
 }
 

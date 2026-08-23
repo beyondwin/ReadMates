@@ -4,5 +4,13 @@ import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.model.UpsertPublicationCommand
 
 interface HostSessionPublicationPort {
-    fun upsertPublication(command: UpsertPublicationCommand): HostPublicationResponse
+    fun upsertPublication(command: UpsertPublicationCommand): HostPublicationWriteResult
+}
+
+data class HostPublicationWriteResult(
+    val response: HostPublicationResponse,
+    val exposureChanged: Boolean,
+    val publicationChanged: Boolean,
+) {
+    val changed: Boolean = exposureChanged || publicationChanged
 }

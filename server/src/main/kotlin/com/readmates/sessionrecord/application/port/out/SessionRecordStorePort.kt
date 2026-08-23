@@ -38,7 +38,7 @@ interface SessionRecordApplyStorePort {
     fun loadCorrectionEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,
-    ): SessionRecordCorrectionEditor? = null
+    ): SessionRecordCorrectionEditor?
 
     fun lockEditor(
         host: AuthenticatedClubActor,
@@ -48,7 +48,7 @@ interface SessionRecordApplyStorePort {
     fun lockCorrectionEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,
-    ): SessionRecordCorrectionEditor? = null
+    ): SessionRecordCorrectionEditor?
 
     fun bumpCorrectionProjectionRevisions(
         host: AuthenticatedClubActor,
@@ -56,7 +56,7 @@ interface SessionRecordApplyStorePort {
         expectedExposureRevision: Long,
         expectedPublicationRevision: Long,
         exposureChanged: Boolean,
-    ): Boolean = false
+    ): Boolean
 
     fun findCompletedApply(
         host: AuthenticatedClubActor,

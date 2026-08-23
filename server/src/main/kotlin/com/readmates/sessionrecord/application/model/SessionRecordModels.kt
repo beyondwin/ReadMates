@@ -208,15 +208,32 @@ fun SessionRecordVisibility.toAudienceProjection(state: String): SessionRecordAu
                 publicationVisibility = SessionRecordVisibility.MEMBER,
                 isPublic = false,
             )
-        SessionRecordVisibility.PUBLIC ->
+        SessionRecordVisibility.PUBLIC -> {
+            val publicPlacementAllowed = state == "CLOSED" || state == "PUBLISHED"
             SessionRecordAudienceProjection(
                 accessScope = SessionRecordAccessScope.GUEST_READABLE,
-                siteVisibility = SessionRecordSiteVisibility.PUBLIC_RECORD,
+                siteVisibility =
+                    if (publicPlacementAllowed) {
+                        SessionRecordSiteVisibility.PUBLIC_RECORD
+                    } else {
+                        SessionRecordSiteVisibility.HIDDEN
+                    },
                 visibility = SessionRecordVisibility.PUBLIC,
-                sessionCompatibilityVisibility = SessionRecordVisibility.PUBLIC,
-                publicationVisibility = SessionRecordVisibility.PUBLIC,
-                isPublic = true,
+                sessionCompatibilityVisibility =
+                    if (publicPlacementAllowed) {
+                        SessionRecordVisibility.PUBLIC
+                    } else {
+                        SessionRecordVisibility.MEMBER
+                    },
+                publicationVisibility =
+                    if (publicPlacementAllowed) {
+                        SessionRecordVisibility.PUBLIC
+                    } else {
+                        SessionRecordVisibility.MEMBER
+                    },
+                isPublic = publicPlacementAllowed,
             )
+        }
     }
 
 data class SessionRecordCorrectionPreview(
@@ -227,6 +244,7 @@ data class SessionRecordCorrectionPreview(
 
 sealed interface PublishSessionRecordCorrectionResult {
     data class Applied(
+        val receiptId: UUID,
         val result: SessionRecordApplyResult,
     ) : PublishSessionRecordCorrectionResult
 

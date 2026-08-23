@@ -43,9 +43,12 @@ class HostSessionPublicationService(
         )
     }
 
-    private fun upsertOnce(command: UpsertPublicationCommand) =
-        publicationPort.upsertPublication(command).also {
+    private fun upsertOnce(command: UpsertPublicationCommand): HostPublicationResponse {
+        val write = publicationPort.upsertPublication(command)
+        if (write.changed) {
             epochPort.bump(command.host.clubId, HostListEpochKind.RECORD)
             cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
         }
+        return write.response
+    }
 }

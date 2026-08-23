@@ -42,6 +42,8 @@ class HostSessionCorrectionSafetyDbTest(
     @Test
     fun `correction preview and confirm project public record to draft host only audience`() {
         val sessionId = publishedSessionWithInitialRecord()
+        insertNotesQuestion(sessionId)
+        assertNotesProjection(sessionId, visible = true)
         saveRecordDraft(sessionId, "host target", "HOST_ONLY")
         val current = versions(sessionId)
 
@@ -58,6 +60,7 @@ class HostSessionCorrectionSafetyDbTest(
         mockMvc
             .get("/api/public/clubs/reading-sai/sessions/$sessionId")
             .andExpect { status { isNotFound() } }
+        assertNotesProjection(sessionId, visible = false)
     }
 
     @Test
@@ -77,6 +80,7 @@ class HostSessionCorrectionSafetyDbTest(
         assertThat(revisionCount(sessionId)).isEqualTo(historyAfterFirst)
         assertThat(applyReceiptCount(sessionId)).isEqualTo(receiptsAfterFirst)
         assertThat(recordEpoch()).isEqualTo(epochAfterFirst)
+        assertCorrectionReceiptBridge(sessionId, "key-correction-vector-01")
 
         saveRecordDraft(sessionId, "changed vector", "PUBLIC")
         val changed = versions(sessionId)
@@ -96,6 +100,39 @@ class HostSessionCorrectionSafetyDbTest(
         assertThat(revisionCount(sessionId)).isEqualTo(historyAfterFirst)
         assertThat(applyReceiptCount(sessionId)).isEqualTo(receiptsAfterFirst)
         assertThat(recordEpoch()).isEqualTo(epochBeforeConflict)
+    }
+
+    @Test
+    fun `correction preview rejects stale draft metadata then rebase makes preview and confirm exact`() {
+        val sessionId = publishedSessionWithInitialRecord()
+        saveRecordDraft(sessionId, "stale then rebase", "PUBLIC")
+        setPublicPlacement(sessionId, "HIDDEN", "key-stale-preview-placement-01")
+        val liveBefore = liveRecordRevision(sessionId)
+        val revisionsBefore = revisionCount(sessionId)
+        val receiptsBefore = applyReceiptCount(sessionId)
+        val epochBefore = recordEpoch()
+
+        mockMvc
+            .get("/api/host/sessions/$sessionId/correction-publish-preview") { withHost() }
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_LIVE_STALE") }
+            }
+
+        assertThat(liveRecordRevision(sessionId)).isEqualTo(liveBefore)
+        assertThat(revisionCount(sessionId)).isEqualTo(revisionsBefore)
+        assertThat(applyReceiptCount(sessionId)).isEqualTo(receiptsBefore)
+        assertThat(recordEpoch()).isEqualTo(epochBefore)
+
+        val editor = loadRecordEditor(sessionId, stale = true)
+        rebaseDraft(sessionId, editor.get("liveSessionUpdatedAt").asString(), liveBefore)
+        val rebased = versions(sessionId)
+        assertThat(rebased.draft).isEqualTo(2)
+        assertCorrectionPreview(sessionId, rebased, "GUEST_READABLE", "PUBLIC_RECORD", "PUBLIC")
+
+        publishCorrection(sessionId, "key-stale-preview-confirm-01", rebased)
+        assertThat(liveRecordRevision(sessionId)).isEqualTo(liveBefore + 1)
+        assertThat(applyReceiptCount(sessionId)).isEqualTo(receiptsBefore + 1)
     }
 
     private fun publishedSessionWithInitialRecord(): String {
@@ -232,6 +269,42 @@ class HostSessionCorrectionSafetyDbTest(
             }.andExpect { status { isOk() } }
     }
 
+    private fun loadRecordEditor(
+        sessionId: String,
+        stale: Boolean,
+    ) = mockMvc
+        .get("/api/host/sessions/$sessionId/record-editor") { withHost() }
+        .andExpect {
+            status { isOk() }
+            jsonPath("$.draftLiveBaseStale") { value(stale) }
+        }.andReturn()
+        .response
+        .contentAsString
+        .let(jsonMapper::readTree)
+
+    private fun rebaseDraft(
+        sessionId: String,
+        expectedSessionUpdatedAt: String,
+        expectedLiveRevision: Long,
+    ) {
+        mockMvc
+            .post("/api/host/sessions/$sessionId/record-draft/rebase") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "expectedDraftRevision": 1,
+                      "expectedLiveRevision": $expectedLiveRevision,
+                      "expectedSessionUpdatedAt": "$expectedSessionUpdatedAt"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.draftRevision") { value(2) }
+            }
+    }
+
     private fun publishCorrection(
         sessionId: String,
         key: String,
@@ -298,6 +371,62 @@ class HostSessionCorrectionSafetyDbTest(
         assertThat(row["is_public"]).isEqualTo(isPublic)
     }
 
+    private fun insertNotesQuestion(sessionId: String) {
+        jdbcTemplate.update(
+            """
+            insert into questions (id, club_id, session_id, membership_id, priority, text, draft_thought)
+            values (?, ?, ?, ?, 1, ?, ?)
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            CLUB_ID,
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+            NOTES_QUESTION,
+            NOTES_PRIVATE_THOUGHT,
+        )
+    }
+
+    private fun assertNotesProjection(
+        sessionId: String,
+        visible: Boolean,
+    ) {
+        val sessions =
+            mockMvc
+                .get("/api/notes/sessions") { with(user("member1@example.com")) }
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+        val feed =
+            mockMvc
+                .get("/api/notes/feed") { with(user("member1@example.com")) }
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+        val filtered =
+            mockMvc
+                .get("/api/notes/feed") {
+                    param("sessionId", sessionId)
+                    with(user("member1@example.com"))
+                }.andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+        listOf(sessions, feed, filtered).forEach { response ->
+            if (visible) {
+                assertThat(response).contains(sessionId)
+            } else {
+                assertThat(response).doesNotContain(sessionId, NOTES_QUESTION, "initial highlight")
+            }
+            assertThat(response).doesNotContain(NOTES_PRIVATE_THOUGHT)
+        }
+        if (visible) {
+            assertThat(feed).contains(NOTES_QUESTION, "initial highlight")
+            assertThat(filtered).contains(NOTES_QUESTION, "initial highlight")
+        }
+    }
+
     private fun recordEpoch(): Long =
         jdbcTemplate.queryForObject(
             "select record_epoch from club_host_list_epochs where club_id = ?",
@@ -318,6 +447,63 @@ class HostSessionCorrectionSafetyDbTest(
             Int::class.java,
             sessionId,
         ) ?: 0
+
+    private fun assertCorrectionReceiptBridge(
+        sessionId: String,
+        key: String,
+    ) {
+        val featureReceiptId =
+            jdbcTemplate.queryForObject(
+                """
+                select apply_request_id
+                from session_record_apply_receipts
+                where session_id = ?
+                order by expected_live_revision desc
+                limit 1
+                """.trimIndent(),
+                String::class.java,
+                sessionId,
+            ) ?: error("missing feature receipt")
+        val hostReceiptId =
+            jdbcTemplate.queryForObject(
+                """
+                select id
+                from host_session_mutation_receipts
+                where resource_id = ? and operation = 'SESSION_CORRECTION_PUBLISH'
+                """.trimIndent(),
+                String::class.java,
+                sessionId,
+            ) ?: error("missing host receipt")
+        val operationalReceiptId =
+            jdbcTemplate.queryForObject(
+                """
+                select receipt_id
+                from mutation_idempotency_keys
+                where resource_slot = ?
+                  and operation = 'SESSION_CORRECTION_PUBLISH'
+                  and idempotency_key = ?
+                """.trimIndent(),
+                String::class.java,
+                sessionId,
+                key,
+            ) ?: error("missing operational receipt link")
+
+        assertThat(hostReceiptId).isEqualTo(featureReceiptId)
+        assertThat(operationalReceiptId).isEqualTo(featureReceiptId)
+
+        val reconciliation =
+            mockMvc
+                .get("/api/host/mutations/SESSION_CORRECTION_PUBLISH/$sessionId/$key") { withHost() }
+                .andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+        assertThat(reconciliation.get("status").asString()).isEqualTo("COMMITTED")
+        assertThat(reconciliation.get("receipt").get("receiptId").asString()).isEqualTo(featureReceiptId)
+        assertThat(reconciliation.toString())
+            .doesNotContain("meetingUrl", "meetingPasscode", "expectedDraftHash", "draftSha256")
+    }
 
     private fun hostDisplayName(): String =
         jdbcTemplate.queryForObject(
@@ -375,4 +561,9 @@ class HostSessionCorrectionSafetyDbTest(
 
         주석: Test fixture.
         """.trimIndent()
+
+    private companion object {
+        const val NOTES_QUESTION = "correction-private-notes-question"
+        const val NOTES_PRIVATE_THOUGHT = "correction-private-draft-thought"
+    }
 }

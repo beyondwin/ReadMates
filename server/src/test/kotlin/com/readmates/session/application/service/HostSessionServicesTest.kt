@@ -56,6 +56,7 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.model.normalized
+import com.readmates.session.application.port.out.HostPublicationWriteResult
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
@@ -1984,14 +1985,19 @@ class HostSessionServicesTest {
                 count = command.entries.size,
             ).also { calls += "confirmAttendance:${command.sessionId}:${command.entries.size}" }
 
-        override fun upsertPublication(command: UpsertPublicationCommand): HostPublicationResponse {
+        override fun upsertPublication(command: UpsertPublicationCommand): HostPublicationWriteResult {
             if (throwOnUpsertPublication) {
                 throw IllegalStateException("write failed")
             }
-            return HostPublicationResponse(
-                sessionId = command.sessionId.toString(),
-                publicSummary = command.publicSummary,
-                visibility = command.visibility,
+            return HostPublicationWriteResult(
+                response =
+                    HostPublicationResponse(
+                        sessionId = command.sessionId.toString(),
+                        publicSummary = command.publicSummary,
+                        visibility = command.visibility,
+                    ),
+                exposureChanged = true,
+                publicationChanged = true,
             ).also { calls += "upsertPublication:${command.sessionId}:${command.visibility}" }
         }
 

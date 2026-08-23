@@ -146,7 +146,7 @@ class HostMutationEnvelopeReader(
         if (body.has("idempotencyKey") && envelope.expected.publicationRevision == null) {
             throw InvalidSessionScheduleException()
         }
-        if (envelope.command.accessScope != null && envelope.expected.exposureRevision == null) {
+        if ((envelope.command.accessScope != null) != (envelope.expected.exposureRevision != null)) {
             throw InvalidSessionScheduleException()
         }
         return envelope

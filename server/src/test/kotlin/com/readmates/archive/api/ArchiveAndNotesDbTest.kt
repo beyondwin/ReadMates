@@ -834,11 +834,12 @@ class ArchiveAndNotesDbTest(
               id, club_id, number, title, book_title, book_author, book_translator,
               book_link, book_image_url, session_date, start_time, end_time,
               location_label, meeting_url, meeting_passcode, question_deadline_at,
-              state, visibility
+              state, visibility, access_scope
             )
             values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
               null, null, null, '2026-10-21', '20:00:00', '22:00:00',
-              '온라인', null, null, '2026-10-20 14:59:00.000000', 'CLOSED', 'PUBLIC')
+              '온라인', null, null, '2026-10-20 14:59:00.000000',
+              'CLOSED', 'PUBLIC', 'GUEST_READABLE')
             """.trimIndent(),
             sessionId,
             number,
@@ -1849,7 +1850,8 @@ class ArchiveAndNotesDbTest(
               meeting_passcode,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             values (
               '00000000-0000-0000-0000-000000009181',
@@ -1869,7 +1871,8 @@ class ArchiveAndNotesDbTest(
               null,
               '2026-10-09 14:59:00.000000',
               'PUBLISHED',
-              'PUBLIC'
+              'PUBLIC',
+              'GUEST_READABLE'
             );
         """
 
@@ -2031,7 +2034,8 @@ class ArchiveAndNotesDbTest(
               meeting_passcode,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             select
               '00000000-0000-0000-0000-000000009993',
@@ -2051,7 +2055,8 @@ class ArchiveAndNotesDbTest(
               null,
               '2030-01-31 14:59:00.000000',
               'CLOSED',
-              'MEMBER'
+              'MEMBER',
+              'GUEST_READABLE'
             from clubs
             where clubs.id = '00000000-0000-0000-0000-000000000001';
         """

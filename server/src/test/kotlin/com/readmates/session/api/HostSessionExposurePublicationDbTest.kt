@@ -29,10 +29,193 @@ import java.util.concurrent.Executors
 @Sql(statements = [CLEANUP_EXPOSURE_PUBLICATION_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_EXPOSURE_PUBLICATION_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
+@Suppress("LargeClass")
 class HostSessionExposurePublicationDbTest(
     @Autowired mockMvc: MockMvc,
     @Autowired jdbcTemplate: JdbcTemplate,
 ) : HostSessionAtomicityDbTestSupport(mockMvc, jdbcTemplate) {
+    @Test
+    fun `publication envelope requires expected revisions exactly for the supplied axes`() {
+        val sessionId = createDraft("exact publication axes", "key-axis-create-01").first
+        val initial = versions(sessionId)
+        val epochBefore = recordEpoch()
+
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-axis-extra-exposure-01",
+                        """{"publicationRevision":0,"exposureRevision":0}""",
+                        """{"publicSummary":"axis summary","siteVisibility":"HIDDEN"}""",
+                    )
+            }.andExpect { status { isBadRequest() } }
+
+        assertThat(versions(sessionId)).isEqualTo(initial)
+        assertThat(publicContentCount(sessionId)).isZero()
+        assertThat(recordEpoch()).isEqualTo(epochBefore)
+        assertThat(operationReceiptCount(sessionId, "SESSION_PUBLICATION")).isZero()
+    }
+
+    @Test
+    fun `semantic publication no-op keeps revisions and epoch while exact replay keeps one new receipt`() {
+        val sessionId = closedGuestReadableSession("semantic publication no-op")
+        val initial = versions(sessionId)
+        val epochBeforeFirst = recordEpoch()
+
+        putPublication(
+            sessionId = sessionId,
+            key = "key-semantic-first-01",
+            expectedExposure = initial.exposure,
+            expectedPublication = initial.publication,
+            accessScope = "GUEST_READABLE",
+            siteVisibility = "HIDDEN",
+            summary = "semantic summary",
+        )
+        val first = versions(sessionId)
+        assertThat(first.exposure).isEqualTo(initial.exposure)
+        assertThat(first.publication).isEqualTo(initial.publication + 1)
+        assertThat(recordEpoch()).isEqualTo(epochBeforeFirst + 1)
+
+        val epochBeforeNoop = recordEpoch()
+        val receiptsBeforeNoop = operationReceiptCount(sessionId, "SESSION_PUBLICATION")
+        putPublication(
+            sessionId = sessionId,
+            key = "key-semantic-noop-01",
+            expectedExposure = first.exposure,
+            expectedPublication = first.publication,
+            accessScope = "GUEST_READABLE",
+            siteVisibility = "HIDDEN",
+            summary = "semantic summary",
+        )
+        val afterNoop = versions(sessionId)
+        assertThat(afterNoop).isEqualTo(first)
+        assertThat(recordEpoch()).isEqualTo(epochBeforeNoop)
+        assertThat(operationReceiptCount(sessionId, "SESSION_PUBLICATION")).isEqualTo(receiptsBeforeNoop + 1)
+
+        putPublication(
+            sessionId = sessionId,
+            key = "key-semantic-noop-01",
+            expectedExposure = first.exposure,
+            expectedPublication = first.publication,
+            accessScope = "GUEST_READABLE",
+            siteVisibility = "HIDDEN",
+            summary = "semantic summary",
+        )
+        assertThat(versions(sessionId)).isEqualTo(first)
+        assertThat(recordEpoch()).isEqualTo(epochBeforeNoop)
+        assertThat(operationReceiptCount(sessionId, "SESSION_PUBLICATION")).isEqualTo(receiptsBeforeNoop + 1)
+
+        putPublication(
+            sessionId = sessionId,
+            key = "key-semantic-site-change-01",
+            expectedExposure = first.exposure,
+            expectedPublication = first.publication,
+            accessScope = "GUEST_READABLE",
+            siteVisibility = "PUBLIC_RECORD",
+            summary = "semantic summary",
+        )
+        val afterSiteChange = versions(sessionId)
+        assertThat(afterSiteChange.exposure).isEqualTo(first.exposure)
+        assertThat(afterSiteChange.publication).isEqualTo(first.publication + 1)
+        assertThat(recordEpoch()).isEqualTo(epochBeforeNoop + 1)
+    }
+
+    @Test
+    fun `unauthenticated and non-host exposure publication and correction commit nothing`() {
+        val sessionId = publishedSessionWithInitialRecord()
+        saveRecordDraft(sessionId, "authorization", "PUBLIC")
+        val current = versions(sessionId)
+        val before = atomicFingerprint(sessionId)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-unauth-access-01",
+                        """{"exposureRevision":${current.exposure}}""",
+                        """{"accessScope":"HOST_ONLY"}""",
+                    )
+            }.andExpect { status { isUnauthorized() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                with(user("member1@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-member-publication-01",
+                        """{"publicationRevision":${current.publication}}""",
+                        """{"publicSummary":"unauthorized","siteVisibility":"HIDDEN"}""",
+                    )
+            }.andExpect { status { isForbidden() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/correction-publish") {
+                with(user("member1@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = envelope("key-member-correction-01", correctionVector(current), "{}")
+            }.andExpect { status { isForbidden() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+    }
+
+    @Test
+    fun `host exposure publication and correction fail closed for another club session`() {
+        createOutsideClubSession()
+        val sessionId = OUTSIDE_SESSION_ID
+        val before = atomicFingerprint(sessionId)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-cross-access-01",
+                        """{"exposureRevision":0}""",
+                        """{"accessScope":"HOST_ONLY"}""",
+                    )
+            }.andExpect { status { isNotFound() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-cross-publication-01",
+                        """{"publicationRevision":0}""",
+                        """{"publicSummary":"cross club","siteVisibility":"HIDDEN"}""",
+                    )
+            }.andExpect { status { isNotFound() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/correction-publish") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-cross-correction-01",
+                        """
+                        {"sessionRevision":0,"recordDraftRevision":1,"liveRecordRevision":0,
+                         "exposureRevision":0,"publicationRevision":0}
+                        """.trimIndent(),
+                        "{}",
+                    )
+            }.andExpect { status { isNotFound() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+        assertThat(recordEpoch()).isEqualTo(before.recordEpoch)
+    }
+
     @Test
     fun `dual access and placement validates both revisions and stale command commits nothing`() {
         val sessionId = createDraft("dual exposure", "key-dual-create-01").first
@@ -399,6 +582,31 @@ class HostSessionExposurePublicationDbTest(
             }.andExpect { status { isOk() } }
     }
 
+    private fun putPublication(
+        sessionId: String,
+        key: String,
+        expectedExposure: Long,
+        expectedPublication: Long,
+        accessScope: String,
+        siteVisibility: String,
+        summary: String,
+    ) {
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        key,
+                        """{"publicationRevision":$expectedPublication,"exposureRevision":$expectedExposure}""",
+                        """
+                        {"publicSummary":"$summary","accessScope":"$accessScope",
+                         "siteVisibility":"$siteVisibility"}
+                        """.trimIndent(),
+                    )
+            }.andExpect { status { isOk() } }
+    }
+
     private fun publishVector(versions: Versions): String =
         """
         {"sessionRevision":${versions.session},"liveRecordRevision":${versions.live},
@@ -489,6 +697,58 @@ class HostSessionExposurePublicationDbTest(
             sessionId,
         ) ?: 0
 
+    private fun atomicFingerprint(sessionId: String): AtomicFingerprint =
+        AtomicFingerprint(
+            session =
+                jdbcTemplate.queryForMap(
+                    """
+                    select state, visibility, access_scope, session_revision, exposure_revision,
+                           participant_set_revision, updated_at
+                    from sessions where id = ?
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            publication =
+                jdbcTemplate.queryForList(
+                    """
+                    select public_summary, visibility, site_visibility, is_public
+                    from public_session_publications where session_id = ?
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            liveRevision = liveRecordRevision(sessionId),
+            revisionCount = revisionCount(sessionId),
+            draftRevision = recordDraftRevision(sessionId),
+            applyReceiptCount = applyReceiptCount(sessionId),
+            hostReceiptCount =
+                operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH") +
+                    operationReceiptCount(sessionId, "SESSION_PUBLICATION"),
+            recordEpoch = recordEpoch(),
+        )
+
+    private fun createOutsideClubSession() {
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (?, 'a7-outside-club', 'A7 outside', 'outside', 'outside authorization fixture')
+            """.trimIndent(),
+            OUTSIDE_CLUB_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, session_date,
+              start_time, end_time, location_label, question_deadline_at,
+              state, visibility, access_scope
+            ) values (?, ?, 1, 'Outside session', 'Outside book', 'Outside author', '2026-09-04',
+                      '20:00:00', '22:00:00', '온라인', '2026-09-03 14:59:00',
+                      'PUBLISHED', 'MEMBER', 'GUEST_READABLE')
+            """.trimIndent(),
+            OUTSIDE_SESSION_ID,
+            OUTSIDE_CLUB_ID,
+        )
+    }
+
     private fun applyReceiptCount(sessionId: String): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from session_record_apply_receipts where session_id = ?",
@@ -571,9 +831,27 @@ class HostSessionExposurePublicationDbTest(
 
         주석: Test fixture.
         """.trimIndent()
+
+    private data class AtomicFingerprint(
+        val session: Map<String, Any?>,
+        val publication: List<Map<String, Any?>>,
+        val liveRevision: Long,
+        val revisionCount: Int,
+        val draftRevision: Long?,
+        val applyReceiptCount: Int,
+        val hostReceiptCount: Int,
+        val recordEpoch: Long,
+    )
+
+    private companion object {
+        const val OUTSIDE_CLUB_ID = "00000000-0000-0000-0000-000000079001"
+        const val OUTSIDE_SESSION_ID = "00000000-0000-0000-0000-000000079777"
+    }
 }
 
 internal const val CLEANUP_EXPOSURE_PUBLICATION_SQL = """
+    delete from sessions where id = '00000000-0000-0000-0000-000000079777';
+    delete from clubs where id = '00000000-0000-0000-0000-000000079001' or slug = 'a7-outside-club';
     delete from session_record_apply_receipts
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (select id from sessions where club_id = '00000000-0000-0000-0000-000000000001' and number > 7);
@@ -599,6 +877,9 @@ internal const val CLEANUP_EXPOSURE_PUBLICATION_SQL = """
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (select id from sessions where club_id = '00000000-0000-0000-0000-000000000001' and number > 7);
     delete from one_line_reviews
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (select id from sessions where club_id = '00000000-0000-0000-0000-000000000001' and number > 7);
+    delete from questions
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (select id from sessions where club_id = '00000000-0000-0000-0000-000000000001' and number > 7);
     delete from session_record_revisions

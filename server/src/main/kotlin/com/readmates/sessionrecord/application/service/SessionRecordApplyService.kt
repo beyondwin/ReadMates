@@ -55,6 +55,9 @@ class SessionRecordApplyService(
     ): SessionRecordCorrectionPreview? {
         requireHost(host)
         val correction = store.loadCorrectionEditor(host, sessionId) ?: throw notFound()
+        if (correction.editor.draftLiveBaseStale) {
+            throw liveStale()
+        }
         val draft = correction.editor.draft
         return if (correction.state == "PUBLISHED" && draft != null) {
             SessionRecordCorrectionPreview(
@@ -157,13 +160,14 @@ class SessionRecordApplyService(
                 .toAudienceProjection(correction.state)
         val exposureChanged =
             targetAudience.accessScope != liveAudience.accessScope
+        val receiptId = UUID.randomUUID()
         val result =
             applyLocked(
                 host = host,
                 command =
                     ApplySessionRecordCommand(
                         sessionId = command.sessionId,
-                        applyRequestId = UUID.randomUUID(),
+                        applyRequestId = receiptId,
                         expectedDraftRevision = command.expectedDraftRevision,
                         expectedLiveRevision = command.expectedLiveRevision,
                         expectedDraftHash = requestHash,
@@ -182,7 +186,7 @@ class SessionRecordApplyService(
                     ) { "Locked correction projection revisions changed unexpectedly" }
                 },
             )
-        return PublishSessionRecordCorrectionResult.Applied(result)
+        return PublishSessionRecordCorrectionResult.Applied(receiptId, result)
     }
 
     @Suppress("LongMethod", "ThrowsCount")
@@ -349,6 +353,8 @@ private fun SessionRecordDraft.trustedAuthorBindings(): Map<String, UUID> =
         }
 
 private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
+
+private fun liveStale() = SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
 
 private fun notFound() = SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
 

@@ -206,14 +206,7 @@ class HostSessionLifecycleService(
     override fun correctionPublish(command: HostSessionIdCommand) =
         command.expectedCorrectionVector.let { expected ->
             if (expected == null) throw InvalidSessionScheduleException()
-            executeLifecycle(
-                command = command,
-                operation = HostMutationOperation.SESSION_CORRECTION_PUBLISH,
-                payload = HostMutationPayloads.correction(expected),
-            ) {
-                publishCorrection(command)
-                draftPort.lockVisibilitySnapshot(command).detail
-            }
+            executeCorrectionPublication(command, expected)
         }
 
     override fun correctionPublishPreview(command: HostSessionIdCommand): CorrectionPublicationPreview {
@@ -221,25 +214,17 @@ class HostSessionLifecycleService(
             correctionPublisher.previewCorrection(command.host, command.sessionId)
                 ?: throw HostSessionPublishNotAllowedException()
         val versions = projection.versions
-        val vector =
-            SessionVersionVector(
+        val correctionVersions =
+            CorrectionPublicationVersionVector(
                 sessionRevision = versions.sessionRevision,
-                exposureRevision = versions.exposureRevision,
-                participantSetRevision = versions.participantSetRevision,
-                recordDraftRevision = versions.recordDraftRevision,
+                recordDraftRevision = versions.recordDraftRevision ?: throw HostSessionPublishNotAllowedException(),
                 liveRecordRevision = versions.liveRecordRevision,
+                exposureRevision = versions.exposureRevision,
                 publicationRevision = versions.publicationRevision,
             )
         return CorrectionPublicationPreview(
-            snapshotId = vector.snapshotIdentity(command.sessionId).snapshotId,
-            versions =
-                CorrectionPublicationVersionVector(
-                    sessionRevision = versions.sessionRevision,
-                    recordDraftRevision = versions.recordDraftRevision ?: throw HostSessionPublishNotAllowedException(),
-                    liveRecordRevision = versions.liveRecordRevision,
-                    exposureRevision = versions.exposureRevision,
-                    publicationRevision = versions.publicationRevision,
-                ),
+            snapshotId = correctionVersions.snapshotIdentity(command.sessionId).snapshotId,
+            versions = correctionVersions,
             state = projection.state,
             accessScope = SessionAccessScope.valueOf(projection.targetAudience.accessScope.name),
             siteVisibility = PublicSiteVisibility.valueOf(projection.targetAudience.siteVisibility.name),
@@ -380,9 +365,9 @@ class HostSessionLifecycleService(
         }
     }
 
-    private fun publishCorrection(command: HostSessionIdCommand) {
+    private fun publishCorrection(command: HostSessionIdCommand): UUID {
         val expected = command.expectedCorrectionVector ?: throw InvalidSessionScheduleException()
-        correctionPublisher
+        return correctionPublisher
             .publishCorrection(
                 command.host,
                 PublishSessionRecordCorrectionCommand(
@@ -394,6 +379,35 @@ class HostSessionLifecycleService(
                     expectedPublicationRevision = expected.publicationRevision,
                 ),
             ).requireApplied()
+    }
+
+    private fun executeCorrectionPublication(
+        command: HostSessionIdCommand,
+        expected: CorrectionPublicationVersionVector,
+    ): HostSessionDetailResponse {
+        val coordinator = mutations
+        if (coordinator == null) {
+            publishCorrection(command)
+            return draftPort.lockVisibilitySnapshot(command).detail
+        }
+        return coordinator.execute(
+            host = command.host,
+            operation = HostMutationOperation.SESSION_CORRECTION_PUBLISH,
+            resourceSlot = command.sessionId.toString(),
+            idempotencyKey = command.idempotencyKey,
+            payload = HostMutationPayloads.correction(expected),
+            mutate = {
+                val receiptId = publishCorrection(command)
+                HostMutationOutcome(
+                    resourceId = command.sessionId,
+                    result = draftPort.lockVisibilitySnapshot(command).detail,
+                    receiptId = receiptId,
+                )
+            },
+            replay = { _, projection ->
+                projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException()
+            },
+        )
     }
 
     private fun currentVersions(command: HostSessionIdCommand) =
@@ -612,9 +626,9 @@ private fun isFirstMemberPublication(
         previousVisibility == SessionRecordVisibility.HOST_ONLY &&
         requestedVisibility != SessionRecordVisibility.HOST_ONLY
 
-private fun PublishSessionRecordCorrectionResult.requireApplied() {
+private fun PublishSessionRecordCorrectionResult.requireApplied(): UUID =
     when (this) {
-        is PublishSessionRecordCorrectionResult.Applied -> Unit
+        is PublishSessionRecordCorrectionResult.Applied -> receiptId
         is PublishSessionRecordCorrectionResult.RevisionConflict ->
             throw HostSessionRevisionConflictException(
                 SessionVersionVector(
@@ -630,4 +644,3 @@ private fun PublishSessionRecordCorrectionResult.requireApplied() {
             )
         PublishSessionRecordCorrectionResult.NotPublished -> throw HostSessionPublishNotAllowedException()
     }
-}
