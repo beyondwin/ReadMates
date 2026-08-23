@@ -72,6 +72,22 @@ object HostListEpochInventory {
             source("one_liner_count", setOf(Mode.RECORD), setOf(HostListEpochKind.RECORD), MEMBER, RECORD_APPLY),
             source("feedback_ready", setOf(Mode.RECORD), setOf(HostListEpochKind.RECORD), RECORD_APPLY),
             source(
+                "access_scope",
+                setOf(Mode.RECORD),
+                setOf(HostListEpochKind.RECORD),
+                LIFECYCLE,
+                RECORD_APPLY,
+                PUBLICATION,
+            ),
+            source(
+                "site_visibility",
+                setOf(Mode.RECORD),
+                setOf(HostListEpochKind.RECORD),
+                LIFECYCLE,
+                RECORD_APPLY,
+                PUBLICATION,
+            ),
+            source(
                 "participation_status",
                 setOf(Mode.MEETING),
                 setOf(HostListEpochKind.MEETING),

@@ -31,6 +31,8 @@ class HostListEpochCoverageTest {
             "highlight_count",
             "one_liner_count",
             "feedback_ready",
+            "access_scope",
+            "site_visibility",
             "pending_rsvp_count",
             "participation_status",
             "deleted_at",
@@ -55,6 +57,8 @@ class HostListEpochCoverageTest {
             "highlight_count",
             "one_liner_count",
             "feedback_ready",
+            "access_scope",
+            "site_visibility",
             "attention_rank",
         )
     }

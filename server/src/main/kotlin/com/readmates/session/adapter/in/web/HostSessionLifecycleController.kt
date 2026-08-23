@@ -117,6 +117,14 @@ class HostSessionLifecycleController(
         )
     }
 
+    @GetMapping("/{sessionId}/correction-publish-preview")
+    fun correctionPublishPreview(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+    ) = hostSessionLifecycleUseCase.correctionPublishPreview(
+        HostSessionIdCommand(member, parseHostSessionId(sessionId)),
+    )
+
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,

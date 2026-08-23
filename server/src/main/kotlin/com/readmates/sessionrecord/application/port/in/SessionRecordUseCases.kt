@@ -6,6 +6,8 @@ import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.HostSessionRecordCapabilities
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionResult
 import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
@@ -62,6 +64,11 @@ interface ApplySessionRecordUseCase {
         host: CurrentMember,
         command: ApplySessionRecordCommand,
     ): SessionRecordApplyResult
+
+    fun publishCorrection(
+        host: CurrentMember,
+        command: PublishSessionRecordCorrectionCommand,
+    ): PublishSessionRecordCorrectionResult
 }
 
 interface GetHostSessionHistoryUseCase {

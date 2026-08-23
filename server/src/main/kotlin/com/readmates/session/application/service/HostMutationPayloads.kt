@@ -72,5 +72,6 @@ internal object HostMutationPayloads {
         CanonicalMutationPayload.Publication(
             publicSummary = command.publicSummary,
             siteVisibility = command.siteVisibility?.name ?: "HIDDEN",
+            accessScope = command.accessScope?.name,
         )
 }

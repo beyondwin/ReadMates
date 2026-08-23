@@ -6,6 +6,8 @@ import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.CompletedSessionRecordApply
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionVersions
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
 import com.readmates.sessionrecord.application.port.out.SessionRecordApplyStorePort
@@ -40,6 +42,75 @@ internal class JdbcSessionRecordApplyStore(
                             draft.baseSessionUpdatedAt != live.sessionUpdatedAt
                     ),
         )
+    }
+
+    override fun lockCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor? {
+        val editor = lockEditor(host, sessionId) ?: return null
+        return jdbcTemplate
+            .query(
+                """
+                select s.state, s.session_revision, s.exposure_revision, s.participant_set_revision,
+                       coalesce(pv.publication_revision, 0) as publication_revision
+                from active_sessions s
+                left join session_publication_versions pv on pv.session_id = s.id
+                where s.id = ? and s.club_id = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    SessionRecordCorrectionEditor(
+                        state = rs.getString("state"),
+                        editor = editor,
+                        versions =
+                            SessionRecordCorrectionVersions(
+                                sessionRevision = rs.getLong("session_revision"),
+                                exposureRevision = rs.getLong("exposure_revision"),
+                                participantSetRevision = rs.getLong("participant_set_revision"),
+                                recordDraftRevision = editor.draft?.draftRevision,
+                                liveRecordRevision = editor.live.revision,
+                                publicationRevision = rs.getLong("publication_revision"),
+                            ),
+                    )
+                },
+                sessionId.dbString(),
+                host.clubId.dbString(),
+            ).singleOrNull()
+    }
+
+    override fun bumpCorrectionProjectionRevisions(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedExposureRevision: Long,
+        expectedPublicationRevision: Long,
+        exposureChanged: Boolean,
+    ): Boolean {
+        if (exposureChanged) {
+            val exposureUpdated =
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set exposure_revision = exposure_revision + 1
+                    where id = ?
+                      and club_id = ?
+                      and exposure_revision = ?
+                      and deleted_at is null
+                    """.trimIndent(),
+                    sessionId.dbString(),
+                    host.clubId.dbString(),
+                    expectedExposureRevision,
+                )
+            if (exposureUpdated != 1) return false
+        }
+        return jdbcTemplate.update(
+            """
+            update session_publication_versions
+            set publication_revision = publication_revision + 1
+            where session_id = ? and publication_revision = ?
+            """.trimIndent(),
+            sessionId.dbString(),
+            expectedPublicationRevision,
+        ) == 1
     }
 
     override fun findCompletedApply(

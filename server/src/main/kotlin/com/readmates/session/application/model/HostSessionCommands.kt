@@ -154,7 +154,9 @@ data class UpsertPublicationCommand(
     val sessionId: UUID,
     val publicSummary: String,
     val visibility: SessionRecordVisibility = SessionRecordVisibility.HOST_ONLY,
+    val accessScope: SessionAccessScope? = null,
     val siteVisibility: PublicSiteVisibility? = null,
     val expectedPublicationRevision: Long? = null,
+    val expectedExposureRevision: Long? = null,
     val idempotencyKey: String? = null,
 )

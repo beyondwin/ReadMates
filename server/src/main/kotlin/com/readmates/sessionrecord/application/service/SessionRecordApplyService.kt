@@ -6,13 +6,18 @@ import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionResult
 import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
 import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
 import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionVersions
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
 import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
@@ -101,12 +106,70 @@ class SessionRecordApplyService(
         return applyLocked(host, command, editor, identity)
     }
 
+    override fun publishCorrection(
+        host: CurrentMember,
+        command: PublishSessionRecordCorrectionCommand,
+    ): PublishSessionRecordCorrectionResult = publishCorrectionLocked(host, command)
+
+    private fun publishCorrectionLocked(
+        host: CurrentMember,
+        command: PublishSessionRecordCorrectionCommand,
+    ): PublishSessionRecordCorrectionResult {
+        requireHost(host)
+        val correction = store.lockCorrectionEditor(host, command.sessionId) ?: throw notFound()
+        val current = correction.versions
+        return when {
+            correction.state != "PUBLISHED" -> PublishSessionRecordCorrectionResult.NotPublished
+            current.conflictsWith(command) -> PublishSessionRecordCorrectionResult.RevisionConflict(current)
+            else -> applyCorrection(host, command, correction)
+        }
+    }
+
+    private fun applyCorrection(
+        host: CurrentMember,
+        command: PublishSessionRecordCorrectionCommand,
+        correction: SessionRecordCorrectionEditor,
+    ): PublishSessionRecordCorrectionResult {
+        val draft = correction.editor.draft ?: throw draftStale()
+        val requestHash = codec.encode(draft.snapshot).sha256
+        val exposureChanged =
+            draft.snapshot.visibility.isHostOnly() !=
+                correction.editor.live.snapshot.visibility
+                    .isHostOnly()
+        val result =
+            applyLocked(
+                host = host,
+                command =
+                    ApplySessionRecordCommand(
+                        sessionId = command.sessionId,
+                        applyRequestId = UUID.randomUUID(),
+                        expectedDraftRevision = command.expectedDraftRevision,
+                        expectedLiveRevision = command.expectedLiveRevision,
+                        expectedDraftHash = requestHash,
+                    ),
+                editor = correction.editor,
+                afterReplacement = {
+                    check(
+                        store.bumpCorrectionProjectionRevisions(
+                            host = host,
+                            sessionId = command.sessionId,
+                            expectedExposureRevision = command.expectedExposureRevision,
+                            expectedPublicationRevision = command.expectedPublicationRevision,
+                            exposureChanged = exposureChanged,
+                        ),
+                    ) { "Locked correction projection revisions changed unexpectedly" }
+                },
+            )
+        return PublishSessionRecordCorrectionResult.Applied(result)
+    }
+
     @Suppress("LongMethod", "ThrowsCount")
     private fun applyLocked(
         host: CurrentMember,
         command: ApplySessionRecordCommand,
         editor: SessionRecordEditor,
         identity: MutationIdentity? = null,
+        afterReplacement: () -> Unit = {},
     ): SessionRecordApplyResult {
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId, forUpdate = true)?.let { completed ->
             if (identity != null) {
@@ -154,6 +217,7 @@ class SessionRecordApplyService(
                     )
             }
         val encodedDraft = codec.encode(canonicalSnapshot)
+        afterReplacement()
         val revision = store.insertAppliedRevision(host, editor, encodedDraft)
         store.insertApplyReceipt(host, command, requestHash, eventType, revision)
         if (identity != null) {
@@ -247,15 +311,24 @@ class SessionRecordApplyService(
             idempotencyKey = key,
         )
     }
-
-    private fun requireHost(host: CurrentMember) {
-        if (!host.isHost) throw AccessDeniedException("Host role required")
-    }
-
-    private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
-
-    private fun notFound() = SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
 }
+
+private fun SessionRecordVisibility.isHostOnly(): Boolean = this == SessionRecordVisibility.HOST_ONLY
+
+private fun SessionRecordCorrectionVersions.conflictsWith(command: PublishSessionRecordCorrectionCommand): Boolean =
+    sessionRevision != command.expectedSessionRevision ||
+        recordDraftRevision != command.expectedDraftRevision ||
+        liveRecordRevision != command.expectedLiveRevision ||
+        exposureRevision != command.expectedExposureRevision ||
+        publicationRevision != command.expectedPublicationRevision
+
+private fun requireHost(host: CurrentMember) {
+    if (!host.isHost) throw AccessDeniedException("Host role required")
+}
+
+private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
+
+private fun notFound() = SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
 
 private fun SessionRecordDraft.historicalAuthorBindings(
     live: LiveSessionRecord,

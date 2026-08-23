@@ -3,6 +3,7 @@ package com.readmates.session.adapter.`in`.web
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
 import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.CurrentMember
 import jakarta.validation.Valid
@@ -17,6 +18,7 @@ import java.util.UUID
 
 data class HostSessionPublicationRequest(
     @field:NotBlank val publicSummary: String,
+    val accessScope: SessionAccessScope? = null,
     val siteVisibility: PublicSiteVisibility? = null,
     val visibility: SessionRecordVisibility? = null,
 ) {
@@ -29,6 +31,7 @@ data class HostSessionPublicationRequest(
             sessionId,
             publicSummary.trim(),
             visibility ?: SessionRecordVisibility.HOST_ONLY,
+            accessScope,
             siteVisibility,
         )
 }
@@ -49,6 +52,7 @@ class PublicationController(
         return upsertPublicationUseCase.upsertPublication(
             envelope.command.toCommand(member, parseHostSessionId(sessionId)).copy(
                 expectedPublicationRevision = envelope.expected.publicationRevision,
+                expectedExposureRevision = envelope.expected.exposureRevision,
                 idempotencyKey = envelope.idempotencyKey,
             ),
         )

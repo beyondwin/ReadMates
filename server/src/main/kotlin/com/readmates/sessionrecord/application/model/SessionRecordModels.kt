@@ -144,6 +144,42 @@ data class ApplySessionRecordCommand(
     ) : this(sessionId, previewId, expectedDraftRevision, expectedLiveRevision, "")
 }
 
+data class PublishSessionRecordCorrectionCommand(
+    val sessionId: UUID,
+    val expectedSessionRevision: Long,
+    val expectedDraftRevision: Long,
+    val expectedLiveRevision: Long,
+    val expectedExposureRevision: Long,
+    val expectedPublicationRevision: Long,
+)
+
+data class SessionRecordCorrectionVersions(
+    val sessionRevision: Long,
+    val exposureRevision: Long,
+    val participantSetRevision: Long,
+    val recordDraftRevision: Long?,
+    val liveRecordRevision: Long,
+    val publicationRevision: Long,
+)
+
+data class SessionRecordCorrectionEditor(
+    val state: String,
+    val editor: SessionRecordEditor,
+    val versions: SessionRecordCorrectionVersions,
+)
+
+sealed interface PublishSessionRecordCorrectionResult {
+    data class Applied(
+        val result: SessionRecordApplyResult,
+    ) : PublishSessionRecordCorrectionResult
+
+    data class RevisionConflict(
+        val current: SessionRecordCorrectionVersions,
+    ) : PublishSessionRecordCorrectionResult
+
+    data object NotPublished : PublishSessionRecordCorrectionResult
+}
+
 data class HostNotificationComposerContext(
     val sessionId: UUID,
     val eventType: NotificationEventType,

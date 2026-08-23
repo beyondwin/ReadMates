@@ -17,6 +17,11 @@ internal class HostSessionPublicationWriteOperations(
         stagingRequired: Boolean,
     ): HostPublicationResponse {
         val locked = queries.locks.lockExposure(command.host, command.sessionId)
+        command.expectedExposureRevision?.let { expected ->
+            if (locked.exposureRevision != expected) {
+                queries.revisions.throwIfStale(0, command.host, command.sessionId)
+            }
+        }
         command.expectedPublicationRevision?.let { expected ->
             if (locked.publicationRevision != expected) {
                 queries.revisions.throwIfStale(0, command.host, command.sessionId)
@@ -27,7 +32,12 @@ internal class HostSessionPublicationWriteOperations(
         }
         val exposure = policy.publicationExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
-        updateSessionExposure(command, exposure.accessScope.name, compatibility.sessionVisibility)
+        updateSessionExposure(
+            command,
+            exposure.accessScope.name,
+            compatibility.sessionVisibility,
+            bumpExposureRevision = command.expectedExposureRevision != null,
+        )
         upsertPublication(
             command,
             exposure.siteVisibility.name,
@@ -61,12 +71,14 @@ internal class HostSessionPublicationWriteOperations(
         command: UpsertPublicationCommand,
         accessScope: String,
         sessionVisibility: String,
+        bumpExposureRevision: Boolean,
     ) {
         jdbcTemplate.update(
             """
             update sessions
             set access_scope = ?,
                 visibility = ?,
+                exposure_revision = exposure_revision + ?,
                 updated_at = utc_timestamp(6)
             where id = ?
               and club_id = ?
@@ -74,6 +86,7 @@ internal class HostSessionPublicationWriteOperations(
             """.trimIndent(),
             accessScope,
             sessionVisibility,
+            if (bumpExposureRevision) 1 else 0,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )

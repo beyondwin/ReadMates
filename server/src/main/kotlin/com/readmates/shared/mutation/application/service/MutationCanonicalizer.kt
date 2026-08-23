@@ -49,6 +49,7 @@ object MutationCanonicalizer {
             is CanonicalMutationPayload.Publication -> {
                 writer.writeString(payload.publicSummary)
                 writer.writeString(payload.siteVisibility)
+                payload.accessScope?.let(writer::writeString)
             }
             is CanonicalMutationPayload.RecordApply -> {
                 writer.writeString(payload.applyRequestId.toString())

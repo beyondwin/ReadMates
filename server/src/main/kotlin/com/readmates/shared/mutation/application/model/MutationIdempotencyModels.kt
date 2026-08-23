@@ -222,6 +222,7 @@ sealed class CanonicalMutationPayload {
     data class Publication(
         val publicSummary: String,
         val siteVisibility: String,
+        val accessScope: String? = null,
         override val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
         override val operation: HostMutationOperation = HostMutationOperation.SESSION_PUBLICATION,
     ) : CanonicalMutationPayload() {
