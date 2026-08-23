@@ -30,6 +30,16 @@ function renderAtRecordOrigin(pathname: string, element: ReactElement, scoped = 
   );
 }
 
+function renderHostChromeAtState(pathname: string, state: unknown, appBasePath = "") {
+  return render(
+    <MemoryRouter initialEntries={[{ pathname, state }]}>
+      <TopNav variant="host" memberName="김호스트" appBasePath={appBasePath} />
+      <MobileHeader variant="host" appBasePath={appBasePath} />
+      <MobileTabBar variant="host" appBasePath={appBasePath} />
+    </MemoryRouter>,
+  );
+}
+
 const memberToHostAction = { href: "/app/host", label: "호스트 화면", navigation: "push" } as const;
 const hostToMemberAction = { href: "/app", label: "멤버 화면으로", navigation: "push" } as const;
 
@@ -201,6 +211,47 @@ describe("TopNav responsive variants", () => {
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
     expect(within(nav).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
     expect(within(nav).getByRole("link", { name: "모임" })).not.toHaveAttribute("aria-current");
+  });
+
+  it.each([
+    ["external origin", "/app/host/sessions/session-6", {
+      readmatesReturnTo: "https://external.example/app/host/records",
+      readmatesReturnLabel: "기록으로",
+    }, ""],
+    ["another club", "/clubs/reading-sai/app/host/sessions/session-6", {
+      readmatesReturnTo: "/clubs/other-club/app/host/records",
+      readmatesReturnLabel: "기록으로",
+    }, "/clubs/reading-sai/app"],
+  ] as const)("rejects %s record ownership consistently across host chrome", (_name, pathname, state, appBasePath) => {
+    renderHostChromeAtState(pathname, state, appBasePath);
+
+    const desktop = screen.getByRole("navigation", { name: "앱 내비게이션" });
+    const mobile = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(desktop).getByRole("link", { name: "모임" })).toHaveAttribute("aria-current", "page");
+    expect(within(mobile).getByRole("link", { name: "모임" })).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("모임");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute(
+      "href",
+      appBasePath ? `${appBasePath}/host/sessions` : "/app/host/sessions",
+    );
+  });
+
+  it("uses the exact records owner for Back when an outer app return wraps records", () => {
+    renderHostChromeAtState("/app/host/sessions/session-6", {
+      readmatesReturnTo: "/app/host/operations",
+      readmatesReturnLabel: "운영으로",
+      readmatesReturnState: {
+        readmatesReturnTo: "/app/host/records",
+        readmatesReturnLabel: "기록으로",
+      },
+    });
+
+    const desktop = screen.getByRole("navigation", { name: "앱 내비게이션" });
+    const mobile = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(desktop).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(mobile).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("기록");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host/records");
   });
 
   it("groups host invitations under members and keeps the meeting list available during current lookup", () => {

@@ -120,6 +120,13 @@ function updateEditorDraft(
   );
 }
 
+function invalidateRecordDraftLedgerProjection(
+  client: QueryClient,
+  context?: ReadmatesApiContext,
+) {
+  return client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) });
+}
+
 export function useSaveHostSessionRecordDraftMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
@@ -127,8 +134,10 @@ export function useSaveHostSessionRecordDraftMutation(context?: ReadmatesApiCont
       sessionId: string;
       request: SaveHostSessionRecordDraftRequest;
     }) => saveHostSessionRecordDraft(sessionId, request, context),
-    onSuccess: (draft, variables) =>
-      updateEditorDraft(client, variables.sessionId, context, draft, true),
+    onSuccess: async (draft, variables) => {
+      updateEditorDraft(client, variables.sessionId, context, draft, true);
+      await invalidateRecordDraftLedgerProjection(client, context);
+    },
   });
 }
 
@@ -174,9 +183,10 @@ export function useRebaseHostSessionRecordDraftMutation(context?: ReadmatesApiCo
           };
         },
       );
-      if (cacheAdvanced) {
-        await client.invalidateQueries({ queryKey: editorKey, exact: true });
-      }
+      await Promise.all([
+        ...(cacheAdvanced ? [client.invalidateQueries({ queryKey: editorKey, exact: true })] : []),
+        invalidateRecordDraftLedgerProjection(client, context),
+      ]);
     },
   });
 }
@@ -188,7 +198,10 @@ export function useDeleteHostSessionRecordDraftMutation(context?: ReadmatesApiCo
       sessionId: string;
       expectedDraftRevision: number;
     }) => deleteHostSessionRecordDraft(sessionId, expectedDraftRevision, context),
-    onSuccess: (_response, variables) => updateEditorDraft(client, variables.sessionId, context, null),
+    onSuccess: async (_response, variables) => {
+      updateEditorDraft(client, variables.sessionId, context, null);
+      await invalidateRecordDraftLedgerProjection(client, context);
+    },
   });
 }
 
@@ -269,6 +282,9 @@ export function useRestoreHostSessionRevisionToDraftMutation(context?: Readmates
       revisionId: string;
       request: RestoreHostSessionRecordDraftRequest;
     }) => restoreHostSessionRevisionToDraft(sessionId, revisionId, request, context),
-    onSuccess: (draft, variables) => updateEditorDraft(client, variables.sessionId, context, draft),
+    onSuccess: async (draft, variables) => {
+      updateEditorDraft(client, variables.sessionId, context, draft);
+      await invalidateRecordDraftLedgerProjection(client, context);
+    },
   });
 }

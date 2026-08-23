@@ -383,7 +383,7 @@ function AppTopNav({
   const rawAppPath = appPathname(pathname);
   const appPath = variant === "host"
     && /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(rawAppPath)
-    && hasHostRecordsReturnState(location.state)
+    && hasHostRecordsReturnState(location.state, pathname)
     ? "/app/host/records"
     : rawAppPath;
   const resolvedCurrentSessionStatus =

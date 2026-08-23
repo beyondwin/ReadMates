@@ -292,11 +292,11 @@ describe("host session mutation hooks", () => {
       entries.current,
       entries.recordLedger,
       entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
     ]);
     expectFresh(client, [
       entries.manualDispatches,
-      entries.recordEditor,
-      entries.recordHistory,
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
@@ -362,19 +362,17 @@ describe("host session mutation hooks", () => {
     expectFresh(client, [entries.closingStatus, entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 
-  it("invalidates same-club record membership and removes stale record detail caches after trash restore", async () => {
+  it("invalidates same-club record membership and record detail caches after trash restore", async () => {
     vi.mocked(restoreHostSession).mockResolvedValue(visibilityResult().session as never);
     const { client, Wrapper } = createWrapper();
-    const { entries, keys } = seedSurfaces(client);
+    const { entries } = seedSurfaces(client);
     const { result } = renderHook(() => useRestoreHostSessionMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
       await result.current.mutateAsync("session-7");
     });
 
-    expectInvalidated(client, [entries.recordLedger, entries.recordAttention]);
-    expect(client.getQueryState(keys.recordEditor)).toBeUndefined();
-    expect(client.getQueryState(keys.recordHistory)).toBeUndefined();
+    expectInvalidated(client, [entries.recordLedger, entries.recordAttention, entries.recordEditor, entries.recordHistory]);
     expectFresh(client, [entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 
@@ -401,6 +399,8 @@ describe("host session mutation hooks", () => {
       entries.current,
       entries.recordLedger,
       entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
     ]);
     if (expectsManualDispatches) {
       expectInvalidated(client, [entries.manualDispatches]);
@@ -408,8 +408,6 @@ describe("host session mutation hooks", () => {
       expectFresh(client, [entries.manualDispatches]);
     }
     expectFresh(client, [
-      entries.recordEditor,
-      entries.recordHistory,
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
@@ -440,10 +438,10 @@ describe("host session mutation hooks", () => {
       entries.manualDispatches,
       entries.recordLedger,
       entries.recordAttention,
-    ]);
-    expectFresh(client, [
       entries.recordEditor,
       entries.recordHistory,
+    ]);
+    expectFresh(client, [
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
@@ -477,13 +475,12 @@ describe("host session mutation hooks", () => {
     );
     expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
     expect(client.getQueryData(manualOptionsKey)).toBeUndefined();
-    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention]);
+    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention, entries.recordEditor]);
     expectFresh(client, [
       [keys.detail, visibilityResult().session],
       entries.closingStatus,
       entries.current,
       entries.manualDispatches,
-      entries.recordEditor,
       entries.recordHistory,
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
@@ -510,11 +507,11 @@ describe("host session mutation hooks", () => {
       entries.manualDispatches,
       entries.recordLedger,
       entries.recordAttention,
+      entries.recordEditor,
     ]);
     expectFresh(client, [
       entries.closingStatus,
       entries.current,
-      entries.recordEditor,
       entries.recordHistory,
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
@@ -531,8 +528,8 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request: { accessScope: "GUEST_READABLE" } });
     });
 
-    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention]);
-    expectFresh(client, [entries.otherClubDetail, entries.otherClubRecordLedger]);
+    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention, entries.recordEditor]);
+    expectFresh(client, [entries.recordHistory, entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 
   it("invalidates detail and current session after attendance update", async () => {
@@ -554,7 +551,7 @@ describe("host session mutation hooks", () => {
     expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", [
       { membershipId: "member-1", attendanceStatus: "ATTENDED" },
     ], context);
-    expectInvalidated(client, [entries.detail, entries.current]);
+    expectInvalidated(client, [entries.detail, entries.current, entries.recordHistory]);
     expectFresh(client, [
       entries.closingStatus,
       entries.list,
@@ -563,7 +560,6 @@ describe("host session mutation hooks", () => {
       entries.recordLedger,
       entries.recordAttention,
       entries.recordEditor,
-      entries.recordHistory,
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
@@ -592,12 +588,12 @@ describe("host session mutation hooks", () => {
       entries.current,
       entries.recordLedger,
       entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
     ]);
     expectFresh(client, [
       entries.closingStatus,
       entries.manualDispatches,
-      entries.recordEditor,
-      entries.recordHistory,
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);

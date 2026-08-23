@@ -37,6 +37,7 @@ function seedSurfaces(client: QueryClient) {
   const entries = {
     detail: [hostSessionKeys.detail("session-7", context), { surface: "detail" }],
     history: [hostSessionRecordKeys.historyRoot("session-7", context), { surface: "history" }],
+    editor: [hostSessionRecordKeys.editor("session-7", context), { surface: "editor" }],
     recordLedger: [hostSessionRecordKeys.ledger(undefined, context), { surface: "record-ledger" }],
     list: [hostSessionKeys.list({ limit: 50 }, context), { surface: "list" }],
     dashboard: [hostSessionKeys.dashboard(context), { surface: "dashboard" }],
@@ -121,6 +122,7 @@ describe("host session recovery queries", () => {
     expectInvalidated(client, [
       entries.detail,
       entries.history,
+      entries.editor,
       entries.recordLedger,
       entries.list,
       entries.dashboard,

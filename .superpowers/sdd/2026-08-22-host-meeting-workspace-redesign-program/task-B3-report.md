@@ -102,3 +102,50 @@ Status: `DONE_WITH_CONCERNS`
 
 - The known full-aggregate residuals from the original B3 report remain unchanged and are deferred to the program risk phase: the two B1 architecture/copy expectations are not B3 fix-round regressions.
 - No browser/E2E evidence was requested for this fix round; scoped return-state behavior is covered at desktop/mobile router-component level rather than a real browser.
+
+## Fix round 2
+
+Status: `DONE_WITH_CONCERNS`
+
+### Implementation
+
+- Completed the mutation-to-record-cache matrix from the server history and ledger projections. Basic updates, lifecycle transitions, import, trash restore, and recovery restore now invalidate the same-session editor/history plus exact-club record ledger/attention caches. Visibility/access/publication invalidate editor and record ledger/attention; attendance invalidates history; draft save/rebase/delete/revision restore invalidate record ledger/attention after updating the editor cache. Delete removes the same-session editor/history. All key prefixes retain club isolation.
+- Replaced boolean-only record-origin detection with one bounded, cycle-safe, same-origin/current-club parser that returns the exact validated `/host/records` target. Desktop owner, mobile title/tab, and mobile Back all consume the same result. An outer app path cannot replace Back even when it wraps a nested records target; external, cross-club, malformed, over-depth, and cyclic state are rejected. The generic return parsers are also depth/visited bounded.
+- Added scoped `기록` return state at the production record-row owner, rather than relying on later path prefixing. Desktop and mobile record links carry the same scoped owner into the canonical detail route.
+- Added `ReadmatesTransportError` at the shared fetch boundary. Only a fetch-rejected `TypeError` is converted, with a stable user-safe message and no raw provider details. Host list loaders recover that typed transport error and ordinary non-auth API responses; arbitrary programmer `TypeError`, Zod/opposite-lifecycle contract failures, and auth/authorization failures remain fatal.
+
+### TDD evidence
+
+- Session mutation cache RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-queries.hooks.test.tsx` — expected failure: 13 failed, 5 passed because editor/history and some exact-club record ledger/attention caches remained fresh or were removed with stale semantics.
+- Record draft cache RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-record-queries.test.tsx` — expected failure: 5 failed, 10 passed because save/rebase/delete/revision restore did not invalidate the record ledger projection.
+- Recovery cache RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-recovery-queries.test.tsx` — expected failure: 1 failed, 1 passed because restored record changes left the editor cache fresh.
+- Record-origin validation RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/routing/readmates-route-state.test.ts` — expected failure: 2 failed, 1 passed because cross-club and over-depth nested state could claim record ownership.
+- Typed transport RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/route/host-meeting-list-data.test.ts tests/unit/readmates-fetch.test.ts` — expected failure: 2 failed, 22 passed because arbitrary programmer `TypeError` was downgraded and fetch failures were still raw `TypeError` values.
+
+### Verification
+
+- Focused B3: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/routes/host.test.tsx src/app/host-route-destination-inventory.test.ts features/host/api/host-api.test.ts tests/unit/host-contract-zod.test.ts features/host/model/host-meeting-list-model.test.ts features/host/ui/meeting-list/host-meeting-list.test.tsx features/host/model/host-session-ledger-model.test.ts features/host/ui/host-session-ledger.test.tsx --reporter=verbose` — PASS: 8 files, 56 tests.
+- Count correction: Fix round 1's focused result should have read 8 files/55 tests, not 8/54. This round adds one scoped ledger return-state test, producing the current 8/56 result above.
+- Affected ledger/editor/layout/route regressions: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/route/host-session-editor-route.test.tsx tests/unit/spa-layout.test.tsx src/app/layouts/app-route-layout.test.tsx features/host/api/host-session-record-api.test.ts features/host/route/host-dashboard-data.test.ts features/host/route/host-dashboard-route.test.tsx features/host/route/host-meeting-ledger-route.test.tsx features/host/ui/meeting-ledger/host-meeting-ledger.test.tsx shared/observability/route-patterns.test.ts tests/unit/responsive-navigation.test.tsx tests/unit/route-continuity.test.ts --reporter=dot` — PASS: 11 files, 201 tests; the same pre-existing React `act` and router `HydrateFallback` stderr warnings remain.
+- Fix-specific cache/loader/return-state/client group: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-queries.hooks.test.tsx features/host/queries/host-session-record-queries.test.tsx features/host/queries/host-session-recovery-queries.test.tsx features/host/route/host-meeting-list-data.test.ts shared/routing/readmates-route-state.test.ts shared/ui/mobile-header-cycle.test.tsx tests/unit/readmates-fetch.test.ts tests/unit/responsive-navigation.test.tsx tests/unit/route-continuity.test.ts --reporter=dot` — PASS: 9 files, 142 tests.
+- Session hook gate: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-queries.hooks.test.tsx --reporter=dot` — PASS: 1 file, 18 tests.
+- Navigation ownership gate: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/routing/readmates-route-state.test.ts shared/ui/mobile-header-cycle.test.tsx tests/unit/responsive-navigation.test.tsx tests/unit/route-continuity.test.ts --reporter=dot` — PASS: 4 files, 83 tests.
+- Executable inventory gate: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/host-route-destination-inventory.test.ts --reporter=dot` — PASS: 1 file, 6 tests.
+- `npx --yes corepack@0.35.0 pnpm --dir front lint` — PASS.
+- `npx --yes corepack@0.35.0 pnpm --dir front build` — PASS: Vite transformed 698 modules.
+- `git diff --check` — PASS before report append; re-run immediately before commit.
+- No task-specific E2E slice was added, so E2E was not run. The full frontend aggregate was not re-run in this round; the program has already accepted the two known B1 residuals below for later risk resolution.
+
+### Self-review
+
+- Query keys and club isolation: every record invalidation starts at `['host','session-records',clubSlug,...]`; cache-level tests seed a second club and prove it stays fresh. Ledger invalidation includes attention pages under the same ledger prefix. Same-session editor/history keys are exact or session-root scoped, and no global record cache invalidation was added.
+- Mutation projections: basic/lifecycle/import/recovery can change editor/history and record-row membership/projection, so they invalidate all three surfaces. Visibility/access/publication affect the editor and ledger projection but not server history. Attendance affects server history but no record editor/ledger DTO field. Draft mutations synchronously update editor draft state and invalidate ledger fields such as `hasDraft`, `draftRevision`, and `lastModifiedAt`.
+- Scoped return state and route ownership: the parser accepts only same-origin state under the current unscoped or exact club-scoped app root. It returns the matched records node itself, never an arbitrary outer chain. The exact target drives desktop/mobile ownership and Back; closing/feedback-document remain record-owned, while direct meeting-origin detail remains meeting-owned. Actual MobileHeader renders cover both record and generic cyclic state without stack overflow.
+- Auth versus query failure: auth is required before list recovery. The recovery boundary recognizes only the typed fetch-boundary transport error and non-401/403 `ReadmatesApiError`. Arbitrary `TypeError`, Zod/opposite-lifecycle contract violations, session expiry, and authorization errors escape to the route boundary as intended.
+- Inventory and cursor behavior: the canonical production route inventory/observability tests remain green for scoped/unscoped meeting list, record list, feedback-document, and compatibility destinations. Existing `LIST_CURSOR_STALE` replace/announce/focus and empty-page/no-replay tests remain part of the focused gate.
+
+### Concerns
+
+- The known aggregate residuals remain deferred to the program risk phase: `frontend-boundaries.test.ts` reports the two B1 app-module imports, and `host-session-editor.test.tsx` retains the pre-B1 publication-copy expectation. This round did not change either surface or claim a new aggregate pass.
+- The affected regression gate still emits the pre-existing React `act` and router `HydrateFallback` warnings. Tests pass, but those warnings remain cleanup work outside B3 route/cache ownership.
+- Browser/E2E evidence was not requested or added for this fix round; scoped and cyclic return-state behavior is covered through router-component and direct MobileHeader render tests.

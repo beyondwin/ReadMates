@@ -75,4 +75,28 @@ describe("hostMeetingListLoaderFactory", () => {
     await expect(hostMeetingListLoaderFactory(client())(args("https://readmates.test/app/host/sessions")))
       .rejects.toMatchObject({ name: "ZodError" });
   });
+
+  it("keeps arbitrary programmer TypeErrors fatal", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(Response.json(hostAuth))));
+    const programmerFailureClient = {
+      fetchQuery: vi.fn().mockRejectedValue(new TypeError("programmer bug")),
+    } as unknown as QueryClient;
+
+    await expect(hostMeetingListLoaderFactory(programmerFailureClient)(
+      args("https://readmates.test/app/host/sessions"),
+    )).rejects.toThrow("programmer bug");
+  });
+
+  it("returns unavailable meeting data for an ordinary non-auth API response", async () => {
+    vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL) => {
+      if (String(input).includes("/api/bff/api/auth/me")) {
+        return Promise.resolve(Response.json(hostAuth));
+      }
+      return Promise.resolve(Response.json({ message: "temporarily unavailable" }, { status: 503 }));
+    }));
+
+    await expect(hostMeetingListLoaderFactory(client())(
+      args("https://readmates.test/app/host/sessions"),
+    )).resolves.toMatchObject({ view: "meeting", page: null });
+  });
 });

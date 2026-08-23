@@ -112,10 +112,16 @@ export function appFeedbackHref(sessionId: string, printMode = false) {
   return `/app/feedback/${encodeURIComponent(sessionId)}${printMode ? "/print" : ""}`;
 }
 
-function readReturnTargetFromState(state: unknown, scope: "app" | "public"): ReadmatesReturnTarget | null {
-  if (!state || typeof state !== "object") {
+function readReturnTargetFromState(
+  state: unknown,
+  scope: "app" | "public",
+  visited = new Set<object>(),
+  depth = 0,
+): ReadmatesReturnTarget | null {
+  if (depth >= 8 || !state || typeof state !== "object" || visited.has(state)) {
     return null;
   }
+  visited.add(state);
 
   const routeState = state as ReadmatesRouteState;
   const href = typeof routeState.readmatesReturnTo === "string" ? toSafeReadmatesHref(routeState.readmatesReturnTo, scope) : null;
@@ -124,7 +130,12 @@ function readReturnTargetFromState(state: unknown, scope: "app" | "public"): Rea
     return null;
   }
 
-  const nestedTarget = readReturnTargetFromState(routeState.readmatesReturnState, scope);
+  const nestedTarget = readReturnTargetFromState(
+    routeState.readmatesReturnState,
+    scope,
+    visited,
+    depth + 1,
+  );
 
   return {
     href,

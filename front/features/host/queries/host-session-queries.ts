@@ -314,6 +314,25 @@ function invalidateOk(response: Response, invalidate: () => Promise<unknown>) {
   return response.ok ? invalidate() : Promise.resolve();
 }
 
+async function invalidateHostSessionRecordCaches(
+  client: QueryClient,
+  sessionId: string,
+  context?: ReadmatesApiContext,
+  options: { editor?: boolean; history?: boolean; ledgers?: boolean } = {},
+) {
+  await Promise.all([
+    ...(options.editor
+      ? [client.invalidateQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context), exact: true })]
+      : []),
+    ...(options.history
+      ? [client.invalidateQueries({ queryKey: hostSessionRecordKeys.historyRoot(sessionId, context) })]
+      : []),
+    ...(options.ledgers
+      ? [client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) })]
+      : []),
+  ]);
+}
+
 async function invalidateSessionMutationSurfaces(
   client: QueryClient,
   sessionId: string,
@@ -326,7 +345,11 @@ async function invalidateSessionMutationSurfaces(
     invalidateHostSessionLists(client, context),
     invalidateHostSessionDashboard(client, context),
     invalidateHostCurrentSession(client, context),
-    client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+    invalidateHostSessionRecordCaches(client, sessionId, context, {
+      editor: true,
+      history: true,
+      ledgers: true,
+    }),
     ...(options?.manualDispatches ? [invalidateHostSessionManualDispatches(client, context)] : []),
   ]);
 }
@@ -391,11 +414,13 @@ export function useRestoreHostSessionMutation(context?: ReadmatesApiContext) {
     onSuccess: async (detail, sessionId) => {
       client.setQueryData(hostSessionKeys.detail(sessionId, context), detail);
       client.removeQueries({ queryKey: hostSessionKeys.trashDetail(sessionId, context) });
-      client.removeQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context) });
-      client.removeQueries({ queryKey: hostSessionRecordKeys.historyRoot(sessionId, context) });
       await Promise.all([
         invalidateHostSessionSurface(client, context),
-        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+        invalidateHostSessionRecordCaches(client, sessionId, context, {
+          editor: true,
+          history: true,
+          ledgers: true,
+        }),
       ]);
     },
   });
@@ -480,7 +505,7 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
       return Promise.all([
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
-        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+        invalidateHostSessionRecordCaches(client, variables.sessionId, context, { editor: true, ledgers: true }),
       ]);
     },
   });
@@ -502,7 +527,7 @@ export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiCont
       return Promise.all([
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
-        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+        invalidateHostSessionRecordCaches(client, variables.sessionId, context, { editor: true, ledgers: true }),
       ]);
     },
   });
@@ -520,7 +545,7 @@ export function useSaveHostSessionPublicationMutation(context?: ReadmatesApiCont
           invalidateHostSessionLists(client, context),
           invalidateHostSessionDashboard(client, context),
           invalidateHostSessionManualDispatches(client, context),
-          client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+          invalidateHostSessionRecordCaches(client, variables.sessionId, context, { editor: true, ledgers: true }),
         ]),
       ),
   });
@@ -535,6 +560,7 @@ export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiCon
       Promise.all([
         invalidateHostSessionDetail(client, variables.sessionId, context),
         invalidateHostCurrentSession(client, context),
+        invalidateHostSessionRecordCaches(client, variables.sessionId, context, { history: true }),
       ]),
   });
 }
@@ -550,7 +576,11 @@ export function useCommitHostSessionImportMutation(context?: ReadmatesApiContext
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
         invalidateHostCurrentSession(client, context),
-        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+        invalidateHostSessionRecordCaches(client, variables.sessionId, context, {
+          editor: true,
+          history: true,
+          ledgers: true,
+        }),
       ]),
   });
 }

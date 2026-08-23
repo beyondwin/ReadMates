@@ -6,7 +6,10 @@ import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS } from "./readmates-copy";
 import { TabIcon, type TabIconName } from "./mobile-tab-bar";
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
-import { hasHostRecordsReturnState } from "@/shared/routing/readmates-route-state";
+import {
+  hasHostRecordsReturnState,
+  readHostRecordsReturnTarget,
+} from "@/shared/routing/readmates-route-state";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
 
@@ -129,10 +132,16 @@ function defaultReadmatesReturnState(target: ReadmatesReturnTarget) {
   return state;
 }
 
-function readReturnTargetFromState(state: unknown, scope: "app" | "public"): ReadmatesReturnTarget | null {
-  if (!state || typeof state !== "object") {
+function readReturnTargetFromState(
+  state: unknown,
+  scope: "app" | "public",
+  visited = new Set<object>(),
+  depth = 0,
+): ReadmatesReturnTarget | null {
+  if (depth >= 8 || !state || typeof state !== "object" || visited.has(state)) {
     return null;
   }
+  visited.add(state);
 
   const routeState = state as ReadmatesRouteState;
   const href = typeof routeState.readmatesReturnTo === "string" ? toSafeReadmatesHref(routeState.readmatesReturnTo, scope) : null;
@@ -141,7 +150,12 @@ function readReturnTargetFromState(state: unknown, scope: "app" | "public"): Rea
     return null;
   }
 
-  const nestedTarget = readReturnTargetFromState(routeState.readmatesReturnState, scope);
+  const nestedTarget = readReturnTargetFromState(
+    routeState.readmatesReturnState,
+    scope,
+    visited,
+    depth + 1,
+  );
 
   return {
     href,
@@ -279,9 +293,10 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
   return variant === "host" ? READMATES_NAV_LABELS.host.operations : "읽는사이";
 }
 
-function isHostRecordOwnedRoute(pathname: string, state: unknown) {
+function isHostRecordOwnedRoute(pathname: string, state: unknown, currentPathname = pathname) {
   return /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname)
-    || (/^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname) && hasHostRecordsReturnState(state));
+    || (/^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname)
+      && hasHostRecordsReturnState(state, currentPathname));
 }
 
 type HeaderBackTarget = {
@@ -304,6 +319,7 @@ function appBackTarget(
   pathname: string,
   state: unknown,
   navigationContinuity: ReadmatesNavigationContinuity,
+  currentPathname = pathname,
 ): HeaderBackTarget | null {
   if (pathname === "/app/session" || pathname.startsWith("/app/session/")) {
     return { href: "/app", label: "홈", icon: "brand" };
@@ -321,11 +337,11 @@ function appBackTarget(
     return null;
   }
 
-  if (variant === "host" && isHostRecordOwnedRoute(pathname, state)) {
-    const target = navigationContinuity.readReadmatesReturnTarget(state, {
+  if (variant === "host" && isHostRecordOwnedRoute(pathname, state, currentPathname)) {
+    const target = readHostRecordsReturnTarget(state, currentPathname) ?? {
       href: "/app/host/records",
       label: "기록으로",
-    });
+    };
     return { href: target.href, state: target.state, label: "뒤로", icon: "brand" };
   }
 
@@ -531,14 +547,17 @@ function AppMobileHeader({
   const location = useLocation();
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
-  const recordOwned = variant === "host" && isHostRecordOwnedRoute(appPath, location.state);
+  const recordOwned = variant === "host" && isHostRecordOwnedRoute(appPath, location.state, pathname);
 
   return (
     <HeaderShell
       workspace={variant}
       kicker={variant === "host" ? "호스트" : null}
       title={recordOwned ? "기록" : appTitle(variant, appPath)}
-      backTarget={scopeAppBackTarget(appBackTarget(variant, appPath, location.state, navigationContinuity), appBasePath)}
+      backTarget={scopeAppBackTarget(
+        appBackTarget(variant, appPath, location.state, navigationContinuity, pathname),
+        appBasePath,
+      )}
       rightAction={appRightAction(appBasePath, workspaceAction)}
       accountControl={accountControl}
       brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}

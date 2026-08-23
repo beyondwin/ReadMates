@@ -295,6 +295,7 @@ export function HostSessionLedgerRoute({
           }}
           trashHref="/app/host/sessions?view=trash"
           activeHref="/app/host/records"
+          recordReturnHref={scopedAppLinkTarget(location.pathname, "/app/host/records")}
           LinkComponent={LinkComponent}
         />
       </section>

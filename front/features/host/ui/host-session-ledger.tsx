@@ -52,6 +52,7 @@ export type HostSessionLedgerProps = {
   trashItems?: HostSessionLedgerTrashItem[];
   trashHref?: string;
   activeHref?: string;
+  recordReturnHref?: string;
   onRestore?: (sessionId: string) => void;
   onRetryRestore?: (sessionId: string) => void;
 };
@@ -173,9 +174,11 @@ function LedgerFilters({
 function DesktopLedger({
   items,
   LinkComponent,
+  recordReturnHref,
 }: {
   items: HostSessionLedgerItem[];
   LinkComponent: HostSessionLedgerLinkComponent;
+  recordReturnHref: string;
 }) {
   return (
     <div className="desktop-only rm-document-panel" style={{ overflowX: "auto" }}>
@@ -213,7 +216,7 @@ function DesktopLedger({
               <td style={{ padding: 16, verticalAlign: "top" }}>
                 <LinkComponent
                   to={sessionRecordHref(item.sessionId)}
-                  state={readmatesReturnState({ href: "/app/host/records", label: "기록으로" })}
+                  state={readmatesReturnState({ href: recordReturnHref, label: "기록으로" })}
                   className="btn btn-ghost btn-sm"
                   aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
                 >
@@ -231,9 +234,11 @@ function DesktopLedger({
 function MobileLedger({
   items,
   LinkComponent,
+  recordReturnHref,
 }: {
   items: HostSessionLedgerItem[];
   LinkComponent: HostSessionLedgerLinkComponent;
+  recordReturnHref: string;
 }) {
   return (
     <div className="mobile-only stack" style={{ "--stack": "10px", minWidth: 0 } as React.CSSProperties}>
@@ -261,7 +266,7 @@ function MobileLedger({
           <div style={{ marginTop: 12 }}><LedgerBadges item={item} /></div>
           <LinkComponent
             to={sessionRecordHref(item.sessionId)}
-            state={readmatesReturnState({ href: "/app/host/records", label: "기록으로" })}
+            state={readmatesReturnState({ href: recordReturnHref, label: "기록으로" })}
             className="btn btn-primary"
             aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
           >
@@ -354,6 +359,7 @@ export function HostSessionLedger({
   trashItems = [],
   trashHref = "?view=trash",
   activeHref = "/app/host/records",
+  recordReturnHref = "/app/host/records",
   onRestore,
   onRetryRestore,
 }: HostSessionLedgerProps) {
@@ -407,8 +413,8 @@ export function HostSessionLedger({
         />
       ) : (
         <>
-          <DesktopLedger items={items} LinkComponent={LinkComponent} />
-          <MobileLedger items={items} LinkComponent={LinkComponent} />
+          <DesktopLedger items={items} LinkComponent={LinkComponent} recordReturnHref={recordReturnHref} />
+          <MobileLedger items={items} LinkComponent={LinkComponent} recordReturnHref={recordReturnHref} />
         </>
       )}
       {nextCursor ? (

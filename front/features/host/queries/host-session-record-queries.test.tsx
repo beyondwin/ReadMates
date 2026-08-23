@@ -9,7 +9,9 @@ vi.mock("@/features/host/api/host-session-record-api", () => ({
   fetchHostSessionRecordEditor: vi.fn(),
   fetchHostSessionRecordCapabilities: vi.fn(),
   fetchHostSessionRecordLedger: vi.fn(),
+  deleteHostSessionRecordDraft: vi.fn(),
   rebaseHostSessionRecordDraft: vi.fn(),
+  restoreHostSessionRevisionToDraft: vi.fn(),
   saveHostSessionRecordDraft: vi.fn(),
 }));
 
@@ -23,10 +25,12 @@ import {
 } from "@/features/host/api/host-session-record-contracts";
 import {
   applyHostSessionRecord,
+  deleteHostSessionRecordDraft,
   fetchHostSessionHistory,
   fetchHostSessionRecordEditor,
   fetchHostSessionRecordLedger,
   rebaseHostSessionRecordDraft,
+  restoreHostSessionRevisionToDraft,
   saveHostSessionRecordDraft,
 } from "@/features/host/api/host-session-record-api";
 import { hostSessionKeys } from "./host-session-queries";
@@ -38,8 +42,10 @@ import {
   hostSessionRecordKeys,
   hostSessionRecordLedgerQuery,
   useApplyHostSessionRecordMutation,
+  useDeleteHostSessionRecordDraftMutation,
   useRebaseHostSessionRecordDraftMutation,
   useSaveHostSessionRecordDraftMutation,
+  useRestoreHostSessionRevisionToDraftMutation,
 } from "./host-session-record-queries";
 
 function createWrapper() {
@@ -92,6 +98,22 @@ function editor() {
     draftLiveBaseStale: false,
     validationSummary: { valid: true, issues: [] },
   };
+}
+
+function seedRecordLedgers(client: QueryClient, context = { clubSlug: "reading-sai" }) {
+  const same = hostSessionRecordKeys.ledger({ page: { limit: 50 } }, context);
+  const attention = hostSessionRecordKeys.attentionPages(context);
+  const other = hostSessionRecordKeys.ledger({ page: { limit: 50 } }, { clubSlug: "other-club" });
+  client.setQueryData(same, { items: ["session-28"] });
+  client.setQueryData(attention, { pages: ["session-28"] });
+  client.setQueryData(other, { items: ["other-session"] });
+  return { same, attention, other };
+}
+
+function expectLedgerIsolation(client: QueryClient, keys: ReturnType<typeof seedRecordLedgers>) {
+  expect(client.getQueryState(keys.same)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(keys.attention)?.isInvalidated).toBe(true);
+  expect(client.getQueryState(keys.other)?.isInvalidated).toBe(false);
 }
 
 beforeEach(() => {
@@ -228,6 +250,7 @@ describe("host session record queries", () => {
     vi.mocked(saveHostSessionRecordDraft).mockResolvedValue(draft());
     const context = { clubSlug: "reading-sai" };
     const { client, Wrapper } = createWrapper();
+    const ledgerKeys = seedRecordLedgers(client, context);
     client.setQueryData(hostSessionRecordKeys.editor("session-28", context), editor());
     const { result } = renderHook(() => useSaveHostSessionRecordDraftMutation(context), { wrapper: Wrapper });
 
@@ -244,6 +267,7 @@ describe("host session record queries", () => {
       draft: { draftRevision: 3 },
       draftLiveBaseStale: false,
     });
+    expectLedgerIsolation(client, ledgerKeys);
   });
 
   it("does not clear metadata staleness when an already-stale draft autosaves", async () => {
@@ -253,6 +277,7 @@ describe("host session record queries", () => {
     });
     const context = { clubSlug: "reading-sai" };
     const { client, Wrapper } = createWrapper();
+    const ledgerKeys = seedRecordLedgers(client, context);
     const key = hostSessionRecordKeys.editor("session-28", context);
     client.setQueryData(key, {
       ...editor(),
@@ -277,6 +302,45 @@ describe("host session record queries", () => {
       draft: { draftRevision: 4 },
       draftLiveBaseStale: true,
       validationSummary: { valid: false, issues: ["LIVE_REVISION_STALE"] },
+    });
+    expectLedgerIsolation(client, ledgerKeys);
+  });
+
+  it("invalidates exact-club ledgers after deleting a record draft", async () => {
+    vi.mocked(deleteHostSessionRecordDraft).mockResolvedValue(new Response(null, { status: 204 }));
+    const context = { clubSlug: "reading-sai" };
+    const { client, Wrapper } = createWrapper();
+    const ledgerKeys = seedRecordLedgers(client, context);
+    client.setQueryData(hostSessionRecordKeys.editor("session-28", context), { ...editor(), draft: draft() });
+    const { result } = renderHook(() => useDeleteHostSessionRecordDraftMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "session-28", expectedDraftRevision: 3 });
+    });
+
+    expectLedgerIsolation(client, ledgerKeys);
+    expect(client.getQueryData(hostSessionRecordKeys.editor("session-28", context))).toMatchObject({ draft: null });
+  });
+
+  it("invalidates exact-club ledgers after restoring a revision to draft", async () => {
+    vi.mocked(restoreHostSessionRevisionToDraft).mockResolvedValue({ ...draft(), source: "RESTORED" });
+    const context = { clubSlug: "reading-sai" };
+    const { client, Wrapper } = createWrapper();
+    const ledgerKeys = seedRecordLedgers(client, context);
+    client.setQueryData(hostSessionRecordKeys.editor("session-28", context), editor());
+    const { result } = renderHook(() => useRestoreHostSessionRevisionToDraftMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        sessionId: "session-28",
+        revisionId: "revision-2",
+        request: { expectedDraftRevision: null },
+      });
+    });
+
+    expectLedgerIsolation(client, ledgerKeys);
+    expect(client.getQueryData(hostSessionRecordKeys.editor("session-28", context))).toMatchObject({
+      draft: { source: "RESTORED", draftRevision: 3 },
     });
   });
 
@@ -303,6 +367,7 @@ describe("host session record queries", () => {
     });
     const context = { clubSlug: "reading-sai" };
     const { client, Wrapper } = createWrapper();
+    const ledgerKeys = seedRecordLedgers(client, context);
     const key = hostSessionRecordKeys.editor("session-28", context);
     client.setQueryData(key, {
       ...editor(),
@@ -331,6 +396,7 @@ describe("host session record queries", () => {
       draftLiveBaseStale: false,
       validationSummary: { valid: true, issues: [] },
     });
+    expectLedgerIsolation(client, ledgerKeys);
   });
 
   it("does not clear stale state when the editor cache advances during rebase", async () => {

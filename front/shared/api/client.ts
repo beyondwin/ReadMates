@@ -1,4 +1,4 @@
-import { apiErrorFromResponse } from "@/shared/api/errors";
+import { apiErrorFromResponse, ReadmatesTransportError } from "@/shared/api/errors";
 import { parseReadmatesResponse } from "@/shared/api/response";
 import { signalSessionExpired } from "@/shared/auth/session-expiry";
 import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
@@ -63,6 +63,17 @@ export function readmatesApiPath(path: string, context?: ReadmatesApiContext) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+async function readmatesTransportFetch(input: RequestInfo | URL, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ReadmatesTransportError();
+    }
+    throw error;
+  }
+}
+
 export async function readmatesFetchResponse(
   path: string,
   init?: RequestInit,
@@ -83,7 +94,7 @@ export async function readmatesFetchResponse(
     headers.delete(HOST_WRITE_CLIENT_CONTRACT_HEADER);
   }
 
-  const response = await fetch(`/api/bff${readmatesApiPath(path, context)}`, {
+  const response = await readmatesTransportFetch(`/api/bff${readmatesApiPath(path, context)}`, {
     ...init,
     headers,
     cache: "no-store",
@@ -135,7 +146,7 @@ export async function readmatesPublicFetchResponse(path: string, init?: RequestI
     headers.set("Content-Type", "application/json");
   }
 
-  return fetch(`/api/bff${readmatesApiPath(path, { clubSlug: undefined })}`, {
+  return readmatesTransportFetch(`/api/bff${readmatesApiPath(path, { clubSlug: undefined })}`, {
     ...init,
     headers,
     cache: "no-store",

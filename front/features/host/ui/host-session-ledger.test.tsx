@@ -97,6 +97,36 @@ describe("HostSessionLedger", () => {
     ]);
   });
 
+  it("preserves the scoped records owner on every record row link", () => {
+    const recordLinkStates: unknown[] = [];
+    render(
+      <HostSessionLedger
+        items={items}
+        filters={filters}
+        nextCursor={null}
+        loadingMore={false}
+        recordReturnHref="/clubs/reading-sai/app/host/records"
+        onFiltersChange={vi.fn()}
+        onLoadMore={vi.fn()}
+        LinkComponent={({ to, state, children, ...props }) => {
+          recordLinkStates.push(state);
+          return <a {...props} href={to}>{children}</a>;
+        }}
+      />,
+    );
+
+    expect(recordLinkStates.filter(Boolean)).toEqual([
+      {
+        readmatesReturnTo: "/clubs/reading-sai/app/host/records",
+        readmatesReturnLabel: "기록으로",
+      },
+      {
+        readmatesReturnTo: "/clubs/reading-sai/app/host/records",
+        readmatesReturnLabel: "기록으로",
+      },
+    ]);
+  });
+
   it("hides active filters in trash view and restores a row inline", async () => {
     const user = userEvent.setup();
     const onRestore = vi.fn();

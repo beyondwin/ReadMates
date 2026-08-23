@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readmatesApiPath, readmatesFetch, readmatesFetchResponse, ReadMatesSessionExpiredError, __resetRedirectGuardForTest } from "@/shared/api/client";
-import { isReadmatesApiError } from "@/shared/api/errors";
+import { isReadmatesApiError, ReadmatesTransportError } from "@/shared/api/errors";
 import { frontendObservability } from "@/shared/observability/frontend-observability";
 import { normalizedClubSlug } from "@/shared/security/club-slug";
 
@@ -12,6 +12,23 @@ afterEach(() => {
 });
 
 describe("readmatesFetchResponse", () => {
+  it("maps only fetch-boundary TypeErrors to a safe typed transport failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(
+      new TypeError("provider socket detail must not escape"),
+    ));
+
+    await expect(readmatesFetchResponse("/api/app/me")).rejects.toMatchObject({
+      name: "ReadmatesTransportError",
+      message: "네트워크 연결을 확인해 주세요.",
+    });
+    await expect(readmatesFetchResponse("/api/app/me")).rejects.toBeInstanceOf(
+      ReadmatesTransportError,
+    );
+    await expect(readmatesFetchResponse("/api/app/me")).rejects.not.toThrow(
+      /provider socket detail/,
+    );
+  });
+
   it("normalizes club slugs through the shared BFF helper contract", () => {
     expect(normalizedClubSlug(" Reading-Sai ")).toBe("reading-sai");
     expect(normalizedClubSlug("bad--slug")).toBe("");

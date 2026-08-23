@@ -83,6 +83,19 @@ describe("route continuity", () => {
     ).toEqual(fallback);
   });
 
+  it("bounds cyclic nested return state without overflowing", () => {
+    const cyclic: Record<string, unknown> = {
+      readmatesReturnTo: "/app/host/sessions/session-6",
+      readmatesReturnLabel: "모임으로",
+    };
+    cyclic.readmatesReturnState = cyclic;
+
+    expect(readReadmatesReturnTarget(cyclic, { href: "/app", label: "앱으로" })).toEqual({
+      href: "/app/host/sessions/session-6",
+      label: "모임으로",
+    });
+  });
+
   it("scopes public links from club app routes", () => {
     expect(scopedPublicLinkTarget("/clubs/reading-sai/app/me", "/about")).toBe("/clubs/reading-sai/about");
     expect(scopedPublicLinkTarget("/clubs/reading-sai/app/me", "/records")).toBe("/clubs/reading-sai/records");
