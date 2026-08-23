@@ -455,11 +455,11 @@ internal class LargeReadPathFixture(
             """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, session_date,
-              start_time, end_time, location_label, question_deadline_at, state, visibility
+              start_time, end_time, location_label, question_deadline_at, state, visibility, access_scope
             )
             values (?, ?, 9002, 'Archive detail performance fixture', 'Archive fixture book',
               'Fixture Author', '2026-09-08', '19:30:00', '21:30:00', 'Online',
-              '2026-09-07 14:59:00.000000', 'PUBLISHED', 'PUBLIC')
+              '2026-09-07 14:59:00.000000', 'PUBLISHED', 'PUBLIC', 'GUEST_READABLE')
             """.trimIndent(),
             ARCHIVE_DETAIL_SESSION_ID,
             CLUB_ID,

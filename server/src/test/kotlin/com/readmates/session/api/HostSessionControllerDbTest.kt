@@ -19,10 +19,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
@@ -39,7 +36,6 @@ import java.time.LocalDate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
     update host_action_notification_previews
@@ -2008,20 +2004,28 @@ class HostSessionControllerDbTest(
     fun `host close does not overwrite session state changed before close update`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
+        val expectedRevision = sessionRevision(sessionId)
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'PUBLISHED',
+                visibility = 'MEMBER',
+                session_revision = session_revision + 1
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            sessionId,
+        )
 
-        HostSessionCloseRaceProbe.publishBeforeNextCloseUpdate(sessionId)
-        try {
-            mockMvc
-                .post("/api/host/sessions/$sessionId/close") {
-                    with(user("host@example.com"))
-                    with(csrf())
-                    withExpectedRevision(sessionId)
-                }.andExpect {
-                    status { isConflict() }
-                }
-        } finally {
-            HostSessionCloseRaceProbe.clear()
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":$expectedRevision}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
         assertEquals("PUBLISHED", findSessionState(sessionId))
     }
@@ -4993,69 +4997,4 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
             sessionId,
         )
-
-    @TestConfiguration
-    class CloseRaceJdbcTemplateConfig {
-        @Bean
-        @Primary
-        fun closeRaceJdbcTemplate(dataSource: DataSource): JdbcTemplate = CloseRaceJdbcTemplate(dataSource)
-    }
-}
-
-private object HostSessionCloseRaceProbe {
-    private val targetSessionId = ThreadLocal<String>()
-
-    fun publishBeforeNextCloseUpdate(sessionId: String) {
-        targetSessionId.set(sessionId)
-    }
-
-    fun clear() {
-        targetSessionId.remove()
-    }
-
-    fun consumeIfMatches(
-        sql: String,
-        args: Array<out Any?>,
-    ): String? {
-        val sessionId = targetSessionId.get() ?: return null
-        val normalizedSql = sql.trimIndent().replace(Regex("\\s+"), " ")
-        val isHostSessionCloseUpdate =
-            normalizedSql.startsWith("update sessions set state = 'CLOSED'") &&
-                normalizedSql.contains("session_revision = session_revision + 1")
-        if (!isHostSessionCloseUpdate || args.firstOrNull() != sessionId) {
-            return null
-        }
-
-        targetSessionId.remove()
-        return sessionId
-    }
-}
-
-private class CloseRaceJdbcTemplate(
-    private val rawDataSource: DataSource,
-) : JdbcTemplate(rawDataSource) {
-    override fun update(
-        sql: String,
-        vararg args: Any?,
-    ): Int {
-        val sessionId = HostSessionCloseRaceProbe.consumeIfMatches(sql, args)
-        if (sessionId != null) {
-            rawDataSource.connection.use { connection ->
-                connection.autoCommit = true
-                connection
-                    .prepareStatement(
-                        """
-                        update sessions
-                        set state = 'PUBLISHED', visibility = 'MEMBER'
-                        where id = ?
-                          and club_id = '00000000-0000-0000-0000-000000000001'
-                        """.trimIndent(),
-                    ).use { statement ->
-                        statement.setString(1, sessionId)
-                        statement.executeUpdate()
-                    }
-            }
-        }
-        return super.update(sql, *args)
-    }
 }

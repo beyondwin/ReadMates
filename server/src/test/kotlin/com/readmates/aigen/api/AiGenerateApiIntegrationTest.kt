@@ -94,6 +94,7 @@ private const val CLEANUP_SQL = """
     delete from sessions where id = '$SESSION_ID';
     delete from memberships where id in ('$HOST_MEMBERSHIP_ID', '$MEMBER_MEMBERSHIP_ID');
     delete from users where id in ('$HOST_USER_ID', '$MEMBER_USER_ID');
+    delete from club_host_list_epochs where club_id = '$CLUB_ID';
     delete from clubs where id = '$CLUB_ID';
     delete from ai_generation_audit_log where club_id = '$CLUB_ID';
 """

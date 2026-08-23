@@ -138,7 +138,7 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `rotated current key can still replay a previous-key row`() {
         val identity = identity("rotation-key")
-        val original = service(properties = keyPair(current = KEY_V1, currentVersion = 1))
+        val original = service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION))
         original.claim(identity, payload())
         val receiptId = insertReceipt()
         original.complete(identity, receiptId)
@@ -147,9 +147,9 @@ class JdbcMutationIdempotencyAdapterDbTest(
                 properties =
                     keyPair(
                         current = KEY_V2,
-                        currentVersion = 2,
+                        currentVersion = KEY_V2_VERSION,
                         previous = KEY_V1,
-                        previousVersion = 1,
+                        previousVersion = KEY_V1_VERSION,
                     ),
             )
         assertThat(rotated.claim(identity, payload())).isEqualTo(MutationClaimResult.Replayed(identity, receiptId))
@@ -158,16 +158,16 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `referenced digest key retirement is fail closed until purge and buffer elapse`() {
         val identity = identity("retire-key")
-        val v1 = service(properties = keyPair(current = KEY_V1, currentVersion = 1))
+        val v1 = service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION))
         v1.claim(identity, payload())
         val rotated =
             service(
                 properties =
                     keyPair(
                         current = KEY_V2,
-                        currentVersion = 2,
+                        currentVersion = KEY_V2_VERSION,
                         previous = KEY_V1,
-                        previousVersion = 1,
+                        previousVersion = KEY_V1_VERSION,
                     ),
             )
         assertThatThrownBy { rotated.retirePreviousKey() }
@@ -178,7 +178,7 @@ class JdbcMutationIdempotencyAdapterDbTest(
             .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
         clock.instant = clock.instant.plus(Duration.ofHours(24))
         rotated.retirePreviousKey()
-        val retired = service(properties = keyPair(current = KEY_V2, currentVersion = 2))
+        val retired = service(properties = keyPair(current = KEY_V2, currentVersion = KEY_V2_VERSION))
         assertThat(retired.claim(identity("post-retire-key"), payload()))
             .isInstanceOf(MutationClaimResult.Claimed::class.java)
     }
@@ -276,10 +276,10 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `startup validator fails closed when referenced key cannot be replayed`() {
         val identity = identity("orphan-key")
-        service(properties = keyPair(current = KEY_V1, currentVersion = 9)).claim(identity, payload())
+        service(properties = keyPair(current = KEY_V1, currentVersion = ORPHAN_KEY_VERSION)).claim(identity, payload())
         val validator =
             com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator(
-                keyPair(current = KEY_V2, currentVersion = 2),
+                keyPair(current = KEY_V2, currentVersion = KEY_V2_VERSION),
                 adapter,
                 org.springframework.mock.env
                     .MockEnvironment(),
@@ -289,7 +289,11 @@ class JdbcMutationIdempotencyAdapterDbTest(
             .hasMessageContaining("digest key")
     }
 
-    private fun service(properties: MutationIdempotencyProperties = keyPair(current = KEY_V1, currentVersion = 1)) =
+    private fun service(): MutationIdempotencyService = service(defaultProperties())
+
+    private fun defaultProperties() = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION)
+
+    private fun service(properties: MutationIdempotencyProperties) =
         MutationIdempotencyService(adapter, properties, clock, MutationIdempotencyMetrics(registry))
 
     private fun payload(
@@ -367,6 +371,9 @@ class JdbcMutationIdempotencyAdapterDbTest(
         val RESOURCE_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053010")
         const val KEY_V1 = "test-mutation-identity-v1-key"
         const val KEY_V2 = "test-mutation-identity-v2-key"
+        const val KEY_V1_VERSION = 5_301
+        const val KEY_V2_VERSION = 5_302
+        const val ORPHAN_KEY_VERSION = 5_309
         const val SENSITIVE_URL = "https://meet.example.com/private-room"
         const val SENSITIVE_PASSCODE = "room-passcode-value"
 
@@ -393,5 +400,5 @@ where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from host_session_mutation_receipts
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from mutation_digest_key_state
-where digest_key_version in (1, 2, 9);
+where digest_key_version in (5301, 5302, 5309);
 """

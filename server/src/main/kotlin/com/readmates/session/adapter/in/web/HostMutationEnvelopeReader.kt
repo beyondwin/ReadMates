@@ -7,6 +7,7 @@ import com.readmates.session.application.model.HostMutationEnvelope
 import jakarta.validation.ConstraintViolationException
 import jakarta.validation.Validator
 import org.springframework.stereotype.Component
+import tools.jackson.core.JacksonException
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
@@ -99,7 +100,12 @@ class HostMutationEnvelopeReader(
     fun attendance(body: JsonNode): HostMutationEnvelope<HostAttendanceCommandBody, ExpectedAttendanceRowsBody> {
         if (body.isArray) {
             val entries = mutableListOf<AttendanceEntry>()
-            body.forEach { node -> entries += convert(node, AttendanceEntry::class.java) }
+            body.forEach { node ->
+                entries += convert(node, AttendanceEntry::class.java).also(::validate)
+            }
+            if (entries.isEmpty()) {
+                throw InvalidSessionScheduleException()
+            }
             return HostMutationEnvelope(
                 idempotencyKey = generatedKey(),
                 expected =
@@ -215,8 +221,20 @@ class HostMutationEnvelopeReader(
         if (node == null || node.isNull) {
             throw InvalidSessionScheduleException()
         }
-        return mapper.convertValue(node, type)
+        return convertValue(node, type)
     }
+
+    private fun <T> convertValue(
+        node: JsonNode,
+        type: Class<T>,
+    ): T =
+        try {
+            mapper.convertValue(node, type)
+        } catch (_: JacksonException) {
+            throw InvalidSessionScheduleException()
+        } catch (_: IllegalArgumentException) {
+            throw InvalidSessionScheduleException()
+        }
 
     private fun validate(value: Any) {
         val violations = validator.validate(value)

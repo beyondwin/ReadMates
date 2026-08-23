@@ -1,6 +1,7 @@
 package com.readmates.session.api
 
 import com.readmates.session.application.port.`in`.PurgeExpiredHostSessionTrashUseCase
+import com.readmates.shared.security.Sha256
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Tag
@@ -890,19 +891,102 @@ abstract class HostSessionIdempotencyDbTestSupport(
     }
 
     protected fun insertRecordDraft(sessionId: String) {
+        val snapshotJson =
+            jsonMapper.writeValueAsString(
+                mapOf(
+                    "schema" to "readmates-session-record:v1",
+                    "visibility" to "MEMBER",
+                    "publicationSummary" to "발행 요약",
+                    "highlights" to
+                        listOf(
+                            mapOf(
+                                "membershipId" to HOST_MEMBERSHIP_ID,
+                                "authorDisplayName" to "김호스트",
+                                "text" to "검증된 하이라이트",
+                            ),
+                        ),
+                    "oneLineReviews" to
+                        listOf(
+                            mapOf(
+                                "membershipId" to HOST_MEMBERSHIP_ID,
+                                "authorDisplayName" to "김호스트",
+                                "text" to "검증된 한줄평",
+                            ),
+                        ),
+                    "feedbackDocument" to
+                        mapOf(
+                            "fileName" to "fixture-feedback.md",
+                            "title" to "회차 피드백",
+                            "markdown" to validFeedbackDocument(),
+                        ),
+                ),
+            )
         jdbcTemplate.update(
             """
             insert into session_record_drafts (
-              session_id, club_id, base_live_revision, draft_revision, source,
+              session_id, club_id, base_live_revision, base_session_updated_at, draft_revision, source,
               snapshot_json, snapshot_sha256, updated_by_membership_id
-            ) values (?, ?, 0, 1, 'MANUAL', '{}', ?, ?)
+            ) values (?, ?, 0, (select updated_at from sessions where id = ?), 1, 'MANUAL', ?, ?, ?)
             """.trimIndent(),
             sessionId,
             CLUB_ID,
-            "a".repeat(64),
+            sessionId,
+            snapshotJson,
+            Sha256.hex(snapshotJson),
             HOST_MEMBERSHIP_ID,
         )
     }
+
+    private fun validFeedbackDocument(): String =
+        """
+        <!-- readmates-feedback:v1 -->
+
+        # 독서모임 1차 피드백
+
+        영수증 책 · 2026.09.04
+
+        ## 메타
+
+        - 책: 영수증 책
+
+        ## 관찰자 노트
+
+        검증 가능한 공개 안전 fixture입니다.
+
+        ## 참여자별 피드백
+
+        ### 01. 호스트
+
+        역할: 진행자
+
+        #### 참여 스타일
+
+        차분하게 논의를 진행했습니다.
+
+        #### 실질 기여
+
+        - 핵심 질문을 정리했습니다.
+
+        #### 문제점과 자기모순
+
+        ##### 1. 적용 범위를 더 명확히 할 수 있습니다
+
+        - 핵심: 범위를 구체화할 필요가 있습니다.
+        - 근거: 논의에서 범위를 확인했습니다.
+        - 해석: 다음 회차에 기준을 명시할 수 있습니다.
+
+        #### 실천 과제
+
+        1. 다음 회차에 적용 범위를 명시합니다.
+
+        #### 드러난 한 문장
+
+        > 기준을 함께 확인하겠습니다.
+
+        맥락: 논의를 정리한 장면
+
+        주석: 진행 방향을 보여 줍니다.
+        """.trimIndent()
 
     protected fun preparePublication(sessionId: String) {
         mockMvc
@@ -1105,7 +1189,37 @@ abstract class HostSessionIdempotencyDbTestSupport(
 }
 
 private const val CLEANUP_IDEMPOTENCY_SQL = """
+    delete from session_record_apply_receipts
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
     delete from session_record_drafts
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from session_record_revisions
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from session_feedback_documents
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from highlights
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from one_line_reviews
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
         select id from sessions

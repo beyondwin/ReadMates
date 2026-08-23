@@ -251,11 +251,11 @@ class NotificationKafkaPipelineIntegrationTest(
             insert into sessions (
               id, club_id, number, title, book_title, book_author,
               session_date, start_time, end_time, location_label,
-              question_deadline_at, state, visibility
+              question_deadline_at, state, visibility, access_scope
             ) values (
               ?, ?, 6, 'Pipeline Test Session', 'Example Book', 'Example Author',
               '2026-05-01', '19:30:00', '21:30:00', 'Online',
-              '2026-04-30 12:00:00.000000', 'OPEN', 'MEMBER'
+              '2026-04-30 12:00:00.000000', 'OPEN', 'MEMBER', 'GUEST_READABLE'
             )
             """.trimIndent(),
             PIPELINE_SESSION_ID,
