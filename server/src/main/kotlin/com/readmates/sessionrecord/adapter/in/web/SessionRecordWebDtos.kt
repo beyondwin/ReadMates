@@ -86,15 +86,19 @@ data class SaveSessionRecordDraftRequest(
 
 data class RebaseSessionRecordDraftRequest(
     @field:Positive val expectedDraftRevision: Long,
+    @field:PositiveOrZero val expectedSessionRevision: Long,
     @field:PositiveOrZero val expectedLiveRevision: Long,
-    val expectedSessionUpdatedAt: OffsetDateTime,
+    @field:PositiveOrZero val expectedExposureRevision: Long,
+    @field:PositiveOrZero val expectedPublicationRevision: Long,
 ) {
     fun toCommand(sessionId: UUID) =
         RebaseSessionRecordDraftCommand(
             sessionId = sessionId,
             expectedDraftRevision = expectedDraftRevision,
+            expectedSessionRevision = expectedSessionRevision,
             expectedLiveRevision = expectedLiveRevision,
-            expectedSessionUpdatedAt = expectedSessionUpdatedAt,
+            expectedExposureRevision = expectedExposureRevision,
+            expectedPublicationRevision = expectedPublicationRevision,
         )
 }
 
@@ -210,6 +214,9 @@ data class SessionRecordFeedbackDocumentResponse(
 data class SessionRecordDraftResponse(
     val sessionId: String,
     val baseLiveRevision: Long,
+    val baseSessionRevision: Long,
+    val baseExposureRevision: Long,
+    val basePublicationRevision: Long,
     val draftRevision: Long,
     val source: SessionRecordDraftSource,
     val restoredFromRevisionId: String?,
@@ -225,7 +232,9 @@ data class SessionRecordValidationSummaryResponse(
 data class SessionRecordEditorResponse(
     val sessionId: String,
     val liveRevision: Long,
-    val liveSessionUpdatedAt: OffsetDateTime,
+    val liveSessionRevision: Long,
+    val liveExposureRevision: Long,
+    val livePublicationRevision: Long,
     val liveSnapshot: SessionRecordSnapshotResponse,
     val draft: SessionRecordDraftResponse?,
     val draftLiveBaseStale: Boolean,
@@ -289,7 +298,9 @@ fun SessionRecordEditor.toResponse() =
     SessionRecordEditorResponse(
         sessionId = live.sessionId.toString(),
         liveRevision = live.revision,
-        liveSessionUpdatedAt = live.sessionUpdatedAt,
+        liveSessionRevision = live.sessionRevision,
+        liveExposureRevision = live.exposureRevision,
+        livePublicationRevision = live.publicationRevision,
         liveSnapshot = live.snapshot.toResponse(),
         draft = draft?.toResponse(),
         draftLiveBaseStale = draftLiveBaseStale,
@@ -304,6 +315,9 @@ fun SessionRecordDraft.toResponse() =
     SessionRecordDraftResponse(
         sessionId = sessionId.toString(),
         baseLiveRevision = baseLiveRevision,
+        baseSessionRevision = baseSessionRevision,
+        baseExposureRevision = baseExposureRevision,
+        basePublicationRevision = basePublicationRevision,
         draftRevision = draftRevision,
         source = source,
         restoredFromRevisionId = restoredFromRevisionId?.toString(),

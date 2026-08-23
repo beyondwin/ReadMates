@@ -151,7 +151,13 @@ class MutationIdempotencyService(
     }
 
     private fun requireSupported(payload: CanonicalMutationPayload) {
-        if (payload.schemaVersion != CanonicalMutationPayload.CURRENT_SCHEMA_VERSION) {
+        val expected =
+            if (payload is CanonicalMutationPayload.Publication) {
+                CanonicalMutationPayload.PUBLICATION_SCHEMA_VERSION
+            } else {
+                CanonicalMutationPayload.CURRENT_SCHEMA_VERSION
+            }
+        if (payload.schemaVersion != expected) {
             throw UnsupportedCanonicalSchemaException()
         }
     }

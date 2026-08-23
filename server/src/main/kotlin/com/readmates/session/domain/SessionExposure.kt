@@ -1,5 +1,7 @@
 package com.readmates.session.domain
 
+import com.readmates.shared.exposure.v45CompatibilityProjection
+
 enum class SessionAccessScope {
     HOST_ONLY,
     GUEST_READABLE,
@@ -49,11 +51,10 @@ data class CompatibilityExposure(
 )
 
 fun SessionExposure.toCompatibility(state: String): CompatibilityExposure {
-    require(!(accessScope == SessionAccessScope.HOST_ONLY && siteVisibility == PublicSiteVisibility.PUBLIC_RECORD))
-    require(siteVisibility != PublicSiteVisibility.PUBLIC_RECORD || state in setOf("CLOSED", "PUBLISHED"))
-    return when {
-        accessScope == SessionAccessScope.HOST_ONLY -> CompatibilityExposure("HOST_ONLY", "MEMBER", false)
-        siteVisibility == PublicSiteVisibility.PUBLIC_RECORD -> CompatibilityExposure("PUBLIC", "PUBLIC", true)
-        else -> CompatibilityExposure("MEMBER", "MEMBER", false)
-    }
+    val projection = v45CompatibilityProjection(state, accessScope.name, siteVisibility.name)
+    return CompatibilityExposure(
+        projection.sessionVisibility,
+        projection.publicationVisibility,
+        projection.isPublic,
+    )
 }

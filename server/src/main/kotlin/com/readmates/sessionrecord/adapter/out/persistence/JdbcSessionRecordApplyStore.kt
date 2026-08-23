@@ -41,12 +41,7 @@ internal class JdbcSessionRecordApplyStore(
         return SessionRecordEditor(
             live = live,
             draft = draft,
-            draftLiveBaseStale =
-                draft != null &&
-                    (
-                        draft.baseLiveRevision != live.revision ||
-                            draft.baseSessionUpdatedAt != live.sessionUpdatedAt
-                    ),
+            draftLiveBaseStale = draft?.isStaleAgainst(live) == true,
         )
     }
 

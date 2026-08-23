@@ -68,7 +68,7 @@ interface SessionRecordApplyStorePort {
         sessionId: UUID,
         applyRequestId: UUID,
         forUpdate: Boolean = false,
-    ): SessionRecordApplyReceipt? = null
+    ): SessionRecordApplyReceipt?
 
     fun insertApplyReceipt(
         host: AuthenticatedClubActor,

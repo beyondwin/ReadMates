@@ -161,6 +161,25 @@ class MutationCanonicalizationTest {
     }
 
     @Test
+    fun `publication identity preserves omitted axes and legacy visibility`() {
+        val omitted =
+            CanonicalMutationPayload.Publication(
+                publicSummary = "요약",
+                siteVisibility = null,
+                accessScope = null,
+                visibility = "MEMBER",
+            )
+        val hidden = omitted.copy(siteVisibility = "HIDDEN")
+        val publicLegacy = omitted.copy(visibility = "PUBLIC")
+
+        assertSameDigest(service.digest(omitted), service.digest(omitted.copy()))
+        assertDifferentDigest(service.digest(omitted), service.digest(hidden))
+        assertDifferentDigest(service.digest(omitted), service.digest(publicLegacy))
+        assertThat(service.digest(omitted).canonicalSchemaVersion)
+            .isEqualTo(CanonicalMutationPayload.PUBLICATION_SCHEMA_VERSION)
+    }
+
+    @Test
     fun `bulk attendance memberships are set sorted`() {
         val membershipA = UUID.fromString("aaaaaaaa-0000-4000-8000-000000000001")
         val membershipB = UUID.fromString("bbbbbbbb-0000-4000-8000-000000000002")

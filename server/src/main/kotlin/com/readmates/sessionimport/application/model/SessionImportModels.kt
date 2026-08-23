@@ -105,6 +105,9 @@ data class SessionImportDraftResult(
     val sessionId: String,
     val draftRevision: Long,
     val baseLiveRevision: Long,
+    val baseSessionRevision: Long = 0,
+    val baseExposureRevision: Long = 0,
+    val basePublicationRevision: Long = 0,
     val liveApplied: Boolean = false,
 )
 

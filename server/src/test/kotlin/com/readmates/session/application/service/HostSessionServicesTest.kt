@@ -686,6 +686,56 @@ class HostSessionServicesTest {
     }
 
     @Test
+    fun `compatibility-only publication repair evicts cache and bumps record epoch once`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                publicationExposureChanged = false
+                publicationChanged = false
+                publicationCompatibilityChanged = true
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service = HostSessionPublicationService(port, invalidation, epochs)
+
+        service.upsertPublication(
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.HOST_ONLY,
+            ),
+        )
+
+        assertEquals(listOf(host.clubId), invalidation.clubs)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
+    fun `semantic publication no-op leaves cache and record epoch unchanged`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                publicationExposureChanged = false
+                publicationChanged = false
+                publicationCompatibilityChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service = HostSessionPublicationService(port, invalidation, epochs)
+
+        service.upsertPublication(
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.HOST_ONLY,
+            ),
+        )
+
+        assertThat(invalidation.clubs).isEmpty()
+        assertThat(epochs.bumps).isEmpty()
+    }
+
+    @Test
     fun `evicts host mutation after commit when transaction synchronization is active`() {
         val port = RecordingHostSessionPorts()
         val invalidation = RecordingReadCacheInvalidationPort()
@@ -1655,6 +1705,9 @@ class HostSessionServicesTest {
         var returnToDraftFailure: RuntimeException? = null
         var lifecycleStateWriteCount = 0
         var throwOnUpsertPublication = false
+        var publicationExposureChanged = true
+        var publicationChanged = true
+        var publicationCompatibilityChanged = false
         var visibilityState = "OPEN"
         var currentVisibility = SessionRecordVisibility.HOST_ONLY
         var currentAccessScope = SessionAccessScope.HOST_ONLY
@@ -1996,8 +2049,9 @@ class HostSessionServicesTest {
                         publicSummary = command.publicSummary,
                         visibility = command.visibility,
                     ),
-                exposureChanged = true,
-                publicationChanged = true,
+                exposureChanged = publicationExposureChanged,
+                publicationChanged = publicationChanged,
+                compatibilityChanged = publicationCompatibilityChanged,
             ).also { calls += "upsertPublication:${command.sessionId}:${command.visibility}" }
         }
 

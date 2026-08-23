@@ -149,17 +149,29 @@ class SessionRecordDraftServiceTest {
     }
 
     @Test
-    fun `basic metadata drift marks draft live base stale`() {
-        val store =
-            FakeStore(
-                live = live(sessionUpdatedAt = NOW.plusSeconds(1)),
-                draft = draft(baseSessionUpdatedAt = NOW),
+    fun `each correction-owned base revision marks the draft stale`() {
+        val base = live()
+        val changedLives =
+            listOf(
+                base.copy(sessionRevision = base.sessionRevision + 1),
+                base.copy(revision = base.revision + 1),
+                base.copy(exposureRevision = base.exposureRevision + 1),
+                base.copy(publicationRevision = base.publicationRevision + 1),
             )
-        val service = SessionRecordDraftService(store, codec)
 
-        val editor: SessionRecordEditor = service.getEditor(host, sessionId)
+        changedLives.forEach { changed ->
+            val editor = SessionRecordDraftService(FakeStore(changed, draft()), codec).getEditor(host, sessionId)
+            assertThat(editor.draftLiveBaseStale).isTrue()
+        }
+    }
 
-        assertThat(editor.draftLiveBaseStale).isTrue()
+    @Test
+    fun `participant-only session timestamp change does not stale an unchanged correction vector`() {
+        val store = FakeStore(live = live(sessionUpdatedAt = NOW.plusSeconds(1)), draft = draft())
+
+        val editor: SessionRecordEditor = SessionRecordDraftService(store, codec).getEditor(host, sessionId)
+
+        assertThat(editor.draftLiveBaseStale).isFalse()
     }
 
     @Test
@@ -181,14 +193,18 @@ class SessionRecordDraftServiceTest {
                 RebaseSessionRecordDraftCommand(
                     sessionId = sessionId,
                     expectedDraftRevision = originalDraft.draftRevision,
+                    expectedSessionRevision = currentLive.sessionRevision,
                     expectedLiveRevision = currentLive.revision,
-                    expectedSessionUpdatedAt = currentLive.sessionUpdatedAt,
+                    expectedExposureRevision = currentLive.exposureRevision,
+                    expectedPublicationRevision = currentLive.publicationRevision,
                 ),
             )
 
         assertThat(rebased.draftRevision).isEqualTo(originalDraft.draftRevision + 1)
         assertThat(rebased.baseLiveRevision).isEqualTo(currentLive.revision)
-        assertThat(rebased.baseSessionUpdatedAt).isEqualTo(currentLive.sessionUpdatedAt)
+        assertThat(rebased.baseSessionRevision).isEqualTo(currentLive.sessionRevision)
+        assertThat(rebased.baseExposureRevision).isEqualTo(currentLive.exposureRevision)
+        assertThat(rebased.basePublicationRevision).isEqualTo(currentLive.publicationRevision)
         assertThat(rebased.snapshot).isEqualTo(originalDraft.snapshot)
         assertThat(rebased.source).isEqualTo(SessionRecordDraftSource.RESTORED)
         assertThat(rebased.restoredFromRevisionId).isEqualTo(restoredFrom)
@@ -196,9 +212,9 @@ class SessionRecordDraftServiceTest {
     }
 
     @Test
-    fun `rebase rejects live metadata changed after the host loaded it without touching the draft`() {
-        val currentLive = live(sessionUpdatedAt = NOW.plusSeconds(2))
-        val originalDraft = draft(baseSessionUpdatedAt = NOW)
+    fun `rebase rejects a correction vector changed after the host loaded it without touching the draft`() {
+        val currentLive = live(publicationRevision = 10)
+        val originalDraft = draft()
         val store = FakeStore(live = currentLive, draft = originalDraft)
         val service = SessionRecordDraftService(store, codec)
         val before = store.state()
@@ -209,8 +225,10 @@ class SessionRecordDraftServiceTest {
                 RebaseSessionRecordDraftCommand(
                     sessionId = sessionId,
                     expectedDraftRevision = originalDraft.draftRevision,
+                    expectedSessionRevision = currentLive.sessionRevision,
                     expectedLiveRevision = currentLive.revision,
-                    expectedSessionUpdatedAt = NOW.plusSeconds(1),
+                    expectedExposureRevision = currentLive.exposureRevision,
+                    expectedPublicationRevision = currentLive.publicationRevision - 1,
                 ),
             )
         }.isInstanceOf(SessionRecordException::class.java)
@@ -233,8 +251,10 @@ class SessionRecordDraftServiceTest {
                 RebaseSessionRecordDraftCommand(
                     sessionId = sessionId,
                     expectedDraftRevision = 1,
+                    expectedSessionRevision = currentLive.sessionRevision,
                     expectedLiveRevision = currentLive.revision,
-                    expectedSessionUpdatedAt = currentLive.sessionUpdatedAt,
+                    expectedExposureRevision = currentLive.exposureRevision,
+                    expectedPublicationRevision = currentLive.publicationRevision,
                 ),
             )
         }.isInstanceOf(SessionRecordException::class.java)
@@ -245,23 +265,35 @@ class SessionRecordDraftServiceTest {
 
     private fun live(
         revision: Long = 4,
+        sessionRevision: Long = 7,
+        exposureRevision: Long = 8,
+        publicationRevision: Long = 9,
         sessionUpdatedAt: OffsetDateTime = NOW,
     ) = LiveSessionRecord(
         sessionId,
         host.clubId,
         revision,
         snapshot(),
+        sessionRevision = sessionRevision,
+        exposureRevision = exposureRevision,
+        publicationRevision = publicationRevision,
         sessionUpdatedAt = sessionUpdatedAt,
     )
 
     private fun draft(
         baseLiveRevision: Long = 4,
+        baseSessionRevision: Long = 7,
+        baseExposureRevision: Long = 8,
+        basePublicationRevision: Long = 9,
         draftRevision: Long = 1,
         baseSessionUpdatedAt: OffsetDateTime = NOW,
     ) = SessionRecordDraft(
         sessionId = sessionId,
         clubId = host.clubId,
         baseLiveRevision = baseLiveRevision,
+        baseSessionRevision = baseSessionRevision,
+        baseExposureRevision = baseExposureRevision,
+        basePublicationRevision = basePublicationRevision,
         draftRevision = draftRevision,
         source = SessionRecordDraftSource.MANUAL,
         restoredFromRevisionId = null,
@@ -324,8 +356,7 @@ class SessionRecordDraftServiceTest {
                     it,
                     draft,
                     draft?.let { current ->
-                        current.baseLiveRevision != it.revision ||
-                            current.baseSessionUpdatedAt != it.sessionUpdatedAt
+                        current.isStaleAgainst(it)
                     } ?: false,
                 )
             }
@@ -352,6 +383,13 @@ class SessionRecordDraftServiceTest {
             host: AuthenticatedClubActor,
             previewId: UUID,
         ): com.readmates.sessionrecord.application.model.CompletedSessionRecordApply? = null
+
+        override fun findApplyReceipt(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            applyRequestId: UUID,
+            forUpdate: Boolean,
+        ): SessionRecordApplyReceipt? = null
 
         override fun insertApplyReceipt(
             host: AuthenticatedClubActor,
@@ -436,6 +474,9 @@ class SessionRecordDraftServiceTest {
                 current
                     .copy(
                         baseLiveRevision = live.revision,
+                        baseSessionRevision = live.sessionRevision,
+                        baseExposureRevision = live.exposureRevision,
+                        basePublicationRevision = live.publicationRevision,
                         baseSessionUpdatedAt = live.sessionUpdatedAt,
                         draftRevision = current.draftRevision + 1,
                         updatedByMembershipId = host.membershipId,
@@ -489,6 +530,9 @@ class SessionRecordDraftServiceTest {
             sessionId = live.sessionId,
             clubId = live.clubId,
             baseLiveRevision = live.revision,
+            baseSessionRevision = live.sessionRevision,
+            baseExposureRevision = live.exposureRevision,
+            basePublicationRevision = live.publicationRevision,
             draftRevision = (draft?.draftRevision ?: 0) + 1,
             source = source,
             restoredFromRevisionId = restoredFromRevisionId,

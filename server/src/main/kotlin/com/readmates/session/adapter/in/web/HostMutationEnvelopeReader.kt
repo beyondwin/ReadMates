@@ -134,6 +134,12 @@ class HostMutationEnvelopeReader(
     }
 
     fun publication(body: JsonNode): HostMutationEnvelope<HostSessionPublicationRequest, ExpectedPublicationRevisionBody> {
+        if (body.has("command")) {
+            requireExactProperties(
+                body.get("command"),
+                setOf("publicSummary", "accessScope", "siteVisibility", "visibility"),
+            )
+        }
         val envelope =
             read(
                 body,

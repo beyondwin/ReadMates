@@ -26,14 +26,19 @@ internal class JdbcSessionRecordDraftStore(
         jdbcTemplate.update(
             """
             insert into session_record_drafts (
-              session_id, club_id, base_live_revision, base_session_updated_at,
+              session_id, club_id, base_live_revision,
+              base_session_revision, base_exposure_revision, base_publication_revision,
+              base_session_updated_at,
               draft_revision, source, restored_from_revision_id,
               snapshot_json, snapshot_sha256, updated_by_membership_id
-            ) values (?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+            ) values (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
             """.trimIndent(),
             live.sessionId.dbString(),
             host.clubId.dbString(),
             live.revision,
+            live.sessionRevision,
+            live.exposureRevision,
+            live.publicationRevision,
             live.sessionUpdatedAt.toUtcLocalDateTime(),
             command.source.name,
             command.restoredFromRevisionId?.dbString(),
@@ -85,6 +90,9 @@ internal class JdbcSessionRecordDraftStore(
                 """
                 update session_record_drafts
                 set base_live_revision = ?,
+                    base_session_revision = ?,
+                    base_exposure_revision = ?,
+                    base_publication_revision = ?,
                     base_session_updated_at = ?,
                     draft_revision = draft_revision + 1,
                     updated_by_membership_id = ?,
@@ -92,6 +100,9 @@ internal class JdbcSessionRecordDraftStore(
                 where club_id = ? and session_id = ? and draft_revision = ?
                 """.trimIndent(),
                 live.revision,
+                live.sessionRevision,
+                live.exposureRevision,
+                live.publicationRevision,
                 live.sessionUpdatedAt.toUtcLocalDateTime(),
                 host.membershipId.dbString(),
                 host.clubId.dbString(),
@@ -116,6 +127,7 @@ internal class JdbcSessionRecordDraftStore(
             expectedDraftRevision,
         ) == 1
 
+    @Suppress("LongMethod")
     override fun insertRestoredDraft(
         host: AuthenticatedClubActor,
         live: LiveSessionRecord,
@@ -128,11 +140,13 @@ internal class JdbcSessionRecordDraftStore(
                 jdbcTemplate.update(
                     """
                     insert into session_record_drafts (
-                      session_id, club_id, base_live_revision, base_session_updated_at,
+                      session_id, club_id, base_live_revision,
+                      base_session_revision, base_exposure_revision, base_publication_revision,
+                      base_session_updated_at,
                       draft_revision, source, restored_from_revision_id,
                       snapshot_json, snapshot_sha256, updated_by_membership_id
                     )
-                    select ?, ?, ?, ?, 1, 'RESTORED', ?, ?, ?, ?
+                    select ?, ?, ?, ?, ?, ?, ?, 1, 'RESTORED', ?, ?, ?, ?
                     where not exists (
                       select 1 from session_record_drafts where club_id = ? and session_id = ?
                     )
@@ -140,6 +154,9 @@ internal class JdbcSessionRecordDraftStore(
                     live.sessionId.dbString(),
                     host.clubId.dbString(),
                     live.revision,
+                    live.sessionRevision,
+                    live.exposureRevision,
+                    live.publicationRevision,
                     live.sessionUpdatedAt.toUtcLocalDateTime(),
                     revision.id.dbString(),
                     encoded.json,
@@ -153,6 +170,9 @@ internal class JdbcSessionRecordDraftStore(
                     """
                     update session_record_drafts
                     set base_live_revision = ?,
+                        base_session_revision = ?,
+                        base_exposure_revision = ?,
+                        base_publication_revision = ?,
                         base_session_updated_at = ?,
                         draft_revision = draft_revision + 1,
                         source = 'RESTORED',
@@ -164,6 +184,9 @@ internal class JdbcSessionRecordDraftStore(
                     where club_id = ? and session_id = ? and draft_revision = ?
                     """.trimIndent(),
                     live.revision,
+                    live.sessionRevision,
+                    live.exposureRevision,
+                    live.publicationRevision,
                     live.sessionUpdatedAt.toUtcLocalDateTime(),
                     revision.id.dbString(),
                     encoded.json,

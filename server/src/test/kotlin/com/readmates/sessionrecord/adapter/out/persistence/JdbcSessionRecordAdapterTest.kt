@@ -46,7 +46,7 @@ class JdbcSessionRecordAdapterTest(
     fun `lockEditor takes a parent session row lock before insertAppliedRevision`() {
         val source = applyStoreSource()
         val lockEditorIndex = source.indexOf("fun lockEditor(")
-        val parentLockIndex = source.indexOf("loadLive(host, sessionId, forUpdate = true)")
+        val parentLockIndex = source.indexOf("readStore.loadLive(host, sessionId, forUpdate = forUpdate)")
         val insertIndex = source.indexOf("fun insertAppliedRevision(")
         assertThat(lockEditorIndex).isGreaterThanOrEqualTo(0)
         assertThat(parentLockIndex).isGreaterThan(lockEditorIndex)
@@ -114,6 +114,9 @@ class JdbcSessionRecordAdapterTest(
         val draft = adapter.insertDraft(first.host, live, command, codec.encode(first.snapshot))
 
         assertThat(adapter.loadDraft(first.host, first.sessionId)).isEqualTo(draft)
+        assertThat(draft.baseSessionRevision).isEqualTo(live.sessionRevision)
+        assertThat(draft.baseExposureRevision).isEqualTo(live.exposureRevision)
+        assertThat(draft.basePublicationRevision).isEqualTo(live.publicationRevision)
         assertThat(adapter.loadDraft(second.host, first.sessionId)).isNull()
         assertThatThrownBy { adapter.insertDraft(first.host, live, command, codec.encode(first.snapshot)) }
             .isInstanceOf(DuplicateKeyException::class.java)
@@ -134,6 +137,7 @@ class JdbcSessionRecordAdapterTest(
             """
             update sessions
             set book_title = '변경된 책',
+                session_revision = session_revision + 1,
                 updated_at = timestampadd(microsecond, 1, updated_at)
             where id = ? and club_id = ?
             """.trimIndent(),
@@ -142,6 +146,25 @@ class JdbcSessionRecordAdapterTest(
         )
 
         assertThat(requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId)).draftLiveBaseStale).isTrue()
+    }
+
+    @Test
+    fun `participant-only timestamp change does not stale the persisted draft base vector`() {
+        val fixture = fixture("participant-safe")
+        val live = requireNotNull(adapter.loadLive(fixture.host, fixture.sessionId))
+        adapter.insertDraft(
+            fixture.host,
+            live,
+            SaveSessionRecordDraftCommand(fixture.sessionId, fixture.snapshot, null),
+            codec.encode(fixture.snapshot),
+        )
+
+        jdbcTemplate.update(
+            "update sessions set updated_at = timestampadd(microsecond, 1, updated_at) where id = ?",
+            fixture.sessionId.toString(),
+        )
+
+        assertThat(requireNotNull(adapter.lockEditor(fixture.host, fixture.sessionId)).draftLiveBaseStale).isFalse()
     }
 
     @Test
@@ -159,6 +182,7 @@ class JdbcSessionRecordAdapterTest(
             """
             update sessions
             set book_title = '변경된 책',
+                session_revision = session_revision + 1,
                 updated_at = timestampadd(microsecond, 1, updated_at)
             where id = ? and club_id = ?
             """.trimIndent(),
@@ -176,7 +200,9 @@ class JdbcSessionRecordAdapterTest(
 
         assertThat(rebased?.draftRevision).isEqualTo(originalDraft.draftRevision + 1)
         assertThat(rebased?.baseLiveRevision).isEqualTo(currentLive.revision)
-        assertThat(rebased?.baseSessionUpdatedAt).isEqualTo(currentLive.sessionUpdatedAt)
+        assertThat(rebased?.baseSessionRevision).isEqualTo(currentLive.sessionRevision)
+        assertThat(rebased?.baseExposureRevision).isEqualTo(currentLive.exposureRevision)
+        assertThat(rebased?.basePublicationRevision).isEqualTo(currentLive.publicationRevision)
         assertThat(rebased?.snapshot).isEqualTo(originalDraft.snapshot)
         assertThat(
             adapter.rebaseDraft(

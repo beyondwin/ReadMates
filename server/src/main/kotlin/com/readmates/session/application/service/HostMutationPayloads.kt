@@ -81,7 +81,8 @@ internal object HostMutationPayloads {
     fun publication(command: UpsertPublicationCommand): CanonicalMutationPayload.Publication =
         CanonicalMutationPayload.Publication(
             publicSummary = command.publicSummary,
-            siteVisibility = command.siteVisibility?.name ?: "HIDDEN",
+            siteVisibility = command.siteVisibility?.name,
             accessScope = command.accessScope?.name,
+            visibility = command.visibility.name,
         )
 }

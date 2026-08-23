@@ -62,6 +62,9 @@ data class SessionImportDraftResponse(
     val sessionId: String,
     val draftRevision: Long,
     val baseLiveRevision: Long,
+    val baseSessionRevision: Long,
+    val baseExposureRevision: Long,
+    val basePublicationRevision: Long,
     val liveApplied: Boolean,
 )
 
@@ -70,5 +73,8 @@ fun SessionImportDraftResult.toResponse() =
         sessionId = sessionId,
         draftRevision = draftRevision,
         baseLiveRevision = baseLiveRevision,
+        baseSessionRevision = baseSessionRevision,
+        baseExposureRevision = baseExposureRevision,
+        basePublicationRevision = basePublicationRevision,
         liveApplied = liveApplied,
     )

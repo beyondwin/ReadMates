@@ -754,8 +754,10 @@ class HostSessionBffSecurityTest(
                     """
                     {
                       "expectedDraftRevision":1,
+                      "expectedSessionRevision":0,
                       "expectedLiveRevision":0,
-                      "expectedSessionUpdatedAt":"2026-07-25T00:00:00Z"
+                      "expectedExposureRevision":0,
+                      "expectedPublicationRevision":0
                     }
                     """.trimIndent(),
                 ),

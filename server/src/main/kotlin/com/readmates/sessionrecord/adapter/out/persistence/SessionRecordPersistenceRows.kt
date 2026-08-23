@@ -34,6 +34,9 @@ internal class SessionRecordPersistenceRows(
             sessionNumber = rs.getInt("number"),
             bookTitle = rs.getString("book_title"),
             meetingDate = rs.getObject("session_date", LocalDate::class.java),
+            sessionRevision = rs.getLong("session_revision"),
+            exposureRevision = rs.getLong("exposure_revision"),
+            publicationRevision = rs.getLong("publication_revision"),
             sessionUpdatedAt = rs.utcOffsetDateTime("updated_at"),
         )
 
@@ -66,6 +69,9 @@ internal class SessionRecordPersistenceRows(
         sessionNumber = row.sessionNumber,
         bookTitle = row.bookTitle,
         meetingDate = row.meetingDate,
+        sessionRevision = row.sessionRevision,
+        exposureRevision = row.exposureRevision,
+        publicationRevision = row.publicationRevision,
         sessionUpdatedAt = row.sessionUpdatedAt,
     )
 
@@ -88,6 +94,9 @@ internal class SessionRecordPersistenceRows(
             sessionId = rs.uuid("session_id"),
             clubId = rs.uuid("club_id"),
             baseLiveRevision = rs.getLong("base_live_revision"),
+            baseSessionRevision = rs.getLong("base_session_revision"),
+            baseExposureRevision = rs.getLong("base_exposure_revision"),
+            basePublicationRevision = rs.getLong("base_publication_revision"),
             baseSessionUpdatedAt = rs.utcOffsetDateTime("base_session_updated_at"),
             draftRevision = rs.getLong("draft_revision"),
             source = SessionRecordDraftSource.valueOf(rs.getString("source")),
@@ -120,5 +129,8 @@ internal data class SessionRecordLiveRow(
     val sessionNumber: Int,
     val bookTitle: String,
     val meetingDate: LocalDate,
+    val sessionRevision: Long,
+    val exposureRevision: Long,
+    val publicationRevision: Long,
     val sessionUpdatedAt: OffsetDateTime,
 )

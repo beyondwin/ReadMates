@@ -5,6 +5,7 @@ import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
+import com.readmates.sessionrecord.application.port.out.SessionRecordApplyStorePort
 import com.readmates.shared.security.ClubActor
 import com.readmates.shared.security.CurrentMember
 import com.tngtech.archunit.base.DescribedPredicate
@@ -23,6 +24,7 @@ import org.junit.jupiter.api.assertAll
 import org.junit.jupiter.api.io.TempDir
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository
 import org.springframework.stereotype.Service
+import java.lang.reflect.Modifier
 import java.nio.file.Files
 import java.nio.file.Path
 import kotlin.io.path.name
@@ -1701,13 +1703,6 @@ private val sessionRecordCapabilityMethods =
             ),
     )
 
-private val requiredAbstractCorrectionStoreMethods =
-    setOf(
-        "loadCorrectionEditor",
-        "lockCorrectionEditor",
-        "bumpCorrectionProjectionRevisions",
-    )
-
 private val sessionRecordPersistenceUnitNames =
     listOf(
         "JdbcSessionRecordAdapter.kt",
@@ -1804,18 +1799,15 @@ private fun assertSessionRecordCapabilityBoundaries(portSource: String) {
             )
         },
         {
-            val applyCapability = interfaceBody(portSource, "SessionRecordApplyStorePort").orEmpty()
             val defaultedCorrectionMethods =
-                requiredAbstractCorrectionStoreMethods.filter { method ->
-                    val declaration =
-                        applyCapability
-                            .substringAfter("fun $method(", missingDelimiterValue = "")
-                            .substringBefore("\n    fun ")
-                    declaration.substringAfterLast(')').contains('=')
+                sessionRecordCapabilityMethods.getValue("SessionRecordApplyStorePort").filter { method ->
+                    SessionRecordApplyStorePort::class.java.declaredMethods
+                        .filter { declared -> declared.name == method }
+                        .none { declared -> Modifier.isAbstract(declared.modifiers) }
                 }
             assertTrue(
                 defaultedCorrectionMethods.isEmpty(),
-                "Production correction store capabilities must be abstract: $defaultedCorrectionMethods",
+                "Production apply-store capabilities must be abstract: $defaultedCorrectionMethods",
             )
         },
     )

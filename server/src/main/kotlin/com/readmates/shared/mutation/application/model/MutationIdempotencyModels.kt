@@ -241,9 +241,10 @@ sealed class CanonicalMutationPayload {
 
     data class Publication(
         val publicSummary: String,
-        val siteVisibility: String,
+        val siteVisibility: String?,
         val accessScope: String? = null,
-        override val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
+        val visibility: String,
+        override val schemaVersion: Int = PUBLICATION_SCHEMA_VERSION,
         override val operation: HostMutationOperation = HostMutationOperation.SESSION_PUBLICATION,
     ) : CanonicalMutationPayload() {
         init {
@@ -264,6 +265,7 @@ sealed class CanonicalMutationPayload {
 
     companion object {
         const val CURRENT_SCHEMA_VERSION = 1
+        const val PUBLICATION_SCHEMA_VERSION = 2
         const val DEFAULT_START_TIME = "20:00"
         const val DEFAULT_END_TIME = "22:00"
         const val DEFAULT_ACCESS_SCOPE = "HOST_ONLY"

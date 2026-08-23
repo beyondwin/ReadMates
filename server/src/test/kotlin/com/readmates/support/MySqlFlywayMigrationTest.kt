@@ -3515,6 +3515,34 @@ class MySqlFlywayMigrationTest(
             .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
         assertThat(columns(jdbcTemplate, "host_session_mutation_receipts"))
             .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
+        assertThat(columns(jdbcTemplate, "session_record_drafts")).contains(
+            "base_session_revision",
+            "base_exposure_revision",
+            "base_publication_revision",
+        )
+        assertThat(columnMetadata(jdbcTemplate, "session_record_drafts", "base_session_revision")["IS_NULLABLE"])
+            .isEqualTo("NO")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_session_revision_check"))
+            .contains("base_session_revision", ">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_exposure_revision_check"))
+            .contains("base_exposure_revision", ">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_publication_revision_check"))
+            .contains("base_publication_revision", ">= 0")
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from session_record_drafts d
+                join sessions s on s.id = d.session_id and s.club_id = d.club_id
+                join session_publication_versions p on p.session_id = d.session_id
+                where d.base_session_revision <> s.session_revision
+                   or d.base_exposure_revision <> s.exposure_revision
+                   or d.base_publication_revision <> p.publication_revision
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
         assertThat(checkConstraintClause(jdbcTemplate, "mutation_idempotency_keys_status_check"))
             .contains("IN_PROGRESS", "COMPLETED")
         assertThat(checkConstraintClause(jdbcTemplate, "host_session_mutation_receipts_decision_check"))

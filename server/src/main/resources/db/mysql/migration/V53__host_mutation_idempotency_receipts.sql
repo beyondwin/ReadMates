@@ -70,3 +70,22 @@ create table host_session_mutation_receipts (
     )
   )
 ) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
+
+alter table session_record_drafts
+  add column base_session_revision bigint not null default 0 after base_live_revision,
+  add column base_exposure_revision bigint not null default 0 after base_session_revision,
+  add column base_publication_revision bigint not null default 0 after base_exposure_revision;
+
+update session_record_drafts d
+join sessions s
+  on s.id = d.session_id and s.club_id = d.club_id
+left join session_publication_versions p
+  on p.session_id = d.session_id
+set d.base_session_revision = s.session_revision,
+    d.base_exposure_revision = s.exposure_revision,
+    d.base_publication_revision = coalesce(p.publication_revision, 0);
+
+alter table session_record_drafts
+  add constraint session_record_drafts_base_session_revision_check check (base_session_revision >= 0),
+  add constraint session_record_drafts_base_exposure_revision_check check (base_exposure_revision >= 0),
+  add constraint session_record_drafts_base_publication_revision_check check (base_publication_revision >= 0);

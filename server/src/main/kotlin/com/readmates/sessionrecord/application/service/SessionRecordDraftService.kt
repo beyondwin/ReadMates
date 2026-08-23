@@ -155,12 +155,11 @@ class SessionRecordDraftService(
     private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
 }
 
-private fun SessionRecordDraft.isStaleAgainst(live: LiveSessionRecord): Boolean =
-    baseLiveRevision != live.revision || baseSessionUpdatedAt != live.sessionUpdatedAt
-
 private fun LiveSessionRecord.requireReviewed(command: RebaseSessionRecordDraftCommand) {
-    if (revision != command.expectedLiveRevision ||
-        !sessionUpdatedAt.isEqual(command.expectedSessionUpdatedAt)
+    if (sessionRevision != command.expectedSessionRevision ||
+        revision != command.expectedLiveRevision ||
+        exposureRevision != command.expectedExposureRevision ||
+        publicationRevision != command.expectedPublicationRevision
     ) {
         throw SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
     }

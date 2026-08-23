@@ -11,6 +11,7 @@ data class HostPublicationWriteResult(
     val response: HostPublicationResponse,
     val exposureChanged: Boolean,
     val publicationChanged: Boolean,
+    val compatibilityChanged: Boolean = false,
 ) {
-    val changed: Boolean = exposureChanged || publicationChanged
+    val changed: Boolean = exposureChanged || publicationChanged || compatibilityChanged
 }

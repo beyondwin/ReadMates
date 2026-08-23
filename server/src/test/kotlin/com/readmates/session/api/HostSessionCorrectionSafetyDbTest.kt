@@ -22,6 +22,7 @@ import java.util.UUID
 @Sql(statements = [CLEANUP_EXPOSURE_PUBLICATION_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_EXPOSURE_PUBLICATION_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
+@Suppress("LargeClass")
 class HostSessionCorrectionSafetyDbTest(
     @Autowired mockMvc: MockMvc,
     @Autowired jdbcTemplate: JdbcTemplate,
@@ -61,6 +62,31 @@ class HostSessionCorrectionSafetyDbTest(
             .get("/api/public/clubs/reading-sai/sessions/$sessionId")
             .andExpect { status { isNotFound() } }
         assertNotesProjection(sessionId, visible = false)
+
+        val noOpVersions = versions(sessionId)
+        val updatedAtBefore = sessionUpdatedAt(sessionId)
+        val epochBefore = recordEpoch()
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-host-only-repeat-publication-01",
+                        """
+                        {"exposureRevision":${noOpVersions.exposure},
+                         "publicationRevision":${noOpVersions.publication}}
+                        """.trimIndent(),
+                        """
+                        {"publicSummary":"host target summary","accessScope":"HOST_ONLY",
+                         "siteVisibility":"HIDDEN"}
+                        """.trimIndent(),
+                    )
+            }.andExpect { status { isOk() } }
+
+        assertThat(versions(sessionId)).isEqualTo(noOpVersions)
+        assertThat(sessionUpdatedAt(sessionId)).isEqualTo(updatedAtBefore)
+        assertThat(recordEpoch()).isEqualTo(epochBefore)
     }
 
     @Test
@@ -125,7 +151,7 @@ class HostSessionCorrectionSafetyDbTest(
         assertThat(recordEpoch()).isEqualTo(epochBefore)
 
         val editor = loadRecordEditor(sessionId, stale = true)
-        rebaseDraft(sessionId, editor.get("liveSessionUpdatedAt").asString(), liveBefore)
+        rebaseDraft(sessionId, editor)
         val rebased = versions(sessionId)
         assertThat(rebased.draft).isEqualTo(2)
         assertCorrectionPreview(sessionId, rebased, "GUEST_READABLE", "PUBLIC_RECORD", "PUBLIC")
@@ -133,6 +159,66 @@ class HostSessionCorrectionSafetyDbTest(
         publishCorrection(sessionId, "key-stale-preview-confirm-01", rebased)
         assertThat(liveRecordRevision(sessionId)).isEqualTo(liveBefore + 1)
         assertThat(applyReceiptCount(sessionId)).isEqualTo(receiptsBefore + 1)
+    }
+
+    @Test
+    fun `summary access and basic revision changes each stale the exact correction draft base`() {
+        val summarySession = publishedSessionWithInitialRecord()
+        saveRecordDraft(summarySession, "summary stale", "PUBLIC")
+        setPublicationSummary(summarySession, "summary changed after draft")
+        assertPreviewStaleWithoutWrites(summarySession)
+
+        val accessSession = publishedSessionWithInitialRecord()
+        setPublicPlacement(accessSession, "HIDDEN", "key-access-base-hidden-01")
+        saveRecordDraft(accessSession, "access stale", "PUBLIC")
+        mockMvc
+            .patch("/api/host/sessions/$accessSession/access-scope") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-stale-preview-access-01",
+                        """{"exposureRevision":${exposureRevision(accessSession)}}""",
+                        """{"accessScope":"HOST_ONLY"}""",
+                    )
+            }.andExpect { status { isOk() } }
+        assertPreviewStaleWithoutWrites(accessSession)
+
+        val basicSession = publishedSessionWithInitialRecord()
+        saveRecordDraft(basicSession, "basic stale", "PUBLIC")
+        mockMvc
+            .patch("/api/host/sessions/$basicSession") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-stale-preview-basic-01",
+                        """{"sessionRevision":${sessionRevision(basicSession)}}""",
+                        sessionCommand("basic changed after draft"),
+                    )
+            }.andExpect { status { isOk() } }
+        assertPreviewStaleWithoutWrites(basicSession)
+    }
+
+    @Test
+    fun `participant-only timestamp change leaves exact correction preview and confirm eligible`() {
+        val sessionId = publishedSessionWithInitialRecord()
+        saveRecordDraft(sessionId, "participant safe", "PUBLIC")
+        jdbcTemplate.update(
+            """
+            update sessions
+            set participant_set_revision = participant_set_revision + 1,
+                updated_at = timestampadd(microsecond, 1, updated_at)
+            where id = ?
+            """.trimIndent(),
+            sessionId,
+        )
+        val current = versions(sessionId)
+
+        assertCorrectionPreview(sessionId, current, "GUEST_READABLE", "PUBLIC_RECORD", "PUBLIC")
+        publishCorrection(sessionId, "key-participant-safe-confirm-01", current)
+
+        assertThat(liveRecordRevision(sessionId)).isEqualTo(current.live + 1)
     }
 
     private fun publishedSessionWithInitialRecord(): String {
@@ -269,6 +355,47 @@ class HostSessionCorrectionSafetyDbTest(
             }.andExpect { status { isOk() } }
     }
 
+    private fun setPublicationSummary(
+        sessionId: String,
+        summary: String,
+    ) {
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-stale-preview-summary-${UUID.randomUUID()}",
+                        """{"publicationRevision":${publicationRevision(sessionId)}}""",
+                        """{"publicSummary":"$summary","siteVisibility":"PUBLIC_RECORD"}""",
+                    )
+            }.andExpect { status { isOk() } }
+    }
+
+    private fun assertPreviewStaleWithoutWrites(sessionId: String) {
+        val before =
+            listOf(
+                liveRecordRevision(sessionId),
+                revisionCount(sessionId).toLong(),
+                applyReceiptCount(sessionId).toLong(),
+                recordEpoch(),
+            )
+        mockMvc
+            .get("/api/host/sessions/$sessionId/correction-publish-preview") { withHost() }
+            .andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_LIVE_STALE") }
+            }
+        assertThat(
+            listOf(
+                liveRecordRevision(sessionId),
+                revisionCount(sessionId).toLong(),
+                applyReceiptCount(sessionId).toLong(),
+                recordEpoch(),
+            ),
+        ).isEqualTo(before)
+    }
+
     private fun loadRecordEditor(
         sessionId: String,
         stale: Boolean,
@@ -284,8 +411,7 @@ class HostSessionCorrectionSafetyDbTest(
 
     private fun rebaseDraft(
         sessionId: String,
-        expectedSessionUpdatedAt: String,
-        expectedLiveRevision: Long,
+        editor: tools.jackson.databind.JsonNode,
     ) {
         mockMvc
             .post("/api/host/sessions/$sessionId/record-draft/rebase") {
@@ -295,8 +421,10 @@ class HostSessionCorrectionSafetyDbTest(
                     """
                     {
                       "expectedDraftRevision": 1,
-                      "expectedLiveRevision": $expectedLiveRevision,
-                      "expectedSessionUpdatedAt": "$expectedSessionUpdatedAt"
+                      "expectedSessionRevision": ${editor.get("liveSessionRevision").asLong()},
+                      "expectedLiveRevision": ${editor.get("liveRevision").asLong()},
+                      "expectedExposureRevision": ${editor.get("liveExposureRevision").asLong()},
+                      "expectedPublicationRevision": ${editor.get("livePublicationRevision").asLong()}
                     }
                     """.trimIndent()
             }.andExpect {
@@ -370,6 +498,13 @@ class HostSessionCorrectionSafetyDbTest(
         assertThat(row["publication_visibility"]).isEqualTo(publicationVisibility)
         assertThat(row["is_public"]).isEqualTo(isPublic)
     }
+
+    private fun sessionUpdatedAt(sessionId: String): java.time.LocalDateTime =
+        jdbcTemplate.queryForObject(
+            "select updated_at from sessions where id = ?",
+            java.time.LocalDateTime::class.java,
+            sessionId,
+        ) ?: error("missing session updated_at")
 
     private fun insertNotesQuestion(sessionId: String) {
         jdbcTemplate.update(

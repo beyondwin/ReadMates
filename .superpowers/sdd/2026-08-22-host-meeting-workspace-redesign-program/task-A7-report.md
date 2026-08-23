@@ -362,3 +362,137 @@ All Testcontainers runs remained serial; existing services and containers were p
 Self-review confirmed that controllers only parse/map; preview rejects stale draft metadata before presenting an exact vector; semantic no-op detection happens under the same locks as revision validation; correction receipt generation remains inside the session-record feature; and denial tests inspect every origin table/epoch affected by A7. No raw meeting URL/passcode, canonical request, or private draft thought is persisted in new receipts or returned by new responses.
 
 The release boundary is unchanged: this round proves origin atomicity and privacy only. It does not implement or claim C1 convergence generation, append-only convergence attempts, BFF/CDN denial convergence, cache propagation SLA, runtime deployment, or provider validation.
+
+## Fix round 2: exact draft base, canonical publication identity, compatibility signal, and complete authorization evidence
+
+This round closes the four remaining Important review findings. It corrects one statement from fix round 1: an exact correction base did require schema support. Because the feature line is still undeployed and C1 explicitly owns `V54__public_projection_convergence.sql`, no A7 V54 migration was added. The three draft-base columns, backfill, and non-negative checks were appended to the existing undeployed `V53__host_mutation_idempotency_receipts.sql`; C1's V54 filename and contract remain reserved.
+
+### ADR impact
+
+- ADR-0022 (`update` impact, no status promotion): correction/import and publication now call one shared authoritative V45 compatibility projection. Canonical `access_scope`/`site_visibility` remain the eligibility source; lifecycle compatibility columns cannot drift between write paths.
+- ADR-0023 (`update` impact, no status promotion): each draft persists the exact `session`, live-record, exposure, and publication base revisions. Participant-only changes are intentionally excluded. A compatibility-only repair signals one record epoch/cache invalidation without bumping exposure/publication domain revisions.
+- ADR-0028 (`update` impact, no status promotion): publication canonical identity is operation-schema v2 and binds nullable placement, nullable access, and legacy visibility separately. Omitted placement is not collapsed into explicit `HIDDEN`; raw payload/canonical bytes/SHA remain unpersisted.
+- ADR-0033 ownership is unchanged: the application transaction and atomic outbound capability still own the origin commit. No new ADR or promotion is required.
+
+### Implementation and contract changes
+
+- `SessionRecordDraft` now carries `baseSessionRevision`, `baseLiveRevision`, `baseExposureRevision`, and `basePublicationRevision`, with `draftRevision` remaining separate. Save, restore, and rebase write the complete base vector; editor and import-draft responses carry it back to callers.
+- `baseSessionUpdatedAt` remains only as V41 storage compatibility. It is not read by stale detection, preview, rebase review, or confirm. Preview and confirm use the same explicit revision basis. Summary, basic/session, access, placement, or live-record revision changes stale the draft; a participant-set-only `sessions.updated_at` change does not.
+- Publication canonical payload schema v2 writes nullable markers for `siteVisibility` and `accessScope` and binds legacy `visibility`. DTO command properties are allowlisted exactly before service entry. Same-key omitted versus explicit `HIDDEN`, and legacy `MEMBER` versus `PUBLIC`, conflict; an exact request replays.
+- `v45CompatibilityProjection` is the single mapper used by session publication and record correction/import. A PUBLISHED `HOST_ONLY` canonical exposure maps to the required V45 `MEMBER` compatibility column while remaining denied by canonical access. Compatibility-only repair is exposed by `HostPublicationWriteResult.compatibilityChanged`, signals once, and leaves domain revisions unchanged. Once repaired, the same semantics are a true no-op: no `sessions.updated_at`, revision, epoch, or cache signal.
+- The correction apply port has no production default body, including `findApplyReceipt`. The architecture test inspects JVM method modifiers with `Modifier.isAbstract` for every apply-store capability rather than searching source for `=`.
+- Anonymous and active non-host callers exercise access, publication, and correction. Cross-club tests use a valid foreign PUBLISHED session, live revision, exact-base draft, publication row/version, foreign host membership, and both club epochs. The before/after fingerprint covers sessions, public projection contents/revisions, all origin content tables, immutable history, drafts, audits, feature and host receipts, operational keys, both club epochs, and notification outboxes.
+
+### Fix-round 2 TDD RED evidence
+
+Exact draft-base RED:
+
+```bash
+./server/gradlew -p server compileKotlin compileTestKotlin --console=plain
+```
+
+- FAIL at `compileTestKotlin`: the new tests could not resolve `expectedSessionRevision`, `expectedExposureRevision`, or `expectedPublicationRevision`, and rejected the removed `expectedSessionUpdatedAt` precondition. This established that the persisted/model/API contract only carried the timestamp proxy.
+
+Publication identity RED:
+
+```bash
+./server/gradlew -p server compileTestKotlin --console=plain
+```
+
+- FAIL with four canonical-contract errors: `siteVisibility` rejected null, `visibility` did not exist, and `PUBLICATION_SCHEMA_VERSION` was unresolved. The prior payload therefore could not distinguish omission or bind legacy V45 effect.
+
+The authorization additions were GREEN against the existing security boundary. Their value is complete fixture validity and enlarged zero-write evidence, not an authorization production-code change.
+
+### Fix-round 2 GREEN evidence
+
+Exact base persistence and rebase:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*JdbcSessionRecordAdapterTest' --tests '*HostSessionRecordDraftRebaseControllerDbTest' --console=plain --max-workers=1
+```
+
+- PASS, 15/15: 14 JDBC adapter tests plus one controller rebase test.
+
+Migration schema/backfill:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*MySqlFlywayMigrationTest' --console=plain --max-workers=1
+```
+
+- PASS, 18/18, including V53 exact-base columns, checks, and legacy-draft backfill. No V54 file exists in A7.
+
+Focused origin, canonical identity, compatibility, and authorization:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.session.api.HostSessionCorrectionSafetyDbTest --tests com.readmates.session.api.HostSessionExposurePublicationDbTest --console=plain --no-parallel --max-workers=1
+```
+
+- PASS, 16/16: correction 6, exposure/publication/auth 10.
+
+Focused application/domain/canonical bundle:
+
+```bash
+./server/gradlew -p server unitTest --tests '*SessionRecordDraftServiceTest' --tests '*SessionRecordApplyServiceTest' --tests '*SessionExposureTest' --tests '*MutationCanonicalizationTest' --tests '*HostSessionServicesTest' architectureTest --tests '*ServerArchitectureBoundaryTest' --console=plain
+```
+
+- PASS, 109/109 focused unit tests: draft 11, apply 16, exposure 4, canonicalization 16, host services 62.
+- PASS, 38/38 focused architecture tests. The apply-store assertion uses JVM abstract modifiers and every fake is explicit.
+
+Notes/archive, ordinary import, and A6 regressions:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.archive.api.ArchiveAndNotesDbTest --tests com.readmates.sessionimport.api.HostSessionImportControllerDbTest --tests com.readmates.session.api.HostSessionIdempotencyDbTest --tests com.readmates.sessionrecord.api.HostSessionRecordControllerDbTest --console=plain --no-parallel --max-workers=1
+```
+
+- PASS. The selected classes contain 32 Notes/archive, 8 import, 10 idempotency, and 8 primary session-record controller tests. The separate record-draft rebase controller is covered in the 15-test persistence/rebase command above.
+
+Redis/cache regression:
+
+```bash
+./server/gradlew -p server integrationTest --tests com.readmates.shared.adapter.out.redis.RedisReadCacheInvalidationAdapterTest --console=plain --no-parallel --max-workers=1
+```
+
+- PASS, 6/6.
+
+Full lanes and quality baseline:
+
+```bash
+./server/gradlew -p server unitTest --console=plain --no-parallel --max-workers=1
+./server/gradlew -p server architectureTest --console=plain --no-parallel --max-workers=1
+./scripts/server-ci-check.sh
+```
+
+- Full unit: 1,630 total, 1,628 passed, 1 skipped, 1 inherited `ActiveSessionProjectionArchitectureTest` failure.
+- Full architecture: 97 total, 96 passed, 1 inherited `HostSessionQueryPort.listMode` default-runtime-failure finding.
+- Server CI remains blocked at the inherited detekt gate with exactly 122 issues across 38 files: MaxLineLength 57, ThrowsCount 15, MagicNumber 12, LongMethod 10, UnusedParameter 9, TooManyFunctions 7, LargeClass 5, ReturnCount 3, CyclomaticComplexMethod 3, ComplexCondition 1. This exactly matches fix-round-1 A7 HEAD and introduces no round-2 detekt debt.
+- `ktlintCheck` reports exactly the same 13 inherited findings, all in unchanged `CanonicalMeetingLanguageInventoryTest.kt`; round-2 changed files have zero findings.
+
+```bash
+git diff --check
+```
+
+- PASS.
+
+All Testcontainers commands remained serial/isolated. Existing services and containers were not stopped.
+
+### Acceptance matrix selection for fix round 2
+
+Selected:
+
+- Actor/authorization and club context: anonymous, active non-host, valid cross-club foreign correction vector, explicit status, and full zero-write fingerprint.
+- Lifecycle and guest/public exposure: summary/access/placement/basic/live-record draft-base invalidation, participant-only non-invalidation, PUBLISHED `HOST_ONLY` compatibility, and repeat no-op.
+- Persistence/migration: undeployed V53 schema/backfill, exact base save/restore/rebase, locked revision comparison, immutable receipt/history preservation, and no partial writes.
+- Idempotency/privacy: publication schema v2 omission/legacy identity, exact replay/conflict, linked feature/host receipts, HMAC-only operational identity, and no raw meeting URL/passcode/canonical request storage or response.
+- Cache signal: compatibility-only repair and semantic no-op unit behavior plus the existing Redis invalidation regression.
+
+Excluded:
+
+- C1 convergence generation/attempts, BFF/CDN denial convergence, cache propagation SLA, deployment/runtime, OAuth/provider, frontend UI, and browser evidence. A7 neither implements nor claims these release properties.
+
+### Self-review and residual boundary
+
+- The exact base intentionally excludes participant-set revision, so participant management cannot create false correction conflicts. Every correction-owned revision is included and rebase replaces the entire base vector atomically.
+- Compatibility repair updates only V45 projection state and signals readers; it does not counterfeit an access/publication domain change. The next identical command is write-free.
+- Canonical publication v2 preserves semantic omission and legacy compatibility intent without persisting raw request material.
+- Controller work remains parsing/mapping only. Cross-club denial uses a fully valid foreign resource, so `404` is authorization-derived rather than fixture absence or validation failure.
+- C1 remains the non-release boundary. In particular, A7 does not consume C1's reserved V54, implement convergence attempts, or prove BFF/CDN/cache convergence SLA.

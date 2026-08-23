@@ -59,6 +59,90 @@ class HostSessionExposurePublicationDbTest(
     }
 
     @Test
+    fun `publication idempotency distinguishes omitted placement from explicit hidden and legacy audience`() {
+        val omittedSession = closedGuestReadableSession("canonical omitted placement")
+        val omittedKey = "key-canonical-omitted-01"
+        mockMvc
+            .put("/api/host/sessions/$omittedSession/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        omittedKey,
+                        """{"publicationRevision":0}""",
+                        """{"publicSummary":"canonical summary","visibility":"MEMBER"}""",
+                    )
+            }.andExpect { status { isOk() } }
+        val afterOmitted = atomicFingerprint(omittedSession)
+
+        mockMvc
+            .put("/api/host/sessions/$omittedSession/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        omittedKey,
+                        """{"publicationRevision":0}""",
+                        """{"publicSummary":"canonical summary","siteVisibility":"HIDDEN","visibility":"MEMBER"}""",
+                    )
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("IDEMPOTENCY_KEY_REUSED") }
+            }
+        assertThat(atomicFingerprint(omittedSession)).isEqualTo(afterOmitted)
+
+        val legacySession = closedGuestReadableSession("canonical legacy audience")
+        val legacyKey = "key-canonical-legacy-01"
+        mockMvc
+            .put("/api/host/sessions/$legacySession/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        legacyKey,
+                        """{"publicationRevision":0}""",
+                        """{"publicSummary":"legacy summary","visibility":"MEMBER"}""",
+                    )
+            }.andExpect { status { isOk() } }
+        val afterMember = atomicFingerprint(legacySession)
+        mockMvc
+            .put("/api/host/sessions/$legacySession/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        legacyKey,
+                        """{"publicationRevision":0}""",
+                        """{"publicSummary":"legacy summary","visibility":"PUBLIC"}""",
+                    )
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("IDEMPOTENCY_KEY_REUSED") }
+            }
+        assertThat(atomicFingerprint(legacySession)).isEqualTo(afterMember)
+    }
+
+    @Test
+    fun `publication envelope rejects unknown command fields before mutation`() {
+        val sessionId = createDraft("publication unknown command", "key-command-create-01").first
+        val before = atomicFingerprint(sessionId)
+
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-command-extra-01",
+                        """{"publicationRevision":0}""",
+                        """{"publicSummary":"summary","visibility":"MEMBER","rawPayload":"forbidden"}""",
+                    )
+            }.andExpect { status { isBadRequest() } }
+
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+    }
+
+    @Test
     fun `semantic publication no-op keeps revisions and epoch while exact replay keeps one new receipt`() {
         val sessionId = closedGuestReadableSession("semantic publication no-op")
         val initial = versions(sessionId)
@@ -123,6 +207,51 @@ class HostSessionExposurePublicationDbTest(
     }
 
     @Test
+    fun `compatibility-only publication repair signals once without bumping domain revisions`() {
+        val sessionId = publishedSessionWithInitialRecord()
+        saveRecordDraft(sessionId, "compatibility repair", "HOST_ONLY")
+        val correction = versions(sessionId)
+        mockMvc
+            .post("/api/host/sessions/$sessionId/correction-publish") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = envelope("key-compat-correction-01", correctionVector(correction), "{}")
+            }.andExpect { status { isOk() } }
+        val canonical = versions(sessionId)
+        jdbcTemplate.update("update sessions set visibility = 'PUBLIC' where id = ?", sessionId)
+        val epochBeforeRepair = recordEpoch()
+
+        putPublication(
+            sessionId = sessionId,
+            key = "key-compat-repair-01",
+            expectedExposure = canonical.exposure,
+            expectedPublication = canonical.publication,
+            accessScope = "HOST_ONLY",
+            siteVisibility = "HIDDEN",
+            summary = "compatibility repair summary",
+        )
+
+        assertThat(versions(sessionId)).isEqualTo(canonical)
+        assertThat(recordEpoch()).isEqualTo(epochBeforeRepair + 1)
+        assertExposure(sessionId, "HOST_ONLY", "MEMBER", "HIDDEN", "MEMBER", false, "compatibility repair summary")
+
+        val repairedAt = sessionUpdatedAt(sessionId)
+        putPublication(
+            sessionId = sessionId,
+            key = "key-compat-repair-noop-01",
+            expectedExposure = canonical.exposure,
+            expectedPublication = canonical.publication,
+            accessScope = "HOST_ONLY",
+            siteVisibility = "HIDDEN",
+            summary = "compatibility repair summary",
+        )
+        assertThat(versions(sessionId)).isEqualTo(canonical)
+        assertThat(recordEpoch()).isEqualTo(epochBeforeRepair + 1)
+        assertThat(sessionUpdatedAt(sessionId)).isEqualTo(repairedAt)
+    }
+
+    @Test
+    @Suppress("LongMethod")
     fun `unauthenticated and non-host exposure publication and correction commit nothing`() {
         val sessionId = publishedSessionWithInitialRecord()
         saveRecordDraft(sessionId, "authorization", "PUBLIC")
@@ -140,6 +269,41 @@ class HostSessionExposurePublicationDbTest(
                         """{"accessScope":"HOST_ONLY"}""",
                     )
             }.andExpect { status { isUnauthorized() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-unauth-publication-01",
+                        """{"publicationRevision":${current.publication}}""",
+                        """{"publicSummary":"unauthorized","siteVisibility":"HIDDEN"}""",
+                    )
+            }.andExpect { status { isUnauthorized() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+
+        mockMvc
+            .post("/api/host/sessions/$sessionId/correction-publish") {
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = envelope("key-unauth-correction-01", correctionVector(current), "{}")
+            }.andExpect { status { isUnauthorized() } }
+        assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                with(user("member1@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-member-access-01",
+                        """{"exposureRevision":${current.exposure}}""",
+                        """{"accessScope":"HOST_ONLY"}""",
+                    )
+            }.andExpect { status { isForbidden() } }
         assertThat(atomicFingerprint(sessionId)).isEqualTo(before)
 
         mockMvc
@@ -206,7 +370,7 @@ class HostSessionExposurePublicationDbTest(
                     envelope(
                         "key-cross-correction-01",
                         """
-                        {"sessionRevision":0,"recordDraftRevision":1,"liveRecordRevision":0,
+                        {"sessionRevision":0,"recordDraftRevision":1,"liveRecordRevision":1,
                          "exposureRevision":0,"publicationRevision":0}
                         """.trimIndent(),
                         "{}",
@@ -665,6 +829,13 @@ class HostSessionExposurePublicationDbTest(
             sessionId,
         ) ?: error("missing publication")
 
+    private fun sessionUpdatedAt(sessionId: String): java.time.LocalDateTime =
+        jdbcTemplate.queryForObject(
+            "select updated_at from sessions where id = ?",
+            java.time.LocalDateTime::class.java,
+            sessionId,
+        ) ?: error("missing session updated_at")
+
     private fun hostDisplayName(): String =
         jdbcTemplate.queryForObject(
             """
@@ -697,6 +868,7 @@ class HostSessionExposurePublicationDbTest(
             sessionId,
         ) ?: 0
 
+    @Suppress("LongMethod")
     private fun atomicFingerprint(sessionId: String): AtomicFingerprint =
         AtomicFingerprint(
             session =
@@ -711,10 +883,110 @@ class HostSessionExposurePublicationDbTest(
             publication =
                 jdbcTemplate.queryForList(
                     """
-                    select public_summary, visibility, site_visibility, is_public
-                    from public_session_publications where session_id = ?
+                    select p.public_summary, p.visibility, p.site_visibility, p.is_public,
+                           p.published_at, p.updated_at, v.publication_revision
+                    from public_session_publications p
+                    left join session_publication_versions v on v.session_id = p.session_id
+                    where p.session_id = ?
                     """.trimIndent(),
                     sessionId,
+                ),
+            origins =
+                listOf("highlights", "one_line_reviews", "questions", "session_feedback_documents")
+                    .associateWith { table ->
+                        jdbcTemplate.queryForList("select * from $table where session_id = ? order by id", sessionId)
+                    },
+            history =
+                jdbcTemplate.queryForList(
+                    """
+                    select id, version, source, restored_from_revision_id, snapshot_json,
+                           snapshot_sha256, applied_by_membership_id, applied_at
+                    from session_record_revisions where session_id = ? order by version
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            drafts =
+                jdbcTemplate.queryForList(
+                    """
+                    select base_live_revision, base_session_revision, base_exposure_revision,
+                           base_publication_revision, draft_revision, source, restored_from_revision_id,
+                           snapshot_json, snapshot_sha256, updated_by_membership_id, created_at, updated_at
+                    from session_record_drafts where session_id = ?
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            audits =
+                mapOf(
+                    "change" to
+                        jdbcTemplate.queryForList(
+                            "select * from host_session_change_audit where session_id = ? order by id",
+                            sessionId,
+                        ),
+                    "lifecycle" to
+                        jdbcTemplate.queryForList(
+                            "select * from host_session_lifecycle_audit where session_id = ? order by id",
+                            sessionId,
+                        ),
+                    "participant" to
+                        jdbcTemplate.queryForList(
+                            "select * from session_participant_change_audit where session_id = ? order by id",
+                            sessionId,
+                        ),
+                ),
+            featureReceipts =
+                jdbcTemplate.queryForList(
+                    """
+                    select id, apply_request_id, club_id, session_id, host_membership_id,
+                           expected_draft_revision, expected_live_revision, draft_sha256,
+                           composer_event_type, revision_id, created_at
+                    from session_record_apply_receipts where session_id = ? order by id
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            hostReceipts =
+                jdbcTemplate.queryForList(
+                    "select * from host_session_mutation_receipts where resource_id = ? order by id",
+                    sessionId,
+                ),
+            idempotencyRows =
+                jdbcTemplate.queryForList(
+                    """
+                    select club_id, actor_membership_id, operation, resource_slot, idempotency_key,
+                           canonical_schema_version, digest_key_version, hex(request_hmac) request_hmac_hex,
+                           status, receipt_id, created_at, updated_at, expires_at
+                    from mutation_idempotency_keys where resource_slot = ? order by operation, idempotency_key
+                    """.trimIndent(),
+                    sessionId,
+                ),
+            epochs =
+                jdbcTemplate.queryForList(
+                    """
+                    select club_id, meeting_epoch, record_epoch
+                    from club_host_list_epochs
+                    where club_id in (?, ?)
+                    order by club_id
+                    """.trimIndent(),
+                    CLUB_ID,
+                    OUTSIDE_CLUB_ID,
+                ),
+            outbox =
+                mapOf(
+                    "event" to
+                        jdbcTemplate.queryForList(
+                            """
+                            select id, club_id, event_type, aggregate_id, status, dedupe_key
+                            from notification_event_outbox where aggregate_id = ? order by id
+                            """.trimIndent(),
+                            sessionId,
+                        ),
+                    "legacy" to
+                        jdbcTemplate.queryForList(
+                            """
+                            select id, club_id, event_type, aggregate_id, status, dedupe_key
+                            from notification_outbox where aggregate_id = ? order by id
+                            """.trimIndent(),
+                            sessionId,
+                        ),
                 ),
             liveRevision = liveRecordRevision(sessionId),
             revisionCount = revisionCount(sessionId),
@@ -726,6 +998,7 @@ class HostSessionExposurePublicationDbTest(
             recordEpoch = recordEpoch(),
         )
 
+    @Suppress("LongMethod")
     private fun createOutsideClubSession() {
         jdbcTemplate.update(
             """
@@ -733,6 +1006,22 @@ class HostSessionExposurePublicationDbTest(
             values (?, 'a7-outside-club', 'A7 outside', 'outside', 'outside authorization fixture')
             """.trimIndent(),
             OUTSIDE_CLUB_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name)
+            values (?, 'a7-outside-subject', 'a7-outside@example.test', 'A7 outside host', 'outside')
+            """.trimIndent(),
+            OUTSIDE_USER_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, 'HOST', 'ACTIVE', utc_timestamp(6), 'outside', 'mushroom-green-book')
+            """.trimIndent(),
+            OUTSIDE_MEMBERSHIP_ID,
+            OUTSIDE_CLUB_ID,
+            OUTSIDE_USER_ID,
         )
         jdbcTemplate.update(
             """
@@ -744,6 +1033,70 @@ class HostSessionExposurePublicationDbTest(
                       '20:00:00', '22:00:00', '온라인', '2026-09-03 14:59:00',
                       'PUBLISHED', 'MEMBER', 'GUEST_READABLE')
             """.trimIndent(),
+            OUTSIDE_SESSION_ID,
+            OUTSIDE_CLUB_ID,
+        )
+        jdbcTemplate.update(
+            "insert into session_publication_versions (session_id, publication_revision) values (?, 0)",
+            OUTSIDE_SESSION_ID,
+        )
+        jdbcTemplate.update(
+            "insert into club_host_list_epochs (club_id, meeting_epoch, record_epoch) values (?, 0, 0)",
+            OUTSIDE_CLUB_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility
+            ) values (?, ?, ?, 'outside summary', false, 'MEMBER', 'HIDDEN')
+            """.trimIndent(),
+            OUTSIDE_PUBLICATION_ID,
+            OUTSIDE_CLUB_ID,
+            OUTSIDE_SESSION_ID,
+        )
+        val snapshot =
+            jsonMapper
+                .createObjectNode()
+                .apply {
+                    put("schema", "readmates-session-record:v1")
+                    put("visibility", "MEMBER")
+                    put("publicationSummary", "outside correction")
+                    putArray("highlights")
+                    putArray("oneLineReviews")
+                    putObject("feedbackDocument").apply {
+                        put("fileName", "outside.md")
+                        put("title", "outside")
+                        put("markdown", "")
+                    }
+                }.toString()
+        jdbcTemplate.update(
+            """
+            insert into session_record_revisions (
+              id, session_id, club_id, version, source, snapshot_json, snapshot_sha256,
+              applied_by_membership_id
+            ) values (?, ?, ?, 1, 'MANUAL', ?, ?, ?)
+            """.trimIndent(),
+            OUTSIDE_REVISION_ID,
+            OUTSIDE_SESSION_ID,
+            OUTSIDE_CLUB_ID,
+            snapshot,
+            "a".repeat(64),
+            OUTSIDE_MEMBERSHIP_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_record_drafts (
+              session_id, club_id, base_live_revision, base_session_revision,
+              base_exposure_revision, base_publication_revision, base_session_updated_at,
+              draft_revision, source, snapshot_json, snapshot_sha256, updated_by_membership_id
+            )
+            select id, club_id, 1, session_revision, exposure_revision, 0, updated_at,
+                   1, 'MANUAL', ?, ?, ?
+            from sessions where id = ? and club_id = ?
+            """.trimIndent(),
+            snapshot,
+            "b".repeat(64),
+            OUTSIDE_MEMBERSHIP_ID,
             OUTSIDE_SESSION_ID,
             OUTSIDE_CLUB_ID,
         )
@@ -835,6 +1188,15 @@ class HostSessionExposurePublicationDbTest(
     private data class AtomicFingerprint(
         val session: Map<String, Any?>,
         val publication: List<Map<String, Any?>>,
+        val origins: Map<String, List<Map<String, Any?>>>,
+        val history: List<Map<String, Any?>>,
+        val drafts: List<Map<String, Any?>>,
+        val audits: Map<String, List<Map<String, Any?>>>,
+        val featureReceipts: List<Map<String, Any?>>,
+        val hostReceipts: List<Map<String, Any?>>,
+        val idempotencyRows: List<Map<String, Any?>>,
+        val epochs: List<Map<String, Any?>>,
+        val outbox: Map<String, List<Map<String, Any?>>>,
         val liveRevision: Long,
         val revisionCount: Int,
         val draftRevision: Long?,
@@ -845,12 +1207,36 @@ class HostSessionExposurePublicationDbTest(
 
     private companion object {
         const val OUTSIDE_CLUB_ID = "00000000-0000-0000-0000-000000079001"
+        const val OUTSIDE_USER_ID = "00000000-0000-0000-0000-000000079101"
+        const val OUTSIDE_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000079201"
         const val OUTSIDE_SESSION_ID = "00000000-0000-0000-0000-000000079777"
+        const val OUTSIDE_PUBLICATION_ID = "00000000-0000-0000-0000-000000079778"
+        const val OUTSIDE_REVISION_ID = "00000000-0000-0000-0000-000000079779"
     }
 }
 
 internal const val CLEANUP_EXPOSURE_PUBLICATION_SQL = """
+    delete from mutation_idempotency_keys where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from host_session_mutation_receipts where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from session_record_apply_receipts where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from session_record_drafts where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from host_session_change_audit where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from host_session_lifecycle_audit where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from session_participant_change_audit where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from session_feedback_documents where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from highlights where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from one_line_reviews where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from questions where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from session_record_revisions where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from session_participants where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from public_session_publications where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from session_publication_versions where session_id = '00000000-0000-0000-0000-000000079777';
+    delete from notification_event_outbox where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from notification_outbox where club_id = '00000000-0000-0000-0000-000000079001';
     delete from sessions where id = '00000000-0000-0000-0000-000000079777';
+    delete from club_host_list_epochs where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from memberships where club_id = '00000000-0000-0000-0000-000000079001';
+    delete from users where id = '00000000-0000-0000-0000-000000079101';
     delete from clubs where id = '00000000-0000-0000-0000-000000079001' or slug = 'a7-outside-club';
     delete from session_record_apply_receipts
     where club_id = '00000000-0000-0000-0000-000000000001'

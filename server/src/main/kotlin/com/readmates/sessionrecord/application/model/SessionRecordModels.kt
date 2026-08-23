@@ -2,6 +2,7 @@ package com.readmates.sessionrecord.application.model
 
 import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.exposure.v45CompatibilityProjection
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -60,6 +61,9 @@ data class SessionRecordDraft(
     val sessionId: UUID,
     val clubId: UUID,
     val baseLiveRevision: Long,
+    val baseSessionRevision: Long = 0,
+    val baseExposureRevision: Long = 0,
+    val basePublicationRevision: Long = 0,
     val draftRevision: Long,
     val source: SessionRecordDraftSource,
     val restoredFromRevisionId: UUID?,
@@ -68,7 +72,13 @@ data class SessionRecordDraft(
     val createdAt: OffsetDateTime,
     val updatedAt: OffsetDateTime,
     val baseSessionUpdatedAt: OffsetDateTime = LEGACY_SESSION_RECORD_TIMESTAMP,
-)
+) {
+    fun isStaleAgainst(live: LiveSessionRecord): Boolean =
+        baseSessionRevision != live.sessionRevision ||
+            baseLiveRevision != live.revision ||
+            baseExposureRevision != live.exposureRevision ||
+            basePublicationRevision != live.publicationRevision
+}
 
 data class SessionRecordRevision(
     val id: UUID,
@@ -90,6 +100,9 @@ data class LiveSessionRecord(
     val sessionNumber: Int = 0,
     val bookTitle: String = "",
     val meetingDate: LocalDate = LocalDate.MIN,
+    val sessionRevision: Long = 0,
+    val exposureRevision: Long = 0,
+    val publicationRevision: Long = 0,
     val sessionUpdatedAt: OffsetDateTime = LEGACY_SESSION_RECORD_TIMESTAMP,
 )
 
@@ -110,8 +123,10 @@ data class SaveSessionRecordDraftCommand(
 data class RebaseSessionRecordDraftCommand(
     val sessionId: UUID,
     val expectedDraftRevision: Long,
+    val expectedSessionRevision: Long,
     val expectedLiveRevision: Long,
-    val expectedSessionUpdatedAt: OffsetDateTime,
+    val expectedExposureRevision: Long,
+    val expectedPublicationRevision: Long,
 )
 
 data class RestoreSessionRecordDraftCommand(
@@ -188,52 +203,28 @@ data class SessionRecordAudienceProjection(
 )
 
 fun SessionRecordVisibility.toAudienceProjection(state: String): SessionRecordAudienceProjection =
-    when (this) {
-        SessionRecordVisibility.HOST_ONLY ->
-            SessionRecordAudienceProjection(
-                accessScope = SessionRecordAccessScope.HOST_ONLY,
-                siteVisibility = SessionRecordSiteVisibility.HIDDEN,
-                visibility = SessionRecordVisibility.HOST_ONLY,
-                sessionCompatibilityVisibility =
-                    if (state == "PUBLISHED") SessionRecordVisibility.MEMBER else SessionRecordVisibility.HOST_ONLY,
-                publicationVisibility = SessionRecordVisibility.MEMBER,
-                isPublic = false,
-            )
-        SessionRecordVisibility.MEMBER ->
-            SessionRecordAudienceProjection(
-                accessScope = SessionRecordAccessScope.GUEST_READABLE,
-                siteVisibility = SessionRecordSiteVisibility.HIDDEN,
-                visibility = SessionRecordVisibility.MEMBER,
-                sessionCompatibilityVisibility = SessionRecordVisibility.MEMBER,
-                publicationVisibility = SessionRecordVisibility.MEMBER,
-                isPublic = false,
-            )
-        SessionRecordVisibility.PUBLIC -> {
-            val publicPlacementAllowed = state == "CLOSED" || state == "PUBLISHED"
-            SessionRecordAudienceProjection(
-                accessScope = SessionRecordAccessScope.GUEST_READABLE,
-                siteVisibility =
-                    if (publicPlacementAllowed) {
-                        SessionRecordSiteVisibility.PUBLIC_RECORD
-                    } else {
-                        SessionRecordSiteVisibility.HIDDEN
-                    },
-                visibility = SessionRecordVisibility.PUBLIC,
-                sessionCompatibilityVisibility =
-                    if (publicPlacementAllowed) {
-                        SessionRecordVisibility.PUBLIC
-                    } else {
-                        SessionRecordVisibility.MEMBER
-                    },
-                publicationVisibility =
-                    if (publicPlacementAllowed) {
-                        SessionRecordVisibility.PUBLIC
-                    } else {
-                        SessionRecordVisibility.MEMBER
-                    },
-                isPublic = publicPlacementAllowed,
-            )
-        }
+    run {
+        val accessScope =
+            when (this) {
+                SessionRecordVisibility.HOST_ONLY -> SessionRecordAccessScope.HOST_ONLY
+                SessionRecordVisibility.MEMBER, SessionRecordVisibility.PUBLIC ->
+                    SessionRecordAccessScope.GUEST_READABLE
+            }
+        val siteVisibility =
+            if (this == SessionRecordVisibility.PUBLIC && state in setOf("CLOSED", "PUBLISHED")) {
+                SessionRecordSiteVisibility.PUBLIC_RECORD
+            } else {
+                SessionRecordSiteVisibility.HIDDEN
+            }
+        val compatibility = v45CompatibilityProjection(state, accessScope.name, siteVisibility.name)
+        SessionRecordAudienceProjection(
+            accessScope = accessScope,
+            siteVisibility = siteVisibility,
+            visibility = this,
+            sessionCompatibilityVisibility = SessionRecordVisibility.valueOf(compatibility.sessionVisibility),
+            publicationVisibility = SessionRecordVisibility.valueOf(compatibility.publicationVisibility),
+            isPublic = compatibility.isPublic,
+        )
     }
 
 data class SessionRecordCorrectionPreview(

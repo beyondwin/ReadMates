@@ -53,6 +53,13 @@ class SessionExposureTest {
                 PublicSiteVisibility.PUBLIC_RECORD,
             ).toCompatibility("CLOSED"),
         )
+        assertEquals(
+            CompatibilityExposure("MEMBER", "MEMBER", false),
+            SessionExposure(
+                SessionAccessScope.HOST_ONLY,
+                PublicSiteVisibility.HIDDEN,
+            ).toCompatibility("PUBLISHED"),
+        )
     }
 
     @Test

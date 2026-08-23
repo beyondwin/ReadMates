@@ -155,11 +155,11 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
-    fun `session metadata drift rejects preview and apply before notification preparation`() {
+    fun `session revision drift rejects preview and apply before notification preparation`() {
         val fixture =
             Fixture(
-                liveSessionUpdatedAt = TEST_NOW.plusSeconds(1),
-                draftBaseSessionUpdatedAt = TEST_NOW,
+                liveSessionRevision = 1,
+                draftBaseSessionRevision = 0,
             )
 
         assertThrows(SessionRecordException::class.java) {
@@ -175,11 +175,25 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
-    fun `correction preview rejects a draft whose live metadata base is stale`() {
+    fun `participant-only timestamp drift keeps preview and apply eligible`() {
         val fixture =
             Fixture(
                 liveSessionUpdatedAt = TEST_NOW.plusSeconds(1),
                 draftBaseSessionUpdatedAt = TEST_NOW,
+            )
+
+        fixture.preview()
+        fixture.apply()
+
+        assertEquals(1, fixture.store.receipts.size)
+    }
+
+    @Test
+    fun `correction preview rejects a draft whose exact live base is stale`() {
+        val fixture =
+            Fixture(
+                livePublicationRevision = 1,
+                draftBasePublicationRevision = 0,
             )
 
         assertThrows(SessionRecordException::class.java) {
@@ -301,6 +315,12 @@ private class Fixture(
     draftSource: SessionRecordDraftSource = SessionRecordDraftSource.MANUAL,
     restoredFromRevisionId: UUID? = null,
     draftPublicationSummary: String = "Summary",
+    liveSessionRevision: Long = 0,
+    draftBaseSessionRevision: Long = liveSessionRevision,
+    liveExposureRevision: Long = 0,
+    draftBaseExposureRevision: Long = liveExposureRevision,
+    livePublicationRevision: Long = 0,
+    draftBasePublicationRevision: Long = livePublicationRevision,
     liveSessionUpdatedAt: OffsetDateTime = TEST_NOW,
     draftBaseSessionUpdatedAt: OffsetDateTime = liveSessionUpdatedAt,
 ) {
@@ -328,6 +348,9 @@ private class Fixture(
             sessionNumber = 28,
             bookTitle = "Apply Test Book",
             meetingDate = LocalDate.of(2026, 7, 23),
+            sessionRevision = liveSessionRevision,
+            exposureRevision = liveExposureRevision,
+            publicationRevision = livePublicationRevision,
             sessionUpdatedAt = liveSessionUpdatedAt,
         )
     val draft =
@@ -335,6 +358,9 @@ private class Fixture(
             sessionId = sessionId,
             clubId = clubId,
             baseLiveRevision = liveRevision,
+            baseSessionRevision = draftBaseSessionRevision,
+            baseExposureRevision = draftBaseExposureRevision,
+            basePublicationRevision = draftBasePublicationRevision,
             draftRevision = 2,
             source = draftSource,
             restoredFromRevisionId = restoredFromRevisionId,
@@ -594,7 +620,7 @@ private class FakeApplyStore(
             live = live,
             draft = draft,
             draftLiveBaseStale =
-                draft?.let { it.baseLiveRevision != live.revision || it.baseSessionUpdatedAt != live.sessionUpdatedAt }
+                draft?.isStaleAgainst(live)
                     ?: false,
         )
 

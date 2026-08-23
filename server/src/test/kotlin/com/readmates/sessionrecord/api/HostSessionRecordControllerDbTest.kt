@@ -709,15 +709,14 @@ class HostSessionRecordDraftRebaseControllerDbTest(
         saveInitialDraft(initialEditor.get("liveSnapshot"))
         touchSession("호스트가 다시 확인할 책")
         val staleEditor = loadEditor(expectedStale = true)
-        val reviewedSessionUpdatedAt = staleEditor.get("liveSessionUpdatedAt").asText()
 
-        val rebasedDraft = rebaseDraft(reviewedSessionUpdatedAt)
+        val rebasedDraft = rebaseDraft(staleEditor)
 
         assertThat(rebasedDraft.get("snapshot")).isEqualTo(staleEditor.get("draft").get("snapshot"))
         assertThat(loadEditor(expectedStale = false).get("draft").get("draftRevision").asLong()).isEqualTo(2)
 
         touchSession("재확인 요청 중 다시 바뀐 책")
-        rejectRebaseWithStaleLive(reviewedSessionUpdatedAt)
+        rejectRebaseWithStaleLive(staleEditor)
         assertThat(loadEditor(expectedStale = true).get("draft").get("draftRevision").asLong()).isEqualTo(2)
     }
 
@@ -727,7 +726,9 @@ class HostSessionRecordDraftRebaseControllerDbTest(
                 with(user("host@example.com"))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.liveSessionUpdatedAt") { isString() }
+                jsonPath("$.liveSessionRevision") { isNumber() }
+                jsonPath("$.liveExposureRevision") { isNumber() }
+                jsonPath("$.livePublicationRevision") { isNumber() }
                 jsonPath("$.draftLiveBaseStale") { value(expectedStale) }
             }.andReturn()
             .response.contentAsString
@@ -751,6 +752,7 @@ class HostSessionRecordDraftRebaseControllerDbTest(
             """
             update sessions
             set book_title = ?,
+                session_revision = session_revision + 1,
                 updated_at = timestampadd(microsecond, 1, updated_at)
             where id = ?
             """.trimIndent(),
@@ -759,13 +761,13 @@ class HostSessionRecordDraftRebaseControllerDbTest(
         )
     }
 
-    private fun rebaseDraft(reviewedSessionUpdatedAt: String): tools.jackson.databind.JsonNode =
+    private fun rebaseDraft(reviewed: tools.jackson.databind.JsonNode): tools.jackson.databind.JsonNode =
         mockMvc
             .post("/api/host/sessions/$REBASE_SESSION_ID/record-draft/rebase") {
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = rebaseJson(expectedDraftRevision = 1, reviewedSessionUpdatedAt)
+                content = rebaseJson(expectedDraftRevision = 1, reviewed)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.draftRevision") { value(2) }
@@ -773,13 +775,13 @@ class HostSessionRecordDraftRebaseControllerDbTest(
             .response.contentAsString
             .let(tools.jackson.databind.ObjectMapper()::readTree)
 
-    private fun rejectRebaseWithStaleLive(reviewedSessionUpdatedAt: String) {
+    private fun rejectRebaseWithStaleLive(reviewed: tools.jackson.databind.JsonNode) {
         mockMvc
             .post("/api/host/sessions/$REBASE_SESSION_ID/record-draft/rebase") {
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = rebaseJson(expectedDraftRevision = 2, reviewedSessionUpdatedAt)
+                content = rebaseJson(expectedDraftRevision = 2, reviewed)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_RECORD_LIVE_STALE") }
@@ -788,12 +790,14 @@ class HostSessionRecordDraftRebaseControllerDbTest(
 
     private fun rebaseJson(
         expectedDraftRevision: Long,
-        reviewedSessionUpdatedAt: String,
+        reviewed: tools.jackson.databind.JsonNode,
     ) = """
         {
           "expectedDraftRevision": $expectedDraftRevision,
-          "expectedLiveRevision": 0,
-          "expectedSessionUpdatedAt": "$reviewedSessionUpdatedAt"
+          "expectedSessionRevision": ${reviewed.get("liveSessionRevision").asLong()},
+          "expectedLiveRevision": ${reviewed.get("liveRevision").asLong()},
+          "expectedExposureRevision": ${reviewed.get("liveExposureRevision").asLong()},
+          "expectedPublicationRevision": ${reviewed.get("livePublicationRevision").asLong()}
         }
         """.trimIndent()
 

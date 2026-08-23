@@ -72,6 +72,7 @@ internal class HostSessionPublicationWriteOperations(
                 ),
             exposureChanged = changes.exposure,
             publicationChanged = changes.publication,
+            compatibilityChanged = changes.sessionProjection,
         )
     }
 
