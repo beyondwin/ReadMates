@@ -5,6 +5,7 @@ import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicHighlightResult
 import com.readmates.publication.application.model.PublicOneLinerResult
+import com.readmates.publication.application.model.PublicProjectionGeneration
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.model.PublicSessionSummaryResult
 import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
@@ -39,8 +40,25 @@ class JdbcPublicQueryAdapter(
                         about = rs.getString("about"),
                         stats = publicStats(jdbcTemplate, clubId),
                         recentSessions = publicSessions(jdbcTemplate, clubId),
+                        cacheGeneration = loadClubGeneration(clubSlug) ?: 0,
                     )
                 },
+                clubSlug,
+            ).firstOrNull()
+
+    override fun loadClubGeneration(clubSlug: String): Long? =
+        jdbcTemplate
+            .query(
+                """
+                select coalesce(sum(generation.generation), 0) as cache_generation
+                from clubs
+                left join public_projection_generations generation on generation.club_id = clubs.id
+                where clubs.slug = ?
+                  and clubs.status = 'ACTIVE'
+                  and clubs.public_visibility = 'PUBLIC'
+                group by clubs.id
+                """.trimIndent(),
+                { resultSet, _ -> resultSet.getLong("cache_generation") },
                 clubSlug,
             ).firstOrNull()
 
@@ -54,11 +72,12 @@ class JdbcPublicQueryAdapter(
             .query(
                 """
                 select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
-                       public_session_publications.public_summary
+                       public_session_publications.public_summary, public_projection_generations.generation
                 from active_sessions sessions
                 join clubs on clubs.id = sessions.club_id
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
+                left join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
                 where clubs.slug = ?
                   and clubs.status = 'ACTIVE'
                   and clubs.public_visibility = 'PUBLIC'
@@ -78,6 +97,37 @@ class JdbcPublicQueryAdapter(
                         summary = rs.getString("public_summary"),
                         highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), sessionId),
                         oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), sessionId),
+                        cacheGeneration = rs.getLong("generation").let { if (rs.wasNull()) 0 else it },
+                    )
+                },
+                clubSlug,
+                sessionId.dbString(),
+            ).firstOrNull()
+
+    override fun loadSessionGeneration(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicProjectionGeneration? =
+        jdbcTemplate
+            .query(
+                """
+                select generation.publication_id, generation.generation,
+                       generation.live_record_revision, generation.origin_readable
+                from public_projection_generations generation
+                join clubs on clubs.id = generation.club_id
+                where clubs.slug = ?
+                  and clubs.status = 'ACTIVE'
+                  and clubs.public_visibility = 'PUBLIC'
+                  and generation.session_id = ?
+                """.trimIndent(),
+                { resultSet, _ ->
+                    val liveRevision = resultSet.getLong("live_record_revision")
+                    val liveRevisionOrNull = if (resultSet.wasNull()) null else liveRevision
+                    PublicProjectionGeneration(
+                        publicationId = resultSet.uuid("publication_id"),
+                        generation = resultSet.getLong("generation"),
+                        liveRecordRevision = liveRevisionOrNull,
+                        originReadable = resultSet.getBoolean("origin_readable"),
                     )
                 },
                 clubSlug,

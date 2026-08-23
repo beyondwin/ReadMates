@@ -891,6 +891,69 @@ describe("Cloudflare BFF function", () => {
 });
 
 describe("Cloudflare BFF cache layer", () => {
+  it("clamps an old public detail policy before returning or storing it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response('{"generation":2}', {
+          status: 200,
+          headers: {
+            "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
+          },
+        }),
+      ),
+    );
+    const cacheMatch = vi.fn(async () => undefined);
+    const cachePut = vi.fn(async () => undefined);
+    const ctx = context(
+      new Request(
+        "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/sessions/session-1",
+      ),
+      { path: ["api", "public", "clubs", "reading-sai", "sessions", "session-1"] },
+    );
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+
+    const response = await onRequest(ctx);
+
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=60, must-revalidate");
+    expect(ctx.waitUntil).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(cachePut).toHaveBeenCalledOnce());
+    const [, stored] = cachePut.mock.calls[0] as unknown as [Request, Response];
+    expect(stored.headers.get("Cache-Control")).toBe("public, max-age=60, must-revalidate");
+  });
+
+  it("ignores an unsafe cached response and revalidates against origin", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response('{"fresh":true}', {
+        status: 200,
+        headers: { "Cache-Control": "public, max-age=60" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const cacheMatch = vi.fn(async () =>
+      new Response('{"revokedBody":true}', {
+        status: 200,
+        headers: { "Cache-Control": "private, max-age=120" },
+      }),
+    );
+    const cachePut = vi.fn(async () => undefined);
+    const cacheDelete = vi.fn(async () => true);
+    vi.stubGlobal("caches", {
+      default: { match: cacheMatch, put: cachePut, delete: cacheDelete },
+    });
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai"),
+        { path: ["api", "public", "clubs", "reading-sai"] },
+      ),
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    await expect(response.json()).resolves.toEqual({ fresh: true });
+    expect(cacheDelete).toHaveBeenCalledOnce();
+  });
+
   it("returns cached response on cache hit without calling upstream fetch", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);

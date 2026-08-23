@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
-private const val PUBLIC_CACHE_CONTROL = "public, max-age=120, stale-while-revalidate=600"
+private const val PUBLIC_CACHE_CONTROL = "public, max-age=60, must-revalidate"
 
 @RestController
 @RequestMapping("/api/public")
@@ -34,12 +34,14 @@ class PublicController(
     fun club(
         @PathVariable clubSlug: String,
     ): ResponseEntity<PublicClubResponse> {
-        val response =
-            getPublicClubUseCase.getClub(clubSlug)?.toResponse()
+        val result =
+            getPublicClubUseCase.getClub(clubSlug)
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val response = result.toResponse()
         return ResponseEntity
             .ok()
             .header("Cache-Control", PUBLIC_CACHE_CONTROL)
+            .eTag("public-club-${result.cacheGeneration}")
             .body(response)
     }
 
@@ -57,12 +59,14 @@ class PublicController(
             runCatching { UUID.fromString(sessionId) }.getOrNull()
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
 
-        val response =
-            getPublicSessionUseCase.getSession(clubSlug, id)?.toResponse()
+        val result =
+            getPublicSessionUseCase.getSession(clubSlug, id)
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
+        val response = result.toResponse()
         return ResponseEntity
             .ok()
             .header("Cache-Control", PUBLIC_CACHE_CONTROL)
+            .eTag("public-session-${result.cacheGeneration}")
             .body(response)
     }
 

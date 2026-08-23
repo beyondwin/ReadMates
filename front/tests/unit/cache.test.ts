@@ -1,10 +1,31 @@
 import { describe, expect, it } from "vitest";
 import {
+  boundedPublicCacheControl,
   buildPublicCacheKey,
   isCacheableUpstreamResponse,
   isPublicCacheableRequest,
   PUBLIC_CACHEABLE_PATH_PREFIXES,
 } from "../../functions/_shared/cache";
+
+describe("boundedPublicCacheControl", () => {
+  it("caps takedown-eligible public responses at 60 seconds without stale reuse", () => {
+    expect(
+      boundedPublicCacheControl(
+        "/api/public/clubs/reading-sai/sessions/session-1",
+        "public, max-age=120, stale-while-revalidate=600",
+      ),
+    ).toBe("public, max-age=60, must-revalidate");
+  });
+
+  it("preserves no-store instead of making a denied response cacheable", () => {
+    expect(
+      boundedPublicCacheControl(
+        "/api/public/clubs/reading-sai/sessions/session-1",
+        "no-store",
+      ),
+    ).toBe("no-store");
+  });
+});
 
 describe("PUBLIC_CACHEABLE_PATH_PREFIXES", () => {
   it("contains clubs and records prefixes with trailing slashes", () => {
@@ -128,6 +149,27 @@ describe("isCacheableUpstreamResponse", () => {
     const response = new Response("{}", {
       status: 200,
       headers: { "Cache-Control": "public, max-age=120", Vary: "Authorization" },
+    });
+    expect(isCacheableUpstreamResponse(response)).toBe(false);
+  });
+
+  it("returns false when Vary is wildcard or includes an unapproved request header", () => {
+    for (const vary of ["*", "Accept-Encoding, X-Private-Projection"]) {
+      const response = new Response("{}", {
+        status: 200,
+        headers: { "Cache-Control": "public, max-age=60", Vary: vary },
+      });
+      expect(isCacheableUpstreamResponse(response)).toBe(false);
+    }
+  });
+
+  it("returns false when a directly visible Set-Cookie header exists", () => {
+    const response = new Response("{}", {
+      status: 200,
+      headers: {
+        "Cache-Control": "public, max-age=60",
+        "Set-Cookie": "session=placeholder; HttpOnly",
+      },
     });
     expect(isCacheableUpstreamResponse(response)).toBe(false);
   });

@@ -9,6 +9,7 @@ import {
 } from "../../_shared/proxy";
 import { bffErrorResponse } from "../../_shared/errors";
 import {
+  boundedPublicCacheControl,
   buildPublicCacheKey,
   isCacheableUpstreamResponse,
   isPublicCacheableRequest,
@@ -169,8 +170,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
     const cacheKey = buildPublicCacheKey(context.request);
     const cached = await caches.default.match(cacheKey);
+    if (cached && isCacheableUpstreamResponse(cached)) {
+      const bounded = new Response(cached.body, cached);
+      bounded.headers.set(
+        "Cache-Control",
+        boundedPublicCacheControl(upstreamPath, cached.headers.get("Cache-Control") ?? ""),
+      );
+      return bounded;
+    }
     if (cached) {
-      return cached;
+      await caches.default.delete(cacheKey);
     }
   }
 
@@ -253,7 +262,21 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   });
   outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
 
-  if (isPublicCacheableRequest(context.request.method, upstreamPath) && isCacheableUpstreamResponse(upstream)) {
+  if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
+    outboundResponse.headers.set(
+      "Cache-Control",
+      boundedPublicCacheControl(
+        upstreamPath,
+        outboundResponse.headers.get("Cache-Control") ?? "",
+      ),
+    );
+  }
+
+  if (
+    isPublicCacheableRequest(context.request.method, upstreamPath) &&
+    isCacheableUpstreamResponse(upstream) &&
+    isCacheableUpstreamResponse(outboundResponse)
+  ) {
     const cacheKey = buildPublicCacheKey(context.request);
     context.waitUntil(caches.default.put(cacheKey, outboundResponse.clone()));
   }

@@ -45,7 +45,89 @@ class JdbcHostMutationReceiptAdapter(
             record.dispatchReceiptId?.dbString(),
             createdAt.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
         )
+        writePublicConvergence(record)
     }
+
+    private fun writePublicConvergence(record: HostMutationReceiptRecord) {
+        if (record.operation !in PUBLIC_EFFECT_OPERATIONS) {
+            return
+        }
+        val publicProjection = loadPublicProjection(record.resourceId) ?: return
+        jdbcTemplate.update(
+            """
+            insert into public_projection_generations (
+              publication_id, club_id, session_id, generation,
+              live_record_revision, origin_readable, updated_at
+            ) values (?, ?, ?, 1, ?, ?, utc_timestamp(6))
+            on duplicate key update
+              generation = public_projection_generations.generation + 1,
+              live_record_revision = values(live_record_revision),
+              origin_readable = values(origin_readable),
+              updated_at = utc_timestamp(6)
+            """.trimIndent(),
+            publicProjection.publicationId.dbString(),
+            record.clubId.dbString(),
+            record.resourceId.dbString(),
+            record.resultingVersions.liveRecordRevision,
+            publicProjection.originReadable,
+        )
+        val committedGeneration =
+            jdbcTemplate.queryForObject(
+                "select generation from public_projection_generations where publication_id = ?",
+                Long::class.java,
+                publicProjection.publicationId.dbString(),
+            ) ?: error("Public projection generation was not persisted")
+        val convergenceId = UUID.randomUUID()
+        jdbcTemplate.update(
+            """
+            insert into public_mutation_convergence_receipts (
+              mutation_receipt_id, convergence_id, publication_id_snapshot,
+              session_id_snapshot, committed_generation, origin_readable, created_at
+            ) values (?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            record.receiptId.dbString(),
+            convergenceId.dbString(),
+            publicProjection.publicationId.dbString(),
+            record.resourceId.dbString(),
+            committedGeneration,
+            publicProjection.originReadable,
+            record.createdAt.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_convergence_work (
+              convergence_id, next_attempt_no, available_at
+            ) values (?, 1, ?)
+            """.trimIndent(),
+            convergenceId.dbString(),
+            record.createdAt.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
+        )
+    }
+
+    private fun loadPublicProjection(sessionId: UUID): PublicProjectionWriteSnapshot? =
+        jdbcTemplate
+            .query(
+                """
+                select publication.id as publication_id,
+                       (
+                         sessions.state = 'PUBLISHED'
+                         and sessions.access_scope = 'GUEST_READABLE'
+                         and publication.site_visibility = 'PUBLIC_RECORD'
+                       ) as origin_readable
+                from active_sessions sessions
+                join public_session_publications publication
+                  on publication.session_id = sessions.id
+                 and publication.club_id = sessions.club_id
+                where sessions.id = ?
+                """.trimIndent(),
+                { resultSet, _ ->
+                    PublicProjectionWriteSnapshot(
+                        publicationId = resultSet.uuid("publication_id"),
+                        originReadable = resultSet.getBoolean("origin_readable"),
+                    )
+                },
+                sessionId.dbString(),
+            ).firstOrNull()
 
     override fun find(
         clubId: UUID,
@@ -90,5 +172,22 @@ class JdbcHostMutationReceiptAdapter(
     private fun ResultSet.getLongOrNull(column: String): Long? {
         val value = getLong(column)
         return if (wasNull()) null else value
+    }
+
+    private data class PublicProjectionWriteSnapshot(
+        val publicationId: UUID,
+        val originReadable: Boolean,
+    )
+
+    private companion object {
+        val PUBLIC_EFFECT_OPERATIONS =
+            setOf(
+                "SESSION_EXPOSURE",
+                "SESSION_PUBLICATION",
+                "SESSION_REVERSE",
+                "SESSION_RECORD_APPLY",
+                "SESSION_PUBLISH",
+                "SESSION_CORRECTION_PUBLISH",
+            )
     }
 }

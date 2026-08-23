@@ -154,6 +154,9 @@ class HostSessionExposurePublicationDbTest(
         val initialApplyReceiptCount = applyReceiptCount(sessionId)
         val initialPublishReceiptCount = operationReceiptCount(sessionId, "SESSION_PUBLISH")
         val initialCorrectionReceiptCount = operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH")
+        val initialGeneration = publicGeneration(sessionId)
+        val initialConvergenceReceiptCount = convergenceReceiptCount(sessionId)
+        val initialConvergenceWorkCount = convergenceWorkCount(sessionId)
 
         mockMvc
             .post("/api/host/sessions/$sessionId/publish") {
@@ -194,6 +197,9 @@ class HostSessionExposurePublicationDbTest(
         assertThat(operationReceiptCount(sessionId, "SESSION_PUBLISH")).isEqualTo(initialPublishReceiptCount)
         assertThat(operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH"))
             .isEqualTo(initialCorrectionReceiptCount)
+        assertThat(publicGeneration(sessionId)).isEqualTo(initialGeneration)
+        assertThat(convergenceReceiptCount(sessionId)).isEqualTo(initialConvergenceReceiptCount)
+        assertThat(convergenceWorkCount(sessionId)).isEqualTo(initialConvergenceWorkCount)
         assertThat(recordEpoch()).isEqualTo(epochBeforeStale)
 
         val epochBefore = recordEpoch()
@@ -213,6 +219,10 @@ class HostSessionExposurePublicationDbTest(
         assertThat(revisionCount(sessionId)).isEqualTo(2)
         assertThat(applyReceiptCount(sessionId)).isEqualTo(2)
         assertThat(operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH")).isEqualTo(1)
+        assertThat(publicGeneration(sessionId)).isEqualTo(initialGeneration + 1)
+        assertThat(convergenceReceiptCount(sessionId)).isEqualTo(initialConvergenceReceiptCount + 1)
+        assertThat(convergenceWorkCount(sessionId)).isEqualTo(initialConvergenceWorkCount + 1)
+        assertThat(convergenceReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH")).isEqualTo(1)
         assertThat(revisionSnapshot(oldRevisionId)).isEqualTo(oldSnapshot)
         assertThat(publicSummary(sessionId)).isEqualTo("corrected summary")
         assertThat(originTexts(sessionId)).containsExactly("corrected highlight", "corrected one line")
@@ -507,6 +517,44 @@ class HostSessionExposurePublicationDbTest(
             Int::class.java,
             sessionId,
             operation,
+        ) ?: 0
+
+    private fun publicGeneration(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select generation from public_projection_generations where session_id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: error("missing public generation")
+
+    private fun convergenceReceiptCount(
+        sessionId: String,
+        operation: String? = null,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from public_mutation_convergence_receipts convergence
+            join host_session_mutation_receipts host on host.id = convergence.mutation_receipt_id
+            where convergence.session_id_snapshot = ?
+              and (? is null or host.operation = ?)
+            """.trimIndent(),
+            Int::class.java,
+            sessionId,
+            operation,
+            operation,
+        ) ?: 0
+
+    private fun convergenceWorkCount(sessionId: String): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from public_convergence_work work
+            join public_mutation_convergence_receipts convergence
+              on convergence.convergence_id = work.convergence_id
+            where convergence.session_id_snapshot = ?
+            """.trimIndent(),
+            Int::class.java,
+            sessionId,
         ) ?: 0
 
     private fun originTexts(sessionId: String): List<String> =

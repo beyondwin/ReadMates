@@ -68,6 +68,42 @@ class ServerArchitectureInventoryTest {
     }
 
     @Test
+    fun `public convergence writes preserve transaction ownership and immutable port shape`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        listOf("session/application", "sessionrecord/application").forEach { relative ->
+            Files.walk(productionSourceRoot.resolve("com/readmates/$relative")).use { paths ->
+                paths
+                    .filter(Files::isRegularFile)
+                    .filter { it.fileName.toString().endsWith(".kt") }
+                    .forEach { sourceFile ->
+                        assertThat(Files.readString(sourceFile)).doesNotContain("import com.readmates.publication.")
+                    }
+            }
+        }
+
+        val ownerAdapter =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/session/adapter/out/persistence/JdbcHostMutationReceiptAdapter.kt",
+                ),
+            )
+        assertThat(ownerAdapter)
+            .contains("insert into public_projection_generations")
+            .contains("insert into public_mutation_convergence_receipts")
+            .contains("insert into public_convergence_work")
+            .doesNotContain("import com.readmates.publication.")
+
+        val convergencePort =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/publication/application/port/out/PublicConvergencePort.kt",
+                ),
+            )
+        assertThat(convergencePort)
+            .doesNotContain("updateReceipt", "deleteReceipt", "updateEvent", "deleteEvent")
+    }
+
+    @Test
     @Suppress("LongMethod")
     fun `mutation idempotency substrate stays shared and session receipts stay session owned`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")

@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(11)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(12)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,10 +94,11 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("53")
+            assertThat(latestVersion).isEqualTo("54")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
+            assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -374,7 +375,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(10)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -386,10 +387,11 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("53")
+            assertThat(latestVersion).isEqualTo("54")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
+            assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1651,9 +1653,10 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("53")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("54")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
+            assertV54PublicProjectionConvergenceSchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1752,10 +1755,23 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("53")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("54")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
+            assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
+            assertThat(
+                upgradeJdbc.queryForMap(
+                    """
+                    select generation, live_record_revision, origin_readable
+                    from public_projection_generations
+                    where session_id = ?
+                    """.trimIndent(),
+                    fixtures.publishedSessionId,
+                ),
+            ).containsEntry("generation", 1L)
+                .containsEntry("live_record_revision", null)
+                .containsEntry("origin_readable", true)
             assertV52RevisionBackfill(upgradeJdbc)
             assertEquals(publicationCountBefore, countRows(upgradeJdbc, "public_session_publications"))
             assertEquals(5, sessionsWithoutPublication)
@@ -1805,6 +1821,7 @@ class MySqlFlywayMigrationTest(
     fun `mysql adds revision domains participant audit and application snapshot identity`() {
         assertV52RevisionSchema(jdbcTemplate)
         assertV53IdempotencySchema(jdbcTemplate)
+        assertV54PublicProjectionConvergenceSchema(jdbcTemplate)
         val fixture = V52LiveRevisionFixture()
         try {
             insertV52RevisionClubGraph(
@@ -3519,6 +3536,55 @@ class MySqlFlywayMigrationTest(
             .contains("IN_PROGRESS", "COMPLETED")
         assertThat(checkConstraintClause(jdbcTemplate, "host_session_mutation_receipts_decision_check"))
             .contains("NOT_SENT", "DISPATCH_REFERENCED")
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV54PublicProjectionConvergenceSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "public_projection_generations")).containsExactlyInAnyOrder(
+            "publication_id",
+            "club_id",
+            "session_id",
+            "generation",
+            "live_record_revision",
+            "origin_readable",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_receipts")).containsExactlyInAnyOrder(
+            "mutation_receipt_id",
+            "convergence_id",
+            "publication_id_snapshot",
+            "session_id_snapshot",
+            "committed_generation",
+            "origin_readable",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_convergence_work")).containsExactlyInAnyOrder(
+            "convergence_id",
+            "next_attempt_no",
+            "lease_owner",
+            "lease_expires_at",
+            "available_at",
+            "created_at",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_convergence_events")).containsExactlyInAnyOrder(
+            "convergence_id",
+            "publication_id_snapshot",
+            "session_id_snapshot",
+            "attempt_no",
+            "event_seq",
+            "status",
+            "observed_at",
+            "result_category",
+        )
+        assertThat(importedKeys(jdbcTemplate, "public_mutation_convergence_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_convergence_events")).isEmpty()
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_receipts"))
+            .doesNotContain("provider_response", "provider_error", "private_body", "reason")
+        assertThat(columns(jdbcTemplate, "public_convergence_events"))
+            .doesNotContain("provider_response", "provider_error", "private_body", "reason")
+        assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_status_check"))
+            .contains("PENDING", "SUCCEEDED", "FAILED")
     }
 
     @Suppress("LongMethod")
