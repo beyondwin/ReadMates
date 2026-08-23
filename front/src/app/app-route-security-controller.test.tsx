@@ -5,6 +5,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, Link, MemoryRouter, useLocation } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import { AppRouteSecurityController } from "./app-route-security-controller";
+import {
+  createWorkspaceRouteTransitionStore,
+  type WorkspaceRouteTransitionStore,
+} from "./app-route-security-transition";
+
+let transitionStore: WorkspaceRouteTransitionStore;
 
 function RouteControllerHarness() {
   const location = useLocation();
@@ -13,7 +19,7 @@ function RouteControllerHarness() {
 
   return (
     <>
-      <AppRouteSecurityController workspace={workspace} />
+      <AppRouteSecurityController workspace={workspace} transitionStore={transitionStore} />
       <main>
         <h1>{label}</h1>
         <Link to="/clubs/reading-sai/app">멤버로</Link>
@@ -29,6 +35,10 @@ function RouteControllerHarness() {
 
 beforeEach(() => {
   window.sessionStorage.clear();
+  transitionStore = createWorkspaceRouteTransitionStore({
+    storage: window.sessionStorage,
+    pageSessionId: "controller-test-page",
+  });
   document.title = "ReadMates";
 });
 

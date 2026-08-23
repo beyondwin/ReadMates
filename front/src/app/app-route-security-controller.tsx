@@ -4,6 +4,7 @@ import type { ClubWorkspace } from "@/shared/model/app-club-shell";
 import {
   consumePreparedWorkspaceTransition,
   prepareWorkspaceRoute,
+  type WorkspaceRouteTransitionStore,
 } from "@/src/app/app-route-security-transition";
 
 const workspaceLabels: Record<ClubWorkspace, string> = {
@@ -22,7 +23,18 @@ function workspaceTitle(workspace: ClubWorkspace, currentTitle: string) {
   return `${workspaceLabels[workspace]} · ${baseTitle || "읽는사이"}`;
 }
 
-export function AppRouteSecurityController({ workspace }: { workspace: ClubWorkspace }) {
+const defaultTransitionStore: WorkspaceRouteTransitionStore = {
+  prepare: prepareWorkspaceRoute,
+  consume: consumePreparedWorkspaceTransition,
+};
+
+export function AppRouteSecurityController({
+  workspace,
+  transitionStore = defaultTransitionStore,
+}: {
+  workspace: ClubWorkspace;
+  transitionStore?: WorkspaceRouteTransitionStore;
+}) {
   const location = useLocation();
   const [announcement, setAnnouncement] = useState("");
 
@@ -34,13 +46,13 @@ export function AppRouteSecurityController({ workspace }: { workspace: ClubWorks
       href,
       locationKey: location.key,
     };
-    const changedWorkspace = prepareWorkspaceRoute(currentRoute);
+    const changedWorkspace = transitionStore.prepare(currentRoute);
     const label = workspaceLabels[workspace];
     document.title = workspaceTitle(workspace, document.title);
 
     const finishRouteTransition = () => {
       const shouldAnnounce = changedWorkspace
-        && consumePreparedWorkspaceTransition(currentRoute);
+        && transitionStore.consume(currentRoute);
       setAnnouncement(shouldAnnounce ? `${label}으로 전환했습니다` : "");
       const heading = document.querySelector<HTMLElement>("main h1, h1");
       if (!heading) {
@@ -53,7 +65,7 @@ export function AppRouteSecurityController({ workspace }: { workspace: ClubWorks
     };
     const frame = window.requestAnimationFrame(finishRouteTransition);
     return () => window.cancelAnimationFrame(frame);
-  }, [location.hash, location.key, location.pathname, location.search, workspace]);
+  }, [location.hash, location.key, location.pathname, location.search, transitionStore, workspace]);
 
   return (
     <div data-app-route-security-controller>

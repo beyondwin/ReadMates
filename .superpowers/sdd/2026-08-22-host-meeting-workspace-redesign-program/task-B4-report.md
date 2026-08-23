@@ -152,3 +152,49 @@ Required isolated browser gate:
 - Shared production UI remains free of React Router, `src/app`, and feature imports. All href, replace/push, security receipt, route scope, and Back decisions remain in `src/app` or shared routing policy; shared UI only distinguishes current presentation from navigable destinations.
 - `AppRouteLayout` still mounts exactly one authenticated security controller. Empty feedback still renders no `role=status`, and the matched consume contract prevents duplicate or stale announcements.
 - The aggregate suite was not rerun after the focused final gate. The two unchanged BASE aggregate concerns documented above therefore remain integration risks, not B4 fix-round regressions.
+
+## Fix round 2 — memory-authoritative transition receipts
+
+ADR impact: `update` (unchanged). This round corrects the runtime mechanics of the route-bound transition receipt already covered by Proposed ADR-0019/ADR-0026. It adds no new durable product or architecture decision and does not promote either ADR.
+
+### Review finding closed
+
+- The live page-session receipt is now authoritative. `sessionStorage` is only an optional reload mirror: a successful `getItem` returning `null` or an older value, or throwing `setItem`/`removeItem`, cannot erase or replace a newer in-memory receipt.
+- The six-hour TTL applies only while hydrating the persisted mirror. A continuously running page can remain idle beyond six hours and still recognize its next real member/host transition from live memory.
+- Receipt preparation and consumption are explicit pure state transitions. A pending announcement survives only an exact StrictMode re-setup with the same workspace, club scope, full pathname/search/hash href, and React Router location key. Moving to another href/key or club replaces the pending receipt with a non-announcing baseline, so it cannot migrate or be consumed later.
+- The controller accepts the app-owned transition store as a dependency while production continues to use the single default page-session store. This keeps controller tests isolated without weakening route-derived authority or adding click-intent authority.
+
+### TDD evidence
+
+Initial RED:
+
+`npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/app-route-security-transition.test.ts`
+
+- Failed as intended: 1 file, 5/5 tests failed because the required pure receipt functions and memory-authoritative store did not exist (`prepareWorkspaceRouteReceipt is not a function`, `createWorkspaceRouteTransitionStore is not a function`). The cases were the live-memory TTL boundary, exact-route StrictMode preservation and one-shot consumption, two pending-migration identities, and readable-but-unwritable storage.
+
+Focused GREEN after implementation:
+
+`npx --yes corepack@0.35.0 pnpm --dir front exec vitest run src/app/app-route-security-transition.test.ts src/app/app-route-security-controller.test.tsx src/app/layouts/app-route-layout.test.tsx shared/routing/readmates-route-state.test.ts tests/unit/responsive-navigation.test.tsx tests/unit/spa-layout.test.tsx shared/ui/app-club-shell.test.tsx`
+
+- PASS: 7 files, 126/126 tests.
+- The direct receipt/store suite proves same-page member to host still detects and consumes exactly once when storage reads succeed but writes/removes throw; live memory remains valid after six hours; pending host club A state stays only on the exact route identity; and different href/key or club B receives no announcement and cannot consume either identity.
+- Existing controller coverage remains green for click, Back, Forward, StrictMode remount, same-route reload, exact title/focus/status behavior, modified/cancelled navigation, loader failure, fully unavailable storage, and exactly one `role=status` node.
+
+### Browser and static evidence
+
+Isolated transition browser slice:
+
+`READMATES_E2E_DB_NAME=readmates_e2e_b4_fix2_20260824a READMATES_API_BASE_URL=http://127.0.0.1:18135 PLAYWRIGHT_PORT=3155 PLAYWRIGHT_WORKERS=1 READMATES_MUTATION_IDENTITY_CURRENT_KEY=e2e-mutation-key READMATES_HOST_LIST_CURSOR_CURRENT_KEY=e2e-cursor-key npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/responsive-navigation-chrome.spec.ts --grep 'desktop public and host pages show the expected top navigation'`
+
+- PASS: 1/1 Chromium test on a fresh task-specific database and dedicated API/frontend ports. It exercised member to host to member, Back, Forward, and reload with exact title, focus, one status node, and no reload announcement. Existing services, databases, and containers were not stopped or reused.
+- Component tests were not rerun because this round changed no shared shell/selector DOM, style, responsive behavior, or visual contract. The controller's rendered status markup is unchanged; its app-layer receipt dependency is the only TSX change.
+- `npx --yes corepack@0.35.0 pnpm --dir front lint` — PASS.
+- `npx --yes corepack@0.35.0 pnpm --dir front build` — PASS, 702 modules transformed.
+- `git diff --check` — PASS before report staging.
+
+### Self-review and concerns
+
+- The receipt remains bound to page session, source and destination workspace, club scope, full href, and location key. Storage hydration validates shape, page session, timestamp direction, and persisted TTL; live memory deliberately bypasses persisted TTL and storage reconciliation.
+- Any different current route safely replaces an unconsumed same-workspace pending receipt. Only a real workspace change creates a new pending receipt; only the exact mounted destination can consume it; consumption is idempotent.
+- Route/location state remains the only transition authority. No click handler, shared-UI import, router dependency outside `src/app`, second controller, or second live-status region was introduced.
+- No round-specific residual remains. The aggregate suite was not rerun; the two unchanged BASE concerns already documented in this report remain program-integration risks rather than receipt regressions.
