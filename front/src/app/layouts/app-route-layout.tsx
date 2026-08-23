@@ -29,10 +29,16 @@ import {
   readmatesReturnState,
   resetReadmatesNavigationScroll,
 } from "@/src/app/route-continuity";
-import { buildClubSwitchTarget, workspaceFromCanonicalPath } from "@/src/app/workspace-route-model";
+import {
+  buildClubSwitchTarget,
+  candidateRoleSwitchTarget,
+  resolveAuthorizedRoleSwitchTarget,
+  workspaceFromCanonicalPath,
+  type ClubWorkspace,
+} from "@/src/app/workspace-route-model";
 import { Link } from "@/src/app/router-link";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
-import { canUseHostApp } from "@/shared/auth/member-app-access";
+import { canUseHostApp, canUseJoinedClubHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
@@ -73,7 +79,43 @@ function appBasePath(pathname: string) {
 
 function appClubSlug(pathname: string) {
   const match = /^\/clubs\/([^/]+)\/app(?:\/|$)/.exec(pathname);
-  return match ? decodeURIComponent(match[1]) : null;
+  if (!match) {
+    return null;
+  }
+
+  try {
+    return decodeURIComponent(match[1]);
+  } catch {
+    return null;
+  }
+}
+
+function lastSafeWorkspaceTargetKey(workspace: ClubWorkspace) {
+  return `readmates:last-safe-workspace-target:${workspace}`;
+}
+
+function readLastSafeWorkspaceTarget(workspace: ClubWorkspace) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    return window.sessionStorage.getItem(lastSafeWorkspaceTargetKey(workspace));
+  } catch {
+    return null;
+  }
+}
+
+function rememberLastSafeWorkspaceTarget(workspace: ClubWorkspace, pathname: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.sessionStorage.setItem(lastSafeWorkspaceTargetKey(workspace), pathname);
+  } catch {
+    // Storage is optional continuity only; pathname remains render authority.
+  }
 }
 
 type GuestContinuationTarget = {
@@ -182,7 +224,7 @@ function ClubSwitcher({
             buildClubSwitchTarget({
               pathname,
               targetClubSlug: nextSlug,
-              targetWorkspace: nextClub?.role === "HOST" && nextClub.status === "ACTIVE" ? "host" : "member",
+              targetWorkspace: nextClub && auth && canUseJoinedClubHostApp(auth, nextClub) ? "host" : "member",
             }),
           );
         }}
@@ -228,6 +270,37 @@ export function AppRouteLayout({
   const AppLinkComponent = isGuestAudience ? GuestNavigationLink : Link;
   const isHostWorkspace = workspaceFromCanonicalPath(pathname) === "host";
   const isActiveHost = !isGuestAudience && auth ? canUseHostApp(auth) : false;
+  const authorizedWorkspaces = useMemo<ClubWorkspace[]>(() => {
+    if (isGuestAudience || !auth) {
+      return [];
+    }
+
+    return [
+      ...(canUseMemberApp(auth) ? ["member" as const] : []),
+      ...(canUseHostApp(auth) ? ["host" as const] : []),
+    ];
+  }, [auth, isGuestAudience]);
+  const roleSwitchAction = useMemo(() => {
+    const targetWorkspace: ClubWorkspace = isHostWorkspace ? "member" : "host";
+    if (!authorizedWorkspaces.includes(targetWorkspace)) {
+      return null;
+    }
+
+    const candidate = candidateRoleSwitchTarget({ pathname, targetWorkspace });
+    const target = resolveAuthorizedRoleSwitchTarget({
+      candidate,
+      authorizedWorkspaces,
+      // The target's route loader remains the authority for the same object before it renders.
+      correspondence: candidate.requiresCorrespondence ? "authorized" : "unknown",
+      lastSafeTarget: readLastSafeWorkspaceTarget(targetWorkspace),
+    });
+
+    return {
+      href: target,
+      label: targetWorkspace === "host" ? "호스트 화면" : "멤버 화면으로",
+      navigation: candidate.navigation,
+    };
+  }, [authorizedWorkspaces, isHostWorkspace, pathname]);
   const desktopVariant = isHostWorkspace ? "host" : "member";
   const mobileWorkspace = desktopVariant;
   const mobileVariant = mobileWorkspace;
@@ -267,6 +340,37 @@ export function AppRouteLayout({
       setIsRetryingCurrentSession(false);
     });
   };
+
+  useEffect(() => {
+    const workspace = workspaceFromCanonicalPath(pathname);
+    if (authorizedWorkspaces.includes(workspace)) {
+      rememberLastSafeWorkspaceTarget(workspace, pathname);
+    }
+  }, [authorizedWorkspaces, pathname]);
+
+  useEffect(() => {
+    if (
+      !isHostWorkspace ||
+      isActiveHost ||
+      !authorizedWorkspaces.includes("member") ||
+      (clubSlug !== null && auth?.currentMembership?.clubSlug !== undefined && auth.currentMembership?.clubSlug !== clubSlug)
+    ) {
+      return;
+    }
+
+    const candidate = candidateRoleSwitchTarget({
+      pathname,
+      targetWorkspace: "member",
+      transition: "authority-loss",
+    });
+    const target = resolveAuthorizedRoleSwitchTarget({
+      candidate,
+      authorizedWorkspaces,
+      correspondence: "unknown",
+      lastSafeTarget: readLastSafeWorkspaceTarget("member"),
+    });
+    navigate(target, { replace: candidate.navigation === "replace" });
+  }, [auth?.currentMembership?.clubSlug, authorizedWorkspaces, clubSlug, isActiveHost, isHostWorkspace, navigate, pathname]);
 
   const sessionExpiry =
     !isGuestAudience && state.status === "session_expired" && state.cause
@@ -362,6 +466,7 @@ export function AppRouteLayout({
           memberName={memberName}
           memberAvatarKey={memberAvatarKey}
           showHostEntry={showHostEntry}
+          workspaceAction={roleSwitchAction}
           appBasePath={basePath}
           currentSessionId={desktopVariant === "host" ? currentSessionId : null}
           currentSessionStatus={desktopVariant === "host" ? currentSessionStatus : "ready"}
@@ -383,6 +488,7 @@ export function AppRouteLayout({
         <MobileHeader
           variant={mobileVariant}
           showHostEntry={showHostEntry}
+          workspaceAction={roleSwitchAction}
           appBasePath={basePath}
           LinkComponent={AppLinkComponent}
           navigationContinuity={readmatesNavigationContinuity}

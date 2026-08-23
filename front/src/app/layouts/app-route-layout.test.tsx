@@ -411,6 +411,63 @@ describe("AppRouteLayout guest shell", () => {
 });
 
 describe("AppRouteLayout workspace authority", () => {
+  it("derives the same-meeting host role-switch destination in app chrome", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+            <MemoryRouter initialEntries={["/clubs/reading-sai/app/sessions/meeting-7"]}>
+              <Routes>
+                <Route
+                  path="/clubs/:clubSlug/app/sessions/:sessionId"
+                  element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />}
+                >
+                  <Route index element={<main>member record</main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByRole("link", { name: "호스트 화면" })).toHaveLength(2);
+    for (const link of screen.getAllByRole("link", { name: "호스트 화면" })) {
+      expect(link).toHaveAttribute("href", "/clubs/reading-sai/app/host/sessions/meeting-7");
+    }
+  });
+
+  it("replaces a revoked host route with its member-safe destination", async () => {
+    window.sessionStorage.removeItem("readmates:last-safe-workspace-target:member");
+    window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: memberAuth }}>
+            <MemoryRouter initialEntries={["/clubs/reading-sai/app/host/sessions/meeting-7"]}>
+              <Routes>
+                <Route path="/clubs/:clubSlug/app" element={<AppRouteLayout scopedAuth={memberAuth} audience="MEMBER" />}>
+                  <Route path="host/sessions/:sessionId" element={<main>revoked host record</main>} />
+                  <Route path="archive" element={<main>member archive</main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("member archive")).toBeInTheDocument();
+  });
+
   it("keeps a canonical member record route in member chrome despite a stale host workspace hint", () => {
     window.sessionStorage.setItem("readmates:mobile-workspace", "host");
     vi.stubGlobal(

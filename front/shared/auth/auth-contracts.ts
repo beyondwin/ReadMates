@@ -38,6 +38,7 @@ export type AuthJoinedClub = {
   membershipId: string;
   role: MemberRole;
   status: MembershipStatus;
+  approvalState: ApprovalState;
   primaryHost: string | null;
 };
 

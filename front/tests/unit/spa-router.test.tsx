@@ -981,6 +981,51 @@ describe("SPA router", () => {
     expectNoMemberHomeChildDataFetch(fetchMock);
   });
 
+  it("replaces bare app entry with the loader-authorized current club instead of rendering club selection", async () => {
+    const currentClubAuth = {
+      authenticated: true,
+      userId: "multi-club-user",
+      membershipId: "reading-sai-membership",
+      clubId: "reading-sai-club",
+      email: "multi-club@example.com",
+      displayName: "읽는사이 멤버",
+      accountName: "멀티클럽",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+      currentMembership: {
+        membershipId: "reading-sai-membership",
+        clubId: "reading-sai-club",
+        clubSlug: "reading-sai",
+        displayName: "읽는사이 멤버",
+        role: "MEMBER",
+        membershipStatus: "ACTIVE",
+        approvalState: "ACTIVE",
+        avatarKey: "cloud-green-book",
+      },
+      joinedClubs: [],
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(currentClubAuth));
+      }
+      return Promise.resolve(jsonResponse({ message: "not needed" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
+
+    renderWithRoutesQueryClient(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/clubs/reading-sai/app"));
+    expect(screen.queryByRole("heading", { name: "클럽을 선택하세요" })).not.toBeInTheDocument();
+  });
+
   it("shows club selection for inactive member home navigation before child data fetches", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();

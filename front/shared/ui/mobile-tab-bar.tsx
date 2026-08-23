@@ -51,7 +51,6 @@ type TabLink = {
     pending: boolean;
   };
   icon: TabIconName;
-  state?: { readmatesWorkspace: "host" | "member" };
   current: (pathname: string) => boolean;
 };
 
@@ -312,7 +311,6 @@ export function MobileTabBar({
           <LinkComponent
             key={tab.key}
             to={tab.href}
-            state={tab.state}
             className="m-tab"
             aria-current={tab.current(appPath) ? "page" : undefined}
           >

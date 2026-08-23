@@ -6,6 +6,7 @@ import {
   canEditOwnProfile,
   canReadMemberContent,
   canUseHostApp,
+  canUseJoinedClubHostApp,
   canUseMemberApp,
   canWriteMemberActivity,
 } from "@/shared/auth/member-app-access";
@@ -92,6 +93,23 @@ describe("member app access helpers", () => {
     expect(canUseHostApp(authForStatus("VIEWER", { role: "HOST" }))).toBe(false);
     expect(canUseHostApp(authForStatus("SUSPENDED", { role: "HOST" }))).toBe(false);
     expect(canUseHostApp(anonymousAuth)).toBe(false);
+  });
+
+  it("requires authenticated active and approved host membership before selecting a host club destination", () => {
+    const hostClub = {
+      clubId: "club-host",
+      clubSlug: "host-club",
+      clubName: "호스트 클럽",
+      membershipId: "membership-host",
+      role: "HOST" as const,
+      status: "ACTIVE" as const,
+      approvalState: "ACTIVE" as const,
+      primaryHost: null,
+    };
+
+    expect(canUseJoinedClubHostApp(authForStatus("ACTIVE"), hostClub)).toBe(true);
+    expect(canUseJoinedClubHostApp({ authenticated: false }, hostClub)).toBe(false);
+    expect(canUseJoinedClubHostApp(authForStatus("ACTIVE"), { ...hostClub, approvalState: "VIEWER" })).toBe(false);
   });
 
   it("allows only active members to edit their own profile", () => {

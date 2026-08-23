@@ -37,9 +37,18 @@ describe("workspace route model", () => {
     ["member profile", "/clubs/reading-sai/app/me", "host", "/clubs/reading-sai/app/host", false],
     ["member notifications", "/clubs/reading-sai/app/notifications", "host", "/clubs/reading-sai/app/host/notifications", false],
     ["member account", "/clubs/reading-sai/app/me/settings", "host", "/clubs/reading-sai/app/host", false],
+    ["member personal records", "/clubs/reading-sai/app/me/records", "host", "/clubs/reading-sai/app/host/sessions", false],
+    ["member notification settings", "/clubs/reading-sai/app/notifications/settings", "host", "/clubs/reading-sai/app/host/notifications", false],
     ["host today", "/clubs/reading-sai/app/host", "member", "/clubs/reading-sai/app", false],
+    ["host operations", "/clubs/reading-sai/app/host/operations", "member", "/clubs/reading-sai/app", false],
+    ["host members", "/clubs/reading-sai/app/host/members", "member", "/clubs/reading-sai/app", false],
+    ["host invitations", "/clubs/reading-sai/app/host/invitations", "member", "/clubs/reading-sai/app", false],
     ["host records list", "/clubs/reading-sai/app/host/sessions", "member", "/clubs/reading-sai/app/archive", false],
     ["host meeting detail", "/clubs/reading-sai/app/host/sessions/meeting-7", "member", "/clubs/reading-sai/app/sessions/meeting-7", true],
+    ["host draft", "/clubs/reading-sai/app/host/sessions/new", "member", "/clubs/reading-sai/app", false],
+    ["host edit", "/clubs/reading-sai/app/host/sessions/meeting-7/edit", "member", "/clubs/reading-sai/app", false],
+    ["host closing", "/clubs/reading-sai/app/host/sessions/meeting-7/closing", "member", "/clubs/reading-sai/app", false],
+    ["host feedback preview", "/clubs/reading-sai/app/host/sessions/meeting-7/feedback-document", "member", "/clubs/reading-sai/app", false],
     ["host notifications", "/clubs/reading-sai/app/host/notifications", "member", "/clubs/reading-sai/app/notifications", false],
   ] as const)("maps %s to only its safe role counterpart", (_name, pathname, targetWorkspace, target, requiresCorrespondence) => {
     const candidate = candidateRoleSwitchTarget({ pathname, targetWorkspace });
@@ -129,7 +138,11 @@ describe("workspace route model", () => {
     ["/clubs/reading-sai/app/notes", "member", "/clubs/next-club/app/notes"],
     ["/clubs/reading-sai/app/archive", "member", "/clubs/next-club/app/archive"],
     ["/clubs/reading-sai/app/me", "member", "/clubs/next-club/app/me"],
+    ["/clubs/reading-sai/app/me/records", "member", "/clubs/next-club/app/archive"],
+    ["/clubs/reading-sai/app/me/settings", "member", "/clubs/next-club/app/me/settings"],
     ["/clubs/reading-sai/app/notifications", "member", "/clubs/next-club/app/notifications"],
+    ["/clubs/reading-sai/app/notifications/settings", "member", "/clubs/next-club/app/notifications"],
+    ["/clubs/reading-sai/app/session/current", "member", "/clubs/next-club/app"],
     ["/clubs/reading-sai/app/host", "host", "/clubs/next-club/app/host"],
     ["/clubs/reading-sai/app/host/sessions", "host", "/clubs/next-club/app/host/sessions"],
     ["/clubs/reading-sai/app/host/notifications", "host", "/clubs/next-club/app/host/notifications"],
@@ -148,5 +161,16 @@ describe("workspace route model", () => {
     });
 
     expect(candidate.navigation).toBe("replace");
+  });
+
+  it("handles malformed scoped club slugs without throwing or trusting a decoded value", () => {
+    expect(workspaceFromCanonicalPath("/clubs/%E0%A4%A/app/host")).toBe("host");
+    expect(
+      buildClubSwitchTarget({
+        pathname: "/clubs/%E0%A4%A/app/archive",
+        targetClubSlug: "next-club",
+        targetWorkspace: "member",
+      }),
+    ).toBe("/clubs/next-club/app/archive");
   });
 });

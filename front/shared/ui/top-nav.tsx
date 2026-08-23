@@ -13,8 +13,15 @@ import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
 export type TopNavVariant = "guest" | "member" | "host";
 
+export type WorkspaceAction = {
+  href: string;
+  label: string;
+  navigation: "push" | "replace";
+};
+
 type AppLinkProps = {
   to: string;
+  replace?: boolean;
   className?: string;
   children: ReactNode;
   "aria-label"?: string;
@@ -29,6 +36,7 @@ type NavLink = {
   key: string;
   href: string | null;
   label: string;
+  replace?: boolean;
   pendingLabel?: string;
   pendingAriaLabel?: string;
   retry?: {
@@ -45,6 +53,7 @@ type TopNavProps = {
   memberName?: string | null;
   memberAvatarKey?: string | null;
   showHostEntry?: boolean;
+  workspaceAction?: WorkspaceAction | null;
   authenticated?: boolean;
   publicBasePath?: string;
   appBasePath?: string;
@@ -161,7 +170,9 @@ const memberReturnLink: NavLink = {
   current: (pathname) => pathname === "/app",
 };
 
-function DefaultLink({ to, children, ...props }: AppLinkProps) {
+function DefaultLink({ to, replace: _replace, children, ...props }: AppLinkProps) {
+  void _replace;
+
   return (
     <a {...props} href={to}>
       {children}
@@ -185,6 +196,20 @@ function scopedAppLink(link: NavLink, appBasePath: string): NavLink {
   return {
     ...link,
     href: link.href ? prefixedAppPath(appBasePath, link.href) : null,
+  };
+}
+
+function scopedWorkspaceAction(action: WorkspaceAction | null, appBasePath: string): NavLink | null {
+  if (!action) {
+    return null;
+  }
+
+  return {
+    key: "workspace-action",
+    href: action.href.startsWith("/clubs/") ? action.href : prefixedAppPath(appBasePath, action.href),
+    label: action.label,
+    replace: action.navigation === "replace",
+    current: () => false,
   };
 }
 
@@ -307,6 +332,7 @@ function TopNavFrame({
               {workspaceAction ? (
                 <LinkComponent
                   to={workspaceAction.href!}
+                  replace={workspaceAction.replace}
                   className="rm-workspace-switch"
                   aria-label={workspaceAction.label}
                   title={workspaceAction.label}
@@ -365,6 +391,7 @@ function AppTopNav({
   memberName,
   memberAvatarKey,
   showHostEntry,
+  workspaceAction,
   currentSessionId,
   currentSessionStatus,
   onRetryCurrentSession,
@@ -376,6 +403,7 @@ function AppTopNav({
   memberName?: string | null;
   memberAvatarKey?: string | null;
   showHostEntry?: boolean;
+  workspaceAction?: WorkspaceAction | null;
   currentSessionId?: string | null;
   currentSessionStatus?: CurrentSessionNavigationStatus;
   onRetryCurrentSession?: () => void;
@@ -396,8 +424,12 @@ function AppTopNav({
         })
       : memberLinks
   ).map((link) => scopedAppLink(link, appBasePath));
-  const workspaceAction = variant === "host" ? memberReturnLink : showHostEntry ? hostEntryLink : null;
-  const scopedWorkspaceAction = workspaceAction ? scopedAppLink(workspaceAction, appBasePath) : null;
+  const fallbackWorkspaceAction = variant === "host" ? memberReturnLink : showHostEntry ? hostEntryLink : null;
+  const resolvedWorkspaceAction = workspaceAction
+    ? scopedWorkspaceAction(workspaceAction, appBasePath)
+    : fallbackWorkspaceAction
+      ? scopedAppLink(fallbackWorkspaceAction, appBasePath)
+      : null;
 
   return (
     <TopNavFrame
@@ -407,7 +439,7 @@ function AppTopNav({
       pathname={appPath}
       memberName={memberName}
       memberAvatarKey={memberAvatarKey}
-      workspaceAction={scopedWorkspaceAction}
+      workspaceAction={resolvedWorkspaceAction}
       accountControl={accountControl}
       LinkComponent={LinkComponent}
     />
@@ -419,6 +451,7 @@ export function TopNav({
   memberName,
   memberAvatarKey,
   showHostEntry,
+  workspaceAction,
   authenticated,
   publicBasePath,
   appBasePath,
@@ -438,6 +471,7 @@ export function TopNav({
       memberName={memberName}
       memberAvatarKey={memberAvatarKey}
       showHostEntry={showHostEntry}
+      workspaceAction={workspaceAction}
       appBasePath={appBasePath}
       currentSessionId={currentSessionId}
       currentSessionStatus={currentSessionStatus}

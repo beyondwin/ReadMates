@@ -31,6 +31,7 @@ import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
 import { canonicalizeCompatibilityEntry } from "@/src/app/workspace-route-model";
+import { clubSelectionLoader } from "@/features/club-selection/route/club-selection-data";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 import { GuestHomeContent } from "@/src/pages/guest-home";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -95,6 +96,11 @@ async function canonicalMemberCompatibilityLoader(args: LoaderFunctionArgs) {
       currentClubSlug: clubSlug,
     }),
   );
+}
+
+async function canonicalMemberEntryLoader(args: LoaderFunctionArgs) {
+  await canonicalMemberCompatibilityLoader(args);
+  return clubSelectionLoader();
 }
 
 function componentForScopedAudience(Component: ComponentType, _scoped: boolean) {
@@ -586,11 +592,9 @@ export function memberRoutes(queryClient: QueryClient): RouteObject[] {
           index: true,
           errorElement: <ArchiveRouteError />,
           hydrateFallbackElement: <ReadmatesRouteLoading label="클럽을 확인하는 중" variant="member" />,
+          loader: canonicalMemberEntryLoader,
           lazy: async () => {
-            const [{ ClubSelectionRoute }, { clubSelectionLoader }] = await Promise.all([
-              import("@/features/club-selection/route/club-selection-route"),
-              import("@/features/club-selection/route/club-selection-data"),
-            ]);
+            const { ClubSelectionRoute } = await import("@/features/club-selection/route/club-selection-route");
 
             function ClubSelectionRouteElement() {
               return (
@@ -600,7 +604,7 @@ export function memberRoutes(queryClient: QueryClient): RouteObject[] {
               );
             }
 
-            return { Component: ClubSelectionRouteElement, loader: clubSelectionLoader };
+            return { Component: ClubSelectionRouteElement };
           },
         },
         {

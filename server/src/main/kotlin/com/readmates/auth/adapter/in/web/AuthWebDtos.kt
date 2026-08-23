@@ -138,6 +138,7 @@ data class AuthJoinedClub(
     val membershipId: UUID,
     val role: MembershipRole,
     val status: MembershipStatus,
+    val approvalState: ApprovalState,
     val primaryHost: String?,
 ) {
     companion object {
@@ -149,6 +150,7 @@ data class AuthJoinedClub(
                 membershipId = summary.membershipId,
                 role = summary.role,
                 status = summary.status,
+                approvalState = summary.status.toApprovalState(),
                 primaryHost = summary.primaryHost,
             )
     }

@@ -47,7 +47,11 @@ type ParsedAppPath = {
 function parsedAppPath(pathname: string): ParsedAppPath {
   const scoped = /^\/clubs\/([^/]+)\/app(?:(\/.*))?$/.exec(pathname);
   if (scoped) {
-    return { clubSlug: decodeURIComponent(scoped[1]), appPath: scoped[2] ?? "" };
+    try {
+      return { clubSlug: decodeURIComponent(scoped[1]), appPath: scoped[2] ?? "" };
+    } catch {
+      return { clubSlug: null, appPath: scoped[2] ?? "" };
+    }
   }
 
   const compatibility = /^\/app(?:(\/.*))?$/.exec(pathname);
@@ -55,7 +59,7 @@ function parsedAppPath(pathname: string): ParsedAppPath {
 }
 
 function canonicalAppBase(clubSlug: string) {
-  return `/clubs/${encodeURIComponent(clubSlug)}/app`;
+  return clubSlug ? `/clubs/${encodeURIComponent(clubSlug)}/app` : "/app";
 }
 
 function pathForWorkspace(clubSlug: string, workspace: ClubWorkspace, suffix = "") {
@@ -70,11 +74,11 @@ function routeFamily(appPath: string, workspace: ClubWorkspace): SafeRouteFamily
   if (localPath === "" || localPath === "/session/current") return "today";
   if (workspace === "member" && localPath === "/notes") return "notes-list";
   if (workspace === "member" && /^\/notes\/[^/]+$/.test(localPath)) return "note-detail";
-  if (localPath === "/archive" || (workspace === "host" && localPath === "/sessions")) return "records-list";
+  if (localPath === "/archive" || localPath === "/me/records" || (workspace === "host" && localPath === "/sessions")) return "records-list";
   if (workspace === "member" && /^\/sessions\/[^/]+$/.test(localPath)) return "record-detail";
   if (workspace === "member" && /^\/feedback\/[^/]+(?:\/print)?$/.test(localPath)) return "record-detail";
-  if (workspace === "host" && /^\/sessions\/[^/]+$/.test(localPath)) return "meeting-detail";
-  if (localPath === "/notifications") return "notification-list";
+  if (workspace === "host" && /^\/sessions\/(?!new$)[^/]+$/.test(localPath)) return "meeting-detail";
+  if (localPath === "/notifications" || localPath === "/notifications/settings") return "notification-list";
   if (workspace === "member" && localPath === "/me") return "profile";
   if (workspace === "member" && localPath === "/me/settings") return "account";
   return null;
@@ -106,8 +110,8 @@ function targetForRoleSwitch(
 ) {
   const sessionId =
     sourceWorkspace === "host"
-      ? /^\/host\/sessions\/([^/]+)$/.exec(appPath)?.[1]
-      : /^\/sessions\/([^/]+)$/.exec(appPath)?.[1];
+      ? /^\/host\/sessions\/(?!new$)([^/]+)$/.exec(appPath)?.[1]
+      : /^\/(?:sessions|feedback)\/([^/]+)(?:\/print)?$/.exec(appPath)?.[1];
   const fallback = safeFallback(clubSlug, targetWorkspace, family);
 
   if (sourceWorkspace === targetWorkspace) {

@@ -331,6 +331,7 @@ describe("SPA AppRouteLayout", () => {
           membershipId: "membership-active-member",
           role: "MEMBER",
           status: "ACTIVE",
+          approvalState: "ACTIVE",
           primaryHost: "reading-sai.example.test",
         },
         {
@@ -340,6 +341,7 @@ describe("SPA AppRouteLayout", () => {
           membershipId: "membership-sample",
           role: "HOST",
           status: "ACTIVE",
+          approvalState: "ACTIVE",
           primaryHost: null,
         },
       ],
@@ -431,8 +433,8 @@ describe("SPA AppRouteLayout", () => {
     ]);
     expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
     expect(screen.getAllByRole("link", { name: "호스트 화면" }).map((link) => link.getAttribute("href"))).toEqual([
-      "/app/host",
-      "/app/host",
+      "/app/host/sessions",
+      "/app/host/sessions",
     ]);
     expect(screen.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
@@ -477,7 +479,7 @@ describe("SPA AppRouteLayout", () => {
     const desktopNav = screen.getByRole("navigation", { name: "앱 내비게이션" });
     expect(within(desktopNav).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
     expect(screen.getAllByRole("link", { name: "호스트 화면" })).toHaveLength(2);
-    expect(screen.getAllByRole("link", { name: "호스트 화면" })[0]).toHaveAttribute("href", "/app/host");
+    expect(screen.getAllByRole("link", { name: "호스트 화면" })[0]).toHaveAttribute("href", "/app/host/sessions");
 
     expect(screen.getAllByText("기록")).toHaveLength(2);
     expect(screen.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();

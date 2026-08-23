@@ -9,8 +9,15 @@ import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
 
+export type MobileWorkspaceAction = {
+  href: string;
+  label: string;
+  navigation: "push" | "replace";
+};
+
 type AppLinkProps = {
   to: string;
+  replace?: boolean;
   state?: unknown;
   className?: string;
   children: ReactNode;
@@ -45,6 +52,7 @@ type ReadmatesNavigationContinuity = {
 type MobileHeaderProps = {
   variant: MobileHeaderVariant;
   showHostEntry?: boolean;
+  workspaceAction?: MobileWorkspaceAction | null;
   authenticated?: boolean;
   publicBasePath?: string;
   appBasePath?: string;
@@ -66,7 +74,8 @@ const defaultPublicRecordsReturnTarget: ReadmatesReturnTarget = {
   label: "공개 기록",
 };
 
-function DefaultLink({ to, state: _state, children, ...props }: AppLinkProps) {
+function DefaultLink({ to, replace: _replace, state: _state, children, ...props }: AppLinkProps) {
+  void _replace;
   void _state;
 
   return (
@@ -276,6 +285,7 @@ type HeaderBackTarget = {
 type HeaderAction = {
   href: string;
   label: string;
+  replace?: boolean;
   ariaLabel?: string;
   icon?: "workspace-switch";
 };
@@ -410,6 +420,7 @@ function HeaderShell({
         {rightAction ? (
           <LinkComponent
             to={rightAction.href}
+            replace={rightAction.replace}
             className={`m-hdr-link${rightAction.icon ? " m-hdr-link--icon" : ""}`}
             aria-label={rightAction.ariaLabel}
             title={actionTitle}
@@ -464,7 +475,22 @@ function GuestMobileHeader({
   );
 }
 
-function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHostEntry: boolean, appBasePath: string): HeaderAction | null {
+function appRightAction(
+  variant: Exclude<MobileHeaderVariant, "guest">,
+  showHostEntry: boolean,
+  appBasePath: string,
+  workspaceAction?: MobileWorkspaceAction | null,
+): HeaderAction | null {
+  if (workspaceAction) {
+    return {
+      href: workspaceAction.href.startsWith("/clubs/") ? workspaceAction.href : prefixedAppPath(appBasePath, workspaceAction.href),
+      label: workspaceAction.label,
+      replace: workspaceAction.navigation === "replace",
+      ariaLabel: workspaceAction.label,
+      icon: "workspace-switch",
+    };
+  }
+
   if (variant === "host") {
     return {
       href: prefixedAppPath(appBasePath, "/app"),
@@ -489,6 +515,7 @@ function appRightAction(variant: Exclude<MobileHeaderVariant, "guest">, showHost
 function AppMobileHeader({
   variant,
   showHostEntry = false,
+  workspaceAction,
   appBasePath = "",
   LinkComponent,
   navigationContinuity,
@@ -496,6 +523,7 @@ function AppMobileHeader({
 }: {
   variant: Exclude<MobileHeaderVariant, "guest">;
   showHostEntry?: boolean;
+  workspaceAction?: MobileWorkspaceAction | null;
   appBasePath?: string;
   LinkComponent: AppLinkComponent;
   navigationContinuity: ReadmatesNavigationContinuity;
@@ -511,7 +539,7 @@ function AppMobileHeader({
       kicker={variant === "host" ? "호스트" : null}
       title={appTitle(variant, appPath)}
       backTarget={scopeAppBackTarget(appBackTarget(variant, appPath, location.state, navigationContinuity), appBasePath)}
-      rightAction={appRightAction(variant, showHostEntry, appBasePath)}
+      rightAction={appRightAction(variant, showHostEntry, appBasePath, workspaceAction)}
       accountControl={accountControl}
       brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
       LinkComponent={LinkComponent}
@@ -522,6 +550,7 @@ function AppMobileHeader({
 export function MobileHeader({
   variant,
   showHostEntry,
+  workspaceAction,
   authenticated,
   publicBasePath,
   appBasePath,
@@ -544,6 +573,7 @@ export function MobileHeader({
     <AppMobileHeader
       variant={variant}
       showHostEntry={showHostEntry}
+      workspaceAction={workspaceAction}
       appBasePath={appBasePath}
       LinkComponent={LinkComponent}
       navigationContinuity={navigationContinuity}

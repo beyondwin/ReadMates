@@ -6,6 +6,7 @@ import {
   ensureSecondClubFixture,
   loginWithGoogleFixture,
   resetSeedGoogleLogins,
+  runMysql,
 } from "./readmates-e2e-db";
 
 const secondClubInviteEmail = "sample.club.invited@example.com";
@@ -19,6 +20,7 @@ test.beforeEach(() => {
 
 test.afterEach(() => {
   cleanupSecondClubInvitedMembers([secondClubInviteEmail]);
+  ensureSecondClubFixture();
   cleanupSecondClubFixture();
   resetSeedGoogleLogins(["host@example.com", secondClubInviteEmail]);
 });
@@ -40,13 +42,10 @@ test("public club routes and APIs stay isolated by slug", async ({ page }) => {
   expect(publicClubs.sampleClub.recentSessions).toEqual([]);
 });
 
-test("user with multiple joined clubs chooses an entry club from the shared session", async ({ page }) => {
+test("bare app entry replaces to the shared session's current club", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app");
-  await expect(page.getByRole("heading", { name: "클럽을 선택하세요" })).toBeVisible();
-
-  await page.getByRole("link", { name: /샘플 북클럽/ }).click();
   await expect(page).toHaveURL(/\/clubs\/sample-book-club\/app$/);
 
   const authState = await page.evaluate(async () => {
@@ -61,7 +60,7 @@ test("user with multiple joined clubs chooses an entry club from the shared sess
 test("club switcher changes club context while preserving independent roles", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
 
-  await page.goto("/app/host/sessions?cursor=source-cursor#source-modal");
+  await page.goto("/clubs/reading-sai/app/host/sessions?cursor=source-cursor#source-modal");
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host\/sessions(?:\?.*)?$/);
 
   const readingSaiAuth = await page.evaluate(async () => {
@@ -74,7 +73,7 @@ test("club switcher changes club context while preserving independent roles", as
 
   await page.getByLabel("클럽 전환").selectOption("sample-book-club");
 
-  await expect(page).toHaveURL(/\/clubs\/sample-book-club\/app$/);
+  await expect(page).toHaveURL(/\/clubs\/sample-book-club\/app\/archive$/);
   expect(new URL(page.url()).search).toBe("");
   expect(new URL(page.url()).hash).toBe("");
   const sampleClubAuth = await page.evaluate(async () => {
@@ -89,7 +88,7 @@ test("club switcher changes club context while preserving independent roles", as
 test("canonical workspace URLs survive direct entry, reload, resize, and role-switch history", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
 
-  await page.goto("/app/host");
+  await page.goto("/clubs/reading-sai/app/host");
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
   await page.reload();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
@@ -103,6 +102,42 @@ test("canonical workspace URLs survive direct entry, reload, resize, and role-sw
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
   await page.goForward();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
+});
+
+test("same-meeting role switching keeps an authorized canonical meeting object", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  const sessionId = runMysql(`
+select sessions.id
+from sessions
+join clubs on clubs.id = sessions.club_id
+where clubs.slug = 'reading-sai'
+order by sessions.created_at desc
+limit 1;
+`).trim().split("\n").at(-1)!;
+
+  await page.goto(`/clubs/reading-sai/app/sessions/${sessionId}`);
+  await expect(page.locator(".desktop-only .rm-workspace-switch")).toHaveAttribute(
+    "href",
+    `/clubs/reading-sai/app/host/sessions/${sessionId}`,
+  );
+  await page.locator(".desktop-only .rm-workspace-switch").click();
+  await expect(page).toHaveURL(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
+});
+
+test("revoked host authority replaces the host route with the member-safe route", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto("/clubs/reading-sai/app/host");
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+
+  runMysql(`
+update memberships
+join users on users.id = memberships.user_id
+join clubs on clubs.id = memberships.club_id
+set memberships.role = 'MEMBER', memberships.updated_at = utc_timestamp(6)
+where lower(users.email) = 'host@example.com' and clubs.slug = 'reading-sai';
+`);
+  await page.reload();
+  await expect(page).toHaveURL("/clubs/reading-sai/app");
 });
 
 test("club-scoped invite acceptance activates only the target club", async ({ page }) => {
