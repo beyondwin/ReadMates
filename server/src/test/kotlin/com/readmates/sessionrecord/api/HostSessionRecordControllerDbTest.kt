@@ -31,11 +31,10 @@ import org.springframework.test.web.servlet.put
 @Tag("integration")
 @Sql(statements = [RESET_RECORD_API_FIXTURES], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEAN_RECORD_API_FIXTURES], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
-@Suppress("LargeClass")
 class HostSessionRecordControllerDbTest(
-    @param:Autowired private val mockMvc: MockMvc,
-    @param:Autowired private val jdbcTemplate: JdbcTemplate,
-) : ReadmatesMySqlIntegrationTestSupport() {
+    @param:Autowired mockMvc: MockMvc,
+    @param:Autowired jdbcTemplate: JdbcTemplate,
+) : HostSessionRecordControllerDbTestSupport(mockMvc, jdbcTemplate) {
     @Test
     fun `host capabilities and editor are host scoped and public safe`() {
         mockMvc
@@ -530,15 +529,20 @@ class HostSessionRecordControllerDbTest(
         assertThat(notificationDecisionCount()).isZero()
         assertThat(notificationEventCount()).isZero()
     }
+}
 
-    private fun notificationDecisionCount(): Int =
+abstract class HostSessionRecordControllerDbTestSupport(
+    protected val mockMvc: MockMvc,
+    protected val jdbcTemplate: JdbcTemplate,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    protected fun notificationDecisionCount(): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from host_action_notification_decisions where session_id = ?",
             Int::class.java,
             VISIBILITY_SESSION_ID,
         ) ?: 0
 
-    private fun notificationEventCount(): Int =
+    protected fun notificationEventCount(): Int =
         jdbcTemplate.queryForObject(
             """
             select count(*) from notification_event_outbox
@@ -548,7 +552,7 @@ class HostSessionRecordControllerDbTest(
             VISIBILITY_SESSION_ID,
         ) ?: 0
 
-    private fun makeDraftFailAppliedRevisionForeignKey() {
+    protected fun makeDraftFailAppliedRevisionForeignKey() {
         jdbcTemplate.execute(
             ConnectionCallback {
                 it.createStatement().use { statement ->
@@ -571,7 +575,7 @@ class HostSessionRecordControllerDbTest(
     }
 
     @Suppress("LongMethod")
-    private fun recordApplyState() =
+    protected fun recordApplyState() =
         RecordApplyState(
             liveSession =
                 jdbcTemplate.queryForList(
@@ -664,7 +668,7 @@ class HostSessionRecordControllerDbTest(
                 ),
         )
 
-    private fun draftJson(expectedDraftRevision: Long?): String {
+    protected fun draftJson(expectedDraftRevision: Long?): String {
         val revision = expectedDraftRevision?.toString() ?: "null"
         return """
             {
@@ -684,7 +688,7 @@ class HostSessionRecordControllerDbTest(
             """.trimIndent()
     }
 
-    private companion object {
+    protected companion object {
         const val SESSION_ID = "00000000-0000-0000-0000-000000000301"
         const val VISIBILITY_SESSION_ID = "00000000-0000-0000-0000-000000099301"
     }
@@ -803,7 +807,7 @@ class HostSessionRecordDraftRebaseControllerDbTest(
     }
 }
 
-private data class RecordApplyState(
+data class RecordApplyState(
     val liveSession: List<Map<String, Any?>>,
     val publication: List<Map<String, Any?>>,
     val highlights: List<Map<String, Any?>>,

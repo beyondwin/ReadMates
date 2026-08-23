@@ -31,57 +31,12 @@ import java.util.UUID
 )
 @AutoConfigureMockMvc
 @Tag("integration")
-@Suppress("LargeClass")
 class HostSessionParticipantSnapshotDbTest(
-    @param:Autowired private val mockMvc: MockMvc,
-    @param:Autowired private val jdbcTemplate: JdbcTemplate,
-    @param:Autowired private val authSessionService: AuthSessionService,
-    @param:Autowired private val invitationService: InvitationService,
-) : ReadmatesMySqlIntegrationTestSupport() {
-    private val jsonMapper =
-        tools.jackson.databind.json.JsonMapper
-            .builder()
-            .findAndAddModules()
-            .build()
-    private val createdSessionTokenHashes = linkedSetOf<String>()
-    private val createdMembershipIds = linkedSetOf<String>()
-    private val createdUserIds = linkedSetOf<String>()
-    private val createdSessionIds = linkedSetOf<String>()
-    private val createdInvitationEmails = linkedSetOf<String>()
-
-    @AfterEach
-    fun cleanupCreatedRows() {
-        try {
-            deleteWhereIn("session_participant_change_audit", "session_id", createdSessionIds)
-            deleteWhereIn("reading_checkins", "session_id", createdSessionIds)
-            deleteWhereIn("questions", "session_id", createdSessionIds)
-            deleteWhereIn("one_line_reviews", "session_id", createdSessionIds)
-            deleteWhereIn("long_reviews", "session_id", createdSessionIds)
-            deleteWhereIn("session_participants", "session_id", createdSessionIds)
-            deleteWhereIn("session_participants", "membership_id", createdMembershipIds)
-            deleteWhereIn("host_session_lifecycle_audit", "session_id", createdSessionIds)
-            deleteWhereIn("host_session_change_audit", "session_id", createdSessionIds)
-            deleteWhereIn("session_publication_versions", "session_id", createdSessionIds)
-            deleteWhereIn("sessions", "id", createdSessionIds)
-            deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
-            if (createdInvitationEmails.isNotEmpty()) {
-                val placeholders = createdInvitationEmails.joinToString(",") { "?" }
-                jdbcTemplate.update(
-                    "delete from invitations where invited_email in ($placeholders)",
-                    *createdInvitationEmails.toTypedArray(),
-                )
-            }
-            deleteWhereIn("memberships", "id", createdMembershipIds)
-            deleteWhereIn("users", "id", createdUserIds)
-        } finally {
-            createdSessionTokenHashes.clear()
-            createdMembershipIds.clear()
-            createdUserIds.clear()
-            createdSessionIds.clear()
-            createdInvitationEmails.clear()
-        }
-    }
-
+    @param:Autowired mockMvc: MockMvc,
+    @param:Autowired jdbcTemplate: JdbcTemplate,
+    @param:Autowired authSessionService: AuthSessionService,
+    @param:Autowired invitationService: InvitationService,
+) : HostSessionParticipantSnapshotDbTestSupport(mockMvc, jdbcTemplate, authSessionService, invitationService) {
     @Test
     fun `open snapshots active members and switches draft host-only to open guest readable hidden`() {
         val joinedBefore = insertActiveMember("snapshot.join.before", "열린 전 합류")
@@ -265,8 +220,59 @@ class HostSessionParticipantSnapshotDbTest(
         assertThat(pendingRsvpCount(sessionId)).isEqualTo(openDenominator - 1L)
         assertThat(rsvpStatus(sessionId, extra)).isEqualTo("NO_RESPONSE")
     }
+}
 
-    private fun createDraft(title: String): String {
+abstract class HostSessionParticipantSnapshotDbTestSupport(
+    protected val mockMvc: MockMvc,
+    protected val jdbcTemplate: JdbcTemplate,
+    protected val authSessionService: AuthSessionService,
+    protected val invitationService: InvitationService,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    protected val jsonMapper =
+        tools.jackson.databind.json.JsonMapper
+            .builder()
+            .findAndAddModules()
+            .build()
+    protected val createdSessionTokenHashes = linkedSetOf<String>()
+    protected val createdMembershipIds = linkedSetOf<String>()
+    protected val createdUserIds = linkedSetOf<String>()
+    protected val createdSessionIds = linkedSetOf<String>()
+    protected val createdInvitationEmails = linkedSetOf<String>()
+
+    @AfterEach
+    fun cleanupCreatedRows() {
+        try {
+            deleteWhereIn("session_participant_change_audit", "session_id", createdSessionIds)
+            deleteWhereIn("reading_checkins", "session_id", createdSessionIds)
+            deleteWhereIn("questions", "session_id", createdSessionIds)
+            deleteWhereIn("one_line_reviews", "session_id", createdSessionIds)
+            deleteWhereIn("long_reviews", "session_id", createdSessionIds)
+            deleteWhereIn("session_participants", "session_id", createdSessionIds)
+            deleteWhereIn("session_participants", "membership_id", createdMembershipIds)
+            deleteWhereIn("host_session_lifecycle_audit", "session_id", createdSessionIds)
+            deleteWhereIn("host_session_change_audit", "session_id", createdSessionIds)
+            deleteWhereIn("session_publication_versions", "session_id", createdSessionIds)
+            deleteWhereIn("sessions", "id", createdSessionIds)
+            deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
+            if (createdInvitationEmails.isNotEmpty()) {
+                val placeholders = createdInvitationEmails.joinToString(",") { "?" }
+                jdbcTemplate.update(
+                    "delete from invitations where invited_email in ($placeholders)",
+                    *createdInvitationEmails.toTypedArray(),
+                )
+            }
+            deleteWhereIn("memberships", "id", createdMembershipIds)
+            deleteWhereIn("users", "id", createdUserIds)
+        } finally {
+            createdSessionTokenHashes.clear()
+            createdMembershipIds.clear()
+            createdUserIds.clear()
+            createdSessionIds.clear()
+            createdInvitationEmails.clear()
+        }
+    }
+
+    protected fun createDraft(title: String): String {
         val body =
             mockMvc
                 .post("/api/host/sessions") {
@@ -289,7 +295,7 @@ class HostSessionParticipantSnapshotDbTest(
         return jsonMapper.readTree(body).get("sessionId").asString()
     }
 
-    private fun open(
+    protected fun open(
         sessionId: String,
         expectedRevision: Long,
     ) {
@@ -301,7 +307,7 @@ class HostSessionParticipantSnapshotDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun addToCurrentSession(membershipId: String) {
+    protected fun addToCurrentSession(membershipId: String) {
         mockMvc
             .post("/api/host/members/$membershipId/current-session/add") {
                 cookie(hostCookie())
@@ -311,7 +317,7 @@ class HostSessionParticipantSnapshotDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun removeFromCurrentSession(membershipId: String) {
+    protected fun removeFromCurrentSession(membershipId: String) {
         mockMvc
             .post("/api/host/members/$membershipId/current-session/remove") {
                 cookie(hostCookie())
@@ -321,7 +327,7 @@ class HostSessionParticipantSnapshotDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun suspendMember(membershipId: String) {
+    protected fun suspendMember(membershipId: String) {
         mockMvc
             .post("/api/host/members/$membershipId/suspend") {
                 cookie(hostCookie())
@@ -333,7 +339,7 @@ class HostSessionParticipantSnapshotDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun restoreMember(membershipId: String) {
+    protected fun restoreMember(membershipId: String) {
         mockMvc
             .post("/api/host/members/$membershipId/restore") {
                 cookie(hostCookie())
@@ -343,7 +349,7 @@ class HostSessionParticipantSnapshotDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun leaveClub(membershipId: String) {
+    protected fun leaveClub(membershipId: String) {
         val email =
             jdbcTemplate.queryForObject(
                 """
@@ -366,7 +372,7 @@ class HostSessionParticipantSnapshotDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun insertActiveMember(
+    protected fun insertActiveMember(
         prefix: String,
         name: String,
         displayName: String = name,
@@ -400,7 +406,7 @@ class HostSessionParticipantSnapshotDbTest(
         return membershipId
     }
 
-    private fun acceptInvitationAfterOpen(
+    protected fun acceptInvitationAfterOpen(
         prefix: String,
         applyToCurrentSession: Boolean,
     ): String {
@@ -408,7 +414,7 @@ class HostSessionParticipantSnapshotDbTest(
         return acceptInvitationForEmail(email, "초대 합류", applyToCurrentSession)
     }
 
-    private fun acceptInvitationForEmail(
+    protected fun acceptInvitationForEmail(
         email: String,
         name: String,
         applyToCurrentSession: Boolean,
@@ -456,7 +462,7 @@ class HostSessionParticipantSnapshotDbTest(
         return membershipId
     }
 
-    private fun membershipIdForEmail(email: String): String =
+    protected fun membershipIdForEmail(email: String): String =
         jdbcTemplate.queryForObject(
             """
             select memberships.id
@@ -468,7 +474,7 @@ class HostSessionParticipantSnapshotDbTest(
             email,
         ) ?: error("missing membership")
 
-    private fun insertViewerAndActivate(
+    protected fun insertViewerAndActivate(
         prefix: String,
         name: String,
     ): String {
@@ -507,7 +513,7 @@ class HostSessionParticipantSnapshotDbTest(
         return membershipId
     }
 
-    private fun setHistoricalFacts(
+    protected fun setHistoricalFacts(
         sessionId: String,
         membershipId: String,
         rsvp: String,
@@ -526,7 +532,7 @@ class HostSessionParticipantSnapshotDbTest(
         )
     }
 
-    private fun activeMembershipIds(sessionId: String): Set<String> =
+    protected fun activeMembershipIds(sessionId: String): Set<String> =
         jdbcTemplate
             .query(
                 """
@@ -538,7 +544,7 @@ class HostSessionParticipantSnapshotDbTest(
                 sessionId,
             ).toSet()
 
-    private fun pendingRsvpCount(sessionId: String): Long =
+    protected fun pendingRsvpCount(sessionId: String): Long =
         jdbcTemplate.queryForObject(
             """
             select count(*)
@@ -551,22 +557,22 @@ class HostSessionParticipantSnapshotDbTest(
             sessionId,
         ) ?: 0
 
-    private fun participantSetRevision(sessionId: String): Long =
+    protected fun participantSetRevision(sessionId: String): Long =
         jdbcTemplate.queryForObject(
             "select participant_set_revision from sessions where id = ?",
             Long::class.java,
             sessionId,
         ) ?: error("missing participant set revision")
 
-    private fun sessionState(sessionId: String): String =
+    protected fun sessionState(sessionId: String): String =
         jdbcTemplate.queryForObject("select state from sessions where id = ?", String::class.java, sessionId)
             ?: error("missing state")
 
-    private fun accessScope(sessionId: String): String =
+    protected fun accessScope(sessionId: String): String =
         jdbcTemplate.queryForObject("select access_scope from sessions where id = ?", String::class.java, sessionId)
             ?: error("missing access scope")
 
-    private fun siteVisibility(sessionId: String): String =
+    protected fun siteVisibility(sessionId: String): String =
         jdbcTemplate.queryForObject(
             """
             select coalesce(
@@ -585,19 +591,19 @@ class HostSessionParticipantSnapshotDbTest(
             sessionId,
         ) ?: error("missing site visibility")
 
-    private fun meetingEpoch(): Long =
+    protected fun meetingEpoch(): Long =
         jdbcTemplate.queryForObject(
             "select meeting_epoch from club_host_list_epochs where club_id = ?",
             Long::class.java,
             CLUB_ID,
         ) ?: 0
 
-    private fun participationStatus(
+    protected fun participationStatus(
         sessionId: String,
         membershipId: String,
     ): String = participationStatusOrNull(sessionId, membershipId) ?: error("missing participant")
 
-    private fun participationStatusOrNull(
+    protected fun participationStatusOrNull(
         sessionId: String,
         membershipId: String,
     ): String? =
@@ -613,7 +619,7 @@ class HostSessionParticipantSnapshotDbTest(
                 membershipId,
             ).firstOrNull()
 
-    private fun rsvpStatus(
+    protected fun rsvpStatus(
         sessionId: String,
         membershipId: String,
     ): String =
@@ -624,7 +630,7 @@ class HostSessionParticipantSnapshotDbTest(
             membershipId,
         ) ?: error("missing rsvp")
 
-    private fun attendanceStatus(
+    protected fun attendanceStatus(
         sessionId: String,
         membershipId: String,
     ): String =
@@ -635,7 +641,7 @@ class HostSessionParticipantSnapshotDbTest(
             membershipId,
         ) ?: error("missing attendance")
 
-    private fun latestAudit(
+    protected fun latestAudit(
         sessionId: String,
         membershipId: String,
     ): List<Any> {
@@ -676,7 +682,7 @@ class HostSessionParticipantSnapshotDbTest(
         return row
     }
 
-    private fun auditCount(
+    protected fun auditCount(
         sessionId: String,
         membershipId: String,
     ): Int =
@@ -691,9 +697,9 @@ class HostSessionParticipantSnapshotDbTest(
             membershipId,
         ) ?: 0
 
-    private fun hostCookie(): Cookie = sessionCookieForEmail("host@example.com")
+    protected fun hostCookie(): Cookie = sessionCookieForEmail("host@example.com")
 
-    private fun sessionCookieForEmail(email: String): Cookie {
+    protected fun sessionCookieForEmail(email: String): Cookie {
         val userId =
             jdbcTemplate.queryForObject(
                 "select id from users where email = ?",
@@ -720,14 +726,14 @@ class HostSessionParticipantSnapshotDbTest(
         jdbcTemplate.update("delete from $table where $column in ($placeholders)", *ids.toTypedArray())
     }
 
-    private fun MockHttpServletRequestDsl.withHost() {
+    protected fun MockHttpServletRequestDsl.withHost() {
         with(user("host@example.com"))
         with(csrf())
         header("X-Readmates-Bff-Secret", "test-bff-secret")
         header("Origin", "http://localhost:3000")
     }
 
-    private companion object {
+    protected companion object {
         const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
         const val MEMBER5_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000206"

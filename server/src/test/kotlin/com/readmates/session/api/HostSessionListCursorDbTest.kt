@@ -54,23 +54,11 @@ import java.util.concurrent.TimeUnit
 @Sql(statements = [CLEANUP_LIST_CURSOR_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_LIST_CURSOR_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
-@Suppress("LargeClass")
 class HostSessionListCursorDbTest(
-    @param:Autowired private val mockMvc: MockMvc,
-    @param:Autowired private val jdbcTemplate: JdbcTemplate,
-    @param:Autowired private val cursorSigner: HostListCursorSigner,
-) : ReadmatesMySqlIntegrationTestSupport() {
-    private val jsonMapper =
-        tools.jackson.databind.json.JsonMapper
-            .builder()
-            .findAndAddModules()
-            .build()
-
-    @BeforeEach
-    fun wipeGeneratedSessions() {
-        cleanupGenerated()
-    }
-
+    @param:Autowired mockMvc: MockMvc,
+    @param:Autowired jdbcTemplate: JdbcTemplate,
+    @param:Autowired cursorSigner: HostListCursorSigner,
+) : HostSessionListCursorDbTestSupport(mockMvc, jdbcTemplate, cursorSigner) {
     @Test
     fun `mode states and state are mutually exclusive and states are canonicalized`() {
         mockMvc
@@ -433,7 +421,31 @@ class HostSessionListCursorDbTest(
         }
     }
 
-    private fun mutateRegisteredSource(source: HostListEpochInventory.Source) {
+    @TestConfiguration
+    class SnapshotProbeConfiguration {
+        @Bean
+        @Primary
+        fun snapshotProbe(): HostSessionListReadProbe = SNAPSHOT_PROBE
+    }
+}
+
+abstract class HostSessionListCursorDbTestSupport(
+    protected val mockMvc: MockMvc,
+    protected val jdbcTemplate: JdbcTemplate,
+    protected val cursorSigner: HostListCursorSigner,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    protected val jsonMapper =
+        tools.jackson.databind.json.JsonMapper
+            .builder()
+            .findAndAddModules()
+            .build()
+
+    @BeforeEach
+    fun wipeGeneratedSessions() {
+        cleanupGenerated()
+    }
+
+    protected fun mutateRegisteredSource(source: HostListEpochInventory.Source) {
         val sessionId = createInState("소스 ${source.sqlToken}", "DRAFT", "2026-09-15")
         when {
             source.sqlToken == "sessions.title" || source.sqlToken == "sessions.book_title" ||
@@ -450,14 +462,14 @@ class HostSessionListCursorDbTest(
         }
     }
 
-    private fun listEpoch(column: String): Long =
+    protected fun listEpoch(column: String): Long =
         jdbcTemplate.queryForObject(
             "select $column from club_host_list_epochs where club_id = ?",
             Long::class.java,
             CLUB_ID,
         ) ?: 0
 
-    private fun bumpEpochs(kinds: Set<HostListEpochKind>) {
+    protected fun bumpEpochs(kinds: Set<HostListEpochKind>) {
         if (kinds.isEmpty()) return
         jdbcTemplate.update(
             """
@@ -472,7 +484,7 @@ class HostSessionListCursorDbTest(
         )
     }
 
-    private fun createInState(
+    protected fun createInState(
         title: String,
         state: String,
         date: String?,
@@ -504,7 +516,7 @@ class HostSessionListCursorDbTest(
         return sessionId
     }
 
-    private fun createDraft(
+    protected fun createDraft(
         title: String,
         date: String = "2026-09-01",
         bookTitle: String = LIST_BOOK,
@@ -531,14 +543,14 @@ class HostSessionListCursorDbTest(
         return jsonMapper.readTree(body).get("sessionId").asString()
     }
 
-    private fun patchTitle(
+    protected fun patchTitle(
         sessionId: String,
         title: String,
     ) {
         patchTitleReturningChangeId(sessionId, title)
     }
 
-    private fun patchTitleReturningChangeId(
+    protected fun patchTitleReturningChangeId(
         sessionId: String,
         title: String,
     ): String {
@@ -571,7 +583,7 @@ class HostSessionListCursorDbTest(
         return body.get("changeReceipt").get("changeId").asString()
     }
 
-    private fun restoreBasicChange(
+    protected fun restoreBasicChange(
         sessionId: String,
         changeId: String,
     ) {
@@ -599,7 +611,7 @@ class HostSessionListCursorDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun open(sessionId: String) {
+    protected fun open(sessionId: String) {
         val revision =
             jdbcTemplate.queryForObject(
                 "select session_revision from sessions where id = ?",
@@ -614,7 +626,7 @@ class HostSessionListCursorDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun close(sessionId: String) {
+    protected fun close(sessionId: String) {
         val revision =
             jdbcTemplate.queryForObject(
                 "select session_revision from sessions where id = ?",
@@ -629,7 +641,7 @@ class HostSessionListCursorDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun trash(sessionId: String) {
+    protected fun trash(sessionId: String) {
         val revision =
             jdbcTemplate.queryForObject(
                 "select session_revision from sessions where id = ?",
@@ -644,7 +656,7 @@ class HostSessionListCursorDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun insertRecordDraft(sessionId: String) {
+    protected fun insertRecordDraft(sessionId: String) {
         jdbcTemplate.update(
             """
             insert into session_record_drafts (
@@ -660,9 +672,9 @@ class HostSessionListCursorDbTest(
         )
     }
 
-    private fun listSessions(mode: String): List<String> = sessionIds(listPage(mode, limit = 50))
+    protected fun listSessions(mode: String): List<String> = sessionIds(listPage(mode, limit = 50))
 
-    private fun listPage(
+    protected fun listPage(
         mode: String,
         limit: Int,
         cursor: String? = null,
@@ -683,12 +695,12 @@ class HostSessionListCursorDbTest(
         return jsonMapper.readTree(result)
     }
 
-    private fun sessionIds(page: JsonNode): List<String> {
+    protected fun sessionIds(page: JsonNode): List<String> {
         val items = page.get("items")
         return (0 until items.size()).map { items.get(it).get("sessionId").asString() }
     }
 
-    private fun mutatePayloadField(
+    protected fun mutatePayloadField(
         cursor: String,
         field: String,
     ): String {
@@ -720,7 +732,7 @@ class HostSessionListCursorDbTest(
         return "${parts[0]}.$encoded.${parts[2]}"
     }
 
-    private fun resign(
+    protected fun resign(
         cursor: String,
         keyVersion: Int,
         expiry: Instant,
@@ -733,7 +745,7 @@ class HostSessionListCursorDbTest(
         return cursorSigner.sign(replaced, keyVersion)
     }
 
-    private fun captureSignerLogs(): SignerLogCapture {
+    protected fun captureSignerLogs(): SignerLogCapture {
         val logger = LoggerFactory.getLogger(HostListCursorSigner::class.java) as Logger
         val appender = ListAppender<ILoggingEvent>().apply { start() }
         logger.addAppender(appender)
@@ -741,7 +753,7 @@ class HostSessionListCursorDbTest(
         return SignerLogCapture(logger, appender)
     }
 
-    private class SignerLogCapture(
+    protected class SignerLogCapture(
         private val logger: Logger,
         val appender: ListAppender<ILoggingEvent>,
     ) : AutoCloseable {
@@ -751,7 +763,7 @@ class HostSessionListCursorDbTest(
         }
     }
 
-    private fun cleanupGenerated() {
+    protected fun cleanupGenerated() {
         CLEANUP_LIST_CURSOR_SQL
             .split(';')
             .map { statement -> statement.trim() }
@@ -759,40 +771,34 @@ class HostSessionListCursorDbTest(
             .forEach { statement -> jdbcTemplate.update(statement) }
     }
 
-    private fun MockHttpServletRequestDsl.withHost() {
+    protected fun MockHttpServletRequestDsl.withHost() {
         with(user("host@example.com"))
         with(csrf())
     }
 
-    @TestConfiguration
-    class SnapshotProbeConfiguration {
-        @Bean
-        @Primary
-        fun snapshotProbe(): HostSessionListReadProbe = SNAPSHOT_PROBE
-    }
-
-    private companion object {
+    protected companion object {
         const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
         const val LIST_BOOK = "CursorListBook"
         const val SNAP_RACE_BOOK = "SnapRaceBook"
-        val SNAPSHOT_ENTERED = ResettableLatch()
-        val SNAPSHOT_RELEASE = ResettableLatch()
-        val SNAPSHOT_PROBE = SnapshotListReadProbe()
-    }
-
-    class SnapshotListReadProbe : HostSessionListReadProbe {
-        @Volatile var enabled = false
-
-        override fun afterEpochRead() {
-            if (!enabled) return
-            SNAPSHOT_ENTERED.countDown()
-            check(SNAPSHOT_RELEASE.await(5, TimeUnit.SECONDS))
-        }
     }
 }
 
-private class ResettableLatch {
+private val SNAPSHOT_ENTERED = ResettableLatch()
+private val SNAPSHOT_RELEASE = ResettableLatch()
+private val SNAPSHOT_PROBE = SnapshotListReadProbe()
+
+private class SnapshotListReadProbe : HostSessionListReadProbe {
+    @Volatile var enabled = false
+
+    override fun afterEpochRead() {
+        if (!enabled) return
+        SNAPSHOT_ENTERED.countDown()
+        check(SNAPSHOT_RELEASE.await(5, TimeUnit.SECONDS))
+    }
+}
+
+class ResettableLatch {
     private var latch = CountDownLatch(1)
 
     fun reset() {

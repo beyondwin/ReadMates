@@ -10,10 +10,12 @@ import com.readmates.shared.db.uuid
 import org.springframework.jdbc.core.JdbcTemplate
 import java.util.UUID
 
-@Suppress("TooManyFunctions")
 internal class ManualNotificationAudienceQueries(
     private val jdbcTemplate: JdbcTemplate,
 ) {
+    private val revisionQueries = ManualNotificationAudienceRevisionQueries(jdbcTemplate)
+    private val emailQueries = ManualNotificationEmailEligibilityQueries(jdbcTemplate)
+
     fun validateMembershipEdits(
         clubId: UUID,
         membershipIds: Set<UUID>,
@@ -43,7 +45,7 @@ internal class ManualNotificationAudienceQueries(
         val includedIds = activeMembershipIds(clubId, selection.includedMembershipIds)
         val excludedIds = selection.excludedMembershipIds.toSet()
         val finalIds = (baseIds - excludedIds + includedIds).sortedBy { it.toString() }
-        val audienceRevision = audienceRevision(clubId, selection)
+        val audienceRevision = revisionQueries.audienceRevision(clubId, selection)
         return if (finalIds.isEmpty()) {
             emptySnapshot(baseIds, includedIds, selection, audienceRevision)
         } else {
@@ -160,7 +162,7 @@ internal class ManualNotificationAudienceQueries(
     ): ManualNotificationTargetSnapshot {
         val emailRequested = selection.requestedChannels != ManualNotificationRequestedChannels.IN_APP
         val inAppRequested = selection.requestedChannels != ManualNotificationRequestedChannels.EMAIL
-        val eligibility = emailEligibility(clubId, selection.eventType, finalIds)
+        val eligibility = emailQueries.emailEligibility(clubId, selection.eventType, finalIds)
         val inAppIds = if (inAppRequested) finalIds else emptyList()
         val emailIds = if (emailRequested) eligibility.eligibleIds else emptyList()
         return ManualNotificationTargetSnapshot(
@@ -192,8 +194,12 @@ internal class ManualNotificationAudienceQueries(
             }
         return jdbcTemplate.query(sql, { resultSet, _ -> resultSet.uuid("id") }, *args).toSet()
     }
+}
 
-    private fun audienceRevision(
+private class ManualNotificationAudienceRevisionQueries(
+    private val jdbcTemplate: JdbcTemplate,
+) {
+    fun audienceRevision(
         clubId: UUID,
         selection: ManualNotificationSelection,
     ): String =
@@ -241,37 +247,41 @@ internal class ManualNotificationAudienceQueries(
                 clubId.dbString(),
                 sessionId.dbString(),
             ).joinToString(",")
+}
 
-    private fun audienceSql(audience: ManualNotificationAudience): String? =
-        when (audience) {
-            ManualNotificationAudience.ALL_ACTIVE_MEMBERS ->
-                """
-                select memberships.id
-                from memberships
-                where memberships.club_id = ?
-                  and memberships.status = 'ACTIVE'
-                """.trimIndent()
-            ManualNotificationAudience.SESSION_PARTICIPANTS ->
-                """
-                select session_participants.membership_id as id
-                from session_participants
-                where session_participants.session_id = ?
-                  and session_participants.club_id = ?
-                  and session_participants.participation_status = 'ACTIVE'
-                """.trimIndent()
-            ManualNotificationAudience.CONFIRMED_ATTENDEES ->
-                """
-                select session_participants.membership_id as id
-                from session_participants
-                where session_participants.session_id = ?
-                  and session_participants.club_id = ?
-                  and session_participants.participation_status = 'ACTIVE'
-                  and session_participants.attendance_status = 'ATTENDED'
-                """.trimIndent()
-            ManualNotificationAudience.SELECTED_MEMBERS -> null
-        }
+private fun audienceSql(audience: ManualNotificationAudience): String? =
+    when (audience) {
+        ManualNotificationAudience.ALL_ACTIVE_MEMBERS ->
+            """
+            select memberships.id
+            from memberships
+            where memberships.club_id = ?
+              and memberships.status = 'ACTIVE'
+            """.trimIndent()
+        ManualNotificationAudience.SESSION_PARTICIPANTS ->
+            """
+            select session_participants.membership_id as id
+            from session_participants
+            where session_participants.session_id = ?
+              and session_participants.club_id = ?
+              and session_participants.participation_status = 'ACTIVE'
+            """.trimIndent()
+        ManualNotificationAudience.CONFIRMED_ATTENDEES ->
+            """
+            select session_participants.membership_id as id
+            from session_participants
+            where session_participants.session_id = ?
+              and session_participants.club_id = ?
+              and session_participants.participation_status = 'ACTIVE'
+              and session_participants.attendance_status = 'ATTENDED'
+            """.trimIndent()
+        ManualNotificationAudience.SELECTED_MEMBERS -> null
+    }
 
-    private fun emailEligibility(
+private class ManualNotificationEmailEligibilityQueries(
+    private val jdbcTemplate: JdbcTemplate,
+) {
+    fun emailEligibility(
         clubId: UUID,
         eventType: NotificationEventType,
         membershipIds: List<UUID>,

@@ -30,19 +30,13 @@ import org.springframework.test.web.servlet.put
 @Sql(statements = [CLEANUP_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
-@Suppress("LargeClass", "LongMethod", "MaxLineLength")
 class HostSessionIdempotencyDbTest(
-    @param:Autowired private val mockMvc: MockMvc,
-    @param:Autowired private val jdbcTemplate: JdbcTemplate,
-    @param:Autowired private val purgeExpiredHostSessionTrash: PurgeExpiredHostSessionTrashUseCase,
-) : ReadmatesMySqlIntegrationTestSupport() {
-    private val jsonMapper =
-        tools.jackson.databind.json.JsonMapper
-            .builder()
-            .findAndAddModules()
-            .build()
-
+    @param:Autowired mockMvc: MockMvc,
+    @param:Autowired jdbcTemplate: JdbcTemplate,
+    @param:Autowired purgeExpiredHostSessionTrash: PurgeExpiredHostSessionTrashUseCase,
+) : HostSessionIdempotencyDbTestSupport(mockMvc, jdbcTemplate, purgeExpiredHostSessionTrash) {
     @Test
+    @Suppress("LongMethod")
     fun `envelope rejects missing extra and wrong-domain expected revisions`() {
         val created = createDraft("envelope-validate", "key-create-valid-01")
         val sessionId = created.first
@@ -93,7 +87,14 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-close-extra-01",
-                        """{"sessionRevision":0,"participantSetRevision":0,"attendanceSnapshotId":"att:","publicationRevision":0}""",
+                        """
+                        {
+                          "sessionRevision": 0,
+                          "participantSetRevision": 0,
+                          "attendanceSnapshotId": "att:",
+                          "publicationRevision": 0
+                        }
+                        """.trimIndent(),
                         "{}",
                     )
             }.andExpect { status { isBadRequest() } }
@@ -104,8 +105,8 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-att-extra-01",
-                        """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}],"sessionRevision":0}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
+                        attendanceExpected(HOST_MEMBERSHIP_ID, extraSessionRevision = 0),
+                        attendanceCommand(HOST_MEMBERSHIP_ID, "ATTENDED"),
                     )
             }.andExpect { status { isBadRequest() } }
         mockMvc
@@ -204,6 +205,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `duplicate basic save attendance and close keep one side effect`() {
         val created = createDraft("중복 저장", "key-basic-orig-0001")
         val sessionId = created.first
@@ -234,7 +236,7 @@ class HostSessionIdempotencyDbTest(
                     envelope(
                         "key-att-dup-0001",
                         """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
+                        attendanceCommand(HOST_MEMBERSHIP_ID, "ATTENDED"),
                     )
             }.andExpect { status { isOk() } }
         mockMvc
@@ -245,7 +247,7 @@ class HostSessionIdempotencyDbTest(
                     envelope(
                         "key-att-dup-0001",
                         """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
+                        attendanceCommand(HOST_MEMBERSHIP_ID, "ATTENDED"),
                     )
             }.andExpect { status { isOk() } }
         assertThat(attendanceAuditCount(sessionId)).isEqualTo(1)
@@ -260,7 +262,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-close-dup-0001",
-                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,"attendanceSnapshotId":"$snapshot"}""",
+                        closeExpected(sessionRev, setRevision, snapshot),
                         "{}",
                     )
             }.andExpect { status { isOk() } }
@@ -271,7 +273,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-close-dup-0001",
-                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,"attendanceSnapshotId":"$snapshot"}""",
+                        closeExpected(sessionRev, setRevision, snapshot),
                         "{}",
                     )
             }.andExpect { status { isOk() } }
@@ -280,6 +282,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `envelope rejects reverse restore bulk attendance access publication and publish vector fields`() {
         val sessionId = createDraft("vector-validate", "key-create-vector-01").first
         mockMvc
@@ -307,7 +310,15 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-publish-extra-01",
-                        """{"sessionRevision":0,"liveRecordRevision":0,"exposureRevision":0,"publicationRevision":0,"participantSetRevision":0}""",
+                        """
+                        {
+                          "sessionRevision": 0,
+                          "liveRecordRevision": 0,
+                          "exposureRevision": 0,
+                          "publicationRevision": 0,
+                          "participantSetRevision": 0
+                        }
+                        """.trimIndent(),
                         "{}",
                     )
             }.andExpect { status { isBadRequest() } }
@@ -324,7 +335,16 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-corr-extra-01",
-                        """{"sessionRevision":0,"recordDraftRevision":1,"liveRecordRevision":1,"exposureRevision":0,"publicationRevision":0,"participantSetRevision":0}""",
+                        """
+                        {
+                          "sessionRevision": 0,
+                          "recordDraftRevision": 1,
+                          "liveRecordRevision": 1,
+                          "exposureRevision": 0,
+                          "publicationRevision": 0,
+                          "participantSetRevision": 0
+                        }
+                        """.trimIndent(),
                         "{}",
                     )
             }.andExpect { status { isBadRequest() } }
@@ -335,8 +355,13 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-missing-set-01",
-                        """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        attendanceExpected(HOST_MEMBERSHIP_ID, MEMBER_MEMBERSHIP_ID),
+                        attendanceCommand(
+                            HOST_MEMBERSHIP_ID,
+                            "ATTENDED",
+                            MEMBER_MEMBERSHIP_ID,
+                            "ABSENT",
+                        ),
                     )
             }.andExpect { status { isBadRequest() } }
     }
@@ -353,13 +378,22 @@ class HostSessionIdempotencyDbTest(
                     envelope(
                         "key-att-mis-01",
                         """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":9}]}""",
+                        """
+                        {
+                          "entries": [{
+                            "membershipId": "$HOST_MEMBERSHIP_ID",
+                            "attendanceStatus": "ATTENDED",
+                            "expectedAttendanceRevision": 9
+                          }]
+                        }
+                        """.trimIndent(),
                     )
             }.andExpect { status { isBadRequest() } }
         assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `history restore replay returns the audit change id and kind`() {
         val sessionId = createDraft("복원 원본", "key-hist-create-01").first
         val first =
@@ -426,8 +460,24 @@ class HostSessionIdempotencyDbTest(
         ).isEqualTo(1)
         assertThat(replayed.get("changeId").asString()).isNotEqualTo(replayed.path("receiptId").asString())
     }
+}
 
+@SpringBootTest(
+    properties = [
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+    ],
+)
+@AutoConfigureMockMvc
+@Sql(statements = [CLEANUP_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
+@Sql(statements = [CLEANUP_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Tag("integration")
+class HostSessionReverseIdempotencyDbTest(
+    @param:Autowired mockMvc: MockMvc,
+    @param:Autowired jdbcTemplate: JdbcTemplate,
+    @param:Autowired purgeExpiredHostSessionTrash: PurgeExpiredHostSessionTrashUseCase,
+) : HostSessionIdempotencyDbTestSupport(mockMvc, jdbcTemplate, purgeExpiredHostSessionTrash) {
     @Test
+    @Suppress("LongMethod")
     fun `access and publication envelope cas increments revisions`() {
         val sessionId = createDraft("노출 개정", "key-exp-create-01").first
         mockMvc
@@ -507,6 +557,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `reverse trash restore bulk attendance and publish replay once`() {
         val sessionId = createDraft("범위 재시도", "key-scope-create-01").first
         open(sessionId, 0, "key-scope-open-01")
@@ -518,8 +569,17 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-dup-01",
-                        """{"participantSetRevision":$setRevision,"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        attendanceExpected(
+                            HOST_MEMBERSHIP_ID,
+                            MEMBER_MEMBERSHIP_ID,
+                            participantSetRevision = setRevision,
+                        ),
+                        attendanceCommand(
+                            HOST_MEMBERSHIP_ID,
+                            "ATTENDED",
+                            MEMBER_MEMBERSHIP_ID,
+                            "ABSENT",
+                        ),
                     )
             }.andExpect { status { isOk() } }
         mockMvc
@@ -529,8 +589,17 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-dup-01",
-                        """{"participantSetRevision":$setRevision,"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        attendanceExpected(
+                            HOST_MEMBERSHIP_ID,
+                            MEMBER_MEMBERSHIP_ID,
+                            participantSetRevision = setRevision,
+                        ),
+                        attendanceCommand(
+                            HOST_MEMBERSHIP_ID,
+                            "ATTENDED",
+                            MEMBER_MEMBERSHIP_ID,
+                            "ABSENT",
+                        ),
                     )
             }.andExpect { status { isOk() } }
         assertThat(attendanceAuditCount(sessionId)).isEqualTo(1)
@@ -684,8 +753,20 @@ class HostSessionIdempotencyDbTest(
             .andExpect { jsonPath("$.status") { value("NOT_EXECUTED") } }
             .andExpect { jsonPath("$.receipt") { doesNotExist() } }
     }
+}
 
-    private fun createDraft(
+abstract class HostSessionIdempotencyDbTestSupport(
+    protected val mockMvc: MockMvc,
+    protected val jdbcTemplate: JdbcTemplate,
+    protected val purgeExpiredHostSessionTrash: PurgeExpiredHostSessionTrashUseCase,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    protected val jsonMapper =
+        tools.jackson.databind.json.JsonMapper
+            .builder()
+            .findAndAddModules()
+            .build()
+
+    protected fun createDraft(
         title: String,
         key: String,
         meetingUrl: String? = null,
@@ -704,7 +785,7 @@ class HostSessionIdempotencyDbTest(
         return jsonMapper.readTree(body).get("sessionId").asString() to key
     }
 
-    private fun open(
+    protected fun open(
         sessionId: String,
         revision: Long,
         key: String,
@@ -717,13 +798,56 @@ class HostSessionIdempotencyDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun envelope(
+    protected fun envelope(
         key: String,
         expected: String,
         command: String,
     ) = """{"idempotencyKey":"$key","expected":$expected,"command":$command}"""
 
-    private fun sessionCommand(
+    protected fun attendanceExpected(
+        vararg membershipIds: String,
+        participantSetRevision: Long? = null,
+        extraSessionRevision: Long? = null,
+    ): String {
+        val fields =
+            buildList {
+                participantSetRevision?.let { add("\"participantSetRevision\":$it") }
+                add(
+                    membershipIds.joinToString(",", "\"rows\":[", "]") { membershipId ->
+                        """{"membershipId":"$membershipId","attendanceRevision":0}"""
+                    },
+                )
+                extraSessionRevision?.let { add("\"sessionRevision\":$it") }
+            }
+        return fields.joinToString(",", "{", "}")
+    }
+
+    protected fun attendanceCommand(vararg membershipAndStatus: String): String {
+        require(membershipAndStatus.size % 2 == 0)
+        return membershipAndStatus
+            .asList()
+            .chunked(2)
+            .joinToString(",", "{\"entries\":[", "]}") { (membershipId, status) ->
+                """
+                {"membershipId":"$membershipId","attendanceStatus":"$status","expectedAttendanceRevision":0}
+                """.trimIndent()
+            }
+    }
+
+    protected fun closeExpected(
+        sessionRevision: Long,
+        participantSetRevision: Long,
+        attendanceSnapshotId: String,
+    ): String =
+        """
+        {
+          "sessionRevision": $sessionRevision,
+          "participantSetRevision": $participantSetRevision,
+          "attendanceSnapshotId": "$attendanceSnapshotId"
+        }
+        """.trimIndent()
+
+    protected fun sessionCommand(
         title: String,
         meetingUrl: String? = null,
         meetingPasscode: String? = null,
@@ -745,7 +869,7 @@ class HostSessionIdempotencyDbTest(
             """.trimIndent()
     }
 
-    private fun close(
+    protected fun close(
         sessionId: String,
         sessionRev: Long,
         setRevision: Long,
@@ -759,13 +883,13 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         key,
-                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,"attendanceSnapshotId":"$snapshot"}""",
+                        closeExpected(sessionRev, setRevision, snapshot),
                         "{}",
                     )
             }.andExpect { status { isOk() } }
     }
 
-    private fun insertRecordDraft(sessionId: String) {
+    protected fun insertRecordDraft(sessionId: String) {
         jdbcTemplate.update(
             """
             insert into session_record_drafts (
@@ -780,7 +904,7 @@ class HostSessionIdempotencyDbTest(
         )
     }
 
-    private fun preparePublication(sessionId: String) {
+    protected fun preparePublication(sessionId: String) {
         mockMvc
             .put("/api/host/sessions/$sessionId/publication") {
                 withHost()
@@ -794,7 +918,7 @@ class HostSessionIdempotencyDbTest(
             }.andExpect { status { isOk() } }
     }
 
-    private fun publishVectorJson(sessionId: String): String {
+    protected fun publishVectorJson(sessionId: String): String {
         val versions = versions(sessionId)
         return """
             {"sessionRevision":${versions.session},"liveRecordRevision":${versions.live},
@@ -802,7 +926,7 @@ class HostSessionIdempotencyDbTest(
             """.trimIndent().replace("\n", "")
     }
 
-    private fun correctionVectorJson(sessionId: String): String {
+    protected fun correctionVectorJson(sessionId: String): String {
         val versions = versions(sessionId)
         val draft = versions.draft ?: 1
         return """
@@ -812,7 +936,7 @@ class HostSessionIdempotencyDbTest(
             """.trimIndent().replace("\n", "")
     }
 
-    private data class Versions(
+    protected data class Versions(
         val session: Long,
         val exposure: Long,
         val live: Long,
@@ -820,7 +944,7 @@ class HostSessionIdempotencyDbTest(
         val draft: Long?,
     )
 
-    private fun versions(sessionId: String): Versions =
+    protected fun versions(sessionId: String): Versions =
         Versions(
             session = sessionRevision(sessionId),
             exposure = exposureRevision(sessionId),
@@ -829,42 +953,42 @@ class HostSessionIdempotencyDbTest(
             draft = recordDraftRevision(sessionId),
         )
 
-    private fun sessionRevision(sessionId: String): Long =
+    protected fun sessionRevision(sessionId: String): Long =
         jdbcTemplate.queryForObject(
             "select session_revision from sessions where id = ?",
             Long::class.java,
             sessionId,
         ) ?: error("missing revision")
 
-    private fun participantSetRevision(sessionId: String): Long =
+    protected fun participantSetRevision(sessionId: String): Long =
         jdbcTemplate.queryForObject(
             "select participant_set_revision from sessions where id = ?",
             Long::class.java,
             sessionId,
         ) ?: error("missing set revision")
 
-    private fun exposureRevision(sessionId: String): Long =
+    protected fun exposureRevision(sessionId: String): Long =
         jdbcTemplate.queryForObject(
             "select exposure_revision from sessions where id = ?",
             Long::class.java,
             sessionId,
         ) ?: error("missing exposure revision")
 
-    private fun publicationRevision(sessionId: String): Long =
+    protected fun publicationRevision(sessionId: String): Long =
         jdbcTemplate.queryForObject(
             "select coalesce(publication_revision, 0) from session_publication_versions where session_id = ?",
             Long::class.java,
             sessionId,
         ) ?: 0
 
-    private fun liveRecordRevision(sessionId: String): Long =
+    protected fun liveRecordRevision(sessionId: String): Long =
         jdbcTemplate.queryForObject(
             "select coalesce(max(version), 0) from session_record_revisions where session_id = ?",
             Long::class.java,
             sessionId,
         ) ?: 0
 
-    private fun recordDraftRevision(sessionId: String): Long? =
+    protected fun recordDraftRevision(sessionId: String): Long? =
         jdbcTemplate
             .query(
                 "select draft_revision from session_record_drafts where session_id = ?",
@@ -872,7 +996,7 @@ class HostSessionIdempotencyDbTest(
                 sessionId,
             ).firstOrNull()
 
-    private fun attendanceStatus(
+    protected fun attendanceStatus(
         sessionId: String,
         membershipId: String,
     ): String =
@@ -886,7 +1010,7 @@ class HostSessionIdempotencyDbTest(
             membershipId,
         ) ?: error("missing attendance")
 
-    private fun attendanceSnapshotId(sessionId: String): String {
+    protected fun attendanceSnapshotId(sessionId: String): String {
         val rows =
             jdbcTemplate.query(
                 """
@@ -901,27 +1025,27 @@ class HostSessionIdempotencyDbTest(
         return "att:${rows.joinToString(",")}"
     }
 
-    private fun findState(sessionId: String): String =
+    protected fun findState(sessionId: String): String =
         jdbcTemplate.queryForObject(
             "select state from sessions where id = ?",
             String::class.java,
             sessionId,
         ) ?: error("missing state")
 
-    private fun countSessions(where: String): Int =
+    protected fun countSessions(where: String): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from sessions where club_id = '$CLUB_ID' and number > 7 and $where",
             Int::class.java,
         ) ?: 0
 
-    private fun publicationVersionCount(sessionId: String): Int =
+    protected fun publicationVersionCount(sessionId: String): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from session_publication_versions where session_id = ?",
             Int::class.java,
             sessionId,
         ) ?: 0
 
-    private fun publicContentCount(sessionId: String): Int =
+    protected fun publicContentCount(sessionId: String): Int =
         jdbcTemplate.queryForObject(
             """
             select count(*) from public_session_publications
@@ -931,14 +1055,14 @@ class HostSessionIdempotencyDbTest(
             sessionId,
         ) ?: 0
 
-    private fun receiptCount(sessionId: String): Int =
+    protected fun receiptCount(sessionId: String): Int =
         jdbcTemplate.queryForObject(
             "select count(*) from host_session_mutation_receipts where resource_id = ?",
             Int::class.java,
             sessionId,
         ) ?: 0
 
-    private fun auditCount(
+    protected fun auditCount(
         sessionId: String,
         action: String? = null,
     ): Int {
@@ -955,9 +1079,9 @@ class HostSessionIdempotencyDbTest(
         }
     }
 
-    private fun attendanceAuditCount(sessionId: String): Int = auditCount(sessionId, "ATTENDANCE_UPDATED")
+    protected fun attendanceAuditCount(sessionId: String): Int = auditCount(sessionId, "ATTENDANCE_UPDATED")
 
-    private fun lifecycleCount(
+    protected fun lifecycleCount(
         sessionId: String,
         action: String,
     ): Int =
@@ -968,12 +1092,12 @@ class HostSessionIdempotencyDbTest(
             action,
         ) ?: 0
 
-    private fun MockHttpServletRequestDsl.withHost() {
+    protected fun MockHttpServletRequestDsl.withHost() {
         with(user("host@example.com"))
         with(csrf())
     }
 
-    private companion object {
+    protected companion object {
         const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         const val HOST_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000201"
         const val MEMBER_MEMBERSHIP_ID = "00000000-0000-0000-0000-000000000202"

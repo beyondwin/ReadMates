@@ -1,5 +1,3 @@
-@file:Suppress("TooManyFunctions")
-
 package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionFeedbackDocument
@@ -9,7 +7,6 @@ import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionPublication
-import com.readmates.session.application.InvalidHostSessionCursorException
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.HostDashboardResult
@@ -25,8 +22,6 @@ import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
-import java.nio.charset.StandardCharsets
-import java.security.MessageDigest
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
@@ -778,29 +773,6 @@ internal fun loadHostSessionLedgerSummary(
             host.clubId.dbString(),
         ),
     )
-
-internal fun invalidCursor(): Nothing = throw InvalidHostSessionCursorException()
-
-internal fun HostSessionListQuery.normalized() =
-    copy(
-        search = search?.trim()?.lowercase()?.takeIf(String::isNotBlank),
-        state = state?.trim()?.uppercase()?.takeIf(String::isNotBlank),
-    )
-
-internal fun HostSessionListQuery.fingerprint(orderingVersion: String? = null): String {
-    val parts =
-        buildList {
-            add(search.orEmpty())
-            add(state.orEmpty())
-            add(recordStatus?.name.orEmpty())
-            add(needsAttention?.toString().orEmpty())
-            if (orderingVersion != null) add(orderingVersion)
-        }
-    return MessageDigest
-        .getInstance("SHA-256")
-        .digest(parts.joinToString("\u0000").toByteArray(StandardCharsets.UTF_8))
-        .joinToString("") { "%02x".format(it) }
-}
 
 private const val MEETING_ATTENTION_DATE_BINDS = 3
 private const val HOST_MEETING_DATE_SENTINEL_LAST = "9999-12-31"
