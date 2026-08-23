@@ -1,4 +1,5 @@
 import type { HostSessionReverseRequest } from "../api/host-session-record-contracts";
+import { formatPublicationAction } from "@/shared/model/meeting-language";
 import type { HostSessionState } from "./host-session-editor-model";
 import type { HostSessionDetailResponse } from "./host-view-types";
 
@@ -29,6 +30,9 @@ type ReverseLifecycleAction = {
   label: string;
 };
 
+const publishMemberNotes = formatPublicationAction("publishMemberNotes");
+const removeMemberNotes = formatPublicationAction("removeMemberNotes");
+
 const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleConfirmCopy> = {
   open: {
     kind: "open",
@@ -46,10 +50,10 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
   },
   publish: {
     kind: "publish",
-    title: "게스트·멤버 노트에 기록 게시",
+    title: publishMemberNotes,
     body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
-    confirmLabel: "게스트·멤버 노트에 기록 게시",
-    successFlash: "기록을 공개했습니다.",
+    confirmLabel: publishMemberNotes,
+    successFlash: "게스트·멤버 노트에 기록을 게시했습니다.",
   },
   reopen: {
     kind: "reopen",
@@ -60,9 +64,9 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
   },
   unpublish: {
     kind: "unpublish",
-    title: "게스트·멤버 노트에서 기록 내리기",
+    title: removeMemberNotes,
     body: "공개 사이트에서 내려갑니다. 기록과 이미 보낸 알림은 남습니다.",
-    confirmLabel: "게스트·멤버 노트에서 기록 내리기",
+    confirmLabel: removeMemberNotes,
     successFlash: "게스트·멤버 노트에서 기록을 내렸습니다.",
   },
   "return-to-draft": {
@@ -82,7 +86,7 @@ export function reverseLifecycleAction(state: HostSessionState): ReverseLifecycl
     return { kind: "reopen", label: "다시 준비 중으로" };
   }
   if (state === "PUBLISHED") {
-    return { kind: "unpublish", label: "게스트·멤버 노트에서 기록 내리기" };
+    return { kind: "unpublish", label: removeMemberNotes };
   }
   return null;
 }

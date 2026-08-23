@@ -10,6 +10,7 @@ import {
 } from "@/features/feedback/model/feedback-document-model";
 import { Link } from "@/features/feedback/ui/feedback-link";
 import { feedbackDocumentPdfDownloadsEnabled } from "@/shared/config/readmates-feature-flags";
+import { MEETING_NOUN } from "@/shared/model/meeting-language";
 
 const singlePagePrintStyleId = "rm-feedback-document-single-page-print-style";
 const printPageExtraMinHeightPx = 520;
@@ -304,10 +305,10 @@ export function FeedbackDocumentUnavailablePage({
               <div className="eyebrow">열람 규칙</div>
               <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
                 {presentation === "hostPreview"
-                  ? copy.rule
-                  : reason === "forbidden"
-                    ? "active 정식 멤버로 확인된 계정만 문서 본문을 열람할 수 있습니다."
-                    : "문서가 등록되지 않은 모임는 본문을 표시하지 않습니다."}
+                    ? copy.rule
+                    : reason === "forbidden"
+                      ? "active 정식 멤버로 확인된 계정만 문서 본문을 열람할 수 있습니다."
+                    : `문서가 등록되지 않은 ${MEETING_NOUN}은 본문을 표시하지 않습니다.`}
               </p>
             </div>
             <div className="row rm-feedback-document-actions" style={{ gap: 8, flexWrap: "wrap" }}>

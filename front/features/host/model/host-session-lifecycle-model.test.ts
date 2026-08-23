@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { HostSessionState } from "./host-session-editor-model";
 import {
   buildHostSessionReverseRequest,
@@ -25,6 +25,33 @@ describe("reverseLifecycleAction", () => {
 });
 
 describe("lifecycleConfirmCopy", () => {
+  it("gets publication confirmation actions from the canonical formatter", async () => {
+    vi.resetModules();
+    vi.doMock("@/shared/model/meeting-language", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/shared/model/meeting-language")>();
+      return {
+        ...actual,
+        formatPublicationAction: (action: "publishMemberNotes" | "removeMemberNotes") => `canonical:${action}`,
+      };
+    });
+
+    try {
+      const { lifecycleConfirmCopy: getLifecycleConfirmCopy } = await import("./host-session-lifecycle-model");
+
+      expect(getLifecycleConfirmCopy("publish")).toMatchObject({
+        title: "canonical:publishMemberNotes",
+        confirmLabel: "canonical:publishMemberNotes",
+      });
+      expect(getLifecycleConfirmCopy("unpublish")).toMatchObject({
+        title: "canonical:removeMemberNotes",
+        confirmLabel: "canonical:removeMemberNotes",
+      });
+    } finally {
+      vi.doUnmock("@/shared/model/meeting-language");
+      vi.resetModules();
+    }
+  });
+
   it("returns open confirmation copy", () => {
     expect(lifecycleConfirmCopy("open")).toEqual({
       kind: "open",
@@ -53,7 +80,7 @@ describe("lifecycleConfirmCopy", () => {
         title: "게스트·멤버 노트에 기록 게시",
         body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
         confirmLabel: "게스트·멤버 노트에 기록 게시",
-        successFlash: "기록을 공개했습니다.",
+        successFlash: "게스트·멤버 노트에 기록을 게시했습니다.",
       },
     ],
     [
