@@ -26,13 +26,10 @@ import {
   publicRecordsReturnTarget,
   readPublicReadmatesReturnTarget,
   readReadmatesReturnTarget,
-  readReadmatesWorkspaceState,
   readmatesReturnState,
-  readStoredReadmatesMobileWorkspace,
-  rememberReadmatesMobileWorkspace,
   resetReadmatesNavigationScroll,
-  type ReadmatesMobileWorkspace,
 } from "@/src/app/route-continuity";
+import { buildClubSwitchTarget, workspaceFromCanonicalPath } from "@/src/app/workspace-route-model";
 import { Link } from "@/src/app/router-link";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { canUseHostApp } from "@/shared/auth/member-app-access";
@@ -149,35 +146,14 @@ async function verifyGuestReadableRoute(clubSlug: string, target: GuestContinuat
   throw new Error("Guest continuation route is not verifiable.");
 }
 
-function clubSwitcherTargetPath({
-  clubSlug,
-  appPath,
-  search,
-  hash,
-  canOpenHostPath,
-}: {
-  clubSlug: string;
-  appPath: string;
-  search: string;
-  hash: string;
-  canOpenHostPath: boolean;
-}) {
-  const nextAppPath = appPath.startsWith("/app/host") && !canOpenHostPath ? "/app" : appPath;
-  return `/clubs/${encodeURIComponent(clubSlug)}${nextAppPath}${search}${hash}`;
-}
-
 function ClubSwitcher({
   auth,
   currentClubSlug,
-  appPath,
-  search,
-  hash,
+  pathname,
 }: {
   auth: AuthMeResponse | null;
   currentClubSlug: string | null;
-  appPath: string;
-  search: string;
-  hash: string;
+  pathname: string;
 }) {
   const navigate = useNavigate();
   const clubs = usableJoinedClubs(auth?.joinedClubs ?? []);
@@ -203,12 +179,10 @@ function ClubSwitcher({
           }
           const nextClub = clubs.find((club) => club.clubSlug === nextSlug);
           navigate(
-            clubSwitcherTargetPath({
-              clubSlug: nextSlug,
-              appPath,
-              search,
-              hash,
-              canOpenHostPath: nextClub?.role === "HOST" && nextClub.status === "ACTIVE",
+            buildClubSwitchTarget({
+              pathname,
+              targetClubSlug: nextSlug,
+              targetWorkspace: nextClub?.role === "HOST" && nextClub.status === "ACTIVE" ? "host" : "member",
             }),
           );
         }}
@@ -252,19 +226,10 @@ export function AppRouteLayout({
       : null;
   const isGuestAudience = audience === "GUEST";
   const AppLinkComponent = isGuestAudience ? GuestNavigationLink : Link;
-  const isHostWorkspace = appPath.startsWith("/app/host");
-  const isHostRecordRoute =
-    appPath.startsWith("/app/archive") || appPath.startsWith("/app/sessions/") || appPath.startsWith("/app/feedback/");
+  const isHostWorkspace = workspaceFromCanonicalPath(pathname) === "host";
   const isActiveHost = !isGuestAudience && auth ? canUseHostApp(auth) : false;
   const desktopVariant = isHostWorkspace ? "host" : "member";
-  const explicitWorkspace = readReadmatesWorkspaceState(location.state);
-  const storedWorkspace = readStoredReadmatesMobileWorkspace();
-  const mobileWorkspace: ReadmatesMobileWorkspace =
-    isActiveHost && isHostWorkspace
-      ? "host"
-      : isActiveHost && isHostRecordRoute
-        ? (explicitWorkspace ?? storedWorkspace ?? "host")
-        : "member";
+  const mobileWorkspace = desktopVariant;
   const mobileVariant = mobileWorkspace;
   const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
   const memberName = auth?.displayName ?? null;
@@ -302,14 +267,6 @@ export function AppRouteLayout({
       setIsRetryingCurrentSession(false);
     });
   };
-
-  useEffect(() => {
-    if (!isActiveHost) {
-      return;
-    }
-
-    rememberReadmatesMobileWorkspace(mobileWorkspace);
-  }, [isActiveHost, mobileWorkspace]);
 
   const sessionExpiry =
     !isGuestAudience && state.status === "session_expired" && state.cause
@@ -454,9 +411,7 @@ export function AppRouteLayout({
         <ClubSwitcher
           auth={auth}
           currentClubSlug={clubSlug ?? auth?.currentMembership?.clubSlug ?? null}
-          appPath={appPath}
-          search={location.search}
-          hash={location.hash}
+          pathname={pathname}
         />
         <RouteOutlet />
       </div>

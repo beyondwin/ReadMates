@@ -331,6 +331,7 @@ describe("SPA router", () => {
               role: "HOST",
               membershipStatus: "ACTIVE",
               approvalState: "ACTIVE",
+              currentMembership: { clubSlug: "reading-sai" },
             }),
           );
         }

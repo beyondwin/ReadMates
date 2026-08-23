@@ -410,6 +410,46 @@ describe("AppRouteLayout guest shell", () => {
   });
 });
 
+describe("AppRouteLayout workspace authority", () => {
+  it("keeps a canonical member record route in member chrome despite a stale host workspace hint", () => {
+    window.sessionStorage.setItem("readmates:mobile-workspace", "host");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        if (input.toString().includes("/api/bff/api/sessions/current")) {
+          return Promise.resolve(jsonResponse({ currentSession: null }));
+        }
+        return Promise.reject(new Error(`Unexpected fetch: ${input.toString()}`));
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+            <MemoryRouter initialEntries={["/clubs/reading-sai/app/sessions/meeting-7"]}>
+              <Routes>
+                <Route
+                  path="/clubs/:clubSlug/app/sessions/:sessionId"
+                  element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />}
+                >
+                  <Route index element={<main>member record</main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(document.querySelector(".mobile-only .m-hdr")).toHaveAttribute("data-workspace", "member");
+    expect(document.querySelector(".mobile-only .m-tabbar")).toHaveAttribute("data-variant", "member");
+  });
+});
+
 describe("AppRouteLayout session expiry recovery", () => {
   it("retains successful read content and offers exact-route reauth or guest continuation", async () => {
     const user = userEvent.setup();

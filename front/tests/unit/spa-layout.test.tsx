@@ -309,7 +309,7 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
   });
 
-  it("switches clubs while keeping the same app-relative route", async () => {
+  it("switches clubs through a safe route-family target", async () => {
     const user = userEvent.setup();
     const scopedAuth: AuthMeResponse = {
       ...activeMemberAuth,
@@ -371,6 +371,14 @@ describe("SPA AppRouteLayout", () => {
                   </main>
                 }
               />
+              <Route
+                path="host/sessions"
+                element={
+                  <main>
+                    host records child <CurrentLocationText />
+                  </main>
+                }
+              />
             </Route>
           </Routes>
         </MemoryRouter>
@@ -380,7 +388,7 @@ describe("SPA AppRouteLayout", () => {
     expect(await screen.findByText(/archive child/)).toBeInTheDocument();
     await user.selectOptions(await screen.findByLabelText("클럽 전환"), "sample-book-club");
 
-    expect(await screen.findByText("/clubs/sample-book-club/app/archive")).toBeInTheDocument();
+    expect(await screen.findByText("/clubs/sample-book-club/app/host/sessions")).toBeInTheDocument();
   });
 
   it("keeps host users on member mobile chrome after opening archive from the member workspace", async () => {
@@ -430,7 +438,7 @@ describe("SPA AppRouteLayout", () => {
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
   });
 
-  it("keeps active hosts on host mobile chrome for archive routes", async () => {
+  it("keeps archive routes in member chrome for active hosts", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -468,34 +476,23 @@ describe("SPA AppRouteLayout", () => {
 
     const desktopNav = screen.getByRole("navigation", { name: "앱 내비게이션" });
     expect(within(desktopNav).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
-    await waitFor(() => {
-      expect(screen.getAllByRole("link", { name: "호스트 화면" })).toHaveLength(1);
-    });
-    expect(screen.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
+    expect(screen.getAllByRole("link", { name: "호스트 화면" })).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "호스트 화면" })[0]).toHaveAttribute("href", "/app/host");
 
-    expect(screen.getAllByText("기록")).toHaveLength(3);
-    const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
-    expect(memberReturn).toHaveAttribute("href", "/app");
-    expect(memberReturn).toHaveClass("m-hdr-link--icon");
-    expect(memberReturn.textContent).toBe("");
+    expect(screen.getAllByText("기록")).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    await waitFor(() => {
-      expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
-        "오늘",
-        "모임",
-        "멤버",
-        "기록",
-      ]);
-    });
-    expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute(
-      "href",
-      "/app/host/sessions/session-6",
-    );
-    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/host/sessions");
+    expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
+      "오늘",
+      "노트",
+      "기록",
+      "내 공간",
+    ]);
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
   });
 
-  it("keeps active hosts on host mobile chrome for feedback document routes", async () => {
+  it("keeps feedback document routes in member chrome for active hosts", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -533,27 +530,25 @@ describe("SPA AppRouteLayout", () => {
     await waitFor(() => {
       expect(screen.getAllByRole("banner").find((element) => element.classList.contains("m-hdr"))).toHaveAttribute(
         "data-workspace",
-        "host",
+        "member",
       );
     });
     const mobileHeader = screen.getAllByRole("banner").find((element) => element.classList.contains("m-hdr"));
     expect(mobileHeader).toBeDefined();
-    expect(within(mobileHeader!).getByText("기록")).toBeInTheDocument();
+    expect(within(mobileHeader!).getByText("피드백 문서")).toBeInTheDocument();
     const backLink = within(mobileHeader!).getByRole("link", { name: "뒤로" });
     expect(backLink).toHaveAttribute("href", "/app/archive?view=report");
     expect(backLink.textContent).toBe("뒤로");
     expect(backLink).not.toHaveClass("m-hdr-back--icon");
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    await waitFor(() => {
-      expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
-        "오늘",
-        "모임",
-        "멤버",
-        "기록",
-      ]);
-    });
-    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("href", "/app/host/sessions");
+    expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([
+      "오늘",
+      "노트",
+      "기록",
+      "내 공간",
+    ]);
+    expect(screen.getAllByRole("link", { name: "호스트 화면" })).toHaveLength(2);
   });
 
   it("keeps host edit disabled while the current session tab target is loading", async () => {

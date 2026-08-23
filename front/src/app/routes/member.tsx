@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { useLoaderData, type LoaderFunction, type RouteObject } from "react-router";
+import { redirect, useLoaderData, type LoaderFunction, type LoaderFunctionArgs, type RouteObject } from "react-router";
 import type { InternalLinkComponent } from "@/features/current-session";
 import { CurrentSessionRouteError } from "@/features/current-session/route/current-session-route-error";
 import { notesFeedShouldRevalidate } from "@/features/archive/route/notes-feed-revalidation";
@@ -29,6 +29,8 @@ import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layou
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
+import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
+import { canonicalizeCompatibilityEntry } from "@/src/app/workspace-route-model";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 import { GuestHomeContent } from "@/src/pages/guest-home";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -75,6 +77,25 @@ type ScopedRouteModule = {
   Component: ComponentType;
   loader: LoaderFunction;
 };
+
+async function canonicalMemberCompatibilityLoader(args: LoaderFunctionArgs) {
+  const access = await loadMemberAppAuth(args);
+  const clubSlug = access.auth.currentMembership?.clubSlug;
+
+  if (!access.allowed || !clubSlug) {
+    return null;
+  }
+
+  const url = new URL(args.request.url);
+  throw redirect(
+    canonicalizeCompatibilityEntry({
+      pathname: url.pathname,
+      search: url.search,
+      hash: url.hash,
+      currentClubSlug: clubSlug,
+    }),
+  );
+}
 
 function componentForScopedAudience(Component: ComponentType, _scoped: boolean) {
   void _scoped;
@@ -584,6 +605,8 @@ export function memberRoutes(queryClient: QueryClient): RouteObject[] {
         },
         {
           id: "app",
+          loader: canonicalMemberCompatibilityLoader,
+          hydrateFallbackElement: <ReadmatesRouteLoading label="클럽을 확인하는 중" variant="member" />,
           element: (
             <RequireMemberApp>
               <AppRouteLayout />

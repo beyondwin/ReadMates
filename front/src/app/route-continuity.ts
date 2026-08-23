@@ -6,7 +6,6 @@ import {
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
-const MOBILE_WORKSPACE_KEY = "readmates:mobile-workspace";
 
 export { readmatesReturnState };
 export type { ReadmatesReturnState, ReadmatesReturnTarget };
@@ -15,10 +14,7 @@ type ReadmatesRouteState = {
   readmatesReturnTo?: unknown;
   readmatesReturnLabel?: unknown;
   readmatesReturnState?: unknown;
-  readmatesWorkspace?: unknown;
 };
-
-export type ReadmatesMobileWorkspace = "member" | "host";
 
 export const archiveSessionsReturnTarget: ReadmatesReturnTarget = {
   href: "/app/archive?view=sessions",
@@ -75,44 +71,6 @@ export function appSessionHref(sessionId: string, hash?: string) {
 
 export function appFeedbackHref(sessionId: string, printMode = false) {
   return `/app/feedback/${encodeURIComponent(sessionId)}${printMode ? "/print" : ""}`;
-}
-
-export function readReadmatesWorkspaceState(state: unknown): ReadmatesMobileWorkspace | null {
-  if (!state || typeof state !== "object") {
-    return null;
-  }
-
-  const workspace = (state as ReadmatesRouteState).readmatesWorkspace;
-
-  return workspace === "host" || workspace === "member" ? workspace : null;
-}
-
-export function readStoredReadmatesMobileWorkspace(): ReadmatesMobileWorkspace | null {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  let workspace: string | null;
-
-  try {
-    workspace = window.sessionStorage.getItem(MOBILE_WORKSPACE_KEY);
-  } catch {
-    return null;
-  }
-
-  return workspace === "host" || workspace === "member" ? workspace : null;
-}
-
-export function rememberReadmatesMobileWorkspace(workspace: ReadmatesMobileWorkspace) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.sessionStorage.setItem(MOBILE_WORKSPACE_KEY, workspace);
-  } catch {
-    // Workspace memory is only a navigation hint; unavailable storage should not break routing.
-  }
 }
 
 function readReturnTargetFromState(state: unknown, scope: "app" | "public"): ReadmatesReturnTarget | null {

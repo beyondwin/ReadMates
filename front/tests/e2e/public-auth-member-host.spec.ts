@@ -81,7 +81,7 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app/host");
-  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   const ledgerHeading = page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ });
   const workspace = page.locator(".rm-host-session-workspace");

@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   readReadmatesReturnTarget,
-  readReadmatesWorkspaceState,
-  readStoredReadmatesMobileWorkspace,
   rememberReadmatesListScroll,
-  rememberReadmatesMobileWorkspace,
   resetReadmatesNavigationScroll,
   restoreReadmatesListScroll,
 } from "@/src/app/route-continuity";
@@ -70,18 +67,6 @@ describe("route continuity", () => {
     expect(window.sessionStorage.getItem(ARCHIVE_SCROLL_KEY)).toBeNull();
     expect(window.sessionStorage.getItem(PUBLIC_RECORDS_SCROLL_KEY)).toBeNull();
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
-  });
-
-  it("reads valid mobile workspace state from router state", () => {
-    expect(readReadmatesWorkspaceState({ readmatesWorkspace: "host" })).toBe("host");
-    expect(readReadmatesWorkspaceState({ readmatesWorkspace: "member" })).toBe("member");
-    expect(readReadmatesWorkspaceState({ readmatesWorkspace: "other" })).toBeNull();
-  });
-
-  it("stores mobile workspace in session storage", () => {
-    rememberReadmatesMobileWorkspace("host");
-
-    expect(readStoredReadmatesMobileWorkspace()).toBe("host");
   });
 
   it("rejects external return targets", () => {

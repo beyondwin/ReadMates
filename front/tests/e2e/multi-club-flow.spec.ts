@@ -61,9 +61,8 @@ test("user with multiple joined clubs chooses an entry club from the shared sess
 test("club switcher changes club context while preserving independent roles", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
 
-  await page.goto("/app");
-  await page.getByRole("link", { name: /읽는사이/ }).click();
-  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
+  await page.goto("/app/host/sessions?cursor=source-cursor#source-modal");
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host\/sessions(?:\?.*)?$/);
 
   const readingSaiAuth = await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/auth/me?clubSlug=reading-sai", { cache: "no-store" });
@@ -76,6 +75,8 @@ test("club switcher changes club context while preserving independent roles", as
   await page.getByLabel("클럽 전환").selectOption("sample-book-club");
 
   await expect(page).toHaveURL(/\/clubs\/sample-book-club\/app$/);
+  expect(new URL(page.url()).search).toBe("");
+  expect(new URL(page.url()).hash).toBe("");
   const sampleClubAuth = await page.evaluate(async () => {
     const response = await fetch("/api/bff/api/auth/me?clubSlug=sample-book-club", { cache: "no-store" });
     return response.json();
@@ -83,6 +84,25 @@ test("club switcher changes club context while preserving independent roles", as
 
   expect(sampleClubAuth.currentMembership.clubSlug).toBe("sample-book-club");
   expect(sampleClubAuth.currentMembership.role).toBe("MEMBER");
+});
+
+test("canonical workspace URLs survive direct entry, reload, resize, and role-switch history", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+
+  await page.goto("/app/host");
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await page.reload();
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await page.setViewportSize({ width: 1280, height: 900 });
+
+  await page.locator(".desktop-only .rm-workspace-switch").click();
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
+  await page.goBack();
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await page.goForward();
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
 });
 
 test("club-scoped invite acceptance activates only the target club", async ({ page }) => {
