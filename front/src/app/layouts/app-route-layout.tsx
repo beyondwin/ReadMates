@@ -304,7 +304,6 @@ export function AppRouteLayout({
   const desktopVariant = isHostWorkspace ? "host" : "member";
   const mobileWorkspace = desktopVariant;
   const mobileVariant = mobileWorkspace;
-  const showHostEntry = Boolean(isActiveHost && !isHostWorkspace);
   const memberName = auth?.displayName ?? null;
   const memberAvatarKey = auth?.currentMembership?.avatarKey ?? auth?.avatarKey ?? null;
   const activeHostKey = isActiveHost && mobileWorkspace === "host" ? auth.membershipId : null;
@@ -366,7 +365,7 @@ export function AppRouteLayout({
     const target = resolveAuthorizedRoleSwitchTarget({
       candidate,
       authorizedWorkspaces,
-      correspondence: "unknown",
+      correspondence: "unavailable",
       lastSafeTarget: readLastSafeWorkspaceTarget("member"),
     });
     navigate(target, { replace: candidate.navigation === "replace" });
@@ -465,7 +464,6 @@ export function AppRouteLayout({
           variant={desktopVariant}
           memberName={memberName}
           memberAvatarKey={memberAvatarKey}
-          showHostEntry={showHostEntry}
           workspaceAction={roleSwitchAction}
           appBasePath={basePath}
           currentSessionId={desktopVariant === "host" ? currentSessionId : null}
@@ -487,7 +485,6 @@ export function AppRouteLayout({
       <div className="mobile-only">
         <MobileHeader
           variant={mobileVariant}
-          showHostEntry={showHostEntry}
           workspaceAction={roleSwitchAction}
           appBasePath={basePath}
           LinkComponent={AppLinkComponent}

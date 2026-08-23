@@ -1767,17 +1767,29 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     expect(loaderApiMocks.fetchManualNotificationDispatches).not.toHaveBeenCalled();
   });
 
-  it.each([401, 403, 500])("does not fetch trash when active detail is %s", async (status) => {
+  it.each([401, 403])("replaces an unreadable host counterpart with a safe host target when active detail is %s", async (status) => {
     loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(status));
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
 
-    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({
-      status,
-    });
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({ status: 302 });
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
+    }
     expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
     expect(loaderApiMocks.fetchHostSessionRecordEditor).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch trash when active detail is 500", async () => {
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(500));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({ status: 500 });
+    expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
   });
 });
 

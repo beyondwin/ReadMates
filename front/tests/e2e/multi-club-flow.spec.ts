@@ -124,9 +124,35 @@ limit 1;
   await expect(page).toHaveURL(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
 });
 
+test("same-meeting role switching replaces an unavailable member counterpart with a safe archive target", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  const sessionId = runMysql(`
+select sessions.id
+from sessions
+join clubs on clubs.id = sessions.club_id
+where clubs.slug = 'reading-sai' and sessions.state = 'PUBLISHED'
+order by sessions.created_at desc
+limit 1;
+`).trim().split("\n").at(-1)!;
+
+  runMysql(`update sessions set state = 'OPEN', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
+  try {
+    await page.goto(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
+    await expect(page.locator(".desktop-only .rm-workspace-switch")).toHaveAttribute(
+      "href",
+      `/clubs/reading-sai/app/sessions/${sessionId}`,
+    );
+    await page.locator(".desktop-only .rm-workspace-switch").click();
+    await expect(page).toHaveURL("/clubs/reading-sai/app/archive");
+  } finally {
+    runMysql(`update sessions set state = 'PUBLISHED', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
+  }
+});
+
 test("revoked host authority replaces the host route with the member-safe route", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
-  await page.goto("/clubs/reading-sai/app/host");
+  await page.goto("/clubs/reading-sai/app");
+  await page.locator(".desktop-only .rm-workspace-switch").click();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
 
   runMysql(`
@@ -135,9 +161,12 @@ join users on users.id = memberships.user_id
 join clubs on clubs.id = memberships.club_id
 set memberships.role = 'MEMBER', memberships.updated_at = utc_timestamp(6)
 where lower(users.email) = 'host@example.com' and clubs.slug = 'reading-sai';
-`);
+  `);
   await page.reload();
   await expect(page).toHaveURL("/clubs/reading-sai/app");
+  await page.goBack();
+  await expect(page).toHaveURL("/clubs/reading-sai/app");
+  expect(page.url()).not.toContain("/host");
 });
 
 test("club-scoped invite acceptance activates only the target club", async ({ page }) => {

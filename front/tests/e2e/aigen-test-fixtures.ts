@@ -51,6 +51,7 @@ export function hostAuthResponse(clubSlug: string): AuthMeResponse {
         membershipId: "m-1",
         role: "HOST",
         status: "ACTIVE",
+        approvalState: "ACTIVE",
         primaryHost: null,
       },
     ],

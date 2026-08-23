@@ -7,7 +7,6 @@ import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import {
   READMATES_NAV_LABELS,
   READMATES_PRIMARY_NAV_LABELS,
-  READMATES_WORKSPACE_LABELS,
 } from "./readmates-copy";
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 
@@ -52,7 +51,6 @@ type TopNavProps = {
   variant?: TopNavVariant;
   memberName?: string | null;
   memberAvatarKey?: string | null;
-  showHostEntry?: boolean;
   workspaceAction?: WorkspaceAction | null;
   authenticated?: boolean;
   publicBasePath?: string;
@@ -92,13 +90,6 @@ const memberLinks: NavLink[] = [
     current: (pathname) => pathname.startsWith("/app/me") || pathname.startsWith("/app/notifications"),
   },
 ];
-
-const hostEntryLink: NavLink = {
-  key: "host-entry",
-  href: "/app/host",
-  label: READMATES_WORKSPACE_LABELS.hostWorkspace,
-  current: (pathname) => pathname.startsWith("/app/host"),
-};
 
 function hostLinks({
   currentSessionId,
@@ -162,13 +153,6 @@ function hostLinks({
     },
   ];
 }
-
-const memberReturnLink: NavLink = {
-  key: "member-workspace",
-  href: "/app",
-  label: READMATES_WORKSPACE_LABELS.memberWorkspaceReturn,
-  current: (pathname) => pathname === "/app",
-};
 
 function DefaultLink({ to, replace: _replace, children, ...props }: AppLinkProps) {
   void _replace;
@@ -390,7 +374,6 @@ function AppTopNav({
   variant,
   memberName,
   memberAvatarKey,
-  showHostEntry,
   workspaceAction,
   currentSessionId,
   currentSessionStatus,
@@ -402,7 +385,6 @@ function AppTopNav({
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
   memberAvatarKey?: string | null;
-  showHostEntry?: boolean;
   workspaceAction?: WorkspaceAction | null;
   currentSessionId?: string | null;
   currentSessionStatus?: CurrentSessionNavigationStatus;
@@ -424,12 +406,7 @@ function AppTopNav({
         })
       : memberLinks
   ).map((link) => scopedAppLink(link, appBasePath));
-  const fallbackWorkspaceAction = variant === "host" ? memberReturnLink : showHostEntry ? hostEntryLink : null;
-  const resolvedWorkspaceAction = workspaceAction
-    ? scopedWorkspaceAction(workspaceAction, appBasePath)
-    : fallbackWorkspaceAction
-      ? scopedAppLink(fallbackWorkspaceAction, appBasePath)
-      : null;
+  const resolvedWorkspaceAction = workspaceAction ? scopedWorkspaceAction(workspaceAction, appBasePath) : null;
 
   return (
     <TopNavFrame
@@ -450,7 +427,6 @@ export function TopNav({
   variant = "guest",
   memberName,
   memberAvatarKey,
-  showHostEntry,
   workspaceAction,
   authenticated,
   publicBasePath,
@@ -470,7 +446,6 @@ export function TopNav({
       variant={variant}
       memberName={memberName}
       memberAvatarKey={memberAvatarKey}
-      showHostEntry={showHostEntry}
       workspaceAction={workspaceAction}
       appBasePath={appBasePath}
       currentSessionId={currentSessionId}

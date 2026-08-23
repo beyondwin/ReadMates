@@ -175,14 +175,44 @@ export function resolveAuthorizedRoleSwitchTarget(input: {
     return input.authorizedWorkspaces.includes("member") ? input.candidate.memberFallback : input.candidate.fallback;
   }
 
-  if (!input.candidate.requiresCorrespondence || input.correspondence === "authorized") {
+  if (input.correspondence === "authorized" || (input.candidate.requiresCorrespondence && input.correspondence === "unknown")) {
     return input.candidate.target;
   }
 
   if (lastSafeAndAuthorized && lastTargetWorkspace === input.candidate.targetWorkspace) {
     return input.lastSafeTarget!;
   }
+
+  if (!input.candidate.requiresCorrespondence && input.candidate.target !== input.candidate.fallback) {
+    return input.candidate.target;
+  }
   return input.candidate.fallback;
+}
+
+export function resolveUnavailableDetailTarget(input: {
+  pathname: string;
+  lastSafeTarget?: string | null;
+}): string {
+  const { clubSlug, appPath } = parsedAppPath(input.pathname);
+  const workspace = workspaceFromCanonicalPath(input.pathname);
+  const family = routeFamily(appPath, workspace);
+  const safeClubSlug = clubSlug ?? "";
+  const fallback = safeFallback(safeClubSlug, workspace, family);
+  const suffix = workspace === "host" ? appPath.replace(/^\/host/, "") : appPath;
+
+  return resolveAuthorizedRoleSwitchTarget({
+    candidate: {
+      targetWorkspace: workspace,
+      target: pathForWorkspace(safeClubSlug, workspace, suffix),
+      fallback,
+      memberFallback: safeFallback(safeClubSlug, "member", family),
+      requiresCorrespondence: true,
+      navigation: "replace",
+    },
+    authorizedWorkspaces: [workspace],
+    correspondence: "unavailable",
+    lastSafeTarget: input.lastSafeTarget ?? null,
+  });
 }
 
 export function buildClubSwitchTarget(input: ClubSwitchInput): string {

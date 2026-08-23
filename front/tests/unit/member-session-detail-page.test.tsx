@@ -289,6 +289,74 @@ describe("MemberSessionDetailPage", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("replaces an unreadable scoped member detail with its safe archive fallback", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              authenticated: true,
+              membershipId: "member-1",
+              role: "MEMBER",
+              membershipStatus: "ACTIVE",
+              approvalState: "ACTIVE",
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      memberSessionDetailLoaderFactory(createTestQueryClient())({
+        params: { clubSlug: "reading-sai", sessionId: "unreadable-session" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/unreadable-session"),
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]),
+    ).rejects.toMatchObject({ status: 302 });
+
+    try {
+      await memberSessionDetailLoaderFactory(createTestQueryClient())({
+        params: { clubSlug: "reading-sai", sessionId: "unreadable-session" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/unreadable-session"),
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/archive");
+      expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
+    }
+  });
+
+  it("replaces a forbidden scoped member detail with its safe archive fallback", async () => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              authenticated: true,
+              membershipId: "member-1",
+              role: "MEMBER",
+              membershipStatus: "ACTIVE",
+              approvalState: "ACTIVE",
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+
+      return Promise.resolve(new Response(JSON.stringify({ code: "FORBIDDEN", message: "forbidden", status: 403 }), { status: 403 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(
+      memberSessionDetailLoaderFactory(createTestQueryClient())({
+        params: { clubSlug: "reading-sai", sessionId: "forbidden-session" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/forbidden-session"),
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]),
+    ).rejects.toMatchObject({ status: 302 });
+  });
+
   it("enriches legacy session detail highlights from the notes feed authors", () => {
     const enriched = enrichSessionDetailHighlightAuthors(
       {

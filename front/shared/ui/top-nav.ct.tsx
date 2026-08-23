@@ -89,7 +89,11 @@ test("TopNav gives the workspace switch the approved desktop icon scale", async 
   await page.setViewportSize({ width: 1280, height: 480 });
   const navigation = await mount(
     <MemoryRouter initialEntries={["/app"]}>
-      <TopNav variant="member" memberName="멤버1" showHostEntry />
+      <TopNav
+        variant="member"
+        memberName="멤버1"
+        workspaceAction={{ href: "/app/host", label: "호스트 화면", navigation: "push" }}
+      />
     </MemoryRouter>,
   );
 

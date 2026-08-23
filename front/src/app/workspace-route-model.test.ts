@@ -72,7 +72,7 @@ describe("workspace route model", () => {
     ).toBe("/clubs/reading-sai/app/host/sessions/meeting-7");
   });
 
-  it.each(["unavailable", "unknown"] as const)("falls back when same-meeting correspondence is %s", (correspondence) => {
+  it("keeps an unknown same-meeting target for the route loader to authorize", () => {
     const candidate = candidateRoleSwitchTarget({
       pathname: "/clubs/reading-sai/app/host/sessions/meeting-7",
       targetWorkspace: "member",
@@ -82,10 +82,42 @@ describe("workspace route model", () => {
       resolveAuthorizedRoleSwitchTarget({
         candidate,
         authorizedWorkspaces: ["member", "host"],
-        correspondence,
+        correspondence: "unknown",
         lastSafeTarget: "/clubs/reading-sai/app/archive",
       }),
-    ).toBe("/clubs/reading-sai/app/archive");
+    ).toBe("/clubs/reading-sai/app/sessions/meeting-7");
+  });
+
+  it("uses a same-club last-safe target when the detail loader marks a counterpart unavailable", () => {
+    const candidate = candidateRoleSwitchTarget({
+      pathname: "/clubs/reading-sai/app/host/sessions/meeting-7",
+      targetWorkspace: "member",
+    });
+
+    expect(
+      resolveAuthorizedRoleSwitchTarget({
+        candidate,
+        authorizedWorkspaces: ["member", "host"],
+        correspondence: "unavailable",
+        lastSafeTarget: "/clubs/reading-sai/app/notes",
+      }),
+    ).toBe("/clubs/reading-sai/app/notes");
+  });
+
+  it("prefers a same-club last-safe target for an authorized workspace-home transition", () => {
+    const candidate = candidateRoleSwitchTarget({
+      pathname: "/clubs/reading-sai/app/host/operations",
+      targetWorkspace: "member",
+    });
+
+    expect(
+      resolveAuthorizedRoleSwitchTarget({
+        candidate,
+        authorizedWorkspaces: ["member", "host"],
+        correspondence: "unknown",
+        lastSafeTarget: "/clubs/reading-sai/app/notes",
+      }),
+    ).toBe("/clubs/reading-sai/app/notes");
   });
 
   it("does not preserve a host-only draft when changing to the member workspace", () => {

@@ -1,4 +1,4 @@
-import { redirect } from "react-router";
+import { redirect, replace } from "react-router";
 import { readmatesFetch, readmatesPublicFetch } from "@/shared/api/client";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { loginPathForReturnTo } from "@/shared/auth/login-return";
@@ -18,7 +18,7 @@ const pendingScopedHostAuthorizations = new WeakMap<Request, Promise<AuthMeRespo
 async function requireScopedHostLoaderAuth(clubSlug: string): Promise<AuthMeResponse> {
   const auth = await readmatesPublicFetch<AuthMeResponse>(authMePath(clubSlug));
   if (!auth.authenticated || !canUseHostApp(auth)) {
-    throw redirect(scopedAppPath(clubSlug));
+    throw replace(scopedAppPath(clubSlug));
   }
   return auth;
 }
@@ -56,7 +56,7 @@ export async function requireHostLoaderAuth(args?: ClubScopedLoaderArgs): Promis
   }
 
   if (!canUseHostApp(auth)) {
-    throw redirect(scopedAppPath(clubSlug));
+    throw replace(scopedAppPath(clubSlug));
   }
 
   return auth;

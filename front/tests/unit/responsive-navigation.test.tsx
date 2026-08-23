@@ -15,12 +15,15 @@ function renderAt(pathname: string, element: ReactElement) {
   return render(<MemoryRouter initialEntries={[pathname]}>{element}</MemoryRouter>);
 }
 
+const memberToHostAction = { href: "/app/host", label: "호스트 화면", navigation: "push" } as const;
+const hostToMemberAction = { href: "/app", label: "멤버 화면으로", navigation: "push" } as const;
+
 describe("TopNav responsive variants", () => {
   it("renders an account control after the desktop workspace action", () => {
     const accountControl = <button type="button">계정 메뉴</button>;
     const { container } = renderAt(
       "/app",
-      <TopNav variant="member" memberName="김호스트" showHostEntry accountControl={accountControl} />,
+      <TopNav variant="member" memberName="김호스트" workspaceAction={memberToHostAction} accountControl={accountControl} />,
     );
 
     const rightChrome = container.querySelector(".topnav-account-actions");
@@ -89,8 +92,15 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
   });
 
-  it("shows a desktop host workspace entry only when requested from member navigation", () => {
-    renderAt("/app", <TopNav variant="member" memberName="김호스트" showHostEntry />);
+  it("renders only an app-provided desktop workspace action", () => {
+    renderAt(
+      "/app",
+      <TopNav
+        variant="member"
+        memberName="김호스트"
+        workspaceAction={{ href: "/clubs/reading-sai/app/host", label: "호스트 화면", navigation: "push" }}
+      />,
+    );
 
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
     expect(within(nav).getAllByRole("link").map((link) => link.textContent)).toEqual([
@@ -100,9 +110,15 @@ describe("TopNav responsive variants", () => {
       "내 공간",
     ]);
     const hostEntry = screen.getByRole("link", { name: "호스트 화면" });
-    expect(hostEntry).toHaveAttribute("href", "/app/host");
+    expect(hostEntry).toHaveAttribute("href", "/clubs/reading-sai/app/host");
     expect(hostEntry).toHaveClass("rm-workspace-switch");
     expect(hostEntry.textContent).toBe("");
+  });
+
+  it("does not infer a desktop role-switch destination from the displayed workspace", () => {
+    renderAt("/app/host", <TopNav variant="host" memberName="김호스트" />);
+
+    expect(screen.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
   });
 
   it("marks archive active for member session detail routes on desktop", () => {
@@ -124,7 +140,7 @@ describe("TopNav responsive variants", () => {
   it("renders host desktop workspace navigation with the required labels and member return action", () => {
     const { container } = renderAt(
       "/app/host/sessions/new",
-      <TopNav variant="host" memberName="김호스트" memberAvatarKey="cloud-green-book" currentSessionId="session-6" />,
+      <TopNav variant="host" memberName="김호스트" memberAvatarKey="cloud-green-book" workspaceAction={hostToMemberAction} currentSessionId="session-6" />,
     );
 
     const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
@@ -206,7 +222,7 @@ describe("MobileHeader route titles and actions", () => {
       variant === "host" ? "/app/host" : "/app",
       <MobileHeader
         variant={variant}
-        showHostEntry={variant === "member"}
+        workspaceAction={variant === "member" ? memberToHostAction : hostToMemberAction}
         accountControl={accountControl}
       />,
     );
@@ -224,7 +240,7 @@ describe("MobileHeader route titles and actions", () => {
   it("keeps mobile header side rails present when actions change", () => {
     const { container } = render(
       <MemoryRouter initialEntries={["/app/host/sessions/session-6/edit"]}>
-        <MobileHeader variant="host" />
+        <MobileHeader variant="host" workspaceAction={hostToMemberAction} />
       </MemoryRouter>,
     );
 
@@ -243,7 +259,7 @@ describe("MobileHeader route titles and actions", () => {
   });
 
   it("keeps scoped host mobile header actions inside the scoped app route", () => {
-    renderAt("/clubs/reading-sai/app/host/sessions/session-6/edit", <MobileHeader variant="host" appBasePath="/clubs/reading-sai/app" />);
+    renderAt("/clubs/reading-sai/app/host/sessions/session-6/edit", <MobileHeader variant="host" appBasePath="/clubs/reading-sai/app" workspaceAction={{ href: "/clubs/reading-sai/app", label: "멤버 화면으로", navigation: "push" }} />);
 
     expect(screen.getByText("모임")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/clubs/reading-sai/app/host");
@@ -403,18 +419,30 @@ describe("MobileHeader route titles and actions", () => {
     expect(document.querySelector(".m-hdr-title")).toHaveTextContent("내 공간");
   });
 
-  it("shows a compact mobile host workspace entry from member screens when requested", () => {
-    renderAt("/app", <MobileHeader variant="member" showHostEntry />);
+  it("renders only an app-provided compact mobile workspace action", () => {
+    renderAt(
+      "/app",
+      <MobileHeader
+        variant="member"
+        workspaceAction={{ href: "/clubs/reading-sai/app/host", label: "호스트 화면", navigation: "push" }}
+      />,
+    );
 
     expect(screen.getByText("읽는사이")).toBeInTheDocument();
     const hostEntry = screen.getByRole("link", { name: "호스트 화면" });
-    expect(hostEntry).toHaveAttribute("href", "/app/host");
+    expect(hostEntry).toHaveAttribute("href", "/clubs/reading-sai/app/host");
     expect(hostEntry).toHaveClass("m-hdr-link--icon");
     expect(hostEntry.textContent).toBe("");
   });
 
+  it("does not infer a mobile role-switch destination from the displayed workspace", () => {
+    renderAt("/app/host", <MobileHeader variant="host" />);
+
+    expect(screen.queryByRole("link", { name: "멤버 화면으로" })).not.toBeInTheDocument();
+  });
+
   it("renders host editor pages with a host back link", () => {
-    renderAt("/app/host/sessions/session-6/edit", <MobileHeader variant="host" />);
+    renderAt("/app/host/sessions/session-6/edit", <MobileHeader variant="host" workspaceAction={hostToMemberAction} />);
 
     expect(screen.getByText("모임")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
@@ -425,7 +453,7 @@ describe("MobileHeader route titles and actions", () => {
   });
 
   it("renders the host new session route as the session editor title", () => {
-    renderAt("/app/host/sessions/new", <MobileHeader variant="host" />);
+    renderAt("/app/host/sessions/new", <MobileHeader variant="host" workspaceAction={hostToMemberAction} />);
 
     expect(screen.getByText("모임")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host");
@@ -436,7 +464,7 @@ describe("MobileHeader route titles and actions", () => {
   });
 
   it("keeps host record routes in host mobile chrome with member return", () => {
-    renderAt("/app/archive", <MobileHeader variant="host" />);
+    renderAt("/app/archive", <MobileHeader variant="host" workspaceAction={hostToMemberAction} />);
 
     expect(screen.getByText("기록")).toBeInTheDocument();
     const memberReturn = screen.getByRole("link", { name: "멤버 화면으로" });
