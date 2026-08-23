@@ -144,7 +144,17 @@ export function buildHostMeetingUrl(
   currentUrl: string | URL,
   next: HostMeetingLocation,
 ): string {
-  const current = readRawAppHref(currentUrl);
+  return buildHostMeetingUrlWithPolicy(currentUrl, next, "semantic-detail");
+}
+
+type HostMeetingPathPolicy = "semantic-detail" | "compatibility-editor";
+
+function buildHostMeetingUrlWithPolicy(
+  currentUrl: string | URL,
+  next: HostMeetingLocation,
+  pathPolicy: HostMeetingPathPolicy,
+): string {
+  const current = readRawAppHref(currentUrl, pathPolicy);
   if (!current) return "/";
 
   const unrelatedTokens = current.query === null
@@ -175,19 +185,25 @@ type RawAppHref = {
   hash: string;
 };
 
-function readRawAppHref(currentUrl: string | URL): RawAppHref | null {
+function readRawAppHref(
+  currentUrl: string | URL,
+  pathPolicy: HostMeetingPathPolicy,
+): RawAppHref | null {
   if (currentUrl instanceof URL) {
     if (
       !isHttpProtocol(currentUrl.protocol)
       || currentUrl.username
       || currentUrl.password
     ) return null;
-    return splitRawAppHref(`${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`);
+    return splitRawAppHref(
+      `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`,
+      pathPolicy,
+    );
   }
   if (containsUnsafeHrefCharacters(currentUrl)) return null;
   if (currentUrl.startsWith("/")) {
     if (currentUrl.startsWith("//")) return null;
-    return splitRawAppHref(currentUrl);
+    return splitRawAppHref(currentUrl, pathPolicy);
   }
 
   const absolutePrefix = /^[A-Za-z][A-Za-z\d+.-]*:\/\//.exec(currentUrl);
@@ -203,10 +219,16 @@ function readRawAppHref(currentUrl: string | URL): RawAppHref | null {
   const authorityStart = absolutePrefix[0].length;
   const suffixStart = findAbsoluteSuffixStart(currentUrl, authorityStart);
   const suffix = suffixStart === -1 ? "/" : currentUrl.slice(suffixStart);
-  return splitRawAppHref(suffix.startsWith("/") ? suffix : `/${suffix}`);
+  return splitRawAppHref(
+    suffix.startsWith("/") ? suffix : `/${suffix}`,
+    pathPolicy,
+  );
 }
 
-function splitRawAppHref(href: string): RawAppHref | null {
+function splitRawAppHref(
+  href: string,
+  pathPolicy: HostMeetingPathPolicy,
+): RawAppHref | null {
   const hashStart = href.indexOf("#");
   const hash = hashStart === -1 ? "" : href.slice(hashStart);
   const beforeHash = hashStart === -1 ? href : href.slice(0, hashStart);
@@ -214,8 +236,72 @@ function splitRawAppHref(href: string): RawAppHref | null {
   const pathname = queryStart === -1 ? beforeHash : beforeHash.slice(0, queryStart);
   const query = queryStart === -1 ? null : beforeHash.slice(queryStart + 1);
 
-  if (!pathname.startsWith("/") || pathname.startsWith("//")) return null;
+  if (
+    !pathname.startsWith("/")
+    || pathname.startsWith("//")
+    || !isParserStablePathname(pathname)
+    || !isAllowedHostMeetingPathname(pathname, pathPolicy)
+  ) return null;
   return { pathname, query, hash };
+}
+
+function isParserStablePathname(pathname: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(pathname, "https://readmates.invalid");
+  } catch {
+    return false;
+  }
+  return parsed.origin === "https://readmates.invalid"
+    && parsed.pathname === pathname
+    && parsed.search === ""
+    && parsed.hash === "";
+}
+
+function isAllowedHostMeetingPathname(
+  pathname: string,
+  pathPolicy: HostMeetingPathPolicy,
+): boolean {
+  const unscoped = /^\/app\/host\/sessions\/([^/]+)\/?$/.exec(pathname);
+  if (unscoped) return isAllowedSessionId(unscoped[1], pathPolicy);
+
+  const scoped = /^\/clubs\/([^/]+)\/app\/host\/sessions\/([^/]+)\/?$/.exec(pathname);
+  return scoped !== null
+    && isAllowedClubSlug(scoped[1])
+    && isAllowedSessionId(scoped[2], pathPolicy);
+}
+
+const RESERVED_CLUB_SLUGS = new Set([
+  "admin",
+  "api",
+  "app",
+  "auth",
+  "login",
+  "logout",
+  "oauth2",
+  "www",
+  "mail",
+  "support",
+  "static",
+  "assets",
+  "pages",
+  "readmates",
+]);
+
+function isAllowedClubSlug(value: string): boolean {
+  return /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/.test(value)
+    && !value.includes("--")
+    && !RESERVED_CLUB_SLUGS.has(value);
+}
+
+function isAllowedSessionId(
+  value: string,
+  pathPolicy: HostMeetingPathPolicy,
+): boolean {
+  if (pathPolicy === "semantic-detail") {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  }
+  return /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,63})$/.test(value);
 }
 
 function findAbsoluteSuffixStart(value: string, authorityStart: number): number {
@@ -299,7 +385,11 @@ export function buildHostSessionWorkspaceUrl(
   currentUrl: string | URL,
   next: HostSessionWorkspaceLocation,
 ): string {
-  return buildHostMeetingUrl(currentUrl, hostMeetingLocationFromCompatibility(next));
+  return buildHostMeetingUrlWithPolicy(
+    currentUrl,
+    hostMeetingLocationFromCompatibility(next),
+    "compatibility-editor",
+  );
 }
 
 function hostMeetingLocationFromCompatibility(

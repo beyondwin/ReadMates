@@ -6,8 +6,10 @@ import {
   type HostSessionWorkspaceInput,
 } from "./host-session-workspace-model";
 
+const SESSION_ID = "11111111-1111-1111-1111-111111111111";
+
 const baseInput = {
-  currentUrl: "https://readmates.test/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost#meeting",
+  currentUrl: `https://readmates.test/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost#meeting`,
   meetingDate: "2026-08-21",
   today: "2026-08-20",
   unansweredResponseCount: 0,
@@ -30,32 +32,32 @@ describe("buildHostMeetingWorkspace", () => {
       {
         task: "overview",
         label: "개요",
-        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost#meeting",
+        href: `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost#meeting`,
       },
       {
         task: "responses",
         label: "참석 응답",
-        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=responses#meeting",
+        href: `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=responses#meeting`,
       },
       {
         task: "attendance",
         label: "실제 출석",
-        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=attendance#meeting",
+        href: `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=attendance#meeting`,
       },
       {
         task: "records",
         label: "모임 기록",
-        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=records#meeting",
+        href: `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=records#meeting`,
       },
       {
         task: "notifications",
         label: "알림",
-        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=notifications#meeting",
+        href: `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=notifications#meeting`,
       },
       {
         task: "history",
         label: "변경 내역",
-        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=history#meeting",
+        href: `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=history#meeting`,
       },
     ]);
     expect(Object.keys(view)).not.toEqual(

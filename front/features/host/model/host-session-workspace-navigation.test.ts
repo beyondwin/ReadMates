@@ -8,6 +8,18 @@ import {
   type HostSessionWorkspaceLocation,
 } from "./host-session-workspace-navigation";
 
+const SESSION_ID = "11111111-1111-1111-1111-111111111111";
+
+const recordsJsonLocation = {
+  task: "records",
+  overviewEditOpen: false,
+  recordSource: "json",
+} satisfies HostMeetingLocation;
+
+function stringAndUrl(href: string): [string, URL] {
+  return [href, new URL(href, "https://readmates.test")];
+}
+
 describe("host meeting local task navigation", () => {
   it("returns an independent overview location for each parse", () => {
     const first = parseHostMeetingLocation("");
@@ -108,27 +120,27 @@ describe("host meeting local task navigation", () => {
   it.each([
     [
       "records AI",
-      "https://readmates.test/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&from=dashboard#audit",
+      `https://readmates.test/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&from=dashboard#audit`,
       { task: "records", overviewEditOpen: false, recordSource: "ai" },
-      "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&from=dashboard&section=records&source=ai#audit",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&from=dashboard&section=records&source=ai#audit`,
     ],
     [
       "overview editor",
-      "/clubs/alpha/app/host/sessions/session-1?from=dashboard&aigen=1#basic",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}?from=dashboard&aigen=1#basic`,
       { task: "overview", overviewEditOpen: true, recordSource: "manual" },
-      "/clubs/alpha/app/host/sessions/session-1?from=dashboard&section=basic#basic",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}?from=dashboard&section=basic#basic`,
     ],
     [
       "overview",
-      "https://readmates.test/clubs/alpha/app/host/sessions/session-1?from=dashboard&section=records&source=json&records=json#audit",
+      `https://readmates.test/clubs/alpha/app/host/sessions/${SESSION_ID}?from=dashboard&section=records&source=json&records=json#audit`,
       { task: "overview", overviewEditOpen: false, recordSource: "manual" },
-      "/clubs/alpha/app/host/sessions/session-1?from=dashboard#audit",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}?from=dashboard#audit`,
     ],
     [
       "notifications",
-      new URL("https://readmates.test/clubs/alpha/app/host/sessions/session-1?from=meeting#dispatch"),
+      new URL(`https://readmates.test/clubs/alpha/app/host/sessions/${SESSION_ID}?from=meeting#dispatch`),
       { task: "notifications", overviewEditOpen: false, recordSource: "manual" },
-      "/clubs/alpha/app/host/sessions/session-1?from=meeting&section=notifications#dispatch",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}?from=meeting&section=notifications#dispatch`,
     ],
   ] satisfies Array<[string, string | URL, HostMeetingLocation, string]>) (
     "preserves scoped path, unrelated query, and hash while building %s",
@@ -140,38 +152,38 @@ describe("host meeting local task navigation", () => {
   it("preserves every unrelated raw query token, separator order, and hash byte-for-byte", () => {
     expect(
       buildHostMeetingUrl(
-        "/clubs/alpha/app/host/sessions/s-1/?space=%20&plus=+&lower=%2f&upper=%2F&dup=one&dup=two&&bare&blank=&section=overview#Frag%2f+?x",
+        `/clubs/alpha/app/host/sessions/${SESSION_ID}/?space=%20&plus=+&lower=%2f&upper=%2F&dup=one&dup=two&&bare&blank=&section=overview#Frag%2f+?x`,
         { task: "records", overviewEditOpen: false, recordSource: "ai" },
       ),
     ).toBe(
-      "/clubs/alpha/app/host/sessions/s-1/?space=%20&plus=+&lower=%2f&upper=%2F&dup=one&dup=two&&bare&blank=&section=records&source=ai#Frag%2f+?x",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}/?space=%20&plus=+&lower=%2f&upper=%2F&dup=one&dup=two&&bare&blank=&section=records&source=ai#Frag%2f+?x`,
     );
   });
 
   it("removes encoded owned keys without normalizing adjacent unrelated tokens", () => {
     expect(
       buildHostMeetingUrl(
-        "/app/host/sessions/s-1?keep=%2f&task=records&%73ection=records&%73ource=json&records=json&aigen=1&blank=&bare#hash%2f",
+        `/app/host/sessions/${SESSION_ID}?keep=%2f&task=records&%73ection=records&%73ource=json&records=json&aigen=1&blank=&bare#hash%2f`,
         { task: "attendance", overviewEditOpen: false, recordSource: "manual" },
       ),
-    ).toBe("/app/host/sessions/s-1?keep=%2f&blank=&bare&section=attendance#hash%2f");
+    ).toBe(`/app/host/sessions/${SESSION_ID}?keep=%2f&blank=&bare&section=attendance#hash%2f`);
   });
 
   it.each([
     [
       "relative compatibility",
-      "/app/host/sessions/s-1/?raw=%20#tail",
-      "/app/host/sessions/s-1/?raw=%20&section=history#tail",
+      `/app/host/sessions/${SESSION_ID}/?raw=%20#tail`,
+      `/app/host/sessions/${SESSION_ID}/?raw=%20&section=history#tail`,
     ],
     [
       "scoped",
-      "/clubs/alpha/app/host/sessions/s-1/?raw=%2f#tail",
-      "/clubs/alpha/app/host/sessions/s-1/?raw=%2f&section=history#tail",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}/?raw=%2f#tail`,
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}/?raw=%2f&section=history#tail`,
     ],
     [
       "absolute input emitted as an app href",
-      "https://readmates.test/clubs/alpha/app/host/sessions/s-1/?raw=+#tail",
-      "/clubs/alpha/app/host/sessions/s-1/?raw=+&section=history#tail",
+      `https://readmates.test/clubs/alpha/app/host/sessions/${SESSION_ID}/?raw=+#tail`,
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}/?raw=+&section=history#tail`,
     ],
   ])("preserves the %s path, trailing slash, raw query, and hash contract", (_name, currentUrl, expected) => {
     expect(
@@ -204,6 +216,64 @@ describe("host meeting local task navigation", () => {
     })).toBe("/");
     },
   );
+
+  it.each([
+    [
+      "unscoped detail",
+      `/app/host/sessions/${SESSION_ID}?raw=%20&lower=%2f&plus=+&bare#tail%2f`,
+      `/app/host/sessions/${SESSION_ID}?raw=%20&lower=%2f&plus=+&bare&section=records&source=json#tail%2f`,
+    ],
+    [
+      "club-scoped detail with trailing slash",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}/?raw=%2F&&blank=#tail`,
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}/?raw=%2F&&blank=&section=records&source=json#tail`,
+    ],
+    [
+      "allowed detail path from an unretained foreign origin",
+      `https://evil.example/clubs/alpha/app/host/sessions/${SESSION_ID}?raw=+#tail`,
+      `/clubs/alpha/app/host/sessions/${SESSION_ID}?raw=+&section=records&source=json#tail`,
+    ],
+  ])("produces identical local hrefs for valid string and URL object %s", (_name, href, expected) => {
+    expect(stringAndUrl(href).map((currentUrl) => (
+      buildHostMeetingUrl(currentUrl, recordsJsonLocation)
+    ))).toEqual([expected, expected]);
+  });
+
+  it.each([
+    ["internal double slash", `/clubs/alpha//app/host/sessions/${SESSION_ID}`],
+    ["literal parent segment", `/clubs/alpha/app/host/sessions/../${SESSION_ID}`],
+    ["literal current segment", `/clubs/./app/host/sessions/${SESSION_ID}`],
+    ["encoded current segment", `/clubs/%2e/app/host/sessions/${SESSION_ID}`],
+    ["encoded parent segment", `/clubs/alpha/app/host/sessions/%2e%2e/${SESSION_ID}`],
+    ["mixed encoded parent segment", `/clubs/alpha/app/host/sessions/%2E./${SESSION_ID}`],
+    ["mixed-case encoded parent segment", `/clubs/alpha/app/host/sessions/.%2e/${SESSION_ID}`],
+    ["raw path space", `/clubs/al pha/app/host/sessions/${SESSION_ID}`],
+    ["percent-encoded path space", `/clubs/al%20pha/app/host/sessions/${SESSION_ID}`],
+    [
+      "raw path control",
+      `/clubs/alpha/app/host/sessions/${SESSION_ID.slice(0, -1)}\u0000${SESSION_ID.slice(-1)}`,
+    ],
+    ["raw backslash", `/clubs/alpha/app/host/sessions/${SESSION_ID}\\extra`],
+    ["encoded forward slash in id", `/clubs/alpha/app/host/sessions/${SESSION_ID}%2Fextra`],
+    ["encoded backslash in id", `/clubs/alpha/app/host/sessions/${SESSION_ID}%5cextra`],
+    ["foreign absolute wrong path", "https://evil.example/steal?x=1"],
+    ["arbitrary local path", "/steal?x=1"],
+    ["member route family", `/clubs/alpha/app/sessions/${SESSION_ID}`],
+    ["wrong host route family", "/clubs/alpha/app/host/records"],
+    ["nested edit path", `/clubs/alpha/app/host/sessions/${SESSION_ID}/edit`],
+    ["nested closing path", `/app/host/sessions/${SESSION_ID}/closing`],
+    ["semantic create path", "/clubs/alpha/app/host/sessions/new"],
+    ["non-UUID session id", "/app/host/sessions/session-1"],
+    ["empty session id", "/clubs/alpha/app/host/sessions/"],
+    ["uppercase club slug", `/clubs/Alpha/app/host/sessions/${SESSION_ID}`],
+    ["short club slug", `/clubs/ab/app/host/sessions/${SESSION_ID}`],
+    ["double-hyphen club slug", `/clubs/alpha--beta/app/host/sessions/${SESSION_ID}`],
+    ["reserved club slug", `/clubs/admin/app/host/sessions/${SESSION_ID}`],
+  ])("rejects unsafe or non-owned %s for both string and URL object inputs", (_name, href) => {
+    expect(stringAndUrl(href).map((currentUrl) => (
+      buildHostMeetingUrl(currentUrl, recordsJsonLocation)
+    ))).toEqual(["/", "/"]);
+  });
 
   it("maps Back and Forward URL snapshots to the same deterministic semantic targets", () => {
     const snapshots = [

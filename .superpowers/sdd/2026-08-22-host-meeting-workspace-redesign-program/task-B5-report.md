@@ -121,3 +121,51 @@ Safe-input symmetry self-review RED:
 - The builder returns pathname/query/hash hrefs for both relative and absolute inputs, preserving the established caller contract rather than retaining absolute authority in navigation output.
 - Invalid parser input returns a pure semantic value only. No test or implementation reads, replaces, pushes, or otherwise mutates browser history.
 - The pre-existing feature-route→app architecture boundary residual documented above remains untouched. B8 still owns compatibility import migration; the restored deprecated shapes must not gain new consumers or survive beyond that migration window.
+
+## Fix round 2
+
+Status: `DONE_WITH_CONCERNS`
+
+ADR impact: `none`. This round closes an input-validation gap inside the existing B5 pure URL builder contract. It does not change workspace ownership, route families, or a durable architecture decision.
+
+### Finding closed
+
+- `buildHostMeetingUrl` now accepts only unscoped `/app/host/sessions/:sessionId` and exact club-scoped `/clubs/:clubSlug/app/host/sessions/:sessionId`, with an optional trailing slash and no nested path. Semantic session IDs must be canonical UUID text. Club slugs use the server `ClubSlug` length/character, double-hyphen, and reserved-name rules.
+- Before emitting an href, a raw pathname is parsed against a fixed inert origin and must remain byte-identical to the parser pathname. Literal/encoded dot traversal, internal double slashes, raw spaces, controls, backslashes, decoded-separator ambiguity, percent-encoded path spaces, arbitrary/member/wrong-host routes, empty IDs, non-UUID IDs, and nested edit/closing paths fail closed to `/`.
+- Relative strings, absolute strings, and `URL` objects use the same pathname allowlist. An absolute origin is never retained; a valid detail path is emitted as the same local href, while an arbitrary foreign path is rejected. Unrelated raw query tokens and hashes remain byte-preserved after the pathname passes validation.
+- The deprecated `buildHostSessionWorkspaceUrl` uses the same parser-stability, club-slug, and exact route-family validation. Until B8 removes the incumbent editor adapter, it alone retains the existing opaque fixture/session segment and exact `new` route behavior needed by the already characterized create/editor route. New semantic callers cannot use that exception.
+
+### TDD evidence
+
+Path-family, traversal, and representation RED:
+
+`npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/model/host-session-workspace-navigation.test.ts -t 'identical local|unsafe or non-owned'`
+
+- RED: 25 failed, 3 passed, 76 skipped. The prior builder emitted raw internal double slashes, dot traversal, parser-rewritten paths, arbitrary route families, unsafe encoded segments, and invalid slug paths.
+- GREEN after the pathname allowlist and parser-stability implementation: 28 passed, 76 skipped.
+
+Repository ID-rule RED:
+
+`npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/model/host-session-workspace-navigation.test.ts -t 'non-UUID session id'`
+
+- RED: 1 failed, 104 skipped because the semantic builder still accepted the opaque `session-1` fixture as a detail ID.
+- GREEN: 1 passed, 104 skipped after semantic paths were restricted to canonical UUID text and semantic fixtures were updated accordingly.
+
+Final focused GREEN:
+
+`npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/model/host-session-workspace-model.test.ts features/host/model/host-session-workspace-navigation.test.ts`
+
+- PASS: 2 files, 138/138 tests.
+
+### Regression and static verification
+
+- `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/model/host-session-editor-view-model.test.ts features/host/ui/session-workspace/host-session-workspace.test.tsx features/host/route/host-session-editor-route.test.tsx` — PASS, 3 files and 102/102 tests.
+- `npx --yes corepack@0.35.0 pnpm --dir front lint` — PASS.
+- `npx --yes corepack@0.35.0 pnpm --dir front build` — PASS, Vite transformed 702 modules.
+- No production UI, browser component test, or E2E surface was changed or run.
+
+### Self-review and concerns
+
+- Percent-encoded spaces are deliberately rejected in the pathname for both strings and `URL` objects. Percent encoding remains allowed and byte-preserved only in unrelated query/hash tokens after the path has passed the allowlist.
+- A `URL` object exposes its already-normalized pathname, so validation cannot reconstruct syntax discarded before the builder received the object. It still applies the exact allowlist to that exposed pathname; test pairs whose dot/control/backslash input normalizes outside the owned family reject symmetrically, while directly canonical objects remain safe accepted inputs.
+- The `compatibility-editor` path policy is an explicitly temporary B8 migration exception, not a new public model. It cannot escape the two exact host-session path families or add nested task paths, and it must be deleted with the deprecated builder.
