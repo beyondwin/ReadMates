@@ -28,9 +28,10 @@ class HostListCursorSigner(
         return "$keyVersion.$payloadPart.${macPart(key, payload)}"
     }
 
+    @Suppress("ThrowsCount")
     fun verify(raw: String): VerifiedHostListCursor {
         val parts = raw.split('.')
-        if (parts.size != 3) throw InvalidHostListCursorException()
+        if (parts.size != CURSOR_PART_COUNT) throw InvalidHostListCursorException()
         val version = parts[0].toIntOrNull() ?: throw InvalidHostListCursorException()
         val payloadBytes = decodePart(parts[1])
         val providedMac = decodePart(parts[2])
@@ -90,6 +91,7 @@ class HostListCursorSigner(
         }
 
     private companion object {
+        const val CURSOR_PART_COUNT = 3
         const val HMAC_ALGORITHM = "HmacSHA256"
         const val PURPOSE_PREFIX = "readmates:host-list:v1\u0000"
         val encoder: Base64.Encoder = Base64.getUrlEncoder().withoutPadding()

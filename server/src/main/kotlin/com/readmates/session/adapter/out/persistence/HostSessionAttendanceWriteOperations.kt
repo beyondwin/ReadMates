@@ -30,7 +30,7 @@ internal class HostSessionAttendanceWriteOperations(
             throw InvalidSessionScheduleException()
         }
         val participantSetRevision =
-            queries.lockParticipantSetRevision(command.host, command.sessionId)
+            queries.locks.lockParticipantSetRevision(command.host, command.sessionId)
                 ?: throwConflict(command.host, command.sessionId)
         if (rows.size > 1) {
             val expectedSetRevision =
@@ -40,7 +40,7 @@ internal class HostSessionAttendanceWriteOperations(
             }
         }
         val ordered = rows.sortedBy { it.membershipId.toString() }
-        val locked = queries.lockAttendanceRows(command.host, command.sessionId, ordered.map { it.membershipId })
+        val locked = queries.locks.lockAttendanceRows(command.host, command.sessionId, ordered.map { it.membershipId })
         validateLocked(command.host, command.sessionId, ordered, locked)
         writeRows(command.host, command.sessionId, ordered)
         return HostAttendanceResponse(
@@ -133,7 +133,7 @@ internal class HostSessionAttendanceWriteOperations(
     private fun throwConflict(
         host: CurrentMember,
         sessionId: UUID,
-    ): Nothing = throw queries.revisionConflict(host, sessionId) ?: HostSessionParticipantNotFoundException()
+    ): Nothing = throw queries.revisions.revisionConflict(host, sessionId) ?: HostSessionParticipantNotFoundException()
 }
 
 private fun attendanceRowHash(

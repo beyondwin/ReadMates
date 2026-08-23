@@ -233,7 +233,7 @@ class JdbcMemberLifecycleStoreAdapter(
             .query(
                 """
                 select id
-                from sessions
+                from active_sessions
                 where club_id = ?
                   and deleted_at is null
                   and state = 'OPEN'
@@ -249,13 +249,19 @@ class JdbcMemberLifecycleStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    ): SessionParticipationChange = applyParticipationStatus(clubId, sessionId, membershipId, SessionParticipationStatus.ACTIVE)
+    ): SessionParticipationChange {
+        val status = SessionParticipationStatus.ACTIVE
+        return applyParticipationStatus(clubId, sessionId, membershipId, status)
+    }
 
     override fun markRemovedFromCurrentSession(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    ): SessionParticipationChange = applyParticipationStatus(clubId, sessionId, membershipId, SessionParticipationStatus.REMOVED)
+    ): SessionParticipationChange {
+        val status = SessionParticipationStatus.REMOVED
+        return applyParticipationStatus(clubId, sessionId, membershipId, status)
+    }
 
     private fun applyParticipationStatus(
         clubId: UUID,
@@ -343,7 +349,7 @@ class JdbcMemberLifecycleStoreAdapter(
 
     private fun currentParticipantSetRevision(sessionId: UUID): Long =
         jdbcTemplate.queryForObject(
-            "select participant_set_revision from sessions where id = ?",
+            "select participant_set_revision from active_sessions where id = ?",
             Long::class.java,
             sessionId.dbString(),
         ) ?: 0

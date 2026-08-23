@@ -23,8 +23,12 @@ data class AttendanceEntry(
     @field:NotNull @field:Min(0) val expectedAttendanceRevision: Long,
 )
 
-fun AttendanceEntry.toCommand(): AttendanceEntryCommand = AttendanceEntryCommand(membershipId, attendanceStatus, expectedAttendanceRevision)
+fun AttendanceEntry.toCommand(): AttendanceEntryCommand {
+    val command = AttendanceEntryCommand(membershipId, attendanceStatus, expectedAttendanceRevision)
+    return command
+}
 
+@Suppress("ThrowsCount")
 private fun bindExpectedAttendanceRows(
     commandEntries: List<AttendanceEntry>,
     expectedRows: List<ExpectedAttendanceRowBody>?,
@@ -41,7 +45,8 @@ private fun bindExpectedAttendanceRows(
         }
     val commandIds =
         commandEntries.map { entry ->
-            runCatching { java.util.UUID.fromString(entry.membershipId) }.getOrElse { throw InvalidSessionScheduleException() }
+            runCatching { java.util.UUID.fromString(entry.membershipId) }
+                .getOrElse { throw InvalidSessionScheduleException() }
         }
     if (commandIds.toSet() != expectedByMembership.keys || commandIds.size != expectedByMembership.size) {
         throw InvalidSessionScheduleException()
@@ -63,6 +68,7 @@ class AttendanceController(
     private val envelopes: HostMutationEnvelopeReader,
 ) {
     @PostMapping
+    @Suppress("ThrowsCount")
     fun confirm(
         @PathVariable sessionId: String,
         @RequestParam(required = false) expectedParticipantSetRevision: Long?,

@@ -54,6 +54,7 @@ import java.util.concurrent.TimeUnit
 @Sql(statements = [CLEANUP_LIST_CURSOR_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_LIST_CURSOR_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
+@Suppress("LargeClass")
 class HostSessionListCursorDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,

@@ -42,7 +42,7 @@ class JdbcSessionParticipationWriteAdapter(
                 .query(
                     """
                     select id
-                    from sessions
+                    from active_sessions
                     where club_id = ?
                       and deleted_at is null
                       and state = 'OPEN'

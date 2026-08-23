@@ -6,6 +6,7 @@ import com.readmates.session.application.HostSessionDeletionNotAllowedException
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
+import com.readmates.session.application.model.HostProjectionSnapshot
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionLifecycleAction
@@ -34,6 +35,18 @@ import java.util.UUID
 class HostSessionDeletionQueries(
     private val jdbcTemplate: JdbcTemplate,
 ) {
+    fun loadProjection(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): HostProjectionSnapshot? =
+        jdbcTemplate
+            .query(
+                TRASH_PROJECTION_SQL,
+                { resultSet, _ -> resultSet.toHostProjectionSnapshot() },
+                sessionId.dbString(),
+                host.clubId.dbString(),
+            ).firstOrNull()
+
     fun assess(
         command: HostSessionIdCommand,
         lock: Boolean,
@@ -589,6 +602,42 @@ class HostSessionDeletionQueries(
             counts = EMPTY_TRASH_COUNTS,
         )
 }
+
+private const val TRASH_PROJECTION_SQL = """
+select sessions.id,
+       sessions.number,
+       sessions.title,
+       sessions.book_title,
+       sessions.book_author,
+       sessions.session_date,
+       sessions.start_time,
+       sessions.end_time,
+       sessions.location_label,
+       sessions.state,
+       sessions.visibility,
+       sessions.access_scope,
+       sessions.session_revision,
+       sessions.exposure_revision,
+       sessions.participant_set_revision,
+       draft.draft_revision,
+       coalesce(revision.live_revision, 0) as live_revision,
+       coalesce(publication.publication_revision, 0) as publication_revision,
+       coalesce(public_session_publications.site_visibility, 'HIDDEN') as site_visibility
+from sessions
+left join session_record_drafts draft
+  on draft.session_id = sessions.id and draft.club_id = sessions.club_id
+left join (
+  select club_id, session_id, max(version) as live_revision
+  from session_record_revisions
+  group by club_id, session_id
+) revision
+  on revision.club_id = sessions.club_id and revision.session_id = sessions.id
+left join session_publication_versions publication on publication.session_id = sessions.id
+left join public_session_publications
+  on public_session_publications.session_id = sessions.id
+ and public_session_publications.club_id = sessions.club_id
+where sessions.id = ? and sessions.club_id = ?
+"""
 
 private val EMPTY_TRASH_COUNTS =
     HostSessionDeletionCounts(

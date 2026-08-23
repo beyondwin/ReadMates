@@ -40,6 +40,7 @@ class HostSessionQueryService(
     ListUpcomingSessionsUseCase,
     GetHostDashboardUseCase {
     @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
+    @Suppress("ComplexCondition")
     override fun list(
         host: CurrentMember,
         pageRequest: PageRequest,
@@ -108,6 +109,7 @@ class HostSessionQueryService(
         return queryPort.scheduleDefaults(host)
     }
 
+    @Suppress("ThrowsCount")
     private fun decodeCursor(
         raw: String,
         now: Instant,

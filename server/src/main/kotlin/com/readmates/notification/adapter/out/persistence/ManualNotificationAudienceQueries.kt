@@ -10,6 +10,7 @@ import com.readmates.shared.db.uuid
 import org.springframework.jdbc.core.JdbcTemplate
 import java.util.UUID
 
+@Suppress("TooManyFunctions")
 internal class ManualNotificationAudienceQueries(
     private val jdbcTemplate: JdbcTemplate,
 ) {
@@ -213,7 +214,7 @@ internal class ManualNotificationAudienceQueries(
         jdbcTemplate.queryForObject(
             """
             select participant_set_revision
-            from sessions
+            from active_sessions
             where id = ? and club_id = ?
             """.trimIndent(),
             Long::class.java,

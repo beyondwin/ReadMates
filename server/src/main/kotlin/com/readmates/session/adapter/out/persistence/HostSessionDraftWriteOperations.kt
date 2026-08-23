@@ -7,6 +7,7 @@ import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.requireHost
+import com.readmates.session.domain.CompatibilityExposure
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionExposure
@@ -39,61 +40,81 @@ internal class HostSessionDraftWriteOperations(
         with(command) {
             requireHost(host)
             val values = policy.normalizeUpdate(session, queries.existingSchedule(host, sessionId))
-            val updated = updateDraft(host, sessionId, session, values, queries.expectedRevision(expectedSessionRevision))
-            queries.throwIfStale(updated, host, sessionId)
+            val updated =
+                updateDraft(host, sessionId, session, values, queries.expectedRevision(expectedSessionRevision))
+            queries.revisions.throwIfStale(updated, host, sessionId)
             queries.detail(host, sessionId)
         }
 
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
-        val locked = queries.lockExposure(command.host, command.sessionId)
+        val locked = queries.locks.lockExposure(command.host, command.sessionId)
         command.expectedExposureRevision?.let { expected ->
             if (locked.exposureRevision != expected) {
-                queries.throwIfStale(0, command.host, command.sessionId)
+                queries.revisions.throwIfStale(0, command.host, command.sessionId)
             }
         }
         val exposure = policy.visibilityExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
         val expectedExposure = command.expectedExposureRevision
-        val updated =
-            if (expectedExposure == null) {
-                jdbcTemplate.update(
-                    """
-                    update sessions
-                    set access_scope = ?,
-                        visibility = ?,
-                        updated_at = utc_timestamp(6)
-                    where id = ?
-                      and club_id = ?
-                      and deleted_at is null
-                    """.trimIndent(),
-                    exposure.accessScope.name,
-                    compatibility.sessionVisibility,
-                    command.sessionId.dbString(),
-                    command.host.clubId.dbString(),
-                )
-            } else {
-                jdbcTemplate.update(
-                    """
-                    update sessions
-                    set access_scope = ?,
-                        visibility = ?,
-                        exposure_revision = exposure_revision + 1,
-                        updated_at = utc_timestamp(6)
-                    where id = ?
-                      and club_id = ?
-                      and deleted_at is null
-                      and exposure_revision = ?
-                    """.trimIndent(),
-                    exposure.accessScope.name,
-                    compatibility.sessionVisibility,
-                    command.sessionId.dbString(),
-                    command.host.clubId.dbString(),
-                    expectedExposure,
-                )
-            }
+        val updated = updateExposure(command, exposure, compatibility, expectedExposure)
         if (expectedExposure != null) {
-            queries.throwIfStale(updated, command.host, command.sessionId)
+            queries.revisions.throwIfStale(updated, command.host, command.sessionId)
         }
+        syncPublicPlacement(command, exposure, compatibility)
+        return HostSessionVisibilityUpdateResult(
+            previousVisibility = SessionRecordVisibility.valueOf(locked.sessionVisibility),
+            detail = queries.detail(command.host, command.sessionId),
+        )
+    }
+
+    private fun updateExposure(
+        command: UpdateHostSessionVisibilityCommand,
+        exposure: SessionExposure,
+        compatibility: CompatibilityExposure,
+        expectedExposure: Long?,
+    ): Int =
+        if (expectedExposure == null) {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set access_scope = ?,
+                    visibility = ?,
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and deleted_at is null
+                """.trimIndent(),
+                exposure.accessScope.name,
+                compatibility.sessionVisibility,
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            )
+        } else {
+            jdbcTemplate.update(
+                """
+                update sessions
+                set access_scope = ?,
+                    visibility = ?,
+                    exposure_revision = exposure_revision + 1,
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and deleted_at is null
+                  and exposure_revision = ?
+                """.trimIndent(),
+                exposure.accessScope.name,
+                compatibility.sessionVisibility,
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+                expectedExposure,
+            )
+        }
+
+    private fun syncPublicPlacement(
+        command: UpdateHostSessionVisibilityCommand,
+        exposure: SessionExposure,
+        compatibility: CompatibilityExposure,
+    ) {
         jdbcTemplate.update(
             """
             update public_session_publications
@@ -111,10 +132,6 @@ internal class HostSessionDraftWriteOperations(
             compatibility.isPublic,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
-        )
-        return HostSessionVisibilityUpdateResult(
-            previousVisibility = SessionRecordVisibility.valueOf(locked.sessionVisibility),
-            detail = queries.detail(command.host, command.sessionId),
         )
     }
 

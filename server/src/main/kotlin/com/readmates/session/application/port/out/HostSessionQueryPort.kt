@@ -28,7 +28,7 @@ interface HostSessionQueryPort {
         query: CanonicalHostSessionListQuery,
         evaluatedAt: Instant,
         cursor: HostMeetingListTuple?,
-    ): HostMeetingListPageRead = error("listMode is not implemented")
+    ): HostMeetingListPageRead
 
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
 

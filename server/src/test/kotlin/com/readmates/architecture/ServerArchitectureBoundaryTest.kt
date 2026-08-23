@@ -350,6 +350,7 @@ private fun jacksonImportsIn(serviceRoot: Path): List<String> =
     }
 
 @Tag("architecture")
+@Suppress("LargeClass")
 class ServerArchitectureBoundaryTest {
     @Test
     fun `notification decomposition boundaries remain focused`() = assertNotificationAndAiRedisBoundaries()

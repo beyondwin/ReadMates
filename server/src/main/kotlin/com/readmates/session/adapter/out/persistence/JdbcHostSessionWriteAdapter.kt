@@ -59,6 +59,7 @@ class JdbcHostSessionWriteAdapter(
     private val attendance = HostSessionAttendanceWriteOperations(jdbcTemplate, writeQueries, writePolicy)
     private val publication = HostSessionPublicationWriteOperations(jdbcTemplate, writeQueries, writePolicy)
     private val lifecycle = HostSessionLifecycleWriteOperations(jdbcTemplate, writeQueries, writePolicy)
+    private val reverse = HostSessionReverseWriteOperations(jdbcTemplate, writeQueries)
 
     override fun create(command: HostSessionCommand) = draftWrites.create(command)
 
@@ -144,7 +145,7 @@ class JdbcHostSessionWriteAdapter(
     override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)
 
     override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot =
-        writeQueries.lockVisibilitySnapshot(command)
+        writeQueries.locks.lockVisibilitySnapshot(command)
 
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) = draftWrites.updateVisibility(command)
 
@@ -154,25 +155,30 @@ class JdbcHostSessionWriteAdapter(
 
     override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.publish(command)
 
-    override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.reopen(command)
+    override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult = reverse.reopen(command)
 
-    override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.unpublish(command)
+    override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult = reverse.unpublish(command)
 
-    override fun returnToDraft(command: HostSessionIdCommand) = lifecycle.returnToDraft(command)
+    override fun returnToDraft(command: HostSessionIdCommand) = reverse.returnToDraft(command)
 
     override fun loadProjection(
         host: CurrentMember,
         sessionId: UUID,
         includeTrashed: Boolean,
-    ): HostProjectionSnapshot? = writeQueries.loadProjection(host, sessionId, includeTrashed)
+    ): HostProjectionSnapshot? =
+        if (includeTrashed) {
+            deletionQueries.loadProjection(host, sessionId)
+        } else {
+            writeQueries.revisions.loadProjection(host, sessionId)
+        }
 
     override fun loadVersionVector(
         host: CurrentMember,
         sessionId: UUID,
-    ): SessionVersionVector? = writeQueries.loadVersionVector(host, sessionId)
+    ): SessionVersionVector? = writeQueries.revisions.loadVersionVector(host, sessionId)
 
     override fun attendanceSnapshotId(
         host: CurrentMember,
         sessionId: UUID,
-    ): String = writeQueries.attendanceSnapshotId(host, sessionId)
+    ): String = writeQueries.revisions.attendanceSnapshotId(host, sessionId)
 }

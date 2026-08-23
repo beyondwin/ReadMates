@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package com.readmates.session.application.model
 
 import com.readmates.session.application.HostSessionListQuery
@@ -132,6 +134,7 @@ private data class SelectedListScope(
     val states: List<String>,
 )
 
+@Suppress("ThrowsCount")
 private fun HostSessionListQuery.selectedModeAndStates(): SelectedListScope {
     val provided =
         listOfNotNull(state?.takeIf { it.isNotBlank() }, mode?.takeIf { it.isNotBlank() }).size +
@@ -191,6 +194,7 @@ fun hostMeetingStateRank(
         HostMeetingListMode.RECORD -> if (state == "CLOSED") 0 else 1
     }
 
+@Suppress("CyclomaticComplexMethod", "MagicNumber")
 fun hostMeetingAttentionRank(
     mode: HostMeetingListMode,
     state: String,
@@ -301,6 +305,7 @@ private fun parseStringArray(json: String): List<String> {
     return splitTopLevel(body).map(::decodeJsonString)
 }
 
+@Suppress("CyclomaticComplexMethod")
 private fun splitTopLevel(body: String): List<String> {
     val parts = mutableListOf<String>()
     val current = StringBuilder()

@@ -31,6 +31,7 @@ import java.util.UUID
 )
 @AutoConfigureMockMvc
 @Tag("integration")
+@Suppress("LargeClass")
 class HostSessionParticipantSnapshotDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,

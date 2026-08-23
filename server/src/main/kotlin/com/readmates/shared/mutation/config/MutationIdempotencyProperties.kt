@@ -14,6 +14,7 @@ import java.time.Duration
 private const val DEFAULT_PURGE_BATCH_SIZE = 50
 private const val MIN_PURGE_BATCH_SIZE = 1
 private const val MAX_PURGE_BATCH_SIZE = 500
+private const val MINIMUM_RETENTION_HOURS = 24L
 
 @ConfigurationProperties(prefix = "readmates.mutation.idempotency")
 data class MutationIdempotencyProperties(
@@ -21,8 +22,8 @@ data class MutationIdempotencyProperties(
     val currentKeyVersion: Int = 1,
     val previousKey: String = "",
     val previousKeyVersion: Int = 0,
-    val retention: Duration = Duration.ofHours(24),
-    val previousKeyRolloutBuffer: Duration = Duration.ofHours(24),
+    val retention: Duration = Duration.ofHours(MINIMUM_RETENTION_HOURS),
+    val previousKeyRolloutBuffer: Duration = Duration.ofHours(MINIMUM_RETENTION_HOURS),
     val purgeFixedDelay: Duration = Duration.ofHours(1),
     val purgeBatchSize: Int = DEFAULT_PURGE_BATCH_SIZE,
     val allowEmptySecret: Boolean = false,
@@ -38,6 +39,7 @@ data class MutationIdempotencyProperties(
             else -> null
         }
 
+    @Suppress("ThrowsCount")
     fun validate(environment: Environment) {
         val activeProfiles = environment.activeProfiles
         val productionLike =
@@ -49,7 +51,7 @@ data class MutationIdempotencyProperties(
         if (currentKeyVersion == previousKeyVersion) {
             throw IllegalStateException("readmates.mutation.idempotency current and previous key versions must differ")
         }
-        if (retention < Duration.ofHours(24)) {
+        if (retention < Duration.ofHours(MINIMUM_RETENTION_HOURS)) {
             throw IllegalStateException("readmates.mutation.idempotency.retention must be at least 24h")
         }
         if (currentKey.isNotBlank()) {

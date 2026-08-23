@@ -98,13 +98,17 @@ class MutationIdempotencyService(
         val now = clock.instant()
         val remaining = port.countByDigestKeyVersion(properties.previousKeyVersion)
         val unreferencedSince = port.unreferencedSince(properties.previousKeyVersion)
-        if (remaining > 0 || unreferencedSince == null || now < unreferencedSince.plus(properties.previousKeyRolloutBuffer)) {
+        if (remaining > 0 ||
+            unreferencedSince == null ||
+            now < unreferencedSince.plus(properties.previousKeyRolloutBuffer)
+        ) {
             metrics.retirement(false)
             throw DigestKeyRetirementRejectedException()
         }
         metrics.retirement(true)
     }
 
+    @Suppress("ThrowsCount")
     private fun replayOrConflict(
         identity: MutationIdentity,
         payload: CanonicalMutationPayload,
@@ -131,6 +135,7 @@ class MutationIdempotencyService(
         }
     }
 
+    @Suppress("ThrowsCount")
     private fun validateIdentity(
         identity: MutationIdentity,
         payload: CanonicalMutationPayload,

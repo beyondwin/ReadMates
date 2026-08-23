@@ -1155,7 +1155,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]"""
+                content =
+                    """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT",""" +
+                    """"expectedAttendanceRevision":0}]"""
             }.andExpect {
                 status { isOk() }
             }
@@ -1932,6 +1934,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host cannot publish open draft host only or unpublished sessions`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
@@ -2299,6 +2302,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host unpublishes a published session`() {
         val sessionId = createDraftSessionSeven()
         mockMvc
@@ -2722,7 +2726,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"LEGACY_UNSPECIFIED"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"LEGACY_UNSPECIFIED"}"""
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2733,7 +2739,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"EMPTY_SESSION_DELETED"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"EMPTY_SESSION_DELETED"}"""
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2802,7 +2810,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"ACCIDENTAL_TRANSITION"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"ACCIDENTAL_TRANSITION"}"""
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
@@ -2847,7 +2857,9 @@ class HostSessionControllerDbTest(
                 with(csrf())
                 header(RequestIdFilter.HEADER, requestId)
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"OPERATIONAL_RECOVERY"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"OPERATIONAL_RECOVERY"}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }

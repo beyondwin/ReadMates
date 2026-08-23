@@ -43,6 +43,8 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
+private typealias HostRevisionConflictEntity = ResponseEntity<HostSessionRevisionConflictResponse>
+
 @RestControllerAdvice
 @Suppress("TooManyFunctions")
 class SessionApplicationErrorHandler {
@@ -166,7 +168,7 @@ class SessionApplicationErrorHandler {
         )
 
     @ExceptionHandler(HostSessionRevisionConflictException::class)
-    fun handleRevisionConflict(ex: HostSessionRevisionConflictException): ResponseEntity<HostSessionRevisionConflictResponse> =
+    fun handleRevisionConflict(ex: HostSessionRevisionConflictException): HostRevisionConflictEntity =
         ResponseEntity.status(HttpStatus.CONFLICT).body(
             HostSessionRevisionConflictResponse(
                 message = "다른 호스트가 모임을 먼저 저장했습니다. 최신 내용을 확인한 뒤 다시 적용하세요.",

@@ -179,7 +179,8 @@ class JdbcMutationIdempotencyAdapterDbTest(
         clock.instant = clock.instant.plus(Duration.ofHours(24))
         rotated.retirePreviousKey()
         val retired = service(properties = keyPair(current = KEY_V2, currentVersion = 2))
-        assertThat(retired.claim(identity("post-retire-key"), payload())).isInstanceOf(MutationClaimResult.Claimed::class.java)
+        assertThat(retired.claim(identity("post-retire-key"), payload()))
+            .isInstanceOf(MutationClaimResult.Claimed::class.java)
     }
 
     @Test
@@ -215,7 +216,11 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `tables logs and receipt dto never persist raw canonical url passcode sha or hmac secret`() {
         val identity = identity("secret-key")
-        val claimed = service().claim(identity, payload(meetingUrl = SENSITIVE_URL, meetingPasscode = SENSITIVE_PASSCODE))
+        val claimed =
+            service().claim(
+                identity,
+                payload(meetingUrl = SENSITIVE_URL, meetingPasscode = SENSITIVE_PASSCODE),
+            )
         assertThat(claimed).isInstanceOf(MutationClaimResult.Claimed::class.java)
         val receiptId = insertReceipt()
         receipts.insert(

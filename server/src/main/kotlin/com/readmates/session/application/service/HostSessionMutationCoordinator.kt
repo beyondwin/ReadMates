@@ -43,6 +43,7 @@ class HostSessionMutationCoordinator(
         sessionId: UUID,
     ): String = projectionPort.attendanceSnapshotId(host, sessionId)
 
+    @Suppress("ThrowsCount")
     fun <T> execute(
         host: CurrentMember,
         operation: HostMutationOperation,

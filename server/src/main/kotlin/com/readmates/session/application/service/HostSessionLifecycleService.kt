@@ -338,6 +338,7 @@ class HostSessionLifecycleService(
         }
     }
 
+    @Suppress("ComplexCondition", "ThrowsCount")
     private fun verifyCorrectionVector(command: HostSessionIdCommand) {
         val expected = command.expectedCorrectionVector ?: throw InvalidSessionScheduleException()
         val snapshot =

@@ -28,6 +28,7 @@ class HostMutationReconciliationService(
     private val projectionPort: HostSessionProjectionPort,
 ) : ReconcileHostMutationUseCase {
     @Transactional(readOnly = true)
+    @Suppress("ReturnCount", "ThrowsCount")
     override fun reconcile(command: ReconcileHostMutationCommand): HostMutationReconciliationResult {
         if (!command.host.isHost) {
             throw HostMutationNotAuthorizedException()

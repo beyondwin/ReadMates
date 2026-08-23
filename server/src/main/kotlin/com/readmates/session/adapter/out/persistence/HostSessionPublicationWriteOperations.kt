@@ -16,14 +16,14 @@ internal class HostSessionPublicationWriteOperations(
         command: UpsertPublicationCommand,
         stagingRequired: Boolean,
     ): HostPublicationResponse {
-        val locked = queries.lockExposure(command.host, command.sessionId)
+        val locked = queries.locks.lockExposure(command.host, command.sessionId)
         command.expectedPublicationRevision?.let { expected ->
             if (locked.publicationRevision != expected) {
-                queries.throwIfStale(0, command.host, command.sessionId)
+                queries.revisions.throwIfStale(0, command.host, command.sessionId)
             }
         }
         if (stagingRequired && command.siteVisibility == null) {
-            queries.requireLegacyPublicationWriteAllowed(command.host, command.sessionId)
+            queries.locks.requireLegacyPublicationWriteAllowed(command.host, command.sessionId)
         }
         val exposure = policy.publicationExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
@@ -46,7 +46,7 @@ internal class HostSessionPublicationWriteOperations(
                     command.sessionId.dbString(),
                     expected,
                 )
-            queries.throwIfStale(bumped, command.host, command.sessionId)
+            queries.revisions.throwIfStale(bumped, command.host, command.sessionId)
         }
         return HostPublicationResponse(
             sessionId = command.sessionId.toString(),

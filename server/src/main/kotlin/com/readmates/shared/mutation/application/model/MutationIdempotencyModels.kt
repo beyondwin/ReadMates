@@ -203,7 +203,10 @@ sealed class CanonicalMutationPayload {
             require(schemaVersion > 0) { "schemaVersion must be positive" }
         }
 
-        override fun toString(): String = "Reverse(operation=$operation, reasonCode=$reasonCode, schemaVersion=$schemaVersion)"
+        override fun toString(): String {
+            val redacted = "Reverse(operation=$operation, reasonCode=$reasonCode, schemaVersion=$schemaVersion)"
+            return redacted
+        }
     }
 
     data class Exposure(

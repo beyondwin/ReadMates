@@ -298,7 +298,9 @@ class HostSessionRecoveryControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """[{"membershipId":"$membershipId","attendanceStatus":"$status","expectedAttendanceRevision":0}]"""
+                content =
+                    """[{"membershipId":"$membershipId","attendanceStatus":"$status",""" +
+                    """"expectedAttendanceRevision":0}]"""
             }.andExpect { status { isOk() } }
             .andReturn()
             .response

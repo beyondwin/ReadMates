@@ -29,9 +29,11 @@ import com.readmates.session.application.HostSessionRecordStagingRequiredExcepti
 import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
 import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionCommand
@@ -56,6 +58,7 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.model.normalized
+import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
@@ -90,6 +93,7 @@ import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -509,7 +513,10 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0)),
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                    ),
             )
 
         service.confirmAttendance(command)
@@ -564,7 +571,10 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0)),
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                    ),
             )
 
         val result = service.confirmAttendance(command)
@@ -584,7 +594,10 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "UNKNOWN", expectedAttendanceRevision = 2)),
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "UNKNOWN", expectedAttendanceRevision = 2),
+                    ),
             )
 
         val result = service.confirmAttendance(command)
@@ -631,7 +644,10 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 4)),
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 4),
+                    ),
             )
 
         service.confirmAttendance(command)
@@ -1677,6 +1693,14 @@ class HostSessionServicesTest {
                 summary = HostSessionListSummary(0, 0, 0),
             )
         }
+
+        override fun listMode(
+            host: CurrentMember,
+            limit: Int,
+            query: CanonicalHostSessionListQuery,
+            evaluatedAt: Instant,
+            cursor: HostMeetingListTuple?,
+        ) = HostMeetingListPageRead(emptyList(), null, false, HostSessionListSummary(0, 0, 0))
 
         override fun create(command: HostSessionCommand) =
             CreatedSessionResponse(

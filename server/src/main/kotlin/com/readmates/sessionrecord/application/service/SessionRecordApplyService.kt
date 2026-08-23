@@ -61,6 +61,7 @@ class SessionRecordApplyService(
     }
 
     @Transactional
+    @Suppress("ReturnCount", "ThrowsCount")
     override fun apply(
         host: CurrentMember,
         command: ApplySessionRecordCommand,

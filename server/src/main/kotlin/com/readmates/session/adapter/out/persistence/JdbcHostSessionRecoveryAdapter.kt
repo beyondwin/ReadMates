@@ -57,7 +57,7 @@ class JdbcHostSessionRecoveryAdapter(
             jdbcTemplate.queryForObject(
                 """
                 select participant_set_revision
-                from sessions
+                from active_sessions
                 where id = ? and club_id = ? and deleted_at is null
                 """.trimIndent(),
                 Long::class.java,
