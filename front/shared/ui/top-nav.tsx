@@ -11,6 +11,7 @@ import {
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
 import { hasHostRecordsReturnState } from "@/shared/routing/readmates-route-state";
 import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
+import type { PrimaryNavigationItem } from "@/shared/model/app-club-shell";
 
 export type TopNavVariant = "guest" | "member" | "host";
 
@@ -23,10 +24,11 @@ export type WorkspaceAction = {
 type AppLinkProps = {
   to: string;
   replace?: boolean;
+  state?: unknown;
   className?: string;
   children: ReactNode;
   "aria-label"?: string;
-  "aria-current"?: "page";
+  "aria-current"?: "page" | "true";
   title?: string;
   style?: CSSProperties;
 };
@@ -62,6 +64,10 @@ type TopNavProps = {
   onRetryCurrentSession?: () => void;
   LinkComponent?: AppLinkComponent;
   accountControl?: ReactNode;
+  primaryItems?: ReadonlyArray<PrimaryNavigationItem>;
+  navLabel?: string;
+  brandHref?: string;
+  contextControl?: ReactNode;
 };
 
 const memberLinks: NavLink[] = [
@@ -139,8 +145,9 @@ function hostLinks({
   ];
 }
 
-function DefaultLink({ to, replace: _replace, children, ...props }: AppLinkProps) {
+function DefaultLink({ to, replace: _replace, state: _state, children, ...props }: AppLinkProps) {
   void _replace;
+  void _state;
 
   return (
     <a {...props} href={to}>
@@ -242,6 +249,7 @@ function TopNavFrame({
   memberAvatarKey,
   workspaceAction,
   accountControl,
+  contextControl,
   LinkComponent,
 }: {
   brandHref: string;
@@ -252,12 +260,16 @@ function TopNavFrame({
   memberAvatarKey?: string | null;
   workspaceAction?: NavLink | null;
   accountControl?: ReactNode;
+  contextControl?: ReactNode;
   LinkComponent: AppLinkComponent;
 }) {
   return (
     <header className="topnav">
       <div className="container topnav-inner">
-        <Brand href={brandHref} LinkComponent={LinkComponent} />
+        <div className="topnav-global-context">
+          <Brand href={brandHref} LinkComponent={LinkComponent} />
+          {contextControl}
+        </div>
 
         <div className="row" style={{ gap: "12px" }}>
           <nav className="nav-links" aria-label={navLabel}>
@@ -266,6 +278,7 @@ function TopNavFrame({
                 <LinkComponent
                   key={link.key}
                   to={link.href}
+                  replace={link.replace}
                   className="nav-link"
                   aria-current={link.current(pathname) ? "page" : undefined}
                 >
@@ -366,6 +379,10 @@ function AppTopNav({
   appBasePath = "",
   LinkComponent,
   accountControl,
+  primaryItems,
+  navLabel,
+  brandHref,
+  contextControl,
 }: {
   variant: Exclude<TopNavVariant, "guest">;
   memberName?: string | null;
@@ -377,6 +394,10 @@ function AppTopNav({
   appBasePath?: string;
   LinkComponent: AppLinkComponent;
   accountControl?: ReactNode;
+  primaryItems?: ReadonlyArray<PrimaryNavigationItem>;
+  navLabel?: string;
+  brandHref?: string;
+  contextControl?: ReactNode;
 }) {
   const location = useLocation();
   const pathname = location.pathname;
@@ -388,27 +409,36 @@ function AppTopNav({
     : rawAppPath;
   const resolvedCurrentSessionStatus =
     currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
-  const links = (
-    variant === "host"
-      ? hostLinks({
-          currentSessionId,
-          currentSessionStatus: resolvedCurrentSessionStatus,
-          onRetryCurrentSession,
-        })
-      : memberLinks
-  ).map((link) => scopedAppLink(link, appBasePath));
+  const links = primaryItems
+    ? primaryItems.map((item) => ({
+        key: item.id,
+        href: item.href,
+        label: item.label,
+        replace: item.navigation === "replace",
+        current: () => item.current,
+      }))
+    : (
+        variant === "host"
+          ? hostLinks({
+              currentSessionId,
+              currentSessionStatus: resolvedCurrentSessionStatus,
+              onRetryCurrentSession,
+            })
+          : memberLinks
+      ).map((link) => scopedAppLink(link, appBasePath));
   const resolvedWorkspaceAction = workspaceAction ? scopedWorkspaceAction(workspaceAction, appBasePath) : null;
 
   return (
     <TopNavFrame
-      brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
-      navLabel="앱 내비게이션"
+      brandHref={brandHref ?? prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
+      navLabel={navLabel ?? "앱 내비게이션"}
       links={links}
       pathname={appPath}
       memberName={memberName}
       memberAvatarKey={memberAvatarKey}
       workspaceAction={resolvedWorkspaceAction}
       accountControl={accountControl}
+      contextControl={contextControl}
       LinkComponent={LinkComponent}
     />
   );
@@ -427,9 +457,41 @@ export function TopNav({
   onRetryCurrentSession,
   LinkComponent = DefaultLink,
   accountControl,
+  primaryItems,
+  navLabel,
+  brandHref,
+  contextControl,
 }: TopNavProps) {
   if (variant === "guest") {
     return <GuestTopNav authenticated={authenticated} publicBasePath={publicBasePath} LinkComponent={LinkComponent} />;
+  }
+
+  if (primaryItems) {
+    const links: NavLink[] = primaryItems.map((item) => ({
+      key: item.id,
+      href: item.href,
+      label: item.label,
+      replace: item.navigation === "replace",
+      current: () => item.current,
+    }));
+    const resolvedWorkspaceAction = workspaceAction
+      ? scopedWorkspaceAction(workspaceAction, appBasePath ?? "")
+      : null;
+
+    return (
+      <TopNavFrame
+        brandHref={brandHref ?? (variant === "host" ? "/app/host" : "/app")}
+        navLabel={navLabel ?? "앱 내비게이션"}
+        links={links}
+        pathname=""
+        memberName={memberName}
+        memberAvatarKey={memberAvatarKey}
+        workspaceAction={resolvedWorkspaceAction}
+        accountControl={accountControl}
+        contextControl={contextControl}
+        LinkComponent={LinkComponent}
+      />
+    );
   }
 
   return (
@@ -444,6 +506,10 @@ export function TopNav({
       onRetryCurrentSession={onRetryCurrentSession}
       LinkComponent={LinkComponent}
       accountControl={accountControl}
+      primaryItems={primaryItems}
+      navLabel={navLabel}
+      brandHref={brandHref}
+      contextControl={contextControl}
     />
   );
 }

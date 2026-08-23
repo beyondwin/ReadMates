@@ -10,6 +10,7 @@ import {
   hasHostRecordsReturnState,
   readHostRecordsReturnTarget,
 } from "@/shared/routing/readmates-route-state";
+import type { ClubShellBackTarget } from "@/shared/model/app-club-shell";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
 
@@ -62,6 +63,12 @@ type MobileHeaderProps = {
   LinkComponent?: AppLinkComponent;
   navigationContinuity?: ReadmatesNavigationContinuity;
   accountControl?: ReactNode;
+  presentation?: {
+    title: string;
+    kicker?: string | null;
+    backTarget?: ClubShellBackTarget | null;
+    brandHref: string;
+  };
 };
 
 const defaultArchiveSessionsReturnTarget: ReadmatesReturnTarget = {
@@ -301,7 +308,7 @@ function isHostRecordOwnedRoute(pathname: string, state: unknown, currentPathnam
 
 type HeaderBackTarget = {
   href: string;
-  state?: ReadmatesReturnState;
+  state?: unknown;
   label: string;
   icon?: TabIconName | "brand";
 };
@@ -536,6 +543,7 @@ function AppMobileHeader({
   LinkComponent,
   navigationContinuity,
   accountControl,
+  presentation,
 }: {
   variant: Exclude<MobileHeaderVariant, "guest">;
   workspaceAction?: MobileWorkspaceAction | null;
@@ -543,6 +551,7 @@ function AppMobileHeader({
   LinkComponent: AppLinkComponent;
   navigationContinuity: ReadmatesNavigationContinuity;
   accountControl?: ReactNode;
+  presentation?: MobileHeaderProps["presentation"];
 }) {
   const location = useLocation();
   const pathname = location.pathname;
@@ -552,15 +561,17 @@ function AppMobileHeader({
   return (
     <HeaderShell
       workspace={variant}
-      kicker={variant === "host" ? "호스트" : null}
-      title={recordOwned ? "기록" : appTitle(variant, appPath)}
-      backTarget={scopeAppBackTarget(
-        appBackTarget(variant, appPath, location.state, navigationContinuity, pathname),
-        appBasePath,
-      )}
+      kicker={presentation?.kicker ?? (variant === "host" ? "호스트" : null)}
+      title={presentation?.title ?? (recordOwned ? "기록" : appTitle(variant, appPath))}
+      backTarget={presentation
+        ? (presentation.backTarget as HeaderBackTarget | null | undefined)
+        : scopeAppBackTarget(
+            appBackTarget(variant, appPath, location.state, navigationContinuity, pathname),
+            appBasePath,
+          )}
       rightAction={appRightAction(appBasePath, workspaceAction)}
       accountControl={accountControl}
-      brandHref={prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
+      brandHref={presentation?.brandHref ?? prefixedAppPath(appBasePath, variant === "host" ? "/app/host" : "/app")}
       LinkComponent={LinkComponent}
     />
   );
@@ -575,6 +586,7 @@ export function MobileHeader({
   LinkComponent = DefaultLink,
   navigationContinuity = defaultNavigationContinuity,
   accountControl,
+  presentation,
 }: MobileHeaderProps) {
   if (variant === "guest") {
     return (
@@ -587,6 +599,21 @@ export function MobileHeader({
     );
   }
 
+  if (presentation) {
+    return (
+      <HeaderShell
+        workspace={variant}
+        kicker={presentation.kicker}
+        title={presentation.title}
+        backTarget={presentation.backTarget as HeaderBackTarget | null | undefined}
+        rightAction={appRightAction(appBasePath ?? "", workspaceAction)}
+        accountControl={accountControl}
+        brandHref={presentation.brandHref}
+        LinkComponent={LinkComponent}
+      />
+    );
+  }
+
   return (
     <AppMobileHeader
       variant={variant}
@@ -595,6 +622,7 @@ export function MobileHeader({
       LinkComponent={LinkComponent}
       navigationContinuity={navigationContinuity}
       accountControl={accountControl}
+      presentation={presentation}
     />
   );
 }

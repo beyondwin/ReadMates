@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { TopNav } from "@/shared/ui/top-nav";
 import { MobileHeader } from "@/shared/ui/mobile-header";
 import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
+import type { PrimaryNavigationItem } from "@/shared/model/app-club-shell";
 
 afterEach(() => {
   cleanup();
@@ -44,6 +45,44 @@ const memberToHostAction = { href: "/app/host", label: "호스트 화면", navig
 const hostToMemberAction = { href: "/app", label: "멤버 화면으로", navigation: "push" } as const;
 
 describe("TopNav responsive variants", () => {
+  it("renders app-owned navigation targets without consulting router state", () => {
+    const primaryItems: PrimaryNavigationItem[] = [
+      { id: "today", label: "오늘", href: "/clubs/reading-sai/app", icon: "home", current: true },
+      { id: "records", label: "기록", href: "/clubs/reading-sai/app/archive", icon: "archive", current: false },
+    ];
+
+    render(
+      <>
+        <TopNav
+          variant="member"
+          primaryItems={primaryItems}
+          navLabel="멤버 주 메뉴"
+          brandHref="/clubs/reading-sai/app"
+        />
+        <MobileHeader
+          variant="member"
+          presentation={{
+            title: "읽는사이",
+            brandHref: "/clubs/reading-sai/app",
+          }}
+        />
+        <MobileTabBar
+          variant="member"
+          items={primaryItems}
+          navLabel="멤버 주 메뉴 모바일"
+        />
+      </>,
+    );
+
+    expect(screen.getByRole("navigation", { name: "멤버 주 메뉴" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "멤버 주 메뉴 모바일" })).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: "오늘" })).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "읽는사이 홈" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app",
+    );
+  });
+
   it("renders an account control after the desktop workspace action", () => {
     const accountControl = <button type="button">계정 메뉴</button>;
     const { container } = renderAt(

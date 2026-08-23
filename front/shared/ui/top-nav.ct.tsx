@@ -15,23 +15,21 @@ const fontMetrics = async (locator: Locator) =>
     };
   });
 
-test("TopNav keeps the host retry control typographically aligned with destination links", async ({
+test("TopNav keeps the stable host meeting destination typographically aligned with sibling links", async ({
   mount,
 }) => {
   const navigation = await mount(
     <MemoryRouter initialEntries={["/app/host"]}>
       <TopNav
         variant="host"
-        currentSessionStatus="error"
-        onRetryCurrentSession={() => undefined}
       />
     </MemoryRouter>,
   );
 
   const destinationLink = navigation.getByRole("link", { name: "멤버", exact: true });
-  const retryButton = navigation.getByRole("button", { name: "모임 다시 확인" });
-  const [linkTypography, retryTypography] = await Promise.all(
-    [destinationLink, retryButton].map((locator) =>
+  const meetingLink = navigation.getByRole("link", { name: "모임", exact: true });
+  const [linkTypography, meetingTypography] = await Promise.all(
+    [destinationLink, meetingLink].map((locator) =>
       locator.evaluate((element) => {
         const style = getComputedStyle(element);
         return {
@@ -44,7 +42,7 @@ test("TopNav keeps the host retry control typographically aligned with destinati
     ),
   );
 
-  expect(retryTypography).toEqual(linkTypography);
+  expect(meetingTypography).toEqual(linkTypography);
 });
 
 test("TopNav shows the desktop avatar and preserves a long account name in its accessible label", async ({ mount, page }) => {

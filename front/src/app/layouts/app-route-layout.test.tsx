@@ -292,7 +292,7 @@ describe("AppRouteLayout host session navigation", () => {
     },
   );
 
-  it("does not derive the stable meeting-list destination from current-session lookup", () => {
+  it("does not fetch current-session identity for stable shell destinations", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = input.toString();
       return Promise.reject(new Error(`Unexpected fetch: ${path}`));
@@ -314,7 +314,7 @@ describe("AppRouteLayout host session navigation", () => {
     expect(screen.queryByRole("button", { name: "모임 다시 확인" })).not.toBeInTheDocument();
     expect(
       fetchMock.mock.calls.filter(([input]) => input.toString() === "/api/bff/api/sessions/current"),
-    ).toHaveLength(1);
+    ).toHaveLength(0);
   });
 });
 
@@ -388,10 +388,11 @@ describe("AppRouteLayout workspace authority", () => {
       </QueryClientProvider>,
     );
 
-    expect(screen.getAllByRole("link", { name: "호스트 화면" })).toHaveLength(2);
-    for (const link of screen.getAllByRole("link", { name: "호스트 화면" })) {
+    expect(screen.getAllByRole("link", { name: "호스트 공간" })).toHaveLength(2);
+    for (const link of screen.getAllByRole("link", { name: "호스트 공간" })) {
       expect(link).toHaveAttribute("href", "/clubs/reading-sai/app/host/sessions/meeting-7");
     }
+    expect(document.querySelectorAll("[data-app-route-security-controller]")).toHaveLength(1);
   });
 
   it("replaces a revoked host route with its member-safe destination", async () => {

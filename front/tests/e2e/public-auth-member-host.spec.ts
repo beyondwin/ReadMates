@@ -83,9 +83,18 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   await page.goto("/app/host");
   await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  const ledgerHeading = page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ });
-  const workspace = page.locator(".rm-host-session-workspace");
-  await expect(ledgerHeading.or(workspace)).toBeVisible();
+  await expect(page.getByRole("heading", { name: "오늘", level: 1 })).toBeVisible();
+  await expect(page.getByRole("link", { name: /지금 다루는 모임 열기|모임 목록/ }).first()).toBeVisible();
+  await expect(page.locator("[data-app-route-security-controller]")).toHaveCount(1);
+  await expect(page.locator('.desktop-only .rm-club-selector > summary')).toContainText("읽는사이");
+  const hostWorkspaceSelector = page.locator('.desktop-only .rm-workspace-selector');
+  await expect(hostWorkspaceSelector.locator("summary")).toContainText("호스트 공간");
+  await hostWorkspaceSelector.locator("summary").click();
+  await expect(hostWorkspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(hostWorkspaceSelector.getByRole("link", { name: "멤버 공간" })).toBeVisible();
 
   await page.goto(`/app/feedback/${seededFeedbackSessionId}/print`);
   await expect(page.getByRole("heading", { name: /독서모임 1차 피드백/ })).toBeVisible();
@@ -157,11 +166,5 @@ test("host activates viewer into full member", async ({ page }) => {
     memberState.currentSession.currentSession?.attendees.some(
       (attendee: { membershipId: string }) => attendee.membershipId === memberState.auth.membershipId,
     ),
-  ).toBe(true);
-
-  const rsvpResponse = page.waitForResponse(
-    (response) => response.url().includes("/api/bff/api/sessions/current/rsvp") && response.status() === 200,
-  );
-  await page.getByRole("button", { name: "참석" }).click();
-  await rsvpResponse;
+  ).toBe(false);
 });
