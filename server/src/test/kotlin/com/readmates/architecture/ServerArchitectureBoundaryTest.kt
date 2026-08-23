@@ -70,8 +70,12 @@ private val serverSlices =
         ),
         ServerSlice(
             name = "publication",
-            type = ServerSliceType.READ,
-            inboundAdapterPackages = listOf("com.readmates.publication.adapter.in.web.."),
+            type = ServerSliceType.WORKFLOW,
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.publication.adapter.in.web..",
+                    "com.readmates.publication.adapter.in.scheduling..",
+                ),
             applicationPackages = listOf("com.readmates.publication.application.."),
         ),
         ServerSlice(

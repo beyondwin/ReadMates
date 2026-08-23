@@ -13,13 +13,21 @@ data class PublicProjectionGeneration(
 data class PublicMutationConvergenceReceipt(
     val mutationReceiptId: String,
     val convergenceId: UUID,
+    val publicationIdSnapshot: UUID,
+    val sessionIdSnapshot: UUID,
     val committedGeneration: Long,
+    val originReadable: Boolean,
 )
 
 enum class ConvergenceAttemptStatus {
     PENDING,
     SUCCEEDED,
     FAILED,
+}
+
+enum class PublicConvergenceProcessResult {
+    PROCESSED,
+    NO_WORK,
 }
 
 data class PublicConvergenceWork(
@@ -46,6 +54,54 @@ data class AppendPublicConvergenceEventCommand(
     val observedAt: Instant,
     val resultCategory: String?,
 )
+
+data class ClaimPublicConvergenceWorkCommand(
+    val workerId: String,
+    val now: Instant,
+    val leaseExpiresAt: Instant,
+    val maxAttempts: Int,
+)
+
+data class ClaimedPublicConvergenceWork(
+    val convergenceId: UUID,
+    val publicationId: UUID,
+    val sessionId: UUID,
+    val committedGeneration: Long,
+    val originReadable: Boolean,
+    val attemptNo: Int,
+    val workerId: String,
+    val leaseExpiresAt: Instant,
+)
+
+data class CompletePublicConvergenceAttemptCommand(
+    val convergenceId: UUID,
+    val attemptNo: Int,
+    val workerId: String,
+    val status: ConvergenceAttemptStatus,
+    val observedAt: Instant,
+    val resultCategory: String,
+    val nextAvailableAt: Instant,
+    val exhausted: Boolean,
+)
+
+data class PublicConvergenceHostSnapshot(
+    val receipt: PublicMutationConvergenceReceipt,
+    val currentEvent: PublicConvergenceEvent?,
+    val nextAttemptNo: Int,
+)
+
+data class PublicConvergenceView(
+    val convergenceId: UUID,
+    val originResult: String,
+    val committedGeneration: Long,
+    val status: String,
+    val lastAttemptAt: Instant?,
+    val retryable: Boolean,
+)
+
+class PublicConvergenceNotAuthorizedException : RuntimeException("PUBLIC_CONVERGENCE_NOT_AUTHORIZED")
+
+class PublicConvergenceNotFoundException : RuntimeException("PUBLIC_CONVERGENCE_NOT_FOUND")
 
 fun providerIdempotencyToken(
     convergenceId: UUID,

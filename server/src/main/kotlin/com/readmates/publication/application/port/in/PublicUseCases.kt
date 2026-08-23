@@ -2,7 +2,10 @@ package com.readmates.publication.application.port.`in`
 
 import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
 import com.readmates.publication.application.model.PublicClubResult
+import com.readmates.publication.application.model.PublicConvergenceProcessResult
+import com.readmates.publication.application.model.PublicConvergenceView
 import com.readmates.publication.application.model.PublicSessionDetailResult
+import com.readmates.shared.security.ClubActor
 import java.util.UUID
 
 interface GetPublicClubUseCase {
@@ -18,4 +21,16 @@ interface GetPublicSessionUseCase {
     ): PublicSessionDetailResult?
 
     fun getSession(sessionId: UUID): PublicSessionDetailResult? = getSession(LEGACY_PUBLIC_CLUB_SLUG, sessionId)
+}
+
+interface GetHostPublicConvergenceUseCase {
+    fun getConvergence(
+        actor: ClubActor,
+        sessionId: UUID,
+        mutationReceiptId: UUID,
+    ): PublicConvergenceView
+}
+
+interface ProcessPublicConvergenceUseCase {
+    fun processOne(workerId: String): PublicConvergenceProcessResult
 }
