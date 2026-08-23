@@ -6,6 +6,7 @@ export type MeetingPublicationAction =
   | "removeMemberNotes"
   | "publishPublicRecord"
   | "removePublicRecord";
+export type MeetingPublicationActionForm = "action" | "completed";
 export type AccessScope = "HOST_ONLY" | "GUEST_READABLE";
 export type SiteVisibility = "HIDDEN" | "PUBLIC_RECORD";
 export type MeetingProjectionSurface = "host" | "memberGuest" | "publicRecord";
@@ -34,6 +35,13 @@ const PUBLICATION_ACTION_LABEL: Record<MeetingPublicationAction, string> = {
   removeMemberNotes: "게스트·멤버 노트에서 기록 내리기",
   publishPublicRecord: "공개 기록에 게시",
   removePublicRecord: "공개 기록에서 내리기",
+};
+
+const PUBLICATION_COMPLETED_LABEL: Record<MeetingPublicationAction, string> = {
+  publishMemberNotes: "게스트·멤버 노트에 기록을 게시했습니다.",
+  removeMemberNotes: "게스트·멤버 노트에서 기록을 내렸습니다.",
+  publishPublicRecord: "공개 기록에 게시했습니다.",
+  removePublicRecord: "공개 기록에서 내렸습니다.",
 };
 
 export function formatMeetingOrdinal(value: number, mode: "folio" | "sentence"): string {
@@ -86,6 +94,9 @@ export function formatMeetingProjection(
   return input.siteVisibility === "PUBLIC_RECORD" ? "공개 기록에 게시" : "공개 기록에 게시 안 함";
 }
 
-export function formatPublicationAction(action: MeetingPublicationAction): string {
-  return PUBLICATION_ACTION_LABEL[action];
+export function formatPublicationAction(
+  action: MeetingPublicationAction,
+  form: MeetingPublicationActionForm = "action",
+): string {
+  return form === "completed" ? PUBLICATION_COMPLETED_LABEL[action] : PUBLICATION_ACTION_LABEL[action];
 }

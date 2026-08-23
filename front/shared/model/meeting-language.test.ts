@@ -53,11 +53,15 @@ describe("canonical meeting language", () => {
     expect(MEETING_APPLY_LABEL).toBe("기록에 반영");
   });
 
-  it("names publication actions by audience and destination", () => {
+  it("formats publication actions and completed statuses by audience and destination", () => {
     expect(formatPublicationAction("publishMemberNotes")).toBe("게스트·멤버 노트에 기록 게시");
     expect(formatPublicationAction("removeMemberNotes")).toBe("게스트·멤버 노트에서 기록 내리기");
     expect(formatPublicationAction("publishPublicRecord")).toBe("공개 기록에 게시");
     expect(formatPublicationAction("removePublicRecord")).toBe("공개 기록에서 내리기");
+    expect(formatPublicationAction("publishMemberNotes", "completed")).toBe("게스트·멤버 노트에 기록을 게시했습니다.");
+    expect(formatPublicationAction("removeMemberNotes", "completed")).toBe("게스트·멤버 노트에서 기록을 내렸습니다.");
+    expect(formatPublicationAction("publishPublicRecord", "completed")).toBe("공개 기록에 게시했습니다.");
+    expect(formatPublicationAction("removePublicRecord", "completed")).toBe("공개 기록에서 내렸습니다.");
   });
 
   it("does not collapse public visibility into lifecycle or access scope", () => {

@@ -32,6 +32,8 @@ type ReverseLifecycleAction = {
 
 const publishMemberNotes = formatPublicationAction("publishMemberNotes");
 const removeMemberNotes = formatPublicationAction("removeMemberNotes");
+const publishMemberNotesCompleted = formatPublicationAction("publishMemberNotes", "completed");
+const removeMemberNotesCompleted = formatPublicationAction("removeMemberNotes", "completed");
 
 const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleConfirmCopy> = {
   open: {
@@ -53,7 +55,7 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
     title: publishMemberNotes,
     body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
     confirmLabel: publishMemberNotes,
-    successFlash: publishMemberNotes,
+    successFlash: publishMemberNotesCompleted,
   },
   reopen: {
     kind: "reopen",
@@ -67,7 +69,7 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
     title: removeMemberNotes,
     body: "공개 사이트에서 내려갑니다. 기록과 이미 보낸 알림은 남습니다.",
     confirmLabel: removeMemberNotes,
-    successFlash: removeMemberNotes,
+    successFlash: removeMemberNotesCompleted,
   },
   "return-to-draft": {
     kind: "return-to-draft",
