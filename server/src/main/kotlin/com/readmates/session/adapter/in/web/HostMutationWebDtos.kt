@@ -96,6 +96,7 @@ data class ExpectedExposureRevisionBody(
 
 data class ExpectedPublicationRevisionBody(
     @field:NotNull @field:Min(0) val publicationRevision: Long? = null,
+    @field:Min(0) val exposureRevision: Long? = null,
 ) {
     @JsonAnySetter
     fun rejectUnknown(

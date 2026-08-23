@@ -87,6 +87,7 @@ class SessionImportService(
                 input.trustedAuthorBindings,
                 input.historicalAuthorBindings,
                 trustAuthorDisplayNames = input.source == SessionRecordDraftSource.AI_GENERATED,
+                allowHostOnlyVisibility = input.allowHostOnlyVisibility,
             )
         val feedbackTitle = preview.feedbackDocument.title
         if (!preview.valid || feedbackTitle == null) return SessionRecordContentReplacementResult.Invalid
@@ -115,9 +116,10 @@ class SessionImportService(
         trustedAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
         historicalAuthorBindings: Map<String, java.util.UUID> = emptyMap(),
         trustAuthorDisplayNames: Boolean = false,
+        allowHostOnlyVisibility: Boolean = false,
     ): SessionImportPreviewResult {
         val issues = mutableListOf<SessionImportIssue>()
-        validateSessionMetadata(command, target, issues)
+        validateSessionMetadata(command, target, issues, allowHostOnlyVisibility)
         validateImportContent(command, issues)
 
         val highlights =
@@ -176,11 +178,12 @@ class SessionImportService(
         command: SessionImportCommand,
         target: SessionImportTarget,
         issues: MutableList<SessionImportIssue>,
+        allowHostOnlyVisibility: Boolean,
     ) {
         if (command.format != SESSION_IMPORT_FORMAT) {
             issues += SessionImportIssue("INVALID_FORMAT", "이 파일은 readmates-session-import:v1 형식이 아닙니다.")
         }
-        if (command.recordVisibility == SessionRecordVisibility.HOST_ONLY) {
+        if (!allowHostOnlyVisibility && command.recordVisibility == SessionRecordVisibility.HOST_ONLY) {
             issues += SessionImportIssue("HOST_ONLY_VISIBILITY", "호스트만 보기 범위에서는 모임 기록 import를 저장할 수 없습니다.")
         }
         if (command.session.number != target.sessionNumber) {

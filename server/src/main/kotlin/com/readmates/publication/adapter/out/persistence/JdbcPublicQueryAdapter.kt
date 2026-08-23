@@ -64,6 +64,7 @@ class JdbcPublicQueryAdapter(
                   and clubs.public_visibility = 'PUBLIC'
                   and sessions.id = ?
                   and sessions.state = 'PUBLISHED'
+                  and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
                 """.trimIndent(),
                 { rs, _ ->
@@ -98,6 +99,7 @@ class JdbcPublicQueryAdapter(
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
+                  and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
               ) as session_count,
               (
@@ -107,6 +109,7 @@ class JdbcPublicQueryAdapter(
                   and public_session_publications.club_id = sessions.club_id
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
+                  and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
               ) as book_count,
               (
@@ -175,6 +178,7 @@ class JdbcPublicQueryAdapter(
             ) one_liner_counts on one_liner_counts.session_id = sessions.id
             where sessions.club_id = ?
               and sessions.state = 'PUBLISHED'
+              and sessions.access_scope = 'GUEST_READABLE'
               and public_session_publications.site_visibility = 'PUBLIC_RECORD'
             order by sessions.number desc
             limit 6

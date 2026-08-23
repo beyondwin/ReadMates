@@ -1682,6 +1682,9 @@ private val sessionRecordCapabilityMethods =
         "SessionRecordApplyStorePort" to
             setOf(
                 "lockEditor",
+                "loadCorrectionEditor",
+                "lockCorrectionEditor",
+                "bumpCorrectionProjectionRevisions",
                 "findCompletedApply",
                 "findApplyReceipt",
                 "insertApplyReceipt",

@@ -1,14 +1,14 @@
 package com.readmates.sessionimport.adapter.out.persistence
 
-import com.readmates.session.domain.SessionExposure
-import com.readmates.session.domain.toCompatibility
 import com.readmates.sessionimport.application.model.SessionImportAttendee
 import com.readmates.sessionimport.application.model.SessionImportRecordPreview
 import com.readmates.sessionimport.application.model.SessionImportTarget
 import com.readmates.sessionimport.application.port.out.SessionImportRecordReplacement
 import com.readmates.sessionimport.application.port.out.SessionImportStoredFeedbackDocument
 import com.readmates.sessionimport.application.port.out.SessionImportWritePort
+import com.readmates.sessionrecord.application.model.SessionRecordAudienceProjection
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
+import com.readmates.sessionrecord.application.model.toAudienceProjection
 import com.readmates.shared.db.dbString
 import com.readmates.shared.db.uuid
 import com.readmates.shared.security.AuthenticatedClubActor
@@ -81,18 +81,11 @@ class JdbcSessionImportWriteAdapter(
 
     override fun replaceRecords(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument {
         val state = lockSession(command)
-        val exposure =
-            SessionExposure.fromCompatibility(
-                state,
-                command.visibility.name,
-                command.visibility.name,
-                command.visibility == SessionRecordVisibility.PUBLIC,
-            )
-        val compatibility = exposure.toCompatibility(state)
-        updateSessionVisibility(command, exposure, compatibility)
-        upsertPublication(command, exposure, compatibility)
+        val audience = command.visibility.toAudienceProjection(state)
+        updateSessionVisibility(command, audience)
+        upsertPublication(command, audience)
         replaceHighlights(command)
-        replaceOneLineReviews(command, compatibility.isPublic)
+        replaceOneLineReviews(command, audience.isPublic)
         return storeFeedbackDocument(command)
     }
 
@@ -112,8 +105,7 @@ class JdbcSessionImportWriteAdapter(
 
     private fun updateSessionVisibility(
         command: SessionImportRecordReplacement,
-        exposure: SessionExposure,
-        compatibility: com.readmates.session.domain.CompatibilityExposure,
+        audience: SessionRecordAudienceProjection,
     ) {
         jdbcTemplate.update(
             """
@@ -125,8 +117,8 @@ class JdbcSessionImportWriteAdapter(
               and club_id = ?
               and deleted_at is null
             """.trimIndent(),
-            exposure.accessScope.name,
-            compatibility.sessionVisibility,
+            audience.accessScope.name,
+            audience.sessionCompatibilityVisibility.name,
             command.sessionId.dbString(),
             command.host.clubId.dbString(),
         )
@@ -134,8 +126,7 @@ class JdbcSessionImportWriteAdapter(
 
     private fun upsertPublication(
         command: SessionImportRecordReplacement,
-        exposure: SessionExposure,
-        compatibility: com.readmates.session.domain.CompatibilityExposure,
+        audience: SessionRecordAudienceProjection,
     ) {
         jdbcTemplate.update(
             """
@@ -155,10 +146,10 @@ class JdbcSessionImportWriteAdapter(
             command.host.clubId.dbString(),
             command.sessionId.dbString(),
             command.publicationSummary,
-            compatibility.isPublic,
-            compatibility.publicationVisibility,
-            exposure.siteVisibility.name,
-            compatibility.isPublic,
+            audience.isPublic,
+            audience.publicationVisibility.name,
+            audience.siteVisibility.name,
+            audience.isPublic,
         )
     }
 

@@ -67,7 +67,7 @@ internal class ArchiveListQueries {
                   and latest_feedback_document.club_id = sessions.club_id
                 where sessions.club_id = ?
                   and sessions.state in ('CLOSED', 'PUBLISHED')
-                  and sessions.visibility in ('MEMBER', 'PUBLIC')
+                  and sessions.access_scope = 'GUEST_READABLE'
                   and (
                     ? is null
                     or sessions.number < ?

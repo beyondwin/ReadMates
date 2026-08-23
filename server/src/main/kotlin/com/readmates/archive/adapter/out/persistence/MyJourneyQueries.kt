@@ -213,7 +213,7 @@ private val MY_JOURNEY_ELIGIBILITY_SQL =
     """
     sessions.club_id = ?
       and sessions.state in ('CLOSED', 'PUBLISHED')
-      and sessions.visibility in ('MEMBER', 'PUBLIC')
+      and sessions.access_scope = 'GUEST_READABLE'
       and (
         current_participant.attendance_status = 'ATTENDED'
         or coalesce(my_questions.question_count, 0) > 0

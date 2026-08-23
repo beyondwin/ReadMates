@@ -139,11 +139,14 @@ class HostMutationEnvelopeReader(
                 body,
                 ExpectedPublicationRevisionBody::class.java,
                 HostSessionPublicationRequest::class.java,
-                setOf("publicationRevision"),
+                setOf("publicationRevision", "exposureRevision"),
             ) {
                 ExpectedPublicationRevisionBody() to convert(body, HostSessionPublicationRequest::class.java)
             }
         if (body.has("idempotencyKey") && envelope.expected.publicationRevision == null) {
+            throw InvalidSessionScheduleException()
+        }
+        if (envelope.command.accessScope != null && envelope.expected.exposureRevision == null) {
             throw InvalidSessionScheduleException()
         }
         return envelope

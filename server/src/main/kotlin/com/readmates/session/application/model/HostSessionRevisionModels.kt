@@ -1,5 +1,8 @@
 package com.readmates.session.application.model
 
+import com.readmates.session.domain.PublicSiteVisibility
+import com.readmates.session.domain.SessionAccessScope
+import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import java.time.Instant
 import java.util.UUID
 
@@ -72,6 +75,15 @@ data class CorrectionPublicationVersionVector(
         require(publicationRevision >= 0) { "publicationRevision must be non-negative" }
     }
 }
+
+data class CorrectionPublicationPreview(
+    val snapshotId: String,
+    val versions: CorrectionPublicationVersionVector,
+    val state: String,
+    val accessScope: SessionAccessScope,
+    val siteVisibility: PublicSiteVisibility,
+    val visibility: SessionRecordVisibility,
+)
 
 data class ExpectedSessionRevision(
     val value: Long,

@@ -7,6 +7,7 @@ import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapsho
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordApplyReceipt
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordRevision
@@ -34,10 +35,28 @@ interface SessionRecordReadStorePort {
 }
 
 interface SessionRecordApplyStorePort {
+    fun loadCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor? = null
+
     fun lockEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,
     ): SessionRecordEditor?
+
+    fun lockCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor? = null
+
+    fun bumpCorrectionProjectionRevisions(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedExposureRevision: Long,
+        expectedPublicationRevision: Long,
+        exposureChanged: Boolean,
+    ): Boolean = false
 
     fun findCompletedApply(
         host: AuthenticatedClubActor,

@@ -765,19 +765,94 @@ class HostSessionIdempotencyDbTest(
     }
 
     private fun insertRecordDraft(sessionId: String) {
-        jdbcTemplate.update(
-            """
-            insert into session_record_drafts (
-              session_id, club_id, base_live_revision, draft_revision, source,
-              snapshot_json, snapshot_sha256, updated_by_membership_id
-            ) values (?, ?, 0, 1, 'MANUAL', '{}', ?, ?)
-            """.trimIndent(),
-            sessionId,
-            CLUB_ID,
-            "a".repeat(64),
-            HOST_MEMBERSHIP_ID,
-        )
+        val hostDisplayName =
+            jdbcTemplate.queryForObject(
+                "select name from users where email = 'host@example.com'",
+                String::class.java,
+            ) ?: error("missing host")
+        val snapshot =
+            jsonMapper.createObjectNode().apply {
+                put("visibility", "MEMBER")
+                put("publicationSummary", "교정 발행 회귀 요약")
+                putArray("highlights").addObject().apply {
+                    put("membershipId", HOST_MEMBERSHIP_ID)
+                    put("authorDisplayName", hostDisplayName)
+                    put("text", "교정 발행 회귀 하이라이트")
+                }
+                putArray("oneLineReviews").addObject().apply {
+                    put("membershipId", HOST_MEMBERSHIP_ID)
+                    put("authorDisplayName", hostDisplayName)
+                    put("text", "교정 발행 회귀 한줄평")
+                }
+                putObject("feedbackDocument").apply {
+                    put("fileName", "correction-regression.md")
+                    put("title", "교정 발행 회귀 피드백")
+                    put("markdown", correctionFeedbackMarkdown())
+                }
+            }
+        val body =
+            jsonMapper.createObjectNode().apply {
+                putNull("expectedDraftRevision")
+                set("snapshot", snapshot)
+            }
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/record-draft") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = body.toString()
+            }.andExpect { status { isOk() } }
     }
+
+    private fun correctionFeedbackMarkdown() =
+        """
+        <!-- readmates-feedback:v1 -->
+
+        # 독서모임 1차 피드백
+
+        범위 재시도 · 2026.09.04
+
+        ## 메타
+
+        - 책: 범위 재시도
+
+        ## 관찰자 노트
+
+        교정 발행 원자성 회귀를 확인합니다.
+
+        ## 참여자별 피드백
+
+        ### 01. Host
+
+        역할: 호스트
+
+        #### 참여 스타일
+
+        안정적입니다.
+
+        #### 실질 기여
+
+        - 회귀 경로를 확인했습니다.
+
+        #### 문제점과 자기모순
+
+        ##### 1. 범위
+
+        - 핵심: 범위를 유지합니다.
+        - 근거: 단일 원자성 경로입니다.
+        - 해석: 동일 계약을 유지합니다.
+
+        #### 실천 과제
+
+        1. 원자성 검증을 유지합니다.
+
+        #### 드러난 한 문장
+
+        > 교정 발행은 한 번만 반영됩니다.
+
+        맥락: 회귀 테스트
+
+        주석: 공개 데이터가 아닌 테스트 fixture입니다.
+        """.trimIndent()
 
     private fun preparePublication(sessionId: String) {
         mockMvc
@@ -980,6 +1055,12 @@ class HostSessionIdempotencyDbTest(
 }
 
 private const val CLEANUP_IDEMPOTENCY_SQL = """
+    delete from session_record_apply_receipts
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
     delete from session_record_drafts
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
@@ -1002,6 +1083,30 @@ private const val CLEANUP_IDEMPOTENCY_SQL = """
         where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
       );
     delete from host_session_lifecycle_audit
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from session_feedback_documents
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from highlights
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from one_line_reviews
+    where club_id = '00000000-0000-0000-0000-000000000001'
+      and session_id in (
+        select id from sessions
+        where club_id = '00000000-0000-0000-0000-000000000001' and number > 7
+      );
+    delete from session_record_revisions
     where club_id = '00000000-0000-0000-0000-000000000001'
       and session_id in (
         select id from sessions

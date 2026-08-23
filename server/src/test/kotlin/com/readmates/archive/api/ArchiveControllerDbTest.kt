@@ -270,11 +270,11 @@ class ArchiveControllerDbTest(
               id, club_id, number, title, book_title, book_author, book_translator,
               book_link, book_image_url, session_date, start_time, end_time,
               location_label, meeting_url, meeting_passcode, question_deadline_at,
-              state, visibility
+              state, visibility, access_scope
             )
             values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
               null, null, null, '2026-08-15', '20:00:00', '22:00:00',
-              '온라인', null, null, '2026-08-14 14:59:00.000000', ?, ?)
+              '온라인', null, null, '2026-08-14 14:59:00.000000', ?, ?, ?)
             """.trimIndent(),
             sessionId,
             number,
@@ -282,6 +282,7 @@ class ArchiveControllerDbTest(
             "필터 책 $number",
             state,
             visibility,
+            if (visibility == "HOST_ONLY") "HOST_ONLY" else "GUEST_READABLE",
         )
 
         return sessionId
@@ -534,7 +535,8 @@ class ArchiveControllerDbTest(
               meeting_passcode,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             values (
               '00000000-0000-0000-0000-000000009281',
@@ -554,7 +556,8 @@ class ArchiveControllerDbTest(
               null,
               '2026-10-11 14:59:00.000000',
               'PUBLISHED',
-              'PUBLIC'
+              'PUBLIC',
+              'GUEST_READABLE'
             );
         """
 
@@ -775,7 +778,8 @@ class ArchiveControllerDbTest(
               location_label,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             values
             (
@@ -794,7 +798,8 @@ class ArchiveControllerDbTest(
               '온라인',
               '2026-12-29 14:59:00.000000',
               'PUBLISHED',
-              'MEMBER'
+              'MEMBER',
+              'GUEST_READABLE'
             ),
             (
               '00000000-0000-0000-0000-000000000997',
@@ -812,7 +817,8 @@ class ArchiveControllerDbTest(
               '온라인',
               '2026-12-28 14:59:00.000000',
               'PUBLISHED',
-              'MEMBER'
+              'MEMBER',
+              'GUEST_READABLE'
             ),
             (
               '00000000-0000-0000-0000-000000000996',
@@ -830,7 +836,8 @@ class ArchiveControllerDbTest(
               '온라인',
               '2026-12-27 14:59:00.000000',
               'PUBLISHED',
-              'PUBLIC'
+              'PUBLIC',
+              'GUEST_READABLE'
             );
         """
 

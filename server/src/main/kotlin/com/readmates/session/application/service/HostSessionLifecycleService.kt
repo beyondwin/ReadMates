@@ -11,6 +11,8 @@ import com.readmates.session.application.HostSessionRecordStagingRequiredExcepti
 import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.InvalidSessionScheduleException
+import com.readmates.session.application.model.CorrectionPublicationPreview
+import com.readmates.session.application.model.CorrectionPublicationVersionVector
 import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
@@ -21,6 +23,7 @@ import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
 import com.readmates.session.application.model.HostSessionLifecycleReasonCode
 import com.readmates.session.application.model.HostSessionReverseCommand
 import com.readmates.session.application.model.HostSessionTrashResponse
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.normalized
 import com.readmates.session.application.model.toDetail
@@ -33,9 +36,13 @@ import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.toPreviewResponse
 import com.readmates.session.config.HostSessionLifecycleProperties
+import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionResult
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
+import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.listing.application.model.HostListEpochKind
@@ -58,6 +65,7 @@ class HostSessionLifecycleService(
     private val lifecyclePort: HostSessionLifecyclePort,
     private val deletionPort: HostSessionDeletionPort,
     private val draftPort: HostSessionDraftPort,
+    private val correctionPublisher: ApplySessionRecordUseCase,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val confirmationProperties: HostActionConfirmationProperties = HostActionConfirmationProperties(),
     private val lifecycleAudit: HostSessionLifecycleAuditPort = NoopHostSessionLifecycleAuditPort,
@@ -196,14 +204,48 @@ class HostSessionLifecycleService(
 
     @Transactional
     override fun correctionPublish(command: HostSessionIdCommand) =
-        executeLifecycle(
-            command = command,
-            operation = HostMutationOperation.SESSION_CORRECTION_PUBLISH,
-            payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_CORRECTION_PUBLISH),
-        ) {
-            verifyCorrectionVector(command)
-            draftPort.lockVisibilitySnapshot(command).detail
+        command.expectedCorrectionVector.let { expected ->
+            if (expected == null) throw InvalidSessionScheduleException()
+            executeLifecycle(
+                command = command,
+                operation = HostMutationOperation.SESSION_CORRECTION_PUBLISH,
+                payload = HostMutationPayloads.correction(expected),
+            ) {
+                publishCorrection(command)
+                draftPort.lockVisibilitySnapshot(command).detail
+            }
         }
+
+    override fun correctionPublishPreview(command: HostSessionIdCommand): CorrectionPublicationPreview {
+        val projection =
+            correctionPublisher.previewCorrection(command.host, command.sessionId)
+                ?: throw HostSessionPublishNotAllowedException()
+        val versions = projection.versions
+        val vector =
+            SessionVersionVector(
+                sessionRevision = versions.sessionRevision,
+                exposureRevision = versions.exposureRevision,
+                participantSetRevision = versions.participantSetRevision,
+                recordDraftRevision = versions.recordDraftRevision,
+                liveRecordRevision = versions.liveRecordRevision,
+                publicationRevision = versions.publicationRevision,
+            )
+        return CorrectionPublicationPreview(
+            snapshotId = vector.snapshotIdentity(command.sessionId).snapshotId,
+            versions =
+                CorrectionPublicationVersionVector(
+                    sessionRevision = versions.sessionRevision,
+                    recordDraftRevision = versions.recordDraftRevision ?: throw HostSessionPublishNotAllowedException(),
+                    liveRecordRevision = versions.liveRecordRevision,
+                    exposureRevision = versions.exposureRevision,
+                    publicationRevision = versions.publicationRevision,
+                ),
+            state = projection.state,
+            accessScope = SessionAccessScope.valueOf(projection.targetAudience.accessScope.name),
+            siteVisibility = PublicSiteVisibility.valueOf(projection.targetAudience.siteVisibility.name),
+            visibility = projection.targetAudience.visibility,
+        )
+    }
 
     @Transactional
     override fun reopen(command: HostSessionReverseCommand) =
@@ -338,23 +380,20 @@ class HostSessionLifecycleService(
         }
     }
 
-    private fun verifyCorrectionVector(command: HostSessionIdCommand) {
+    private fun publishCorrection(command: HostSessionIdCommand) {
         val expected = command.expectedCorrectionVector ?: throw InvalidSessionScheduleException()
-        val snapshot =
-            mutations?.loadProjection(command.host, command.sessionId)
-                ?: throw HostSessionNotFoundException()
-        if (snapshot.state != "PUBLISHED") {
-            throw HostSessionPublishNotAllowedException()
-        }
-        val current = snapshot.versions
-        if (expected.sessionRevision != current.sessionRevision ||
-            expected.exposureRevision != current.exposureRevision ||
-            expected.publicationRevision != current.publicationRevision ||
-            expected.liveRecordRevision != (current.liveRecordRevision ?: 0L) ||
-            expected.recordDraftRevision != (current.recordDraftRevision ?: 0L)
-        ) {
-            throw HostSessionRevisionConflictException(current, null, null)
-        }
+        correctionPublisher
+            .publishCorrection(
+                command.host,
+                PublishSessionRecordCorrectionCommand(
+                    sessionId = command.sessionId,
+                    expectedSessionRevision = expected.sessionRevision,
+                    expectedDraftRevision = expected.recordDraftRevision,
+                    expectedLiveRevision = expected.liveRecordRevision,
+                    expectedExposureRevision = expected.exposureRevision,
+                    expectedPublicationRevision = expected.publicationRevision,
+                ),
+            ).requireApplied()
     }
 
     private fun currentVersions(command: HostSessionIdCommand) =
@@ -572,3 +611,23 @@ private fun isFirstMemberPublication(
     state == "DRAFT" &&
         previousVisibility == SessionRecordVisibility.HOST_ONLY &&
         requestedVisibility != SessionRecordVisibility.HOST_ONLY
+
+private fun PublishSessionRecordCorrectionResult.requireApplied() {
+    when (this) {
+        is PublishSessionRecordCorrectionResult.Applied -> Unit
+        is PublishSessionRecordCorrectionResult.RevisionConflict ->
+            throw HostSessionRevisionConflictException(
+                SessionVersionVector(
+                    sessionRevision = current.sessionRevision,
+                    exposureRevision = current.exposureRevision,
+                    participantSetRevision = current.participantSetRevision,
+                    recordDraftRevision = current.recordDraftRevision,
+                    liveRecordRevision = current.liveRecordRevision.takeIf { it > 0 },
+                    publicationRevision = current.publicationRevision,
+                ),
+                null,
+                null,
+            )
+        PublishSessionRecordCorrectionResult.NotPublished -> throw HostSessionPublishNotAllowedException()
+    }
+}

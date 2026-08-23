@@ -41,6 +41,13 @@ object MutationCanonicalizer {
                 writer.writeNullableLong(payload.expectedParticipantSetRevision)
             }
             is CanonicalMutationPayload.ResourceOnly -> Unit
+            is CanonicalMutationPayload.CorrectionPublish -> {
+                writer.writeLong(payload.expectedSessionRevision)
+                writer.writeLong(payload.expectedDraftRevision)
+                writer.writeLong(payload.expectedLiveRevision)
+                writer.writeLong(payload.expectedExposureRevision)
+                writer.writeLong(payload.expectedPublicationRevision)
+            }
             is CanonicalMutationPayload.Reverse -> {
                 writer.writeNullableString(payload.reasonCode)
                 writer.writeNullableString(payload.reasonNote)
@@ -49,6 +56,7 @@ object MutationCanonicalizer {
             is CanonicalMutationPayload.Publication -> {
                 writer.writeString(payload.publicSummary)
                 writer.writeString(payload.siteVisibility)
+                payload.accessScope?.let(writer::writeString)
             }
             is CanonicalMutationPayload.RecordApply -> {
                 writer.writeString(payload.applyRequestId.toString())
