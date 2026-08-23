@@ -195,7 +195,7 @@ internal class NotificationDeliveryPlanningOperations(
             where sessions.club_id = ?
               and sessions.id = ?
               and $statePredicate
-              and sessions.visibility in ('MEMBER', 'PUBLIC')
+              and sessions.access_scope = 'GUEST_READABLE'
               and memberships.status = 'ACTIVE'
             """.trimIndent(),
             { resultSet, _ -> with(rowMappers) { resultSet.toDeliveryRecipient() } },
@@ -264,7 +264,7 @@ internal class NotificationDeliveryPlanningOperations(
             where sessions.club_id = ?
               and sessions.id = ?
               and sessions.state = 'PUBLISHED'
-              and sessions.visibility in ('MEMBER', 'PUBLIC')
+              and sessions.access_scope = 'GUEST_READABLE'
               and memberships.status = 'ACTIVE'
               and memberships.id <> ?
             """.trimIndent(),

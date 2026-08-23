@@ -46,12 +46,14 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
       '00000000-0000-0000-0000-000000009501',
       '00000000-0000-0000-0000-000000009510',
       '00000000-0000-0000-0000-000000009511',
-      '00000000-0000-0000-0000-000000009512'
+      '00000000-0000-0000-0000-000000009512',
+      '00000000-0000-0000-0000-000000009513'
     );
     delete from club_notification_policies
     where club_id in (
       '00000000-0000-0000-0000-000000000910',
-      '00000000-0000-0000-0000-000000000911'
+      '00000000-0000-0000-0000-000000000911',
+      '00000000-0000-0000-0000-000000000913'
     );
     delete from sessions
     where id in (
@@ -59,7 +61,8 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
       '00000000-0000-0000-0000-000000009501',
       '00000000-0000-0000-0000-000000009510',
       '00000000-0000-0000-0000-000000009511',
-      '00000000-0000-0000-0000-000000009512'
+      '00000000-0000-0000-0000-000000009512',
+      '00000000-0000-0000-0000-000000009513'
     );
     delete from sessions
     where club_id = '00000000-0000-0000-0000-000000000101';
@@ -69,7 +72,8 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
     where id in (
       '00000000-0000-0000-0000-000000000810',
       '00000000-0000-0000-0000-000000000811',
-      '00000000-0000-0000-0000-000000000812'
+      '00000000-0000-0000-0000-000000000812',
+      '00000000-0000-0000-0000-000000000813'
     );
     delete from users
     where id = '00000000-0000-0000-0000-000000000701';
@@ -77,13 +81,15 @@ private const val CLEANUP_NOTIFICATION_EVENT_OUTBOX_SQL = """
     where id in (
       '00000000-0000-0000-0000-000000000710',
       '00000000-0000-0000-0000-000000000711',
-      '00000000-0000-0000-0000-000000000712'
+      '00000000-0000-0000-0000-000000000712',
+      '00000000-0000-0000-0000-000000000713'
     );
     delete from clubs
     where id in (
       '00000000-0000-0000-0000-000000000910',
       '00000000-0000-0000-0000-000000000911',
-      '00000000-0000-0000-0000-000000000912'
+      '00000000-0000-0000-0000-000000000912',
+      '00000000-0000-0000-0000-000000000913'
     );
     delete from clubs
     where id = '00000000-0000-0000-0000-000000000101';
@@ -635,6 +641,14 @@ class JdbcNotificationEventOutboxAdapterTest(
             sessionId = "00000000-0000-0000-0000-000000009512",
             policy = null,
         )
+        jdbcTemplate.seedReminderCandidate(
+            clubId = "00000000-0000-0000-0000-000000000913",
+            userId = "00000000-0000-0000-0000-000000000713",
+            membershipId = "00000000-0000-0000-0000-000000000813",
+            sessionId = "00000000-0000-0000-0000-000000009513",
+            policy = true,
+            accessScope = "HOST_ONLY",
+        )
 
         val firstInserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 5, 1))
         val duplicateInserted = adapter.enqueueSessionReminderDue(LocalDate.of(2026, 5, 1))
@@ -644,6 +658,7 @@ class JdbcNotificationEventOutboxAdapterTest(
         assertThat(jdbcTemplate.reminderEventCount("00000000-0000-0000-0000-000000000910")).isEqualTo(1)
         assertThat(jdbcTemplate.reminderEventCount("00000000-0000-0000-0000-000000000911")).isZero()
         assertThat(jdbcTemplate.reminderEventCount("00000000-0000-0000-0000-000000000912")).isZero()
+        assertThat(jdbcTemplate.reminderEventCount("00000000-0000-0000-0000-000000000913")).isZero()
         assertOptedInReminderRow(jdbcTemplate)
     }
 
@@ -1060,10 +1075,11 @@ private fun JdbcTemplate.seedReminderCandidate(
     membershipId: String,
     sessionId: String,
     policy: Boolean?,
+    accessScope: String = "GUEST_READABLE",
 ) {
     insertReminderClub(clubId)
     insertReminderHost(clubId, userId, membershipId)
-    insertReminderSession(clubId, sessionId)
+    insertReminderSession(clubId, sessionId, accessScope)
     policy?.let { insertReminderPolicy(clubId, membershipId, it) }
 }
 
@@ -1106,21 +1122,23 @@ private fun JdbcTemplate.insertReminderHost(
 private fun JdbcTemplate.insertReminderSession(
     clubId: String,
     sessionId: String,
+    accessScope: String,
 ) {
     update(
         """
         insert into sessions (
           id, club_id, number, title, book_title, book_author,
           session_date, start_time, end_time, location_label,
-          question_deadline_at, state, visibility
+          question_deadline_at, state, visibility, access_scope
         ) values (
           ?, ?, 9501, '리마인더 이벤트 테스트 회차', '리마인더 이벤트 테스트 책', '테스트 저자',
           '2026-05-01', '19:30:00', '21:30:00', '온라인',
-          '2026-04-30 14:59:00.000000', 'OPEN', 'MEMBER'
+          '2026-04-30 14:59:00.000000', 'OPEN', 'MEMBER', ?
         )
         """.trimIndent(),
         sessionId,
         clubId,
+        accessScope,
     )
 }
 

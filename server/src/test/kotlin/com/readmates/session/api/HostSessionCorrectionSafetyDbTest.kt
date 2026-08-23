@@ -2,6 +2,7 @@ package com.readmates.session.api
 
 import com.readmates.session.application.port.`in`.PurgeExpiredHostSessionTrashUseCase
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -60,7 +61,34 @@ class HostSessionCorrectionSafetyDbTest(
         mockMvc
             .get("/api/public/clubs/reading-sai/sessions/$sessionId")
             .andExpect { status { isNotFound() } }
+        val sessionListIds = notesSessionIds("/api/notes/sessions")
+        val globalFeedIds = notesSessionIds("/api/notes/feed")
+        val sessionFeedIds = notesSessionIds("/api/notes/feed", sessionId)
+        assertSoftly { softly ->
+            softly.assertThat(sessionListIds).doesNotContain(sessionId)
+            softly.assertThat(globalFeedIds).doesNotContain(sessionId)
+            softly.assertThat(sessionFeedIds).doesNotContain(sessionId)
+        }
     }
+
+    private fun notesSessionIds(
+        path: String,
+        sessionId: String? = null,
+    ): List<String> =
+        mockMvc
+            .get(path) {
+                sessionId?.let { param("sessionId", it) }
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isOk() }
+            }.andReturn()
+            .response.contentAsString
+            .let(jsonMapper::readTree)
+            .get("items")
+            .iterator()
+            .asSequence()
+            .map { item -> item.get("sessionId").asString() }
+            .toList()
 
     @Test
     fun `correction idempotency binds the exact five field vector`() {
