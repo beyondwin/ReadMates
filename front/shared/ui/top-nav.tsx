@@ -9,6 +9,8 @@ import {
   READMATES_PRIMARY_NAV_LABELS,
 } from "./readmates-copy";
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
+import { hasHostRecordsReturnState } from "@/shared/routing/readmates-route-state";
+import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 
 export type TopNavVariant = "guest" | "member" | "host";
 
@@ -107,13 +109,13 @@ function hostLinks({
   return [
     {
       key: "host-operations",
-      href: "/app/host",
+      href: HOST_ROUTE_HREFS.today,
       label: READMATES_PRIMARY_NAV_LABELS.host.today,
       current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
     },
     {
       key: "host-session",
-      href: "/app/host/sessions",
+      href: HOST_ROUTE_HREFS.meetings,
       label: READMATES_PRIMARY_NAV_LABELS.host.session,
       current: (pathname) =>
         pathname === "/app/host/sessions"
@@ -122,13 +124,13 @@ function hostLinks({
     },
     {
       key: "host-members",
-      href: "/app/host/members",
+      href: HOST_ROUTE_HREFS.members,
       label: READMATES_PRIMARY_NAV_LABELS.host.members,
       current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
     },
     {
       key: "host-records",
-      href: "/app/host/records",
+      href: HOST_ROUTE_HREFS.records,
       label: READMATES_PRIMARY_NAV_LABELS.host.records,
       current: (pathname) =>
         pathname === "/app/host/records" ||
@@ -376,8 +378,14 @@ function AppTopNav({
   LinkComponent: AppLinkComponent;
   accountControl?: ReactNode;
 }) {
-  const pathname = useLocation().pathname;
-  const appPath = appPathname(pathname);
+  const location = useLocation();
+  const pathname = location.pathname;
+  const rawAppPath = appPathname(pathname);
+  const appPath = variant === "host"
+    && /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(rawAppPath)
+    && hasHostRecordsReturnState(location.state)
+    ? "/app/host/records"
+    : rawAppPath;
   const resolvedCurrentSessionStatus =
     currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
   const links = (

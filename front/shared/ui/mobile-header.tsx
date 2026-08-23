@@ -6,6 +6,7 @@ import { ReadmatesBrandMark } from "./readmates-brand-mark";
 import { READMATES_MOBILE_TAB_LABELS, READMATES_NAV_LABELS } from "./readmates-copy";
 import { TabIcon, type TabIconName } from "./mobile-tab-bar";
 import { WorkspaceSwitchIcon } from "./workspace-switch-icon";
+import { hasHostRecordsReturnState } from "@/shared/routing/readmates-route-state";
 
 export type MobileHeaderVariant = "guest" | "member" | "host";
 
@@ -278,6 +279,11 @@ function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: stri
   return variant === "host" ? READMATES_NAV_LABELS.host.operations : "읽는사이";
 }
 
+function isHostRecordOwnedRoute(pathname: string, state: unknown) {
+  return /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname)
+    || (/^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname) && hasHostRecordsReturnState(state));
+}
+
 type HeaderBackTarget = {
   href: string;
   state?: ReadmatesReturnState;
@@ -313,6 +319,14 @@ function appBackTarget(
 
   if (pathname === "/app/host/records") {
     return null;
+  }
+
+  if (variant === "host" && isHostRecordOwnedRoute(pathname, state)) {
+    const target = navigationContinuity.readReadmatesReturnTarget(state, {
+      href: "/app/host/records",
+      label: "기록으로",
+    });
+    return { href: target.href, state: target.state, label: "뒤로", icon: "brand" };
   }
 
   if (pathname.startsWith("/app/host/sessions/")) {
@@ -517,12 +531,13 @@ function AppMobileHeader({
   const location = useLocation();
   const pathname = location.pathname;
   const appPath = appPathname(pathname);
+  const recordOwned = variant === "host" && isHostRecordOwnedRoute(appPath, location.state);
 
   return (
     <HeaderShell
       workspace={variant}
       kicker={variant === "host" ? "호스트" : null}
-      title={appTitle(variant, appPath)}
+      title={recordOwned ? "기록" : appTitle(variant, appPath)}
       backTarget={scopeAppBackTarget(appBackTarget(variant, appPath, location.state, navigationContinuity), appBasePath)}
       rightAction={appRightAction(appBasePath, workspaceAction)}
       accountControl={accountControl}

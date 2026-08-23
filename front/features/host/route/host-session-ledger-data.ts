@@ -11,6 +11,7 @@ import {
 } from "@/features/host/queries/host-session-record-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { recoverableHostListLoaderFailure } from "./host-list-loader-recovery";
 
 export const HOST_SESSION_LEDGER_PAGE_LIMIT = 50;
 
@@ -44,12 +45,12 @@ export function hostSessionLedgerLoaderFactory(client: QueryClient) {
     if (filters.view === "trash") {
       const trashPage = await client.fetchQuery(
         hostSessionTrashListQuery({ limit: HOST_SESSION_LEDGER_PAGE_LIMIT }, context),
-      ).catch(() => null);
+      ).catch(recoverableHostListLoaderFailure);
       return { filters, page: null, trashPage };
     }
 
     const page = await client.fetchQuery(hostSessionRecordLedgerQuery(request, context))
-      .catch(() => null);
+      .catch(recoverableHostListLoaderFailure);
 
     return { filters, page, trashPage: null };
   };

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { HOST_ROUTE_DESTINATION_INVENTORY } from "./route-continuity";
+import { HOST_ROUTE_HREFS, HOST_ROUTE_PATHS } from "@/shared/routing/host-route-destinations";
 
 describe("host route destination inventory", () => {
   it("keeps the four primary host destinations distinct", () => {
@@ -37,6 +38,30 @@ describe("host route destination inventory", () => {
     for (const entry of HOST_ROUTE_DESTINATION_INVENTORY) {
       expect(entry.scopedHref, entry.owner).toMatch(/^\/clubs\/:slug(?:\/|$)/);
     }
+  });
+
+  it("covers every canonical production host destination", () => {
+    const inventoried = new Set(HOST_ROUTE_DESTINATION_INVENTORY.map((entry) => entry.href));
+    expect(Object.values(HOST_ROUTE_HREFS).every((href) => inventoried.has(href))).toBe(true);
+    expect(HOST_ROUTE_DESTINATION_INVENTORY.map((entry) => entry.owner)).toEqual(expect.arrayContaining([
+      "host-invitations",
+      "host-notifications",
+      "host-operations",
+      "host-new-meeting",
+      "host-session-edit",
+      "host-session-closing",
+      "host-feedback-document",
+      "host-meeting-detail",
+      "host-record-detail",
+      "host-trash-compatibility",
+    ]));
+  });
+
+  it("derives every production route href from the exact registered child path", () => {
+    for (const key of Object.keys(HOST_ROUTE_PATHS) as Array<keyof typeof HOST_ROUTE_PATHS>) {
+      expect(HOST_ROUTE_HREFS[key]).toBe(`/app/host${HOST_ROUTE_PATHS[key] ? `/${HOST_ROUTE_PATHS[key]}` : ""}`);
+    }
+    expect(HOST_ROUTE_HREFS.trashCompatibility).toBe(`${HOST_ROUTE_HREFS.meetings}?view=trash`);
   });
 
   it("documents the only compatibility trash entry", () => {

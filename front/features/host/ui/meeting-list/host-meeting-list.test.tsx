@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { HostMeetingListRow } from "@/features/host/model/host-meeting-list-model";
 import { HostMeetingList } from "./host-meeting-list";
@@ -52,5 +53,24 @@ describe("HostMeetingList", () => {
 
     expect(screen.getByRole("status")).toHaveTextContent("목록이 바뀌어 처음부터 다시 불러왔습니다.");
     expect(screen.getByRole("heading", { name: "모임" })).toHaveFocus();
+  });
+
+  it("shows a retryable inline failure instead of the first-meeting empty state", async () => {
+    const onRetry = vi.fn();
+    render(
+      <HostMeetingList
+        rows={[]}
+        nextCursor={null}
+        loadingMore={false}
+        onLoadMore={vi.fn()}
+        errorMessage="모임을 불러오지 못했습니다."
+        onRetry={onRetry}
+      />,
+    );
+
+    expect(screen.getByText("모임을 불러오지 못했습니다.")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "첫 모임 만들기" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "다시 시도" }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

@@ -20,6 +20,9 @@ export function HostMeetingList({
   LinkComponent = DefaultLink,
   announcement = null,
   focusHeadingRevision = 0,
+  loading = false,
+  errorMessage = null,
+  onRetry,
 }: {
   rows: readonly HostMeetingListRow[];
   nextCursor: string | null;
@@ -28,6 +31,9 @@ export function HostMeetingList({
   LinkComponent?: HostMeetingListLinkComponent;
   announcement?: string | null;
   focusHeadingRevision?: number;
+  loading?: boolean;
+  errorMessage?: string | null;
+  onRetry?: () => void;
 }) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const previousFocusRevision = useRef(focusHeadingRevision);
@@ -61,7 +67,15 @@ export function HostMeetingList({
             ) : null}
           </div>
           <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
-          {rows.length === 0 ? (
+          {errorMessage ? (
+            <div className="rm-empty-state" role="alert">
+              <h2 className="h3 editorial">모임을 불러오지 못했습니다</h2>
+              <p className="small">{errorMessage}</p>
+              <button type="button" className="btn btn-primary" onClick={onRetry}>다시 시도</button>
+            </div>
+          ) : loading ? (
+            <div className="rm-empty-state" role="status">모임을 불러오는 중</div>
+          ) : rows.length === 0 ? (
             <div className="rm-empty-state">
               <h2 className="h3 editorial">첫 모임을 준비해 보세요</h2>
               <LinkComponent to="/app/host/sessions/new" className="btn btn-primary">첫 모임 만들기</LinkComponent>

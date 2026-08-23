@@ -7,6 +7,7 @@ import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { recoverableHostListLoaderFailure } from "./host-list-loader-recovery";
 
 export const HOST_MEETING_LIST_PAGE_LIMIT = 50;
 
@@ -15,12 +16,12 @@ export function hostMeetingListPageQuery(page: PageRequest, context?: ReadmatesA
 }
 
 export type HostMeetingListRouteData =
-  | { view: "meeting"; page: HostSessionListPage }
+  | { view: "meeting"; page: HostSessionListPage | null }
   | {
       view: "trash";
       filters: HostSessionLedgerFilters;
       page: null;
-      trashPage: HostSessionTrashPage;
+      trashPage: HostSessionTrashPage | null;
     };
 
 export function hostMeetingListLoaderFactory(client: QueryClient) {
@@ -36,14 +37,14 @@ export function hostMeetingListLoaderFactory(client: QueryClient) {
         page: null,
         trashPage: await client.fetchQuery(
           hostSessionTrashListQuery({ limit: HOST_MEETING_LIST_PAGE_LIMIT }, context),
-        ),
+        ).catch(recoverableHostListLoaderFailure),
       };
     }
     return {
       view: "meeting",
       page: await client.fetchQuery(
         hostMeetingListPageQuery({ limit: HOST_MEETING_LIST_PAGE_LIMIT }, context),
-      ),
+      ).catch(recoverableHostListLoaderFailure),
     };
   };
 }

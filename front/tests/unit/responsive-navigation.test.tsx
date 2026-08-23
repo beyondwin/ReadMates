@@ -15,6 +15,21 @@ function renderAt(pathname: string, element: ReactElement) {
   return render(<MemoryRouter initialEntries={[pathname]}>{element}</MemoryRouter>);
 }
 
+function renderAtRecordOrigin(pathname: string, element: ReactElement, scoped = false) {
+  return render(
+    <MemoryRouter initialEntries={[{
+      pathname,
+      state: {
+        readmatesReturnTo: scoped ? "/clubs/reading-sai/app/host/records" : "/app/host/records",
+        readmatesReturnLabel: "기록으로",
+      },
+    }]}
+    >
+      {element}
+    </MemoryRouter>,
+  );
+}
+
 const memberToHostAction = { href: "/app/host", label: "호스트 화면", navigation: "push" } as const;
 const hostToMemberAction = { href: "/app", label: "멤버 화면으로", navigation: "push" } as const;
 
@@ -177,6 +192,17 @@ describe("TopNav responsive variants", () => {
     expect(within(nav).getByRole("link", { name: "모임" })).not.toHaveAttribute("aria-current");
   });
 
+  it("keeps a record-origin canonical session detail owned by records on desktop", () => {
+    renderAtRecordOrigin(
+      "/app/host/sessions/session-6",
+      <TopNav variant="host" memberName="김호스트" currentSessionId="session-6" />,
+    );
+
+    const nav = screen.getByRole("navigation", { name: "앱 내비게이션" });
+    expect(within(nav).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "모임" })).not.toHaveAttribute("aria-current");
+  });
+
   it("groups host invitations under members and keeps the meeting list available during current lookup", () => {
     const { rerender } = renderAt(
       "/app/host/invitations",
@@ -264,6 +290,30 @@ describe("MobileHeader route titles and actions", () => {
     expect(screen.getByText("모임")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/clubs/reading-sai/app/host/sessions");
     expect(screen.getByRole("link", { name: "멤버 화면으로" })).toHaveAttribute("href", "/clubs/reading-sai/app");
+  });
+
+  it("keeps scoped record-origin detail title and Back under records on mobile", () => {
+    renderAtRecordOrigin(
+      "/clubs/reading-sai/app/host/sessions/session-6",
+      <MobileHeader variant="host" appBasePath="/clubs/reading-sai/app" />,
+      true,
+    );
+
+    expect(screen.getByText("기록")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/host/records",
+    );
+  });
+
+  it.each([
+    "/app/host/sessions/session-6/closing",
+    "/app/host/sessions/session-6/feedback-document",
+  ])("keeps the host record workflow title and direct-entry Back under records on %s", (pathname) => {
+    renderAt(pathname, <MobileHeader variant="host" />);
+
+    expect(screen.getByText("기록")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute("href", "/app/host/records");
   });
 
   it("renders the public session mobile title and authenticated entry action", async () => {
@@ -686,6 +736,18 @@ describe("MobileTabBar app tabs", () => {
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
     expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute("aria-current", "page");
     expect(within(tabs).getByRole("link", { name: "기록" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("keeps the scoped records tab active on a record-origin canonical detail", () => {
+    renderAtRecordOrigin(
+      "/clubs/reading-sai/app/host/sessions/session-6",
+      <MobileTabBar variant="host" currentSessionId="session-6" appBasePath="/clubs/reading-sai/app" />,
+      true,
+    );
+
+    const tabs = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(tabs).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(tabs).getByRole("link", { name: "모임" })).not.toHaveAttribute("aria-current");
   });
 
   it("marks the host member tab active on invitation and member routes", () => {

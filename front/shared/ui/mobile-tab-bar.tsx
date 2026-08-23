@@ -5,6 +5,8 @@ import {
   READMATES_MOBILE_TAB_LABELS,
   READMATES_PRIMARY_NAV_LABELS,
 } from "./readmates-copy";
+import { hasHostRecordsReturnState } from "@/shared/routing/readmates-route-state";
+import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 
 export type MobileTabBarVariant = "member" | "host";
 
@@ -128,14 +130,14 @@ function hostTabs({
   return [
     {
       key: "host",
-      href: "/app/host",
+      href: HOST_ROUTE_HREFS.today,
       label: READMATES_MOBILE_TAB_LABELS.hostToday,
       icon: "host",
       current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
     },
     {
       key: "host-edit",
-      href: "/app/host/sessions",
+      href: HOST_ROUTE_HREFS.meetings,
       label: READMATES_MOBILE_TAB_LABELS.hostSession,
       icon: "edit",
       current: (pathname) =>
@@ -145,14 +147,14 @@ function hostTabs({
     },
     {
       key: "host-members",
-      href: "/app/host/members",
+      href: HOST_ROUTE_HREFS.members,
       label: READMATES_MOBILE_TAB_LABELS.hostMembers,
       icon: "approve",
       current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
     },
     {
       key: "host-records",
-      href: "/app/host/records",
+      href: HOST_ROUTE_HREFS.records,
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
       current: (pathname) =>
@@ -262,8 +264,14 @@ export function MobileTabBar({
   appBasePath = "",
   LinkComponent = DefaultLink,
 }: MobileTabBarProps) {
-  const pathname = useLocation().pathname;
-  const appPath = appPathname(pathname);
+  const location = useLocation();
+  const pathname = location.pathname;
+  const rawAppPath = appPathname(pathname);
+  const appPath = variant === "host"
+    && /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(rawAppPath)
+    && hasHostRecordsReturnState(location.state)
+    ? "/app/host/records"
+    : rawAppPath;
   const resolvedCurrentSessionStatus =
     currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
   const tabs = scopedTabs(

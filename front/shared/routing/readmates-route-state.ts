@@ -22,3 +22,21 @@ export function readmatesReturnState(target: ReadmatesReturnTarget): ReadmatesRe
 
   return state;
 }
+
+export function hasHostRecordsReturnState(state: unknown): boolean {
+  if (!state || typeof state !== "object") {
+    return false;
+  }
+  const routeState = state as Partial<ReadmatesReturnState>;
+  if (typeof routeState.readmatesReturnTo === "string") {
+    try {
+      const pathname = new URL(routeState.readmatesReturnTo, "https://readmates.local").pathname;
+      if (/^(?:\/clubs\/[^/]+)?\/app\/host\/records\/?$/.test(pathname)) {
+        return true;
+      }
+    } catch {
+      return false;
+    }
+  }
+  return hasHostRecordsReturnState(routeState.readmatesReturnState);
+}

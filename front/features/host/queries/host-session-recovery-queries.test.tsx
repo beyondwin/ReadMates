@@ -37,6 +37,7 @@ function seedSurfaces(client: QueryClient) {
   const entries = {
     detail: [hostSessionKeys.detail("session-7", context), { surface: "detail" }],
     history: [hostSessionRecordKeys.historyRoot("session-7", context), { surface: "history" }],
+    recordLedger: [hostSessionRecordKeys.ledger(undefined, context), { surface: "record-ledger" }],
     list: [hostSessionKeys.list({ limit: 50 }, context), { surface: "list" }],
     dashboard: [hostSessionKeys.dashboard(context), { surface: "dashboard" }],
     current: [hostSessionKeys.current(context), { surface: "current" }],
@@ -48,6 +49,10 @@ function seedSurfaces(client: QueryClient) {
     otherClubDetail: [
       hostSessionKeys.detail("session-7", { clubSlug: "other-club" }),
       { surface: "other-detail" },
+    ],
+    otherClubRecordLedger: [
+      hostSessionRecordKeys.ledger(undefined, { clubSlug: "other-club" }),
+      { surface: "other-record-ledger" },
     ],
   } as const satisfies Record<string, CacheEntry>;
   for (const [key, value] of Object.values(entries)) {
@@ -116,12 +121,13 @@ describe("host session recovery queries", () => {
     expectInvalidated(client, [
       entries.detail,
       entries.history,
+      entries.recordLedger,
       entries.list,
       entries.dashboard,
       entries.current,
       entries.closingStatus,
       entries.restorePreview,
     ]);
-    expectFresh(client, [entries.otherClubDetail]);
+    expectFresh(client, [entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 });

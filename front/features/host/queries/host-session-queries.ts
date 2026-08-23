@@ -60,6 +60,7 @@ import {
 } from "@/features/host/model/host-schedule-defaults-model";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
+import { hostSessionRecordKeys } from "./host-session-record-query-keys";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
 
@@ -325,6 +326,7 @@ async function invalidateSessionMutationSurfaces(
     invalidateHostSessionLists(client, context),
     invalidateHostSessionDashboard(client, context),
     invalidateHostCurrentSession(client, context),
+    client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
     ...(options?.manualDispatches ? [invalidateHostSessionManualDispatches(client, context)] : []),
   ]);
 }
@@ -367,6 +369,8 @@ export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
     mutationFn: (sessionId: string) => deleteHostSession(sessionId, context),
     onSuccess: async (result, sessionId) => {
       client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
+      client.removeQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context) });
+      client.removeQueries({ queryKey: hostSessionRecordKeys.historyRoot(sessionId, context) });
       client.setQueryData(hostSessionKeys.trashDetail(sessionId, context), toTrashItem(result));
       await Promise.all([
         invalidateHostSessionLists(client, context),
@@ -374,6 +378,7 @@ export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
         invalidateHostCurrentSession(client, context),
         invalidateHostSessionManualDispatches(client, context),
         invalidateHostSessionTrash(client, context),
+        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
       ]);
     },
   });
@@ -386,7 +391,12 @@ export function useRestoreHostSessionMutation(context?: ReadmatesApiContext) {
     onSuccess: async (detail, sessionId) => {
       client.setQueryData(hostSessionKeys.detail(sessionId, context), detail);
       client.removeQueries({ queryKey: hostSessionKeys.trashDetail(sessionId, context) });
-      await invalidateHostSessionSurface(client, context);
+      client.removeQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context) });
+      client.removeQueries({ queryKey: hostSessionRecordKeys.historyRoot(sessionId, context) });
+      await Promise.all([
+        invalidateHostSessionSurface(client, context),
+        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
+      ]);
     },
   });
 }
@@ -470,6 +480,7 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
       return Promise.all([
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
+        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
       ]);
     },
   });
@@ -491,6 +502,7 @@ export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiCont
       return Promise.all([
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
+        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
       ]);
     },
   });
@@ -508,6 +520,7 @@ export function useSaveHostSessionPublicationMutation(context?: ReadmatesApiCont
           invalidateHostSessionLists(client, context),
           invalidateHostSessionDashboard(client, context),
           invalidateHostSessionManualDispatches(client, context),
+          client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
         ]),
       ),
   });
@@ -537,6 +550,7 @@ export function useCommitHostSessionImportMutation(context?: ReadmatesApiContext
         invalidateHostSessionLists(client, context),
         invalidateHostSessionDashboard(client, context),
         invalidateHostCurrentSession(client, context),
+        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
       ]),
   });
 }

@@ -63,6 +63,7 @@ describe("HostSessionLedger", () => {
   });
 
   it("renders semantic desktop rows and equivalent mobile cards", () => {
+    const recordLinkStates: unknown[] = [];
     const { container } = render(
       <HostSessionLedger
         items={items}
@@ -71,6 +72,10 @@ describe("HostSessionLedger", () => {
         loadingMore={false}
         onFiltersChange={vi.fn()}
         onLoadMore={vi.fn()}
+        LinkComponent={({ to, state, children, ...props }) => {
+          recordLinkStates.push(state);
+          return <a {...props} href={to}>{children}</a>;
+        }}
       />,
     );
 
@@ -86,6 +91,10 @@ describe("HostSessionLedger", () => {
     expect(screen.queryByRole("link", { name: "새 모임 만들기" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "휴지통" })).toHaveAttribute("href", "?view=trash");
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(recordLinkStates.filter(Boolean)).toEqual([
+      { readmatesReturnTo: "/app/host/records", readmatesReturnLabel: "기록으로" },
+      { readmatesReturnTo: "/app/host/records", readmatesReturnLabel: "기록으로" },
+    ]);
   });
 
   it("hides active filters in trash view and restores a row inline", async () => {

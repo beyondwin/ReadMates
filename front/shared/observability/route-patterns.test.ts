@@ -39,8 +39,18 @@ describe("frontend route observability patterns", () => {
       "/clubs/:slug/app/host/operations",
     );
     expect(normalizeFrontendRoutePattern("/app/host/records")).toBe("/app/host/records");
+    expect(normalizeFrontendRoutePattern("/app/host/sessions")).toBe("/app/host/sessions");
+    expect(normalizeFrontendRoutePattern("/app/host/sessions/session-6/feedback-document")).toBe(
+      "/app/host/sessions/:sessionId/feedback-document",
+    );
     expect(normalizeFrontendRoutePattern("/clubs/reading-sai/app/host/records")).toBe(
       "/clubs/:slug/app/host/records",
+    );
+    expect(normalizeFrontendRoutePattern("/clubs/reading-sai/app/host/sessions")).toBe(
+      "/clubs/:slug/app/host/sessions",
+    );
+    expect(normalizeFrontendRoutePattern("/clubs/reading-sai/app/host/sessions/session-6/feedback-document")).toBe(
+      "/clubs/:slug/app/host/sessions/:sessionId/feedback-document",
     );
     expect(normalizeFrontendRoutePattern("/admin/clubs/123e4567-e89b-12d3-a456-426614174000")).toBe(
       "/admin/clubs/:clubId",

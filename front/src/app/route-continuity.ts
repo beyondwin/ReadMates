@@ -3,6 +3,7 @@ import {
   type ReadmatesReturnState,
   type ReadmatesReturnTarget,
 } from "@/shared/routing/readmates-route-state";
+import { HOST_ROUTE_HREFS, scopedHostRouteHref } from "@/shared/routing/host-route-destinations";
 
 const ARCHIVE_SCROLL_KEY = "readmates:archive-scroll";
 const PUBLIC_RECORDS_SCROLL_KEY = "readmates:public-records-scroll";
@@ -38,24 +39,31 @@ export const hostDashboardReturnTarget: ReadmatesReturnTarget = {
 
 export type HostRouteDestinationInventoryEntry = {
   owner: string;
-  kind: "host-primary" | "member-primary" | "public-primary" | "detail" | "compatibility";
+  kind: "host-primary" | "host-secondary" | "member-primary" | "public-primary" | "detail" | "compatibility";
   href: string;
   scopedHref: string;
   lifecycle: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED" | null;
 };
 
 export const HOST_ROUTE_DESTINATION_INVENTORY: readonly HostRouteDestinationInventoryEntry[] = [
-  { owner: "host-today", kind: "host-primary", href: "/app/host", scopedHref: "/clubs/:slug/app/host", lifecycle: null },
-  { owner: "host-meetings", kind: "host-primary", href: "/app/host/sessions", scopedHref: "/clubs/:slug/app/host/sessions", lifecycle: null },
-  { owner: "host-members", kind: "host-primary", href: "/app/host/members", scopedHref: "/clubs/:slug/app/host/members", lifecycle: null },
-  { owner: "host-records", kind: "host-primary", href: "/app/host/records", scopedHref: "/clubs/:slug/app/host/records", lifecycle: null },
-  { owner: "host-draft-list", kind: "detail", href: "/app/host/sessions", scopedHref: "/clubs/:slug/app/host/sessions", lifecycle: "DRAFT" },
-  { owner: "host-open-list", kind: "detail", href: "/app/host/sessions", scopedHref: "/clubs/:slug/app/host/sessions", lifecycle: "OPEN" },
-  { owner: "host-closed-list", kind: "detail", href: "/app/host/records", scopedHref: "/clubs/:slug/app/host/records", lifecycle: "CLOSED" },
-  { owner: "host-published-list", kind: "detail", href: "/app/host/records", scopedHref: "/clubs/:slug/app/host/records", lifecycle: "PUBLISHED" },
-  { owner: "host-meeting-detail", kind: "detail", href: "/app/host/sessions/:sessionId", scopedHref: "/clubs/:slug/app/host/sessions/:sessionId", lifecycle: "OPEN" },
-  { owner: "host-record-detail", kind: "detail", href: "/app/host/sessions/:sessionId", scopedHref: "/clubs/:slug/app/host/sessions/:sessionId", lifecycle: "CLOSED" },
-  { owner: "host-trash-compatibility", kind: "compatibility", href: "/app/host/sessions?view=trash", scopedHref: "/clubs/:slug/app/host/sessions?view=trash", lifecycle: null },
+  { owner: "host-today", kind: "host-primary", href: HOST_ROUTE_HREFS.today, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.today), lifecycle: null },
+  { owner: "host-meetings", kind: "host-primary", href: HOST_ROUTE_HREFS.meetings, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.meetings), lifecycle: null },
+  { owner: "host-members", kind: "host-primary", href: HOST_ROUTE_HREFS.members, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.members), lifecycle: null },
+  { owner: "host-records", kind: "host-primary", href: HOST_ROUTE_HREFS.records, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.records), lifecycle: null },
+  { owner: "host-invitations", kind: "host-secondary", href: HOST_ROUTE_HREFS.invitations, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.invitations), lifecycle: null },
+  { owner: "host-notifications", kind: "host-secondary", href: HOST_ROUTE_HREFS.notifications, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.notifications), lifecycle: null },
+  { owner: "host-operations", kind: "host-secondary", href: HOST_ROUTE_HREFS.operations, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.operations), lifecycle: null },
+  { owner: "host-new-meeting", kind: "detail", href: HOST_ROUTE_HREFS.newSession, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.newSession), lifecycle: "DRAFT" },
+  { owner: "host-draft-list", kind: "detail", href: HOST_ROUTE_HREFS.meetings, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.meetings), lifecycle: "DRAFT" },
+  { owner: "host-open-list", kind: "detail", href: HOST_ROUTE_HREFS.meetings, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.meetings), lifecycle: "OPEN" },
+  { owner: "host-closed-list", kind: "detail", href: HOST_ROUTE_HREFS.records, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.records), lifecycle: "CLOSED" },
+  { owner: "host-published-list", kind: "detail", href: HOST_ROUTE_HREFS.records, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.records), lifecycle: "PUBLISHED" },
+  { owner: "host-meeting-detail", kind: "detail", href: HOST_ROUTE_HREFS.sessionDetail, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionDetail), lifecycle: "OPEN" },
+  { owner: "host-record-detail", kind: "detail", href: HOST_ROUTE_HREFS.sessionDetail, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionDetail), lifecycle: "CLOSED" },
+  { owner: "host-session-edit", kind: "detail", href: HOST_ROUTE_HREFS.sessionEdit, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionEdit), lifecycle: null },
+  { owner: "host-session-closing", kind: "detail", href: HOST_ROUTE_HREFS.sessionClosing, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.sessionClosing), lifecycle: "CLOSED" },
+  { owner: "host-feedback-document", kind: "detail", href: HOST_ROUTE_HREFS.feedbackDocument, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.feedbackDocument), lifecycle: "CLOSED" },
+  { owner: "host-trash-compatibility", kind: "compatibility", href: HOST_ROUTE_HREFS.trashCompatibility, scopedHref: scopedHostRouteHref(HOST_ROUTE_HREFS.trashCompatibility), lifecycle: null },
   { owner: "member-today", kind: "member-primary", href: "/app", scopedHref: "/clubs/:slug/app", lifecycle: null },
   { owner: "member-notes", kind: "member-primary", href: "/app/notes", scopedHref: "/clubs/:slug/app/notes", lifecycle: null },
   { owner: "member-records", kind: "member-primary", href: "/app/archive", scopedHref: "/clubs/:slug/app/archive", lifecycle: null },

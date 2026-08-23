@@ -66,12 +66,12 @@ function MeetingListBody({
   const firstRequest = useMemo(() => ({ limit: HOST_MEETING_LIST_PAGE_LIMIT }), []);
   const query = useQuery({
     ...hostMeetingListPageQuery(firstRequest, context),
-    initialData: loaderData.page,
+    initialData: loaderData.page ?? undefined,
   });
   const [state, setState] = useState<HostMeetingListState>({
     baseUpdatedAt: query.dataUpdatedAt,
     appendedItems: [],
-    nextCursor: loaderData.page.nextCursor,
+    nextCursor: loaderData.page?.nextCursor ?? null,
     paginationStarted: false,
     announcement: null,
     focusHeadingRevision: 0,
@@ -79,10 +79,10 @@ function MeetingListBody({
   });
   const [loadingMore, setLoadingMore] = useState(false);
   const basePage = query.data ?? loaderData.page;
-  const visibleState = state.baseUpdatedAt === query.dataUpdatedAt
+  const visibleState = state.baseUpdatedAt === query.dataUpdatedAt || !basePage
     ? state
     : hostMeetingListBaseRefresh(state, query.dataUpdatedAt, basePage.nextCursor);
-  const nextCursor = hostMeetingListNextCursor(visibleState, basePage.nextCursor);
+  const nextCursor = hostMeetingListNextCursor(visibleState, basePage?.nextCursor ?? null);
 
   const loadMore = async () => {
     if (!nextCursor || loadingMore) return;
@@ -94,7 +94,7 @@ function MeetingListBody({
       setState((current) => {
         const currentBase = current.baseUpdatedAt === query.dataUpdatedAt
           ? current
-          : hostMeetingListBaseRefresh(current, query.dataUpdatedAt, basePage.nextCursor);
+          : hostMeetingListBaseRefresh(current, query.dataUpdatedAt, basePage?.nextCursor ?? null);
         return {
           ...currentBase,
           appendedItems: [...currentBase.appendedItems, ...nextPage.items],
@@ -119,13 +119,16 @@ function MeetingListBody({
 
   return (
     <HostMeetingList
-      rows={hostMeetingListRows([...basePage.items, ...visibleState.appendedItems])}
+      rows={hostMeetingListRows([...(basePage?.items ?? []), ...visibleState.appendedItems])}
       nextCursor={nextCursor}
       loadingMore={loadingMore}
       onLoadMore={() => void loadMore()}
       LinkComponent={LinkComponent}
       announcement={visibleState.announcement}
       focusHeadingRevision={visibleState.focusHeadingRevision}
+      loading={query.isPending && !basePage}
+      errorMessage={query.isError && !basePage ? "모임을 불러오지 못했습니다." : null}
+      onRetry={() => void query.refetch()}
     />
   );
 }

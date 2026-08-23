@@ -61,6 +61,7 @@ export function useRestoreHostSessionChangeMutation(context?: ReadmatesApiContex
         client.invalidateQueries({
           queryKey: hostSessionRecordKeys.historyRoot(variables.sessionId, context),
         }),
+        client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) }),
         client.invalidateQueries({
           queryKey: hostSessionRecoveryKeys.restorePreviews(variables.sessionId, context),
         }),

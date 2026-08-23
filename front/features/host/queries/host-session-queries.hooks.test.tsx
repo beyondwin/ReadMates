@@ -16,6 +16,7 @@ vi.mock("@/features/host/api/host-api", () => ({
   returnHostSessionToDraft: vi.fn(),
   saveHostSessionAttendance: vi.fn(),
   saveHostSessionPublication: vi.fn(),
+  saveHostSessionAccessScope: vi.fn(),
   saveHostSessionVisibility: vi.fn(),
   unpublishHostSession: vi.fn(),
   updateHostSession: vi.fn(),
@@ -34,8 +35,10 @@ import {
   publishHostSession,
   reopenHostSession,
   returnHostSessionToDraft,
+  restoreHostSession,
   saveHostSessionAttendance,
   saveHostSessionPublication,
+  saveHostSessionAccessScope,
   saveHostSessionVisibility,
   unpublishHostSession,
   updateHostSession,
@@ -50,12 +53,15 @@ import {
   usePublishHostSessionMutation,
   useReopenHostSessionMutation,
   useReturnHostSessionToDraftMutation,
+  useRestoreHostSessionMutation,
   useSaveHostSessionPublicationMutation,
+  useSaveHostSessionAccessScopeMutation,
   useSaveHostSessionVisibilityMutation,
   useUnpublishHostSessionMutation,
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
 } from "./host-session-queries";
+import { hostSessionRecordKeys } from "./host-session-record-queries";
 
 function createWrapper() {
   const client = new QueryClient({
@@ -81,7 +87,15 @@ function surfaceKeys() {
     dashboard: hostSessionKeys.dashboard(context),
     current: hostSessionKeys.current(context),
     manualDispatches: hostSessionKeys.manualDispatches({ sessionId: "session-7" }, context),
+    recordLedger: hostSessionRecordKeys.ledger({ page: { limit: 50 } }, context),
+    recordAttention: hostSessionRecordKeys.attentionPages(context),
+    recordEditor: hostSessionRecordKeys.editor("session-7", context),
+    recordHistory: hostSessionRecordKeys.history("session-7", { limit: 20 }, context),
     otherClubDetail: hostSessionKeys.detail("session-7", { clubSlug: "other-club" }),
+    otherClubRecordLedger: hostSessionRecordKeys.ledger(
+      { page: { limit: 50 } },
+      { clubSlug: "other-club" },
+    ),
   };
 }
 
@@ -94,7 +108,15 @@ function seedSurfaces(client: QueryClient) {
     dashboard: [keys.dashboard, { surface: "dashboard", sessions: ["session-7"] }],
     current: [keys.current, { surface: "current", sessionId: "session-7" }],
     manualDispatches: [keys.manualDispatches, { surface: "manual-dispatches", items: ["dispatch-1"] }],
+    recordLedger: [keys.recordLedger, { surface: "record-ledger", items: ["session-7"] }],
+    recordAttention: [keys.recordAttention, { surface: "record-attention", pages: ["session-7"] }],
+    recordEditor: [keys.recordEditor, { surface: "record-editor", sessionId: "session-7" }],
+    recordHistory: [keys.recordHistory, { surface: "record-history", sessionId: "session-7" }],
     otherClubDetail: [keys.otherClubDetail, { surface: "detail", sessionId: "other-club-session-7" }],
+    otherClubRecordLedger: [
+      keys.otherClubRecordLedger,
+      { surface: "record-ledger", items: ["other-club-session-7"] },
+    ],
   } as const satisfies Record<string, CacheEntry>;
   for (const [key, value] of Object.values(entries)) {
     client.setQueryData(key, value);
@@ -196,7 +218,9 @@ beforeEach(() => {
   vi.mocked(reopenHostSession).mockReset();
   vi.mocked(unpublishHostSession).mockReset();
   vi.mocked(returnHostSessionToDraft).mockReset();
+  vi.mocked(restoreHostSession).mockReset();
   vi.mocked(saveHostSessionVisibility).mockReset();
+  vi.mocked(saveHostSessionAccessScope).mockReset();
   vi.mocked(saveHostSessionPublication).mockReset();
   vi.mocked(saveHostSessionAttendance).mockReset();
   vi.mocked(commitHostSessionImport).mockReset();
@@ -225,7 +249,12 @@ describe("host session mutation hooks", () => {
       entries.closingStatus,
       entries.current,
       entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
       entries.otherClubDetail,
+      entries.otherClubRecordLedger,
     ]);
   });
 
@@ -261,8 +290,16 @@ describe("host session mutation hooks", () => {
       entries.list,
       entries.dashboard,
       entries.current,
+      entries.recordLedger,
+      entries.recordAttention,
     ]);
-    expectFresh(client, [entries.manualDispatches, entries.otherClubDetail]);
+    expectFresh(client, [
+      entries.manualDispatches,
+      entries.recordEditor,
+      entries.recordHistory,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it("does not remove detail or invalidate when delete fails", async () => {
@@ -317,8 +354,28 @@ describe("host session mutation hooks", () => {
       entries.dashboard,
       entries.current,
       entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
     ]);
-    expectFresh(client, [entries.closingStatus, entries.otherClubDetail]);
+    expect(client.getQueryState(keys.recordEditor)).toBeUndefined();
+    expect(client.getQueryState(keys.recordHistory)).toBeUndefined();
+    expectFresh(client, [entries.closingStatus, entries.otherClubDetail, entries.otherClubRecordLedger]);
+  });
+
+  it("invalidates same-club record membership and removes stale record detail caches after trash restore", async () => {
+    vi.mocked(restoreHostSession).mockResolvedValue(visibilityResult().session as never);
+    const { client, Wrapper } = createWrapper();
+    const { entries, keys } = seedSurfaces(client);
+    const { result } = renderHook(() => useRestoreHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    expectInvalidated(client, [entries.recordLedger, entries.recordAttention]);
+    expect(client.getQueryState(keys.recordEditor)).toBeUndefined();
+    expect(client.getQueryState(keys.recordHistory)).toBeUndefined();
+    expectFresh(client, [entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 
   it.each([
@@ -342,13 +399,20 @@ describe("host session mutation hooks", () => {
       entries.list,
       entries.dashboard,
       entries.current,
+      entries.recordLedger,
+      entries.recordAttention,
     ]);
     if (expectsManualDispatches) {
       expectInvalidated(client, [entries.manualDispatches]);
     } else {
       expectFresh(client, [entries.manualDispatches]);
     }
-    expectFresh(client, [entries.otherClubDetail]);
+    expectFresh(client, [
+      entries.recordEditor,
+      entries.recordHistory,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it.each([
@@ -374,8 +438,15 @@ describe("host session mutation hooks", () => {
       entries.dashboard,
       entries.current,
       entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
     ]);
-    expectFresh(client, [entries.otherClubDetail]);
+    expectFresh(client, [
+      entries.recordEditor,
+      entries.recordHistory,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it("returns the visibility composer result and caches the updated session", async () => {
@@ -406,13 +477,16 @@ describe("host session mutation hooks", () => {
     );
     expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
     expect(client.getQueryData(manualOptionsKey)).toBeUndefined();
-    expectInvalidated(client, [entries.list, entries.dashboard]);
+    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention]);
     expectFresh(client, [
       [keys.detail, visibilityResult().session],
       entries.closingStatus,
       entries.current,
       entries.manualDispatches,
+      entries.recordEditor,
+      entries.recordHistory,
       entries.otherClubDetail,
+      entries.otherClubRecordLedger,
     ]);
   });
 
@@ -429,8 +503,36 @@ describe("host session mutation hooks", () => {
       });
     });
 
-    expectInvalidated(client, [entries.detail, entries.list, entries.dashboard, entries.manualDispatches]);
-    expectFresh(client, [entries.closingStatus, entries.current, entries.otherClubDetail]);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.list,
+      entries.dashboard,
+      entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
+    ]);
+    expectFresh(client, [
+      entries.closingStatus,
+      entries.current,
+      entries.recordEditor,
+      entries.recordHistory,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
+  });
+
+  it("invalidates exact-club record projections after access-scope save", async () => {
+    vi.mocked(saveHostSessionAccessScope).mockResolvedValue(visibilityResult() as never);
+    const { client, Wrapper } = createWrapper();
+    const { entries } = seedSurfaces(client);
+    const { result } = renderHook(() => useSaveHostSessionAccessScopeMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "session-7", request: { accessScope: "GUEST_READABLE" } });
+    });
+
+    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention]);
+    expectFresh(client, [entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 
   it("invalidates detail and current session after attendance update", async () => {
@@ -458,7 +560,12 @@ describe("host session mutation hooks", () => {
       entries.list,
       entries.dashboard,
       entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
       entries.otherClubDetail,
+      entries.otherClubRecordLedger,
     ]);
   });
 
@@ -478,8 +585,22 @@ describe("host session mutation hooks", () => {
     });
 
     expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest);
-    expectInvalidated(client, [entries.detail, entries.list, entries.dashboard, entries.current]);
-    expectFresh(client, [entries.closingStatus, entries.manualDispatches, entries.otherClubDetail]);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.list,
+      entries.dashboard,
+      entries.current,
+      entries.recordLedger,
+      entries.recordAttention,
+    ]);
+    expectFresh(client, [
+      entries.closingStatus,
+      entries.manualDispatches,
+      entries.recordEditor,
+      entries.recordHistory,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it("leaves every seeded cache unchanged when visibility save rejects", async () => {
