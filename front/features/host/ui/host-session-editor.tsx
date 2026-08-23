@@ -414,6 +414,7 @@ export default function HostSessionEditor({
     session,
     returnTarget,
     readmatesReturnState,
+    clubSlug,
   );
   const editorTitle = isNewSession ? "모임 문서 만들기" : null;
   const basicSaveLabel = saveState === "saving"

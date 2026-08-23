@@ -532,13 +532,18 @@ describe("host session mutation hooks", () => {
     expectFresh(client, [entries.recordHistory, entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 
-  it("invalidates detail and current session after attendance update", async () => {
+  it("invalidates exact-club record audit projections after attendance update", async () => {
     vi.mocked(saveHostSessionAttendance).mockResolvedValue({
       sessionId: "session-7",
       count: 1,
     } as never);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
+    const otherClubAttention = [
+      hostSessionRecordKeys.attentionPages({ clubSlug: "other-club" }),
+      { surface: "other-record-attention", pages: ["other-session-7"] },
+    ] as const satisfies CacheEntry;
+    client.setQueryData(...otherClubAttention);
     const { result } = renderHook(() => useUpdateHostSessionAttendanceMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -551,17 +556,22 @@ describe("host session mutation hooks", () => {
     expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", [
       { membershipId: "member-1", attendanceStatus: "ATTENDED" },
     ], context);
-    expectInvalidated(client, [entries.detail, entries.current, entries.recordHistory]);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.current,
+      entries.recordHistory,
+      entries.recordLedger,
+      entries.recordAttention,
+    ]);
     expectFresh(client, [
       entries.closingStatus,
       entries.list,
       entries.dashboard,
       entries.manualDispatches,
-      entries.recordLedger,
-      entries.recordAttention,
       entries.recordEditor,
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
+      otherClubAttention,
     ]);
   });
 

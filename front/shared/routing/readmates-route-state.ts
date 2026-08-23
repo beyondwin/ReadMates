@@ -23,6 +23,96 @@ export function readmatesReturnState(target: ReadmatesReturnTarget): ReadmatesRe
   return state;
 }
 
+function appScopeRoot(currentPathname: string) {
+  const scopedMatch = /^(\/clubs\/[^/]+\/app)(?:\/|$)/.exec(currentPathname);
+  if (scopedMatch) {
+    return scopedMatch[1]!;
+  }
+  if (currentPathname === "/app" || currentPathname.startsWith("/app/")) {
+    return "/app";
+  }
+  return null;
+}
+
+function isPathInsideAppScope(pathname: string, root: string) {
+  return pathname === root || pathname.startsWith(`${root}/`);
+}
+
+function hrefInsideAppScope(target: URL, root: string) {
+  const pathname = root !== "/app"
+    && (target.pathname === "/app" || target.pathname.startsWith("/app/"))
+    ? `${root}${target.pathname.slice("/app".length)}`
+    : target.pathname;
+  return isPathInsideAppScope(pathname, root)
+    ? `${pathname}${target.search}${target.hash}`
+    : null;
+}
+
+export function readAppReturnTarget(
+  state: unknown,
+  currentPathname: string,
+  fallback: ReadmatesReturnTarget,
+): ReadmatesReturnTarget {
+  const root = appScopeRoot(currentPathname);
+  if (!root) {
+    return fallback;
+  }
+
+  const baseOrigin = typeof window === "undefined" ? "https://readmates.local" : window.location.origin;
+  const visited = new Set<object>();
+  const chain: Array<{ href: string; label: string }> = [];
+  let current = state;
+
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (!current || typeof current !== "object" || visited.has(current)) {
+      return fallback;
+    }
+    visited.add(current);
+    const routeState = current as Partial<ReadmatesReturnState>;
+    if (typeof routeState.readmatesReturnTo !== "string") {
+      return fallback;
+    }
+
+    try {
+      const target = new URL(routeState.readmatesReturnTo, baseOrigin);
+      const href = target.origin === baseOrigin ? hrefInsideAppScope(target, root) : null;
+      if (!href) {
+        return fallback;
+      }
+      chain.push({
+        href,
+        label: typeof routeState.readmatesReturnLabel === "string"
+          ? routeState.readmatesReturnLabel
+          : "",
+      });
+    } catch {
+      return fallback;
+    }
+
+    if (routeState.readmatesReturnState === undefined) {
+      let resolved: ReadmatesReturnTarget | null = null;
+      for (let index = chain.length - 1; index >= 0; index -= 1) {
+        const entry = chain[index]!;
+        resolved = {
+          href: entry.href,
+          label: entry.label,
+          ...(resolved ? { state: readmatesReturnState(resolved) } : {}),
+        };
+      }
+      if (!resolved) {
+        return fallback;
+      }
+      return {
+        ...resolved,
+        label: resolved.label || fallback.label,
+      };
+    }
+    current = routeState.readmatesReturnState;
+  }
+
+  return fallback;
+}
+
 export function readHostRecordsReturnTarget(
   state: unknown,
   currentPathname: string,

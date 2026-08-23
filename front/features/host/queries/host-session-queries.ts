@@ -560,7 +560,10 @@ export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiCon
       Promise.all([
         invalidateHostSessionDetail(client, variables.sessionId, context),
         invalidateHostCurrentSession(client, context),
-        invalidateHostSessionRecordCaches(client, variables.sessionId, context, { history: true }),
+        invalidateHostSessionRecordCaches(client, variables.sessionId, context, {
+          history: true,
+          ledgers: true,
+        }),
       ]),
   });
 }

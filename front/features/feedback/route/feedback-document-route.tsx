@@ -30,7 +30,7 @@ export function FeedbackDocumentRoute({
     ? { status: "unavailable" as const, reason: unavailableReason }
     : documentQuery.data;
   const location = useLocation();
-  const returnTarget = readFeedbackReturnTarget(location.state);
+  const returnTarget = readFeedbackReturnTarget(location.state, location.pathname);
   const effectivePrintMode = printMode && feedbackDocumentPdfDownloadsEnabled;
 
   if (!result) {

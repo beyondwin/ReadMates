@@ -829,13 +829,24 @@ describe("HostSessionEditor", () => {
     "keeps the %s session feedback document in the shared record context",
     (state) => {
       const workflow = recordWorkflow("MEMBER");
+      let previewState: unknown;
       workflow.editor.liveSnapshot.feedbackDocument.fileName = "251126 1차.md";
       render(
         <HostSessionEditorForTest
           session={{ ...session, state }}
           clubSlug="club-a"
+          returnTarget={{
+            href: "/clubs/club-a/app/host/records",
+            label: "기록으로",
+          }}
           initialLocation={{ panel: "records", source: "json" }}
           recordWorkflow={workflow}
+          LinkComponent={({ to, state: linkState, children, ...linkProps }) => {
+            if (to.endsWith("/feedback-document")) {
+              previewState = linkState;
+            }
+            return <a {...linkProps} href={to}>{children}</a>;
+          }}
         />,
       );
 
@@ -848,6 +859,14 @@ describe("HostSessionEditor", () => {
           "href",
           "/clubs/club-a/app/host/sessions/session-1/feedback-document",
         );
+      expect(previewState).toEqual({
+        readmatesReturnTo: "/clubs/club-a/app/host/sessions/session-1",
+        readmatesReturnLabel: "모임 문서로",
+        readmatesReturnState: {
+          readmatesReturnTo: "/clubs/club-a/app/host/records",
+          readmatesReturnLabel: "기록으로",
+        },
+      });
       expect(screen.queryByText("모임 기록 완성")).not.toBeInTheDocument();
       expect(screen.queryByLabelText("피드백 문서 파일")).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "교체" })).not.toBeInTheDocument();

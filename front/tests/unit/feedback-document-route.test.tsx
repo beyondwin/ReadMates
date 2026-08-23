@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createMemoryRouter, useLocation } from "react-router";
@@ -10,6 +10,11 @@ import { feedbackDocumentLoaderFactory } from "@/features/feedback/route/feedbac
 import { FeedbackRouteError } from "@/features/feedback/route/feedback-route-state";
 import { hostFeedbackDocumentPreviewLoaderFactory } from "@/src/app/host-routes/feedback-document-preview-data";
 import { HostFeedbackDocumentPreviewRouteElement } from "@/src/app/host-routes/feedback-document-preview-route-element";
+import { feedbackPreviewStateForSession } from "@/features/host/ui/session-editor/session-editor-feedback";
+import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
+import { TopNav } from "@/shared/ui/top-nav";
+import { MobileHeader } from "@/shared/ui/mobile-header";
+import { MobileTabBar } from "@/shared/ui/mobile-tab-bar";
 
 function installRouterRequestShim() {
   const NativeRequest = globalThis.Request;
@@ -152,7 +157,7 @@ function renderFeedbackRoute(
   );
 }
 
-function renderHostFeedbackPreviewRoute(path: string) {
+function renderHostFeedbackPreviewRoute(path: string | { pathname: string; state?: unknown }) {
   installRouterRequestShim();
   const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
@@ -163,6 +168,10 @@ function renderHostFeedbackPreviewRoute(path: string) {
         loader: hostFeedbackDocumentPreviewLoaderFactory(queryClient),
         errorElement: <FeedbackRouteError />,
         hydrateFallbackElement: <div>호스트 피드백 문서를 불러오는 중</div>,
+      },
+      {
+        path: "/clubs/:clubSlug/app/host/sessions/:sessionId",
+        element: <HostDetailReturnProbe />,
       },
       { path: "/clubs/:clubSlug/app", element: <main><h1>멤버 앱</h1></main> },
       { path: "/login", element: <main><h1>읽는사이 들어가기</h1></main> },
@@ -175,6 +184,52 @@ function renderHostFeedbackPreviewRoute(path: string) {
       <RouterProvider router={router} />
     </QueryClientProvider>,
   );
+}
+
+function HostDetailReturnProbe() {
+  const location = useLocation();
+  const appBasePath = location.pathname.match(/^\/clubs\/[^/]+\/app/)?.[0] ?? "";
+  const returnState = location.state as { readmatesReturnTo?: string } | null;
+
+  return (
+    <main>
+      <TopNav variant="host" memberName="호스트" appBasePath={appBasePath} />
+      <MobileHeader variant="host" appBasePath={appBasePath} />
+      <MobileTabBar variant="host" appBasePath={appBasePath} />
+      <div data-testid="host-detail-path">{location.pathname}</div>
+      <div data-testid="host-detail-return-to">{returnState?.readmatesReturnTo ?? ""}</div>
+    </main>
+  );
+}
+
+function setupHostPreviewJson(sessionId: string, title: string) {
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = input.toString();
+
+    if (url === "/api/bff/api/auth/me?clubSlug=club-a") {
+      return Promise.resolve(Response.json(hostAuth));
+    }
+
+    if (url === `/api/bff/api/host/sessions/${sessionId}/feedback-document/preview?clubSlug=club-a`) {
+      return Promise.resolve(Response.json({
+        sessionId,
+        sessionNumber: 1,
+        title,
+        subtitle: "테스트 책 · 2026.08.24",
+        bookTitle: "테스트 책",
+        date: "2026-08-24",
+        fileName: "feedback.md",
+        uploadedAt: "2026-08-24T09:00:00Z",
+        metadata: [],
+        observerNotes: [],
+        participants: [],
+      }));
+    }
+
+    return Promise.reject(new Error(`Unexpected request: ${url}`));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
 }
 
 function LocationStateEcho() {
@@ -452,6 +507,70 @@ describe("Host feedback document preview route", () => {
       expect.stringContaining("/api/sessions/open-session/feedback-document"),
       expect.anything(),
     );
+  });
+
+  it("returns from scoped record preview to scoped detail with record-owned chrome", async () => {
+    const user = userEvent.setup();
+    setupHostPreviewJson("session-1", "클럽 A 피드백 미리보기");
+    const previewState = feedbackPreviewStateForSession(
+      { sessionId: "session-1" },
+      { href: "/clubs/club-a/app/host/records", label: "기록으로" },
+      readmatesReturnState,
+      "club-a",
+    );
+
+    renderHostFeedbackPreviewRoute({
+      pathname: "/clubs/club-a/app/host/sessions/session-1/feedback-document",
+      state: previewState,
+    });
+
+    expect(await screen.findByRole("heading", { name: "클럽 A 피드백 미리보기" })).toBeInTheDocument();
+    const previewBack = screen.getByRole("link", { name: "모임 문서로 돌아가기" });
+    expect(previewBack).toHaveAttribute(
+      "href",
+      "/clubs/club-a/app/host/sessions/session-1",
+    );
+
+    await user.click(previewBack);
+
+    expect(await screen.findByTestId("host-detail-path")).toHaveTextContent(
+      "/clubs/club-a/app/host/sessions/session-1",
+    );
+    expect(screen.getByTestId("host-detail-return-to")).toHaveTextContent(
+      "/clubs/club-a/app/host/records",
+    );
+    const desktop = screen.getByRole("navigation", { name: "앱 내비게이션" });
+    const mobile = screen.getByRole("navigation", { name: "앱 탭" });
+    expect(within(desktop).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(within(mobile).getByRole("link", { name: "기록" })).toHaveAttribute("aria-current", "page");
+    expect(document.querySelector(".m-hdr-title")).toHaveTextContent("기록");
+    expect(screen.getByRole("link", { name: "뒤로" })).toHaveAttribute(
+      "href",
+      "/clubs/club-a/app/host/records",
+    );
+  });
+
+  it("falls back inside club A instead of adopting a club B preview return", async () => {
+    setupHostPreviewJson("session-1", "클럽 A 피드백 미리보기");
+
+    renderHostFeedbackPreviewRoute({
+      pathname: "/clubs/club-a/app/host/sessions/session-1/feedback-document",
+      state: {
+        readmatesReturnTo: "/clubs/club-b/app/host/sessions/session-1",
+        readmatesReturnLabel: "모임 문서로",
+        readmatesReturnState: {
+          readmatesReturnTo: "/clubs/club-b/app/host/records",
+          readmatesReturnLabel: "기록으로",
+        },
+      },
+    });
+
+    expect(await screen.findByRole("heading", { name: "클럽 A 피드백 미리보기" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "아카이브로 돌아가기" })).toHaveAttribute(
+      "href",
+      "/clubs/club-a/app/archive?view=report",
+    );
+    expect(screen.queryByRole("link", { name: "모임 문서로 돌아가기" })).not.toBeInTheDocument();
   });
 
   it("renders the missing-document state from the host preview API", async () => {

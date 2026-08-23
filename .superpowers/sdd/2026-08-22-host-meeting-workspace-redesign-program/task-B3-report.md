@@ -149,3 +149,49 @@ Status: `DONE_WITH_CONCERNS`
 - The known aggregate residuals remain deferred to the program risk phase: `frontend-boundaries.test.ts` reports the two B1 app-module imports, and `host-session-editor.test.tsx` retains the pre-B1 publication-copy expectation. This round did not change either surface or claim a new aggregate pass.
 - The affected regression gate still emits the pre-existing React `act` and router `HydrateFallback` warnings. Tests pass, but those warnings remain cleanup work outside B3 route/cache ownership.
 - Browser/E2E evidence was not requested or added for this fix round; scoped and cyclic return-state behavior is covered through router-component and direct MobileHeader render tests.
+
+## Fix round 3
+
+Status: `DONE_WITH_CONCERNS`
+
+ADR impact: `none`. This round preserves the Proposed ADR-0019 URL-authority contract and does not add or promote an ADR.
+
+### Implementation
+
+- Corrected the attendance mutation matrix: attendance changes create an audit entry whose timestamp updates record-ledger `lastModifiedAt`, so success now invalidates same-session history plus the exact-club record ledger root and its attention pages. The session detail/current-session invalidations remain intact, and another club's ledger and attention caches remain fresh.
+- Made the record-owned feedback preview producer club-aware. A scoped record row now carries `/clubs/:clubSlug/app/host/records` into the scoped canonical detail, and the editor then emits a scoped detail return target into the feedback preview. Preview Back returns to scoped detail with the nested scoped records owner; detail desktop/mobile navigation, mobile title, and Back remain `기록`-owned.
+- Replaced the feedback route's independent unbounded return-state reader with the shared bounded app-return parser. It validates same origin and current app scope, rejects cross-club/external/malformed/cyclic/over-depth state, and rebuilds nested state only after the complete chain passes. Scoped member compatibility targets under `/app` are canonicalized into the authoritative current club instead of escaping its route scope.
+
+### TDD evidence
+
+- Attendance cache RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-queries.hooks.test.tsx -t "invalidates exact-club record audit projections"` — expected failure: 1 failed, 17 skipped because the current club's ledger cache remained fresh.
+- Attendance cache GREEN: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-queries.hooks.test.tsx -t "invalidates exact-club record audit projections"` — PASS: 1 passed, 17 skipped.
+- Scoped producer/parser RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/ui/session-editor/session-editor-feedback.test.ts features/feedback/route/feedback-route-continuity.test.ts` — expected failure: 2 files, 6 failed and 3 passed because the preview producer emitted an unscoped detail target and the feedback parser adopted unsafe or cyclic state.
+- Actual route RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/feedback-document-route.test.tsx -t "scoped record preview|club B preview return"` — expected failure: 1 failed, 1 passed, 13 skipped because a club B detail return was still adopted from club A.
+- Scoped compatibility RED: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/feedback/route/feedback-route-continuity.test.ts -t "scopes an unscoped compatibility chain"` — expected failure: 1 failed, 7 skipped because the first safe parser version discarded an existing member compatibility chain instead of canonicalizing it into the current club.
+
+### Verification
+
+- Fix-focused attendance/producer/parser/actual-route group: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/queries/host-session-queries.hooks.test.tsx features/host/ui/session-editor/session-editor-feedback.test.ts features/feedback/route/feedback-route-continuity.test.ts tests/unit/feedback-document-route.test.tsx --reporter=dot` — PASS: 4 files, 43 tests.
+- Affected record workspace/member feedback group: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/ui/session-editor/session-record-workspace.test.tsx features/feedback/ui/feedback-document-page.test.tsx tests/unit/feedback-document-page.test.tsx features/archive/ui/member-session-detail-page.test.tsx tests/unit/member-session-detail-page.test.tsx --reporter=dot` — PASS: 5 files, 50 tests; the existing suspended-resource React `act` stderr warning remains.
+- Actual scoped host-editor producer render: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/host-session-editor.test.tsx -t "session feedback document in the shared record context" --reporter=dot` — PASS: 1 file, 3 passed and 85 skipped.
+- Navigation/inventory/return-state gate: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/routing/readmates-route-state.test.ts shared/ui/mobile-header-cycle.test.tsx tests/unit/responsive-navigation.test.tsx tests/unit/route-continuity.test.ts src/app/host-route-destination-inventory.test.ts --reporter=dot` — PASS: 5 files, 89 tests.
+- Broader host editor/workspace/helper attempt: `npx --yes corepack@0.35.0 pnpm --dir front exec vitest run tests/unit/host-session-editor.test.tsx features/host/ui/session-editor/session-record-workspace.test.tsx features/host/ui/session-editor/session-editor-feedback.test.ts --reporter=dot` — 2 files passed and 1 failed; 103 tests passed and 1 failed. The single failure is the already-known B1 publication-copy expectation described below, not a fix-round-3 behavior regression.
+- `npx --yes corepack@0.35.0 pnpm --dir front lint` — PASS.
+- `npx --yes corepack@0.35.0 pnpm --dir front build` — PASS: Vite 8.1.5 transformed 698 modules and completed the production build.
+- `git diff --check` — PASS before report append; re-run against `2a0d6711..HEAD` after commit.
+- Aggregate frontend tests and E2E were not run, as the fix-round brief explicitly limited verification to focused/affected/navigation/inventory/lint/build evidence and did not require E2E.
+
+### Self-review
+
+- Query keys and isolation: attendance invalidates the exact context's `hostSessionRecordKeys.ledgers(context)` prefix, which includes regular ledger and attention queries. Cache-level coverage seeds club A and club B ledger/attention entries, proves club A becomes stale, and proves club B stays fresh. No global cross-club invalidation was added.
+- Audit projection: the previous round's assumption that attendance changed history only was corrected against the server audit/ledger projection: `ATTENDANCE_UPDATED` contributes audit `created_at` to record `last_modified_at`, so history, ledger, and attention are all invalidated.
+- Scoped return chain: the production editor receives `clubSlug` and emits the exact scoped detail URL around the already-scoped records owner. The actual route test clicks preview Back, verifies the scoped detail path and nested records state, then verifies desktop `기록`, mobile `기록` tab/title, and scoped records Back.
+- Parser authority and safety: preview title, link, and subsequent detail ownership consume one fully validated return chain. The shared parser uses current pathname authority, same-origin URL parsing, exact club scope, a visited set, and an eight-node limit. Cross-club, external, cyclic, and over-depth state fall back without stack overflow. Existing unscoped compatibility targets are canonicalized to the authoritative scoped app root rather than trusted as a second club authority.
+- Accepted B3 fixes remain intact: record-origin detail ownership, canonical destination inventory/observability, typed loader recovery, structural trash retry, and existing cursor reset/empty-page protections remain covered by the focused and navigation/inventory regressions.
+
+### Concerns
+
+- The broader host editor group still has the accepted B1 copy residual: `publishes the applied record through the session publish action` expects `기록을 공개했습니다.`, while runtime correctly uses the B1 canonical `✓ 게스트·멤버 노트에 기록을 게시했습니다.`. It remains deferred to the program risk-resolution phase.
+- `session-record-workspace.test.tsx` continues to emit its pre-existing suspended-resource React `act` warning even though the affected group passes.
+- Aggregate frontend tests and real-browser/E2E validation were intentionally not repeated for this narrow fix round; no passing claim is made for either.
