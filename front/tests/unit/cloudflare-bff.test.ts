@@ -891,6 +891,33 @@ describe("Cloudflare BFF function", () => {
 });
 
 describe("Cloudflare BFF cache layer", () => {
+  it.each([403, 404, 500])(
+    "forces an upstream public %s without cache metadata to no-store",
+    async (status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response('{"denied":true}', { status })),
+      );
+      const cachePut = vi.fn(async () => undefined);
+      const ctx = context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/sessions/session-1",
+        ),
+        { path: ["api", "public", "clubs", "reading-sai", "sessions", "session-1"] },
+      );
+      vi.stubGlobal("caches", {
+        default: { match: vi.fn(async () => undefined), put: cachePut },
+      });
+
+      const response = await onRequest(ctx);
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(cachePut).not.toHaveBeenCalled();
+      expect(ctx.waitUntil).not.toHaveBeenCalled();
+    },
+  );
+
   it("clamps an old public detail policy before returning or storing it", async () => {
     vi.stubGlobal(
       "fetch",

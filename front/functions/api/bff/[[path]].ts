@@ -263,13 +263,17 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
 
   if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
-    outboundResponse.headers.set(
-      "Cache-Control",
-      boundedPublicCacheControl(
-        upstreamPath,
-        outboundResponse.headers.get("Cache-Control") ?? "",
-      ),
-    );
+    if (!isCacheableUpstreamResponse(outboundResponse)) {
+      outboundResponse.headers.set("Cache-Control", "no-store");
+    } else {
+      outboundResponse.headers.set(
+        "Cache-Control",
+        boundedPublicCacheControl(
+          upstreamPath,
+          outboundResponse.headers.get("Cache-Control") ?? "",
+        ),
+      );
+    }
   }
 
   if (

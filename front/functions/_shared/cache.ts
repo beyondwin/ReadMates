@@ -1,11 +1,25 @@
 export const PUBLIC_CACHEABLE_PATH_PREFIXES = [
   "/api/public/clubs/",
   "/api/public/records/",
+  "/api/public/sessions/",
 ] as const;
+
+const PUBLIC_CACHEABLE_EXACT_PATHS = ["/api/public/club"] as const;
+
+const PUBLIC_DETAIL_PATHS = [
+  /^\/api\/public\/clubs\/[^/]+\/sessions\/[^/]+$/,
+  /^\/api\/public\/records\/[^/]+$/,
+  /^\/api\/public\/sessions\/[^/]+$/,
+] as const;
+
+function isPublicCacheablePath(upstreamPath: string): boolean {
+  return PUBLIC_CACHEABLE_EXACT_PATHS.some((path) => path === upstreamPath) ||
+    PUBLIC_CACHEABLE_PATH_PREFIXES.some((prefix) => upstreamPath.startsWith(prefix));
+}
 
 export function isPublicCacheableRequest(method: string, upstreamPath: string): boolean {
   if (method !== "GET") return false;
-  return PUBLIC_CACHEABLE_PATH_PREFIXES.some((p) => upstreamPath.startsWith(p));
+  return isPublicCacheablePath(upstreamPath);
 }
 
 export function buildPublicCacheKey(request: Request): Request {
@@ -26,11 +40,12 @@ export function boundedPublicCacheControl(
   if (!lower.includes("public") && !lower.includes("max-age")) {
     return normalized;
   }
-  if (!PUBLIC_CACHEABLE_PATH_PREFIXES.some((prefix) => upstreamPath.startsWith(prefix))) {
+  if (!isPublicCacheablePath(upstreamPath)) {
     return normalized;
   }
   const upstreamMaxAge = Number(/(?:^|,)\s*max-age=(\d+)/i.exec(normalized)?.[1] ?? 60);
-  const boundedMaxAge = Math.min(Math.max(upstreamMaxAge, 0), 60);
+  const policyMaxAge = PUBLIC_DETAIL_PATHS.some((pattern) => pattern.test(upstreamPath)) ? 60 : 120;
+  const boundedMaxAge = Math.min(Math.max(upstreamMaxAge, 0), policyMaxAge);
   return `public, max-age=${boundedMaxAge}, must-revalidate`;
 }
 

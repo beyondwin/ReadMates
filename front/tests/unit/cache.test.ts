@@ -8,10 +8,25 @@ import {
 } from "../../functions/_shared/cache";
 
 describe("boundedPublicCacheControl", () => {
+  it("keeps general public club responses at the 120-second convergence target", () => {
+    expect(
+      boundedPublicCacheControl(
+        "/api/public/clubs/reading-sai",
+        "public, max-age=120, stale-while-revalidate=600",
+      ),
+    ).toBe("public, max-age=120, must-revalidate");
+  });
+
   it("caps takedown-eligible public responses at 60 seconds without stale reuse", () => {
     expect(
       boundedPublicCacheControl(
         "/api/public/clubs/reading-sai/sessions/session-1",
+        "public, max-age=120, stale-while-revalidate=600",
+      ),
+    ).toBe("public, max-age=60, must-revalidate");
+    expect(
+      boundedPublicCacheControl(
+        "/api/public/sessions/session-1",
         "public, max-age=120, stale-while-revalidate=600",
       ),
     ).toBe("public, max-age=60, must-revalidate");
@@ -37,6 +52,11 @@ describe("PUBLIC_CACHEABLE_PATH_PREFIXES", () => {
 describe("isPublicCacheableRequest", () => {
   it("returns true for GET requests to clubs paths", () => {
     expect(isPublicCacheableRequest("GET", "/api/public/clubs/reading-sai")).toBe(true);
+  });
+
+  it("returns true for legacy public club and session paths", () => {
+    expect(isPublicCacheableRequest("GET", "/api/public/club")).toBe(true);
+    expect(isPublicCacheableRequest("GET", "/api/public/sessions/session-1")).toBe(true);
   });
 
   it("returns true for GET requests to clubs session paths", () => {
