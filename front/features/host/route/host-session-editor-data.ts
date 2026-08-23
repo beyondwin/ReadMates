@@ -19,6 +19,7 @@ import {
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
 import { replace } from "react-router";
 
@@ -44,7 +45,10 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
       await client.fetchQuery(hostSessionDetailQuery(params.sessionId, context));
     } catch (error) {
       if (isReadmatesApiError(error) && (error.status === 401 || error.status === 403)) {
-        throw replace(resolveUnavailableDetailTarget({ pathname: new URL(args.request.url).pathname }));
+        throw replace(resolveUnavailableDetailTarget({
+          pathname: new URL(args.request.url).pathname,
+          lastSafeTarget: readLastSafeWorkspaceTarget("host"),
+        }));
       }
       if (!isHostSessionNotFoundError(error)) {
         throw error;
@@ -52,10 +56,13 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
       try {
         await client.fetchQuery(hostSessionTrashDetailQuery(params.sessionId, context));
       } catch (trashError) {
-        if (!isHostSessionTrashExpiredError(trashError)) {
+        if (!isHostSessionNotFoundError(trashError) && !isHostSessionTrashExpiredError(trashError)) {
           throw trashError;
         }
-        throw replace(resolveUnavailableDetailTarget({ pathname: new URL(args.request.url).pathname }));
+        throw replace(resolveUnavailableDetailTarget({
+          pathname: new URL(args.request.url).pathname,
+          lastSafeTarget: readLastSafeWorkspaceTarget("host"),
+        }));
       }
       return { sessionId: params.sessionId, mode: "trash" };
     }

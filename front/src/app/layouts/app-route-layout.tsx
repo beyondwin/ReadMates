@@ -36,6 +36,10 @@ import {
   workspaceFromCanonicalPath,
   type ClubWorkspace,
 } from "@/src/app/workspace-route-model";
+import {
+  readLastSafeWorkspaceTarget,
+  rememberLastSafeWorkspaceTarget,
+} from "@/src/app/workspace-route-continuity";
 import { Link } from "@/src/app/router-link";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { canUseHostApp, canUseJoinedClubHostApp, canUseMemberApp } from "@/shared/auth/member-app-access";
@@ -87,34 +91,6 @@ function appClubSlug(pathname: string) {
     return decodeURIComponent(match[1]);
   } catch {
     return null;
-  }
-}
-
-function lastSafeWorkspaceTargetKey(workspace: ClubWorkspace) {
-  return `readmates:last-safe-workspace-target:${workspace}`;
-}
-
-function readLastSafeWorkspaceTarget(workspace: ClubWorkspace) {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  try {
-    return window.sessionStorage.getItem(lastSafeWorkspaceTargetKey(workspace));
-  } catch {
-    return null;
-  }
-}
-
-function rememberLastSafeWorkspaceTarget(workspace: ClubWorkspace, pathname: string) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  try {
-    window.sessionStorage.setItem(lastSafeWorkspaceTargetKey(workspace), pathname);
-  } catch {
-    // Storage is optional continuity only; pathname remains render authority.
   }
 }
 
@@ -291,7 +267,7 @@ export function AppRouteLayout({
       candidate,
       authorizedWorkspaces,
       // The target's route loader remains the authority for the same object before it renders.
-      correspondence: candidate.requiresCorrespondence ? "authorized" : "unknown",
+      correspondence: "unknown",
       lastSafeTarget: readLastSafeWorkspaceTarget(targetWorkspace),
     });
 

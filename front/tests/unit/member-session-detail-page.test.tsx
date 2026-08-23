@@ -15,6 +15,7 @@ import {
   enrichSessionDetailHighlightAuthors,
   memberSessionDetailLoaderFactory,
 } from "@/features/archive/route/member-session-detail-data";
+import { archiveKeys } from "@/features/archive/queries/archive-queries";
 import MemberSessionDetailPage from "@/features/archive/ui/member-session-detail-page";
 import MemberSessionDetailRoutePage, { GuestSessionDetailContent } from "@/src/pages/member-session";
 import { archiveSessionDetailContractFixture } from "./api-contract-fixtures";
@@ -355,6 +356,84 @@ describe("MemberSessionDetailPage", () => {
         request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/forbidden-session"),
       } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]),
     ).rejects.toMatchObject({ status: 302 });
+  });
+
+  it.each([
+    ["missing", new Response(null, { status: 404 })],
+    ["forbidden", new Response(JSON.stringify({ code: "FORBIDDEN", message: "forbidden", status: 403 }), { status: 403 })],
+  ])("rechecks stale cached detail when the current member counterpart is %s", async (_reason, detailResponse) => {
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              authenticated: true,
+              membershipId: "member-1",
+              role: "MEMBER",
+              membershipStatus: "ACTIVE",
+              approvalState: "ACTIVE",
+            }),
+            { headers: { "Content-Type": "application/json" } },
+          ),
+        );
+      }
+      return Promise.resolve(detailResponse.clone());
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const client = createTestQueryClient();
+    client.setQueryData(
+      archiveKeys.detail("stale-session", { clubSlug: "reading-sai" }),
+      readableSession,
+    );
+
+    await expect(
+      memberSessionDetailLoaderFactory(client)({
+        params: { clubSlug: "reading-sai", sessionId: "stale-session" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/stale-session"),
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]),
+    ).rejects.toMatchObject({ status: 302 });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/archive/sessions/stale-session?clubSlug=reading-sai",
+      expect.anything(),
+    );
+  });
+
+  it("uses only a same-club safe member last-safe candidate for an unavailable detail", async () => {
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:member", "/clubs/reading-sai/app/notes");
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      if (input.toString() === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(new Response(JSON.stringify({
+          authenticated: true,
+          membershipId: "member-1",
+          role: "MEMBER",
+          membershipStatus: "ACTIVE",
+          approvalState: "ACTIVE",
+        }), { headers: { "Content-Type": "application/json" } }));
+      }
+      return Promise.resolve(new Response(null, { status: 404 }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    try {
+      await memberSessionDetailLoaderFactory(createTestQueryClient())({
+        params: { clubSlug: "reading-sai", sessionId: "unreadable-session" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/unreadable-session"),
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/notes");
+    }
+
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:member", "/clubs/other-club/app/notes");
+    try {
+      await memberSessionDetailLoaderFactory(createTestQueryClient())({
+        params: { clubSlug: "reading-sai", sessionId: "unreadable-session" },
+        request: new Request("https://app.readmates.example/clubs/reading-sai/app/sessions/unreadable-session"),
+      } as Parameters<ReturnType<typeof memberSessionDetailLoaderFactory>>[0]);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/archive");
+    } finally {
+      window.sessionStorage.removeItem("readmates:last-safe-workspace-target:member");
+    }
   });
 
   it("enriches legacy session detail highlights from the notes feed authors", () => {

@@ -8,6 +8,7 @@ import { loadArchiveMemberAuth } from "@/features/archive/route/archive-loader-a
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
 
 export { enrichSessionDetailHighlightAuthors };
@@ -33,17 +34,24 @@ export function memberSessionDetailLoaderFactory(queryClient: QueryClient) {
 
     let detail;
     try {
-      detail = await queryClient.ensureQueryData(memberArchiveSessionQuery(sessionId, contextFromArgs(args)));
+      detail = await queryClient.fetchQuery({
+        ...memberArchiveSessionQuery(sessionId, contextFromArgs(args)),
+        staleTime: 0,
+      });
     } catch (error) {
       if (!isReadmatesApiError(error) || (error.status !== 401 && error.status !== 403)) {
         throw error;
       }
-      throw replace(resolveUnavailableDetailTarget({ pathname: new URL(args.request.url).pathname }));
+      throw replace(resolveUnavailableDetailTarget({
+        pathname: new URL(args.request.url).pathname,
+        lastSafeTarget: readLastSafeWorkspaceTarget("member"),
+      }));
     }
     if (!detail) {
       throw replace(
         resolveUnavailableDetailTarget({
           pathname: new URL(args.request.url).pathname,
+          lastSafeTarget: readLastSafeWorkspaceTarget("member"),
         }),
       );
     }

@@ -1791,6 +1791,41 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({ status: 500 });
     expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
   });
+
+  it("replaces to a safe host fallback when both active and trash detail are not found", async () => {
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(404, "RESOURCE_NOT_FOUND"));
+    loaderApiMocks.fetchHostSessionTrash.mockRejectedValue(loaderApiError(404, "RESOURCE_NOT_FOUND"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({ status: 302 });
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
+    }
+  });
+
+  it("uses only a same-club safe host last-safe candidate when the detail is unavailable", async () => {
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", "/clubs/reading-sai/app/host/notifications");
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(403));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host/notifications");
+    }
+
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", "/clubs/other-club/app/host/notifications");
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+    } finally {
+      window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
+    }
+  });
 });
 
 function renderEditSessionRoute(

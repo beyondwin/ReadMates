@@ -133,16 +133,41 @@ join clubs on clubs.id = sessions.club_id
 where clubs.slug = 'reading-sai' and sessions.state = 'PUBLISHED'
 order by sessions.created_at desc
 limit 1;
-`).trim().split("\n").at(-1)!;
+  `).trim().split("\n").at(-1)!;
 
-  runMysql(`update sessions set state = 'OPEN', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
   try {
+    runMysql(`update sessions set state = 'OPEN', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
     await page.goto(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
     await expect(page.locator(".desktop-only .rm-workspace-switch")).toHaveAttribute(
       "href",
       `/clubs/reading-sai/app/sessions/${sessionId}`,
     );
     await page.locator(".desktop-only .rm-workspace-switch").click();
+    await expect(page).toHaveURL("/clubs/reading-sai/app/archive");
+  } finally {
+    runMysql(`update sessions set state = 'PUBLISHED', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
+  }
+});
+
+test("cached member detail is rechecked before Back returns to an unavailable counterpart", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  const sessionId = runMysql(`
+select sessions.id
+from sessions
+join clubs on clubs.id = sessions.club_id
+where clubs.slug = 'reading-sai' and sessions.state = 'PUBLISHED'
+order by sessions.created_at desc
+limit 1;
+`).trim().split("\n").at(-1)!;
+
+  try {
+    await page.goto(`/clubs/reading-sai/app/sessions/${sessionId}`);
+    await expect(page.locator(".desktop-only a[href='/clubs/reading-sai/app/archive']")).toBeVisible();
+
+    runMysql(`update sessions set state = 'OPEN', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
+    await page.locator(".desktop-only a[href='/clubs/reading-sai/app/archive']").click();
+    await expect(page).toHaveURL("/clubs/reading-sai/app/archive");
+    await page.goBack();
     await expect(page).toHaveURL("/clubs/reading-sai/app/archive");
   } finally {
     runMysql(`update sessions set state = 'PUBLISHED', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
