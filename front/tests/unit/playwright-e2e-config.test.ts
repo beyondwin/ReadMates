@@ -79,6 +79,12 @@ describe("Playwright E2E backend web server config", () => {
     );
   });
 
+  it("provides an explicit public-safe admin command digest key", async () => {
+    await expect(backendWebServerCommand()).resolves.toContain(
+      "READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY='test-admin-command-digest-key'",
+    );
+  });
+
   it("keeps one worker by default and supports explicit worker opt-in", async () => {
     await expect(loadPlaywrightConfigWithWorkers(undefined)).resolves.toMatchObject({ workers: 1 });
     await expect(loadPlaywrightConfigWithWorkers("2")).resolves.toMatchObject({ workers: 2 });
