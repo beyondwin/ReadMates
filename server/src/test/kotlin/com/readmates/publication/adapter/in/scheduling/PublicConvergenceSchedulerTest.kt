@@ -2,8 +2,11 @@
 
 package com.readmates.publication.adapter.`in`.scheduling
 
+import com.readmates.publication.adapter.out.HttpPublicCachePurgeAdapter
+import com.readmates.publication.adapter.out.NoopPublicCachePurgeAdapter
 import com.readmates.publication.application.model.PublicConvergenceProcessResult
 import com.readmates.publication.application.port.`in`.ProcessPublicConvergenceUseCase
+import com.readmates.publication.application.port.out.PublicCachePurgePort
 import com.readmates.publication.config.PublicConvergenceConfiguration
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
@@ -13,30 +16,46 @@ import org.springframework.context.annotation.Configuration
 
 class PublicConvergenceSchedulerTest {
     @Test
-    fun `scheduler is absent unless feature scheduler and http provider are explicitly enabled`() {
-        contextRunner.run { context ->
-            assertThat(context).doesNotHaveBean(PublicConvergenceScheduler::class.java)
-        }
+    fun `all disabled uses noop provider and no scheduler without invoking work`() {
+        assertRuntime(emptyArray(), NoopPublicCachePurgeAdapter::class.java, schedulerExpected = false)
+    }
 
-        contextRunner
-            .withPropertyValues(
+    @Test
+    fun `prepared http provider with disabled feature keeps a complete idle bean graph`() {
+        assertRuntime(httpProviderProperties(), HttpPublicCachePurgeAdapter::class.java, schedulerExpected = false)
+    }
+
+    @Test
+    fun `enabled feature with disabled scheduler prepares http provider without invoking work`() {
+        assertRuntime(
+            arrayOf("readmates.public-convergence.enabled=true") + httpProviderProperties(),
+            HttpPublicCachePurgeAdapter::class.java,
+            schedulerExpected = false,
+        )
+    }
+
+    @Test
+    fun `enabled feature and scheduler without http provider stays inert on noop`() {
+        assertRuntime(
+            arrayOf(
                 "readmates.public-convergence.enabled=true",
                 "readmates.public-convergence.scheduler.enabled=true",
-            ).run { context ->
-                assertThat(context).doesNotHaveBean(PublicConvergenceScheduler::class.java)
-            }
+            ),
+            NoopPublicCachePurgeAdapter::class.java,
+            schedulerExpected = false,
+        )
+    }
 
-        contextRunner
-            .withPropertyValues(
+    @Test
+    fun `scheduler exists only when feature scheduler and http provider are enabled`() {
+        assertRuntime(
+            arrayOf(
                 "readmates.public-convergence.enabled=true",
                 "readmates.public-convergence.scheduler.enabled=true",
-                "readmates.public-convergence.provider.http-enabled=true",
-            ).run { context ->
-                assertThat(context).hasFailed()
-                assertThat(context.startupFailure).hasRootCauseMessage(
-                    "Public convergence provider endpoint must be an HTTPS URI without user info",
-                )
-            }
+            ) + httpProviderProperties(),
+            HttpPublicCachePurgeAdapter::class.java,
+            schedulerExpected = true,
+        )
     }
 
     @Test
@@ -45,10 +64,8 @@ class PublicConvergenceSchedulerTest {
             .withPropertyValues(
                 "readmates.public-convergence.enabled=true",
                 "readmates.public-convergence.scheduler.enabled=true",
-                "readmates.public-convergence.provider.http-enabled=true",
-                "readmates.public-convergence.provider.endpoint=https://cache-provider.example/purge",
-                "readmates.public-convergence.provider.credential=test-credential",
                 "readmates.public-convergence.scheduler.batch-size=2",
+                *httpProviderProperties(),
             ).run { context ->
                 val scheduler = context.getBean(PublicConvergenceScheduler::class.java)
                 val processor = context.getBean(RecordingProcessor::class.java)
@@ -59,10 +76,37 @@ class PublicConvergenceSchedulerTest {
             }
     }
 
+    private fun assertRuntime(
+        properties: Array<String>,
+        expectedProvider: Class<out PublicCachePurgePort>,
+        schedulerExpected: Boolean,
+    ) {
+        contextRunner.withPropertyValues(*properties).run { context ->
+            assertThat(context).hasNotFailed()
+            assertThat(context).hasSingleBean(PublicCachePurgePort::class.java)
+            assertThat(context.getBean(PublicCachePurgePort::class.java)).isInstanceOf(expectedProvider)
+            if (schedulerExpected) {
+                assertThat(context).hasSingleBean(PublicConvergenceScheduler::class.java)
+            } else {
+                assertThat(context).doesNotHaveBean(PublicConvergenceScheduler::class.java)
+            }
+            assertThat(context.getBean(RecordingProcessor::class.java).invocations).isZero()
+        }
+    }
+
+    private fun httpProviderProperties(): Array<String> =
+        arrayOf(
+            "readmates.public-convergence.provider.http-enabled=true",
+            "readmates.public-convergence.provider.endpoint=https://cache-provider.invalid/purge",
+            "readmates.public-convergence.provider.credential=test-only-credential",
+        )
+
     private val contextRunner =
         ApplicationContextRunner()
             .withUserConfiguration(
                 PublicConvergenceConfiguration::class.java,
+                HttpPublicCachePurgeAdapter::class.java,
+                NoopPublicCachePurgeAdapter::class.java,
                 PublicConvergenceScheduler::class.java,
                 TestConfig::class.java,
             )
@@ -71,7 +115,14 @@ class PublicConvergenceSchedulerTest {
     class TestConfig {
         @Bean
         fun processor(): RecordingProcessor = RecordingProcessor()
+
+        @Bean
+        fun providerConsumer(provider: PublicCachePurgePort): ProviderConsumer = ProviderConsumer(provider)
     }
+
+    class ProviderConsumer(
+        val provider: PublicCachePurgePort,
+    )
 
     class RecordingProcessor : ProcessPublicConvergenceUseCase {
         var invocations = 0

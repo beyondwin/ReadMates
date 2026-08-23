@@ -10,6 +10,7 @@ import java.time.Duration
 data class PublicConvergenceProperties(
     val enabled: Boolean = false,
     val leaseDuration: Duration = Duration.ofSeconds(DEFAULT_LEASE_SECONDS),
+    val terminalWriteSafetyMargin: Duration = Duration.ofSeconds(DEFAULT_TERMINAL_WRITE_SAFETY_MARGIN_SECONDS),
     val maxAttempts: Int = DEFAULT_MAX_ATTEMPTS,
     val initialBackoff: Duration = Duration.ofSeconds(DEFAULT_INITIAL_BACKOFF_SECONDS),
     val maxBackoff: Duration = Duration.ofMinutes(DEFAULT_MAX_BACKOFF_MINUTES),
@@ -32,6 +33,19 @@ data class PublicConvergenceProperties(
         }
         require(maxBackoff >= initialBackoff && maxBackoff <= Duration.ofHours(MAX_BACKOFF_HOURS)) {
             "Public convergence max backoff must be between initial backoff and 1h"
+        }
+        require(
+            !terminalWriteSafetyMargin.isNegative &&
+                !terminalWriteSafetyMargin.isZero &&
+                terminalWriteSafetyMargin <= Duration.ofSeconds(MAX_TERMINAL_WRITE_SAFETY_MARGIN_SECONDS),
+        ) {
+            "Public convergence terminal write safety margin must be between 1ns and 30s"
+        }
+        if (provider.httpEnabled) {
+            val boundedProviderBudget = provider.connectTimeout + provider.readTimeout + terminalWriteSafetyMargin
+            require(leaseDuration > boundedProviderBudget) {
+                "Public convergence lease duration must exceed provider call budget plus terminal write safety margin"
+            }
         }
     }
 
@@ -98,6 +112,8 @@ class PublicConvergenceConfiguration
 
 private const val DEFAULT_LEASE_SECONDS = 30L
 private const val MAX_LEASE_MINUTES = 5L
+private const val DEFAULT_TERMINAL_WRITE_SAFETY_MARGIN_SECONDS = 5L
+private const val MAX_TERMINAL_WRITE_SAFETY_MARGIN_SECONDS = 30L
 private const val DEFAULT_MAX_ATTEMPTS = 5
 private const val MIN_ATTEMPTS = 1
 private const val MAX_ATTEMPTS = 10

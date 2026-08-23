@@ -35,11 +35,8 @@ class HostPublicConvergenceQueryService(
             status = current?.status?.name ?: "QUEUED",
             lastAttemptAt = current?.observedAt,
             retryable =
-                current == null ||
-                    (
-                        current.status == ConvergenceAttemptStatus.FAILED &&
-                            snapshot.nextAttemptNo <= properties.maxAttempts
-                    ),
+                current?.status == ConvergenceAttemptStatus.FAILED &&
+                    snapshot.nextAttemptNo <= properties.maxAttempts,
         )
     }
 }

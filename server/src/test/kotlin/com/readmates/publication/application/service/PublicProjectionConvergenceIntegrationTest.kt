@@ -1,6 +1,8 @@
 package com.readmates.publication.application.service
 
+import com.readmates.publication.application.model.ClaimPublicConvergenceWorkCommand
 import com.readmates.publication.application.model.CompletePublicConvergenceAttemptCommand
+import com.readmates.publication.application.model.ConvergenceAttemptStatus
 import com.readmates.publication.application.model.PublicConvergenceEvent
 import com.readmates.publication.application.model.PublicConvergenceProcessResult
 import com.readmates.publication.application.port.out.ProviderAttemptResult
@@ -96,29 +98,35 @@ class PublicProjectionConvergenceIntegrationTest(
 
     @AfterEach
     fun cleanup() {
-        createdConvergenceIds.forEach { convergenceId ->
-            jdbcTemplate.update(
-                "delete from public_convergence_events where convergence_id = ?",
-                convergenceId.toString(),
-            )
-            jdbcTemplate.update(
-                "delete from public_convergence_work where convergence_id = ?",
-                convergenceId.toString(),
-            )
-            jdbcTemplate.update(
-                "delete from public_mutation_convergence_receipts where convergence_id = ?",
-                convergenceId.toString(),
-            )
-        }
-        createdConvergenceIds.clear()
-        suspendedWork.forEach { work ->
-            jdbcTemplate.update(
-                "update public_convergence_work set available_at = ? where convergence_id = ?",
-                work.availableAt,
-                work.convergenceId,
-            )
-        }
-        suspendedWork = emptyList()
+        runFixtureCleanup(
+            deleteOwnedRows = {
+                createdConvergenceIds.forEach { convergenceId ->
+                    jdbcTemplate.update(
+                        "delete from public_convergence_events where convergence_id = ?",
+                        convergenceId.toString(),
+                    )
+                    jdbcTemplate.update(
+                        "delete from public_convergence_work where convergence_id = ?",
+                        convergenceId.toString(),
+                    )
+                    jdbcTemplate.update(
+                        "delete from public_mutation_convergence_receipts where convergence_id = ?",
+                        convergenceId.toString(),
+                    )
+                }
+                createdConvergenceIds.clear()
+            },
+            restoreSuspendedRows = {
+                suspendedWork.forEach { work ->
+                    jdbcTemplate.update(
+                        "update public_convergence_work set available_at = ? where convergence_id = ?",
+                        work.availableAt,
+                        work.convergenceId,
+                    )
+                }
+                suspendedWork = emptyList()
+            },
+        )
     }
 
     @Test
@@ -248,7 +256,7 @@ class PublicProjectionConvergenceIntegrationTest(
                 jsonPath("$.originResult") { value("READABLE") }
                 jsonPath("$.committedGeneration") { value(42) }
                 jsonPath("$.status") { value("QUEUED") }
-                jsonPath("$.retryable") { value(true) }
+                jsonPath("$.retryable") { value(false) }
                 jsonPath("$.providerError") { doesNotExist() }
                 jsonPath("$.resultCategory") { doesNotExist() }
             }
@@ -276,6 +284,57 @@ class PublicProjectionConvergenceIntegrationTest(
                 jsonPath("$.providerError") { doesNotExist() }
                 jsonPath("$.resultCategory") { doesNotExist() }
             }
+    }
+
+    @Test
+    fun `host status API keeps pending and succeeded attempts non-retryable`() {
+        val fixture = insertWorkFixture()
+        val claimedAt = clock.instant()
+        val claim =
+            requireNotNull(
+                convergencePort.claimNext(
+                    ClaimPublicConvergenceWorkCommand(
+                        workerId = "worker-api-state",
+                        now = claimedAt,
+                        leaseExpiresAt = claimedAt.plus(properties.leaseDuration),
+                        maxAttempts = properties.maxAttempts,
+                    ),
+                ),
+            )
+
+        assertHostRetryable(fixture, expectedStatus = "PENDING", expectedRetryable = false)
+
+        convergencePort.completeAttempt(
+            CompletePublicConvergenceAttemptCommand(
+                convergenceId = fixture.convergenceId,
+                attemptNo = claim.attemptNo,
+                workerId = claim.workerId,
+                status = ConvergenceAttemptStatus.SUCCEEDED,
+                observedAt = claimedAt.plusSeconds(1),
+                resultCategory = ProviderSuccessCategory.PURGED.name,
+                nextAvailableAt = claimedAt.plusSeconds(1),
+                exhausted = true,
+            ),
+        )
+
+        assertHostRetryable(fixture, expectedStatus = "SUCCEEDED", expectedRetryable = false)
+    }
+
+    @Test
+    fun `host status API keeps exhausted failure non-retryable`() {
+        val fixture = insertWorkFixture()
+
+        repeat(properties.maxAttempts) { attemptIndex ->
+            purgePort.enqueue(ProviderAttemptResult.Failed(ProviderFailureCategory.UNAVAILABLE, retryable = true))
+            assertThat(service.processOne("worker-api-exhausted"))
+                .describedAs("attempt ${attemptIndex + 1}")
+                .isEqualTo(PublicConvergenceProcessResult.PROCESSED)
+            if (attemptIndex + 1 < properties.maxAttempts) {
+                makeAvailable(fixture.convergenceId)
+            }
+        }
+
+        assertHostRetryable(fixture, expectedStatus = "FAILED", expectedRetryable = false)
     }
 
     private fun insertWorkFixture(): Fixture {
@@ -363,6 +422,21 @@ class PublicProjectionConvergenceIntegrationTest(
             receiptId.toString(),
         )
 
+    private fun assertHostRetryable(
+        fixture: Fixture,
+        expectedStatus: String,
+        expectedRetryable: Boolean,
+    ) {
+        mockMvc
+            .get("/api/host/sessions/$BASELINE_SESSION_ID/publication/convergence/${fixture.receiptId}") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value(expectedStatus) }
+                jsonPath("$.retryable") { value(expectedRetryable) }
+            }
+    }
+
     private data class Fixture(
         val receiptId: UUID,
         val convergenceId: UUID,
@@ -420,4 +494,22 @@ class PublicProjectionConvergenceIntegrationTest(
     private companion object {
         val BASELINE_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000306")
     }
+}
+
+internal fun runFixtureCleanup(
+    deleteOwnedRows: () -> Unit,
+    restoreSuspendedRows: () -> Unit,
+) {
+    var deletionFailure: Throwable? = null
+    try {
+        deleteOwnedRows()
+    } catch (failure: Throwable) {
+        deletionFailure = failure
+    }
+    try {
+        restoreSuspendedRows()
+    } catch (restoreFailure: Throwable) {
+        deletionFailure?.addSuppressed(restoreFailure) ?: throw restoreFailure
+    }
+    deletionFailure?.let { throw it }
 }

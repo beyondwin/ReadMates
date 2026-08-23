@@ -28,7 +28,6 @@ sealed interface ProviderAttemptResult {
 
 enum class ProviderSuccessCategory {
     PURGED,
-    ALREADY_CURRENT,
 }
 
 enum class ProviderFailureCategory {

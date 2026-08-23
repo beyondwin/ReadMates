@@ -44,6 +44,12 @@ class HttpPublicCachePurgeAdapterTest {
             .isEqualTo(ProviderAttemptResult.Failed(ProviderFailureCategory.REJECTED, retryable = false))
     }
 
+    @Test
+    fun `http conflict is rejected until the provider documents idempotent duplicate success`() {
+        assertThat(adapterReturning(409).requestPurge(command()))
+            .isEqualTo(ProviderAttemptResult.Failed(ProviderFailureCategory.REJECTED, retryable = false))
+    }
+
     private fun adapterReturning(status: Int) = HttpPublicCachePurgeAdapter(properties()) { status }
 
     private fun properties() =

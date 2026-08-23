@@ -27,7 +27,6 @@ internal fun interface PublicPurgeHttpExchange {
 }
 
 @Component
-@ConditionalOnProperty(prefix = "readmates.public-convergence", name = ["enabled"], havingValue = "true")
 @ConditionalOnProperty(prefix = "readmates.public-convergence.provider", name = ["http-enabled"], havingValue = "true")
 class HttpPublicCachePurgeAdapter private constructor(
     private val properties: PublicConvergenceProperties.Provider,
@@ -78,7 +77,6 @@ class HttpPublicCachePurgeAdapter private constructor(
         when {
             this in HTTP_SUCCESS_MIN..HTTP_SUCCESS_MAX ->
                 ProviderAttemptResult.Succeeded(ProviderSuccessCategory.PURGED)
-            this == HTTP_CONFLICT -> ProviderAttemptResult.Succeeded(ProviderSuccessCategory.ALREADY_CURRENT)
             this == HTTP_REQUEST_TIMEOUT ->
                 ProviderAttemptResult.Failed(ProviderFailureCategory.TIMEOUT, retryable = true)
             this == HTTP_TOO_MANY_REQUESTS || this in HTTP_SERVER_ERROR_MIN..HTTP_SERVER_ERROR_MAX ->
@@ -125,7 +123,6 @@ private class JdkPublicPurgeHttpExchange(
 private const val HTTP_SUCCESS_MIN = 200
 private const val HTTP_SUCCESS_MAX = 299
 private const val HTTP_REQUEST_TIMEOUT = 408
-private const val HTTP_CONFLICT = 409
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val HTTP_SERVER_ERROR_MIN = 500
 private const val HTTP_SERVER_ERROR_MAX = 599
