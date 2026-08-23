@@ -1,62 +1,90 @@
 import type {
-  HostSessionWorkspaceLocation,
-  HostSessionWorkspacePanel,
+  HostMeetingLocation,
+  HostMeetingTask,
 } from "./host-session-workspace-model";
 
-export type { HostSessionWorkspaceLocation, HostSessionWorkspacePanel };
+export type { HostMeetingLocation, HostMeetingTask };
 
-export type HostSessionDraftSource = HostSessionWorkspaceLocation["source"];
-
-const HOST_SESSION_SECTION_PANELS: readonly Exclude<HostSessionWorkspacePanel, "focus">[] = [
-  "basic",
+const HOST_MEETING_TASKS: readonly HostMeetingTask[] = [
+  "overview",
+  "responses",
   "attendance",
   "records",
+  "notifications",
   "history",
 ];
 
-const HOST_SESSION_DRAFT_SOURCES: readonly HostSessionDraftSource[] = ["manual", "ai", "json"];
+const HOST_MEETING_RECORD_SOURCES: readonly HostMeetingLocation["recordSource"][] = [
+  "manual",
+  "ai",
+  "json",
+];
 
-function defaultLocation(): HostSessionWorkspaceLocation {
-  return { panel: "focus", source: "manual" };
+function overviewLocation(overviewEditOpen = false): HostMeetingLocation {
+  return {
+    task: "overview",
+    overviewEditOpen,
+    recordSource: "manual",
+  };
 }
 
-export function parseHostSessionWorkspaceLocation(search: string): HostSessionWorkspaceLocation {
+export function parseHostMeetingLocation(search: string): HostMeetingLocation {
   const params = new URLSearchParams(search);
   const section = params.get("section");
+  const requestedRecordSource = params.get("source");
+
+  if (
+    requestedRecordSource !== null
+    && !isHostMeetingRecordSource(requestedRecordSource)
+  ) {
+    return overviewLocation();
+  }
 
   if (section !== null) {
-    if (section === "overview") {
-      return defaultLocation();
+    if (section === "basic") {
+      return overviewLocation(true);
     }
-    if (!isHostSessionSectionPanel(section)) {
-      return defaultLocation();
-    }
-    const source = params.get("source");
-    if (source !== null && !isHostSessionDraftSource(source)) {
-      return defaultLocation();
+    if (!isHostMeetingTask(section)) {
+      return overviewLocation();
     }
     if (section !== "records") {
-      return { panel: section, source: "manual" };
+      return {
+        task: section,
+        overviewEditOpen: false,
+        recordSource: "manual",
+      };
     }
 
-    return { panel: section, source: source ?? "manual" };
+    return {
+      task: "records",
+      overviewEditOpen: false,
+      recordSource: requestedRecordSource ?? "manual",
+    };
   }
 
   if (params.get("aigen") === "1") {
-    return { panel: "records", source: "ai" };
+    return {
+      task: "records",
+      overviewEditOpen: false,
+      recordSource: "ai",
+    };
   }
   if (params.get("records") === "json") {
-    return { panel: "records", source: "json" };
+    return {
+      task: "records",
+      overviewEditOpen: false,
+      recordSource: "json",
+    };
   }
-  return defaultLocation();
+  return overviewLocation();
 }
 
-export function buildHostSessionWorkspaceUrl(
+export function buildHostMeetingUrl(
   currentUrl: string | URL,
-  next: HostSessionWorkspaceLocation,
+  next: HostMeetingLocation,
 ): string {
   const url = currentUrl instanceof URL
-    ? new URL(currentUrl)
+    ? new URL(currentUrl.toString())
     : new URL(currentUrl, "https://readmates.invalid");
   const params = url.searchParams;
 
@@ -65,22 +93,88 @@ export function buildHostSessionWorkspaceUrl(
   params.delete("aigen");
   params.delete("records");
 
-  if (next.panel !== "focus") {
-    params.set("section", next.panel);
+  if (next.task === "overview" && next.overviewEditOpen) {
+    params.set("section", "basic");
+  } else if (next.task !== "overview") {
+    params.set("section", next.task);
   }
-  if (next.panel === "records" && (next.source === "ai" || next.source === "json")) {
-    params.set("source", next.source);
+  if (
+    next.task === "records"
+    && (next.recordSource === "ai" || next.recordSource === "json")
+  ) {
+    params.set("source", next.recordSource);
   }
 
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
-function isHostSessionSectionPanel(
-  value: string,
-): value is Exclude<HostSessionWorkspacePanel, "focus"> {
-  return HOST_SESSION_SECTION_PANELS.some((panel) => panel === value);
+function isHostMeetingTask(value: string): value is HostMeetingTask {
+  return HOST_MEETING_TASKS.some((task) => task === value);
 }
 
-function isHostSessionDraftSource(value: string): value is HostSessionDraftSource {
-  return HOST_SESSION_DRAFT_SOURCES.some((source) => source === value);
+function isHostMeetingRecordSource(
+  value: string,
+): value is HostMeetingLocation["recordSource"] {
+  return HOST_MEETING_RECORD_SOURCES.some((source) => source === value);
+}
+
+/**
+ * @deprecated Internal Task 5→8 compatibility only. New code uses
+ * HostMeetingLocation and HostMeetingTask.
+ */
+export type HostSessionWorkspacePanel = "focus" | "basic" | "attendance" | "records" | "history";
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export type HostSessionWorkspaceLocation = {
+  panel: HostSessionWorkspacePanel;
+  source: HostMeetingLocation["recordSource"];
+};
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export type HostSessionDraftSource = HostSessionWorkspaceLocation["source"];
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export function parseHostSessionWorkspaceLocation(search: string): HostSessionWorkspaceLocation {
+  const location = parseHostMeetingLocation(search);
+  if (location.task === "overview") {
+    return {
+      panel: location.overviewEditOpen ? "basic" : "focus",
+      source: "manual",
+    };
+  }
+  if (
+    location.task === "attendance"
+    || location.task === "records"
+    || location.task === "history"
+  ) {
+    return {
+      panel: location.task,
+      source: location.task === "records" ? location.recordSource : "manual",
+    };
+  }
+  return { panel: "focus", source: "manual" };
+}
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export function buildHostSessionWorkspaceUrl(
+  currentUrl: string | URL,
+  next: HostSessionWorkspaceLocation,
+): string {
+  return buildHostMeetingUrl(currentUrl, hostMeetingLocationFromCompatibility(next));
+}
+
+function hostMeetingLocationFromCompatibility(
+  location: HostSessionWorkspaceLocation,
+): HostMeetingLocation {
+  if (location.panel === "focus") {
+    return overviewLocation();
+  }
+  if (location.panel === "basic") {
+    return overviewLocation(true);
+  }
+  return {
+    task: location.panel,
+    overviewEditOpen: false,
+    recordSource: location.panel === "records" ? location.source : "manual",
+  };
 }

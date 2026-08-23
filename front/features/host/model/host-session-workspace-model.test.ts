@@ -1,270 +1,220 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildHostSessionWorkspace,
-  type HostSessionWorkspaceInput,
+  buildHostMeetingWorkspace,
+  type HostMeetingWorkspaceInput,
 } from "./host-session-workspace-model";
 
 const baseInput = {
+  currentUrl: "https://readmates.test/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost#meeting",
   meetingDate: "2026-08-21",
   today: "2026-08-20",
+  unansweredResponseCount: 0,
   unknownAttendanceCount: 0,
   hasRecordDraft: false,
   recordDraftStale: false,
   recordValidationIssueCount: 0,
   hasAppliedRecord: false,
   publicationReady: false,
-} satisfies Omit<HostSessionWorkspaceInput, "state">;
+} satisfies Omit<HostMeetingWorkspaceInput, "state">;
 
-describe("buildHostSessionWorkspace", () => {
-  it("maps DRAFT to open-session without a lifecycle transition", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "DRAFT",
-      }),
-    ).toMatchObject({
-      statusLabel: "모임 작성 중",
-      primaryAction: { kind: "OPEN_SESSION", label: "멤버와 준비 시작", panel: "focus" },
-    });
-  });
-
-  it("reviews member input while OPEN before the meeting date", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "OPEN",
-        meetingDate: "2026-08-21",
-        today: "2026-08-20",
-        unknownAttendanceCount: 2,
-      }),
-    ).toMatchObject({
-      statusLabel: "멤버와 준비 중",
-      primaryAction: {
-        kind: "REVIEW_MEMBER_INPUT",
-        label: "멤버 응답 확인하기",
-        panel: "focus",
-      },
-    });
-  });
-
-  it("prioritizes attendance on meeting day without changing OPEN", () => {
-    expect(
-      buildHostSessionWorkspace({
-        state: "OPEN",
-        meetingDate: "2026-08-21",
-        today: "2026-08-21",
-        unknownAttendanceCount: 2,
-        hasRecordDraft: false,
-        recordDraftStale: false,
-        recordValidationIssueCount: 0,
-        hasAppliedRecord: false,
-        publicationReady: false,
-      }),
-    ).toMatchObject({
-      statusLabel: "멤버와 준비 중",
-      primaryAction: { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", panel: "attendance" },
-    });
-  });
-
-  it("finishes the session on or after the meeting date once attendance is known", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "OPEN",
-        meetingDate: "2026-08-21",
-        today: "2026-08-22",
-        unknownAttendanceCount: 0,
-      }),
-    ).toMatchObject({
-      statusLabel: "멤버와 준비 중",
-      primaryAction: { kind: "FINISH_SESSION", label: "모임 마치기", panel: "focus" },
-    });
-  });
-
-  it("keeps OPEN when dates are invalid and falls back to lifecycle-only priority", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "OPEN",
-        meetingDate: "08/21/2026",
-        today: "not-a-date",
-        unknownAttendanceCount: 3,
-      }),
-    ).toMatchObject({
-      statusLabel: "멤버와 준비 중",
-      primaryAction: {
-        kind: "REVIEW_MEMBER_INPUT",
-        label: "멤버 응답 확인하기",
-        panel: "focus",
-      },
-    });
-  });
-
-  it("uploads a record first when CLOSED has no draft", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "CLOSED",
-      }),
-    ).toMatchObject({
-      statusLabel: "기록 정리 중",
-      primaryAction: { kind: "UPLOAD_RECORD", label: "정리본 올리기", panel: "records" },
-    });
-  });
-
-  it("fixes a stale CLOSED draft before apply", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "CLOSED",
-        hasRecordDraft: true,
-        recordDraftStale: true,
-        recordValidationIssueCount: 0,
-      }),
-    ).toMatchObject({
-      statusLabel: "기록 정리 중",
-      primaryAction: { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" },
-    });
-  });
-
-  it("fixes an invalid CLOSED draft before apply", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "CLOSED",
-        hasRecordDraft: true,
-        recordDraftStale: false,
-        recordValidationIssueCount: 2,
-      }),
-    ).toMatchObject({
-      statusLabel: "기록 정리 중",
-      primaryAction: { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" },
-    });
-  });
-
-  it("reviews a valid CLOSED draft before apply", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "CLOSED",
-        hasRecordDraft: true,
-        hasAppliedRecord: false,
-      }),
-    ).toMatchObject({
-      statusLabel: "기록 정리 중",
-      primaryAction: { kind: "REVIEW_RECORD", label: "기록에 반영", panel: "records" },
-    });
-  });
-
-  it("publishes a CLOSED applied record even after the draft is consumed", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "CLOSED",
-        hasRecordDraft: false,
-        hasAppliedRecord: true,
-        publicationReady: true,
-      }),
-    ).toMatchObject({
-      statusLabel: "기록 정리 중",
-      primaryAction: { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", panel: "records" },
-      publicationReady: true,
-    });
-  });
-
-  it("publishes when CLOSED is ready", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "CLOSED",
-        hasRecordDraft: true,
-        hasAppliedRecord: true,
-        publicationReady: true,
-      }),
-    ).toMatchObject({
-      statusLabel: "기록 정리 중",
-      primaryAction: { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", panel: "records" },
-      publicationReady: true,
-    });
-  });
-
-  it("keeps PUBLISH_RECORD when applied but not publication-ready", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "CLOSED",
-        hasRecordDraft: true,
-        hasAppliedRecord: true,
-        publicationReady: false,
-      }),
-    ).toMatchObject({
-      statusLabel: "기록 정리 중",
-      primaryAction: { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", panel: "records" },
-      publicationReady: false,
-    });
-  });
-
-  it("views the public record when PUBLISHED", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "PUBLISHED",
-        hasRecordDraft: true,
-        hasAppliedRecord: true,
-        publicationReady: true,
-      }),
-    ).toMatchObject({
-      statusLabel: "게스트·멤버 노트 게시 완료",
-      primaryAction: { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", panel: "focus" },
-    });
-  });
-
-  it("never returns an automatic lifecycle transition from dates alone", () => {
-    const view = buildHostSessionWorkspace({
+describe("buildHostMeetingWorkspace", () => {
+  it("builds the six unordered semantic task links without progress fields", () => {
+    const view = buildHostMeetingWorkspace({
       ...baseInput,
       state: "OPEN",
-      meetingDate: "2026-08-01",
-      today: "2026-08-21",
-      unknownAttendanceCount: 0,
     });
-    expect(view.statusLabel).toBe("멤버와 준비 중");
-    expect(view.primaryAction.kind).toBe("FINISH_SESSION");
-    expect(view.primaryAction.kind).not.toMatch(/CLOSE|PUBLISH|OPEN_SESSION/);
+
+    expect(view.tasks).toEqual([
+      {
+        task: "overview",
+        label: "개요",
+        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost#meeting",
+      },
+      {
+        task: "responses",
+        label: "참석 응답",
+        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=responses#meeting",
+      },
+      {
+        task: "attendance",
+        label: "실제 출석",
+        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=attendance#meeting",
+      },
+      {
+        task: "records",
+        label: "모임 기록",
+        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=records#meeting",
+      },
+      {
+        task: "notifications",
+        label: "알림",
+        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=notifications#meeting",
+      },
+      {
+        task: "history",
+        label: "변경 내역",
+        href: "/clubs/alpha/app/host/sessions/session-1?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=history#meeting",
+      },
+    ]);
+    expect(Object.keys(view)).not.toEqual(
+      expect.arrayContaining(["progress", "ordinal", "position", "step", "completed"]),
+    );
+    for (const task of view.tasks) {
+      expect(Object.keys(task)).not.toEqual(
+        expect.arrayContaining(["progress", "ordinal", "position", "step", "completed", "state"]),
+      );
+    }
   });
 
-  it("marks attendance current while the finish CTA is shown", () => {
-    expect(
-      buildHostSessionWorkspace({
-        ...baseInput,
-        state: "OPEN",
-        meetingDate: "2026-08-21",
-        today: "2026-08-22",
-        unknownAttendanceCount: 0,
-      }).progress,
-    ).toEqual([
-      { id: "basic", label: "기본 정보", state: "done" },
-      { id: "members", label: "멤버 준비", state: "done" },
-      { id: "attendance", label: "출석", state: "current" },
-      { id: "records", label: "기록", state: "next" },
-      { id: "publish", label: "공개", state: "next" },
+  it("uses only stored counts and states for task badges", () => {
+    const storedAttention = {
+      unansweredResponseCount: 5,
+      unknownAttendanceCount: 2,
+      hasRecordDraft: true,
+      recordDraftStale: false,
+      recordValidationIssueCount: 0,
+    };
+    const beforeMeeting = buildHostMeetingWorkspace({
+      ...baseInput,
+      ...storedAttention,
+      state: "OPEN",
+      meetingDate: "2026-08-25",
+      today: "2026-08-20",
+    });
+    const afterMeeting = buildHostMeetingWorkspace({
+      ...baseInput,
+      ...storedAttention,
+      state: "CLOSED",
+      meetingDate: "2026-08-10",
+      today: "2026-08-20",
+    });
+
+    const badges = (view: typeof beforeMeeting) => view.tasks.map(({ task, badge }) => [task, badge]);
+    expect(badges(beforeMeeting)).toEqual([
+      ["overview", undefined],
+      ["responses", "미응답 5"],
+      ["attendance", "확인 필요"],
+      ["records", "초안 있음"],
+      ["notifications", undefined],
+      ["history", undefined],
     ]);
+    expect(badges(afterMeeting)).toEqual(badges(beforeMeeting));
+
+    const recordNeedsReview = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "CLOSED",
+      hasRecordDraft: true,
+      recordDraftStale: true,
+    });
+    expect(recordNeedsReview.tasks.find(({ task }) => task === "records")?.badge).toBe("확인 필요");
   });
 
-  it("exposes progress markers for the current focus step", () => {
-    expect(
-      buildHostSessionWorkspace({
+  it.each([
+    [
+      "DRAFT",
+      {},
+      "모임 작성 중",
+      { kind: "OPEN_SESSION", label: "멤버와 준비 시작", task: "overview" },
+    ],
+    [
+      "OPEN",
+      { meetingDate: "2026-08-21", today: "2026-08-20", unknownAttendanceCount: 2 },
+      "멤버와 준비 중",
+      { kind: "REVIEW_MEMBER_INPUT", label: "멤버 응답 확인하기", task: "responses" },
+    ],
+    [
+      "OPEN",
+      { meetingDate: "2026-08-21", today: "2026-08-21", unknownAttendanceCount: 2 },
+      "멤버와 준비 중",
+      { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", task: "attendance" },
+    ],
+    [
+      "OPEN",
+      { meetingDate: "2026-08-21", today: "2026-08-22", unknownAttendanceCount: 0 },
+      "멤버와 준비 중",
+      { kind: "FINISH_SESSION", label: "모임 마치기", task: "overview" },
+    ],
+    [
+      "CLOSED",
+      {},
+      "기록 정리 중",
+      { kind: "UPLOAD_RECORD", label: "정리본 올리기", task: "records" },
+    ],
+    [
+      "PUBLISHED",
+      { hasAppliedRecord: true, publicationReady: true },
+      "게스트·멤버 노트 게시 완료",
+      { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", task: "overview" },
+    ],
+  ] satisfies Array<[
+    HostMeetingWorkspaceInput["state"],
+    Partial<HostMeetingWorkspaceInput>,
+    string,
+    { kind: string; label: string; task: string },
+  ]>) (
+    "keeps %s as the authoritative lifecycle while recommending its primary action",
+    (state, overrides, statusLabel, primaryAction) => {
+      const view = buildHostMeetingWorkspace({
         ...baseInput,
-        state: "OPEN",
-        meetingDate: "2026-08-21",
-        today: "2026-08-21",
-        unknownAttendanceCount: 1,
-      }).progress,
-    ).toEqual([
-      { id: "basic", label: "기본 정보", state: "done" },
-      { id: "members", label: "멤버 준비", state: "done" },
-      { id: "attendance", label: "출석", state: "current" },
-      { id: "records", label: "기록", state: "next" },
-      { id: "publish", label: "공개", state: "next" },
-    ]);
+        ...overrides,
+        state,
+      });
+
+      expect(view.lifecycle).toBe(state);
+      expect(view.statusLabel).toBe(statusLabel);
+      expect(view.primaryAction).toEqual(primaryAction);
+      expect(view).not.toHaveProperty("nextLifecycle");
+    },
+  );
+
+  it("keeps OPEN when dates are invalid and recommends response review", () => {
+    const view = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "OPEN",
+      meetingDate: "08/21/2026",
+      today: "not-a-date",
+      unknownAttendanceCount: 3,
+    });
+
+    expect(view).toMatchObject({
+      lifecycle: "OPEN",
+      statusLabel: "멤버와 준비 중",
+      primaryAction: {
+        kind: "REVIEW_MEMBER_INPUT",
+        label: "멤버 응답 확인하기",
+        task: "responses",
+      },
+    });
   });
+
+  it.each([
+    [
+      { hasRecordDraft: true, recordDraftStale: true },
+      { kind: "FIX_RECORD", label: "반영 전 확인", task: "records" },
+    ],
+    [
+      { hasRecordDraft: true, recordValidationIssueCount: 2 },
+      { kind: "FIX_RECORD", label: "반영 전 확인", task: "records" },
+    ],
+    [
+      { hasRecordDraft: true },
+      { kind: "REVIEW_RECORD", label: "기록에 반영", task: "records" },
+    ],
+    [
+      { hasRecordDraft: false, hasAppliedRecord: true, publicationReady: true },
+      { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", task: "records" },
+    ],
+  ] satisfies Array<[Partial<HostMeetingWorkspaceInput>, { kind: string; label: string; task: string }]>) (
+    "recommends the stored CLOSED record action without deriving lifecycle",
+    (overrides, primaryAction) => {
+      const view = buildHostMeetingWorkspace({
+        ...baseInput,
+        ...overrides,
+        state: "CLOSED",
+      });
+
+      expect(view.lifecycle).toBe("CLOSED");
+      expect(view.primaryAction).toEqual(primaryAction);
+    },
+  );
 });

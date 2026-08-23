@@ -4,18 +4,43 @@ import {
   MEETING_APPLY_LABEL,
   MEETING_ATTENDANCE_LABEL,
 } from "@/shared/model/meeting-language";
+import { buildHostMeetingUrl } from "./host-session-workspace-navigation";
 
-export type HostSessionWorkspacePanel = "focus" | "basic" | "attendance" | "records" | "history";
+export type HostMeetingTask =
+  | "overview"
+  | "responses"
+  | "attendance"
+  | "records"
+  | "notifications"
+  | "history";
 
-export type HostSessionWorkspaceLocation = {
-  panel: HostSessionWorkspacePanel;
-  source: "manual" | "ai" | "json";
+export type HostMeetingTaskLink = {
+  task: HostMeetingTask;
+  label: string;
+  href: string;
+  badge?: string;
 };
 
-export type HostSessionWorkspaceInput = {
-  state: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
+export type HostMeetingLocation = {
+  task: HostMeetingTask;
+  overviewEditOpen: boolean;
+  recordSource: "manual" | "ai" | "json";
+};
+
+type HostMeetingLifecycle = "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
+
+type HostMeetingPrimaryAction = {
+  kind: string;
+  label: string;
+  task: HostMeetingTask;
+};
+
+export type HostMeetingWorkspaceInput = {
+  currentUrl: string | URL;
+  state: HostMeetingLifecycle;
   meetingDate: string;
   today: string;
+  unansweredResponseCount: number;
   unknownAttendanceCount: number;
   hasRecordDraft: boolean;
   recordDraftStale: boolean;
@@ -24,56 +49,103 @@ export type HostSessionWorkspaceInput = {
   publicationReady: boolean;
 };
 
-export type HostSessionWorkspaceView = {
+export type HostMeetingWorkspaceView = {
+  lifecycle: HostMeetingLifecycle;
   statusLabel: "모임 작성 중" | "멤버와 준비 중" | "기록 정리 중" | "게스트·멤버 노트 게시 완료";
-  primaryAction: { kind: string; label: string; panel: HostSessionWorkspacePanel };
-  progress: ReadonlyArray<{ id: string; label: string; state: "done" | "current" | "next" }>;
+  primaryAction: HostMeetingPrimaryAction;
+  tasks: ReadonlyArray<HostMeetingTaskLink>;
   publicationReady: boolean;
 };
 
-type ProgressState = "done" | "current" | "next";
+const HOST_MEETING_TASK_LABELS: ReadonlyArray<readonly [HostMeetingTask, string]> = [
+  ["overview", "개요"],
+  ["responses", "참석 응답"],
+  ["attendance", "실제 출석"],
+  ["records", "모임 기록"],
+  ["notifications", "알림"],
+  ["history", "변경 내역"],
+];
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
-export function buildHostSessionWorkspace(input: HostSessionWorkspaceInput): HostSessionWorkspaceView {
-  const primaryAction = resolvePrimaryAction(input);
+export function buildHostMeetingWorkspace(
+  input: HostMeetingWorkspaceInput,
+): HostMeetingWorkspaceView {
   return {
+    lifecycle: input.state,
     statusLabel: statusLabelFor(input.state),
-    primaryAction,
-    progress: progressFor(input.state, primaryAction.kind),
+    primaryAction: resolvePrimaryAction(input),
+    tasks: buildTaskLinks(input),
     publicationReady: input.publicationReady,
   };
 }
 
+function buildTaskLinks(input: HostMeetingWorkspaceInput): ReadonlyArray<HostMeetingTaskLink> {
+  return HOST_MEETING_TASK_LABELS.map(([task, label]) => {
+    const badge = taskBadge(task, input);
+    return {
+      task,
+      label,
+      href: buildHostMeetingUrl(input.currentUrl, {
+        task,
+        overviewEditOpen: false,
+        recordSource: "manual",
+      }),
+      ...(badge ? { badge } : {}),
+    };
+  });
+}
+
+function taskBadge(
+  task: HostMeetingTask,
+  input: HostMeetingWorkspaceInput,
+): string | undefined {
+  if (task === "responses" && input.unansweredResponseCount > 0) {
+    return `미응답 ${input.unansweredResponseCount}`;
+  }
+  if (task === "attendance" && input.unknownAttendanceCount > 0) {
+    return "확인 필요";
+  }
+  if (task === "records") {
+    if (input.recordDraftStale || input.recordValidationIssueCount > 0) {
+      return "확인 필요";
+    }
+    if (input.hasRecordDraft) {
+      return "초안 있음";
+    }
+  }
+  return undefined;
+}
+
 function statusLabelFor(
-  state: HostSessionWorkspaceInput["state"],
-): HostSessionWorkspaceView["statusLabel"] {
+  state: HostMeetingLifecycle,
+): HostMeetingWorkspaceView["statusLabel"] {
   return formatMeetingLifecycle(state, "host");
 }
 
 function resolvePrimaryAction(
-  input: HostSessionWorkspaceInput,
-): HostSessionWorkspaceView["primaryAction"] {
+  input: Omit<HostMeetingWorkspaceInput, "currentUrl" | "unansweredResponseCount">,
+): HostMeetingPrimaryAction {
   switch (input.state) {
     case "DRAFT":
-      return { kind: "OPEN_SESSION", label: "멤버와 준비 시작", panel: "focus" };
+      return { kind: "OPEN_SESSION", label: "멤버와 준비 시작", task: "overview" };
     case "OPEN":
       return resolveOpenAction(input);
     case "CLOSED":
       return resolveClosedAction(input);
     case "PUBLISHED":
-      return { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", panel: "focus" };
+      return { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", task: "overview" };
   }
 }
 
 function resolveOpenAction(
-  input: HostSessionWorkspaceInput,
-): HostSessionWorkspaceView["primaryAction"] {
+  input: Omit<HostMeetingWorkspaceInput, "currentUrl" | "unansweredResponseCount">,
+): HostMeetingPrimaryAction {
   if (!isValidIsoDate(input.meetingDate) || !isValidIsoDate(input.today)) {
     return {
       kind: "REVIEW_MEMBER_INPUT",
       label: "멤버 응답 확인하기",
-      panel: "focus",
+      task: "responses",
     };
   }
 
@@ -81,84 +153,42 @@ function resolveOpenAction(
     return {
       kind: "REVIEW_MEMBER_INPUT",
       label: "멤버 응답 확인하기",
-      panel: "focus",
+      task: "responses",
     };
   }
 
   if (input.unknownAttendanceCount > 0) {
-    return { kind: "CHECK_ATTENDANCE", label: `${MEETING_ATTENDANCE_LABEL} 확인`, panel: "attendance" };
+    return {
+      kind: "CHECK_ATTENDANCE",
+      label: `${MEETING_ATTENDANCE_LABEL} 확인`,
+      task: "attendance",
+    };
   }
 
-  return { kind: "FINISH_SESSION", label: "모임 마치기", panel: "focus" };
+  return { kind: "FINISH_SESSION", label: "모임 마치기", task: "overview" };
 }
 
 function resolveClosedAction(
-  input: HostSessionWorkspaceInput,
-): HostSessionWorkspaceView["primaryAction"] {
+  input: Omit<HostMeetingWorkspaceInput, "currentUrl" | "unansweredResponseCount">,
+): HostMeetingPrimaryAction {
   if (
     input.hasAppliedRecord
     && !input.recordDraftStale
     && input.recordValidationIssueCount === 0
   ) {
-    return { kind: "PUBLISH_RECORD", label: formatPublicationAction("publishMemberNotes"), panel: "records" };
+    return {
+      kind: "PUBLISH_RECORD",
+      label: formatPublicationAction("publishMemberNotes"),
+      task: "records",
+    };
   }
   if (!input.hasRecordDraft) {
-    return { kind: "UPLOAD_RECORD", label: "정리본 올리기", panel: "records" };
+    return { kind: "UPLOAD_RECORD", label: "정리본 올리기", task: "records" };
   }
   if (input.recordDraftStale || input.recordValidationIssueCount > 0) {
-    return { kind: "FIX_RECORD", label: "반영 전 확인", panel: "records" };
+    return { kind: "FIX_RECORD", label: "반영 전 확인", task: "records" };
   }
-  return { kind: "REVIEW_RECORD", label: MEETING_APPLY_LABEL, panel: "records" };
-}
-
-function progressFor(
-  state: HostSessionWorkspaceInput["state"],
-  actionKind: string,
-): HostSessionWorkspaceView["progress"] {
-  const marker = progressMarker(state, actionKind);
-  const items: Array<{ id: string; label: string }> = [
-    { id: "basic", label: "기본 정보" },
-    { id: "members", label: "멤버 준비" },
-    { id: "attendance", label: "출석" },
-    { id: "records", label: "기록" },
-    { id: "publish", label: "공개" },
-  ];
-
-  return items.map((item, index) => ({
-    ...item,
-    state: progressStateAt(index, marker),
-  }));
-}
-
-type ProgressMarker = { currentIndex: number } | { doneThrough: number };
-
-function progressMarker(
-  state: HostSessionWorkspaceInput["state"],
-  actionKind: string,
-): ProgressMarker {
-  if (state === "DRAFT") return { currentIndex: 0 };
-  if (state === "PUBLISHED") return { doneThrough: 4 };
-  if (actionKind === "REVIEW_MEMBER_INPUT") return { currentIndex: 1 };
-  if (actionKind === "CHECK_ATTENDANCE") return { currentIndex: 2 };
-  if (actionKind === "FINISH_SESSION") return { currentIndex: 2 };
-  if (
-    actionKind === "UPLOAD_RECORD"
-    || actionKind === "FIX_RECORD"
-    || actionKind === "REVIEW_RECORD"
-  ) {
-    return { currentIndex: 3 };
-  }
-  if (actionKind === "PUBLISH_RECORD") return { currentIndex: 4 };
-  return { currentIndex: 0 };
-}
-
-function progressStateAt(index: number, marker: ProgressMarker): ProgressState {
-  if ("doneThrough" in marker) {
-    return index <= marker.doneThrough ? "done" : "next";
-  }
-  if (index < marker.currentIndex) return "done";
-  if (index === marker.currentIndex) return "current";
-  return "next";
+  return { kind: "REVIEW_RECORD", label: MEETING_APPLY_LABEL, task: "records" };
 }
 
 function isValidIsoDate(value: string): boolean {
@@ -179,4 +209,107 @@ function isValidIsoDate(value: string): boolean {
     && utc.getUTCMonth() === month - 1
     && utc.getUTCDate() === day
   );
+}
+
+/**
+ * @deprecated Internal Task 5→8 compatibility only. New code uses
+ * HostMeetingLocation and HostMeetingTask.
+ */
+export type HostSessionWorkspacePanel = "focus" | "basic" | "attendance" | "records" | "history";
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export type HostSessionWorkspaceLocation = {
+  panel: HostSessionWorkspacePanel;
+  source: HostMeetingLocation["recordSource"];
+};
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export type HostSessionWorkspaceInput = Omit<
+  HostMeetingWorkspaceInput,
+  "currentUrl" | "unansweredResponseCount"
+>;
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export type HostSessionWorkspaceView = {
+  statusLabel: HostMeetingWorkspaceView["statusLabel"];
+  primaryAction: { kind: string; label: string; panel: HostSessionWorkspacePanel };
+  progress: ReadonlyArray<{ id: string; label: string; state: "done" | "current" | "next" }>;
+  publicationReady: boolean;
+};
+
+/** @deprecated Internal Task 5→8 compatibility only. */
+export function buildHostSessionWorkspace(
+  input: HostSessionWorkspaceInput,
+): HostSessionWorkspaceView {
+  const primaryAction = resolvePrimaryAction(input);
+  return {
+    statusLabel: statusLabelFor(input.state),
+    primaryAction: {
+      kind: primaryAction.kind,
+      label: primaryAction.label,
+      panel: compatibilityPanelFor(primaryAction),
+    },
+    progress: compatibilityProgressFor(input.state, primaryAction.kind),
+    publicationReady: input.publicationReady,
+  };
+}
+
+function compatibilityPanelFor(action: HostMeetingPrimaryAction): HostSessionWorkspacePanel {
+  if (action.task === "attendance") return "attendance";
+  if (action.task === "records") return "records";
+  return "focus";
+}
+
+function compatibilityProgressFor(
+  state: HostMeetingLifecycle,
+  actionKind: string,
+): HostSessionWorkspaceView["progress"] {
+  const marker = compatibilityProgressMarker(state, actionKind);
+  const items: Array<{ id: string; label: string }> = [
+    { id: "basic", label: "기본 정보" },
+    { id: "members", label: "멤버 준비" },
+    { id: "attendance", label: "출석" },
+    { id: "records", label: "기록" },
+    { id: "publish", label: "공개" },
+  ];
+
+  return items.map((item, index) => ({
+    ...item,
+    state: compatibilityProgressStateAt(index, marker),
+  }));
+}
+
+type CompatibilityProgressMarker = { currentIndex: number } | { doneThrough: number };
+
+function compatibilityProgressMarker(
+  state: HostMeetingLifecycle,
+  actionKind: string,
+): CompatibilityProgressMarker {
+  if (state === "DRAFT") return { currentIndex: 0 };
+  if (state === "PUBLISHED") return { doneThrough: 4 };
+  if (actionKind === "REVIEW_MEMBER_INPUT") return { currentIndex: 1 };
+  if (actionKind === "CHECK_ATTENDANCE" || actionKind === "FINISH_SESSION") {
+    return { currentIndex: 2 };
+  }
+  if (
+    actionKind === "UPLOAD_RECORD"
+    || actionKind === "FIX_RECORD"
+    || actionKind === "REVIEW_RECORD"
+  ) {
+    return { currentIndex: 3 };
+  }
+  if (actionKind === "PUBLISH_RECORD") return { currentIndex: 4 };
+  return { currentIndex: 0 };
+}
+
+function compatibilityProgressStateAt(
+  index: number,
+  marker: CompatibilityProgressMarker,
+): "done" | "current" | "next" {
+  if ("doneThrough" in marker) {
+    return index <= marker.doneThrough ? "done" : "next";
+  }
+  if (index < marker.currentIndex) return "done";
+  if (index === marker.currentIndex) return "current";
+  return "next";
 }
