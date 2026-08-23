@@ -9,6 +9,7 @@ import {
   healthFreshnessLabel,
   healthPrimaryReading,
   healthSourceLabel,
+  isLastKnownHealthEvidence,
   type HealthCard,
   type PlatformHealthRefreshState,
 } from "@/features/platform-admin/model/platform-admin-health-model";
@@ -28,6 +29,7 @@ export function AdminHealthCard({
   const drillLabel = healthDrillLabel(card);
   const lastEvidence = formatLastEvidenceLabel(card.lastCheckedAt);
   const lastEvidenceStamp = formatHealthTimestamp(card.lastCheckedAt);
+  const lastKnown = isLastKnownHealthEvidence(evidence, refreshState);
   const retry = canRetryHealthCard(card) && onRetry;
 
   return (
@@ -42,7 +44,7 @@ export function AdminHealthCard({
     >
       <header className="admin-health-card__header">
         <h3 id={`health-${card.id}`}>{card.title}</h3>
-        <span className={`admin-health-card__pill admin-health-card__pill--${evidence}`}>
+        <span className={`admin-health-card__pill admin-health-card__pill--${lastKnown ? "last-known" : evidence}`}>
           {healthEvidenceLabel(evidence)}
         </span>
       </header>

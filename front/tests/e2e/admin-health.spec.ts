@@ -278,7 +278,7 @@ for (const fixture of HEALTH_REFRESH_FIXTURES) {
 
     await page.goto("/admin/health");
 
-    await expect(page.getByText(fixture.expected)).toBeVisible();
+    await expect(page.getByText(fixture.expected, { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Outbox backlog" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "최근 deploy" })).toBeVisible();
   });

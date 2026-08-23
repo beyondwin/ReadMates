@@ -8,6 +8,7 @@ import {
   formatGeneratedAtLabel,
   formatHealthTimestamp,
   formatLastEvidenceLabel,
+  formatLastSuccessfulLabel,
   formatRefreshStateLabel,
   healthCardEvidenceState,
   healthCardsForPage,
@@ -15,6 +16,7 @@ import {
   healthFailedSources,
   healthFreshnessLabel,
   healthSourceLabel,
+  isLastKnownHealthEvidence,
   missingDeployCard,
   type HealthCard,
   type PlatformHealthSnapshot,
@@ -87,6 +89,16 @@ export function AdminHealthGrid({
           <p className="eyebrow">스냅샷</p>
           <p className="admin-health-grid__timestamp">
             <time dateTime={snapshot.generatedAt}>{formatGeneratedAtLabel(snapshot.generatedAt)}</time>
+            {snapshot.lastSuccessfulAt ? (
+              <>
+                <span aria-hidden="true"> · </span>
+                <time dateTime={snapshot.lastSuccessfulAt}>
+                  {formatLastSuccessfulLabel(snapshot.lastSuccessfulAt)}
+                </time>
+              </>
+            ) : (
+              <span> · 마지막 정상 갱신 이력 없음</span>
+            )}
           </p>
         </div>
         <div className="admin-health-grid__toolbar-actions">
@@ -162,6 +174,7 @@ function DeployEvidence({
 }) {
   const evidence = healthCardEvidenceState(card);
   const lastEvidenceStamp = formatHealthTimestamp(card.lastCheckedAt);
+  const lastKnown = isLastKnownHealthEvidence(evidence, refreshState);
 
   return (
     <section
@@ -176,7 +189,7 @@ function DeployEvidence({
             {evidence === "ok" && card.deployStrip ? `${card.deployStrip.length}건` : healthEvidenceLabel(evidence)}
           </p>
         </div>
-        <span className={`admin-health-card__pill admin-health-card__pill--${evidence}`}>
+        <span className={`admin-health-card__pill admin-health-card__pill--${lastKnown ? "last-known" : evidence}`}>
           {healthEvidenceLabel(evidence)}
         </span>
       </header>
@@ -199,7 +212,7 @@ function DeployEvidence({
         </div>
       </dl>
       {card.reason && evidence === "unavailable" ? <p>{card.reason}</p> : null}
-      <AdminHealthDeployStrip entries={card.deployStrip} evidenceState={evidence} />
+      <AdminHealthDeployStrip entries={card.deployStrip} evidenceState={evidence} lastKnown={lastKnown} />
       {onRetry ? (
         <button type="button" className="admin-health-card__retry" onClick={() => onRetry(card.id)}>
           최근 deploy 다시 확인

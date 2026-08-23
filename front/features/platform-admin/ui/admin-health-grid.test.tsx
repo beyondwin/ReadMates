@@ -178,12 +178,19 @@ describe("AdminHealthGrid", () => {
     expect(screen.getByText(/readmates-api:dev-20260526/)).toBeInTheDocument();
   });
 
-  it("labels generated-at separately from last successful refresh", () => {
-    renderGrid();
+  it("labels generated-at separately from the actual last successful refresh", () => {
+    renderGrid({
+      snapshot: {
+        ...HEALTH_SNAPSHOT,
+        generatedAt: "2026-05-26T00:00:00Z",
+        lastSuccessfulAt: "2026-05-25T23:55:00Z",
+      },
+    });
 
     const generated = screen.getByText(/생성 시각/);
     expect(generated.closest("time")).toHaveAttribute("datetime", "2026-05-26T00:00:00Z");
-    expect(screen.getByText(/정상 갱신/)).toBeInTheDocument();
+    const lastSuccessful = screen.getByText(/마지막 정상 갱신/);
+    expect(lastSuccessful.closest("time")).toHaveAttribute("datetime", "2026-05-25T23:55:00Z");
   });
 
   it("calls the refresh callback", async () => {
@@ -373,10 +380,31 @@ describe("AdminHealthGrid", () => {
   });
 
   it("keeps health card actions on the 44px contract and stills the skeleton", () => {
+    expect(GLOBALS_CSS).toMatch(/\.admin-health-grid__refresh\s*\{[^}]*min-height:\s*44px/);
     expect(GLOBALS_CSS).toMatch(/\.admin-health-card__drill[\s\S]*min-height:\s*44px/);
     expect(GLOBALS_CSS).toMatch(/\.admin-health-card__retry[\s\S]*min-height:\s*44px/);
     expect(GLOBALS_CSS).toMatch(
       /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-health-card--skeleton[\s\S]*animation:\s*none/,
     );
   });
+
+  it.each(["STALE", "UNAVAILABLE"] as const)(
+    "keeps deploy text but removes current-green evidence when the snapshot is %s",
+    (refreshState) => {
+      renderGrid({
+        snapshot: {
+          ...HEALTH_SNAPSHOT,
+          refreshState,
+          lastSuccessfulAt: refreshState === "UNAVAILABLE" ? null : HEALTH_SNAPSHOT.lastSuccessfulAt,
+        },
+      });
+
+      const deploy = screen.getByRole("region", { name: "최근 deploy" });
+      expect(within(deploy).getByText("정상")).toBeInTheDocument();
+      expect(deploy.querySelector(".admin-health-card__pill--ok")).toBeNull();
+      expect(deploy.querySelector(".admin-health-card__pill--last-known")).not.toBeNull();
+      expect(deploy.querySelector(".admin-health-deploy-strip__dot--ok")).toBeNull();
+      expect(deploy.querySelector(".admin-health-deploy-strip__dot--last-known")).not.toBeNull();
+    },
+  );
 });

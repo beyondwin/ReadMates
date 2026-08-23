@@ -135,17 +135,19 @@ describe("AdminHealthCard", () => {
     expect(screen.getByText("알림 운영")).toBeInTheDocument();
   });
 
-  it("labels stale freshness from snapshot metadata without turning the card green", () => {
-    renderCard(
-      card({ status: "WARN", metric: { value: 75, unit: "records", label: "max" } }),
-      { refreshState: "STALE" },
-    );
+  it.each(["STALE", "UNAVAILABLE"] as const)(
+    "keeps an OK reading but removes current-green evidence when the snapshot is %s",
+    (refreshState) => {
+      renderCard(card(), { refreshState });
 
-    const article = articleNamed("Outbox backlog");
-    expect(within(article).getByText("지연")).toBeInTheDocument();
-    expect(within(article).getByText("주의")).toBeInTheDocument();
-    expect(article.querySelector(".admin-health-card__pill--ok")).toBeNull();
-  });
+      const article = articleNamed("Outbox backlog");
+      expect(within(article).getByText("42 rows")).toBeInTheDocument();
+      expect(within(article).getByText("정상")).toBeInTheDocument();
+      expect(within(article).getByText(refreshState === "STALE" ? "지연" : "이력 없음")).toBeInTheDocument();
+      expect(article.querySelector(".admin-health-card__pill--ok")).toBeNull();
+      expect(article.querySelector(".admin-health-card__pill--last-known")).not.toBeNull();
+    },
+  );
 
   it("does not render a drill link when drill is null", () => {
     renderCard(card({ drill: null }));

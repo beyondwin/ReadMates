@@ -2207,7 +2207,7 @@ a.rm-recent-record__destination:hover {
 }
 
 .admin-health-grid__refresh {
-  min-height: 36px;
+  min-height: 44px;
   border: 1px solid var(--text);
   border-radius: var(--r-2);
   background: var(--text);
@@ -2322,6 +2322,13 @@ a.rm-recent-record__destination:hover {
 
 .admin-health-card__pill--crit {
   border-color: var(--danger);
+}
+
+.admin-health-card__pill--last-known {
+  border-color: var(--accent);
+  border-style: dashed;
+  background: var(--bg-sub);
+  color: var(--text-2);
 }
 
 .admin-health-card__pill--unknown,
@@ -2492,6 +2499,10 @@ a.rm-recent-record__destination:hover {
 
 .admin-health-deploy-strip__dot--running {
   border-color: var(--accent);
+}
+
+.admin-health-deploy-strip__dot--last-known {
+  border-color: var(--text-3);
 }
 
 .admin-health-deploy-strip__detail {

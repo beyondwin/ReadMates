@@ -157,8 +157,20 @@ export function formatGeneratedAtLabel(iso: string): string {
   return formatted ? `생성 시각 ${formatted}` : "생성 시각 없음";
 }
 
+export function formatLastSuccessfulLabel(iso: string): string {
+  const formatted = formatHealthTimestamp(iso);
+  return formatted ? `마지막 정상 갱신 ${formatted}` : "마지막 정상 갱신 시각 없음";
+}
+
 export function formatLastEvidenceLabel(iso: string): string {
   return formatHealthTimestamp(iso) ?? "확인 시각 없음";
+}
+
+export function isLastKnownHealthEvidence(
+  evidence: HealthEvidenceState,
+  refreshState: PlatformHealthRefreshState,
+): boolean {
+  return evidence === "ok" && (refreshState === "STALE" || refreshState === "UNAVAILABLE");
 }
 
 export function formatRefreshStateLabel(snapshot: PlatformHealthSnapshot): string {
