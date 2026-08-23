@@ -459,6 +459,44 @@ describe("AppRouteLayout workspace authority", () => {
     expect(document.querySelector(".mobile-only .m-hdr")).toHaveAttribute("data-workspace", "member");
     expect(document.querySelector(".mobile-only .m-tabbar")).toHaveAttribute("data-variant", "member");
   });
+
+  it("falls back inside the current club when member record return state points at another club", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+            <MemoryRouter initialEntries={[{
+              pathname: "/clubs/reading-sai/app/sessions/meeting-7",
+              state: {
+                readmatesReturnTo: "/clubs/another-club/app/archive?view=report#meeting-7",
+                readmatesReturnLabel: "다른 클럽 기록으로",
+              },
+            }]}>
+              <Routes>
+                <Route
+                  path="/clubs/:clubSlug/app/sessions/:sessionId"
+                  element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />}
+                >
+                  <Route index element={<main><h1>멤버 기록</h1></main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    const mobileHeader = document.querySelector<HTMLElement>(".mobile-only .m-hdr");
+    expect(mobileHeader).not.toBeNull();
+    expect(within(mobileHeader!).getByRole("link", { name: "뒤로" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/archive?view=sessions",
+    );
+  });
 });
 
 describe("AppRouteLayout session expiry recovery", () => {

@@ -98,3 +98,57 @@ Fixture diagnosis:
 - The aggregate frontend test command is not fully green: `npx --yes corepack@0.35.0 pnpm --dir front test` completed with 308/310 files and 2553/2555 tests passing. Both failures are unchanged from BASE `b186dbf2587c9ac91b9db6990b9433e438fa7917`: four feature-route imports from `src/app` violate `frontend-boundaries.test.ts`, and `host-session-editor.test.tsx` expects the obsolete `기록을 공개했습니다.` status while runtime uses the approved B1 publication copy. B4 did not edit those files.
 - Docker CT resource pressure is intermittent while other task containers are active. The exact suite has one successful 62/62 run, and the final affected fallback is 2/2; the later pre-test `SIGKILL` is retained above instead of being presented as a pass.
 - Proposed ADR-0019/ADR-0026 should be updated/promoted only in the program integration task after the remaining aggregate residuals and all dependent workspace tasks are reconciled.
+
+## Fix round 1 — current-item continuity and committed workspace transitions
+
+ADR impact: `update` (unchanged). This round tightens the implemented route-authority and transition-feedback details of Proposed ADR-0019/ADR-0026; it does not introduce a new durable decision or promote either ADR.
+
+### Review findings closed
+
+- Current club and workspace entries are now non-navigation current items. Other authorized destinations remain links. Activating a current item cannot add a history entry or discard pathname, search, hash, React Router state, or record-origin ownership.
+- Member mobile Back now uses `readAppReturnTarget` with the current pathname and a current-club scoped fallback. Valid scoped and compatibility `/app/**` state is retained/canonicalized; another club, another origin, malformed input, cycles, and over-depth chains fall back inside the active club. Host record ownership continues to use the stricter host-record parser.
+- The security controller no longer records click intent. It derives the destination from the mounted router location and prepares a committed receipt bound to page-session identity, source and destination workspace, club scope, complete href, history location key, and a six-hour expiry. Only a matching successfully mounted destination can consume the announcement. StrictMode remounts preserve the pending committed receipt until the animation-frame title/focus/status work runs; modified, cancelled, and loader-failed navigation cannot create a destination receipt. An in-memory page-session fallback preserves the same behavior when session storage is unavailable.
+- Every mounted app location receives the current workspace title and heading focus. Actual member/host transitions, including Back and Forward, announce exactly once. Ordinary initial load and same-route reload do not announce. Prior member/host prefixes are stripped before one exact current prefix is applied, so prefixes cannot accumulate.
+
+### TDD evidence
+
+Initial RED command:
+
+`npx --yes corepack@0.35.0 pnpm --dir front test -- shared/ui/app-club-shell.test.tsx shared/ui/workspace-selector.test.tsx shared/routing/readmates-route-state.test.ts src/app/app-route-security-controller.test.tsx src/app/layouts/app-route-layout.test.tsx`
+
+- The script forwarded the separator in a way that ran the aggregate Vitest suite. It produced 2553 passes and 11 failures: nine intended B4 RED assertions (four current-selector, one cross-club Back, four transition/title/focus) plus the two already documented BASE failures (architecture inverse dependencies and stale publication copy).
+- A later StrictMode-specific RED reproduced the browser defect directly: `src/app/app-route-security-controller.test.tsx` had 1/4 failing tests because a remounted destination lost its status on the second StrictMode effect setup.
+
+Final focused GREEN:
+
+`npx --yes corepack@0.35.0 pnpm --dir front exec vitest run shared/ui/app-club-shell.test.tsx shared/ui/workspace-selector.test.tsx shared/routing/readmates-route-state.test.ts src/app/app-route-security-controller.test.tsx src/app/layouts/app-route-layout.test.tsx tests/unit/spa-layout.test.tsx tests/unit/responsive-navigation.test.tsx`
+
+- PASS: 7 files, 123 tests.
+- Coverage includes an actual MemoryRouter history stack with scoped host-record search/hash/state, current item activation followed by Back, valid scoped/unscoped/nested return state, all unsafe return-state classes, StrictMode layout remount, member → host → member → Back → Forward, exact titles, reload/remount focus, one status node, modified/cancelled activation, a failed destination loader, and unavailable session storage.
+
+### Component and browser evidence
+
+Affected exact-boundary CT:
+
+`npx --yes corepack@0.35.0 pnpm --dir front exec playwright test --config=playwright-ct.config.ts shared/ui/app-club-shell.ct.tsx --workers=1`
+
+- PASS: 2/2 at 767px and 768px.
+- The first attempt was 1/2 because the new assertion measured a current item while its native `details` menu was closed, yielding a zero layout box. After the test opened the menu like a user, it verified the non-link current item and its 44px height; both assertions passed. This was a test-harness assertion error, not a product-layout failure.
+
+Required isolated browser gate:
+
+`READMATES_E2E_DB_NAME=readmates_e2e_b4_fix1_20260824e READMATES_API_BASE_URL=http://127.0.0.1:18125 PLAYWRIGHT_PORT=3145 PLAYWRIGHT_WORKERS=1 READMATES_MUTATION_IDENTITY_CURRENT_KEY=e2e-mutation-key READMATES_HOST_LIST_CURSOR_CURRENT_KEY=e2e-cursor-key npx --yes corepack@0.35.0 pnpm --dir front exec playwright test tests/e2e/responsive-navigation-chrome.spec.ts tests/e2e/public-auth-member-host.spec.ts`
+
+- PASS: 14/14 Chromium tests on the final code.
+- Browser assertions cover current club/workspace items preserving a scoped host-record URL, state, and history length; current-club bounded mobile Back after injected cross-club state; exact member/host titles; title/status/focus through switch, Back, Forward, and reload; one controller/status; public-auth chrome; and the 767/768 boundary.
+- The first isolated attempt used a different fresh database and ports and passed 12/14. Both failures were real transition-status assertions: StrictMode consumed the first committed destination receipt before feedback ran. The direct StrictMode RED and matched consume-on-feedback fix closed them. A fresh responsive run then passed 11/11, followed by the final fresh two-file 14/14 gate above.
+- Every run used a new task-specific database and dedicated API/frontend ports. No existing service, database, or container was stopped or reused.
+
+### Static verification and self-review
+
+- `npx --yes corepack@0.35.0 pnpm --dir front lint` — PASS.
+- `npx --yes corepack@0.35.0 pnpm --dir front build` — PASS, 702 modules transformed.
+- Impeccable detector on the changed shell, selector, controller/layout, CT, and browser-test targets — no findings.
+- Shared production UI remains free of React Router, `src/app`, and feature imports. All href, replace/push, security receipt, route scope, and Back decisions remain in `src/app` or shared routing policy; shared UI only distinguishes current presentation from navigable destinations.
+- `AppRouteLayout` still mounts exactly one authenticated security controller. Empty feedback still renders no `role=status`, and the matched consume contract prevents duplicate or stale announcements.
+- The aggregate suite was not rerun after the focused final gate. The two unchanged BASE aggregate concerns documented above therefore remain integration risks, not B4 fix-round regressions.

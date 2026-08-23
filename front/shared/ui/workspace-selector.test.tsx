@@ -23,10 +23,8 @@ describe("WorkspaceSelector", () => {
     );
 
     const navigation = screen.getByRole("navigation", { name: "공간 선택" });
-    expect(within(navigation).getByRole("link", { name: "멤버 공간" })).toHaveAttribute(
-      "aria-current",
-      "page",
-    );
+    expect(within(navigation).queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();
+    expect(within(navigation).getByText("멤버 공간")).toHaveAttribute("aria-current", "page");
     expect(within(navigation).queryByRole("link", { name: "호스트 공간" })).not.toBeInTheDocument();
   });
 
@@ -48,9 +46,7 @@ describe("WorkspaceSelector", () => {
       "href",
       "/clubs/reading-sai/app",
     );
-    expect(within(navigation).getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app/host",
-    );
+    expect(within(navigation).queryByRole("link", { name: "호스트 공간" })).not.toBeInTheDocument();
+    expect(within(navigation).getByText("호스트 공간")).toHaveAttribute("aria-current", "page");
   });
 });

@@ -8,14 +8,12 @@ export type WorkspaceSelectorProps = {
   currentWorkspace: ClubWorkspace;
   items: ReadonlyArray<WorkspaceNavigationItem>;
   LinkComponent: ClubShellLinkComponent;
-  onNavigate?: (item: WorkspaceNavigationItem) => void;
 };
 
 export function WorkspaceSelector({
   currentWorkspace,
   items,
   LinkComponent,
-  onNavigate,
 }: WorkspaceSelectorProps) {
   const current = items.find((item) => item.id === currentWorkspace);
 
@@ -31,14 +29,20 @@ export function WorkspaceSelector({
         <SelectorChevron />
       </summary>
       <nav className="rm-context-selector__menu" aria-label="공간 선택">
-        {items.map((item) => (
+        {items.map((item) => item.id === currentWorkspace ? (
+          <span
+            key={item.id}
+            className="rm-context-selector__item"
+            aria-current="page"
+          >
+            {item.label}
+          </span>
+        ) : (
           <LinkComponent
             key={item.id}
             to={item.href}
             replace={item.navigation === "replace"}
-            className={`rm-context-selector__item${item.id === currentWorkspace ? "" : " rm-workspace-switch"}`}
-            aria-current={item.id === currentWorkspace ? "page" : undefined}
-            onClick={() => onNavigate?.(item)}
+            className="rm-context-selector__item rm-workspace-switch"
           >
             {item.label}
           </LinkComponent>

@@ -140,6 +140,8 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await page.goto("/app");
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
   await expect(page.locator(".app-content > .rm-route-reveal")).toBeVisible();
+  await expect(page).toHaveTitle("멤버 공간 · ReadMates");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
   const appNav = page.getByRole("navigation", { name: "멤버 주 메뉴" });
   await expect(appNav.getByRole("link", { name: "오늘" })).toBeVisible();
   await expect(appNav.getByRole("link", { name: "노트" })).toBeVisible();
@@ -170,13 +172,83 @@ test("desktop public and host pages show the expected top navigation", async ({ 
   await expect(hostNav.getByRole("link", { name: "모임" })).toBeVisible();
   await expect(hostNav.getByRole("link", { name: "멤버" })).toBeVisible();
   await expect(hostNav.getByRole("link", { name: "기록" })).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("호스트 공간으로 전환했습니다");
-  await expect(page).toHaveTitle(/호스트 공간/);
+  const routeSecurityStatus = page.locator('[data-app-route-security-controller] [role="status"]');
+  await expect(routeSecurityStatus).toHaveText("호스트 공간으로 전환했습니다");
+  await expect(routeSecurityStatus).toHaveCount(1);
+  await expect(page).toHaveTitle("호스트 공간 · ReadMates");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
 
   const hostWorkspaceSelector = await openWorkspaceSelector(page, "desktop");
   await hostWorkspaceSelector.getByRole("link", { name: "멤버 공간" }).click();
   await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
-  await expect(page.getByRole("status")).toContainText("멤버 공간으로 전환했습니다");
+  await expect(routeSecurityStatus).toHaveText("멤버 공간으로 전환했습니다");
+  await expect(page).toHaveTitle("멤버 공간 · ReadMates");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
+
+  await page.goBack();
+  await expect.poll(() => new URL(page.url()).pathname).toMatch(/\/app\/host(?:\/sessions\/[^/]+)?$/);
+  await expect(routeSecurityStatus).toHaveText("호스트 공간으로 전환했습니다");
+  await expect(page).toHaveTitle("호스트 공간 · ReadMates");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
+
+  await page.goForward();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
+  await expect(routeSecurityStatus).toHaveText("멤버 공간으로 전환했습니다");
+  await expect(page).toHaveTitle("멤버 공간 · ReadMates");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
+
+  await page.reload();
+  await expect(page).toHaveTitle("멤버 공간 · ReadMates");
+  await expect(page.getByRole("heading", { level: 1 }).first()).toBeFocused();
+  await expect(routeSecurityStatus).toHaveCount(0);
+});
+
+test("current club and workspace items preserve a scoped host record location and browser history", async ({ page }) => {
+  await loginWithGoogleFixture(page, "host@example.com");
+  await page.goto(baselineClubAppPath);
+  await page.goto(`${baselineClubHostPath}/sessions/${seededHostSessionId}?section=records#draft`);
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+
+  await page.evaluate(({ returnTo }) => {
+    const state = {
+      ...window.history.state,
+      usr: {
+        readmatesReturnTo: returnTo,
+        readmatesReturnLabel: "기록으로",
+        recordOwnership: "host-records",
+      },
+    };
+    window.history.replaceState(state, "", window.location.href);
+    window.dispatchEvent(new PopStateEvent("popstate", { state }));
+  }, { returnTo: `${baselineClubHostPath}/records?filter=closed#${seededHostSessionId}` });
+
+  const before = await page.evaluate(() => ({
+    href: window.location.href,
+    length: window.history.length,
+    state: JSON.stringify(window.history.state),
+  }));
+
+  const clubSelector = page.locator(".desktop-only .rm-club-selector");
+  await clubSelector.locator("summary").click();
+  const currentClub = clubSelector.locator('.rm-context-selector__item[aria-current="true"]');
+  await expect(currentClub).toHaveText("읽는사이");
+  await expect(clubSelector.getByRole("link", { name: "읽는사이" })).toHaveCount(0);
+  await currentClub.click();
+
+  const currentWorkspaceSelector = await openWorkspaceSelector(page, "desktop");
+  const currentWorkspace = currentWorkspaceSelector.locator('.rm-context-selector__item[aria-current="page"]');
+  await expect(currentWorkspace).toHaveText("호스트 공간");
+  await expect(currentWorkspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveCount(0);
+  await currentWorkspace.click();
+
+  expect(await page.evaluate(() => ({
+    href: window.location.href,
+    length: window.history.length,
+    state: JSON.stringify(window.history.state),
+  }))).toEqual(before);
+
+  await page.goBack();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}$`));
 });
 
 test("club shell has one non-overlapping global boundary at 767px and 768px", async ({ page }) => {
@@ -424,6 +496,24 @@ test("mobile app route continuity returns to archive tabs and host dashboard sou
   await expect(page).toHaveURL(/\/app\/archive\?view=sessions$/);
   await expect(page.getByRole("button", { name: "모임" })).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByRole("link", { name: "No.1 팩트풀니스 열기" })).toBeVisible();
+
+  await sessionLink.click();
+  await expect(page).toHaveURL(/\/app\/sessions\//);
+  await page.evaluate(() => {
+    const state = {
+      ...window.history.state,
+      usr: {
+        readmatesReturnTo: "/clubs/another-club/app/archive?view=sessions#cross-club",
+        readmatesReturnLabel: "다른 클럽 기록으로",
+      },
+    };
+    window.history.replaceState(state, "", window.location.href);
+    window.dispatchEvent(new PopStateEvent("popstate", { state }));
+  });
+  const boundedBack = page.getByRole("banner").getByRole("link", { name: "뒤로" });
+  await expect(boundedBack).toHaveAttribute("href", `${baselineClubAppPath}/archive?view=sessions`);
+  await boundedBack.click();
+  await expect(page).toHaveURL(new RegExp(`${baselineClubAppPath}/archive\\?view=sessions$`));
 
   await page.goto("/app/archive?view=report");
   await expect(page).toHaveURL(/\/app\/archive\?view=report$/);

@@ -1,8 +1,15 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
+import { createMemoryRouter, Link as RouterLink, useLocation } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { AppClubShell } from "./app-club-shell";
-import type { ClubWorkspace, PrimaryNavigationItem } from "../model/app-club-shell";
+import type {
+  ClubShellLinkComponent,
+  ClubWorkspace,
+  PrimaryNavigationItem,
+} from "../model/app-club-shell";
 
 const LinkComponent = ({ to, children, ...props }: {
   to: string;
@@ -25,6 +32,15 @@ const workspaceItems = [
   { id: "member" as const, label: "멤버 공간", href: "/clubs/reading-sai/app" },
   { id: "host" as const, label: "호스트 공간", href: "/clubs/reading-sai/app/host" },
 ];
+
+const RouterShellLink: ClubShellLinkComponent = ({ to, children, ...props }) => (
+  <RouterLink to={to} {...props}>{children}</RouterLink>
+);
+
+function LocationProbe() {
+  const location = useLocation();
+  return <output aria-label="route location">{JSON.stringify(location)}</output>;
+}
 
 function primaryItems(workspace: ClubWorkspace): PrimaryNavigationItem[] {
   const labels = workspace === "member"
@@ -99,17 +115,79 @@ describe("AppClubShell", () => {
     expect(clubNavigations).toHaveLength(2);
     expect(workspaceNavigations).toHaveLength(2);
     for (const navigation of clubNavigations) {
-      expect(within(navigation).getByRole("link", { name: "읽는사이" })).toHaveAttribute(
-        "aria-current",
-        "true",
+      expect(within(navigation).queryByRole("link", { name: "읽는사이" })).not.toBeInTheDocument();
+      expect(within(navigation).getByText("읽는사이")).toHaveAttribute("aria-current", "true");
+      expect(within(navigation).getByRole("link", { name: "아주 긴 한국어와 English club name" })).toHaveAttribute(
+        "href",
+        "/clubs/long-club/app",
       );
     }
     for (const navigation of workspaceNavigations) {
-      expect(within(navigation).getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
-        "aria-current",
-        "page",
+      expect(within(navigation).queryByRole("link", { name: "호스트 공간" })).not.toBeInTheDocument();
+      expect(within(navigation).getByText("호스트 공간")).toHaveAttribute("aria-current", "page");
+      expect(within(navigation).getByRole("link", { name: "멤버 공간" })).toHaveAttribute(
+        "href",
+        "/clubs/reading-sai/app",
       );
     }
+  });
+
+  it("keeps the full record location and history when current selector items are activated", async () => {
+    const user = userEvent.setup();
+    const recordState = {
+      readmatesReturnTo: "/clubs/reading-sai/app/host/records?filter=closed#session-7",
+      readmatesReturnLabel: "기록으로",
+      recordOwnership: "host-records",
+    };
+    const currentEntry = {
+      pathname: "/clubs/reading-sai/app/host/sessions/session-7",
+      search: "?section=records",
+      hash: "#draft",
+      state: recordState,
+    };
+    const router = createMemoryRouter(
+      [{
+        path: "*",
+        element: (
+          <AppClubShell
+            clubs={clubs}
+            currentClubSlug="reading-sai"
+            workspace="host"
+            workspaceItems={workspaceItems}
+            primaryItems={primaryItems("host")}
+            account={{ control: <button type="button">계정 메뉴</button> }}
+            brandHref="/clubs/reading-sai/app/host"
+            mobileTitle="기록"
+            LinkComponent={RouterShellLink}
+          >
+            <main><h1>기록 상세</h1><LocationProbe /></main>
+          </AppClubShell>
+        ),
+      }],
+      {
+        initialEntries: [
+          "/clubs/reading-sai/app/host/records?filter=closed#session-7",
+          currentEntry,
+        ],
+        initialIndex: 1,
+      },
+    );
+
+    render(<RouterProvider router={router} />);
+
+    const desktopClubNavigation = screen.getAllByRole("navigation", { name: "클럽 선택" })[0]!;
+    const desktopWorkspaceNavigation = screen.getAllByRole("navigation", { name: "공간 선택" })[0]!;
+    await user.click(within(desktopClubNavigation).getByText("읽는사이"));
+    await user.click(within(desktopWorkspaceNavigation).getByText("호스트 공간"));
+
+    expect(router.state.location).toMatchObject(currentEntry);
+    expect(router.state.location.state).toEqual(recordState);
+
+    await act(async () => router.navigate(-1));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/host/records"));
+    expect(`${router.state.location.pathname}${router.state.location.search}${router.state.location.hash}`).toBe(
+      "/clubs/reading-sai/app/host/records?filter=closed#session-7",
+    );
   });
 
   it("renders only the app-provided primary destinations", () => {

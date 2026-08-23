@@ -90,10 +90,11 @@ test("public to Google fixture login to host smoke flow", async ({ page }) => {
   const hostWorkspaceSelector = page.locator('.desktop-only .rm-workspace-selector');
   await expect(hostWorkspaceSelector.locator("summary")).toContainText("호스트 공간");
   await hostWorkspaceSelector.locator("summary").click();
-  await expect(hostWorkspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
+  await expect(hostWorkspaceSelector.locator('.rm-context-selector__item[aria-current="page"]')).toHaveAttribute(
     "aria-current",
     "page",
   );
+  await expect(hostWorkspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveCount(0);
   await expect(hostWorkspaceSelector.getByRole("link", { name: "멤버 공간" })).toBeVisible();
 
   await page.goto(`/app/feedback/${seededFeedbackSessionId}/print`);

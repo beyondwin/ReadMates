@@ -1,45 +1,233 @@
-import { render, screen, waitFor } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { StrictMode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createMemoryRouter, Link, MemoryRouter, useLocation } from "react-router";
+import { RouterProvider } from "react-router/dom";
 import { AppRouteSecurityController } from "./app-route-security-controller";
-import { requestWorkspaceTransition } from "./app-route-security-transition";
+
+function RouteControllerHarness() {
+  const location = useLocation();
+  const workspace = location.pathname.includes("/host") ? "host" : "member";
+  const label = workspace === "host" ? "오늘의 운영" : "멤버 홈";
+
+  return (
+    <>
+      <AppRouteSecurityController workspace={workspace} />
+      <main>
+        <h1>{label}</h1>
+        <Link to="/clubs/reading-sai/app">멤버로</Link>
+        <Link to="/clubs/reading-sai/app/archive">멤버 기록으로</Link>
+        <Link to="/clubs/reading-sai/app/host">호스트로</Link>
+        <Link to="/clubs/reading-sai/app/host" onClick={(event) => event.preventDefault()}>
+          취소된 호스트 전환
+        </Link>
+      </main>
+    </>
+  );
+}
+
+beforeEach(() => {
+  window.sessionStorage.clear();
+  document.title = "ReadMates";
+});
+
+afterEach(() => {
+  cleanup();
+  window.sessionStorage.clear();
+  vi.restoreAllMocks();
+});
 
 describe("AppRouteSecurityController", () => {
-  it("announces a workspace change, updates the title, and moves focus to the route heading", async () => {
-    document.title = "기록 · 읽는사이";
-    const { rerender } = render(
-      <>
-        <AppRouteSecurityController workspace="member" />
-        <main><h1>기록</h1></main>
-      </>,
+  it("announces every committed member-host transition across click, Back, and Forward", async () => {
+    const user = userEvent.setup();
+    const router = createMemoryRouter(
+      [{ path: "*", element: <RouteControllerHarness /> }],
+      { initialEntries: ["/clubs/reading-sai/app"] },
     );
 
-    expect(screen.queryByRole("status")).toBeNull();
+    render(<StrictMode><RouterProvider router={router} /></StrictMode>);
 
-    rerender(
-      <>
-        <AppRouteSecurityController workspace="host" />
-        <main><h1>오늘의 운영</h1></main>
-      </>,
-    );
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+    expect(document.title).toBe("멤버 공간 · ReadMates");
 
+    await user.click(screen.getByRole("link", { name: "호스트로" }));
     expect(await screen.findByRole("status")).toHaveTextContent("호스트 공간으로 전환했습니다");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
     await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
-    expect(document.title).toContain("호스트 공간");
+    expect(document.title).toBe("호스트 공간 · ReadMates");
+
+    await user.click(screen.getByRole("link", { name: "멤버로" }));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("멤버 공간으로 전환했습니다"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+    expect(document.title).toBe("멤버 공간 · ReadMates");
+
+    await act(async () => router.navigate(-1));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("호스트 공간으로 전환했습니다"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
+    expect(document.title).toBe("호스트 공간 · ReadMates");
+
+    await act(async () => router.navigate(1));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("멤버 공간으로 전환했습니다"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+    expect(document.title).toBe("멤버 공간 · ReadMates");
   });
 
-  it("preserves transition feedback when the route layout remounts", async () => {
-    document.title = "오늘 · 읽는사이";
-    requestWorkspaceTransition("host");
+  it("recognizes a committed transition when the route layout remounts", async () => {
+    const member = render(
+      <StrictMode>
+        <MemoryRouter initialEntries={[{ pathname: "/clubs/reading-sai/app", key: "member-entry" }]}>
+          <RouteControllerHarness />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+    member.unmount();
 
     render(
-      <>
-        <AppRouteSecurityController workspace="host" />
-        <main><h1>오늘의 운영</h1></main>
-      </>,
+      <StrictMode>
+        <MemoryRouter initialEntries={[{ pathname: "/clubs/reading-sai/app/host", key: "host-entry" }]}>
+          <RouteControllerHarness />
+        </MemoryRouter>
+      </StrictMode>,
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent("호스트 공간으로 전환했습니다");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
+    expect(document.title).toBe("호스트 공간 · ReadMates");
+  });
+
+  it("canonicalizes one current prefix and restores title and focus on a same-route reload", async () => {
+    document.title = "호스트 공간 · 멤버 공간 · 오늘 · 읽는사이";
+
+    const mounted = render(
+      <MemoryRouter initialEntries={[{ pathname: "/clubs/reading-sai/app/host", key: "host-reload" }]}>
+        <RouteControllerHarness />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
+    mounted.unmount();
+
+    document.title = "멤버 공간 · 호스트 공간 · 오늘 · 읽는사이";
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/clubs/reading-sai/app/host", key: "host-reload" }]}>
+        <RouteControllerHarness />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
+    expect(document.title).toBe("호스트 공간 · 오늘 · 읽는사이");
+  });
+
+  it("ignores a stale intent left by a modified, cancelled, or loader-failed navigation", async () => {
+    window.sessionStorage.setItem("readmates:pending-workspace-transition", "host");
+    document.title = "호스트 공간 · 멤버 공간 · 오늘 · 읽는사이";
+
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/clubs/reading-sai/app/host", key: "fresh-host-load" }]}>
+        <RouteControllerHarness />
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
+    expect(document.title).toBe("호스트 공간 · 오늘 · 읽는사이");
+  });
+
+  it("does not prepare a destination for modified or cancelled link activation", async () => {
+    const user = userEvent.setup();
+    const router = createMemoryRouter(
+      [{ path: "*", element: <RouteControllerHarness /> }],
+      { initialEntries: ["/clubs/reading-sai/app"] },
+    );
+    render(<RouterProvider router={router} />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+
+    const keepModifiedNavigationInTestPage = (event: MouseEvent) => {
+      if (event.ctrlKey) {
+        event.preventDefault();
+      }
+    };
+    window.addEventListener("click", keepModifiedNavigationInTestPage, { capture: true });
+    await user.keyboard("{Control>}");
+    await user.click(screen.getByRole("link", { name: "호스트로" }));
+    await user.keyboard("{/Control}");
+    window.removeEventListener("click", keepModifiedNavigationInTestPage, { capture: true });
+    await user.click(screen.getByRole("link", { name: "취소된 호스트 전환" }));
+    expect(router.state.location.pathname).toBe("/clubs/reading-sai/app");
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("link", { name: "멤버 기록으로" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/clubs/reading-sai/app/archive"));
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(document.title).toBe("멤버 공간 · ReadMates");
+  });
+
+  it("does not commit a workspace receipt when the destination loader fails", async () => {
+    const user = userEvent.setup();
+    const router = createMemoryRouter(
+      [
+        { path: "/clubs/reading-sai/app", element: <RouteControllerHarness /> },
+        { path: "/clubs/reading-sai/app/archive", element: <RouteControllerHarness /> },
+        {
+          path: "/clubs/reading-sai/app/host",
+          loader: () => {
+            throw new Response(null, { status: 503, statusText: "Host loader unavailable" });
+          },
+          errorElement: (
+            <main>
+              <h1>호스트 로드 실패</h1>
+              <Link to="/clubs/reading-sai/app/archive">멤버 기록으로 돌아가기</Link>
+            </main>
+          ),
+        },
+      ],
+      { initialEntries: ["/clubs/reading-sai/app"] },
+    );
+    render(<RouterProvider router={router} />);
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+
+    await user.click(screen.getByRole("link", { name: "호스트로" }));
+    expect(await screen.findByRole("heading", { name: "호스트 로드 실패" })).toBeInTheDocument();
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(document.title).toBe("멤버 공간 · ReadMates");
+
+    await user.click(screen.getByRole("link", { name: "멤버 기록으로 돌아가기" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(document.title).toBe("멤버 공간 · ReadMates");
+  });
+
+  it("keeps committed transition feedback when session storage is unavailable", async () => {
+    const member = render(
+      <MemoryRouter initialEntries={[{ pathname: "/clubs/reading-sai/app", key: "member-no-storage" }]}>
+        <RouteControllerHarness />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+    member.unmount();
+
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+    vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => {
+      throw new Error("storage unavailable");
+    });
+
+    render(
+      <MemoryRouter initialEntries={[{ pathname: "/clubs/reading-sai/app/host", key: "host-no-storage" }]}>
+        <RouteControllerHarness />
+      </MemoryRouter>,
     );
 
     expect(await screen.findByRole("status")).toHaveTextContent("호스트 공간으로 전환했습니다");
     await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
-    expect(document.title).toContain("호스트 공간");
+    expect(document.title).toBe("호스트 공간 · ReadMates");
   });
 });

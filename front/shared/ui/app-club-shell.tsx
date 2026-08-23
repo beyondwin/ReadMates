@@ -28,7 +28,6 @@ export type AppClubShellProps = {
   beforeContent?: ReactNode;
   securityController?: ReactNode;
   desktopFooter?: ReactNode;
-  onWorkspaceNavigate?: (item: WorkspaceNavigationItem) => void;
   children: ReactNode;
 };
 
@@ -51,12 +50,19 @@ function ClubSelector({
         <SelectorChevron />
       </summary>
       <nav className="rm-context-selector__menu" aria-label="클럽 선택">
-        {clubs.map((club) => (
+        {clubs.map((club) => club.slug === currentClubSlug ? (
+          <span
+            key={club.slug}
+            className="rm-context-selector__item"
+            aria-current="true"
+          >
+            {club.name}
+          </span>
+        ) : (
           <LinkComponent
             key={club.slug}
             to={club.href}
             className="rm-context-selector__item"
-            aria-current={club.slug === currentClubSlug ? "true" : undefined}
           >
             {club.name}
           </LinkComponent>
@@ -66,7 +72,7 @@ function ClubSelector({
   );
 }
 
-function ContextSelectors(props: Pick<AppClubShellProps, "clubs" | "currentClubSlug" | "workspace" | "workspaceItems" | "LinkComponent" | "onWorkspaceNavigate">) {
+function ContextSelectors(props: Pick<AppClubShellProps, "clubs" | "currentClubSlug" | "workspace" | "workspaceItems" | "LinkComponent">) {
   return (
     <div className="rm-club-shell-context">
       <ClubSelector
@@ -78,7 +84,6 @@ function ContextSelectors(props: Pick<AppClubShellProps, "clubs" | "currentClubS
         currentWorkspace={props.workspace}
         items={props.workspaceItems}
         LinkComponent={props.LinkComponent}
-        onNavigate={props.onWorkspaceNavigate}
       />
     </div>
   );
@@ -99,7 +104,6 @@ export function AppClubShell({
   beforeContent,
   securityController,
   desktopFooter,
-  onWorkspaceNavigate,
   children,
 }: AppClubShellProps) {
   const desktopNavLabel = workspace === "host" ? "호스트 주 메뉴" : "멤버 주 메뉴";
@@ -110,7 +114,6 @@ export function AppClubShell({
     workspace,
     workspaceItems,
     LinkComponent,
-    onWorkspaceNavigate,
   };
 
   return (

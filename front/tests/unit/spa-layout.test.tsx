@@ -436,8 +436,9 @@ describe("SPA AppRouteLayout", () => {
       "/app/host/sessions",
       "/app/host/sessions",
     ]);
-    for (const link of screen.getAllByRole("link", { name: "멤버 공간" })) {
-      expect(link).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();
+    for (const navigation of screen.getAllByRole("navigation", { name: "공간 선택" })) {
+      expect(within(navigation).getByText("멤버 공간")).toHaveAttribute("aria-current", "page");
     }
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
   });
@@ -484,7 +485,8 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getAllByRole("link", { name: "호스트 공간" })[0]).toHaveAttribute("href", "/app/host/sessions");
 
     expect(screen.getAllByText("기록")).toHaveLength(2);
-    expect(screen.getAllByRole("link", { name: "멤버 공간" })).toHaveLength(2);
+    expect(screen.queryByRole("link", { name: "멤버 공간" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("navigation", { name: "공간 선택" })).toHaveLength(2);
 
     const tabs = screen.getByRole("navigation", { name: "멤버 주 메뉴 모바일" });
     expect(within(tabs).getAllByRole("link").map((tab) => tab.textContent)).toEqual([

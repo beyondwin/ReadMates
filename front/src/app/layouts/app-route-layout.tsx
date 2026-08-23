@@ -20,13 +20,11 @@ import {
 } from "@/features/guest-browse/api/guest-browse-api";
 import { useAuth, useAuthActions } from "@/src/app/auth-state";
 import { AppRouteSecurityController } from "@/src/app/app-route-security-controller";
-import { requestWorkspaceTransition } from "@/src/app/app-route-security-transition";
 import {
   archiveReportReturnTarget,
   archiveSessionsReturnTarget,
   publicRecordsReturnTarget,
   readPublicReadmatesReturnTarget,
-  readReadmatesReturnTarget,
   readmatesReturnState,
   resetReadmatesNavigationScroll,
 } from "@/src/app/route-continuity";
@@ -52,7 +50,11 @@ import type {
   PrimaryNavigationItem,
   WorkspaceNavigationItem,
 } from "@/shared/model/app-club-shell";
-import { hasHostRecordsReturnState, readHostRecordsReturnTarget } from "@/shared/routing/readmates-route-state";
+import {
+  hasHostRecordsReturnState,
+  readAppReturnTarget,
+  readHostRecordsReturnTarget,
+} from "@/shared/routing/readmates-route-state";
 import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
 import { AppClubShell } from "@/shared/ui/app-club-shell";
 import { MobileHeader } from "@/shared/ui/mobile-header";
@@ -66,7 +68,6 @@ const readmatesNavigationContinuity = {
   archiveSessionsReturnTarget,
   publicRecordsReturnTarget,
   readPublicReadmatesReturnTarget,
-  readReadmatesReturnTarget,
   readmatesReturnState,
 };
 
@@ -323,9 +324,13 @@ function appMobileBackTarget({
     return { href: scopedAppPath(basePath, "/app/host/sessions"), label: "모임", icon: "brand" };
   }
   if (appPath.startsWith("/app/feedback/") && appPath.endsWith("/print")) {
-    const sourceTarget = readmatesNavigationContinuity.readReadmatesReturnTarget(
+    const sourceTarget = readAppReturnTarget(
       state,
-      readmatesNavigationContinuity.archiveReportReturnTarget,
+      pathname,
+      {
+        ...readmatesNavigationContinuity.archiveReportReturnTarget,
+        href: scopeAppTarget(readmatesNavigationContinuity.archiveReportReturnTarget.href, basePath),
+      },
     );
     return {
       href: scopeAppTarget(appPath.replace(/\/print$/, ""), basePath),
@@ -334,16 +339,24 @@ function appMobileBackTarget({
     };
   }
   if (appPath.startsWith("/app/feedback/")) {
-    const target = readmatesNavigationContinuity.readReadmatesReturnTarget(
+    const target = readAppReturnTarget(
       state,
-      readmatesNavigationContinuity.archiveReportReturnTarget,
+      pathname,
+      {
+        ...readmatesNavigationContinuity.archiveReportReturnTarget,
+        href: scopeAppTarget(readmatesNavigationContinuity.archiveReportReturnTarget.href, basePath),
+      },
     );
     return { href: scopeAppTarget(target.href, basePath), state: target.state, label: "뒤로" };
   }
   if (appPath.startsWith("/app/sessions/")) {
-    const target = readmatesNavigationContinuity.readReadmatesReturnTarget(
+    const target = readAppReturnTarget(
       state,
-      readmatesNavigationContinuity.archiveSessionsReturnTarget,
+      pathname,
+      {
+        ...readmatesNavigationContinuity.archiveSessionsReturnTarget,
+        href: scopeAppTarget(readmatesNavigationContinuity.archiveSessionsReturnTarget.href, basePath),
+      },
     );
     return { href: scopeAppTarget(target.href, basePath), state: target.state, label: "뒤로" };
   }
@@ -673,11 +686,6 @@ export function AppRouteLayout({
           LinkComponent={AppLinkComponent}
         />
       )}
-      onWorkspaceNavigate={(item) => {
-        if (item.id !== desktopVariant) {
-          requestWorkspaceTransition(item.id);
-        }
-      }}
     >
       <RouteOutlet />
     </AppClubShell>
