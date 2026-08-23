@@ -41,10 +41,12 @@ describe("lifecycleConfirmCopy", () => {
       expect(getLifecycleConfirmCopy("publish")).toMatchObject({
         title: "canonical:publishMemberNotes",
         confirmLabel: "canonical:publishMemberNotes",
+        successFlash: "canonical:publishMemberNotes",
       });
       expect(getLifecycleConfirmCopy("unpublish")).toMatchObject({
         title: "canonical:removeMemberNotes",
         confirmLabel: "canonical:removeMemberNotes",
+        successFlash: "canonical:removeMemberNotes",
       });
     } finally {
       vi.doUnmock("@/shared/model/meeting-language");
@@ -80,7 +82,7 @@ describe("lifecycleConfirmCopy", () => {
         title: "게스트·멤버 노트에 기록 게시",
         body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
         confirmLabel: "게스트·멤버 노트에 기록 게시",
-        successFlash: "게스트·멤버 노트에 기록을 게시했습니다.",
+        successFlash: "게스트·멤버 노트에 기록 게시",
       },
     ],
     [
@@ -100,7 +102,7 @@ describe("lifecycleConfirmCopy", () => {
         title: "게스트·멤버 노트에서 기록 내리기",
         body: "공개 사이트에서 내려갑니다. 기록과 이미 보낸 알림은 남습니다.",
         confirmLabel: "게스트·멤버 노트에서 기록 내리기",
-        successFlash: "게스트·멤버 노트에서 기록을 내렸습니다.",
+        successFlash: "게스트·멤버 노트에서 기록 내리기",
       },
     ],
     [

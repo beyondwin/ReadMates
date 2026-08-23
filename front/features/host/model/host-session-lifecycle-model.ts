@@ -53,7 +53,7 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
     title: publishMemberNotes,
     body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
     confirmLabel: publishMemberNotes,
-    successFlash: "게스트·멤버 노트에 기록을 게시했습니다.",
+    successFlash: publishMemberNotes,
   },
   reopen: {
     kind: "reopen",
@@ -67,7 +67,7 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
     title: removeMemberNotes,
     body: "공개 사이트에서 내려갑니다. 기록과 이미 보낸 알림은 남습니다.",
     confirmLabel: removeMemberNotes,
-    successFlash: "게스트·멤버 노트에서 기록을 내렸습니다.",
+    successFlash: removeMemberNotes,
   },
   "return-to-draft": {
     kind: "return-to-draft",
