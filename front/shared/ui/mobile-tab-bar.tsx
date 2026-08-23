@@ -121,19 +121,9 @@ function hostTabs({
   currentSessionStatus: "ready" | "loading" | "error" | "retrying";
   onRetryCurrentSession?: () => void;
 }): TabLink[] {
-  const editHref =
-    currentSessionStatus !== "ready"
-      ? null
-      : currentSessionId
-          ? `/app/host/sessions/${currentSessionId}`
-          : "/app/host/sessions/new";
-  const retry =
-    onRetryCurrentSession && (currentSessionStatus === "error" || currentSessionStatus === "retrying")
-      ? {
-          onRetry: onRetryCurrentSession,
-          pending: currentSessionStatus === "retrying",
-        }
-      : undefined;
+  void currentSessionId;
+  void currentSessionStatus;
+  void onRetryCurrentSession;
 
   return [
     {
@@ -145,24 +135,12 @@ function hostTabs({
     },
     {
       key: "host-edit",
-      href: editHref,
+      href: "/app/host/sessions",
       label: READMATES_MOBILE_TAB_LABELS.hostSession,
-      pendingLabel:
-        currentSessionStatus === "error"
-          ? "다시 확인"
-          : currentSessionStatus === "ready"
-            ? undefined
-            : READMATES_MOBILE_TAB_LABELS.hostSessionPending,
-      pendingAriaLabel:
-        currentSessionStatus === "error"
-          ? "모임 다시 확인"
-          : currentSessionStatus === "retrying"
-            ? "모임 다시 확인 중"
-            : "모임 불러오는 중",
-      retry,
       icon: "edit",
       current: (pathname) =>
-        pathname === "/app/host/sessions/new"
+        pathname === "/app/host/sessions"
+        || pathname === "/app/host/sessions/new"
         || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname),
     },
     {
@@ -174,11 +152,11 @@ function hostTabs({
     },
     {
       key: "host-records",
-      href: "/app/host/sessions",
+      href: "/app/host/records",
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
       current: (pathname) =>
-        pathname === "/app/host/sessions" ||
+        pathname === "/app/host/records" ||
         /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];

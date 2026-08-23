@@ -32,6 +32,7 @@ import type {
   HostSessionDetailResponse,
   HostSessionAccessScopeRequest,
   HostSessionListPage,
+  HostListMode,
   HostSessionPublicationRequest,
   HostSessionRequest,
   HostSessionScheduleDefaultsWire,
@@ -62,6 +63,7 @@ import {
   parseHostSessionDeletionResponse,
   parseHostSessionTrashItem,
   parseHostSessionTrashPage,
+  parseHostSessionListPage,
   parseHostMemberListPage,
   parseHostNotificationDeliveryListResponse,
   parseHostInvitationListPage,
@@ -241,6 +243,25 @@ export function fetchHostNotificationTestMailAudit(context?: ReadmatesApiContext
 
 export function fetchHostSessions(context?: ReadmatesApiContext, page?: PageRequest) {
   return readmatesFetch<HostSessionListPage>(`/api/host/sessions${pagingSearchParams(page)}`, undefined, context);
+}
+
+export function fetchHostSessionList(
+  mode: HostListMode,
+  context?: ReadmatesApiContext,
+  page?: PageRequest,
+) {
+  const params = new URLSearchParams({ mode });
+  if (page?.limit !== undefined) {
+    params.set("limit", String(page.limit));
+  }
+  if (page?.cursor) {
+    params.set("cursor", page.cursor);
+  }
+  return readmatesFetch<HostSessionListPage>(
+    `/api/host/sessions?${params.toString()}`,
+    undefined,
+    context,
+  ).then((value) => parseHostSessionListPage(value, mode));
 }
 
 export function fetchHostSessionScheduleDefaults(context?: ReadmatesApiContext) {

@@ -40,13 +40,10 @@ function appendPage(params: URLSearchParams, page?: PageRequest) {
 
 function ledgerSearch(request?: HostSessionLedgerRequest) {
   const normalized = normalizeHostSessionLedgerRequest(request);
-  const params = new URLSearchParams();
+  const params = new URLSearchParams({ mode: "record" });
   const search = normalized.search;
   if (search) {
     params.set("search", search);
-  }
-  if (normalized.state) {
-    params.set("state", normalized.state);
   }
   if (normalized.recordStatus) {
     params.set("recordStatus", normalized.recordStatus);

@@ -12,6 +12,7 @@ import {
   fetchHostSessionTrash,
   fetchHostSessionTrashList,
   fetchHostSessions,
+  fetchHostSessionList,
   restoreHostSession,
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
@@ -92,6 +93,8 @@ export const hostSessionKeys = {
     [...hostSessionKeys.scope(context), "list"] as const,
   list: (page?: PageRequest, context?: ReadmatesApiContext) =>
     [...hostSessionKeys.lists(context), normalizePageRequest(page)] as const,
+  modeList: (mode: "meeting" | "record", page?: PageRequest, context?: ReadmatesApiContext) =>
+    [...hostSessionKeys.lists(context), "mode", mode, normalizePageRequest(page)] as const,
   detail: (sessionId: string, context?: ReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "detail", sessionId] as const,
   closingStatus: (sessionId: string, context?: ReadmatesApiContext) =>
@@ -186,6 +189,15 @@ export function hostSessionListQuery(page?: PageRequest, context?: ReadmatesApiC
   return queryOptions<HostSessionListPage>({
     queryKey: hostSessionKeys.list(page, context),
     queryFn: () => fetchHostSessions(context, pageFromNormalizedPageRequest(normalized)),
+  });
+}
+
+export function hostMeetingSessionListQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+  const normalized = normalizePageRequest(page);
+  return queryOptions<HostSessionListPage>({
+    queryKey: hostSessionKeys.modeList("meeting", page, context),
+    queryFn: () => fetchHostSessionList("meeting", context, pageFromNormalizedPageRequest(normalized)),
+    retry: false,
   });
 }
 

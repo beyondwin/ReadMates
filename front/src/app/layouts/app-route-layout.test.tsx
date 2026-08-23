@@ -214,54 +214,32 @@ describe("AppRouteLayout host session navigation", () => {
   it.each([
     {
       operation: "open" as const,
-      initialSessionId: null,
-      nextSessionId: "session-7",
-      initialHref: "/app/host/sessions/new",
-      nextHref: "/app/host/sessions/session-7",
       mutationPath: "/api/bff/api/host/sessions/session-7/open",
       mutationMethod: "POST",
     },
     {
       operation: "close" as const,
-      initialSessionId: "session-7",
-      nextSessionId: null,
-      initialHref: "/app/host/sessions/session-7",
-      nextHref: "/app/host/sessions/new",
       mutationPath: "/api/bff/api/host/sessions/session-7/close",
       mutationMethod: "POST",
     },
     {
       operation: "delete" as const,
-      initialSessionId: "session-7",
-      nextSessionId: null,
-      initialHref: "/app/host/sessions/session-7",
-      nextHref: "/app/host/sessions/new",
       mutationPath: "/api/bff/api/host/sessions/session-7",
       mutationMethod: "DELETE",
     },
   ])(
-    "refreshes the session destination after a successful $operation mutation",
+    "keeps the meeting-list destination stable after a successful $operation mutation",
     async ({
       operation,
-      initialSessionId,
-      nextSessionId,
-      initialHref,
-      nextHref,
       mutationPath,
       mutationMethod,
     }) => {
-      let currentSessionId = initialSessionId;
       const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const path = input.toString();
         if (path === "/api/bff/api/sessions/current") {
-          return Promise.resolve(
-            jsonResponse({
-              currentSession: currentSessionId === null ? null : { sessionId: currentSessionId },
-            }),
-          );
+          return Promise.resolve(jsonResponse({ currentSession: null }));
         }
         if (path === mutationPath && init?.method === mutationMethod) {
-          currentSessionId = nextSessionId;
           if (mutationMethod === "DELETE") {
             return Promise.resolve(jsonResponse({
               sessionId: "session-7",
@@ -303,26 +281,20 @@ describe("AppRouteLayout host session navigation", () => {
         child: <SessionMutationHarness operation={operation} />,
       });
 
-      await waitFor(() => expectSessionLinks(initialHref));
+      expectSessionLinks("/app/host/sessions");
       await user.click(screen.getByRole("button", { name: operation }));
-      await waitFor(() => expectSessionLinks(nextHref));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+        mutationPath,
+        expect.objectContaining({ method: mutationMethod }),
+      ));
+      expectSessionLinks("/app/host/sessions");
 
-      expect(
-        fetchMock.mock.calls.filter(([input]) => input.toString() === "/api/bff/api/sessions/current"),
-      ).toHaveLength(2);
     },
   );
 
-  it("distinguishes loading from failure and recovers a transient current-session lookup", async () => {
-    const initialRequest = deferred<Response>();
-    const retryRequest = deferred<Response>();
-    let currentRequest = 0;
+  it("does not derive the stable meeting-list destination from current-session lookup", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = input.toString();
-      if (path === "/api/bff/api/sessions/current") {
-        currentRequest += 1;
-        return currentRequest === 1 ? initialRequest.promise : retryRequest.promise;
-      }
       return Promise.reject(new Error(`Unexpected fetch: ${path}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -332,36 +304,17 @@ describe("AppRouteLayout host session navigation", () => {
         mutations: { retry: false },
       },
     });
-    const user = userEvent.setup();
-
     renderHostLayout({
       queryClient,
       child: <main>host child</main>,
     });
 
-    expect(screen.getAllByLabelText("모임 불러오는 중")).toHaveLength(2);
-
-    await act(async () => {
-      initialRequest.resolve(jsonResponse({ title: "Unavailable" }, 503));
-      await initialRequest.promise;
-    });
-
-    const retryButtons = await screen.findAllByRole("button", { name: "모임 다시 확인" });
-    expect(retryButtons).toHaveLength(2);
+    expectSessionLinks("/app/host/sessions");
     expect(screen.queryByLabelText("모임 불러오는 중")).not.toBeInTheDocument();
-
-    await user.click(retryButtons[0]);
-
-    expect(await screen.findAllByRole("button", { name: "모임 다시 확인 중" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "모임 다시 확인 중" })[0]).toBeDisabled();
-
-    await act(async () => {
-      retryRequest.resolve(jsonResponse({ currentSession: { sessionId: "session-9" } }));
-      await retryRequest.promise;
-    });
-
-    await waitFor(() => expectSessionLinks("/app/host/sessions/session-9"));
-    expect(currentRequest).toBe(2);
+    expect(screen.queryByRole("button", { name: "모임 다시 확인" })).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter(([input]) => input.toString() === "/api/bff/api/sessions/current"),
+    ).toHaveLength(1);
   });
 });
 

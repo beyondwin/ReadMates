@@ -74,6 +74,29 @@ const validInvitationListPage = {
   nextCursor: null,
 };
 
+const validHostSessionListItem = {
+  sessionId: "session-1",
+  sessionNumber: 1,
+  title: "함께 읽기",
+  bookTitle: "The Book",
+  bookAuthor: "Author",
+  bookImageUrl: null,
+  date: "2026-08-30",
+  startTime: "19:00",
+  endTime: "21:00",
+  locationLabel: "온라인",
+  state: "OPEN" as const,
+  visibility: "MEMBER" as const,
+  accessScope: "GUEST_READABLE" as const,
+  siteVisibility: "HIDDEN" as const,
+  recordStatus: "NOT_STARTED" as const,
+  needsAttention: false,
+  hasDraft: false,
+  liveRevision: 1,
+  draftRevision: null,
+  lastModifiedAt: null,
+};
+
 // ---- DEV mode tests -----------------------------------------------------------
 
 describe("host-contract zod validators (DEV mode)", () => {
@@ -119,6 +142,24 @@ describe("host-contract zod validators (DEV mode)", () => {
     // Should not throw — nextCursor is nullable().optional()
     const result = parseHostNotificationDeliveryListResponse(withoutCursor);
     expect(result).toBeDefined();
+  });
+
+  it("accepts only the lifecycle states owned by the requested host list mode", async () => {
+    const { parseHostSessionListPage } = await import("@/features/host/api/host-contracts");
+    const page = {
+      items: [validHostSessionListItem],
+      nextCursor: "opaque",
+      summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+    };
+
+    expect(parseHostSessionListPage(page, "meeting")).toMatchObject({
+      items: [{ state: "OPEN" }],
+    });
+    expect(() => parseHostSessionListPage(page, "record")).toThrow();
+    expect(() => parseHostSessionListPage({
+      ...page,
+      items: [{ ...validHostSessionListItem, state: "PUBLISHED" }],
+    }, "meeting")).toThrow();
   });
 });
 

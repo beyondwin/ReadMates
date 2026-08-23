@@ -33,8 +33,39 @@ export const publicRecordsReturnTarget: ReadmatesReturnTarget = {
 
 export const hostDashboardReturnTarget: ReadmatesReturnTarget = {
   href: "/app/host",
-  label: "운영으로",
+  label: "오늘로",
 };
+
+export type HostRouteDestinationInventoryEntry = {
+  owner: string;
+  kind: "host-primary" | "member-primary" | "public-primary" | "detail" | "compatibility";
+  href: string;
+  scopedHref: string;
+  lifecycle: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED" | null;
+};
+
+export const HOST_ROUTE_DESTINATION_INVENTORY: readonly HostRouteDestinationInventoryEntry[] = [
+  { owner: "host-today", kind: "host-primary", href: "/app/host", scopedHref: "/clubs/:slug/app/host", lifecycle: null },
+  { owner: "host-meetings", kind: "host-primary", href: "/app/host/sessions", scopedHref: "/clubs/:slug/app/host/sessions", lifecycle: null },
+  { owner: "host-members", kind: "host-primary", href: "/app/host/members", scopedHref: "/clubs/:slug/app/host/members", lifecycle: null },
+  { owner: "host-records", kind: "host-primary", href: "/app/host/records", scopedHref: "/clubs/:slug/app/host/records", lifecycle: null },
+  { owner: "host-draft-list", kind: "detail", href: "/app/host/sessions", scopedHref: "/clubs/:slug/app/host/sessions", lifecycle: "DRAFT" },
+  { owner: "host-open-list", kind: "detail", href: "/app/host/sessions", scopedHref: "/clubs/:slug/app/host/sessions", lifecycle: "OPEN" },
+  { owner: "host-closed-list", kind: "detail", href: "/app/host/records", scopedHref: "/clubs/:slug/app/host/records", lifecycle: "CLOSED" },
+  { owner: "host-published-list", kind: "detail", href: "/app/host/records", scopedHref: "/clubs/:slug/app/host/records", lifecycle: "PUBLISHED" },
+  { owner: "host-meeting-detail", kind: "detail", href: "/app/host/sessions/:sessionId", scopedHref: "/clubs/:slug/app/host/sessions/:sessionId", lifecycle: "OPEN" },
+  { owner: "host-record-detail", kind: "detail", href: "/app/host/sessions/:sessionId", scopedHref: "/clubs/:slug/app/host/sessions/:sessionId", lifecycle: "CLOSED" },
+  { owner: "host-trash-compatibility", kind: "compatibility", href: "/app/host/sessions?view=trash", scopedHref: "/clubs/:slug/app/host/sessions?view=trash", lifecycle: null },
+  { owner: "member-today", kind: "member-primary", href: "/app", scopedHref: "/clubs/:slug/app", lifecycle: null },
+  { owner: "member-notes", kind: "member-primary", href: "/app/notes", scopedHref: "/clubs/:slug/app/notes", lifecycle: null },
+  { owner: "member-records", kind: "member-primary", href: "/app/archive", scopedHref: "/clubs/:slug/app/archive", lifecycle: null },
+  { owner: "member-space", kind: "member-primary", href: "/app/me", scopedHref: "/clubs/:slug/app/me", lifecycle: null },
+  { owner: "member-record-detail", kind: "detail", href: "/app/sessions/:sessionId", scopedHref: "/clubs/:slug/app/sessions/:sessionId", lifecycle: "CLOSED" },
+  { owner: "public-home", kind: "public-primary", href: "/", scopedHref: "/clubs/:slug", lifecycle: null },
+  { owner: "public-about", kind: "public-primary", href: "/about", scopedHref: "/clubs/:slug/about", lifecycle: null },
+  { owner: "public-records", kind: "public-primary", href: "/records", scopedHref: "/clubs/:slug/records", lifecycle: null },
+  { owner: "public-record-detail", kind: "detail", href: "/sessions/:sessionId", scopedHref: "/clubs/:slug/sessions/:sessionId", lifecycle: "PUBLISHED" },
+] as const;
 
 function toSafeReadmatesHref(value: string, scope: "app" | "public") {
   try {

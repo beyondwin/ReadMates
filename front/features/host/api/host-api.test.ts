@@ -17,6 +17,7 @@ import {
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
   fetchHostSessions,
+  fetchHostSessionList,
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
@@ -221,6 +222,34 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/sessions/schedule-defaults?clubSlug=reading-sai",
       "/api/bff/api/host/members?limit=25&cursor=m2&clubSlug=reading-sai",
     ]);
+  });
+
+  it("sends one exact server-owned list mode and preserves opaque cursors", async () => {
+    const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(jsonResponse({
+      items: [],
+      nextCursor: null,
+      summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+    })));
+    vi.stubGlobal("fetch", fetchMock);
+    const opaqueCursor = "eyJlcG9jaCI6IjErLz0ifQ==";
+
+    await fetchHostSessionList("meeting", { clubSlug: "reading-sai" }, {
+      limit: 25,
+      cursor: opaqueCursor,
+    });
+    await fetchHostSessionList("record", { clubSlug: "reading-sai" }, {
+      limit: 10,
+      cursor: "record+cursor/==",
+    });
+
+    const urls = fetchMock.mock.calls.map(([url]) => String(url));
+    expect(urls).toEqual([
+      "/api/bff/api/host/sessions?mode=meeting&limit=25&cursor=eyJlcG9jaCI6IjErLz0ifQ%3D%3D&clubSlug=reading-sai",
+      "/api/bff/api/host/sessions?mode=record&limit=10&cursor=record%2Bcursor%2F%3D%3D&clubSlug=reading-sai",
+    ]);
+    for (const url of urls) {
+      expect(url).not.toMatch(/[?&]states?=/);
+    }
   });
 
   it("validates host member avatar keys as strings while preserving future keys", async () => {

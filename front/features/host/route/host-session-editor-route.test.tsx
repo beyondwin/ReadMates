@@ -10,6 +10,7 @@ const loaderApiMocks = vi.hoisted(() => ({
   fetchHostSessionDetail: vi.fn(),
   fetchHostSessionTrash: vi.fn(),
   fetchHostSessions: vi.fn(),
+  fetchHostSessionList: vi.fn(),
   fetchManualNotificationDispatches: vi.fn(),
   fetchHostSessionRecordEditor: vi.fn(),
   fetchHostSessionHistory: vi.fn(),
@@ -154,6 +155,7 @@ vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
   fetchHostSessionDetail: loaderApiMocks.fetchHostSessionDetail,
   fetchHostSessionTrash: loaderApiMocks.fetchHostSessionTrash,
   fetchHostSessions: loaderApiMocks.fetchHostSessions,
+  fetchHostSessionList: loaderApiMocks.fetchHostSessionList,
   fetchManualNotificationDispatches: loaderApiMocks.fetchManualNotificationDispatches,
   deleteHostSession: loaderApiMocks.deleteHostSession,
   restoreHostSession: loaderApiMocks.restoreHostSession,
@@ -1724,6 +1726,7 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     loaderApiMocks.fetchHostSessionDetail.mockReset();
     loaderApiMocks.fetchHostSessionTrash.mockReset();
     loaderApiMocks.fetchHostSessions.mockReset().mockResolvedValue({ items: [], nextCursor: null });
+    loaderApiMocks.fetchHostSessionList.mockReset().mockResolvedValue({ items: [], nextCursor: null });
     loaderApiMocks.fetchManualNotificationDispatches.mockReset().mockResolvedValue({
       items: [],
       nextCursor: null,
@@ -1746,6 +1749,23 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
       request: new Request("https://readmates.test/clubs/reading-sai/app/host/sessions/session-1"),
     };
   }
+
+  it("prefetches the meeting-owned list with mode=meeting for an active editor", async () => {
+    loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(sessionDetail());
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).resolves.toEqual({
+      sessionId: "session-1",
+      mode: "active",
+    });
+
+    expect(loaderApiMocks.fetchHostSessionList).toHaveBeenCalledWith(
+      "meeting",
+      { clubSlug: "reading-sai" },
+      { limit: 50 },
+    );
+    expect(loaderApiMocks.fetchHostSessions).not.toHaveBeenCalled();
+  });
 
   it("returns mode trash only when active detail is an exact 404", async () => {
     loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(404, "RESOURCE_NOT_FOUND"));
@@ -1871,6 +1891,7 @@ describe("EditHostSessionRoute trash ownership", () => {
     loaderApiMocks.fetchHostSessionDetail.mockReset();
     loaderApiMocks.fetchHostSessionTrash.mockReset();
     loaderApiMocks.fetchHostSessions.mockReset().mockResolvedValue({ items: [], nextCursor: null });
+    loaderApiMocks.fetchHostSessionList.mockReset().mockResolvedValue({ items: [], nextCursor: null });
     loaderApiMocks.fetchManualNotificationDispatches.mockReset().mockResolvedValue({
       items: [],
       nextCursor: null,

@@ -5,7 +5,7 @@ import type { HostSessionEditorActions } from "@/features/host/route/host-sessio
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostSessionDetailQuery,
-  hostSessionListQuery,
+  hostMeetingSessionListQuery,
   hostSessionManualDispatchesQuery,
   hostSessionTrashDetailQuery,
   isHostSessionNotFoundError,
@@ -78,7 +78,10 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
         { limit: EDITOR_HISTORY_PAGE_LIMIT },
         context,
       )),
-      client.fetchQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context)).catch(() => null),
+      client.fetchQuery(hostMeetingSessionListQuery(
+        { limit: DEFAULT_HOST_SESSION_LIST_LIMIT },
+        context,
+      )).catch(() => null),
       client.fetchQuery(hostSessionRecordLedgerQuery({
         needsAttention: true,
         page: { limit: 3 },

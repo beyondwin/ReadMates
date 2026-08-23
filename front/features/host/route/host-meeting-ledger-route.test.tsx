@@ -49,7 +49,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/host/queries/host-session-queries")>()),
   DEFAULT_HOST_SESSION_LIST_LIMIT: 50,
-  hostSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
+  hostMeetingSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
   hostSessionDetailQuery: (sessionId: string) => ({ testData: routeMocks.details[sessionId] }),
   invalidateHostSessionManualDispatches: vi.fn(),
   useCreateHostSessionMutation: () => ({

@@ -134,7 +134,19 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedHostRoute({
       path: "sessions",
       errorElement: <HostRouteError />,
-      fallback: <ReadmatesRouteLoading label="모임 기록 장부를 불러오는 중" variant="host" />,
+      fallback: <ReadmatesRouteLoading label="모임 목록을 불러오는 중" variant="host" />,
+      load: async () => {
+        const [{ HostMeetingListRouteElement: Component }, { hostMeetingListLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/meeting-list-route-element"),
+          import("@/features/host/route/host-meeting-list-data"),
+        ]);
+        return { Component, loader: hostMeetingListLoaderFactory(queryClient) };
+      },
+    }),
+    scopedHostRoute({
+      path: "records",
+      errorElement: <HostRouteError />,
+      fallback: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
       load: async () => {
         const [{ HostSessionLedgerRouteElement: Component }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/session-ledger-route-element"),
@@ -273,7 +285,22 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
     {
       path: "sessions",
       errorElement: <HostRouteError />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 기록 장부를 불러오는 중" variant="host" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임 목록을 불러오는 중" variant="host" />,
+      lazy: async () => {
+        const [{ HostMeetingListRouteElement }, { hostMeetingListLoaderFactory }] = await Promise.all([
+          import("@/src/app/host-routes/meeting-list-route-element"),
+          import("@/features/host/route/host-meeting-list-data"),
+        ]);
+        return {
+          Component: HostMeetingListRouteElement,
+          loader: hostMeetingListLoaderFactory(queryClient),
+        };
+      },
+    },
+    {
+      path: "records",
+      errorElement: <HostRouteError />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="기록 목록을 불러오는 중" variant="host" />,
       lazy: async () => {
         const [{ HostSessionLedgerRouteElement }, { hostSessionLedgerLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/session-ledger-route-element"),

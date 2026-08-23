@@ -71,4 +71,18 @@ describe("hostRoutes", () => {
     expect(unscopedPaths.indexOf("operations")).toBe(unscopedPaths.indexOf("notifications") + 1);
     expect(scopedPaths.indexOf("operations")).toBe(scopedPaths.indexOf("notifications") + 1);
   });
+
+  it("registers four distinct primary host destinations in both route trees", () => {
+    const routes = hostRoutes(new QueryClient());
+
+    for (const routeId of ["app-host", "club-app-host"]) {
+      const route = routes.find((candidate) => candidate.id === routeId);
+      expect(childPaths(route)).toEqual(expect.arrayContaining([
+        "index",
+        "sessions",
+        "members",
+        "records",
+      ]));
+    }
+  });
 });

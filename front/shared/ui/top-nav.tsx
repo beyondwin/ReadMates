@@ -100,19 +100,9 @@ function hostLinks({
   currentSessionStatus: CurrentSessionNavigationStatus;
   onRetryCurrentSession?: () => void;
 }): NavLink[] {
-  const sessionHref =
-    currentSessionStatus !== "ready"
-      ? null
-      : currentSessionId
-          ? `/app/host/sessions/${currentSessionId}`
-          : "/app/host/sessions/new";
-  const retry =
-    onRetryCurrentSession && (currentSessionStatus === "error" || currentSessionStatus === "retrying")
-      ? {
-          onRetry: onRetryCurrentSession,
-          pending: currentSessionStatus === "retrying",
-        }
-      : undefined;
+  void currentSessionId;
+  void currentSessionStatus;
+  void onRetryCurrentSession;
 
   return [
     {
@@ -123,18 +113,11 @@ function hostLinks({
     },
     {
       key: "host-session",
-      href: sessionHref,
+      href: "/app/host/sessions",
       label: READMATES_PRIMARY_NAV_LABELS.host.session,
-      pendingLabel: currentSessionStatus === "error" ? "다시 확인" : "확인 중",
-      pendingAriaLabel:
-        currentSessionStatus === "error"
-          ? "모임 다시 확인"
-          : currentSessionStatus === "retrying"
-            ? "모임 다시 확인 중"
-            : "모임 불러오는 중",
-      retry,
       current: (pathname) =>
-        pathname === "/app/host/sessions/new"
+        pathname === "/app/host/sessions"
+        || pathname === "/app/host/sessions/new"
         || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname),
     },
     {
@@ -145,10 +128,10 @@ function hostLinks({
     },
     {
       key: "host-records",
-      href: "/app/host/sessions",
+      href: "/app/host/records",
       label: READMATES_PRIMARY_NAV_LABELS.host.records,
       current: (pathname) =>
-        pathname === "/app/host/sessions" ||
+        pathname === "/app/host/records" ||
         /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];

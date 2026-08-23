@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, cleanup, render as testingLibraryRender, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render as testingLibraryRender, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactElement } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -553,8 +553,7 @@ describe("SPA AppRouteLayout", () => {
     expect(screen.getAllByRole("link", { name: "호스트 화면" })).toHaveLength(2);
   });
 
-  it("keeps host edit disabled while the current session tab target is loading", async () => {
-    const currentSession = createDeferred<Response>();
+  it("keeps the host meeting list available without waiting for a current-session target", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn((input: RequestInfo | URL) => {
@@ -565,7 +564,7 @@ describe("SPA AppRouteLayout", () => {
         }
 
         if (url === "/api/bff/api/sessions/current") {
-          return currentSession.promise;
+          return Promise.reject(new Error("current session should not be requested"));
         }
 
         return Promise.reject(new Error(`Unexpected fetch: ${url}`));
@@ -592,28 +591,15 @@ describe("SPA AppRouteLayout", () => {
     ]);
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).queryByRole("link", { name: "모임" })).not.toBeInTheDocument();
-    expect(within(tabs).getByLabelText("모임 불러오는 중")).toHaveAttribute("aria-disabled", "true");
-    expect(within(tabs).getByText("확인 중")).toBeInTheDocument();
-
-    currentSession.resolve(
-      jsonResponse({
-        currentSession: {
-          sessionId: "session-6",
-        },
-      }),
+    expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions",
     );
-
-    await waitFor(() => {
-      expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute(
-        "href",
-        "/app/host/sessions/session-6",
-      );
-    });
+    expect(within(tabs).queryByLabelText("모임 불러오는 중")).not.toBeInTheDocument();
+    expect(fetch).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
   });
 
-  it("keeps host edit disabled when the current session lookup fails", async () => {
-    const currentSession = createDeferred<Response>();
+  it("keeps the host meeting list available when current-session lookup is unavailable", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
 
@@ -622,7 +608,7 @@ describe("SPA AppRouteLayout", () => {
       }
 
       if (url === "/api/bff/api/sessions/current") {
-        return currentSession.promise;
+        return Promise.reject(new Error("current session unavailable"));
       }
 
       return Promise.reject(new Error(`Unexpected fetch: ${url}`));
@@ -642,17 +628,14 @@ describe("SPA AppRouteLayout", () => {
     );
 
     expect(await screen.findByText("host child")).toBeInTheDocument();
-    await waitFor(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
-    });
-
-    await act(async () => {
-      currentSession.reject(new Error("current session unavailable"));
-    });
 
     const tabs = screen.getByRole("navigation", { name: "앱 탭" });
-    expect(within(tabs).queryByRole("link", { name: "모임" })).not.toBeInTheDocument();
-    expect(await within(tabs).findByRole("button", { name: "모임 다시 확인" })).toBeEnabled();
+    expect(within(tabs).getByRole("link", { name: "모임" })).toHaveAttribute(
+      "href",
+      "/app/host/sessions",
+    );
+    expect(within(tabs).queryByRole("button", { name: "모임 다시 확인" })).not.toBeInTheDocument();
+    expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/sessions/current", expect.anything());
   });
 
   it("renders a shell-aware member loading skeleton while auth is unresolved", () => {

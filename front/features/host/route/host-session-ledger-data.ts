@@ -21,8 +21,13 @@ export type HostSessionLedgerRouteData = {
 };
 
 export function hostSessionLedgerFiltersFromRequest(request?: Request) {
+  const url = request ? new URL(request.url) : null;
+  const params = url?.searchParams ?? new URLSearchParams();
+  if (url && /\/host\/records\/?$/.test(url.pathname)) {
+    params.delete("view");
+  }
   return normalizeHostSessionLedgerFilters(
-    request ? new URL(request.url).searchParams : new URLSearchParams(),
+    params,
   );
 }
 

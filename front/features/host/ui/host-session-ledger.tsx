@@ -11,11 +11,13 @@ import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model
 import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
 import { formatMeetingOrdinal } from "@/shared/model/meeting-language";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
 
 type LedgerLinkProps = {
   to: string;
   className?: string;
   children: ReactNode;
+  state?: unknown;
   "aria-label"?: string;
 };
 
@@ -47,7 +49,6 @@ export type HostSessionLedgerProps = {
   errorMessage?: string | null;
   loadMoreError?: string | null;
   onRetry?: () => void;
-  newSessionHref?: string;
   trashItems?: HostSessionLedgerTrashItem[];
   trashHref?: string;
   activeHref?: string;
@@ -55,7 +56,8 @@ export type HostSessionLedgerProps = {
   onRetryRestore?: (sessionId: string) => void;
 };
 
-function DefaultLink({ to, children, ...props }: LedgerLinkProps) {
+function DefaultLink({ to, children, state: _state, ...props }: LedgerLinkProps) {
+  void _state;
   return <a {...props} href={to}>{children}</a>;
 }
 
@@ -130,24 +132,6 @@ function LedgerFilters({
           />
           <button className="btn btn-primary btn-sm" type="submit">검색</button>
         </span>
-      </label>
-      <label className="stack" style={{ "--stack": "6px" } as React.CSSProperties}>
-        <span className="tiny">모임 상태</span>
-        <select
-          className="input"
-          aria-label="모임 상태"
-          value={filters.state ?? ""}
-          onChange={(event) => onFiltersChange({
-            ...filters,
-            state: (event.target.value || null) as HostSessionLedgerFilters["state"],
-          })}
-        >
-          <option value="">전체</option>
-          <option value="DRAFT">예정</option>
-          <option value="OPEN">진행 중</option>
-          <option value="CLOSED">종료</option>
-          <option value="PUBLISHED">공개됨</option>
-        </select>
       </label>
       <label className="stack" style={{ "--stack": "6px" } as React.CSSProperties}>
         <span className="tiny">기록 상태</span>
@@ -229,6 +213,7 @@ function DesktopLedger({
               <td style={{ padding: 16, verticalAlign: "top" }}>
                 <LinkComponent
                   to={sessionRecordHref(item.sessionId)}
+                  state={readmatesReturnState({ href: "/app/host/records", label: "기록으로" })}
                   className="btn btn-ghost btn-sm"
                   aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
                 >
@@ -276,6 +261,7 @@ function MobileLedger({
           <div style={{ marginTop: 12 }}><LedgerBadges item={item} /></div>
           <LinkComponent
             to={sessionRecordHref(item.sessionId)}
+            state={readmatesReturnState({ href: "/app/host/records", label: "기록으로" })}
             className="btn btn-primary"
             aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
           >
@@ -365,10 +351,9 @@ export function HostSessionLedger({
   errorMessage = null,
   loadMoreError = null,
   onRetry,
-  newSessionHref = "/app/host/sessions/new",
   trashItems = [],
   trashHref = "?view=trash",
-  activeHref = "/app/host/sessions",
+  activeHref = "/app/host/records",
   onRestore,
   onRetryRestore,
 }: HostSessionLedgerProps) {
@@ -385,16 +370,13 @@ export function HostSessionLedger({
         </span>
         <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
           {trashView ? (
-            <LinkComponent to={activeHref} className="btn btn-quiet btn-sm">
-              모임 기록 장부
+              <LinkComponent to={activeHref} className="btn btn-quiet btn-sm">
+              기록 목록
             </LinkComponent>
           ) : (
             <>
               <LinkComponent to={trashHref} className="btn btn-quiet btn-sm">
                 휴지통
-              </LinkComponent>
-              <LinkComponent to={newSessionHref} className="btn btn-primary btn-sm">
-                새 모임 만들기
               </LinkComponent>
             </>
           )}

@@ -4,6 +4,7 @@ import { useLoaderData, useParams } from "react-router";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
+import { meetingListItemsFromHostSources } from "@/features/host/model/host-meeting-ledger-model";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import {
   HostMeetingLedger,
@@ -47,10 +48,15 @@ export function HostDashboardRoute({
       );
     };
   }, [LinkComponent]);
+  const meetingItems = useMemo(
+    () => meetingListItemsFromHostSources(loaderData.hostSessions.items),
+    [loaderData.hostSessions.items],
+  );
 
   return (
     <HostMeetingLedger
-      items={[]}
+      items={meetingItems}
+      overviewOnly
       attentionPage={attentionPage}
       attentionError={attentionError}
       onRetryAttention={() => {

@@ -21,7 +21,7 @@ import {
 import {
   DEFAULT_HOST_SESSION_LIST_LIMIT,
   hostSessionDetailQuery,
-  hostSessionListQuery,
+  hostMeetingSessionListQuery,
   hostSessionScheduleDefaultsQuery,
   invalidateHostSessionManualDispatches,
   resolveHostScheduleDefaultsLoadState,
@@ -117,7 +117,7 @@ export function HostMeetingLedgerRoute({
 }) {
   const { clubSlug, sessionId } = useParams<{ clubSlug: string; sessionId: string }>();
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
-  const sessionsQuery = useQuery(hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context));
+  const sessionsQuery = useQuery(hostMeetingSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context));
   const recordAttentionQuery = useQuery(hostSessionRecordLedgerQuery({
     needsAttention: true,
     page: { limit: 3 },

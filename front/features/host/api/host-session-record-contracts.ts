@@ -308,6 +308,8 @@ export const HostSessionRecordLedgerPageResponseSchema = z.object({
     locationLabel: z.string(),
     state: z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]),
     visibility: SessionRecordVisibilitySchema,
+    accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]).optional(),
+    siteVisibility: z.enum(["HIDDEN", "LISTED"]).optional(),
     recordStatus: z.enum(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]),
     needsAttention: z.boolean(),
     hasDraft: z.boolean(),
@@ -321,7 +323,17 @@ export const HostSessionRecordLedgerPageResponseSchema = z.object({
     incompletePublishedCount: nonNegativeInteger,
     draftCount: nonNegativeInteger,
   }).strict(),
-}).strict();
+}).strict().superRefine((page, context) => {
+  page.items.forEach((item, index) => {
+    if (item.state !== "CLOSED" && item.state !== "PUBLISHED") {
+      context.addIssue({
+        code: "custom",
+        path: ["items", index, "state"],
+        message: "record 목록은 CLOSED 또는 PUBLISHED만 허용합니다.",
+      });
+    }
+  });
+});
 
 export function parseHostSessionRecordEditor(value: unknown): HostSessionRecordEditor {
   return HostSessionRecordEditorResponseSchema.parse(value) as HostSessionRecordEditor;

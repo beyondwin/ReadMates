@@ -250,7 +250,7 @@ describe("host session record API", () => {
       ["GET", "/api/bff/api/host/capabilities?clubSlug=reading-sai"],
       [
         "GET",
-        "/api/bff/api/host/sessions?search=Moby+Dick&state=CLOSED&recordStatus=INCOMPLETE&needsAttention=true&limit=50&cursor=ledger+page&clubSlug=reading-sai",
+        "/api/bff/api/host/sessions?mode=record&search=Moby+Dick&recordStatus=INCOMPLETE&needsAttention=true&limit=50&cursor=ledger+page&clubSlug=reading-sai",
       ],
       ["POST", "/api/bff/api/host/sessions/session%2F28/record-apply-preview?clubSlug=reading-sai"],
       [

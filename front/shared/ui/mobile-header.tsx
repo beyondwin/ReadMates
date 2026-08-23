@@ -212,8 +212,12 @@ function publicTitle(pathname: string, publicBasePath = "") {
 }
 
 function appTitle(variant: Exclude<MobileHeaderVariant, "guest">, pathname: string) {
-  if (variant === "host" && pathname === "/app/host/sessions") {
+  if (variant === "host" && pathname === "/app/host/records") {
     return "기록";
+  }
+
+  if (variant === "host" && pathname === "/app/host/sessions") {
+    return "모임";
   }
 
   if (
@@ -307,8 +311,12 @@ function appBackTarget(
     return null;
   }
 
+  if (pathname === "/app/host/records") {
+    return null;
+  }
+
   if (pathname.startsWith("/app/host/sessions/")) {
-    return { href: "/app/host", label: "오늘", icon: "brand" };
+    return { href: "/app/host/sessions", label: "모임", icon: "brand" };
   }
 
   if (pathname.startsWith("/app/feedback/") && pathname.endsWith("/print")) {

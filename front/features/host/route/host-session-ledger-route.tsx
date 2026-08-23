@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { useLoaderData, useParams, useSearchParams } from "react-router";
+import { useLoaderData, useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import type { HostSessionRecordLedgerPage, HostSessionTrashPage } from "@/features/host/api/host-contracts";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
@@ -46,10 +46,19 @@ export function HostSessionLedgerRoute({
   const { clubSlug } = useParams<{ clubSlug: string }>();
   const context = useMemo(() => ({ clubSlug }), [clubSlug]);
   const queryClient = useQueryClient();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const [searchParams, setSearchParams] = useSearchParams();
   const filters = useMemo(
-    () => normalizeHostSessionLedgerFilters(searchParams),
-    [searchParams],
+    () => {
+      const params = new URLSearchParams(searchParams);
+      if (/\/host\/records\/?$/.test(location.pathname)) {
+        params.delete("view");
+      }
+      return normalizeHostSessionLedgerFilters(params);
+    },
+    [location.pathname, searchParams],
   );
   const trashView = filters.view === "trash";
   const firstRequest = useMemo(
@@ -81,6 +90,9 @@ export function HostSessionLedgerRoute({
   } | null>(null);
   const [loadingMore, setLoadingMore] = useState(false);
   const [loadMoreError, setLoadMoreError] = useState<string | null>(null);
+  const [listAnnouncement, setListAnnouncement] = useState<string | null>(null);
+  const [focusHeadingRevision, setFocusHeadingRevision] = useState(0);
+  const previousFocusRevision = useRef(0);
   const [restoreState, setRestoreState] = useState<Record<string, Partial<HostSessionLedgerTrashItem>>>({});
   const visiblePage = basePage && appended?.base === basePage
     ? {
@@ -99,6 +111,7 @@ export function HostSessionLedgerRoute({
     setAppended(null);
     setTrashAppended(null);
     setLoadMoreError(null);
+    setListAnnouncement(null);
     setRestoreState({});
     const canonical = toHostSessionLedgerSearch(next);
     setSearchParams(canonical.startsWith("?") ? canonical.slice(1) : "", { replace: true });
@@ -147,12 +160,28 @@ export function HostSessionLedgerRoute({
         items: [...(current?.base === basePage ? current.items : []), ...nextPage.items],
         nextCursor: nextPage.nextCursor,
       }));
-    } catch {
-      setLoadMoreError("더 불러오지 못했습니다.");
+    } catch (error) {
+      if (isReadmatesApiError(error) && error.code === "LIST_CURSOR_STALE") {
+        setAppended(null);
+        setLoadMoreError(null);
+        setListAnnouncement("목록이 바뀌어 처음부터 다시 불러왔습니다.");
+        setFocusHeadingRevision((revision) => revision + 1);
+        await navigate(`${location.pathname}${location.search}`, { replace: true });
+        await query.refetch();
+      } else {
+        setLoadMoreError("더 불러오지 못했습니다.");
+      }
     } finally {
       setLoadingMore(false);
     }
   };
+
+  useEffect(() => {
+    if (focusHeadingRevision > previousFocusRevision.current) {
+      headingRef.current?.focus();
+    }
+    previousFocusRevision.current = focusHeadingRevision;
+  }, [focusHeadingRevision]);
 
   const openSessionHref = (openSessionId: string) => {
     const href = hostMeetingHref(openSessionId);
@@ -227,18 +256,19 @@ export function HostSessionLedgerRoute({
     <main style={{ minWidth: 0 }}>
       <section className="page-header-compact">
         <div className="container">
-          <div className="eyebrow">운영 · 모임 기록</div>
-          <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-            {trashView ? "휴지통" : "모임 기록 장부"}
+          <div className="eyebrow">호스트 · 기록</div>
+          <h1 ref={headingRef} tabIndex={-1} className="h1 editorial" style={{ margin: "6px 0 4px" }}>
+            {trashView ? "휴지통" : "기록"}
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
             {trashView
               ? "삭제된 모임을 서버가 정한 기간 동안 복원할 수 있습니다."
-              : "과거와 예정 모임의 기록 상태, 초안, 공개 범위를 한곳에서 확인합니다."}
+              : "마친 모임의 기록 상태, 초안, 공개 범위를 한곳에서 확인합니다."}
           </p>
         </div>
       </section>
       <section className="container" style={{ paddingTop: 8, paddingBottom: 72, minWidth: 0 }}>
+        <p className="sr-only" role="status" aria-live="polite">{listAnnouncement}</p>
         <HostSessionLedger
           items={visiblePage?.items ?? []}
           trashItems={trashItems}
@@ -263,8 +293,8 @@ export function HostSessionLedgerRoute({
           onRetryRestore={(sessionId) => {
             void restoreTrashItem(sessionId);
           }}
-          trashHref="?view=trash"
-          activeHref="/app/host/sessions"
+          trashHref="/app/host/sessions?view=trash"
+          activeHref="/app/host/records"
           LinkComponent={LinkComponent}
         />
       </section>

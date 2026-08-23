@@ -57,8 +57,7 @@ describe("HostSessionLedger", () => {
     await user.click(screen.getByRole("button", { name: "검색" }));
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, search: "모비 딕" });
 
-    fireEvent.change(screen.getByRole("combobox", { name: "모임 상태" }), { target: { value: "CLOSED" } });
-    expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, state: "CLOSED" });
+    expect(screen.queryByRole("combobox", { name: "모임 상태" })).not.toBeInTheDocument();
     fireEvent.change(screen.getByRole("combobox", { name: "기록 상태" }), { target: { value: "INCOMPLETE" } });
     expect(onFiltersChange).toHaveBeenCalledWith({ ...filters, recordStatus: "INCOMPLETE" });
   });
@@ -84,10 +83,7 @@ describe("HostSessionLedger", () => {
     expect(mobileCard).toHaveStyle({ minWidth: "0", overflowWrap: "anywhere" });
     expect(screen.getAllByRole("link", { name: "No.28 초안 열기" })).toHaveLength(2);
     expect(screen.getAllByText("마지막 수정 2026.07.23 10:00")).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "새 모임 만들기" })).toHaveAttribute(
-      "href",
-      "/app/host/sessions/new",
-    );
+    expect(screen.queryByRole("link", { name: "새 모임 만들기" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "휴지통" })).toHaveAttribute("href", "?view=trash");
     expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
@@ -122,7 +118,7 @@ describe("HostSessionLedger", () => {
     expect(screen.queryByRole("searchbox")).not.toBeInTheDocument();
     expect(screen.queryByRole("combobox", { name: "모임 상태" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "새 모임 만들기" })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "모임 기록 장부" })).toHaveAttribute(
+    expect(screen.getByRole("link", { name: "기록 목록" })).toHaveAttribute(
       "href",
       "/app/host/sessions",
     );

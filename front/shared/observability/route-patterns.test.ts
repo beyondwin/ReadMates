@@ -38,6 +38,10 @@ describe("frontend route observability patterns", () => {
     expect(normalizeFrontendRoutePattern("/clubs/reading-sai/app/host/operations")).toBe(
       "/clubs/:slug/app/host/operations",
     );
+    expect(normalizeFrontendRoutePattern("/app/host/records")).toBe("/app/host/records");
+    expect(normalizeFrontendRoutePattern("/clubs/reading-sai/app/host/records")).toBe(
+      "/clubs/:slug/app/host/records",
+    );
     expect(normalizeFrontendRoutePattern("/admin/clubs/123e4567-e89b-12d3-a456-426614174000")).toBe(
       "/admin/clubs/:clubId",
     );

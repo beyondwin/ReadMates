@@ -476,6 +476,12 @@ export type NotificationTestMailAuditItem = {
 export type NotificationTestMailAuditPage = PagedResponse<NotificationTestMailAuditItem>;
 
 export type SessionRecordVisibility = "HOST_ONLY" | "MEMBER" | "PUBLIC";
+export type HostListMode = "meeting" | "record";
+
+export type HostListCursorFailure = {
+  code: "LIST_CURSOR_STALE";
+  restartHref: string;
+};
 
 export type HostSessionListItem = {
   sessionId: string;
@@ -967,6 +973,54 @@ export function parseSessionImportPreviewResponse(value: unknown): SessionImport
 }
 
 const sessionStateSchema = z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]);
+
+const HostSessionListItemSchema = z.object({
+  sessionId: z.string(),
+  sessionNumber: z.number().int().nonnegative(),
+  title: z.string(),
+  bookTitle: z.string(),
+  bookAuthor: z.string(),
+  bookImageUrl: z.string().nullable(),
+  date: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  locationLabel: z.string(),
+  state: sessionStateSchema,
+  visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]),
+  accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]).optional(),
+  siteVisibility: z.enum(["HIDDEN", "LISTED"]).optional(),
+  recordStatus: z.enum(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]),
+  needsAttention: z.boolean(),
+  hasDraft: z.boolean(),
+  liveRevision: z.number().int().nonnegative(),
+  draftRevision: z.number().int().positive().nullable(),
+  lastModifiedAt: z.string().nullable(),
+}).strict();
+
+const HostSessionListPageSchema = z.object({
+  items: z.array(HostSessionListItemSchema),
+  nextCursor: z.string().nullable(),
+  summary: z.object({
+    needsAttentionCount: z.number().int().nonnegative(),
+    incompletePublishedCount: z.number().int().nonnegative(),
+    draftCount: z.number().int().nonnegative(),
+  }).strict(),
+}).strict();
+
+export function parseHostSessionListPage(value: unknown, mode: HostListMode): HostSessionListPage {
+  const page = HostSessionListPageSchema.parse(value);
+  const allowedStates = mode === "meeting"
+    ? new Set<SessionState>(["DRAFT", "OPEN"])
+    : new Set<SessionState>(["CLOSED", "PUBLISHED"]);
+  if (page.items.some((item) => !allowedStates.has(item.state))) {
+    throw new z.ZodError([{
+      code: "custom",
+      path: ["items"],
+      message: `${mode} 목록에 반대 lifecycle 상태가 포함되었습니다.`,
+    }]);
+  }
+  return page as HostSessionListPage;
+}
 
 export const HostSessionTrashItemSchema = z.object({
   sessionId: z.string(),
