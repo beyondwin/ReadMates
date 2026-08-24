@@ -284,23 +284,7 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
     @Test
     @Timeout(30)
     fun `scheduled maintenance serializes an expired replay before current alias backfill`() {
-        val receiptId = UUID.randomUUID().toString()
-        insertAuditReceipt(receiptId)
-        val first =
-            inTransaction {
-                commandService(V1).claim(identity(), request()) as AdminCommandClaimResult.Claimed
-            }
-        inTransaction {
-            check(
-                commandService(V1).complete(
-                    claimId = first.claimId,
-                    claimToken = first.claimToken,
-                    receiptType = "platform-audit-event",
-                    receiptId = receiptId,
-                ),
-            )
-        }
-        clock.instantValue = NOW.plus(Duration.ofDays(8))
+        val fixture = insertCompletedExpiredClaim()
 
         val identityProperties = identityProperties(V2, V1, previousKeyConfigured = true)
         val maintenanceLocked = CountDownLatch(1)
@@ -337,7 +321,7 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
             assertThat(replay.get(10, TimeUnit.SECONDS)).isInstanceOf(AdminCommandClaimResult.Claimed::class.java)
             assertThat(count("platform_admin_command_idempotency_keys", "digest_key_version = $V1")).isZero()
             assertThat(count("platform_admin_command_idempotency_keys", "digest_key_version = $V2")).isEqualTo(1)
-            assertThat(count("platform_audit_events", "id = '$receiptId'")).isEqualTo(1)
+            assertThat(count("platform_audit_events", "id = '${fixture.receiptId}'")).isEqualTo(1)
         } finally {
             releaseMaintenance.countDown()
             executor.shutdownNow()
@@ -347,23 +331,7 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
     @Test
     @Timeout(30)
     fun `expired replay locks key state before claim and makes scheduled maintenance wait`() {
-        val receiptId = UUID.randomUUID().toString()
-        insertAuditReceipt(receiptId)
-        val first =
-            inTransaction {
-                commandService(V1).claim(identity(), request()) as AdminCommandClaimResult.Claimed
-            }
-        inTransaction {
-            check(
-                commandService(V1).complete(
-                    claimId = first.claimId,
-                    claimToken = first.claimToken,
-                    receiptType = "platform-audit-event",
-                    receiptId = receiptId,
-                ),
-            )
-        }
-        clock.instantValue = NOW.plus(Duration.ofDays(8))
+        val fixture = insertCompletedExpiredClaim()
 
         val identityProperties = identityProperties(V2, V1, previousKeyConfigured = true)
         val replayStateLocked = CountDownLatch(1)
@@ -394,7 +362,7 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
                     }
                 }
             assertThat(replayStateLocked.await(10, TimeUnit.SECONDS)).isTrue()
-            assertClaimAndAliasAreUnlocked(first.claimId)
+            assertClaimAndAliasAreUnlocked(fixture.claimId)
 
             val maintenance =
                 executor.submit<Int> {
@@ -410,13 +378,13 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
 
             assertThat(maintenanceLocked.await(10, TimeUnit.SECONDS)).isTrue()
             assertThat(replay.get(10, TimeUnit.SECONDS))
-                .isEqualTo(AdminCommandClaimResult.Completed("platform-audit-event", receiptId))
+                .isEqualTo(AdminCommandClaimResult.Completed("platform-audit-event", fixture.receiptId))
             assertThat(count("platform_admin_command_idempotency_keys", "digest_key_version = $V2")).isEqualTo(1)
             releaseMaintenance.countDown()
 
             assertThat(maintenance.get(10, TimeUnit.SECONDS)).isEqualTo(1)
             assertThat(count("platform_admin_command_idempotency_keys", "digest_key_version in ($V1, $V2)")).isZero()
-            assertThat(count("platform_audit_events", "id = '$receiptId'")).isEqualTo(1)
+            assertThat(count("platform_audit_events", "id = '${fixture.receiptId}'")).isEqualTo(1)
         } finally {
             releaseReplay.countDown()
             releaseMaintenance.countDown()
@@ -427,8 +395,7 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
     @Test
     @Timeout(30)
     fun `drain mode duplicate loser and maintenance preserve global key state order`() {
-        assertThat(inTransaction { retirementService().assess(V1) }.outcome)
-            .isEqualTo(AdminCommandDigestKeyRetirementOutcome.BUFFER_PENDING)
+        startRetirementBuffer(V1)
         val identityProperties = identityProperties(V2, V1, previousKeyConfigured = true)
         val emptyLookupComplete = CountDownLatch(1)
         val releaseEmptyLookup = CountDownLatch(1)
@@ -660,6 +627,32 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
         )
     }
 
+    private fun insertCompletedExpiredClaim(): ExpiredClaimFixture {
+        val receiptId = UUID.randomUUID().toString()
+        insertAuditReceipt(receiptId)
+        val claim =
+            inTransaction {
+                commandService(V1).claim(identity(), request()) as AdminCommandClaimResult.Claimed
+            }
+        inTransaction {
+            check(
+                commandService(V1).complete(
+                    claimId = claim.claimId,
+                    claimToken = claim.claimToken,
+                    receiptType = "platform-audit-event",
+                    receiptId = receiptId,
+                ),
+            )
+        }
+        clock.instantValue = NOW.plus(Duration.ofDays(8))
+        return ExpiredClaimFixture(claim.claimId, receiptId)
+    }
+
+    private fun startRetirementBuffer(version: Int) {
+        assertThat(inTransaction { retirementService().assess(version) }.outcome)
+            .isEqualTo(AdminCommandDigestKeyRetirementOutcome.BUFFER_PENDING)
+    }
+
     private fun count(
         table: String,
         predicate: String,
@@ -704,6 +697,11 @@ class AdminCommandDigestKeyRetirementConcurrencyTest(
         fun key(version: Int) = "test-admin-command-task4-key-$version"
     }
 }
+
+private data class ExpiredClaimFixture(
+    val claimId: UUID,
+    val receiptId: String,
+)
 
 private class Task4MutableClock(
     var instantValue: Instant,

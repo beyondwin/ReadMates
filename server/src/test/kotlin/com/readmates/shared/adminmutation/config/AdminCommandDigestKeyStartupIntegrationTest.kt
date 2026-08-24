@@ -132,13 +132,15 @@ class AdminCommandDigestKeyStartupIntegrationTest(
     @Test
     fun `reference query failure aborts startup`() {
         jdbcTemplate.execute(
-            "rename table platform_admin_command_digest_key_state to platform_admin_command_digest_key_state_task4_broken",
+            "rename table platform_admin_command_digest_key_state " +
+                "to platform_admin_command_digest_key_state_task4_broken",
         )
         try {
             assertStartupRejected(previousKey = "", previousVersion = 0, queryFailure = true)
         } finally {
             jdbcTemplate.execute(
-                "rename table platform_admin_command_digest_key_state_task4_broken to platform_admin_command_digest_key_state",
+                "rename table platform_admin_command_digest_key_state_task4_broken " +
+                    "to platform_admin_command_digest_key_state",
             )
         }
     }
@@ -154,7 +156,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
         if (queryFailure) {
             assertThat(failure.stackTraceToString())
                 .contains(
-                    "JdbcAdminCommandIdempotencyAdapter.lockDigestKeyStates",
+                    "AdminCommandDigestKeyStartupValidator.afterSingletonsInstantiated",
                     "platform_admin_command_digest_key_state",
                 )
             assertThat(
@@ -289,7 +291,10 @@ class AdminCommandDigestKeyStartupIntegrationTest(
             String::class.java,
         )
 
-    private fun <T> withFreshDatabase(block: (MySQLContainer) -> T): T = FreshStartupMySqlContainer().apply { start() }.use(block)
+    private fun <T> withFreshDatabase(block: (MySQLContainer) -> T): T {
+        val database = FreshStartupMySqlContainer().apply { start() }
+        return database.use(block)
+    }
 
     private companion object {
         val NOW: Instant = Instant.now().minusSeconds(1)

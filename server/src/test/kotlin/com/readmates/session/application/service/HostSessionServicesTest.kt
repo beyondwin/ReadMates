@@ -89,6 +89,7 @@ import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.Isolated
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.dao.DataIntegrityViolationException
@@ -99,6 +100,7 @@ import java.util.UUID
 import kotlin.reflect.full.primaryConstructor
 
 @Suppress("LargeClass")
+@Isolated
 class HostSessionServicesTest {
     @Test
     fun `correction publisher is a mandatory production dependency`() {

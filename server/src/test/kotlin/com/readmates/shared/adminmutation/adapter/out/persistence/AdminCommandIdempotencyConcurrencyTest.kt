@@ -171,7 +171,8 @@ class AdminCommandIdempotencyConcurrencyTest(
 
         assertThatThrownBy {
             inTransaction {
-                val claimed = service(currentVersion = V1).claim(identity(), request()) as AdminCommandClaimResult.Claimed
+                val claimed =
+                    service(currentVersion = V1).claim(identity(), request()) as AdminCommandClaimResult.Claimed
                 insertDomainEvidence(receiptId)
                 service(currentVersion = V1).complete(
                     claimed.claimId,

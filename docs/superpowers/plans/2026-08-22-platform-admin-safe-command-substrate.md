@@ -293,15 +293,22 @@ The DB-backed check runs in one transaction. It locks `platform_admin_command_di
 
 **Files:**
 - Modify only if operator behavior changes: `CHANGELOG.md`
+- Modify verification-led, behavior-preserving refactors if full gates expose quality or flake failures:
+  `server/src/main/kotlin/com/readmates/shared/adminmutation/**`,
+  `server/src/test/kotlin/com/readmates/{architecture,auth,session,shared/adminmutation}/**`, and the directly exercised
+  `scripts/verify-local-*-fixtures.sh` harnesses. Do not weaken Detekt baselines, approved architecture seeds, migration
+  immutability, transaction/savepoint semantics, lock ordering, validation defaults/messages, or product assertions.
 
-- [ ] **Step 1: Run focused tests repeatedly.** Run the Task 2–4 unit and integration commands three times; expected deterministic PASS with no flaky concurrency result.
-- [ ] **Step 2: Run MySQL and server gates.**
+- [x] **Step 1: Run focused tests repeatedly.** Run the Task 2–4 unit and integration commands three times; expected deterministic PASS with no flaky concurrency result.
+- [x] **Step 2: Run MySQL and server gates.**
 
   Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandIdempotencyConcurrencyTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandDigestKeyRetirementConcurrencyTest --tests com.readmates.shared.adminmutation.config.AdminCommandDigestKeyStartupIntegrationTest`
 
   Run: `./scripts/server-ci-check.sh`
 
   Expected: PASS.
-- [ ] **Step 3: Inspect data/log safety.** Search migration, model, DTO, logs, and captured SQL parameters for raw `reason|email|idempotencyKey|canonicalRequest`; only in-memory names and redacted HMAC columns may remain.
-- [ ] **Step 4: Run hygiene.** Run: `git diff --check` and `python3 scripts/agent-preflight.py --paths server/src/main/kotlin/com/readmates/shared/adminmutation --paths server/src/main/resources/db/mysql/migration/V57__platform_admin_command_idempotency.sql`; expected no errors.
-- [ ] **Step 5: Commit acceptance-only changes if any.** Commit: `test(server): verify admin command substrate`
+- [x] **Step 3: Inspect data/log safety.** Search migration, model, DTO, logs, and captured SQL parameters for raw `reason|email|idempotencyKey|canonicalRequest`; only in-memory names and redacted HMAC columns may remain.
+- [x] **Step 4: Run hygiene.** Run: `git diff --check` and `python3 scripts/agent-preflight.py --paths server/src/main/kotlin/com/readmates/shared/adminmutation --paths server/src/main/resources/db/mysql/migration/V57__platform_admin_command_idempotency.sql`; expected no errors.
+- [x] **Step 5: Commit acceptance-only changes if any.** Commit: `test(server): verify admin command substrate`
+
+Acceptance evidence (2026-08-24): Task 2–4 focused unit and MySQL suites passed three fresh rounds. The combined V57 Flyway, claim, retirement, and post-Flyway startup suite passed 52 tests; `server-ci-check.sh` passed 1,708 unit tests (1 skipped), 102 architecture tests, Detekt, ktlint, and JaCoCo. Because the Detekt baseline and approved architecture seeds are frozen/non-growing acceptance contracts, exposed quality findings were resolved through responsibility-splitting refactors instead of suppression. Those refactors split the JDBC protocol/store helpers and architecture inventory without changing transaction/savepoint/lock contracts, retained config defaults and failure messages, isolated the shared-Logback test harness, and kept migration/baseline/approved seeds immutable. Local/deploy/scanner fixtures, Actionlint, shell syntax/static analysis, raw-payload scans, public-release candidate/gitleaks, and `git diff --check` passed; agent preflight completed and classified the expected server/scripts surfaces. One pre-final combined run lost its local Testcontainers MySQL process with exit 137; after stopping stale Gradle daemons, the final no-daemon combined run passed without a product-code change.

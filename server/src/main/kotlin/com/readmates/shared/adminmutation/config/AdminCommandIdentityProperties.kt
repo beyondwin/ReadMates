@@ -58,18 +58,14 @@ data class AdminCommandIdentityProperties(
     }
 
     private fun validateKeyVersions() {
-        if (currentKeyVersion < 0 || previousKeyVersion < 0) {
-            throw IllegalStateException("readmates.admin.command-identity key versions must be non-negative")
+        check(currentKeyVersion >= 0 && previousKeyVersion >= 0) {
+            "readmates.admin.command-identity key versions must be non-negative"
         }
-        if (currentKeyVersion == previousKeyVersion) {
-            throw IllegalStateException(
-                "readmates.admin.command-identity current and previous key versions must differ",
-            )
+        check(currentKeyVersion != previousKeyVersion) {
+            "readmates.admin.command-identity current and previous key versions must differ"
         }
-        if (writePreviousAlias && previousKey.isBlank()) {
-            throw IllegalStateException(
-                "readmates.admin.command-identity.write-previous-alias requires previous-key",
-            )
+        check(!writePreviousAlias || previousKey.isNotBlank()) {
+            "readmates.admin.command-identity.write-previous-alias requires previous-key"
         }
     }
 

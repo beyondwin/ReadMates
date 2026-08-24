@@ -131,7 +131,7 @@ if invalid_alias_output="$({
   PATH="$fixture_root/bin:$PATH" \
     READMATES_OBSERVABILITY_LOCAL_SMOKE_CONFIG_DRY_RUN=true \
     READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="$admin_digest_sentinel" \
-    READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY= \
+    READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY='' \
     READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=true \
     "$repo_root/scripts/observability-local-smoke.sh"
 } 2>&1)"; then

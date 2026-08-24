@@ -298,7 +298,10 @@ class PlatformAdminBffSecurityHarnessConfiguration {
     ) = SessionCookieAuthenticationFilter(sessions, principals, clubs)
 
     @Bean
-    fun platformAdminAuthoritiesFilter(currentMembers: ResolveCurrentMemberUseCase) = PlatformAdminAuthoritiesFilter(currentMembers)
+    fun platformAdminAuthoritiesFilter(currentMembers: ResolveCurrentMemberUseCase): PlatformAdminAuthoritiesFilter {
+        val filter = PlatformAdminAuthoritiesFilter(currentMembers)
+        return filter
+    }
 
     @Bean
     fun memberAuthoritiesFilter(
@@ -400,7 +403,11 @@ class PlatformAdminSecurityIdentities {
             )
         }
 
-    fun user(userId: String): CurrentUser? = UUID.fromString(userId).takeIf { it == sessionUserId }?.let { CurrentUser(it, EMAIL) }
+    fun user(userId: String): CurrentUser? =
+        UUID
+            .fromString(userId)
+            .takeIf { it == sessionUserId }
+            ?.let { CurrentUser(it, EMAIL) }
 
     fun platformAdmin(userId: UUID): CurrentPlatformAdmin? {
         platformAdminLookups += userId

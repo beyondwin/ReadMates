@@ -177,7 +177,10 @@ class AdminCommandIdempotencyServiceTest {
         object : CanonicalAdminCommandRequest {
             override val schemaVersion: String = "club-create:v1"
 
-            override fun canonicalFields(): List<Pair<String, String>> = listOf("reason" to SENSITIVE_REASON, "email" to SENSITIVE_EMAIL)
+            override fun canonicalFields(): List<Pair<String, String>> {
+                val fields = listOf("reason" to SENSITIVE_REASON, "email" to SENSITIVE_EMAIL)
+                return fields
+            }
         }
 
     private fun withinTransaction(block: () -> Unit) {

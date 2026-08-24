@@ -96,7 +96,7 @@ class AdminCommandIdentityService(
         key: ByteArray,
         digestKeyVersion: Int,
     ): AdminCommandDigest {
-        val schemaVersion = requireToken(nfc(request.schemaVersion), SCHEMA_VERSION)
+        val schemaVersion = requireToken(normalizeNfc(request.schemaVersion), SCHEMA_VERSION)
         val fields = canonicalizeFields(request.canonicalFields())
         val digest =
             AdminCommandDigest(
@@ -129,14 +129,14 @@ class AdminCommandIdentityService(
     private fun canonicalizeIdentity(identity: PlatformAdminCommandIdentity): CanonicalIdentity =
         CanonicalIdentity(
             platformAdminUserId = identity.platformAdminUserId,
-            commandType = requireToken(nfc(identity.commandType).lowercase(Locale.ROOT), COMMAND_TYPE),
-            targetType = requireToken(nfc(identity.targetType).lowercase(Locale.ROOT), TARGET_TYPE),
+            commandType = requireToken(normalizeNfc(identity.commandType).lowercase(Locale.ROOT), COMMAND_TYPE),
+            targetType = requireToken(normalizeNfc(identity.targetType).lowercase(Locale.ROOT), TARGET_TYPE),
             targetId = canonicalizeTargetId(identity.targetId),
-            idempotencyKey = requireToken(nfc(identity.idempotencyKey), IDEMPOTENCY_KEY),
+            idempotencyKey = requireToken(normalizeNfc(identity.idempotencyKey), IDEMPOTENCY_KEY),
         )
 
     private fun canonicalizeTargetId(value: String): String {
-        val normalized = nfc(value)
+        val normalized = normalizeNfc(value)
         if (normalized.lowercase(Locale.ROOT) == ADMIN_COMMAND_SYNTHETIC_TARGET_NEW_CLUB) {
             return ADMIN_COMMAND_SYNTHETIC_TARGET_NEW_CLUB
         }
@@ -152,11 +152,11 @@ class AdminCommandIdentityService(
     private fun canonicalizeFields(fields: List<Pair<String, String>>): List<Pair<String, String>> {
         val normalized =
             fields.map { field ->
-                val name = nfc(field.first)
+                val name = normalizeNfc(field.first)
                 if (name.isEmpty()) {
                     throw InvalidAdminCommandIdentityException()
                 }
-                name to nfc(field.second)
+                name to normalizeNfc(field.second)
             }
         if (normalized.map { field -> field.first }.distinct().size != normalized.size) {
             throw InvalidAdminCommandIdentityException()
@@ -203,8 +203,6 @@ class AdminCommandIdentityService(
         return value
     }
 
-    private fun nfc(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFC)
-
     private data class CanonicalIdentity(
         val platformAdminUserId: UUID,
         val commandType: String,
@@ -250,3 +248,5 @@ class AdminCommandIdentityService(
         private val IDEMPOTENCY_KEY = Regex("^[A-Za-z0-9._-]{8,128}$")
     }
 }
+
+private fun normalizeNfc(value: String): String = Normalizer.normalize(value, Normalizer.Form.NFC)

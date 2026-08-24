@@ -7,6 +7,7 @@ import org.springframework.boot.sql.init.dependency.DependsOnDatabaseInitializat
 import org.springframework.stereotype.Component
 import org.springframework.transaction.support.TransactionTemplate
 import java.time.Clock
+import java.time.Instant
 
 @Component
 @DependsOnDatabaseInitialization
@@ -26,40 +27,56 @@ class AdminCommandDigestKeyStartupValidator(
 
     internal fun validateLocked(states: List<AdminCommandDigestKeyReferenceState>) {
         val now = clock.instant()
-        val configuredVersions =
-            buildSet {
-                if (identityProperties.currentKey.isNotBlank()) {
-                    add(identityProperties.currentKeyVersion)
-                }
-                if (identityProperties.previousKey.isNotBlank()) {
-                    add(identityProperties.previousKeyVersion)
-                }
-            }
+        val configuredVersions = configuredVersions()
         val statesByVersion = states.associateBy(AdminCommandDigestKeyReferenceState::digestKeyVersion)
         if (statesByVersion.size != states.size) {
             failClosed()
         }
-        states.forEach { state ->
-            val lastReferencedAt = state.lastReferencedAt
-            if (state.aliasCount > 0) {
-                if (state.digestKeyVersion !in configuredVersions || lastReferencedAt == null) {
-                    failClosed()
-                }
-                return@forEach
+        states.forEach { state -> validateState(state, configuredVersions, now) }
+        validateDeclaredRemovedVersion(statesByVersion, configuredVersions)
+    }
+
+    private fun configuredVersions(): Set<Int> =
+        buildSet {
+            if (identityProperties.currentKey.isNotBlank()) {
+                add(identityProperties.currentKeyVersion)
             }
-            if (state.digestKeyVersion in configuredVersions) {
-                if (lastReferencedAt == null) failClosed()
-                return@forEach
-            }
-            val unreferencedSince = state.unreferencedSince
-            if (lastReferencedAt == null ||
-                unreferencedSince == null ||
-                unreferencedSince.isBefore(lastReferencedAt) ||
-                now.isBefore(unreferencedSince.plus(idempotencyProperties.previousKeyRolloutBuffer))
-            ) {
-                failClosed()
+            if (identityProperties.previousKey.isNotBlank()) {
+                add(identityProperties.previousKeyVersion)
             }
         }
+
+    private fun validateState(
+        state: AdminCommandDigestKeyReferenceState,
+        configuredVersions: Set<Int>,
+        now: Instant,
+    ) {
+        val lastReferencedAt = state.lastReferencedAt
+        when {
+            state.aliasCount > 0 ->
+                if (state.digestKeyVersion !in configuredVersions || lastReferencedAt == null) failClosed()
+            state.digestKeyVersion in configuredVersions ->
+                if (lastReferencedAt == null) failClosed()
+            !hasRetirementEvidence(state, now) -> failClosed()
+        }
+    }
+
+    private fun hasRetirementEvidence(
+        state: AdminCommandDigestKeyReferenceState,
+        now: Instant,
+    ): Boolean {
+        val lastReferencedAt = state.lastReferencedAt
+        val unreferencedSince = state.unreferencedSince
+        return lastReferencedAt != null &&
+            unreferencedSince != null &&
+            !unreferencedSince.isBefore(lastReferencedAt) &&
+            !now.isBefore(unreferencedSince.plus(idempotencyProperties.previousKeyRolloutBuffer))
+    }
+
+    private fun validateDeclaredRemovedVersion(
+        statesByVersion: Map<Int, AdminCommandDigestKeyReferenceState>,
+        configuredVersions: Set<Int>,
+    ) {
         val declaredRemovedVersion =
             identityProperties.previousKeyVersion.takeIf {
                 identityProperties.previousKey.isBlank() && it > 0 && it !in configuredVersions
