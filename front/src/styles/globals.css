@@ -1613,6 +1613,65 @@ a.rm-recent-record__destination:hover {
   font-weight: 700;
 }
 
+.platform-admin-ai-ops__permission-note,
+.platform-admin-ai-ops__load-more {
+  justify-self: start;
+}
+
+.platform-admin-ai-command-dialog__header .h3,
+.platform-admin-ai-command-dialog__impact p,
+.platform-admin-ai-command-dialog__receipt p,
+.platform-admin-ai-command-dialog__notice p {
+  margin: 0;
+}
+
+.platform-admin-ai-command-dialog__impact,
+.platform-admin-ai-command-dialog__receipt,
+.platform-admin-ai-command-dialog__notice {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  background: var(--bg-sub);
+  padding: 14px;
+  overflow-wrap: anywhere;
+}
+
+.platform-admin-ai-command-dialog__impact ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.admin-modal-dialog__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.platform-admin-ai-job-detail {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.platform-admin-ai-job-detail > div {
+  display: grid;
+  grid-template-columns: minmax(88px, 0.35fr) minmax(0, 1fr);
+  gap: 12px;
+}
+
+.platform-admin-ai-job-detail dt {
+  color: var(--text-3);
+}
+
+.platform-admin-ai-job-detail dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
 .platform-admin-work-queue__row {
   grid-template-columns: minmax(0, 1fr) auto;
   border: 1px solid var(--line);
@@ -6060,6 +6119,24 @@ a.rm-recent-record__destination:hover {
 
   .platform-admin-ai-ops__job {
     display: grid;
+  }
+
+  .platform-admin-ai-ops__job-actions,
+  .admin-modal-dialog__actions {
+    display: grid;
+    justify-content: stretch;
+    width: 100%;
+  }
+
+  .platform-admin-ai-ops__job-actions .btn,
+  .platform-admin-ai-ops__load-more {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .platform-admin-ai-job-detail > div {
+    grid-template-columns: 1fr;
+    gap: 2px;
   }
 
   .platform-admin-work-queue__row {

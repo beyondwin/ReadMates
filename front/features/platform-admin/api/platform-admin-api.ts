@@ -7,13 +7,16 @@ import {
   parsePlatformAdminDomainCommandPreview,
   parsePlatformAdminOnboardingPreview,
   parsePlatformAdminOnboardingResult,
+  parsePlatformAdminAiOpsCommandPreview,
+  parsePlatformAdminAiOpsCommandReceipt,
+  type ConfirmPlatformAdminAiOpsCommandRequest,
   type ConfirmPlatformAdminClubVisibilityRequest,
   type ConfirmPlatformAdminDomainRequest,
   type ConfirmPlatformAdminOnboardingRequest,
   CreateSupportAccessGrantRequest,
   PlatformAdminAiGenerationCapabilitiesResponse,
-  PlatformAdminAiOpsActionResponse,
   PlatformAdminAiOpsFilters,
+  PlatformAdminAiOpsJob,
   PlatformAdminAiOpsJobListResponse,
   PlatformAdminAiOpsSummaryResponse,
   PlatformAdminClubCommandReceipt,
@@ -239,18 +242,48 @@ export function fetchPlatformAdminAiOpsJobs(
   );
 }
 
-export function forceCancelPlatformAdminAiJob(jobId: string) {
-  return readmatesFetch<PlatformAdminAiOpsActionResponse>(
-    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/force-cancel`,
-    { method: "POST" },
+export function fetchPlatformAdminAiOpsJob(jobId: string) {
+  return readmatesFetch<PlatformAdminAiOpsJob>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}`,
+    undefined,
     { clubSlug: undefined },
   );
 }
 
-export function retryCommitPlatformAdminAiJob(jobId: string) {
-  return readmatesFetch<PlatformAdminAiOpsActionResponse>(
-    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/retry-commit`,
+export function previewForceCancelPlatformAdminAiJob(jobId: string) {
+  return readmatesFetch<unknown>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/force-cancel/preview`,
     { method: "POST" },
     { clubSlug: undefined },
-  );
+  ).then(parsePlatformAdminAiOpsCommandPreview);
+}
+
+export function previewRetryCommitPlatformAdminAiJob(jobId: string) {
+  return readmatesFetch<unknown>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/retry-commit/preview`,
+    { method: "POST" },
+    { clubSlug: undefined },
+  ).then(parsePlatformAdminAiOpsCommandPreview);
+}
+
+export function confirmForceCancelPlatformAdminAiJob(
+  jobId: string,
+  request: ConfirmPlatformAdminAiOpsCommandRequest,
+) {
+  return readmatesFetch<unknown>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/force-cancel/confirm`,
+    { method: "POST", body: JSON.stringify(request) },
+    { clubSlug: undefined },
+  ).then(parsePlatformAdminAiOpsCommandReceipt);
+}
+
+export function confirmRetryCommitPlatformAdminAiJob(
+  jobId: string,
+  request: ConfirmPlatformAdminAiOpsCommandRequest,
+) {
+  return readmatesFetch<unknown>(
+    `/api/admin/ai-generation/jobs/${encodeURIComponent(jobId)}/retry-commit/confirm`,
+    { method: "POST", body: JSON.stringify(request) },
+    { clubSlug: undefined },
+  ).then(parsePlatformAdminAiOpsCommandReceipt);
 }

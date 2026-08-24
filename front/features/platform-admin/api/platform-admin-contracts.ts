@@ -204,6 +204,40 @@ const PlatformAdminOnboardingResultSchema = import.meta.env.DEV
       .strict()
   : (null as never);
 
+const PlatformAdminAiOpsCommandPreviewSchema = import.meta.env.DEV
+  ? z
+      .object({
+        previewId: z.string().min(1),
+        jobId: z.string().min(1),
+        action: z.enum(["FORCE_CANCEL", "RETRY_COMMIT"]),
+        jobStatus: z.string().min(1),
+        jobRevision: z.number().int().nonnegative(),
+        effectType: z.enum(["AI_JOB_CANCEL", "AI_COMMIT_RETRY"]),
+        impactCodes: z.array(z.string().min(1)),
+        expiresAt: z.string().min(1),
+        fingerprintPrefix: z.string().min(1),
+      })
+      .strict()
+  : (null as never);
+
+const PlatformAdminAiOpsCommandReceiptSchema = import.meta.env.DEV
+  ? z
+      .object({
+        receiptId: z.string().min(1),
+        previewId: z.string().min(1),
+        jobId: z.string().min(1),
+        action: z.enum(["FORCE_CANCEL", "RETRY_COMMIT"]),
+        beforeJobStatus: z.string().min(1),
+        beforeJobRevision: z.number().int().nonnegative(),
+        afterJobStatus: z.string().min(1),
+        afterJobRevision: z.number().int().nonnegative(),
+        originStatus: z.string().min(1),
+        effectStatus: z.string().min(1),
+        safeErrorCode: z.string().min(1).nullable(),
+      })
+      .strict()
+  : (null as never);
+
 export type PlatformAdminClubStatus = z.infer<typeof ClubLifecycleSchema>;
 export type PlatformAdminClubPublicVisibility = z.infer<
   typeof ClubVisibilitySchema
@@ -243,6 +277,12 @@ export type PlatformAdminOnboardingPreviewResponse = z.infer<
 >;
 export type PlatformAdminOnboardingResultResponse = z.infer<
   typeof PlatformAdminOnboardingResultSchema
+>;
+export type PlatformAdminAiOpsCommandPreviewResponse = z.infer<
+  typeof PlatformAdminAiOpsCommandPreviewSchema
+>;
+export type PlatformAdminAiOpsCommandReceiptResponse = z.infer<
+  typeof PlatformAdminAiOpsCommandReceiptSchema
 >;
 
 export type PlatformAdminClubListFilters = {
@@ -312,6 +352,13 @@ export type ConfirmPlatformAdminOnboardingRequest = {
   confirmed: boolean;
 } & PlatformAdminOnboardingCommandInput;
 
+export type ConfirmPlatformAdminAiOpsCommandRequest = {
+  previewId: string;
+  idempotencyKey: string;
+  expectedJobRevision: number;
+  confirmed: true;
+};
+
 function parseInDevelopment<T>(schema: z.ZodType<T>, value: unknown): T {
   return import.meta.env.DEV ? schema.parse(value) : (value as T);
 }
@@ -356,4 +403,16 @@ export function parsePlatformAdminOnboardingResult(
   value: unknown,
 ): PlatformAdminOnboardingResultResponse {
   return parseInDevelopment(PlatformAdminOnboardingResultSchema, value);
+}
+
+export function parsePlatformAdminAiOpsCommandPreview(
+  value: unknown,
+): PlatformAdminAiOpsCommandPreviewResponse {
+  return parseInDevelopment(PlatformAdminAiOpsCommandPreviewSchema, value);
+}
+
+export function parsePlatformAdminAiOpsCommandReceipt(
+  value: unknown,
+): PlatformAdminAiOpsCommandReceiptResponse {
+  return parseInDevelopment(PlatformAdminAiOpsCommandReceiptSchema, value);
 }

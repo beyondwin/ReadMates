@@ -1,17 +1,18 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.application.AiGenerationException
 import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsCostWindow
 import com.readmates.aigen.application.model.AiOpsJobFilters
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.port.`in`.ConfirmAiOpsAdminCommandUseCase
-import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
 import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
 import com.readmates.aigen.application.port.`in`.PreviewAiOpsAdminCommandUseCase
-import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
+import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformCapability
 import com.readmates.shared.security.toPlatformActor
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.web.bind.annotation.GetMapping
@@ -30,8 +31,6 @@ class AiGenerationOpsController(
     private val summaryUseCase: GetAiOpsSummaryUseCase,
     private val listUseCase: ListAiOpsJobsUseCase,
     private val getUseCase: GetAiOpsJobUseCase,
-    private val forceCancelUseCase: ForceCancelAiOpsJobUseCase,
-    private val retryCommitUseCase: RetryAiOpsJobCommitUseCase,
     private val previewAdminCommandUseCase: PreviewAiOpsAdminCommandUseCase,
     private val confirmAdminCommandUseCase: ConfirmAiOpsAdminCommandUseCase,
 ) {
@@ -72,13 +71,13 @@ class AiGenerationOpsController(
     fun forceCancel(
         admin: CurrentPlatformAdmin,
         @PathVariable jobId: UUID,
-    ): AiOpsAdminActionResponse = AiOpsAdminActionResponse.from(forceCancelUseCase.forceCancel(admin, jobId))
+    ): Nothing = requireSafeConfirm(admin, jobId)
 
     @PostMapping("/jobs/{jobId}/retry-commit")
     fun retryCommit(
         admin: CurrentPlatformAdmin,
         @PathVariable jobId: UUID,
-    ): AiOpsAdminActionResponse = AiOpsAdminActionResponse.from(retryCommitUseCase.retryCommit(admin, jobId))
+    ): Nothing = requireSafeConfirm(admin, jobId)
 
     @PostMapping("/jobs/{jobId}/force-cancel/preview")
     fun previewForceCancel(
@@ -127,4 +126,14 @@ class AiGenerationOpsController(
                 request.toCommand(),
             ),
         )
+
+    private fun requireSafeConfirm(
+        admin: CurrentPlatformAdmin,
+        jobId: UUID,
+    ): Nothing {
+        if (!admin.toPlatformActor().can(PlatformCapability.MANAGE_AI_OPERATIONS)) {
+            throw AccessDeniedException("Platform admin role cannot manage AI operations")
+        }
+        throw AiGenerationException.SafeOpsError(jobId, "SAFE_CONFIRM_REQUIRED")
+    }
 }

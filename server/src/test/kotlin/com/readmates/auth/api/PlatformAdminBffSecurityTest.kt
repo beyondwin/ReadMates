@@ -8,6 +8,7 @@ import com.readmates.admin.takedown.application.model.PublicTakedownException
 import com.readmates.admin.takedown.application.model.PublicTakedownPreview
 import com.readmates.admin.takedown.application.port.`in`.ConfirmPublicTakedownUseCase
 import com.readmates.admin.takedown.application.port.`in`.PreviewPublicTakedownUseCase
+import com.readmates.aigen.adapter.`in`.web.AiGenerationErrorHandler
 import com.readmates.aigen.adapter.`in`.web.AiGenerationOpsController
 import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsAdminCommandPreview
@@ -108,6 +109,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -126,10 +128,12 @@ import java.util.UUID
 class PlatformAdminBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val identities: PlatformAdminSecurityIdentities,
+    @param:Autowired private val aiCommandInvocations: PlatformAdminAiCommandInvocations,
 ) {
     @BeforeEach
     fun resetIdentities() {
         identities.reset()
+        aiCommandInvocations.reset()
     }
 
     @Test
@@ -265,10 +269,44 @@ class PlatformAdminBffSecurityTest(
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("legacyAiOneClickRoutes")
-    fun `legacy ai one click commands remain csrf protected`(route: ClubCommandRoute) {
+    fun `legacy ai one click commands return safe confirm required only after the full trust chain`(route: ClubCommandRoute) {
         identities.admin(PlatformAdminRole.OWNER)
 
+        commandRequest(route)
+            .andExpect(status().isGone)
+            .andExpect(jsonPath("$.code").value("SAFE_CONFIRM_REQUIRED"))
+        identities.admin(PlatformAdminRole.OPERATOR)
+        commandRequest(route)
+            .andExpect(status().isGone)
+            .andExpect(jsonPath("$.code").value("SAFE_CONFIRM_REQUIRED"))
+        identities.admin(PlatformAdminRole.OWNER)
+
+        listOf<String?>(null, "wrong-secret").forEach { secret ->
+            commandRequest(route, secret = secret).andExpect(status().isUnauthorized)
+        }
+        commandRequest(route, origin = "https://attacker.example").andExpect(status().isForbidden)
+        commandRequest(route, origin = null, referer = "https://attacker.example/path")
+            .andExpect(status().isForbidden)
+
+        identities.inactiveSession()
+        commandRequest(route).andExpect(status().isUnauthorized)
+        identities.nonAdmin()
         commandRequest(route).andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.SUPPORT)
+        commandRequest(route).andExpect(status().isForbidden)
+
+        assertThat(aiCommandInvocations.total()).isZero()
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("legacyAiOneClickRoutes")
+    fun `legacy ai method suffix and encoded slash near misses stay protected`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OWNER)
+
+        commandRequest(route, method = HttpMethod.PUT).andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}/near-miss").andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}%2Fnear-miss").andExpect(status().isBadRequest)
+        assertThat(aiCommandInvocations.total()).isZero()
     }
 
     private fun commandRequest(
@@ -433,6 +471,22 @@ data class ClubCommandRoute(
     override fun toString(): String = label
 }
 
+class PlatformAdminAiCommandInvocations {
+    var forceCancel: Int = 0
+    var retryCommit: Int = 0
+    var preview: Int = 0
+    var confirm: Int = 0
+
+    fun reset() {
+        forceCancel = 0
+        retryCommit = 0
+        preview = 0
+        confirm = 0
+    }
+
+    fun total(): Int = forceCancel + retryCommit + preview + confirm
+}
+
 @TestConfiguration(proxyBeanMethods = false)
 @EnableAutoConfiguration(exclude = [DataSourceAutoConfiguration::class, FlywayAutoConfiguration::class])
 @Import(
@@ -443,10 +497,14 @@ data class ClubCommandRoute(
     PlatformAdminController::class,
     PlatformAdminClubController::class,
     AiGenerationOpsController::class,
+    AiGenerationErrorHandler::class,
     PlatformAdminErrorHandler::class,
     SharedApplicationErrorHandler::class,
 )
 class PlatformAdminBffSecurityHarnessConfiguration {
+    @Bean
+    fun aiCommandInvocations() = PlatformAdminAiCommandInvocations()
+
     @Bean
     fun identities() = PlatformAdminSecurityIdentities()
 
@@ -618,13 +676,31 @@ class PlatformAdminBffSecurityHarnessConfiguration {
     fun aiOpsJob(): GetAiOpsJobUseCase = mock(GetAiOpsJobUseCase::class.java)
 
     @Bean
-    fun forceCancelAiOpsJob(): ForceCancelAiOpsJobUseCase = mock(ForceCancelAiOpsJobUseCase::class.java)
+    fun forceCancelAiOpsJob(invocations: PlatformAdminAiCommandInvocations): ForceCancelAiOpsJobUseCase =
+        object : ForceCancelAiOpsJobUseCase {
+            override fun forceCancel(
+                admin: CurrentPlatformAdmin,
+                jobId: UUID,
+            ): com.readmates.aigen.application.model.AiOpsAdminActionResult {
+                invocations.forceCancel += 1
+                error("legacy force cancel invoked")
+            }
+        }
 
     @Bean
-    fun retryAiOpsJobCommit(): RetryAiOpsJobCommitUseCase = mock(RetryAiOpsJobCommitUseCase::class.java)
+    fun retryAiOpsJobCommit(invocations: PlatformAdminAiCommandInvocations): RetryAiOpsJobCommitUseCase =
+        object : RetryAiOpsJobCommitUseCase {
+            override fun retryCommit(
+                admin: CurrentPlatformAdmin,
+                jobId: UUID,
+            ): com.readmates.aigen.application.model.AiOpsAdminActionResult {
+                invocations.retryCommit += 1
+                error("legacy retry commit invoked")
+            }
+        }
 
     @Bean
-    fun previewAiOpsAdminCommand(): PreviewAiOpsAdminCommandUseCase =
+    fun previewAiOpsAdminCommand(invocations: PlatformAdminAiCommandInvocations): PreviewAiOpsAdminCommandUseCase =
         object : PreviewAiOpsAdminCommandUseCase {
             override fun previewAdminCommand(
                 admin: PlatformActor,
@@ -632,6 +708,7 @@ class PlatformAdminBffSecurityHarnessConfiguration {
                 action: AiOpsAction,
             ): AiOpsAdminCommandPreview =
                 admin.withCapability(PlatformCapability.MANAGE_AI_OPERATIONS) {
+                    invocations.preview += 1
                     AiOpsAdminCommandPreview(
                         previewId = UUID.fromString("dddddddd-0000-4000-8000-000000060010"),
                         jobId = jobId,
@@ -652,7 +729,7 @@ class PlatformAdminBffSecurityHarnessConfiguration {
         }
 
     @Bean
-    fun confirmAiOpsAdminCommand(): ConfirmAiOpsAdminCommandUseCase =
+    fun confirmAiOpsAdminCommand(invocations: PlatformAdminAiCommandInvocations): ConfirmAiOpsAdminCommandUseCase =
         object : ConfirmAiOpsAdminCommandUseCase {
             override fun confirmAdminCommand(
                 admin: PlatformActor,
@@ -661,6 +738,7 @@ class PlatformAdminBffSecurityHarnessConfiguration {
                 command: ConfirmAiOpsAdminCommand,
             ): AiOpsAdminCommandReceipt =
                 admin.withCapability(PlatformCapability.MANAGE_AI_OPERATIONS) {
+                    invocations.confirm += 1
                     val status = if (action == AiOpsAction.FORCE_CANCEL) JobStatus.RUNNING else JobStatus.COMMIT_RETRY
                     AiOpsAdminCommandReceipt(
                         receiptId = UUID.fromString("dddddddd-0000-4000-8000-000000060011"),

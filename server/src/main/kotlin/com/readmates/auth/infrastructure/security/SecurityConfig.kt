@@ -135,6 +135,13 @@ class SecurityConfig(
                                 "(force-cancel|retry-commit)/(preview|confirm)$",
                         ),
                     ),
+                    methodAndPath(
+                        "POST",
+                        Regex(
+                            "^/api/admin/ai-generation/jobs/[^/]+/" +
+                                "(force-cancel|retry-commit)$",
+                        ),
+                    ),
                     methodAndPath("POST", Regex("^/api/admin/public-takedowns/(preview|confirm)$")),
                     methodAndPath(
                         "POST",

@@ -47,6 +47,20 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
     });
   });
 
+  await page.route("**/api/bff/api/admin/capabilities", async (route) => {
+    await json(route, 200, {
+      schemaVersion: 1,
+      role,
+      status: "ACTIVE",
+      capabilities: [
+        "VIEW_TODAY",
+        "VIEW_AI_OPERATIONS",
+        ...(role === "SUPPORT" ? [] : ["MANAGE_AI_OPERATIONS"]),
+      ],
+      generatedAt: "2026-08-25T00:00:00Z",
+    });
+  });
+
   await page.route("**/api/bff/api/admin/clubs", async (route) => {
     await json(route, 200, { items: [] });
   });
@@ -136,7 +150,7 @@ test("platform support can read AI Ops but cannot force cancel", async ({ page }
 
   await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
   await expect(page.getByText("Book")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Force cancel" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "강제 취소 검토" })).toHaveCount(0);
 });
 
 test("platform owner sees AI Ops action affordance when job is actionable", async ({ page }) => {
@@ -145,7 +159,7 @@ test("platform owner sees AI Ops action affordance when job is actionable", asyn
   await page.goto("/admin/ai-ops");
 
   await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Force cancel" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "강제 취소 검토" })).toBeVisible();
 });
 
 test("platform owner sees retry-commit affordance on a committing job", async ({ page }) => {
@@ -155,7 +169,7 @@ test("platform owner sees retry-commit affordance on a committing job", async ({
 
   await expect(page.getByText("Stuck Volume")).toBeVisible();
   await expect(page.getByText("revision 2 · cleanup pending")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Retry commit" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "커밋 복구 검토" })).toBeVisible();
 });
 
 test("platform support cannot retry-commit", async ({ page }) => {
@@ -164,7 +178,7 @@ test("platform support cannot retry-commit", async ({ page }) => {
   await page.goto("/admin/ai-ops");
 
   await expect(page.getByText("Stuck Volume")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Retry commit" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "커밋 복구 검토" })).toHaveCount(0);
 });
 
 test("cost window toggle updates the rendered trend", async ({ page }) => {

@@ -84,7 +84,12 @@ class AiGenerationErrorHandler {
     @ExceptionHandler(AiGenerationException.SafeOpsError::class)
     fun handleSafeOpsError(error: AiGenerationException.SafeOpsError): ResponseEntity<ProblemDetail> =
         problem(
-            status = if (error.code == "JOB_EXPIRED") HttpStatus.GONE else HttpStatus.CONFLICT,
+            status =
+                if (error.code == "JOB_EXPIRED" || error.code == "SAFE_CONFIRM_REQUIRED") {
+                    HttpStatus.GONE
+                } else {
+                    HttpStatus.CONFLICT
+                },
             code = error.code,
             detail = "AI Ops action is not available for job ${error.jobId}",
             type = PROBLEM_AI_OPS_ACTION,

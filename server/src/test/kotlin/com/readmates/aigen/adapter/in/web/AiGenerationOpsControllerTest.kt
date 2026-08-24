@@ -1,7 +1,6 @@
 package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.application.model.AiOpsAction
-import com.readmates.aigen.application.model.AiOpsAdminActionResult
 import com.readmates.aigen.application.model.AiOpsAdminCommandPreview
 import com.readmates.aigen.application.model.AiOpsAdminCommandReceipt
 import com.readmates.aigen.application.model.AiOpsCostTrend
@@ -19,12 +18,10 @@ import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.port.`in`.ConfirmAiOpsAdminCommandUseCase
-import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
 import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
 import com.readmates.aigen.application.port.`in`.PreviewAiOpsAdminCommandUseCase
-import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.PlatformActor
@@ -48,8 +45,6 @@ class AiGenerationOpsControllerTest {
     private val summary = FakeSummaryUseCase()
     private val list = FakeListUseCase()
     private val get = FakeGetUseCase()
-    private val cancel = FakeForceCancelUseCase()
-    private val retry = FakeRetryCommitUseCase()
     private val safeCommands = FakeAiAdminCommands()
     private val admin =
         CurrentPlatformAdmin(
@@ -69,8 +64,6 @@ class AiGenerationOpsControllerTest {
                         summaryUseCase = summary,
                         listUseCase = list,
                         getUseCase = get,
-                        forceCancelUseCase = cancel,
-                        retryCommitUseCase = retry,
                         previewAdminCommandUseCase = safeCommands,
                         confirmAdminCommandUseCase = safeCommands,
                     ),
@@ -174,35 +167,29 @@ class AiGenerationOpsControllerTest {
     }
 
     @Test
-    fun `force cancel delegates to use case`() {
-        cancel.result = AiOpsAdminActionResult(sampleJobId, JobStatus.RUNNING, JobStatus.CANCELLED)
-
+    fun `legacy force cancel requires the safe confirm flow without invoking mutation`() {
         mockMvc
             .post("/api/admin/ai-generation/jobs/$sampleJobId/force-cancel")
             .andExpect {
-                status { isOk() }
-                jsonPath("$.jobId") { value(sampleJobId.toString()) }
-                jsonPath("$.previousStatus") { value("RUNNING") }
-                jsonPath("$.nextStatus") { value("CANCELLED") }
+                status { isGone() }
+                jsonPath("$.code") { value("SAFE_CONFIRM_REQUIRED") }
             }
 
-        assertThat(cancel.calls).containsExactly(admin to sampleJobId)
+        assertThat(safeCommands.previewCalls).isEmpty()
+        assertThat(safeCommands.confirmCalls).isEmpty()
     }
 
     @Test
-    fun `retry commit delegates to use case`() {
-        retry.result = AiOpsAdminActionResult(sampleJobId, JobStatus.COMMITTING, JobStatus.SUCCEEDED)
-
+    fun `legacy retry commit requires the safe confirm flow without invoking mutation`() {
         mockMvc
             .post("/api/admin/ai-generation/jobs/$sampleJobId/retry-commit")
             .andExpect {
-                status { isOk() }
-                jsonPath("$.jobId") { value(sampleJobId.toString()) }
-                jsonPath("$.previousStatus") { value("COMMITTING") }
-                jsonPath("$.nextStatus") { value("SUCCEEDED") }
+                status { isGone() }
+                jsonPath("$.code") { value("SAFE_CONFIRM_REQUIRED") }
             }
 
-        assertThat(retry.calls).containsExactly(admin to sampleJobId)
+        assertThat(safeCommands.previewCalls).isEmpty()
+        assertThat(safeCommands.confirmCalls).isEmpty()
     }
 
     @Test
@@ -375,32 +362,6 @@ private class FakeGetUseCase : GetAiOpsJobUseCase {
         admin: CurrentPlatformAdmin,
         jobId: UUID,
     ): AiOpsJobListItem = result
-}
-
-private class FakeForceCancelUseCase : ForceCancelAiOpsJobUseCase {
-    lateinit var result: AiOpsAdminActionResult
-    val calls = mutableListOf<Pair<CurrentPlatformAdmin, UUID>>()
-
-    override fun forceCancel(
-        admin: CurrentPlatformAdmin,
-        jobId: UUID,
-    ): AiOpsAdminActionResult {
-        calls += admin to jobId
-        return result
-    }
-}
-
-private class FakeRetryCommitUseCase : RetryAiOpsJobCommitUseCase {
-    lateinit var result: AiOpsAdminActionResult
-    val calls = mutableListOf<Pair<CurrentPlatformAdmin, UUID>>()
-
-    override fun retryCommit(
-        admin: CurrentPlatformAdmin,
-        jobId: UUID,
-    ): AiOpsAdminActionResult {
-        calls += admin to jobId
-        return result
-    }
 }
 
 private class StubCurrentPlatformAdminResolver(

@@ -41,6 +41,15 @@ async function routeShell(page: Page, role: PlatformAdminRole): Promise<void> {
       domainsRequiringAction: [],
     });
   });
+  await page.route("**/api/bff/api/admin/capabilities", async (route) => {
+    await json(route, 200, {
+      schemaVersion: 1,
+      role,
+      status: "ACTIVE",
+      capabilities: ["VIEW_TODAY", "VIEW_AI_OPERATIONS", "MANAGE_AI_OPERATIONS"],
+      generatedAt: "2026-08-25T00:00:00Z",
+    });
+  });
   await page.route("**/api/bff/api/admin/clubs", async (route) => {
     await json(route, 200, { items: [] });
   });
@@ -89,6 +98,10 @@ async function routeAiOps(page: Page): Promise<void> {
   });
   await page.route("**/api/bff/api/admin/ai-generation/jobs**", async (route) => {
     const url = new URL(route.request().url());
+    if (url.pathname.endsWith("/jobs/job-1")) {
+      await json(route, 200, job({ revision: 4 }));
+      return;
+    }
     const errorCode = url.searchParams.get("errorCode");
     const items = errorCode === "PROVIDER_RATE_LIMITED" ? [job({})] : [];
     await json(route, 200, { items, nextCursor: null });
@@ -109,6 +122,12 @@ test("owner drills from a failure code into the affected jobs", async ({ page })
   await expect(page).toHaveURL(/errorCode=PROVIDER_RATE_LIMITED/);
   await expect(page.getByText("Club One")).toBeVisible();
   await expect(page.getByRole("button", { name: "전체 보기" })).toBeVisible();
+
+  await page.getByRole("button", { name: "상세 보기" }).click();
+  await expect(page).toHaveURL(/jobId=job-1/);
+  await expect(page.getByRole("dialog", { name: "AI 작업 상세" })).toContainText("revision 4");
+  await page.getByRole("button", { name: "닫기" }).click();
+  await expect(page).not.toHaveURL(/jobId=/);
 
   await page.getByRole("button", { name: "전체 보기" }).click();
   await expect(page).not.toHaveURL(/errorCode=/);

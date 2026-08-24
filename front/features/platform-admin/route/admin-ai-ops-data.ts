@@ -8,7 +8,8 @@ import {
   EMPTY_AI_OPS_FILTER,
 } from "@/features/platform-admin/model/platform-admin-ai-ops-model";
 import {
-  platformAdminAiOpsJobsQuery,
+  platformAdminAiOpsJobQuery,
+  platformAdminAiOpsJobsInfiniteQuery,
   platformAdminAiOpsSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 
@@ -20,10 +21,14 @@ export function adminAiOpsLoaderFactory(queryClient: QueryClient) {
     const window = args
       ? aiOpsWindowFromSearchParams(new URL(args.request.url).searchParams)
       : AI_OPS_DEFAULT_WINDOW;
-    await Promise.all([
+    const queries: Promise<unknown>[] = [
       queryClient.fetchQuery(platformAdminAiOpsSummaryQuery(window)),
-      queryClient.fetchQuery(platformAdminAiOpsJobsQuery(aiOpsFilterToQuery(filter))),
-    ]);
+      queryClient.fetchInfiniteQuery(platformAdminAiOpsJobsInfiniteQuery(aiOpsFilterToQuery(filter))),
+    ];
+    if (filter.jobId) {
+      queries.push(queryClient.fetchQuery(platformAdminAiOpsJobQuery(filter.jobId)));
+    }
+    await Promise.allSettled(queries);
     return null;
   };
 }

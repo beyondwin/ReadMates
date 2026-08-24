@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import {
   PlatformAdminAiOps,
+  type PlatformAdminAiOpsCommandState,
   type PlatformAdminAiOpsJobView,
   type PlatformAdminAiOpsSummaryView,
 } from "@/features/platform-admin/ui/platform-admin-ai-ops";
@@ -53,6 +54,24 @@ const committingJob: PlatformAdminAiOpsJobView = {
   cleanupPending: true,
 };
 
+const reviewState: PlatformAdminAiOpsCommandState = {
+  phase: "REVIEW",
+  job: runningJob,
+  action: "FORCE_CANCEL",
+  idempotencyKey: "preview-1",
+  preview: {
+    previewId: "preview-1",
+    jobId: "job-1",
+    action: "FORCE_CANCEL",
+    jobStatus: "RUNNING",
+    jobRevision: 7,
+    effectType: "AI_JOB_CANCEL",
+    impactCodes: ["CANCEL_JOB", "DELETE_TRANSIENT_PAYLOAD"],
+    expiresAt: "2026-08-25T01:00:00Z",
+    fingerprintPrefix: "00112233",
+  },
+};
+
 describe("PlatformAdminAiOps", () => {
   it("shows safe aggregate and job metadata without raw content fields", () => {
     render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[runningJob]} />);
@@ -62,7 +81,7 @@ describe("PlatformAdminAiOps", () => {
     expect(within(section).getByText("2")).toBeInTheDocument();
     expect(within(section).getByText("$0.2000")).toBeInTheDocument();
     expect(within(section).getByText(/읽는사이/)).toBeInTheDocument();
-    expect(within(section).queryByRole("button", { name: "Force cancel" })).not.toBeInTheDocument();
+    expect(within(section).queryByRole("button", { name: "강제 취소 검토" })).not.toBeInTheDocument();
     expect(section.textContent).not.toContain("transcript");
     expect(section.textContent).not.toContain("feedbackDocumentMarkdown");
     expect(section.textContent).not.toContain("instructions");
@@ -79,15 +98,111 @@ describe("PlatformAdminAiOps", () => {
     expect(section.textContent).not.toContain("result");
   });
 
-  it("lets owner and operator roles force cancel actionable jobs", async () => {
-    const onForceCancel = vi.fn();
+  it("opens preview instead of executing an actionable job", async () => {
+    const onRequestPreview = vi.fn();
     const user = userEvent.setup();
 
-    render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} onForceCancel={onForceCancel} />);
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        onRequestPreview={onRequestPreview}
+      />,
+    );
 
-    await user.click(screen.getByRole("button", { name: "Force cancel" }));
+    await user.click(screen.getByRole("button", { name: "강제 취소 검토" }));
 
-    expect(onForceCancel).toHaveBeenCalledWith("job-1");
+    expect(onRequestPreview).toHaveBeenCalledWith("job-1", "FORCE_CANCEL");
+  });
+
+  it("shows a focus-safe impact review and requires an explicit final confirmation", async () => {
+    const onConfirmCommand = vi.fn();
+    const onDismissCommand = vi.fn();
+    const trigger = document.createElement("button");
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        commandState={reviewState}
+        commandTrigger={trigger}
+        onConfirmCommand={onConfirmCommand}
+        onDismissCommand={onDismissCommand}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "강제 취소 확인" });
+    expect(within(dialog).getByText("RUNNING · revision 7")).toBeInTheDocument();
+    expect(within(dialog).getByText("DELETE_TRANSIENT_PAYLOAD")).toBeInTheDocument();
+    expect(within(dialog).getByText(/00112233/)).toBeInTheDocument();
+    expect(dialog.contains(document.activeElement)).toBe(true);
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "강제 취소 확인" }));
+    expect(onConfirmCommand).toHaveBeenCalledTimes(1);
+    trigger.remove();
+  });
+
+  it("keeps an ambiguous command open for same-key reconciliation and shows its receipt", async () => {
+    const onRetrySameCommand = vi.fn();
+    const unknown: PlatformAdminAiOpsCommandState = {
+      ...reviewState,
+      phase: "UNKNOWN",
+      message: "명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 확인해 주세요.",
+      code: "NETWORK_UNKNOWN",
+    };
+    const { rerender } = render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        commandState={unknown}
+        onRetrySameCommand={onRetrySameCommand}
+      />,
+    );
+
+    await userEvent.click(screen.getByRole("button", { name: "같은 명령으로 다시 확인" }));
+    expect(onRetrySameCommand).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        onRetrySameCommand={onRetrySameCommand}
+        commandState={{
+          ...reviewState,
+          phase: "RECEIPT",
+          receipt: {
+            receiptId: "receipt-1",
+            previewId: "preview-1",
+            jobId: "job-1",
+            action: "FORCE_CANCEL",
+            beforeJobStatus: "RUNNING",
+            beforeJobRevision: 7,
+            afterJobStatus: "RUNNING",
+            afterJobRevision: 7,
+            originStatus: "ACCEPTED",
+            effectStatus: "PENDING",
+            safeErrorCode: "AI_EFFECT_UNAVAILABLE",
+          },
+        }}
+      />,
+    );
+
+    const receipt = screen.getByRole("status", { name: "AI 명령 영수증" });
+    expect(within(receipt).getByText(/receipt-1/)).toBeInTheDocument();
+    expect(within(receipt).getByText(/PENDING/)).toBeInTheDocument();
+    expect(within(receipt).getByText(/AI_EFFECT_UNAVAILABLE/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "같은 명령으로 상태 다시 확인" }));
+    expect(onRetrySameCommand).toHaveBeenCalledTimes(2);
   });
 
   it("shows errors without hiding the ledger", () => {
@@ -140,29 +255,57 @@ describe("PlatformAdminAiOps", () => {
     expect(screen.getByText("이 필터에 해당하는 AI job이 없습니다.")).toBeInTheDocument();
   });
 
-  it("lets owner and operator roles retry-commit a committing job", async () => {
-    const onRetryCommit = vi.fn();
+  it("lets a capable operator review retry-commit on an eligible job", async () => {
+    const onRequestPreview = vi.fn();
     const user = userEvent.setup();
 
     render(
-      <PlatformAdminAiOps role="OPERATOR" summary={summary} jobs={[committingJob]} onRetryCommit={onRetryCommit} />,
+      <PlatformAdminAiOps
+        role="OPERATOR"
+        canManageActions
+        summary={summary}
+        jobs={[committingJob]}
+        onRequestPreview={onRequestPreview}
+      />,
     );
 
-    await user.click(screen.getByRole("button", { name: "Retry commit" }));
+    await user.click(screen.getByRole("button", { name: "커밋 복구 검토" }));
 
-    expect(onRetryCommit).toHaveBeenCalledWith("job-2");
+    expect(onRequestPreview).toHaveBeenCalledWith("job-2", "RETRY_COMMIT");
   });
 
   it("hides retry-commit from support role", () => {
     render(<PlatformAdminAiOps role="SUPPORT" summary={summary} jobs={[committingJob]} />);
 
-    expect(screen.queryByRole("button", { name: "Retry commit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "커밋 복구 검토" })).not.toBeInTheDocument();
   });
 
   it("does not show retry-commit when the job does not offer it", () => {
-    render(<PlatformAdminAiOps role="OWNER" summary={summary} jobs={[runningJob]} onRetryCommit={vi.fn()} />);
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        onRequestPreview={vi.fn()}
+      />,
+    );
 
-    expect(screen.queryByRole("button", { name: "Retry commit" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "커밋 복구 검토" })).not.toBeInTheDocument();
+  });
+
+  it("uses the authoritative capability instead of role inference", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions={false}
+        summary={summary}
+        jobs={[runningJob]}
+        onRequestPreview={vi.fn()}
+      />,
+    );
+    expect(screen.queryByRole("button", { name: "강제 취소 검토" })).not.toBeInTheDocument();
+    expect(screen.getByText("현재 권한으로는 AI 작업을 변경할 수 없습니다.")).toBeInTheDocument();
   });
 
   it("shows the windowed cost trend with a delta direction", () => {
