@@ -46,6 +46,7 @@ import type {
   SessionImportPreviewResponse,
 } from "@/features/host/api/host-contracts";
 import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lifecycle-model";
+import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 import {
   hostSessionDetailContractFixture,
 } from "./api-contract-fixtures";
@@ -1411,6 +1412,29 @@ describe("HostSessionEditor", () => {
       })),
     );
     expect(location.href).toBe("/app/host/sessions/created-session-8");
+  });
+
+  it("clears mounted meeting URL and passcode before revoked-club navigation", async () => {
+    const user = userEvent.setup();
+    render(
+      <HostSessionEditorForTest
+        clubSlug="reading-sai"
+        initialLocation={{ panel: "basic", source: "manual" }}
+      />,
+    );
+
+    await user.type(screen.getByLabelText("미팅 URL"), "https://meet.example/private-room");
+    await user.type(screen.getByLabelText("Passcode · 선택"), "private-passcode");
+
+    await hostSensitiveStorage.clearClub("other-club");
+    expect(screen.getByLabelText("미팅 URL")).toHaveValue("https://meet.example/private-room");
+    expect(screen.getByLabelText("Passcode · 선택")).toHaveValue("private-passcode");
+
+    await hostSensitiveStorage.clearClub("reading-sai");
+    await waitFor(() => {
+      expect(screen.getByLabelText("미팅 URL")).toHaveValue("");
+      expect(screen.getByLabelText("Passcode · 선택")).toHaveValue("");
+    });
   });
 
   it("keeps new-session save redirects inside the scoped host route", async () => {

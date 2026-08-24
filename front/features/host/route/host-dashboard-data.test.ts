@@ -51,6 +51,13 @@ function createTestQueryClient() {
   });
 }
 
+function loaderArgs(url = "https://readmates.test/clubs/reading-sai/app/host") {
+  return {
+    request: new Request(url),
+    params: { clubSlug: "reading-sai" },
+  } as unknown as LoaderFunctionArgs;
+}
+
 function attentionItem(overrides: Record<string, unknown> = {}) {
   return {
     sessionId: "closed-1",
@@ -118,16 +125,14 @@ describe("hostDashboardLoaderFactory", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host"),
-    } as unknown as LoaderFunctionArgs);
+    await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
     const urls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(urls).toEqual(expect.arrayContaining([
-      "/api/bff/api/auth/me",
-      "/api/bff/api/sessions/current",
-      "/api/bff/api/host/sessions?mode=meeting&limit=50",
-      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1",
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      "/api/bff/api/sessions/current?clubSlug=reading-sai",
+      "/api/bff/api/host/sessions?mode=meeting&limit=50&clubSlug=reading-sai",
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1&clubSlug=reading-sai",
     ]));
     expect(urls.some((url) => url.includes("/host/dashboard"))).toBe(false);
     expect(urls.some((url) => url.includes("/host/notifications"))).toBe(false);
@@ -166,9 +171,9 @@ describe("hostDashboardLoaderFactory", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host?from=mail#board"),
-    } as unknown as LoaderFunctionArgs);
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())(
+      loaderArgs("https://readmates.test/clubs/reading-sai/app/host?from=mail#board"),
+    );
 
     expect(result).toMatchObject({
       hostSessions: { items: [expect.objectContaining({ sessionId: "open-1", state: "OPEN" })] },
@@ -245,9 +250,7 @@ describe("hostDashboardLoaderFactory", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host"),
-    } as unknown as LoaderFunctionArgs);
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
     expect(result).toMatchObject({
       current: { currentSession: null },
@@ -275,9 +278,7 @@ describe("hostDashboardLoaderFactory", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host"),
-    } as unknown as LoaderFunctionArgs);
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
     expect(result).toMatchObject({
       current: { currentSession: null },

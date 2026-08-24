@@ -146,7 +146,7 @@ describe("host session record queries", () => {
   it("uses normalized club-scoped keys", () => {
     const context = { clubSlug: "reading-sai" };
 
-    expect(hostSessionRecordKeys.scope(context)).toEqual(["host", "session-records", "reading-sai"]);
+    expect(hostSessionRecordKeys.scope(context)).toEqual(["host", "reading-sai", "session-records"]);
     expect(hostSessionRecordLedgerQuery(
       { search: "  모비 딕  ", needsAttention: true, page: { limit: 50 } },
       context,
@@ -159,8 +159,8 @@ describe("host session record queries", () => {
     );
     expect(hostSessionRecordKeys.attentionPages(context)).toEqual([
       "host",
-      "session-records",
       "reading-sai",
+      "session-records",
       "ledger",
       "attention-pages",
     ]);
@@ -583,7 +583,7 @@ describe("host session record queries", () => {
     const { Wrapper } = createWrapper();
     const invalidateMemberAndPublicSurfaces = vi.fn().mockResolvedValue(undefined);
     const { result } = renderHook(
-      () => useApplyHostSessionRecordMutation(undefined, invalidateMemberAndPublicSurfaces),
+      () => useApplyHostSessionRecordMutation(undefined as never, invalidateMemberAndPublicSurfaces),
       { wrapper: Wrapper },
     );
 

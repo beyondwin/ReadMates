@@ -177,7 +177,7 @@ describe("AiGenerateTab", () => {
 
     expect(await screen.findByText("AI로 모임 기록 생성")).toBeInTheDocument();
     expect(screen.getByLabelText(/대본 파일/)).toBeInTheDocument();
-    expect(mockedModels).toHaveBeenCalledWith("s1");
+    expect(mockedModels).toHaveBeenCalledWith("s1", { clubSlug: "club-a" });
   });
 
   it("keeps the upload form mounted and shows safe invalid speaker correction", async () => {
@@ -250,7 +250,7 @@ describe("AiGenerateTab", () => {
     });
 
     await waitFor(() => {
-      expect(mockedGetJob).toHaveBeenCalledWith("s1", "job-1");
+      expect(mockedGetJob).toHaveBeenCalledWith("s1", "job-1", { clubSlug: "club-a" });
     });
   });
 
@@ -365,7 +365,7 @@ describe("AiGenerateTab", () => {
       expect(screen.getByText(/LLM이 응답하지 않았습니다/)).toBeInTheDocument();
     });
     expect(screen.getByRole("button", { name: /다시 시도/ })).toBeInTheDocument();
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("club-a", "job-1"))).toBeNull();
   });
 
   it("coalesces draft persistence and flushes the latest edit on pagehide", async () => {
@@ -396,13 +396,14 @@ describe("AiGenerateTab", () => {
     expect(setItem).not.toHaveBeenCalled();
     fireEvent(window, new Event("pagehide"));
     expect(setItem).toHaveBeenCalledTimes(1);
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toContain("최종 편집");
+    expect(window.localStorage.getItem(draftStorageKey("club-a", "job-1"))).toContain("최종 편집");
     vi.useRealTimers();
   });
 
   it("clears a saved draft when polling reports JOB_EXPIRED", async () => {
     saveAigenDraft({
       version: 2,
+      clubSlug: "club-a",
       jobId: "job-1",
       revision: 3,
       serverSnapshot: sampleSnapshot(),
@@ -429,7 +430,7 @@ describe("AiGenerateTab", () => {
     fireEvent.click(start);
 
     await waitFor(() => expect(mockedGetJob).toHaveBeenCalled());
-    await waitFor(() => expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull());
+    await waitFor(() => expect(window.localStorage.getItem(draftStorageKey("club-a", "job-1"))).toBeNull());
   });
 
   it("transitions GENERATING → IDLE when poll returns CANCELLED", async () => {
@@ -502,7 +503,7 @@ describe("AiGenerateTab", () => {
     });
 
     await waitFor(() => {
-      expect(mockedCancel).toHaveBeenCalledWith("s1", "job-1");
+      expect(mockedCancel).toHaveBeenCalledWith("s1", "job-1", { clubSlug: "club-a" });
     });
   });
 

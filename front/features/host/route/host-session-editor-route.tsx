@@ -13,7 +13,9 @@ import HostSessionEditor, {
 } from "@/features/host/ui/host-session-editor";
 import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
 import {
   wrapHostSessionEditorActionsForUndo,
@@ -162,8 +164,8 @@ export type HostSessionRecordsChangedEvent = {
   clubSlug?: string;
 };
 
-function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
-  return { clubSlug };
+function contextFromClubSlug(clubSlug?: string): ExplicitReadmatesApiContext {
+  return requireHostClubContext(clubSlug);
 }
 
 function isOverlayPanel(
@@ -452,7 +454,7 @@ function HostSessionTrashTombstoneRoute({
 }
 
 function useHostSessionEditorActions(
-  context: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
   onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>,
 ): HostSessionEditorActions {
   const queryClient = useQueryClient();
@@ -474,12 +476,15 @@ function useHostSessionEditorActions(
     mutate: () => Promise<Response>,
     sessionId: string,
   ) => {
-    const result = await hostSessionLifecycleResultFromResponse(await mutate());
+    const result = await hostSessionLifecycleResultFromResponse(await mutate(), {
+      clubSlug: context.clubSlug,
+      requestKind: "SESSION_LIFECYCLE",
+    });
     if (result.ok) {
       await onSessionRecordsChanged?.(sessionId);
     }
     return result;
-  }, [onSessionRecordsChanged]);
+  }, [context.clubSlug, onSessionRecordsChanged]);
 
   return useMemo<HostSessionEditorActions>(() => ({
     loadDeletionPreview: (sessionId) =>
@@ -501,7 +506,7 @@ function useHostSessionEditorActions(
         : updateSession({ sessionId, request }),
     updateAttendance: (sessionId, attendance) =>
       updateAttendance({ sessionId, attendance }),
-    previewSessionImport: hostSessionEditorPreviewActions.previewSessionImport,
+    previewSessionImport: hostSessionEditorPreviewActions(context).previewSessionImport,
     commitSessionImport: async (sessionId, request) => {
       const result = await commitImport({ sessionId, request });
       await onSessionRecordsChanged?.(sessionId);
@@ -762,7 +767,7 @@ export function EditHostSessionRecordWorkflow({
   historyPage: HostSessionHistoryPage;
   loadHistoryPage: (cursor: string) => Promise<HostSessionHistoryPage>;
   notificationDispatches: ManualNotificationDispatchListItem[];
-  context: ReadmatesApiContext;
+  context: ExplicitReadmatesApiContext;
   actions: HostSessionEditorActions;
   reloadRecordEditor: () => Promise<HostSessionRecordEditor | undefined>;
   returnTarget?: ReadmatesReturnTarget;
@@ -832,6 +837,7 @@ export function EditHostSessionRecordWorkflow({
     nextCursor: historyPage.nextCursor,
   });
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [returnStatePurged, setReturnStatePurged] = useState(false);
   const effectiveHistory = historyState.firstPage === historyPage
     ? historyState
     : {
@@ -845,6 +851,54 @@ export function EditHostSessionRecordWorkflow({
     onReload: reloadRecordEditor,
   });
   useDraftRouteNavigationGuard(controller.shouldBlockNavigation);
+
+  useEffect(() => {
+    const registrations = [
+      {
+        resourceKey: `record-draft:${recordEditor.sessionId}` as const,
+        clear: controller.clearSensitiveState,
+      },
+      {
+        resourceKey: `mutation-receipt:${recordEditor.sessionId}` as const,
+        clear: () => {
+          pendingUndoRef.current = null;
+          setPendingUndo(null);
+          setUndoConfirm(null);
+          setRestoreNotice(null);
+        },
+      },
+      {
+        resourceKey: `reconciliation:${recordEditor.sessionId}` as const,
+        clear: () => {
+          setApplyPreview(null);
+          setPendingApply(null);
+          setComposerRequest(null);
+          setConfirmationOpen(false);
+          setApplyPreviewRefreshing(false);
+          setRebaseError(null);
+          setConfirmationMessage(null);
+          rebasedDraftRevisionRef.current = null;
+        },
+      },
+      {
+        resourceKey: `history:${recordEditor.sessionId}` as const,
+        clear: () => {
+          setHistoryState({ firstPage: historyPage, items: [], nextCursor: null });
+          setHistoryLoadingMore(false);
+        },
+      },
+      {
+        resourceKey: `host-return-state:${recordEditor.sessionId}` as const,
+        clear: () => setReturnStatePurged(true),
+      },
+    ];
+    const unregister = registrations.map(({ resourceKey, clear }) => registerHostSensitiveState({
+      clubSlug: context.clubSlug,
+      resourceKey,
+      clear,
+    }));
+    return () => unregister.forEach((dispose) => dispose());
+  }, [context.clubSlug, controller.clearSensitiveState, historyPage, recordEditor.sessionId]);
 
   const reloadAuthoritativeDraft = useCallback(async () => {
     rebasedDraftRevisionRef.current = null;
@@ -1245,7 +1299,7 @@ export function EditHostSessionRecordWorkflow({
       <HostSessionEditor
         session={session}
         notificationDispatches={notificationDispatches}
-        returnTarget={returnTarget}
+        returnTarget={returnStatePurged ? undefined : returnTarget}
         actions={editorActions}
         pendingUndo={pendingUndoView}
         undoConfirm={undoConfirmView}
@@ -1253,7 +1307,7 @@ export function EditHostSessionRecordWorkflow({
         clubSlug={clubSlug}
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}
-        readmatesReturnState={readmatesReturnState}
+        readmatesReturnState={returnStatePurged ? undefined : readmatesReturnState}
         onSessionRecordsChanged={onSessionRecordsChanged}
         onSessionTrashed={onSessionTrashed}
         navigation={navigation}

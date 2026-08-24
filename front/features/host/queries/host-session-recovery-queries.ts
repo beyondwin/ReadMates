@@ -4,7 +4,7 @@ import {
   restoreHostSessionChange,
 } from "@/features/host/api/host-session-recovery-api";
 import type { HostSessionRestoreRequest } from "@/features/host/api/host-session-recovery-contracts";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { hostSessionRecordKeys } from "./host-session-record-queries";
 import {
   invalidateHostCurrentSession,
@@ -13,28 +13,24 @@ import {
   invalidateHostSessionDetail,
   invalidateHostSessionLists,
   executeHostMutationWithReconciliation,
-  HostMutationContextRequiredError,
   hostSessionDetailQuery,
 } from "./host-session-queries";
 
-function scopeKey(context?: ReadmatesApiContext) {
-  return context?.clubSlug ?? null;
-}
+import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
 
 export const hostSessionRecoveryKeys = {
-  all: ["host", "session-recovery"] as const,
-  scope: (context?: ReadmatesApiContext) =>
-    [...hostSessionRecoveryKeys.all, scopeKey(context)] as const,
-  restorePreviews: (sessionId: string, context?: ReadmatesApiContext) =>
+  scope: (context: ExplicitReadmatesApiContext) =>
+    [...hostClubQueryPrefix(context.clubSlug), "session-recovery"] as const,
+  restorePreviews: (sessionId: string, context: ExplicitReadmatesApiContext) =>
     [...hostSessionRecoveryKeys.scope(context), "restore-preview", sessionId] as const,
-  restorePreview: (sessionId: string, changeId: string, context?: ReadmatesApiContext) =>
+  restorePreview: (sessionId: string, changeId: string, context: ExplicitReadmatesApiContext) =>
     [...hostSessionRecoveryKeys.restorePreviews(sessionId, context), changeId] as const,
 } as const;
 
 export function hostSessionRestorePreviewQuery(
   sessionId: string,
   changeId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   return queryOptions({
     queryKey: hostSessionRecoveryKeys.restorePreview(sessionId, changeId, context),
@@ -42,9 +38,10 @@ export function hostSessionRestorePreviewQuery(
   });
 }
 
-export function useRestoreHostSessionChangeMutation(context?: ReadmatesApiContext) {
+export function useRestoreHostSessionChangeMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "session-recovery", "restore"),
     mutationFn: ({
       sessionId,
       changeId,
@@ -54,10 +51,7 @@ export function useRestoreHostSessionChangeMutation(context?: ReadmatesApiContex
       changeId: string;
       request: HostSessionRestoreRequest;
     }) => {
-      if (!context?.clubSlug) {
-        throw new HostMutationContextRequiredError();
-      }
-      const explicitContext = { clubSlug: context.clubSlug };
+      const explicitContext = context;
       return client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext)).then((detail) => {
         const envelope = {
           idempotencyKey: `host-${globalThis.crypto.randomUUID()}`,
@@ -79,8 +73,8 @@ export function useRestoreHostSessionChangeMutation(context?: ReadmatesApiContex
             await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
             return {
               changeId: reconciliation.receipt?.receiptId ?? changeId,
-              kind: "BASIC_INFO",
-              undoAvailable: true,
+              kind: "BASIC_INFO" as const,
+              undoAvailable: true as const,
             };
           },
         });

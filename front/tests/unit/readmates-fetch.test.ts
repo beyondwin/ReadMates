@@ -8,6 +8,7 @@ import {
   __resetHostClientContractCapabilityForTest,
   requireHostClientContractV3,
 } from "@/shared/api/host-client-contract";
+import { cancelClubHostRequests } from "@/shared/api/host-authority-event";
 
 afterEach(() => {
   __resetRedirectGuardForTest();
@@ -18,6 +19,53 @@ afterEach(() => {
 });
 
 describe("readmatesFetchResponse", () => {
+  it("registers an explicit host request so exact-club purge aborts the network response", async () => {
+    let requestSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        requestSignal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = readmatesFetchResponse(
+      "/api/host/sessions/session-1",
+      undefined,
+      { clubSlug: "reading-sai" },
+    );
+    await Promise.resolve();
+    cancelClubHostRequests("reading-sai");
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("rejects a host response whose body finishes after its club was purged", async () => {
+    let bodyController!: ReadableStreamDefaultController<Uint8Array>;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        bodyController = controller;
+      },
+    }), { headers: { "Content-Type": "application/json" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+
+    const request = readmatesFetch<{ secret: string }>(
+      "/api/host/sessions/session-1",
+      undefined,
+      { clubSlug: "reading-sai" },
+    );
+    await Promise.resolve();
+    cancelClubHostRequests("reading-sai");
+    bodyController.enqueue(new TextEncoder().encode(JSON.stringify({ secret: "late" })));
+    bodyController.close();
+
+    await expect(request).rejects.toMatchObject({
+      name: "HostRequestPurgedError",
+      code: "HOST_REQUEST_PURGED",
+    });
+  });
+
   it("maps only fetch-boundary TypeErrors to a safe typed transport failure", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(
       new TypeError("provider socket detail must not escape"),

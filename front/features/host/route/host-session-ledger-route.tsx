@@ -19,6 +19,7 @@ import {
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
 import { isReadmatesApiError } from "@/shared/api/errors";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import {
   HostSessionLedger,
   type HostSessionLedgerLinkComponent,
@@ -44,7 +45,7 @@ export function HostSessionLedgerRoute({
 }) {
   const loaderData = useLoaderData() as HostSessionLedgerRouteData;
   const { clubSlug } = useParams<{ clubSlug: string }>();
-  const context = useMemo(() => ({ clubSlug }), [clubSlug]);
+  const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
   const queryClient = useQueryClient();
   const location = useLocation();
   const navigate = useNavigate();

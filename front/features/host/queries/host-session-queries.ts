@@ -53,7 +53,7 @@ import type {
   HostMutationReconciliation,
 } from "@/features/host/api/host-contracts";
 import type { HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
-import type { ExplicitReadmatesApiContext, ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import {
   normalizePageRequest,
@@ -67,6 +67,7 @@ import {
 import { isReadmatesApiError, isReadmatesTransportError } from "@/shared/api/errors";
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
+import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
 
@@ -128,10 +129,6 @@ export type HostSessionManualDispatchesQueryRequest = {
   page?: PageRequest;
 };
 
-function scopeKey(context?: ReadmatesApiContext): string | null {
-  return context?.clubSlug ?? null;
-}
-
 export class HostMutationContextRequiredError extends Error {
   readonly code = "HOST_API_CONTEXT_REQUIRED";
 
@@ -141,11 +138,8 @@ export class HostMutationContextRequiredError extends Error {
   }
 }
 
-function requireHostMutationContext(context?: ReadmatesApiContext): ExplicitReadmatesApiContext {
-  if (!context?.clubSlug) {
-    throw new HostMutationContextRequiredError();
-  }
-  return { clubSlug: context.clubSlug };
+function requireHostMutationContext(context: ExplicitReadmatesApiContext): ExplicitReadmatesApiContext {
+  return context;
 }
 
 function newHostMutationKey(): string {
@@ -182,40 +176,39 @@ function normalizeManualDispatchesRequest(request?: HostSessionManualDispatchesQ
 }
 
 export const hostSessionKeys = {
-  all: ["host", "sessions"] as const,
-  scope: (context?: ReadmatesApiContext) =>
-    [...hostSessionKeys.all, "scope", scopeKey(context)] as const,
-  lists: (context?: ReadmatesApiContext) =>
+  scope: (context: ExplicitReadmatesApiContext) =>
+    [...hostClubQueryPrefix(context.clubSlug), "sessions"] as const,
+  lists: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "list"] as const,
-  list: (page?: PageRequest, context?: ReadmatesApiContext) =>
+  list: (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.lists(context), normalizePageRequest(page)] as const,
-  modeList: (mode: "meeting" | "record", page?: PageRequest, context?: ReadmatesApiContext) =>
+  modeList: (mode: "meeting" | "record", page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.lists(context), "mode", mode, normalizePageRequest(page)] as const,
-  detail: (sessionId: string, context?: ReadmatesApiContext) =>
+  detail: (sessionId: string, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "detail", sessionId] as const,
-  closingStatus: (sessionId: string, context?: ReadmatesApiContext) =>
+  closingStatus: (sessionId: string, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "closingStatus", sessionId] as const,
-  current: (context?: ReadmatesApiContext) =>
+  current: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "current"] as const,
-  dashboard: (context?: ReadmatesApiContext) =>
+  dashboard: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "dashboard"] as const,
-  deletionPreview: (sessionId: string, context?: ReadmatesApiContext) =>
+  deletionPreview: (sessionId: string, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "deletionPreview", sessionId] as const,
-  manualDispatchesRoot: (context?: ReadmatesApiContext) =>
+  manualDispatchesRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "manualDispatches"] as const,
-  manualDispatches: (request?: HostSessionManualDispatchesQueryRequest, context?: ReadmatesApiContext) =>
+  manualDispatches: (request: HostSessionManualDispatchesQueryRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.manualDispatchesRoot(context), normalizeManualDispatchesRequest(request)] as const,
-  scheduleDefaults: (context?: ReadmatesApiContext) =>
+  scheduleDefaults: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "scheduleDefaults"] as const,
-  trashRoot: (context?: ReadmatesApiContext) =>
+  trashRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "trash"] as const,
-  trashList: (page?: PageRequest, context?: ReadmatesApiContext) =>
+  trashList: (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.trashRoot(context), normalizePageRequest(page)] as const,
-  trashDetail: (sessionId: string, context?: ReadmatesApiContext) =>
+  trashDetail: (sessionId: string, context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "trashDetail", sessionId] as const,
 } as const;
 
-export function hostCurrentSessionQuery(context?: ReadmatesApiContext) {
+export function hostCurrentSessionQuery(context: ExplicitReadmatesApiContext) {
   return queryOptions<CurrentSessionResponse>({
     queryKey: hostSessionKeys.current(context),
     queryFn: () => fetchHostCurrentSession(context),
@@ -272,7 +265,7 @@ export function resolveHostScheduleDefaultsLoadState(query: {
   };
 }
 
-export function hostSessionScheduleDefaultsQuery(context?: ReadmatesApiContext) {
+export function hostSessionScheduleDefaultsQuery(context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostSessionKeys.scheduleDefaults(context),
     queryFn: () => fetchHostSessionScheduleDefaults(context),
@@ -280,7 +273,7 @@ export function hostSessionScheduleDefaultsQuery(context?: ReadmatesApiContext) 
   });
 }
 
-export function hostSessionListQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+export function hostSessionListQuery(page: PageRequest | undefined, context: ExplicitReadmatesApiContext) {
   const normalized = normalizePageRequest(page);
   return queryOptions<HostSessionListPage>({
     queryKey: hostSessionKeys.list(page, context),
@@ -288,7 +281,7 @@ export function hostSessionListQuery(page?: PageRequest, context?: ReadmatesApiC
   });
 }
 
-export function hostMeetingSessionListQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+export function hostMeetingSessionListQuery(page: PageRequest | undefined, context: ExplicitReadmatesApiContext) {
   const normalized = normalizePageRequest(page);
   return queryOptions<HostSessionListPage>({
     queryKey: hostSessionKeys.modeList("meeting", page, context),
@@ -297,21 +290,21 @@ export function hostMeetingSessionListQuery(page?: PageRequest, context?: Readma
   });
 }
 
-export function hostSessionDetailQuery(sessionId: string, context?: ReadmatesApiContext) {
+export function hostSessionDetailQuery(sessionId: string, context: ExplicitReadmatesApiContext) {
   return queryOptions<HostSessionDetailResponse>({
     queryKey: hostSessionKeys.detail(sessionId, context),
     queryFn: () => fetchHostSessionDetail(sessionId, context),
   });
 }
 
-export function hostSessionClosingStatusQuery(sessionId: string, context?: ReadmatesApiContext) {
+export function hostSessionClosingStatusQuery(sessionId: string, context: ExplicitReadmatesApiContext) {
   return queryOptions<HostSessionClosingStatusResponse>({
     queryKey: hostSessionKeys.closingStatus(sessionId, context),
     queryFn: () => fetchHostSessionClosingStatus(sessionId, context),
   });
 }
 
-export function hostSessionTrashListQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+export function hostSessionTrashListQuery(page: PageRequest | undefined, context: ExplicitReadmatesApiContext) {
   const normalized = normalizePageRequest(page);
   return queryOptions<HostSessionTrashPage>({
     queryKey: hostSessionKeys.trashList(page, context),
@@ -319,7 +312,7 @@ export function hostSessionTrashListQuery(page?: PageRequest, context?: Readmate
   });
 }
 
-export function hostSessionTrashDetailQuery(sessionId: string, context?: ReadmatesApiContext) {
+export function hostSessionTrashDetailQuery(sessionId: string, context: ExplicitReadmatesApiContext) {
   return queryOptions<HostSessionTrashItem>({
     queryKey: hostSessionKeys.trashDetail(sessionId, context),
     queryFn: () => fetchHostSessionTrash(sessionId, context),
@@ -335,7 +328,7 @@ export function isHostSessionTrashExpiredError(error: unknown): boolean {
     && (error.status === 410 || error.code === "HOST_SESSION_TRASH_EXPIRED");
 }
 
-export function hostSessionDeletionPreviewQuery(sessionId: string, context?: ReadmatesApiContext) {
+export function hostSessionDeletionPreviewQuery(sessionId: string, context: ExplicitReadmatesApiContext) {
   // Each click currently issues a fresh request; opt out of result retention so the
   // delete-preview UX continues to reflect the server state at click time even after
   // an interleaved publish / close / update has mutated the underlying session.
@@ -348,8 +341,8 @@ export function hostSessionDeletionPreviewQuery(sessionId: string, context?: Rea
 }
 
 export function hostSessionManualDispatchesQuery(
-  request?: HostSessionManualDispatchesQueryRequest,
-  context?: ReadmatesApiContext,
+  request: HostSessionManualDispatchesQueryRequest | undefined,
+  context: ExplicitReadmatesApiContext,
 ) {
   const normalized = normalizeManualDispatchesRequest(request);
   return queryOptions<ManualNotificationDispatchListResponse>({
@@ -362,35 +355,35 @@ export function hostSessionManualDispatchesQuery(
   });
 }
 
-export function invalidateHostSessionLists(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostSessionLists(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.lists(context) });
 }
 
-export function invalidateHostSessionDetail(client: QueryClient, sessionId: string, context?: ReadmatesApiContext) {
+export function invalidateHostSessionDetail(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
 }
 
-export function invalidateHostSessionClosingStatus(client: QueryClient, sessionId: string, context?: ReadmatesApiContext) {
+export function invalidateHostSessionClosingStatus(client: QueryClient, sessionId: string, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.closingStatus(sessionId, context) });
 }
 
-export function invalidateHostCurrentSession(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostCurrentSession(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.current(context) });
 }
 
-export function invalidateHostSessionDashboard(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostSessionDashboard(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.dashboard(context) });
 }
 
-export function invalidateHostSessionManualDispatches(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostSessionManualDispatches(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.manualDispatchesRoot(context) });
 }
 
-export function invalidateHostSessionSurface(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostSessionSurface(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.scope(context) });
 }
 
-export function invalidateHostSessionTrash(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostSessionTrash(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostSessionKeys.trashRoot(context) });
 }
 
@@ -413,7 +406,7 @@ function invalidateOk(response: Response, invalidate: () => Promise<unknown>) {
 async function invalidateHostSessionRecordCaches(
   client: QueryClient,
   sessionId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
   options: { editor?: boolean; history?: boolean; ledgers?: boolean } = {},
 ) {
   await Promise.all([
@@ -432,7 +425,7 @@ async function invalidateHostSessionRecordCaches(
 async function invalidateSessionMutationSurfaces(
   client: QueryClient,
   sessionId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
   options?: { manualDispatches?: boolean },
 ) {
   await Promise.all([
@@ -453,15 +446,16 @@ async function invalidateSessionMutationSurfaces(
 export function invalidateHostSessionRecordSurfaces(
   client: QueryClient,
   sessionId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   return invalidateSessionMutationSurfaces(client, sessionId, context);
 }
 
-export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
+export function useCreateHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "create"),
     mutationFn: (request: HostSessionRequest) => {
       const explicitContext = requireHostMutationContext(context);
       const envelope = { idempotencyKey: newHostMutationKey(), expected: {}, command: request };
@@ -491,10 +485,11 @@ export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useUpdateHostSessionMutation(context?: ReadmatesApiContext) {
+export function useUpdateHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "update"),
     mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionRequest }) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -519,10 +514,11 @@ export function useUpdateHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
+export function useDeleteHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "delete"),
     mutationFn: async (sessionId: string) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -559,10 +555,11 @@ export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useRestoreHostSessionMutation(context?: ReadmatesApiContext) {
+export function useRestoreHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "restore"),
     mutationFn: async (sessionId: string) => {
       const explicitContext = requireHostMutationContext(context);
       const trash = await client.fetchQuery(hostSessionTrashDetailQuery(sessionId, explicitContext));
@@ -600,10 +597,11 @@ export function useRestoreHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useOpenHostSessionMutation(context?: ReadmatesApiContext) {
+export function useOpenHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "open"),
     mutationFn: async (sessionId: string) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -628,10 +626,11 @@ export function useOpenHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useCloseHostSessionMutation(context?: ReadmatesApiContext) {
+export function useCloseHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "close"),
     mutationFn: async (sessionId: string) => {
       const explicitContext = requireHostMutationContext(context);
       const closing = await client.fetchQuery(hostSessionClosingStatusQuery(sessionId, explicitContext));
@@ -660,10 +659,11 @@ export function useCloseHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
+export function usePublishHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "publish"),
     mutationFn: async (sessionId: string) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -696,10 +696,11 @@ export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useCorrectionPublishHostSessionMutation(context?: ReadmatesApiContext) {
+export function useCorrectionPublishHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "correction-publish"),
     mutationFn: async (sessionId: string) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -736,10 +737,11 @@ export function useCorrectionPublishHostSessionMutation(context?: ReadmatesApiCo
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useReopenHostSessionMutation(context?: ReadmatesApiContext) {
+export function useReopenHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "reopen"),
     mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -765,10 +767,11 @@ export function useReopenHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useUnpublishHostSessionMutation(context?: ReadmatesApiContext) {
+export function useUnpublishHostSessionMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "unpublish"),
     mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -790,10 +793,11 @@ export function useUnpublishHostSessionMutation(context?: ReadmatesApiContext) {
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useReturnHostSessionToDraftMutation(context?: ReadmatesApiContext) {
+export function useReturnHostSessionToDraftMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "return-to-draft"),
     mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -815,13 +819,14 @@ export function useReturnHostSessionToDraftMutation(context?: ReadmatesApiContex
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiContext) {
+export function useSaveHostSessionVisibilityMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation<
     HostSessionVisibilityUpdateResult,
     Error,
     { sessionId: string; request: HostSessionVisibilityRequest }
   >({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "visibility"),
     mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionVisibilityRequest }) =>
       saveHostSessionVisibility(sessionId, request, context),
     onSuccess: (result, variables) => {
@@ -843,7 +848,7 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
   });
 }
 
-export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiContext) {
+export function useSaveHostSessionAccessScopeMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation<
@@ -851,6 +856,7 @@ export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiCont
     Error,
     { sessionId: string; request: HostSessionAccessScopeRequest }
   >({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "access-scope"),
     mutationFn: async ({ sessionId, request }) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -887,10 +893,11 @@ export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiCont
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useSaveHostSessionPublicationMutation(context?: ReadmatesApiContext) {
+export function useSaveHostSessionPublicationMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "publication"),
     mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionPublicationRequest }) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -928,10 +935,11 @@ export function useSaveHostSessionPublicationMutation(context?: ReadmatesApiCont
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiContext) {
+export function useUpdateHostSessionAttendanceMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
   const mutation = useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "attendance"),
     mutationFn: async ({ sessionId, attendance }: { sessionId: string; attendance: HostAttendanceUpdate[] }) => {
       const explicitContext = requireHostMutationContext(context);
       const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
@@ -984,11 +992,12 @@ export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiCon
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
-export function useCommitHostSessionImportMutation(context?: ReadmatesApiContext) {
+export function useCommitHostSessionImportMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "sessions", "import"),
     mutationFn: ({ sessionId, request }: { sessionId: string; request: SessionImportRequest }) =>
-      commitHostSessionImport(sessionId, request),
+      commitHostSessionImport(sessionId, request, context),
     onSuccess: (_response, variables) =>
       Promise.all([
         invalidateHostSessionDetail(client, variables.sessionId, context),

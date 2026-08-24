@@ -1,13 +1,12 @@
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { hostClubQueryPrefix } from "./host-state-purge";
 
 export function hostNotificationManualOptionsRootKey(
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   return [
-    "host",
+    ...hostClubQueryPrefix(context.clubSlug),
     "notifications",
-    "scope",
-    context?.clubSlug ?? null,
     "manual",
     "options",
   ] as const;

@@ -59,6 +59,35 @@ afterEach(() => {
 });
 
 describe("SessionRecordDraftPanelBody", () => {
+  it("neutralizes queued saves and clears record contents on authority purge", async () => {
+    vi.useFakeTimers();
+    const onSave = vi.fn();
+    const { result } = renderHook(() => useSessionRecordDraftController({
+      editor: editor(),
+      onSave,
+      onReload: vi.fn(),
+    }));
+
+    act(() => result.current.updateSnapshot({
+      ...draftSnapshot,
+      publicationSummary: "권한을 잃은 클럽의 비공개 초안",
+    }));
+    act(() => result.current.clearSensitiveState());
+    await act(async () => vi.advanceTimersByTimeAsync(600));
+
+    expect(result.current.snapshot).toEqual({
+      schema: "readmates-session-record:v1",
+      visibility: "HOST_ONLY",
+      publicationSummary: "",
+      highlights: [],
+      oneLineReviews: [],
+      feedbackDocument: { fileName: "", title: "", markdown: "" },
+    });
+    expect(result.current.saveState).toBe("idle");
+    expect(result.current.expectedDraftRevision).toBeNull();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+
   it("treats a persisted draft as saved when the editor is reopened", () => {
     const { result } = renderHook(() => useSessionRecordDraftController({
       editor: editor(),

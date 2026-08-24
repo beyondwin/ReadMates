@@ -3,6 +3,7 @@ import type { LoaderFunctionArgs } from "react-router";
 import { hostSessionClosingStatusQuery } from "@/features/host/queries/host-session-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 export type HostSessionClosingRouteData = {
   sessionId: string;
@@ -15,7 +16,7 @@ export function hostSessionClosingLoaderFactory(client: QueryClient) {
     if (!sessionId) {
       throw new Error("Missing host session id");
     }
-    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
     await client.fetchQuery(hostSessionClosingStatusQuery(sessionId, context));
     return { sessionId };
   };

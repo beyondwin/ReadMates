@@ -11,6 +11,7 @@ import {
   type HostMeetingLedgerLinkComponent,
 } from "@/features/host/ui/meeting-ledger/host-meeting-ledger";
 import { HOST_HOME_ATTENTION_LIMIT, type HostDashboardRouteData } from "./host-dashboard-data";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 export function HostDashboardRoute({
   LinkComponent,
@@ -22,7 +23,7 @@ export function HostDashboardRoute({
 }) {
   const loaderData = useLoaderData() as HostDashboardRouteData;
   const { clubSlug } = useParams<{ clubSlug: string }>();
-  const context = useMemo(() => ({ clubSlug }), [clubSlug]);
+  const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
   const attentionQuery = useQuery({
     ...hostSessionRecordLedgerQuery({
       needsAttention: true,

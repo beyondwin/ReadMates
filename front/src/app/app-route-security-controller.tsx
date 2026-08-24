@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useLocation } from "react-router";
 import type { ClubWorkspace } from "@/shared/model/app-club-shell";
 import {
@@ -6,6 +6,8 @@ import {
   prepareWorkspaceRoute,
   type WorkspaceRouteTransitionStore,
 } from "@/src/app/app-route-security-transition";
+import { hostAuthorityLossMessage, type HostSecurityPurgeCode } from "@/features/host/model/host-authority-loss";
+import { HostAuthorityLossController } from "./host-authority-loss-controller";
 
 const workspaceLabels: Record<ClubWorkspace, string> = {
   member: "멤버 공간",
@@ -37,6 +39,12 @@ export function AppRouteSecurityController({
 }) {
   const location = useLocation();
   const [announcement, setAnnouncement] = useState("");
+  const authorityAnnouncementRef = useRef<string | null>(null);
+  const handleAuthorityLoss = useCallback((code: HostSecurityPurgeCode) => {
+    const message = hostAuthorityLossMessage(code);
+    authorityAnnouncementRef.current = message;
+    setAnnouncement(message);
+  }, []);
 
   useEffect(() => {
     const href = `${location.pathname}${location.search}${location.hash}`;
@@ -53,7 +61,9 @@ export function AppRouteSecurityController({
     const finishRouteTransition = () => {
       const shouldAnnounce = changedWorkspace
         && transitionStore.consume(currentRoute);
-      setAnnouncement(shouldAnnounce ? `${label}으로 전환했습니다` : "");
+      const authorityAnnouncement = authorityAnnouncementRef.current;
+      authorityAnnouncementRef.current = null;
+      setAnnouncement(authorityAnnouncement ?? (shouldAnnounce ? `${label}으로 전환했습니다` : ""));
       const heading = document.querySelector<HTMLElement>("main h1, h1");
       if (!heading) {
         return;
@@ -69,6 +79,7 @@ export function AppRouteSecurityController({
 
   return (
     <div data-app-route-security-controller>
+      <HostAuthorityLossController onHandled={handleAuthorityLoss} />
       {announcement ? (
         <span className="rm-sr-only" role="status" aria-live="polite" aria-atomic="true">
           {announcement}

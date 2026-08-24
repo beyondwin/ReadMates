@@ -3,14 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { StrictMode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createMemoryRouter, Link, MemoryRouter, useLocation } from "react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "react-router/dom";
 import { AppRouteSecurityController } from "./app-route-security-controller";
 import {
   createWorkspaceRouteTransitionStore,
   type WorkspaceRouteTransitionStore,
 } from "./app-route-security-transition";
+import { signalHostAuthorityLoss } from "@/shared/api/host-authority-event";
 
 let transitionStore: WorkspaceRouteTransitionStore;
+let queryClient: QueryClient;
 
 function RouteControllerHarness() {
   const location = useLocation();
@@ -19,7 +22,9 @@ function RouteControllerHarness() {
 
   return (
     <>
-      <AppRouteSecurityController workspace={workspace} transitionStore={transitionStore} />
+      <QueryClientProvider client={queryClient}>
+        <AppRouteSecurityController workspace={workspace} transitionStore={transitionStore} />
+      </QueryClientProvider>
       <main>
         <h1>{label}</h1>
         <Link to="/clubs/reading-sai/app">멤버로</Link>
@@ -39,6 +44,7 @@ beforeEach(() => {
     storage: window.sessionStorage,
     pageSessionId: "controller-test-page",
   });
+  queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   document.title = "ReadMates";
 });
 
@@ -49,6 +55,24 @@ afterEach(() => {
 });
 
 describe("AppRouteSecurityController", () => {
+  it("announces authority loss after replacing the host route and focuses the safe heading", async () => {
+    render(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
+        <RouteControllerHarness />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(screen.getByRole("heading", { name: "오늘의 운영" })).toHaveFocus());
+
+    signalHostAuthorityLoss({
+      code: "MEMBERSHIP_SUSPENDED",
+      clubSlug: "reading-sai",
+      requestKind: "SESSION_RECORD_DRAFT_SAVE",
+    });
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("멤버십이 중지"));
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+  });
+
   it("announces every committed member-host transition across click, Back, and Forward", async () => {
     const user = userEvent.setup();
     const router = createMemoryRouter(

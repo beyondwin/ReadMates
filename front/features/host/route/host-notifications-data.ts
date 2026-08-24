@@ -23,6 +23,7 @@ import {
 } from "@/features/host/queries/host-notification-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
@@ -49,7 +50,7 @@ export function hostNotificationsLoaderFactory(client: QueryClient) {
   return async (args?: LoaderFunctionArgs): Promise<HostNotificationsRouteData> => {
     await requireHostLoaderAuth(args);
 
-    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
     const url = args?.request ? new URL(args.request.url) : null;
     const sessionId = url?.searchParams.get("sessionId") ?? null;
     const eventType = (url?.searchParams.get("eventType") as HostNotificationEventType | null) ?? null;

@@ -13,6 +13,7 @@ import type {
 } from "@/features/host/api/host-contracts";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 export const HOST_HOME_ATTENTION_LIMIT = 1;
 
@@ -31,7 +32,7 @@ export function preserveLocationSuffix(requestUrl: string, destination: string):
 export function hostDashboardLoaderFactory(client: QueryClient) {
   return async (args?: LoaderFunctionArgs): Promise<HostDashboardRouteData> => {
     await requireHostLoaderAuth(args);
-    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
 
     const [current, hostSessions, attentionResult] = await Promise.all([
       client.fetchQuery(hostCurrentSessionQuery(context)),

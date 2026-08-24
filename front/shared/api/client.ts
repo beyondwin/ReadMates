@@ -1,4 +1,12 @@
 import { apiErrorFromResponse, ReadmatesTransportError } from "@/shared/api/errors";
+import {
+  assertHostResponseActive,
+  hostRequestGeneration,
+  hostApiErrorFromResponse,
+  registerHostRequest,
+  registerHostResponseLease,
+  releaseHostResponse,
+} from "@/shared/api/host-authority-event";
 import { parseReadmatesResponse } from "@/shared/api/response";
 import { signalSessionExpired } from "@/shared/auth/session-expiry";
 import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
@@ -100,13 +108,46 @@ export async function readmatesFetchResponse(
     headers.delete(HOST_WRITE_CLIENT_CONTRACT_HEADER);
   }
 
-  const response = await readmatesTransportFetch(`/api/bff${readmatesApiPath(path, context)}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  const hostRequestController = path.startsWith("/api/host/") && context?.clubSlug
+    ? new AbortController()
+    : null;
+  const hostRequestGenerationAtStart = context?.clubSlug
+    ? hostRequestGeneration(context.clubSlug)
+    : null;
+  const unregisterHostRequest = hostRequestController && context?.clubSlug
+    ? registerHostRequest(context.clubSlug, hostRequestController)
+    : null;
+  const forwardAbort = () => hostRequestController?.abort();
+  init?.signal?.addEventListener("abort", forwardAbort, { once: true });
+  let response: Response;
+  try {
+    response = await readmatesTransportFetch(`/api/bff${readmatesApiPath(path, context)}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+      signal: hostRequestController?.signal ?? init?.signal,
+    });
+  } catch (error) {
+    unregisterHostRequest?.();
+    throw error;
+  } finally {
+    init?.signal?.removeEventListener("abort", forwardAbort);
+  }
+
+  if (
+    unregisterHostRequest
+    && context?.clubSlug
+    && hostRequestGenerationAtStart !== null
+  ) {
+    registerHostResponseLease(response, {
+      clubSlug: context.clubSlug,
+      generation: hostRequestGenerationAtStart,
+      release: unregisterHostRequest,
+    });
+  }
 
   if (response.status === 401) {
+    releaseHostResponse(response);
     if (policy?.sessionExpiry) {
       signalSessionExpired(policy.sessionExpiry === "recover-write" ? "write" : "read");
     } else {
@@ -132,12 +173,23 @@ export async function readmatesFetch<T>(
   const response = await readmatesFetchResponse(path, init, context, policy);
 
   if (!response.ok) {
-    const error = await apiErrorFromResponse(response);
+    const error = path.startsWith("/api/host/") && context?.clubSlug
+      ? await hostApiErrorFromResponse(response, {
+          clubSlug: context.clubSlug,
+          requestKind: `${init?.method?.toUpperCase() ?? "GET"} ${path}`,
+        })
+      : await apiErrorFromResponse(response);
     recordFrontendApiFailure({ path, status: error.status, errorCode: error.code });
     throw error;
   }
 
-  return parseReadmatesResponse<T>(response);
+  try {
+    const value = await parseReadmatesResponse<T>(response);
+    assertHostResponseActive(response);
+    return value;
+  } finally {
+    releaseHostResponse(response);
+  }
 }
 
 /**

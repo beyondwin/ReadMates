@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as sessionExpiry from "@/shared/auth/session-expiry";
 import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
+import { subscribeHostAuthorityLoss } from "@/shared/api/host-authority-event";
 import {
   closeHostSession,
   correctionPublishHostSession,
@@ -21,6 +22,7 @@ import {
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
   openHostSession,
+  processHostNotifications,
   parseHostInvitationListResponse,
   parseHostInvitationResponse,
   publishHostSession,
@@ -30,6 +32,9 @@ import {
   saveHostSessionPublication,
   saveHostSessionAccessScope,
   saveHostSessionVisibility,
+  submitHostMemberLifecycle,
+  submitHostMemberProfile,
+  createHostInvitation,
   updateHostSession,
 } from "./host-api";
 
@@ -149,6 +154,83 @@ afterEach(() => {
 });
 
 describe("host api wrappers", () => {
+  it.each([
+    "HOST_AUTHORITY_REVOKED",
+    "MEMBERSHIP_SUSPENDED",
+    "CROSS_CLUB_SCOPE",
+  ] as const)("emits %s with the explicit club from a normal query helper", async (code) => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeHostAuthorityLoss(listener);
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      code,
+      message: code,
+      status: 403,
+    }), { status: 403, headers: { "Content-Type": "application/json" } })));
+
+    await expect(fetchHostMembers({ clubSlug: "reading-sai" })).rejects.toMatchObject({ code });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    expect(listener).toHaveBeenCalledWith(expect.objectContaining({
+      code,
+      clubSlug: "reading-sai",
+    }));
+    unsubscribe();
+  });
+
+  it("emits one authority event from every raw host mutation response boundary", async () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeHostAuthorityLoss(listener);
+    const problem = {
+      code: "HOST_AUTHORITY_REVOKED",
+      message: "host authority revoked",
+      status: 403,
+    };
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v3"],
+          }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
+        : new Response(JSON.stringify(problem), {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          }),
+    )));
+    const context = { clubSlug: "reading-sai" };
+
+    await expect(submitHostMemberLifecycle(
+      "member-1",
+      "/suspend",
+      undefined,
+      context,
+    )).rejects.toMatchObject({ code: problem.code });
+    await expect(submitHostMemberProfile("member-1", "새 이름", context))
+      .rejects.toMatchObject({ code: problem.code });
+    await expect(createHostInvitation({ name: "초대", email: "invite@example.test" }, context))
+      .rejects.toMatchObject({ code: problem.code });
+    await expect(processHostNotifications(context)).rejects.toMatchObject({ code: problem.code });
+    await expect(createHostSession({
+      idempotencyKey: "b7-host-create-0001",
+      expected: {},
+      command: {
+        title: "함께 읽기",
+        bookTitle: "모비 딕",
+        bookAuthor: "허먼 멜빌",
+        date: "2026-08-30",
+      },
+    }, context)).rejects.toMatchObject({ code: problem.code });
+
+    expect(listener).toHaveBeenCalledTimes(5);
+    expect(listener.mock.calls.map(([event]) => event)).toEqual([
+      expect.objectContaining({ clubSlug: "reading-sai", requestKind: "MEMBER_LIFECYCLE" }),
+      expect.objectContaining({ clubSlug: "reading-sai", requestKind: "MEMBER_PROFILE" }),
+      expect.objectContaining({ clubSlug: "reading-sai", requestKind: "INVITATION_CREATE" }),
+      expect.objectContaining({ clubSlug: "reading-sai", requestKind: "NOTIFICATIONS_PROCESS" }),
+      expect.objectContaining({ clubSlug: "reading-sai", requestKind: "SESSION_CREATE" }),
+    ]);
+    unsubscribe();
+  });
+
   it("parses an exact club-scoped mutation reconciliation response", async () => {
     const receipt = {
       receiptId: "receipt-1",
@@ -540,10 +622,10 @@ describe("host api wrappers", () => {
       .mockResolvedValueOnce(jsonResponse({ items: [hostMemberListItem(42)], nextCursor: null }));
     vi.stubGlobal("fetch", fetchMock);
 
-    await expect(fetchHostMembers()).resolves.toMatchObject({
+    await expect(fetchHostMembers({ clubSlug: "reading-sai" })).resolves.toMatchObject({
       items: [{ avatarKey: "future-avatar" }],
     });
-    await expect(fetchHostMembers()).rejects.toThrow();
+    await expect(fetchHostMembers({ clubSlug: "reading-sai" })).rejects.toThrow();
   });
 
   it("parses visibility responses and returns the composer result", async () => {
@@ -590,6 +672,7 @@ describe("host api wrappers", () => {
     await expect(saveHostSessionVisibility(
       "session-7",
       { visibility: "MEMBER" },
+      { clubSlug: "reading-sai" },
     )).rejects.toMatchObject({
       name: "ZodError",
     });
@@ -646,7 +729,7 @@ describe("host api wrappers", () => {
       hints: ["이전 모임과 같은 시간으로 넣었습니다."],
     })));
 
-    await expect(fetchHostSessionScheduleDefaults()).resolves.toEqual({
+    await expect(fetchHostSessionScheduleDefaults({ clubSlug: "reading-sai" })).resolves.toEqual({
       automatic: {
         startTime: "19:30",
         endTime: "21:30",
@@ -667,7 +750,7 @@ describe("host api wrappers", () => {
     const spy = vi.spyOn(sessionExpiry, "signalSessionExpired");
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
 
-    await expect(fetchHostSessionScheduleDefaults()).rejects.toThrow("ReadMatesSessionExpiredError");
+    await expect(fetchHostSessionScheduleDefaults({ clubSlug: "reading-sai" })).rejects.toThrow("ReadMatesSessionExpiredError");
     expect(spy).toHaveBeenCalledWith("read");
   });
 

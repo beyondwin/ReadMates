@@ -12,6 +12,7 @@ import {
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { recoverableHostListLoaderFailure } from "./host-list-loader-recovery";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 export const HOST_SESSION_LEDGER_PAGE_LIMIT = 50;
 
@@ -36,7 +37,7 @@ export function hostSessionLedgerLoaderFactory(client: QueryClient) {
   return async (args?: LoaderFunctionArgs): Promise<HostSessionLedgerRouteData> => {
     await requireHostLoaderAuth(args);
     const filters = hostSessionLedgerFiltersFromRequest(args?.request);
-    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
     const request = {
       ...filters,
       page: { limit: HOST_SESSION_LEDGER_PAGE_LIMIT },

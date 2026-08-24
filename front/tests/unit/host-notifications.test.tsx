@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter } from "react-router";
+import { createMemoryRouter, MemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import type { LoaderFunctionArgs } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +32,9 @@ import type {
   ManualNotificationPreviewResponse,
   NotificationTestMailAuditItem,
 } from "@/features/host/api/host-contracts";
+import { HostAuthorityLossController } from "@/src/app/host-authority-loss-controller";
+import { hostClubQueryPrefix } from "@/features/host/queries/host-state-purge";
+import { signalHostAuthorityLoss } from "@/shared/api/host-authority-event";
 
 const summary: HostNotificationSummary = {
   pending: 2,
@@ -218,6 +221,7 @@ function renderPage({
 } = {}) {
   render(
     <HostNotificationsPage
+      clubSlug="reading-sai"
       summary={summaryData}
       events={events}
       deliveries={deliveries}
@@ -561,6 +565,18 @@ describe("HostNotificationsRoute", () => {
       const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const url = input.toString();
 
+        if (url === "/api/bff/__internal/client-contract-status") {
+          return Promise.resolve(new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v3"],
+          }), {
+            headers: {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+            },
+          }));
+        }
+
         if (
           url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
           && init?.method === "PUT"
@@ -638,6 +654,18 @@ describe("HostNotificationsRoute", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
 
+      if (url === "/api/bff/__internal/client-contract-status") {
+        return Promise.resolve(new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v3"],
+        }), {
+          headers: {
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+          },
+        }));
+      }
+
       if (
         url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
         && init?.method === "PUT"
@@ -678,6 +706,18 @@ describe("HostNotificationsRoute", () => {
     let policyGetCount = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
+
+      if (url === "/api/bff/__internal/client-contract-status") {
+        return Promise.resolve(new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v3"],
+        }), {
+          headers: {
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+          },
+        }));
+      }
 
       if (
         url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
@@ -870,6 +910,118 @@ describe("HostNotificationsRoute", () => {
 });
 
 describe("HostNotificationsPage", () => {
+  it("clears actual workbench draft/search and page preview/error before authority replacement", async () => {
+    const user = userEvent.setup();
+    const client = testQueryClient();
+    const selectableOptions: ManualNotificationOptionsResponse = {
+      ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template) => template.eventType === "SESSION_REMINDER_DUE"
+        ? { ...template, allowedAudiences: [...template.allowedAudiences, "SELECTED_MEMBERS"] }
+        : template),
+      members: {
+        items: [{
+          membershipId: "membership-secret",
+          displayName: "비공개 멤버",
+          maskedEmail: "s***@example.com",
+          role: "MEMBER",
+          membershipStatus: "ACTIVE",
+          sessionParticipationStatus: "ACTIVE",
+          attendanceStatus: null,
+          emailEligibility: "ELIGIBLE",
+          inAppEligibility: "ELIGIBLE",
+        }],
+        nextCursor: null,
+      },
+    };
+    const preview: ManualNotificationPreviewResponse = {
+      previewId: "preview-sensitive",
+      expiresAt: "2026-08-25T02:00:00+09:00",
+      template: {
+        eventType: "SESSION_REMINDER_DUE",
+        label: "모임 전날 리마인더",
+        subject: "비공개 미리보기",
+        bodyPreview: "권한 해제 전에만 보이는 내용",
+      },
+      audience: {
+        baseGroup: "SELECTED_MEMBERS",
+        baseCount: 0,
+        excludedCount: 0,
+        includedCount: 1,
+        finalTargetCount: 1,
+      },
+      channels: {
+        requested: "BOTH",
+        inAppEligibleCount: 1,
+        emailEligibleCount: 1,
+        emailSkippedByPreferenceCount: 0,
+        emailMissingCount: 0,
+      },
+      duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
+      warnings: [],
+    };
+    const stateWhenHandled: Array<{ preview: boolean; error: boolean; search: string | null }> = [];
+    const otherClubKey = [...hostClubQueryPrefix("other-club"), "authority-proof"];
+    client.setQueryData(otherClubKey, "remove");
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app/host/notifications"]}>
+          <HostAuthorityLossController
+            onHandled={() => stateWhenHandled.push({
+              preview: Boolean(screen.queryByRole("dialog", { name: "발송 전 확인" })),
+              error: screen.queryAllByText("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요.").length > 0,
+              search: (screen.queryByRole("searchbox", { name: "멤버 검색" }) as HTMLInputElement | null)?.value ?? null,
+            })}
+          />
+          <HostNotificationsPage
+            clubSlug="reading-sai"
+            summary={summary}
+            events={[]}
+            deliveries={[]}
+            audit={[]}
+            hostSessions={[hostSessionCurrent]}
+            manualOptions={selectableOptions}
+            initialManualSelection={{ sessionId: "session-1", eventType: "SESSION_REMINDER_DUE" }}
+            onProcess={vi.fn()}
+            onRetry={vi.fn()}
+            onRestore={vi.fn()}
+            onSendTestMail={vi.fn()}
+            onPreviewManual={vi.fn().mockResolvedValue(preview)}
+            onConfirmManual={vi.fn().mockRejectedValue(new Error("confirm failed"))}
+            onLoadManualOptions={vi.fn().mockResolvedValue(selectableOptions)}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "직접 선택" }));
+    await user.type(screen.getByRole("searchbox", { name: "멤버 검색" }), "private member search");
+    await user.click(screen.getByRole("button", { name: "검색" }));
+    await user.click(screen.getByRole("checkbox", { name: /비공개 멤버/ }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
+    await user.click(await screen.findByRole("button", { name: "1명에게 알림 발송" }));
+    expect(await screen.findAllByText("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요."))
+      .not.toHaveLength(0);
+
+    signalHostAuthorityLoss({
+      code: "CROSS_CLUB_SCOPE",
+      clubSlug: "other-club",
+      requestKind: "NOTIFICATIONS_MANUAL_CONFIRM",
+    });
+    await waitFor(() => expect(client.getQueryData(otherClubKey)).toBeUndefined());
+    expect(screen.getByRole("dialog", { name: "발송 전 확인" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "멤버 검색" })).toHaveValue("private member search");
+    expect(stateWhenHandled).toEqual([]);
+
+    signalHostAuthorityLoss({
+      code: "HOST_AUTHORITY_REVOKED",
+      clubSlug: "reading-sai",
+      requestKind: "NOTIFICATIONS_MANUAL_CONFIRM",
+    });
+    await waitFor(() => expect(stateWhenHandled).toHaveLength(1));
+    expect(stateWhenHandled).toEqual([{ preview: false, error: false, search: null }]);
+  });
+
   it("preserves the selected enabled template when session options change", async () => {
     const user = userEvent.setup();
     const sessionOneOptions = {
@@ -893,6 +1045,7 @@ describe("HostNotificationsPage", () => {
       })),
     } satisfies ManualNotificationOptionsResponse;
     const workbenchProps = {
+      clubSlug: "reading-sai",
       hostSessions: [hostSessionCurrent, hostSessionDraft],
       initialSessionId: "session-1",
       initialEventType: null,
@@ -948,6 +1101,7 @@ describe("HostNotificationsPage", () => {
       })),
     } satisfies ManualNotificationOptionsResponse;
     const workbenchProps = {
+      clubSlug: "reading-sai",
       hostSessions: [hostSessionCurrent, hostSessionDraft],
       initialSessionId: "session-1",
       initialEventType: null,
@@ -1360,6 +1514,7 @@ describe("HostNotificationsPage", () => {
 
     render(
       <HostNotificationsPage
+        clubSlug="reading-sai"
         summary={summary}
         events={[pendingEvent]}
         deliveries={[pendingItem]}
@@ -1474,6 +1629,7 @@ describe("HostNotificationsPage", () => {
       .mockResolvedValue(preview);
     const { rerender } = render(
       <HostNotificationsPage
+        clubSlug="reading-sai"
         summary={summary}
         events={[pendingEvent]}
         deliveries={[deadDelivery]}
@@ -1498,6 +1654,7 @@ describe("HostNotificationsPage", () => {
 
     rerender(
       <HostNotificationsPage
+        clubSlug="reading-sai"
         summary={{ ...summary, sentLast24h: summary.sentLast24h + 1 }}
         events={[{ ...pendingEvent, attemptCount: 2 }]}
         deliveries={[deadDelivery]}

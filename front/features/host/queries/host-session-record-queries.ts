@@ -25,7 +25,7 @@ import type {
   SaveHostSessionRecordDraftRequest,
 } from "@/features/host/api/host-session-record-contracts";
 import { normalizeHostSessionLedgerRequest } from "@/features/host/api/host-session-record-contracts";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import { recordHostAttentionResult } from "@/shared/observability/frontend-observability";
 import {
@@ -34,10 +34,11 @@ import {
   invalidateHostSessionDashboard,
 } from "./host-session-queries";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
+import { hostMutationKey } from "./host-state-purge";
 
 export { hostSessionRecordKeys } from "./host-session-record-query-keys";
 
-export function hostSessionRecordCapabilitiesQuery(context?: ReadmatesApiContext) {
+export function hostSessionRecordCapabilitiesQuery(context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostSessionRecordKeys.capabilities(context),
     queryFn: () => fetchHostSessionRecordCapabilities(context),
@@ -47,8 +48,8 @@ export function hostSessionRecordCapabilitiesQuery(context?: ReadmatesApiContext
 export const HOST_OPERATIONS_ATTENTION_PAGE_LIMIT = 20;
 
 export function hostSessionRecordLedgerQuery(
-  request?: HostSessionLedgerRequest,
-  context?: ReadmatesApiContext,
+  request: HostSessionLedgerRequest | undefined,
+  context: ExplicitReadmatesApiContext,
 ) {
   const normalizedRequest = normalizeHostSessionLedgerRequest(request);
   return queryOptions({
@@ -57,7 +58,7 @@ export function hostSessionRecordLedgerQuery(
   });
 }
 
-export function hostSessionRecordAttentionPagesQuery(context?: ReadmatesApiContext) {
+export function hostSessionRecordAttentionPagesQuery(context: ExplicitReadmatesApiContext) {
   return infiniteQueryOptions({
     queryKey: hostSessionRecordKeys.attentionPages(context),
     queryFn: async ({ pageParam }) => {
@@ -77,7 +78,7 @@ export function hostSessionRecordAttentionPagesQuery(context?: ReadmatesApiConte
   });
 }
 
-export function hostSessionRecordEditorQuery(sessionId: string, context?: ReadmatesApiContext) {
+export function hostSessionRecordEditorQuery(sessionId: string, context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostSessionRecordKeys.editor(sessionId, context),
     queryFn: () => fetchHostSessionRecordEditor(sessionId, context),
@@ -86,8 +87,8 @@ export function hostSessionRecordEditorQuery(sessionId: string, context?: Readma
 
 export function hostSessionRecordHistoryQuery(
   sessionId: string,
-  page?: PageRequest,
-  context?: ReadmatesApiContext,
+  page: PageRequest | undefined,
+  context: ExplicitReadmatesApiContext,
 ) {
   return queryOptions({
     queryKey: hostSessionRecordKeys.history(sessionId, page, context),
@@ -98,7 +99,7 @@ export function hostSessionRecordHistoryQuery(
 function updateEditorDraft(
   client: QueryClient,
   sessionId: string,
-  context: ReadmatesApiContext | undefined,
+  context: ExplicitReadmatesApiContext,
   draft: HostSessionRecordDraft | null,
   preserveExistingStaleness = false,
 ) {
@@ -126,14 +127,15 @@ function updateEditorDraft(
 
 function invalidateRecordDraftLedgerProjection(
   client: QueryClient,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   return client.invalidateQueries({ queryKey: hostSessionRecordKeys.ledgers(context) });
 }
 
-export function useSaveHostSessionRecordDraftMutation(context?: ReadmatesApiContext) {
+export function useSaveHostSessionRecordDraftMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "records", "save-draft"),
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: SaveHostSessionRecordDraftRequest;
@@ -145,9 +147,10 @@ export function useSaveHostSessionRecordDraftMutation(context?: ReadmatesApiCont
   });
 }
 
-export function useRebaseHostSessionRecordDraftMutation(context?: ReadmatesApiContext) {
+export function useRebaseHostSessionRecordDraftMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "records", "rebase-draft"),
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: RebaseHostSessionRecordDraftRequest;
@@ -195,9 +198,10 @@ export function useRebaseHostSessionRecordDraftMutation(context?: ReadmatesApiCo
   });
 }
 
-export function useDeleteHostSessionRecordDraftMutation(context?: ReadmatesApiContext) {
+export function useDeleteHostSessionRecordDraftMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "records", "delete-draft"),
     mutationFn: ({ sessionId, expectedDraftRevision }: {
       sessionId: string;
       expectedDraftRevision: number;
@@ -209,7 +213,7 @@ export function useDeleteHostSessionRecordDraftMutation(context?: ReadmatesApiCo
   });
 }
 
-export function usePreviewHostSessionRecordApplyMutation(context?: ReadmatesApiContext) {
+export function usePreviewHostSessionRecordApplyMutation(context: ExplicitReadmatesApiContext) {
   return useMutation<
     HostSessionRecordApplyPreview,
     Error,
@@ -218,6 +222,7 @@ export function usePreviewHostSessionRecordApplyMutation(context?: ReadmatesApiC
       request: PreviewHostSessionRecordApplyRequest;
     }
   >({
+    mutationKey: hostMutationKey(context.clubSlug, "records", "preview-apply"),
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: PreviewHostSessionRecordApplyRequest;
@@ -228,10 +233,10 @@ export function usePreviewHostSessionRecordApplyMutation(context?: ReadmatesApiC
 async function invalidateAppliedRecordSurfaces(
   client: QueryClient,
   sessionId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
   invalidateMemberAndPublicSurfaces?: (event: {
     sessionId: string;
-    clubSlug?: string;
+    clubSlug: string;
   }) => Promise<unknown>,
 ) {
   await Promise.all([
@@ -242,17 +247,17 @@ async function invalidateAppliedRecordSurfaces(
     ...(invalidateMemberAndPublicSurfaces
       ? [invalidateMemberAndPublicSurfaces({
           sessionId,
-          clubSlug: context?.clubSlug,
+          clubSlug: context.clubSlug,
         })]
       : []),
   ]);
 }
 
 export function useApplyHostSessionRecordMutation(
-  context: ReadmatesApiContext | undefined,
+  context: ExplicitReadmatesApiContext,
   invalidateMemberAndPublicSurfaces: (event: {
     sessionId: string;
-    clubSlug?: string;
+    clubSlug: string;
   }) => Promise<unknown>,
 ) {
   const client = useQueryClient();
@@ -264,6 +269,9 @@ export function useApplyHostSessionRecordMutation(
       request: HostSessionRecordApplyRequest;
     }
   >({
+    mutationKey: context?.clubSlug
+      ? hostMutationKey(context.clubSlug, "records", "apply")
+      : ["host-mutation-context-required", "records", "apply"],
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: HostSessionRecordApplyRequest;
@@ -321,9 +329,10 @@ export function useApplyHostSessionRecordMutation(
   });
 }
 
-export function useRestoreHostSessionRevisionToDraftMutation(context?: ReadmatesApiContext) {
+export function useRestoreHostSessionRevisionToDraftMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "records", "restore-revision"),
     mutationFn: ({ sessionId, revisionId, request }: {
       sessionId: string;
       revisionId: string;

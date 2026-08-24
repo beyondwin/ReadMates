@@ -130,6 +130,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     };
     saveAigenDraft({
       version: 2,
+      clubSlug: "club-a",
       jobId: PRESEEDED_JOB_ID,
       revision: 0,
       serverSnapshot: serverSnapshot(),
@@ -186,6 +187,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     const newerDraft = { ...newerServer, summary: "새 revision 사용자 편집" };
     saveAigenDraft({
       version: 2,
+      clubSlug: "club-a",
       jobId: PRESEEDED_JOB_ID,
       revision: 4,
       serverSnapshot: newerServer,
@@ -211,7 +213,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     });
 
     const { client, Wrapper } = createWrapper();
-    client.setQueryData(aiJobKeys.detail("s1", PRESEEDED_JOB_ID), {
+    client.setQueryData(aiJobKeys.detail("s1", PRESEEDED_JOB_ID, { clubSlug: "club-a" }), {
       ...jobResponse(),
       revision: 3,
       groundingStatus: "VALID",

@@ -21,7 +21,10 @@ function client() {
 }
 
 function args(url: string) {
-  return { request: new Request(url) } as unknown as LoaderFunctionArgs;
+  return {
+    request: new Request(url),
+    params: { clubSlug: "reading-sai" },
+  } as unknown as LoaderFunctionArgs;
 }
 
 afterEach(() => vi.unstubAllGlobals());

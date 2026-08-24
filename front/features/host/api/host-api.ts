@@ -2,10 +2,14 @@ import {
   readmatesFetch,
   readmatesFetchResponse,
   RECOVER_READ_SESSION_EXPIRY,
-  type ReadmatesApiContext,
   type ExplicitReadmatesApiContext,
 } from "@/shared/api/client";
-import { apiErrorFromResponse } from "@/shared/api/errors";
+import {
+  completeHostResponseBody,
+  hostApiErrorFromResponse,
+  isHostSecurityPurgeCode,
+  readHostResponseJson,
+} from "@/shared/api/host-authority-event";
 import type { CurrentSessionResponse } from "@/shared/model/current-session-contracts";
 import type {
   CreatedSessionResponse,
@@ -126,19 +130,35 @@ function parseEnvelope<T>(schema: { parse(value: unknown): unknown }, envelope: 
   return envelope;
 }
 
-export function fetchHostCurrentSession(context?: ReadmatesApiContext) {
+async function rawHostResponse(
+  responsePromise: Promise<Response>,
+  context: ExplicitHostApiContext,
+  requestKind: string,
+): Promise<Response> {
+  const response = await responsePromise;
+  if (!response.ok) {
+    const error = await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind,
+    });
+    if (isHostSecurityPurgeCode(error.code)) throw error;
+  }
+  return completeHostResponseBody(response);
+}
+
+export function fetchHostCurrentSession(context: ExplicitHostApiContext) {
   return readmatesFetch<CurrentSessionResponse>("/api/sessions/current", undefined, context);
 }
 
-export function fetchHostClubOperations(context: { clubSlug: string | undefined }) {
+export function fetchHostClubOperations(context: ExplicitHostApiContext) {
   return readmatesFetch<HostClubOperationsResponse>("/api/host/club-operations", undefined, context);
 }
 
-export function fetchHostNotificationSummary(context?: ReadmatesApiContext) {
+export function fetchHostNotificationSummary(context: ExplicitHostApiContext) {
   return readmatesFetch<HostNotificationSummary>("/api/host/notifications/summary", undefined, context);
 }
 
-export function fetchHostNotificationPolicy(context?: ReadmatesApiContext) {
+export function fetchHostNotificationPolicy(context: ExplicitHostApiContext) {
   return readmatesFetch<HostNotificationPolicyResponse>(
     "/api/host/notifications/policy",
     undefined,
@@ -148,7 +168,7 @@ export function fetchHostNotificationPolicy(context?: ReadmatesApiContext) {
 
 export function updateHostNotificationPolicy(
   request: UpdateHostNotificationPolicyRequest,
-  context?: ReadmatesApiContext,
+  context: ExplicitHostApiContext,
 ) {
   return readmatesFetch<HostNotificationPolicyResponse>(
     "/api/host/notifications/policy",
@@ -161,8 +181,12 @@ export function updateHostNotificationPolicy(
   );
 }
 
-export function processHostNotifications() {
-  return readmatesFetchResponse("/api/host/notifications/process", { method: "POST" });
+export function processHostNotifications(context: ExplicitHostApiContext) {
+  return rawHostResponse(
+    readmatesFetchResponse("/api/host/notifications/process", { method: "POST" }, context),
+    context,
+    "NOTIFICATIONS_PROCESS",
+  );
 }
 
 function hostNotificationItemSearch(status?: HostNotificationStatus, page?: PageRequest) {
@@ -180,21 +204,25 @@ function hostNotificationItemSearch(status?: HostNotificationStatus, page?: Page
   return search ? `?${search}` : "";
 }
 
-export function fetchHostNotificationItems(status?: HostNotificationStatus, context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostNotificationItems(
+  status: HostNotificationStatus | undefined,
+  context: ExplicitHostApiContext,
+  page?: PageRequest,
+) {
   const search = hostNotificationItemSearch(status, page);
   return readmatesFetch<HostNotificationItemListResponse>(`/api/host/notifications/items${search}`, undefined, context);
 }
 
-export function fetchHostNotificationEvents(context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostNotificationEvents(context: ExplicitHostApiContext, page?: PageRequest) {
   return readmatesFetch<HostNotificationEventListResponse>(`/api/host/notifications/events${pagingSearchParams(page)}`, undefined, context);
 }
 
-export function fetchHostNotificationDeliveries(context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostNotificationDeliveries(context: ExplicitHostApiContext, page?: PageRequest) {
   return readmatesFetch<HostNotificationDeliveryListResponse>(`/api/host/notifications/deliveries${pagingSearchParams(page)}`, undefined, context).then(parseHostNotificationDeliveryListResponse);
 }
 
 export function fetchManualNotificationOptions(
-  context?: ReadmatesApiContext,
+  context: ExplicitHostApiContext,
   request?: { sessionId?: string; search?: string; page?: PageRequest },
 ) {
   const params = new URLSearchParams();
@@ -218,7 +246,7 @@ export function fetchManualNotificationOptions(
 }
 
 export function fetchManualNotificationDispatches(
-  context?: ReadmatesApiContext,
+  context: ExplicitHostApiContext,
   request?: { sessionId?: string; eventType?: HostNotificationEventType; page?: PageRequest },
 ) {
   const params = new URLSearchParams();
@@ -241,23 +269,29 @@ export function fetchManualNotificationDispatches(
   );
 }
 
-export function previewManualNotification(request: ManualNotificationPreviewRequest) {
+export function previewManualNotification(
+  request: ManualNotificationPreviewRequest,
+  context: ExplicitHostApiContext,
+) {
   return readmatesFetch<ManualNotificationPreviewResponse>("/api/host/notifications/manual/preview", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  });
+  }, context);
 }
 
-export function confirmManualNotification(request: ManualNotificationConfirmRequest) {
+export function confirmManualNotification(
+  request: ManualNotificationConfirmRequest,
+  context: ExplicitHostApiContext,
+) {
   return readmatesFetch<ManualNotificationConfirmResponse>("/api/host/notifications/manual", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  });
+  }, context);
 }
 
-export function fetchHostNotificationDetail(id: string, context?: ReadmatesApiContext) {
+export function fetchHostNotificationDetail(id: string, context: ExplicitHostApiContext) {
   return readmatesFetch<HostNotificationDetailResponse>(
     `/api/host/notifications/items/${encodeURIComponent(id)}`,
     undefined,
@@ -265,39 +299,44 @@ export function fetchHostNotificationDetail(id: string, context?: ReadmatesApiCo
   );
 }
 
-export function retryHostNotification(id: string) {
+export function retryHostNotification(id: string, context: ExplicitHostApiContext) {
   return readmatesFetch<HostNotificationDetailResponse>(
     `/api/host/notifications/items/${encodeURIComponent(id)}/retry`,
     { method: "POST" },
+    context,
   );
 }
 
-export function restoreHostNotification(id: string) {
+export function restoreHostNotification(id: string, context: ExplicitHostApiContext) {
   return readmatesFetch<HostNotificationDetailResponse>(
     `/api/host/notifications/items/${encodeURIComponent(id)}/restore`,
     { method: "POST" },
+    context,
   );
 }
 
-export function sendHostNotificationTestMail(request: SendNotificationTestMailRequest) {
+export function sendHostNotificationTestMail(
+  request: SendNotificationTestMailRequest,
+  context: ExplicitHostApiContext,
+) {
   return readmatesFetch<NotificationTestMailAuditItem>("/api/host/notifications/test-mail", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  });
+  }, context);
 }
 
-export function fetchHostNotificationTestMailAudit(context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostNotificationTestMailAudit(context: ExplicitHostApiContext, page?: PageRequest) {
   return readmatesFetch<NotificationTestMailAuditPage>(`/api/host/notifications/test-mail/audit${pagingSearchParams(page)}`, undefined, context);
 }
 
-export function fetchHostSessions(context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostSessions(context: ExplicitHostApiContext, page?: PageRequest) {
   return readmatesFetch<HostSessionListPage>(`/api/host/sessions${pagingSearchParams(page)}`, undefined, context);
 }
 
 export function fetchHostSessionList(
   mode: HostListMode,
-  context?: ReadmatesApiContext,
+  context: ExplicitHostApiContext,
   page?: PageRequest,
 ) {
   const params = new URLSearchParams({ mode });
@@ -314,7 +353,7 @@ export function fetchHostSessionList(
   ).then((value) => parseHostSessionListPage(value, mode));
 }
 
-export function fetchHostSessionScheduleDefaults(context?: ReadmatesApiContext) {
+export function fetchHostSessionScheduleDefaults(context: ExplicitHostApiContext) {
   return readmatesFetch<HostSessionScheduleDefaultsWire>(
     "/api/host/sessions/schedule-defaults",
     undefined,
@@ -323,11 +362,11 @@ export function fetchHostSessionScheduleDefaults(context?: ReadmatesApiContext) 
   ).then(normalizeHostSessionScheduleDefaults);
 }
 
-export function fetchHostSessionDetail(sessionId: string, context?: ReadmatesApiContext) {
+export function fetchHostSessionDetail(sessionId: string, context: ExplicitHostApiContext) {
   return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, undefined, context).then(parseHostSessionDetailResponse);
 }
 
-export function fetchHostSessionTrashList(context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostSessionTrashList(context: ExplicitHostApiContext, page?: PageRequest) {
   return readmatesFetch<HostSessionTrashPage>(
     `/api/host/sessions/trash${pagingSearchParams(page)}`,
     undefined,
@@ -335,7 +374,7 @@ export function fetchHostSessionTrashList(context?: ReadmatesApiContext, page?: 
   ).then(parseHostSessionTrashPage);
 }
 
-export function fetchHostSessionTrash(sessionId: string, context?: ReadmatesApiContext) {
+export function fetchHostSessionTrash(sessionId: string, context: ExplicitHostApiContext) {
   return readmatesFetch<HostSessionTrashItem>(
     `/api/host/sessions/${encodeURIComponent(sessionId)}/trash`,
     undefined,
@@ -369,7 +408,7 @@ export function restoreHostSession(
   ).then(parseHostSessionDetailResponse);
 }
 
-export function fetchHostSessionClosingStatus(sessionId: string, context?: ReadmatesApiContext) {
+export function fetchHostSessionClosingStatus(sessionId: string, context: ExplicitHostApiContext) {
   return readmatesFetch<HostSessionClosingStatusResponse>(
     `/api/host/sessions/${encodeURIComponent(sessionId)}/closing-status`,
     undefined,
@@ -381,11 +420,11 @@ export function createHostSession(
   envelope: HostSessionCreateEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse("/api/host/sessions", {
+  return rawHostResponse(readmatesFetchResponse("/api/host/sessions", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parseEnvelope(CreateHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<CreatedSessionResponse> }>;
+  }, context), context, "SESSION_CREATE") as Promise<Response & { json(): Promise<CreatedSessionResponse> }>;
 }
 
 export function updateHostSession(
@@ -393,16 +432,16 @@ export function updateHostSession(
   envelope: HostSessionUpdateEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parseEnvelope(UpdateHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_BASIC_SAVE") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function fetchHostSessionDeletionPreview(
   sessionId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitHostApiContext,
 ): Promise<HostSessionDeletionPreviewResponse> {
   return readmatesFetch<HostSessionDeletionPreviewResponse>(
     `/api/host/sessions/${encodeURIComponent(sessionId)}/deletion-preview`,
@@ -434,9 +473,12 @@ export async function saveHostSessionAttendance(
     body: JSON.stringify(parseEnvelope(AttendanceHostSessionMutationEnvelopeSchema, envelope)),
   }, context);
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    throw await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind: "SESSION_ATTENDANCE_SAVE",
+    });
   }
-  return parseHostAttendanceResponse(await response.json());
+  return parseHostAttendanceResponse(await readHostResponseJson(response));
 }
 
 export function saveHostSessionPublication(
@@ -444,17 +486,17 @@ export function saveHostSessionPublication(
   envelope: HostSessionPublicationEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/publication`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/publication`, {
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parseEnvelope(PublicationHostSessionMutationEnvelopeSchema, envelope)),
-  }, context);
+  }, context), context, "SESSION_PUBLICATION_SAVE");
 }
 
 export async function saveHostSessionVisibility(
   sessionId: string,
   request: HostSessionVisibilityRequest,
-  context?: ReadmatesApiContext,
+  context: ExplicitHostApiContext,
 ): Promise<HostSessionVisibilityUpdateResult> {
   const response = await readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/visibility`, {
     method: "PATCH",
@@ -462,10 +504,13 @@ export async function saveHostSessionVisibility(
     body: JSON.stringify(request),
   }, context);
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    throw await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind: "SESSION_VISIBILITY_SAVE",
+    });
   }
   return HostSessionVisibilityUpdateResponseSchema.parse(
-    await response.json(),
+    await readHostResponseJson(response),
   );
 }
 
@@ -480,9 +525,12 @@ export async function saveHostSessionAccessScope(
     body: JSON.stringify(parseEnvelope(AccessHostSessionMutationEnvelopeSchema, envelope)),
   }, context);
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    throw await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind: "SESSION_ACCESS_SCOPE_SAVE",
+    });
   }
-  return HostSessionVisibilityUpdateResponseSchema.parse(await response.json());
+  return HostSessionVisibilityUpdateResponseSchema.parse(await readHostResponseJson(response));
 }
 
 export function openHostSession(
@@ -490,10 +538,10 @@ export function openHostSession(
   envelope: HostSessionRevisionEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/open`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/open`, {
     method: "POST",
     body: JSON.stringify(parseEnvelope(SessionRevisionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_OPEN") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function closeHostSession(
@@ -501,10 +549,10 @@ export function closeHostSession(
   envelope: HostSessionCloseEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/close`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/close`, {
     method: "POST",
     body: JSON.stringify(parseEnvelope(CloseHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_CLOSE") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function publishHostSession(
@@ -512,10 +560,10 @@ export function publishHostSession(
   envelope: HostSessionPublishEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/publish`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/publish`, {
     method: "POST",
     body: JSON.stringify(parseEnvelope(PublishHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_PUBLISH") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function correctionPublishHostSession(
@@ -523,10 +571,10 @@ export function correctionPublishHostSession(
   envelope: HostSessionCorrectionPublishEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/correction-publish`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/correction-publish`, {
     method: "POST",
     body: JSON.stringify(parseEnvelope(CorrectionPublishHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_CORRECTION_PUBLISH") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function reopenHostSession(
@@ -534,11 +582,11 @@ export function reopenHostSession(
   envelope: HostSessionReverseEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/reopen`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/reopen`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parseEnvelope(ReverseHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_REOPEN") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function unpublishHostSession(
@@ -546,11 +594,11 @@ export function unpublishHostSession(
   envelope: HostSessionReverseEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/unpublish`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/unpublish`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parseEnvelope(ReverseHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_UNPUBLISH") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
 export function returnHostSessionToDraft(
@@ -558,14 +606,18 @@ export function returnHostSessionToDraft(
   envelope: HostSessionReverseEnvelope,
   context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/return-to-draft`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/sessions/${encodeURIComponent(sessionId)}/return-to-draft`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(parseEnvelope(ReverseHostSessionMutationEnvelopeSchema, envelope)),
-  }, context) as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
+  }, context), context, "SESSION_RETURN_TO_DRAFT") as Promise<Response & { json(): Promise<HostSessionDetailResponse> }>;
 }
 
-export function previewHostSessionImport(sessionId: string, request: SessionImportRequest) {
+export function previewHostSessionImport(
+  sessionId: string,
+  request: SessionImportRequest,
+  context: ExplicitHostApiContext,
+) {
   return readmatesFetch<SessionImportPreviewResponse>(
     `/api/host/sessions/${encodeURIComponent(sessionId)}/session-import/preview`,
     {
@@ -573,10 +625,15 @@ export function previewHostSessionImport(sessionId: string, request: SessionImpo
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     },
+    context,
   ).then(parseSessionImportPreviewResponse);
 }
 
-export function commitHostSessionImport(sessionId: string, request: SessionImportRequest) {
+export function commitHostSessionImport(
+  sessionId: string,
+  request: SessionImportRequest,
+  context: ExplicitHostApiContext,
+) {
   return readmatesFetch<SessionImportCommitResponse>(
     `/api/host/sessions/${encodeURIComponent(sessionId)}/session-import/commit`,
     {
@@ -584,10 +641,11 @@ export function commitHostSessionImport(sessionId: string, request: SessionImpor
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(request),
     },
+    context,
   );
 }
 
-export function fetchHostMembers(context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostMembers(context: ExplicitHostApiContext, page?: PageRequest) {
   return readmatesFetch<HostMemberListPage>(
     `/api/host/members${pagingSearchParams(page)}`,
     undefined,
@@ -598,58 +656,74 @@ export function fetchHostMembers(context?: ReadmatesApiContext, page?: PageReque
 export function submitHostMemberLifecycle(
   membershipId: string,
   path: "/suspend" | "/deactivate" | "/restore" | "/current-session/add" | "/current-session/remove",
-  request?: MemberLifecycleRequest,
+  request: MemberLifecycleRequest | undefined,
+  context: ExplicitHostApiContext,
 ) {
-  return readmatesFetchResponse(`/api/host/members/${encodeURIComponent(membershipId)}${path}`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/members/${encodeURIComponent(membershipId)}${path}`, {
     method: "POST",
     body: request ? JSON.stringify(request) : undefined,
-  }) as Promise<Response & { json(): Promise<MemberLifecycleResponse> }>;
+  }, context), context, "MEMBER_LIFECYCLE") as Promise<Response & { json(): Promise<MemberLifecycleResponse> }>;
 }
 
-export function submitHostViewerAction(membershipId: string, action: "activate" | "deactivate-viewer") {
+export function submitHostViewerAction(
+  membershipId: string,
+  action: "activate" | "deactivate-viewer",
+  context: ExplicitHostApiContext,
+) {
   return readmatesFetch<ViewerMember>(`/api/host/members/${encodeURIComponent(membershipId)}/${action}`, {
     method: "POST",
-  });
+  }, context);
 }
 
-export function submitHostMemberProfile(membershipId: string, displayName: string) {
+export function submitHostMemberProfile(
+  membershipId: string,
+  displayName: string,
+  context: ExplicitHostApiContext,
+) {
   const request: UpdateHostMemberProfileRequest = { displayName };
 
-  return readmatesFetchResponse(`/api/host/members/${encodeURIComponent(membershipId)}/profile`, {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/members/${encodeURIComponent(membershipId)}/profile`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }) as Promise<Response & { json(): Promise<HostMemberProfileResponse> }>;
+  }, context), context, "MEMBER_PROFILE") as Promise<Response & { json(): Promise<HostMemberProfileResponse> }>;
 }
 
-export function fetchHostInvitations(context?: ReadmatesApiContext, page?: PageRequest) {
+export function fetchHostInvitations(context: ExplicitHostApiContext, page?: PageRequest) {
   return readmatesFetch<HostInvitationListPage>(`/api/host/invitations${pagingSearchParams(page)}`, undefined, context).then(parseHostInvitationListPage);
 }
 
-export function listHostInvitationsResponse(context?: ReadmatesApiContext, page?: PageRequest) {
-  return readmatesFetchResponse(`/api/host/invitations${pagingSearchParams(page)}`, undefined, context) as Promise<Response & {
+export function listHostInvitationsResponse(context: ExplicitHostApiContext, page?: PageRequest) {
+  return rawHostResponse(
+    readmatesFetchResponse(`/api/host/invitations${pagingSearchParams(page)}`, undefined, context),
+    context,
+    "INVITATION_LIST",
+  ) as Promise<Response & {
     json(): Promise<HostInvitationListPage>;
   }>;
 }
 
-export function createHostInvitation(request: CreateHostInvitationRequest) {
-  return readmatesFetchResponse("/api/host/invitations", {
+export function createHostInvitation(
+  request: CreateHostInvitationRequest,
+  context: ExplicitHostApiContext,
+) {
+  return rawHostResponse(readmatesFetchResponse("/api/host/invitations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }) as Promise<Response & { json(): Promise<HostInvitationResponse> }>;
+  }, context), context, "INVITATION_CREATE") as Promise<Response & { json(): Promise<HostInvitationResponse> }>;
 }
 
-export function revokeHostInvitation(invitationId: string) {
-  return readmatesFetchResponse(`/api/host/invitations/${encodeURIComponent(invitationId)}/revoke`, {
+export function revokeHostInvitation(invitationId: string, context: ExplicitHostApiContext) {
+  return rawHostResponse(readmatesFetchResponse(`/api/host/invitations/${encodeURIComponent(invitationId)}/revoke`, {
     method: "POST",
-  });
+  }, context), context, "INVITATION_REVOKE");
 }
 
 export async function parseHostInvitationResponse(response: Response): Promise<HostInvitationResponse> {
-  return (await response.json()) as HostInvitationResponse;
+  return readHostResponseJson<HostInvitationResponse>(response);
 }
 
 export async function parseHostInvitationListResponse(response: Response): Promise<HostInvitationListPage> {
-  return (await response.json()) as HostInvitationListPage;
+  return readHostResponseJson<HostInvitationListPage>(response);
 }

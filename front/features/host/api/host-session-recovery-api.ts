@@ -2,9 +2,11 @@ import {
   readmatesFetch,
   readmatesFetchResponse,
   type ExplicitReadmatesApiContext,
-  type ReadmatesApiContext,
 } from "@/shared/api/client";
-import { apiErrorFromResponse } from "@/shared/api/errors";
+import {
+  hostApiErrorFromResponse,
+  readHostResponseJson,
+} from "@/shared/api/host-authority-event";
 import {
   parseHostSessionChangeReceipt,
   parseHostSessionRestorePreview,
@@ -21,7 +23,7 @@ function changePath(sessionId: string, changeId: string, suffix: string) {
 export function fetchHostSessionRestorePreview(
   sessionId: string,
   changeId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ): Promise<HostSessionRestorePreview> {
   return readmatesFetch<HostSessionRestorePreview>(
     changePath(sessionId, changeId, "restore-preview"),
@@ -46,7 +48,10 @@ export async function restoreHostSessionChange(
     context,
   );
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    throw await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind: "SESSION_CHANGE_RESTORE",
+    });
   }
-  return parseHostSessionChangeReceipt(await response.json());
+  return parseHostSessionChangeReceipt(await readHostResponseJson(response));
 }

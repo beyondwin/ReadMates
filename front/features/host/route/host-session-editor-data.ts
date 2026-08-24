@@ -22,6 +22,8 @@ import { isReadmatesApiError } from "@/shared/api/errors";
 import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
 import { replace } from "react-router";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 const EDITOR_MANUAL_DISPATCH_PAGE_LIMIT = 20;
 const EDITOR_HISTORY_PAGE_LIMIT = 30;
@@ -35,7 +37,7 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
   return async (args: LoaderFunctionArgs): Promise<HostSessionEditorRouteData> => {
     const { params } = args;
     await requireHostLoaderAuth(args);
-    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
 
     if (!params.sessionId) {
       throw new Error("Missing host session id");
@@ -92,6 +94,10 @@ export function hostSessionEditorLoaderFactory(client: QueryClient) {
   };
 }
 
-export const hostSessionEditorPreviewActions = {
-  previewSessionImport: previewHostSessionImport,
-} satisfies Pick<HostSessionEditorActions, "previewSessionImport">;
+export function hostSessionEditorPreviewActions(
+  context: ExplicitReadmatesApiContext,
+): Pick<HostSessionEditorActions, "previewSessionImport"> {
+  return {
+    previewSessionImport: (sessionId, request) => previewHostSessionImport(sessionId, request, context),
+  };
+}

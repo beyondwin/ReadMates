@@ -10,6 +10,7 @@ import type {
   MemberLifecycleResponse,
 } from "@/features/host/model/host-view-types";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
+import { readHostResponseJson } from "@/shared/api/host-authority-event";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
@@ -75,7 +76,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 async function hostProfileErrorCodeFromResponse(response: Response): Promise<HostMemberProfileErrorCode | null> {
   try {
-    const body: unknown = await response.json();
+    const body: unknown = await readHostResponseJson(response);
     const code = isRecord(body) ? body.code : null;
 
     return typeof code === "string" ? (code as HostMemberProfileErrorCode) : null;
@@ -231,7 +232,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
         throw new Error("Member lifecycle update failed");
       }
 
-      const result = (await response.json()) as MemberLifecycleResponse;
+      const result = await readHostResponseJson<MemberLifecycleResponse>(response);
       setMembers((current) =>
         current.map((item) => (item.membershipId === result.member.membershipId ? result.member : item)),
       );
@@ -294,7 +295,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
         throw new Error(hostProfileErrorMessage(response.status, await hostProfileErrorCodeFromResponse(response)));
       }
 
-      const updatedMember = (await response.json()) as HostMemberProfileResponse;
+      const updatedMember = await readHostResponseJson<HostMemberProfileResponse>(response);
       setMembers((current) =>
         current.map((item) => (item.membershipId === updatedMember.membershipId ? updatedMember : item)),
       );

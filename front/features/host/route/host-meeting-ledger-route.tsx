@@ -28,6 +28,7 @@ import {
   useCreateHostSessionMutation,
   useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
+import { readHostResponseJson } from "@/shared/api/host-authority-event";
 import {
   HostNotificationComposerController,
   type HostNotificationComposerRequest,
@@ -37,10 +38,11 @@ import {
   HostMeetingLedger,
   type HostMeetingLedgerLinkComponent,
 } from "@/features/host/ui/meeting-ledger/host-meeting-ledger";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
-function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
-  return { clubSlug };
+function contextFromClubSlug(clubSlug?: string): ExplicitReadmatesApiContext {
+  return requireHostClubContext(clubSlug);
 }
 
 function isMeetingState(state: string): state is MeetingListItemSource["state"] {
@@ -219,7 +221,7 @@ export function HostMeetingLedgerRoute({
     if (!response.ok) {
       throw new Error("create-upcoming-failed");
     }
-    const created = await response.json() as CreatedSessionResponse;
+    const created = await readHostResponseJson<CreatedSessionResponse>(response);
     if (created.composer) {
       openFirstPublicationComposer(created.composer);
     }

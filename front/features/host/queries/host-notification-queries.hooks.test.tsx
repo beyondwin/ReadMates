@@ -94,7 +94,10 @@ describe("useConfirmManualNotificationMutation", () => {
       expect(result.current.isSuccess).toBe(true);
     });
 
-    expect(mockedConfirm).toHaveBeenCalledWith(confirmRequest);
+    expect(mockedConfirm).toHaveBeenCalledWith(
+      confirmRequest,
+      { clubSlug: "reading-sai" },
+    );
     expect(invalidateSpy).toHaveBeenCalledWith({
       queryKey: hostNotificationKeys.manualDispatchesRoot({ clubSlug: "reading-sai" }),
     });

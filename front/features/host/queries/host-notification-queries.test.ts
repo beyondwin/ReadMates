@@ -8,16 +8,17 @@ import {
   hostNotificationSessionsQuery,
   invalidateHostNotificationOverview,
   invalidateManualNotificationState,
+  shouldRecoverHostNotificationMutation,
 } from "./host-notification-queries";
 import { hostSessionListQuery } from "./host-session-queries";
+import { HostRequestPurgedError } from "@/shared/api/host-authority-event";
 
 describe("host notification query keys", () => {
   it("scopes keys by club slug when one is provided", () => {
     expect(hostNotificationKeys.summary({ clubSlug: "reading-sai" })).toEqual([
       "host",
-      "notifications",
-      "scope",
       "reading-sai",
+      "notifications",
       "overview",
       "summary",
     ]);
@@ -29,8 +30,8 @@ describe("host notification query keys", () => {
   it("keeps policy state in its own club-scoped key", () => {
     expect(hostNotificationPolicyQuery({ clubSlug: "reading-sai" }).queryKey).toEqual([
       "host",
-      "notifications",
       "reading-sai",
+      "notifications",
       "policy",
     ]);
   });
@@ -73,5 +74,10 @@ describe("host notification query keys", () => {
     expect(client.invalidateQueries).toHaveBeenCalledWith({
       queryKey: hostNotificationKeys.manual({ clubSlug: "reading-sai" }),
     });
+  });
+
+  it("does not start recovery refetches from a purged late mutation callback", () => {
+    expect(shouldRecoverHostNotificationMutation(new HostRequestPurgedError())).toBe(false);
+    expect(shouldRecoverHostNotificationMutation(new Error("ordinary failure"))).toBe(true);
   });
 });

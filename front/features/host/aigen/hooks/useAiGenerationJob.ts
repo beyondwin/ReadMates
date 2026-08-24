@@ -18,6 +18,7 @@ import type { UseQueryResult } from "@tanstack/react-query";
 import { useQuery } from "@tanstack/react-query";
 import type { AiGenerationJobResponse } from "@/features/host/aigen/api/aigen-contracts";
 import { aiJobDetailQuery, aiJobKeys } from "@/features/host/aigen/queries/aigen-job-queries";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 
 const FIRST_POLL_MS = 2000;
 const SUBSEQUENT_POLL_MS = 4000;
@@ -30,24 +31,25 @@ const TERMINAL_STATUSES: ReadonlySet<AiGenerationJobResponse["status"]> = new Se
 ]);
 
 export const aiGenerationJobKeys = {
-  all: aiJobKeys.all,
+  scope: aiJobKeys.scope,
   detail: aiJobKeys.detail,
 } as const;
 
 export type UseAiGenerationJobOptions = {
   enabled?: boolean;
+  context: ExplicitReadmatesApiContext;
 };
 
 export function useAiGenerationJob(
   sessionId: string,
   jobId: string | null | undefined,
-  options: UseAiGenerationJobOptions = {},
+  options: UseAiGenerationJobOptions,
 ): UseQueryResult<AiGenerationJobResponse> {
   const enabledOption = options.enabled ?? true;
   const enabled = enabledOption && typeof jobId === "string" && jobId.length > 0;
 
   return useQuery({
-    ...aiJobDetailQuery(sessionId, jobId ?? ""),
+    ...aiJobDetailQuery(sessionId, jobId ?? "", options.context),
     enabled,
     refetchInterval: (query) => {
       const status = query.state.data?.status;

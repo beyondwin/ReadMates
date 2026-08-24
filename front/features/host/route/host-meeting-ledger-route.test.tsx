@@ -97,10 +97,10 @@ function PathProbe() {
 
 function renderMeetingSurface(sessionId: string) {
   return render(
-    <MemoryRouter initialEntries={[`/app/host/sessions/${sessionId}`]}>
+    <MemoryRouter initialEntries={[`/clubs/reading-sai/app/host/sessions/${sessionId}`]}>
       <Routes>
         <Route
-          path="/app/host/sessions/:sessionId"
+          path="/clubs/:clubSlug/app/host/sessions/:sessionId"
           element={(
             <HostMeetingLedgerRoute
               LinkComponent={({ to, children }) => (

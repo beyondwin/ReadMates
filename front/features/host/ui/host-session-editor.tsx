@@ -33,6 +33,8 @@ import type {
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
 } from "@/features/host/model/host-session-workspace-navigation";
+import { readHostResponseJson } from "@/shared/api/host-authority-event";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
   hostSessionTrashDeletedAtLabel,
@@ -334,6 +336,51 @@ export default function HostSessionEditor({
   const [visitedSources, setVisitedSources] = useState<Set<HostSessionDraftSource>>(
     () => new Set(navigation.location.panel === "records" ? [navigation.location.source] : []),
   );
+
+  useEffect(() => {
+    if (!clubSlug) return;
+    return registerHostSensitiveState({
+      clubSlug,
+      resourceKey: `meeting-form-draft:${session?.sessionId ?? "new"}`,
+      clear: () => {
+        dispatch({ type: "CLEAR_SENSITIVE" });
+        setSaveState("idle");
+        setLifecycleSaveState("idle");
+        setLifecycleConfirm(null);
+        setLifecycleError(null);
+        setToast(null);
+      },
+    });
+  }, [clubSlug, session?.sessionId]);
+
+  useEffect(() => {
+    if (!clubSlug) return;
+    return registerHostSensitiveState({
+      clubSlug,
+      resourceKey: `record-draft:previews:${session?.sessionId ?? "new"}`,
+      clear: () => {
+        setDeleteModalOpen(false);
+        setDeletePreview(null);
+        setDeleteError(null);
+        setDeletePreviewLoading(false);
+        setDeleteSubmitting(false);
+        setSessionImportRequest(null);
+        setSessionImportPreview(null);
+        setSessionImportCommitResult(null);
+        setSessionImportStatus("idle");
+        setSessionImportError(null);
+        setTrashedSession(null);
+        setTrashRestoreState({
+          restoring: false,
+          success: false,
+          disabled: false,
+          disabledReason: null,
+          error: null,
+          conflict: null,
+        });
+      },
+    });
+  }, [clubSlug, session?.sessionId]);
 
   const sessionIdForAigen = session?.sessionId;
   const workspaceLocation = !session && navigation.location.panel === "focus"
@@ -736,7 +783,7 @@ export default function HostSessionEditor({
         if (response.ok) {
           setSaveState("saved");
           if (isNewSession) {
-            const created = (await response.json()) as { sessionId: string };
+            const created = await readHostResponseJson<{ sessionId: string }>(response);
             globalThis.location.href = scopedHostSessionEditHref(created.sessionId, clubSlug);
             return;
           }

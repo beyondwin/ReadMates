@@ -3,6 +3,7 @@ import { Link, useLoaderData, useLocation, useParams } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { getSessionClosingBoardView } from "@/features/host/model/session-closing-model";
 import { hostSessionClosingStatusQuery } from "@/features/host/queries/host-session-queries";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import {
   SessionClosingBoard,
   type SessionClosingLinkProps,
@@ -24,7 +25,7 @@ export function HostSessionClosingRoute() {
   const loaderData = useLoaderData() as HostSessionClosingRouteData;
   const { clubSlug, sessionId: routeSessionId } = useParams<{ clubSlug: string; sessionId: string }>();
   const sessionId = routeSessionId ?? loaderData.sessionId;
-  const context = useMemo(() => ({ clubSlug }), [clubSlug]);
+  const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
   const query = useQuery(hostSessionClosingStatusQuery(sessionId, context));
 
   if (!query.data) {

@@ -111,7 +111,8 @@ export type HostSessionEditorAction =
       type: "ADOPT_PREVIOUS_ONLINE_MEETING";
       meetingUrl: string;
       meetingPasscode: string;
-    };
+    }
+  | { type: "CLEAR_SENSITIVE" };
 
 const basicFieldToScheduleField = {
   date: "date",
@@ -142,6 +143,9 @@ export function hostSessionEditorReducer(
   action: HostSessionEditorAction,
 ): HostSessionEditorFormState {
   switch (action.type) {
+    case "CLEAR_SENSITIVE":
+      return initialHostSessionEditorState({});
+
     case "SET_FIELD": {
       const scheduleField = action.key === "date" || action.key === "time" || action.key === "locationLabel"
         ? basicFieldToScheduleField[action.key]

@@ -5,12 +5,13 @@ import {
   type SectionReviewState,
 } from "../model/aigen-review-state";
 
-const KEY_PREFIX = "aigen-draft:";
+const KEY_PREFIX = "readmates:host:";
 export const AIGEN_DRAFT_TTL_MS = 6 * 60 * 60 * 1000;
 const expiryTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 export interface AiGenerationDraftEnvelope {
   version: 2;
+  clubSlug: string;
   jobId: string;
   revision: number;
   serverSnapshot: SessionImportV1Snapshot;
@@ -22,8 +23,12 @@ type StoredAiGenerationDraftEnvelope = AiGenerationDraftEnvelope & {
   savedAtEpochMs: number;
 };
 
-export function draftStorageKey(jobId: string): string {
-  return `${KEY_PREFIX}${jobId}`;
+function clubDraftPrefix(clubSlug: string): string {
+  return `${KEY_PREFIX}${clubSlug}:ai-draft:`;
+}
+
+export function draftStorageKey(clubSlug: string, jobId: string): string {
+  return `${clubDraftPrefix(clubSlug)}${jobId}`;
 }
 
 function storage(): Storage | null {
@@ -51,7 +56,7 @@ function safeSnapshot(snapshot: SessionImportV1Snapshot): SessionImportV1Snapsho
 export function saveAigenDraft(envelope: AiGenerationDraftEnvelope): boolean {
   const store = storage();
   if (!store) return false;
-  const key = draftStorageKey(envelope.jobId);
+  const key = draftStorageKey(envelope.clubSlug, envelope.jobId);
   const previous = readStoredEnvelope(store, key);
   if (previous && isExpired(previous)) {
     removeStoredDraft(store, key);
@@ -63,6 +68,7 @@ export function saveAigenDraft(envelope: AiGenerationDraftEnvelope): boolean {
       : Date.now();
   const safe: StoredAiGenerationDraftEnvelope = {
     version: 2,
+    clubSlug: envelope.clubSlug,
     jobId: envelope.jobId,
     revision: envelope.revision,
     // This is the fixed retention anchor for the server revision. Autosave
@@ -141,6 +147,7 @@ function isEnvelope(value: unknown): value is StoredAiGenerationDraftEnvelope {
   const candidate = value as Partial<AiGenerationDraftEnvelope>;
   return (
     candidate.version === 2 &&
+    typeof candidate.clubSlug === "string" &&
     typeof candidate.jobId === "string" &&
     typeof (candidate as Partial<StoredAiGenerationDraftEnvelope>).savedAtEpochMs === "number" &&
     Number.isSafeInteger((candidate as Partial<StoredAiGenerationDraftEnvelope>).savedAtEpochMs) &&
@@ -164,6 +171,7 @@ function isExpired(envelope: StoredAiGenerationDraftEnvelope, now = Date.now()):
 function publicEnvelope(envelope: StoredAiGenerationDraftEnvelope): AiGenerationDraftEnvelope {
   return {
     version: envelope.version,
+    clubSlug: envelope.clubSlug,
     jobId: envelope.jobId,
     revision: envelope.revision,
     serverSnapshot: envelope.serverSnapshot,
@@ -183,16 +191,18 @@ function readStoredEnvelope(store: Storage, key: string): StoredAiGenerationDraf
   }
 }
 
-export function purgeAigenDrafts(activeJobId?: string): void {
+export function purgeAigenDrafts(clubSlug: string, activeJobId?: string): void {
   const store = storage();
   if (!store) return;
+  const prefix = clubDraftPrefix(clubSlug);
   const keys = Array.from({ length: store.length }, (_, index) => store.key(index))
-    .filter((key): key is string => key?.startsWith(KEY_PREFIX) === true);
+    .filter((key): key is string => key?.startsWith(prefix) === true);
   for (const key of keys) {
     const envelope = readStoredEnvelope(store, key);
-    const keyJobId = key.slice(KEY_PREFIX.length);
+    const keyJobId = key.slice(prefix.length);
     if (
       !envelope ||
+      envelope.clubSlug !== clubSlug ||
       envelope.jobId !== keyJobId ||
       isExpired(envelope) ||
       (activeJobId !== undefined && envelope.jobId !== activeJobId)
@@ -202,25 +212,29 @@ export function purgeAigenDrafts(activeJobId?: string): void {
   }
 }
 
-export function loadAigenDraft(jobId: string, revision: number): AiGenerationDraftEnvelope | null {
+export function loadAigenDraft(
+  clubSlug: string,
+  jobId: string,
+  revision: number,
+): AiGenerationDraftEnvelope | null {
   const store = storage();
   if (!store) return null;
-  purgeAigenDrafts();
-  const value = readStoredEnvelope(store, draftStorageKey(jobId));
-  if (!value || value.jobId !== jobId) {
-    clearAigenDraft(jobId);
+  purgeAigenDrafts(clubSlug);
+  const value = readStoredEnvelope(store, draftStorageKey(clubSlug, jobId));
+  if (!value || value.clubSlug !== clubSlug || value.jobId !== jobId) {
+    clearAigenDraft(clubSlug, jobId);
     return null;
   }
   if (value.revision < revision) {
-    clearAigenDraft(jobId);
+    clearAigenDraft(clubSlug, jobId);
     return null;
   }
   if (value.revision > revision) return null;
   return publicEnvelope(value);
 }
 
-export function clearAigenDraft(jobId: string): void {
+export function clearAigenDraft(clubSlug: string, jobId: string): void {
   const store = storage();
   if (!store) return;
-  removeStoredDraft(store, draftStorageKey(jobId));
+  removeStoredDraft(store, draftStorageKey(clubSlug, jobId));
 }

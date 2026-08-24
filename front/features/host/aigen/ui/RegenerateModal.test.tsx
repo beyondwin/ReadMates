@@ -28,6 +28,7 @@ describe("RegenerateModal", () => {
     render(
       <RegenerateModal
         open={false}
+        clubSlug="club-a"
         sessionId="s1"
         jobId="j1"
         item="summary"
@@ -53,6 +54,7 @@ describe("RegenerateModal", () => {
     render(
       <RegenerateModal
         open
+        clubSlug="club-a"
         sessionId="s1"
         jobId="j1"
         item="oneLineReviews"
@@ -72,6 +74,7 @@ describe("RegenerateModal", () => {
     expect(callArgs[0]).toBe("s1");
     expect(callArgs[1]).toBe("j1");
     expect(callArgs[2].item).toBe("ONE_LINE_REVIEWS");
+    expect(callArgs[3]).toEqual({ clubSlug: "club-a" });
     expect(onSuccess).toHaveBeenCalledTimes(1);
   });
 
@@ -87,6 +90,7 @@ describe("RegenerateModal", () => {
     render(
       <RegenerateModal
         open
+        clubSlug="club-a"
         sessionId="s1"
         jobId="j1"
         item="summary"
@@ -127,6 +131,7 @@ describe("RegenerateModal", () => {
     render(
       <RegenerateModal
         open
+        clubSlug="club-a"
         sessionId="s1"
         jobId="j1"
         item="highlights"
@@ -150,6 +155,7 @@ describe("RegenerateModal", () => {
     render(
       <RegenerateModal
         open
+        clubSlug="club-a"
         sessionId="s1"
         jobId="j1"
         item="feedbackDocument"

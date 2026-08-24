@@ -7,9 +7,17 @@
  * defaults at `/api/host/clubs/{clubSlug}/ai-defaults`.
  */
 
-import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
-import { apiErrorFromResponse } from "@/shared/api/errors";
-import { parseReadmatesResponse } from "@/shared/api/response";
+import {
+  readmatesFetch,
+  readmatesFetchResponse,
+  type ExplicitReadmatesApiContext,
+} from "@/shared/api/client";
+import {
+  completeHostResponseBody,
+  hostApiErrorFromResponse,
+  isHostSecurityPurgeCode,
+  readHostResponseJson,
+} from "@/shared/api/host-authority-event";
 import type {
   AiGenerationProblem,
   AiGenerationCapabilitiesResponse,
@@ -39,10 +47,6 @@ import {
   parseStartGenerationResponse,
 } from "./aigen-contracts";
 
-const GENERIC_AI_PROBLEM: AiGenerationProblem = {
-  code: "AI_GENERATION_REQUEST_FAILED",
-  detail: "AI 요청을 처리할 수 없습니다.",
-};
 const MAX_INVALID_SPEAKER_LABELS = 20;
 const MAX_INVALID_SPEAKER_LABEL_CODE_POINTS = 120;
 const LEGACY_GEMINI_MODEL_ID = "gemini-3-flash";
@@ -94,18 +98,30 @@ function parseAiProblem(value: unknown, responseStatus: number): AiGenerationPro
   };
 }
 
-async function aiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await readmatesFetchResponse(path, init);
+async function aiFetch<T>(
+  path: string,
+  init: RequestInit | undefined,
+  context: ExplicitReadmatesApiContext,
+): Promise<T> {
+  const response = await readmatesFetchResponse(path, init, context);
   if (!response.ok) {
     let problem: AiGenerationProblem | null = null;
     try {
-      problem = parseAiProblem(await response.clone().json(), response.status);
+      problem = parseAiProblem(await readHostResponseJson(response.clone()), response.status);
     } catch {
       // Untrusted or non-JSON upstream errors use the content-free fallback.
     }
-    throw new AiGenerationApiError(response.status, problem ?? GENERIC_AI_PROBLEM);
+    const authorityError = await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind: `${init?.method?.toUpperCase() ?? "GET"} ${path}`,
+    });
+    throw new AiGenerationApiError(response.status, problem ?? (
+      isHostSecurityPurgeCode(authorityError.code)
+        ? { code: authorityError.code, detail: authorityError.message }
+        : { code: "AI_GENERATION_REQUEST_FAILED", detail: "AI 요청을 처리할 수 없습니다." }
+    ));
   }
-  return parseReadmatesResponse<T>(response);
+  return readHostResponseJson<T>(response);
 }
 
 function sanitizeJob(response: AiGenerationJobResponse): AiGenerationJobResponse {
@@ -144,6 +160,7 @@ function capabilitiesPath(clubSlug: string): string {
 export function startGeneration(
   sessionId: string,
   payload: StartGenerationRequest,
+  context: ExplicitReadmatesApiContext,
 ): Promise<StartGenerationResponse> {
   const body: StartGenerationBody = {};
   if (payload.model !== undefined) {
@@ -164,22 +181,24 @@ export function startGeneration(
   return aiFetch<unknown>(sessionsPath(sessionId, "/jobs"), {
     method: "POST",
     body: form,
-  }).then(parseStartGenerationResponse);
+  }, context).then(parseStartGenerationResponse);
 }
 
 export async function getJob(
   sessionId: string,
   jobId: string,
+  context: ExplicitReadmatesApiContext,
 ): Promise<AiGenerationJobResponse> {
   return sanitizeJob(
-    parseAiGenerationJobResponse(await aiFetch<unknown>(jobPath(sessionId, jobId))),
+    parseAiGenerationJobResponse(await aiFetch<unknown>(jobPath(sessionId, jobId), undefined, context)),
   );
 }
 
 export function getAvailableModels(
   sessionId: string,
+  context: ExplicitReadmatesApiContext,
 ): Promise<AvailableGenerationModelsResponse> {
-  return aiFetch<unknown>(sessionsPath(sessionId, "/models")).then(
+  return aiFetch<unknown>(sessionsPath(sessionId, "/models"), undefined, context).then(
     parseAvailableGenerationModelsResponse,
   );
 }
@@ -189,14 +208,20 @@ export function expandEvidence(
   jobId: string,
   turnId: string,
   revision: number,
+  context: ExplicitReadmatesApiContext,
 ): Promise<ExpandedEvidenceTurn> {
   const suffix = `/evidence/${encodeURIComponent(turnId)}?revision=${encodeURIComponent(revision)}`;
-  return aiFetch<unknown>(jobPath(sessionId, jobId, suffix)).then(parseExpandedEvidenceTurn);
+  return aiFetch<unknown>(jobPath(sessionId, jobId, suffix), undefined, context).then(parseExpandedEvidenceTurn);
 }
 
-export async function getRecentJob(sessionId: string): Promise<AiRecentJobResponse | null> {
+export async function getRecentJob(
+  sessionId: string,
+  context: ExplicitReadmatesApiContext,
+): Promise<AiRecentJobResponse | null> {
   const result = await aiFetch<unknown>(
     sessionsPath(sessionId, "/jobs/recent"),
+    undefined,
+    context,
   );
   return result == null ? null : parseAiRecentJobResponse(result);
 }
@@ -205,41 +230,48 @@ export function regenerateItem(
   sessionId: string,
   jobId: string,
   request: RegenerateRequest,
+  context: ExplicitReadmatesApiContext,
 ): Promise<RegenerateResponse> {
   return aiFetch<unknown>(jobPath(sessionId, jobId, "/regenerate"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }).then(parseRegenerateResponse);
+  }, context).then(parseRegenerateResponse);
 }
 
 export function commitGeneration(
   sessionId: string,
   jobId: string,
   request: CommitGenerationRequest,
+  context: ExplicitReadmatesApiContext,
 ): Promise<AiCommitResponse> {
   return aiFetch<unknown>(jobPath(sessionId, jobId, "/commit"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  }).then(parseAiCommitResponse);
+  }, context).then(parseAiCommitResponse);
 }
 
 export async function cancelGeneration(
   sessionId: string,
   jobId: string,
+  context: ExplicitReadmatesApiContext,
 ): Promise<void> {
   const response = await readmatesFetchResponse(jobPath(sessionId, jobId), {
     method: "DELETE",
-  });
+  }, context);
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    throw await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind: "AI_GENERATION_CANCEL",
+    });
   }
+  await completeHostResponseBody(response);
 }
 
 export async function getClubAiDefault(clubSlug: string): Promise<ClubAiDefaultResponse> {
   const response = parseClubAiDefaultResponse(
-    await readmatesFetch<unknown>(clubsPath(clubSlug)),
+    await readmatesFetch<unknown>(clubsPath(clubSlug), undefined, { clubSlug }),
   );
   return response.defaultModel === LEGACY_GEMINI_MODEL_ID
     ? { defaultModel: CANONICAL_GEMINI_MODEL_ID }
@@ -249,7 +281,7 @@ export async function getClubAiDefault(clubSlug: string): Promise<ClubAiDefaultR
 export function getAiGenerationCapabilities(
   clubSlug: string,
 ): Promise<AiGenerationCapabilitiesResponse> {
-  return readmatesFetch<unknown>(capabilitiesPath(clubSlug)).then(
+  return readmatesFetch<unknown>(capabilitiesPath(clubSlug), undefined, { clubSlug }).then(
     parseAiGenerationCapabilitiesResponse,
   );
 }
@@ -262,8 +294,12 @@ export async function putClubAiDefault(
     method: "PUT",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(request),
-  });
+  }, { clubSlug });
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    throw await hostApiErrorFromResponse(response, {
+      clubSlug,
+      requestKind: "CLUB_AI_DEFAULT_SAVE",
+    });
   }
+  await completeHostResponseBody(response);
 }

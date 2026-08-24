@@ -64,38 +64,34 @@ describe("host session query keys", () => {
   it("scopes all host session keys by club slug", () => {
     expect(hostSessionKeys.list({ limit: 50 }, { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "list",
       { limit: 50, cursor: null },
     ]);
     expect(hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "detail",
       "session-7",
     ]);
     expect(hostSessionKeys.current({ clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "current",
     ]);
     expect(hostSessionKeys.scheduleDefaults({ clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "scheduleDefaults",
     ]);
   });
 
-  it("uses a null club scope for unscoped host routes", () => {
-    expect(hostSessionKeys.scope()).toEqual(["host", "sessions", "scope", null]);
+  it("rejects an unscoped host query key at runtime", () => {
+    expect(() => hostSessionKeys.scope(undefined as never)).toThrow();
   });
 
   it("normalizes equivalent first page requests to the same key", () => {
@@ -212,17 +208,15 @@ describe("host session query keys", () => {
   it("scopes trash list and detail keys by club slug", () => {
     expect(hostSessionKeys.trashList({ limit: 50 }, { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "trash",
       { limit: 50, cursor: null },
     ]);
     expect(hostSessionKeys.trashDetail("session-7", { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "trashDetail",
       "session-7",
     ]);

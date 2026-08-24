@@ -19,6 +19,8 @@ import {
   hostMeetingListPageQuery,
   type HostMeetingListRouteData,
 } from "./host-meeting-list-data";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 
 export function HostMeetingListRoute({
   LinkComponent,
@@ -27,7 +29,7 @@ export function HostMeetingListRoute({
 }) {
   const loaderData = useLoaderData() as HostMeetingListRouteData;
   const { clubSlug } = useParams<{ clubSlug: string }>();
-  const context = useMemo(() => ({ clubSlug }), [clubSlug]);
+  const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
   const location = useLocation();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -57,7 +59,7 @@ function MeetingListBody({
   LinkComponent,
 }: {
   loaderData: Extract<HostMeetingListRouteData, { view: "meeting" }>;
-  context: { clubSlug?: string };
+  context: ExplicitReadmatesApiContext;
   canonicalHref: string;
   navigate: ReturnType<typeof useNavigate>;
   queryClient: ReturnType<typeof useQueryClient>;

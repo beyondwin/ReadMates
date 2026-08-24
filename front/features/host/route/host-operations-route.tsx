@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useLoaderData, useParams } from "react-router";
 import { getAiGenerationCapabilities, getClubAiDefault } from "@/features/host/aigen/api/aigen-api";
+import { aiClubKeys } from "@/features/host/aigen/queries/aigen-job-queries";
 import { hostClubOperationsQuery } from "@/features/host/queries/host-club-operations-queries";
 import { hostNotificationHealthQuery } from "@/features/host/queries/host-notification-queries";
 import { hostSessionRecordAttentionPagesQuery } from "@/features/host/queries/host-session-record-queries";
@@ -53,22 +54,25 @@ export function HostOperationsRoute({
   const { auth, clubSlug } = useLoaderData() as HostOperationsRouteData;
   const params = useParams<{ clubSlug: string }>();
   const resolvedSlug = clubSlug ?? params.clubSlug ?? auth.currentMembership?.clubSlug;
+  if (!resolvedSlug) {
+    throw new Error("HOST_API_CONTEXT_REQUIRED");
+  }
   const context = useMemo(() => ({ clubSlug: resolvedSlug }), [resolvedSlug]);
 
   const attentionQuery = useInfiniteQuery(hostSessionRecordAttentionPagesQuery(context));
   const clubOpsQuery = useQuery(hostClubOperationsQuery(context));
   const notificationsQuery = useQuery(hostNotificationHealthQuery(context));
   const aiCapabilitiesQuery = useQuery({
-    queryKey: ["host", "aigen", "capabilities", resolvedSlug],
-    queryFn: () => getAiGenerationCapabilities(resolvedSlug ?? ""),
+    queryKey: aiClubKeys.capabilities(context),
+    queryFn: () => getAiGenerationCapabilities(resolvedSlug),
     staleTime: 0,
     enabled: Boolean(resolvedSlug),
   });
   const aiGenerationEnabled =
     aiCapabilitiesQuery.data?.enabled === true && !aiCapabilitiesQuery.isFetching;
   const aiDefaultsQuery = useQuery({
-    queryKey: ["host", "aigen", "club-ai-default", resolvedSlug],
-    queryFn: () => getClubAiDefault(resolvedSlug ?? ""),
+    queryKey: aiClubKeys.defaults(context),
+    queryFn: () => getClubAiDefault(resolvedSlug),
     enabled: Boolean(resolvedSlug) && aiGenerationEnabled,
   });
   useRecordHostOperationsCardLoad("attention", attentionQuery);

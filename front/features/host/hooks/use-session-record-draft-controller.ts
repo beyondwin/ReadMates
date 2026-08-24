@@ -8,6 +8,15 @@ import type {
 
 export type DraftSaveState = "idle" | "dirty" | "saving" | "saved" | "error" | "stale";
 
+const emptySensitiveSnapshot = (): SessionRecordSnapshot => ({
+  schema: "readmates-session-record:v1",
+  visibility: "HOST_ONLY",
+  publicationSummary: "",
+  highlights: [],
+  oneLineReviews: [],
+  feedbackDocument: { fileName: "", title: "", markdown: "" },
+});
+
 function isDraftStaleError(error: unknown) {
   return Boolean(
     error &&
@@ -159,6 +168,16 @@ export function useSessionRecordDraftController({
     setSaveState("saved");
   }, [clearTimer, setDraftRevision]);
 
+  const clearSensitiveState = useCallback(() => {
+    clearTimer();
+    controllerEpochRef.current += 1;
+    queuedSaveRef.current = null;
+    editVersionRef.current = 0;
+    setDraftRevision(null);
+    setSnapshot(emptySensitiveSnapshot());
+    setSaveState("idle");
+  }, [clearTimer, setDraftRevision]);
+
   const copyInput = useCallback(async () => {
     await navigator.clipboard?.writeText(JSON.stringify(snapshot, null, 2));
   }, [snapshot]);
@@ -198,5 +217,6 @@ export function useSessionRecordDraftController({
     copyInput,
     adoptEditor,
     adoptDraftRevision,
+    clearSensitiveState,
   };
 }

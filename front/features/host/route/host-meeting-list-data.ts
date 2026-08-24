@@ -4,14 +4,15 @@ import type { HostSessionListPage, HostSessionTrashPage } from "@/features/host/
 import { normalizeHostSessionLedgerFilters, type HostSessionLedgerFilters } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingSessionListQuery, hostSessionTrashListQuery } from "@/features/host/queries/host-session-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import type { PageRequest } from "@/shared/model/paging";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { recoverableHostListLoaderFailure } from "./host-list-loader-recovery";
 
 export const HOST_MEETING_LIST_PAGE_LIMIT = 50;
 
-export function hostMeetingListPageQuery(page: PageRequest, context?: ReadmatesApiContext) {
+export function hostMeetingListPageQuery(page: PageRequest, context: ExplicitReadmatesApiContext) {
   return hostMeetingSessionListQuery(page, context);
 }
 
@@ -27,7 +28,7 @@ export type HostMeetingListRouteData =
 export function hostMeetingListLoaderFactory(client: QueryClient) {
   return async (args?: LoaderFunctionArgs): Promise<HostMeetingListRouteData> => {
     await requireHostLoaderAuth(args);
-    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
     const requestUrl = args?.request?.url ?? "https://readmates.local/app/host/sessions";
     const view = new URL(requestUrl).searchParams.get("view");
     if (view === "trash") {

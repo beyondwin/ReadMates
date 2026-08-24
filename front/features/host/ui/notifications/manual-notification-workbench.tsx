@@ -1,4 +1,4 @@
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import {
   buildComposerSelection,
   type HostNotificationComposerDraft,
@@ -20,8 +20,10 @@ import {
   manualTemplateDescriptions,
 } from "./manual-notification-labels";
 import { ManualNotificationPreviewConfirmation } from "./manual-notification-preview";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 
 type ManualNotificationWorkbenchProps = {
+  clubSlug: string;
   options: ManualNotificationOptionsResponse;
   hostSessions: HostSessionListItem[];
   initialSessionId: string | null;
@@ -89,11 +91,12 @@ function ManualNotificationWorkbenchState({
   onLoadManualOptions,
   onLoadMoreManualMembers,
   onDraftInvalidated,
+  clubSlug,
   initialTemplate,
   onEventTypeSelected,
 }: ManualNotificationWorkbenchProps & {
   initialTemplate: ManualNotificationOptionsResponse["templates"][number] | undefined;
-  onEventTypeSelected: (eventType: HostNotificationEventType) => void;
+  onEventTypeSelected: (eventType: HostNotificationEventType | null) => void;
 }) {
   const [draft, setDraft] = useState<HostNotificationComposerDraft>({
     sessionId: initialSessionId ?? "",
@@ -105,6 +108,27 @@ function ManualNotificationWorkbenchState({
   });
   const [search, setSearch] = useState("");
   const [memberError, setMemberError] = useState<string | null>(null);
+  const authorityEpochRef = useRef(0);
+
+  useEffect(() => registerHostSensitiveState({
+    clubSlug,
+    resourceKey: `notification-preview:workbench:${initialSessionId ?? "none"}`,
+    clear: () => {
+      authorityEpochRef.current += 1;
+      setDraft({
+        sessionId: "",
+        eventType: "SESSION_REMINDER_DUE",
+        contentRevision: "",
+        recipientMode: "ALL_ACTIVE_MEMBERS",
+        requestedChannels: "BOTH",
+        selectedMembershipIds: [],
+      });
+      setSearch("");
+      setMemberError(null);
+      onEventTypeSelected(null);
+      onDraftInvalidated?.();
+    },
+  }), [clubSlug, initialSessionId, onDraftInvalidated, onEventTypeSelected]);
 
   const changeDraft = (next: HostNotificationComposerDraft) => {
     setDraft(next);
@@ -128,10 +152,13 @@ function ManualNotificationWorkbenchState({
   };
 
   const runMemberLoad = async (callback: () => Promise<unknown>) => {
+    const epoch = authorityEpochRef.current;
     try {
       await callback();
+      if (epoch !== authorityEpochRef.current) return;
       setMemberError(null);
     } catch {
+      if (epoch !== authorityEpochRef.current) return;
       setMemberError("멤버를 불러오지 못했습니다. 다시 시도해 주세요.");
     }
   };

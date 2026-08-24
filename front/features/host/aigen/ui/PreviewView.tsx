@@ -42,6 +42,7 @@ const SECTION_LABEL: Record<ReviewSection, string> = {
 };
 
 export type PreviewViewProps = {
+  clubSlug: string;
   sessionId: string;
   jobId: string;
   snapshot: SessionImportV1;
@@ -68,6 +69,7 @@ export type PreviewViewProps = {
 export function PreviewView(props: PreviewViewProps) {
   const {
     sessionId,
+    clubSlug,
     jobId,
     snapshot,
     recordVisibility,
@@ -331,6 +333,7 @@ export function PreviewView(props: PreviewViewProps) {
       {regenItem ? (
         <RegenerateModal
           open
+          clubSlug={clubSlug}
           sessionId={sessionId}
           jobId={jobId}
           item={regenItem}

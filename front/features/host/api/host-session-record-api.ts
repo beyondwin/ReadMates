@@ -2,9 +2,11 @@ import {
   readmatesFetch,
   readmatesFetchResponse,
   type ExplicitReadmatesApiContext,
-  type ReadmatesApiContext,
 } from "@/shared/api/client";
-import { apiErrorFromResponse } from "@/shared/api/errors";
+import {
+  completeHostResponseBody,
+  hostApiErrorFromResponse,
+} from "@/shared/api/host-authority-event";
 import type { PageRequest } from "@/shared/model/paging";
 import type { HostSessionRecordLedgerPage } from "./host-contracts";
 import {
@@ -69,14 +71,14 @@ function historySearch(page?: PageRequest) {
   return query ? `?${query}` : "";
 }
 
-export function fetchHostSessionRecordCapabilities(context?: ReadmatesApiContext) {
+export function fetchHostSessionRecordCapabilities(context: ExplicitReadmatesApiContext) {
   return readmatesFetch<HostSessionRecordCapabilities>("/api/host/capabilities", undefined, context)
     .then(parseHostSessionRecordCapabilities);
 }
 
 export function fetchHostSessionRecordLedger(
-  request?: HostSessionLedgerRequest,
-  context?: ReadmatesApiContext,
+  request: HostSessionLedgerRequest | undefined,
+  context: ExplicitReadmatesApiContext,
 ) {
   return readmatesFetch<HostSessionRecordLedgerPage>(
     `/api/host/sessions${ledgerSearch(request)}`,
@@ -85,7 +87,7 @@ export function fetchHostSessionRecordLedger(
   ).then((value) => HostSessionRecordLedgerPageResponseSchema.parse(value) as HostSessionRecordLedgerPage);
 }
 
-export function fetchHostSessionRecordEditor(sessionId: string, context?: ReadmatesApiContext) {
+export function fetchHostSessionRecordEditor(sessionId: string, context: ExplicitReadmatesApiContext) {
   return readmatesFetch<HostSessionRecordEditor>(
     sessionRecordPath(sessionId, "record-editor"),
     undefined,
@@ -96,7 +98,7 @@ export function fetchHostSessionRecordEditor(sessionId: string, context?: Readma
 export function saveHostSessionRecordDraft(
   sessionId: string,
   request: SaveHostSessionRecordDraftRequest,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   return readmatesFetch<HostSessionRecordDraft>(
     sessionRecordPath(sessionId, "record-draft"),
@@ -111,7 +113,7 @@ export function saveHostSessionRecordDraft(
 export function rebaseHostSessionRecordDraft(
   sessionId: string,
   request: RebaseHostSessionRecordDraftRequest,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   return readmatesFetch<HostSessionRecordDraft>(
     sessionRecordPath(sessionId, "record-draft/rebase"),
@@ -126,7 +128,7 @@ export function rebaseHostSessionRecordDraft(
 export function deleteHostSessionRecordDraft(
   sessionId: string,
   expectedDraftRevision: number,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   const params = new URLSearchParams({ expectedDraftRevision: String(expectedDraftRevision) });
   return readmatesFetchResponse(
@@ -135,16 +137,19 @@ export function deleteHostSessionRecordDraft(
     context,
   ).then(async (response) => {
     if (!response.ok) {
-      throw await apiErrorFromResponse(response);
+      throw await hostApiErrorFromResponse(response, {
+        clubSlug: context.clubSlug,
+        requestKind: "SESSION_RECORD_DRAFT_DELETE",
+      });
     }
-    return response;
+    return completeHostResponseBody(response);
   });
 }
 
 export function previewHostSessionRecordApply(
   sessionId: string,
   request: PreviewHostSessionRecordApplyRequest,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ): Promise<HostSessionRecordApplyPreview> {
   return readmatesFetch<HostSessionRecordApplyPreview>(
     sessionRecordPath(sessionId, "record-apply-preview"),
@@ -173,8 +178,8 @@ export function applyHostSessionRecord(
 
 export function fetchHostSessionHistory(
   sessionId: string,
-  page?: PageRequest,
-  context?: ReadmatesApiContext,
+  page: PageRequest | undefined,
+  context: ExplicitReadmatesApiContext,
 ) {
   return readmatesFetch<HostSessionHistoryPage>(
     `${sessionRecordPath(sessionId, "history")}${historySearch(page)}`,
@@ -187,7 +192,7 @@ export function restoreHostSessionRevisionToDraft(
   sessionId: string,
   revisionId: string,
   request: RestoreHostSessionRecordDraftRequest,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ) {
   return readmatesFetch<HostSessionRecordDraft>(
     sessionRecordPath(

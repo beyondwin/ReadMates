@@ -33,6 +33,7 @@ const routeMocks = vi.hoisted(() => ({
   adoptDraftRevision: vi.fn(),
   adoptEditor: vi.fn(),
   updateSnapshot: vi.fn(),
+  clearSensitiveState: vi.fn(),
   snapshotRevisionAfterUpdate: null as number | null,
   expectedDraftRevision: 4 as number | null,
   saveState: "idle" as "idle" | "dirty" | "saving" | "saved" | "error" | "stale",
@@ -121,6 +122,7 @@ vi.mock("@/features/host/hooks/use-session-record-draft-controller", () => ({
         routeMocks.adoptEditor(nextEditor);
         setExpectedDraftRevision(nextEditor.draft?.draftRevision ?? null);
       },
+      clearSensitiveState: routeMocks.clearSensitiveState,
     };
   },
 }));
@@ -289,6 +291,7 @@ import type {
   HostSessionWorkspaceLocation,
 } from "@/features/host/model/host-session-workspace-navigation";
 import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
+import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 
 const snapshot = {
   schema: "readmates-session-record:v1" as const,
@@ -328,6 +331,15 @@ function sessionDetail(overrides: Record<string, unknown> = {}) {
     visibility: "MEMBER",
     publication: null,
     state: "OPEN",
+    versions: {
+      sessionRevision: 3,
+      exposureRevision: 2,
+      participantSetRevision: 1,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-1",
     attendees: [],
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
     ...overrides,
@@ -359,10 +371,16 @@ function renderWorkflow(
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const workflowSession = options?.session ?? sessionDetail();
+  loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(workflowSession);
+  client.setQueryData(
+    hostSessionKeys.detail("session-1", { clubSlug: "club-a" }),
+    workflowSession,
+  );
   const rendered = render(
     <QueryClientProvider client={client}>
       <EditHostSessionRecordWorkflow
-        session={(options?.session ?? { sessionId: "session-1" }) as never}
+        session={workflowSession as never}
         recordEditor={editor}
         historyPage={{ items: [], nextCursor: null }}
         loadHistoryPage={vi.fn()}
@@ -1315,11 +1333,49 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(routeMocks.restoreChange).toHaveBeenCalledWith(
       "session-1",
       "change-basic-1",
-      { expectedCurrentHash: "a".repeat(64) },
+      expect.objectContaining({
+        expected: { sessionRevision: 3 },
+        command: { expectedCurrentHash: "a".repeat(64) },
+      }),
       { clubSlug: "club-a" },
     );
     expect((routeMocks.capturedProps?.pendingUndo as { description: string }).description)
       .toBe("모임 정보를 저장했습니다.");
+  });
+
+  it("clears mounted draft, receipt, and reconciliation state for the revoked club only", async () => {
+    const saveSession = vi.fn(async () => jsonResponse({
+      changeReceipt: { changeId: "change-basic-sensitive", kind: "BASIC_INFO", undoAvailable: true },
+    }));
+    routeMocks.preview.mockResolvedValue({
+      eventType: "SESSION_RECORD_UPDATED",
+      expectedDraftHash: "a".repeat(64),
+    });
+    renderWorkflow(recordEditor, vi.fn(), undefined, {
+      session: sessionDetail(),
+      actions: { saveSession },
+    });
+
+    await act(async () => {
+      await (routeMocks.capturedProps?.actions as { saveSession: typeof saveSession })
+        .saveSession("session-1", { title: "비공개 변경" } as never);
+      await workflow().confirmation.onReview();
+    });
+    expect(routeMocks.capturedProps?.pendingUndo).not.toBeNull();
+    expect(workflow().confirmation.open).toBe(true);
+
+    await hostSensitiveStorage.clearClub("other-club");
+    expect(routeMocks.capturedProps?.pendingUndo).not.toBeNull();
+    expect(workflow().confirmation.open).toBe(true);
+    expect(routeMocks.clearSensitiveState).not.toHaveBeenCalled();
+
+    await act(async () => hostSensitiveStorage.clearClub("club-a"));
+    expect(routeMocks.clearSensitiveState).toHaveBeenCalledTimes(1);
+    expect(routeMocks.capturedProps?.pendingUndo).toBeNull();
+    expect(routeMocks.capturedProps?.undoConfirm).toBeNull();
+    expect(routeMocks.capturedProps?.restoreNotice).toBeNull();
+    expect(workflow().confirmation.open).toBe(false);
+    expect(workflow().confirmation.message).toBeNull();
   });
 
   it("clears the undo bar when restore completes without a new undoable receipt", async () => {
@@ -1472,7 +1528,10 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(routeMocks.restoreChange).toHaveBeenCalledWith(
       "session-1",
       "change-att-1",
-      { expectedCurrentHash: "d".repeat(64) },
+      expect.objectContaining({
+        expected: { sessionRevision: 3 },
+        command: { expectedCurrentHash: "d".repeat(64) },
+      }),
       { clubSlug: "club-a" },
     );
   });
@@ -1704,6 +1763,7 @@ function trashDetail() {
     title: "No.7 모임",
     state: "DRAFT" as const,
     trashed: true as const,
+    sessionRevision: 4,
     deletedAt: "2026-08-21T10:00:00Z",
     purgeAfter: "2026-08-28T10:00:00Z",
     counts: {
@@ -1923,6 +1983,7 @@ describe("EditHostSessionRoute trash ownership", () => {
       state: "DRAFT",
       deletedAt: "2026-08-21T10:00:00Z",
       purgeAfter: "2026-08-28T10:00:00Z",
+      sessionRevision: 4,
     });
     client.setQueryData(hostSessionRecordKeys.editor("session-1", context), recordEditor);
     loaderApiMocks.fetchHostSessionTrash.mockResolvedValue(trashDetail());

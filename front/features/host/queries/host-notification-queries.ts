@@ -37,13 +37,15 @@ import type {
   SendNotificationTestMailRequest,
   UpdateHostNotificationPolicyRequest,
 } from "@/features/host/api/host-contracts";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { HostRequestPurgedError } from "@/shared/api/host-authority-event";
 import type { PageRequest } from "@/shared/model/paging";
 import {
   normalizePageRequest,
   pageFromNormalizedPageRequest,
 } from "@/shared/query/cursor-pagination";
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
+import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
 
 export type ManualOptionsQueryRequest = {
   sessionId?: string | null;
@@ -56,10 +58,6 @@ export type ManualDispatchesQueryRequest = {
   eventType?: HostNotificationEventType | null;
   page?: PageRequest;
 };
-
-function scopeKey(context?: ReadmatesApiContext): string | null {
-  return context?.clubSlug ?? null;
-}
 
 function optional(value: string | null | undefined): string | undefined {
   return value ?? undefined;
@@ -87,47 +85,50 @@ function normalizeManualDispatchesRequest(request?: ManualDispatchesQueryRequest
 }
 
 export const hostNotificationKeys = {
-  all: ["host", "notifications"] as const,
-  policy: (context?: ReadmatesApiContext) =>
-    [...hostNotificationKeys.all, scopeKey(context), "policy"] as const,
-  scope: (context?: ReadmatesApiContext) =>
-    [...hostNotificationKeys.all, "scope", scopeKey(context)] as const,
-  overview: (context?: ReadmatesApiContext) =>
+  scope: (context: ExplicitReadmatesApiContext) =>
+    [...hostClubQueryPrefix(context.clubSlug), "notifications"] as const,
+  policy: (context: ExplicitReadmatesApiContext) =>
+    [...hostNotificationKeys.scope(context), "policy"] as const,
+  overview: (context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.scope(context), "overview"] as const,
-  manual: (context?: ReadmatesApiContext) =>
+  manual: (context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.scope(context), "manual"] as const,
-  summary: (context?: ReadmatesApiContext) =>
+  summary: (context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.overview(context), "summary"] as const,
-  eventsRoot: (context?: ReadmatesApiContext) =>
+  eventsRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.overview(context), "events"] as const,
-  events: (page?: PageRequest, context?: ReadmatesApiContext) =>
+  events: (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.eventsRoot(context), normalizePageRequest(page)] as const,
-  deliveriesRoot: (context?: ReadmatesApiContext) =>
+  deliveriesRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.overview(context), "deliveries"] as const,
-  deliveries: (page?: PageRequest, context?: ReadmatesApiContext) =>
+  deliveries: (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.deliveriesRoot(context), normalizePageRequest(page)] as const,
-  auditRoot: (context?: ReadmatesApiContext) =>
+  auditRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.overview(context), "audit"] as const,
-  audit: (page?: PageRequest, context?: ReadmatesApiContext) =>
+  audit: (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.auditRoot(context), normalizePageRequest(page)] as const,
-  manualOptionsRoot: (context?: ReadmatesApiContext) =>
+  manualOptionsRoot: (context: ExplicitReadmatesApiContext) =>
     hostNotificationManualOptionsRootKey(context),
-  manualOptions: (request?: ManualOptionsQueryRequest, context?: ReadmatesApiContext) =>
+  manualOptions: (request: ManualOptionsQueryRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.manualOptionsRoot(context), normalizeManualOptionsRequest(request)] as const,
-  manualDispatchesRoot: (context?: ReadmatesApiContext) =>
+  manualDispatchesRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.manual(context), "dispatches"] as const,
-  manualDispatches: (request?: ManualDispatchesQueryRequest, context?: ReadmatesApiContext) =>
+  manualDispatches: (request: ManualDispatchesQueryRequest | undefined, context: ExplicitReadmatesApiContext) =>
     [...hostNotificationKeys.manualDispatchesRoot(context), normalizeManualDispatchesRequest(request)] as const,
 } as const;
 
-export function hostNotificationSummaryQuery(context?: ReadmatesApiContext) {
+export function shouldRecoverHostNotificationMutation(error: unknown): boolean {
+  return !(error instanceof HostRequestPurgedError);
+}
+
+export function hostNotificationSummaryQuery(context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.summary(context),
     queryFn: () => fetchHostNotificationSummary(context),
   });
 }
 
-export function hostNotificationHealthQuery(context?: ReadmatesApiContext) {
+export function hostNotificationHealthQuery(context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.summary(context),
     queryFn: () => fetchHostNotificationSummary(context),
@@ -135,41 +136,41 @@ export function hostNotificationHealthQuery(context?: ReadmatesApiContext) {
   });
 }
 
-export function hostNotificationPolicyQuery(context?: ReadmatesApiContext) {
+export function hostNotificationPolicyQuery(context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.policy(context),
     queryFn: () => fetchHostNotificationPolicy(context),
   });
 }
 
-export function hostNotificationEventsQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+export function hostNotificationEventsQuery(page: PageRequest | undefined, context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.events(page, context),
     queryFn: () => fetchHostNotificationEvents(context, pageFromNormalizedPageRequest(normalizePageRequest(page))),
   });
 }
 
-export function hostNotificationDeliveriesQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+export function hostNotificationDeliveriesQuery(page: PageRequest | undefined, context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.deliveries(page, context),
     queryFn: () => fetchHostNotificationDeliveries(context, pageFromNormalizedPageRequest(normalizePageRequest(page))),
   });
 }
 
-export function hostNotificationAuditQuery(page?: PageRequest, context?: ReadmatesApiContext) {
+export function hostNotificationAuditQuery(page: PageRequest | undefined, context: ExplicitReadmatesApiContext) {
   return queryOptions({
     queryKey: hostNotificationKeys.audit(page, context),
     queryFn: () => fetchHostNotificationTestMailAudit(context, pageFromNormalizedPageRequest(normalizePageRequest(page))),
   });
 }
 
-export function hostNotificationSessionsQuery(context?: ReadmatesApiContext) {
+export function hostNotificationSessionsQuery(context: ExplicitReadmatesApiContext) {
   return hostSessionListQuery({ limit: DEFAULT_HOST_SESSION_LIST_LIMIT }, context);
 }
 
 export function hostNotificationManualOptionsQuery(
-  request?: ManualOptionsQueryRequest,
-  context?: ReadmatesApiContext,
+  request: ManualOptionsQueryRequest | undefined,
+  context: ExplicitReadmatesApiContext,
 ) {
   const normalized = normalizeManualOptionsRequest(request);
   return queryOptions({
@@ -183,8 +184,8 @@ export function hostNotificationManualOptionsQuery(
 }
 
 export function hostNotificationManualDispatchesQuery(
-  request?: ManualDispatchesQueryRequest,
-  context?: ReadmatesApiContext,
+  request: ManualDispatchesQueryRequest | undefined,
+  context: ExplicitReadmatesApiContext,
 ) {
   const normalized = normalizeManualDispatchesRequest(request);
   return queryOptions({
@@ -197,62 +198,66 @@ export function hostNotificationManualDispatchesQuery(
   });
 }
 
-export function invalidateHostNotificationOverview(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostNotificationOverview(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostNotificationKeys.overview(context) });
 }
 
-export function invalidateManualNotificationState(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateManualNotificationState(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostNotificationKeys.manual(context) });
 }
 
-export function invalidateHostNotificationPolicy(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostNotificationPolicy(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostNotificationKeys.policy(context) });
 }
 
-export function invalidateHostNotifications(client: QueryClient, context?: ReadmatesApiContext) {
+export function invalidateHostNotifications(client: QueryClient, context: ExplicitReadmatesApiContext) {
   return client.invalidateQueries({ queryKey: hostNotificationKeys.scope(context) });
 }
 
-async function processHostNotificationsOrThrow(): Promise<void> {
-  const response = await processHostNotifications();
+async function processHostNotificationsOrThrow(context: ExplicitReadmatesApiContext): Promise<void> {
+  const response = await processHostNotifications(context);
   if (!response.ok) {
     throw new Error("Notification process failed");
   }
 }
 
-export function useProcessHostNotificationsMutation(context?: ReadmatesApiContext) {
+export function useProcessHostNotificationsMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: processHostNotificationsOrThrow,
+    mutationKey: hostMutationKey(context.clubSlug, "notifications", "process"),
+    mutationFn: () => processHostNotificationsOrThrow(context),
     onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
-export function useRetryHostNotificationMutation(context?: ReadmatesApiContext) {
+export function useRetryHostNotificationMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => retryHostNotification(id),
+    mutationKey: hostMutationKey(context.clubSlug, "notifications", "retry"),
+    mutationFn: (id: string) => retryHostNotification(id, context),
     onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
-export function useRestoreHostNotificationMutation(context?: ReadmatesApiContext) {
+export function useRestoreHostNotificationMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => restoreHostNotification(id),
+    mutationKey: hostMutationKey(context.clubSlug, "notifications", "restore"),
+    mutationFn: (id: string) => restoreHostNotification(id, context),
     onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
-export function useSendHostNotificationTestMailMutation(context?: ReadmatesApiContext) {
+export function useSendHostNotificationTestMailMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: (request: SendNotificationTestMailRequest) => sendHostNotificationTestMail(request),
+    mutationKey: hostMutationKey(context.clubSlug, "notifications", "test-mail"),
+    mutationFn: (request: SendNotificationTestMailRequest) => sendHostNotificationTestMail(request, context),
     onSuccess: () => invalidateHostNotificationOverview(client, context),
   });
 }
 
-export function useUpdateHostNotificationPolicyMutation(context?: ReadmatesApiContext) {
+export function useUpdateHostNotificationPolicyMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   const policyKey = hostNotificationKeys.policy(context);
   return useMutation<
@@ -260,12 +265,14 @@ export function useUpdateHostNotificationPolicyMutation(context?: ReadmatesApiCo
     Error,
     UpdateHostNotificationPolicyRequest
   >({
+    mutationKey: hostMutationKey(context.clubSlug, "notifications", "policy"),
     mutationFn: (request) => updateHostNotificationPolicy(request, context),
     onSuccess: async (policy) => {
       client.setQueryData(policyKey, policy);
       await invalidateHostNotificationPolicy(client, context).catch(() => undefined);
     },
-    onError: async () => {
+    onError: async (error) => {
+      if (!shouldRecoverHostNotificationMutation(error)) return;
       await client.refetchQueries({
         queryKey: policyKey,
         exact: true,
@@ -275,16 +282,18 @@ export function useUpdateHostNotificationPolicyMutation(context?: ReadmatesApiCo
   });
 }
 
-export function usePreviewManualNotificationMutation() {
+export function usePreviewManualNotificationMutation(context: ExplicitReadmatesApiContext) {
   return useMutation<ManualNotificationPreviewResponse, Error, ManualNotificationPreviewRequest>({
-    mutationFn: (request) => previewManualNotification(request),
+    mutationKey: hostMutationKey(context.clubSlug, "notifications", "preview"),
+    mutationFn: (request) => previewManualNotification(request, context),
   });
 }
 
-export function useConfirmManualNotificationMutation(context?: ReadmatesApiContext) {
+export function useConfirmManualNotificationMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation<ManualNotificationConfirmResponse, Error, ManualNotificationConfirmRequest>({
-    mutationFn: (request) => confirmManualNotification(request),
+    mutationKey: hostMutationKey(context.clubSlug, "notifications", "confirm"),
+    mutationFn: (request) => confirmManualNotification(request, context),
     onSuccess: async () => {
       await Promise.all([
         client.invalidateQueries({
