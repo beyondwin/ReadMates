@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useLocation, useNavigate } from "react-router";
 import { MemoryRouter } from "react-router";
@@ -73,7 +73,11 @@ describe("HostAuthorityLossController", () => {
     expect(clearMemory).toHaveBeenCalledTimes(1);
     expect(queryClient.getQueryData(same)).toBeUndefined();
     expect(queryClient.getQueryData(other)).toBe("keep");
-    expect(onHandled).toHaveBeenCalledWith("HOST_AUTHORITY_REVOKED");
+    expect(onHandled).toHaveBeenCalledWith(
+      "HOST_AUTHORITY_REVOKED",
+      "/clubs/reading-sai/app",
+      expect.stringMatching(/^host-authority-loss-/),
+    );
   });
 
   it("commits mounted sensitive-state clearing before the safe replacement", async () => {
@@ -131,6 +135,41 @@ describe("HostAuthorityLossController", () => {
     await waitFor(() => expect(queryClient.getQueryData(background)).toBeUndefined());
     expect(screen.getByLabelText("location")).toHaveTextContent("/clubs/reading-sai/app/host");
     expect(onHandled).not.toHaveBeenCalled();
+  });
+
+  it("commits only one replacement handoff for concurrent same-club authority events", async () => {
+    const queryClient = client();
+    const storage = createHostSensitiveStorage();
+    const onHandled = vi.fn();
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
+          <HostAuthorityLossController storage={storage} onHandled={onHandled} />
+          <LocationProbe />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    act(() => {
+      signalHostAuthorityLoss({
+        code: "MEMBERSHIP_SUSPENDED",
+        clubSlug: "reading-sai",
+        requestKind: "SESSION_RECORD_DRAFT_SAVE",
+      });
+      signalHostAuthorityLoss({
+        code: "HOST_AUTHORITY_REVOKED",
+        clubSlug: "reading-sai",
+        requestKind: "SESSION_RECORD_DRAFT_SAVE",
+      });
+    });
+
+    await waitFor(() => expect(screen.getByLabelText("location"))
+      .toHaveTextContent("/clubs/reading-sai/app"));
+    await act(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    }));
+    expect(onHandled).toHaveBeenCalledTimes(1);
   });
 
   it("does not replace a different club entered while the purge is still running", async () => {

@@ -38,6 +38,23 @@ function RouteControllerHarness() {
   );
 }
 
+function RemountingWorkspaceScreen({
+  workspace,
+  label,
+}: {
+  workspace: "host" | "member";
+  label: string;
+}) {
+  return (
+    <>
+      <QueryClientProvider client={queryClient}>
+        <AppRouteSecurityController workspace={workspace} transitionStore={transitionStore} />
+      </QueryClientProvider>
+      <main><h1>{label}</h1></main>
+    </>
+  );
+}
+
 beforeEach(() => {
   window.sessionStorage.clear();
   transitionStore = createWorkspaceRouteTransitionStore({
@@ -55,6 +72,75 @@ afterEach(() => {
 });
 
 describe("AppRouteSecurityController", () => {
+  it("keeps the authority-loss reason through the real host-to-member controller remount", async () => {
+    const router = createMemoryRouter([
+      {
+        path: "/clubs/:clubSlug/app/host/*",
+        element: <RemountingWorkspaceScreen key="host-route-controller" workspace="host" label="모임 기록" />,
+      },
+      {
+        path: "/clubs/:clubSlug/app",
+        element: <RemountingWorkspaceScreen key="member-route-controller" workspace="member" label="멤버 홈" />,
+      },
+    ], {
+      initialEntries: ["/clubs/reading-sai/app/host/meetings/session-1/record"],
+    });
+    render(<RouterProvider router={router} />);
+
+    signalHostAuthorityLoss({
+      code: "MEMBERSHIP_SUSPENDED",
+      clubSlug: "reading-sai",
+      requestKind: "SESSION_RECORD_DRAFT_SAVE",
+    });
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/clubs/reading-sai/app"));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("멤버십이 중지"));
+    await act(() => new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    }));
+    expect(screen.getByRole("status")).toHaveTextContent("멤버십이 중지");
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus();
+  });
+
+  it("does not replay an abandoned authority reason on a later same-path visit", async () => {
+    let memberRouteAvailable = false;
+    const router = createMemoryRouter([
+      {
+        path: "/clubs/:clubSlug/app/host/*",
+        element: <RemountingWorkspaceScreen key="host-route-controller" workspace="host" label="모임 기록" />,
+      },
+      {
+        path: "/clubs/:clubSlug/app",
+        loader: () => {
+          if (!memberRouteAvailable) {
+            throw new Response(null, { status: 503, statusText: "Member route unavailable" });
+          }
+          return null;
+        },
+        element: <RemountingWorkspaceScreen key="member-route-controller" workspace="member" label="멤버 홈" />,
+        errorElement: <main><h1>멤버 공간 로드 실패</h1></main>,
+      },
+    ], {
+      initialEntries: ["/clubs/reading-sai/app/host/meetings/session-1/record"],
+    });
+    render(<RouterProvider router={router} />);
+
+    signalHostAuthorityLoss({
+      code: "MEMBERSHIP_SUSPENDED",
+      clubSlug: "reading-sai",
+      requestKind: "SESSION_RECORD_DRAFT_SAVE",
+    });
+
+    expect(await screen.findByRole("heading", { name: "멤버 공간 로드 실패" })).toBeInTheDocument();
+    memberRouteAvailable = true;
+    await act(async () => router.navigate("/clubs/reading-sai/app", { replace: true }));
+
+    await waitFor(() => expect(screen.getByRole("heading", { name: "멤버 홈" })).toHaveFocus());
+    expect(screen.getByRole("status")).toHaveTextContent("멤버 공간으로 전환했습니다");
+    expect(screen.getByRole("status")).not.toHaveTextContent("멤버십이 중지");
+  });
+
   it("announces authority loss after replacing the host route and focuses the safe heading", async () => {
     render(
       <MemoryRouter initialEntries={["/clubs/reading-sai/app/host"]}>
