@@ -133,7 +133,7 @@ class HostSessionDeletionQueries(
         val rows =
             jdbcTemplate.query(
                 """
-                select id, number, title, state, deleted_at, purge_after,
+                select id, number, title, state, deleted_at, purge_after, session_revision,
                        purge_after > utc_timestamp(6) as restorable
                 from sessions
                 where club_id = ?
@@ -319,7 +319,7 @@ class HostSessionDeletionQueries(
         return jdbcTemplate
             .query(
                 """
-                select id, number, title, state, deleted_at, purge_after,
+                select id, number, title, state, deleted_at, purge_after, session_revision,
                        purge_after > utc_timestamp(6) as restorable
                 from sessions
                 where id = ?
@@ -585,6 +585,7 @@ class HostSessionDeletionQueries(
             deletedAt = utcOffsetDateTime("deleted_at"),
             purgeAfter = utcOffsetDateTime("purge_after"),
             restorable = getBoolean("restorable"),
+            sessionRevision = getLong("session_revision"),
         )
 
     private fun HostSessionTrashRecord.toListResponse() =
@@ -597,6 +598,7 @@ class HostSessionDeletionQueries(
             deletedAt = deletedAt.toString(),
             purgeAfter = purgeAfter.toString(),
             counts = EMPTY_TRASH_COUNTS,
+            sessionRevision = sessionRevision,
         )
 }
 

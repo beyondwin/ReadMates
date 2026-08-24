@@ -31,11 +31,16 @@ class JdbcSessionClosingStatusAdapterTest(
     @Test
     fun `loads counts feedback state notification status and public href for host club session`() {
         seedClosedPublishedSession()
+        insertActiveParticipant(attendanceRevision = 3)
 
         val snapshot = adapter.loadHostSessionClosingSnapshot(host(), sessionId)
 
         assertThat(snapshot).isNotNull
         assertThat(snapshot!!.sessionNumber).isEqualTo(77)
+        assertThat(snapshot.sessionRevision).isEqualTo(9)
+        assertThat(snapshot.participantSetRevision).isEqualTo(4)
+        assertThat(snapshot.attendanceSnapshotId)
+            .isEqualTo("att:00000000-0000-0000-0000-000000000201:3")
         assertThat(snapshot.recordVisibility).isEqualTo(SessionRecordVisibility.PUBLIC)
         assertThat(snapshot.summaryPublished).isTrue()
         assertThat(snapshot.highlightCount).isEqualTo(2)
@@ -93,12 +98,37 @@ class JdbcSessionClosingStatusAdapterTest(
             """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, session_date,
-              start_time, end_time, question_deadline_at, location_label, state, visibility, access_scope
+              start_time, end_time, question_deadline_at, location_label, state, visibility, access_scope,
+              session_revision, participant_set_revision
             )
             values (?, '00000000-0000-0000-0000-000000000001', 77, '77 session', 'Test Book', 'Test Author',
-              '2026-06-18', '19:30:00', '21:30:00', '2026-06-18 12:00:00', 'Online', 'PUBLISHED', 'PUBLIC', 'GUEST_READABLE')
+              '2026-06-18', '19:30:00', '21:30:00', '2026-06-18 12:00:00', 'Online', 'PUBLISHED', 'PUBLIC',
+              'GUEST_READABLE', 9, 4)
             """.trimIndent(),
             sessionId.toString(),
+        )
+    }
+
+    private fun insertActiveParticipant(attendanceRevision: Long) {
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status,
+              participation_status, attendance_revision
+            )
+            values (
+              '22222222-2222-2222-2222-222222222229',
+              '00000000-0000-0000-0000-000000000001',
+              ?,
+              '00000000-0000-0000-0000-000000000201',
+              'GOING',
+              'ATTENDED',
+              'ACTIVE',
+              ?
+            )
+            """.trimIndent(),
+            sessionId.toString(),
+            attendanceRevision,
         )
     }
 
@@ -213,5 +243,6 @@ delete from session_feedback_documents where session_id = '11111111-1111-1111-11
 delete from one_line_reviews where session_id = '11111111-1111-1111-1111-111111111111';
 delete from highlights where session_id = '11111111-1111-1111-1111-111111111111';
 delete from public_session_publications where session_id = '11111111-1111-1111-1111-111111111111';
+delete from session_participants where session_id = '11111111-1111-1111-1111-111111111111';
 delete from sessions where id = '11111111-1111-1111-1111-111111111111';
 """

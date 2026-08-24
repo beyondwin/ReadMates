@@ -43,6 +43,7 @@ class HostSessionDeletionTransaction(
         return assessment.toTrashResponse(
             deletedAt = trashed.deletedAt.toString(),
             purgeAfter = trashed.purgeAfter.toString(),
+            sessionRevision = trashed.sessionRevision,
         )
     }
 }

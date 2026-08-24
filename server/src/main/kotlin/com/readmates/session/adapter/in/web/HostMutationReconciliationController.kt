@@ -2,6 +2,7 @@
 
 package com.readmates.session.adapter.`in`.web
 
+import com.readmates.session.application.model.AttendanceVersion
 import com.readmates.session.application.model.HostMutationReceiptResult
 import com.readmates.session.application.model.HostProjectionSnapshot
 import com.readmates.session.application.port.`in`.HostMutationReconciliationResult
@@ -40,6 +41,8 @@ data class HostMutationReconciliationHttpResponse(
     val status: String,
     val receipt: HostMutationReceiptResult? = null,
     val current: HostProjectionSnapshot? = null,
+    val attendanceVersions: List<AttendanceVersion>? = null,
+    val attendanceSnapshotId: String? = null,
 )
 
 private fun HostMutationReconciliationResult.toHttp(): HostMutationReconciliationHttpResponse =
@@ -49,9 +52,16 @@ private fun HostMutationReconciliationResult.toHttp(): HostMutationReconciliatio
                 status = status,
                 receipt = receipt,
                 current = current,
+                attendanceVersions = attendanceVersions,
+                attendanceSnapshotId = attendanceSnapshotId,
             )
-        HostMutationReconciliationResult.NotExecuted ->
-            HostMutationReconciliationHttpResponse(status = status)
+        is HostMutationReconciliationResult.NotExecuted ->
+            HostMutationReconciliationHttpResponse(
+                status = status,
+                current = current,
+                attendanceVersions = attendanceVersions,
+                attendanceSnapshotId = attendanceSnapshotId,
+            )
         HostMutationReconciliationResult.Pending ->
             HostMutationReconciliationHttpResponse(status = status)
     }

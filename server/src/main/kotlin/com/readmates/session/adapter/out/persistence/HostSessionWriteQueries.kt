@@ -3,6 +3,7 @@ package com.readmates.session.adapter.out.persistence
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
 import com.readmates.session.application.HostSessionRevisionConflictException
+import com.readmates.session.application.model.AttendanceVersion
 import com.readmates.session.application.model.ExpectedSessionRevision
 import com.readmates.session.application.model.HostProjectionSnapshot
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -389,6 +390,29 @@ internal class HostSessionWriteQueries(
             )
         return "att:${rows.joinToString(",")}"
     }
+
+    fun loadAttendanceVersions(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): List<AttendanceVersion> =
+        jdbcTemplate.query(
+            """
+            select membership_id, attendance_revision
+            from session_participants
+            where session_id = ?
+              and club_id = ?
+              and participation_status = 'ACTIVE'
+            order by membership_id
+            """.trimIndent(),
+            { resultSet, _ ->
+                AttendanceVersion(
+                    membershipId = resultSet.uuid("membership_id"),
+                    attendanceRevision = resultSet.getLong("attendance_revision"),
+                )
+            },
+            sessionId.dbString(),
+            host.clubId.dbString(),
+        )
 
     fun loadProjection(
         host: CurrentMember,

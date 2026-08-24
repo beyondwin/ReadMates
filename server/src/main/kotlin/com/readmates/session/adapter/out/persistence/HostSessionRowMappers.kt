@@ -8,6 +8,7 @@ import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionPublication
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.HostDashboardMissingMemberResult
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.session.domain.SessionParticipationStatus
@@ -80,6 +81,15 @@ internal fun ResultSet.toHostSessionDetailBase() =
                 fileName = null,
                 uploadedAt = null,
             ),
+        versions =
+            SessionVersionVector(
+                sessionRevision = getLong("session_revision"),
+                exposureRevision = getLong("exposure_revision"),
+                participantSetRevision = getLong("participant_set_revision"),
+                recordDraftRevision = getLong("draft_revision").takeUnless { wasNull() },
+                liveRecordRevision = getLong("live_revision").takeIf { it > 0 },
+                publicationRevision = getLong("publication_revision"),
+            ),
     )
 
 internal fun ResultSet.toHostSessionAttendee() =
@@ -91,6 +101,7 @@ internal fun ResultSet.toHostSessionAttendee() =
         rsvpStatus = getString("rsvp_status"),
         attendanceStatus = getString("attendance_status"),
         participationStatus = SessionParticipationStatus.valueOf(getString("participation_status")),
+        attendanceRevision = getLong("attendance_revision"),
     )
 
 internal fun ResultSet.toHostSessionFeedbackDocument() =

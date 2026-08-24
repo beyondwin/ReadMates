@@ -19,6 +19,9 @@ data class ClosingSessionResponse(
     val meetingDate: String,
     val state: String,
     val recordVisibility: String,
+    val sessionRevision: Long,
+    val participantSetRevision: Long,
+    val attendanceSnapshotId: String,
 )
 
 data class ClosingOverallResponse(
@@ -61,6 +64,9 @@ fun HostSessionClosingStatus.toResponse() =
                 meetingDate = session.meetingDate.toString(),
                 state = session.state,
                 recordVisibility = session.recordVisibility.name,
+                sessionRevision = session.sessionRevision,
+                participantSetRevision = session.participantSetRevision,
+                attendanceSnapshotId = session.attendanceSnapshotId,
             ),
         overall =
             ClosingOverallResponse(

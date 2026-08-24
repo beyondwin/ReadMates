@@ -49,6 +49,11 @@ class HostSessionClosingControllerTest {
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.schema") { value("host.session_closing_status.v1") }
+                jsonPath("$.session.sessionRevision") { value(9) }
+                jsonPath("$.session.participantSetRevision") { value(4) }
+                jsonPath("$.session.attendanceSnapshotId") {
+                    value("att:00000000-0000-0000-0000-000000000201:3")
+                }
                 jsonPath("$.overall.state") { value("READY") }
                 jsonPath("$.overall.primaryAction") { value("SEND_NOTIFICATION") }
                 jsonPath("$.checklist[0].id") { value("SESSION_CLOSED") }
@@ -84,6 +89,9 @@ class HostSessionClosingControllerTest {
                     meetingDate = LocalDate.parse("2026-06-18"),
                     state = "CLOSED",
                     recordVisibility = SessionRecordVisibility.PUBLIC,
+                    sessionRevision = 9,
+                    participantSetRevision = 4,
+                    attendanceSnapshotId = "att:00000000-0000-0000-0000-000000000201:3",
                 ),
             overall = ClosingOverall(ClosingOverallState.READY, "Ready", ClosingPrimaryAction.SEND_NOTIFICATION),
             checklist =

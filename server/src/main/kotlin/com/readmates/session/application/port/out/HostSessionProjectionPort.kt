@@ -1,5 +1,6 @@
 package com.readmates.session.application.port.out
 
+import com.readmates.session.application.model.AttendanceVersion
 import com.readmates.session.application.model.HostProjectionSnapshot
 import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.shared.security.CurrentMember
@@ -21,4 +22,9 @@ interface HostSessionProjectionPort {
         host: CurrentMember,
         sessionId: UUID,
     ): String
+
+    fun loadAttendanceVersions(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): List<AttendanceVersion>
 }

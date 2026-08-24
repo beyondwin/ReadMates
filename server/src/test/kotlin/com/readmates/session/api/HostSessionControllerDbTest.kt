@@ -1555,6 +1555,61 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host detail exposes authoritative mutation versions and attendance inputs`() {
+        createSessionSeven()
+        val sessionId = "00000000-0000-0000-0000-000000009777"
+        val hostMembershipId = "00000000-0000-0000-0000-000000000201"
+        jdbcTemplate.update(
+            """
+            update sessions
+            set session_revision = 4,
+                exposure_revision = 3,
+                participant_set_revision = 2
+            where id = ?
+            """.trimIndent(),
+            sessionId,
+        )
+        jdbcTemplate.update(
+            "update session_publication_versions set publication_revision = 6 where session_id = ?",
+            sessionId,
+        )
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set attendance_revision = 7
+            where session_id = ? and membership_id = ?
+            """.trimIndent(),
+            sessionId,
+            hostMembershipId,
+        )
+
+        val response =
+            mockMvc
+                .get("/api/host/sessions/$sessionId") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.versions.sessionRevision") { value(4) }
+                    jsonPath("$.versions.exposureRevision") { value(3) }
+                    jsonPath("$.versions.participantSetRevision") { value(2) }
+                    jsonPath("$.versions.recordDraftRevision") { value(null) }
+                    jsonPath("$.versions.liveRecordRevision") { value(null) }
+                    jsonPath("$.versions.publicationRevision") { value(6) }
+                    jsonPath("$.attendees[?(@.membershipId == '$hostMembershipId')].attendanceRevision") {
+                        value(hasItem(7))
+                    }
+                    jsonPath("$.attendanceSnapshotId") { exists() }
+                }.andReturn()
+                .response
+                .contentAsString
+                .let(jsonMapper::readTree)
+
+        assertThat(response.get("attendanceSnapshotId").asString())
+            .startsWith("att:")
+            .contains("$hostMembershipId:7")
+    }
+
+    @Test
     @Sql(
         statements = [
             RESET_MEMBER1_ACTIVE_AVATAR_KEY_SQL,

@@ -178,4 +178,9 @@ class JdbcHostSessionWriteAdapter(
         host: CurrentMember,
         sessionId: UUID,
     ): String = writeQueries.attendanceSnapshotId(host, sessionId)
+
+    override fun loadAttendanceVersions(
+        host: CurrentMember,
+        sessionId: UUID,
+    ) = writeQueries.loadAttendanceVersions(host, sessionId)
 }

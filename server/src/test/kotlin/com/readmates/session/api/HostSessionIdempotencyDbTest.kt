@@ -181,6 +181,36 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    fun `not executed reconciliation returns club scoped authoritative mutation state`() {
+        val sessionId = createDraft("미실행 조회", "key-current-create-01").first
+        open(sessionId, revision = 0, key = "key-current-open-01")
+        jdbcTemplate.update(
+            """
+            update session_participants
+            set attendance_revision = 5
+            where session_id = ? and membership_id = ?
+            """.trimIndent(),
+            sessionId,
+            HOST_MEMBERSHIP_ID,
+        )
+
+        mockMvc
+            .get("/api/host/mutations/SESSION_CLOSE/$sessionId/key-never-ran-0001") { withHost() }
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("NOT_EXECUTED") }
+                jsonPath("$.receipt") { doesNotExist() }
+                jsonPath("$.current.sessionId") { value(sessionId) }
+                jsonPath("$.current.versions.sessionRevision") { value(1) }
+                jsonPath("$.current.versions.participantSetRevision") { value(1) }
+                jsonPath("$.attendanceVersions[?(@.membershipId == '$HOST_MEMBERSHIP_ID')].attendanceRevision") {
+                    value(org.hamcrest.Matchers.hasItem(5))
+                }
+                jsonPath("$.attendanceSnapshotId") { exists() }
+            }
+    }
+
+    @Test
     fun `same key different payload conflicts and writes nothing extra`() {
         val key = "key-create-conflict-01"
         mockMvc

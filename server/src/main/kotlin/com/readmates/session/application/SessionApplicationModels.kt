@@ -145,6 +145,8 @@ data class HostSessionDetailResponse(
     val accessScope: SessionAccessScope = SessionAccessScope.HOST_ONLY,
     val siteVisibility: PublicSiteVisibility = PublicSiteVisibility.HIDDEN,
     val changeReceipt: HostSessionChangeReceipt? = null,
+    val versions: SessionVersionVector = SessionVersionVector.INITIAL,
+    val attendanceSnapshotId: String = "att:",
 )
 
 data class HostSessionAttendee(
@@ -155,6 +157,7 @@ data class HostSessionAttendee(
     val rsvpStatus: String,
     val attendanceStatus: String,
     val participationStatus: SessionParticipationStatus = SessionParticipationStatus.ACTIVE,
+    val attendanceRevision: Long = 0,
 )
 
 data class HostSessionFeedbackDocument(
@@ -315,6 +318,7 @@ fun HostSessionDeletionAssessment.toDeletionResponse() =
 fun HostSessionDeletionAssessment.toTrashResponse(
     deletedAt: String,
     purgeAfter: String,
+    sessionRevision: Long,
 ) = HostSessionTrashResponse(
     sessionId = target.sessionId.toString(),
     sessionNumber = target.sessionNumber,
@@ -324,6 +328,7 @@ fun HostSessionDeletionAssessment.toTrashResponse(
     deletedAt = deletedAt,
     purgeAfter = purgeAfter,
     counts = counts,
+    sessionRevision = sessionRevision,
 )
 
 data class HostSessionDeletionResponse(

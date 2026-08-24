@@ -324,6 +324,7 @@ class HostSessionLifecycleService(
                     deletedAt = trashed.deletedAt.toString(),
                     purgeAfter = trashed.purgeAfter.toString(),
                     counts = deletionPort.deletionCounts(command.host.clubId, command.sessionId),
+                    sessionRevision = trashed.sessionRevision,
                 )
             },
         )
