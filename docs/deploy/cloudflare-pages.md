@@ -75,7 +75,7 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 1. GitHub `main`에 변경을 병합하고 필요한 검증을 끝냅니다.
 2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push해 server image를 build/scan/promote합니다.
 3. Server/API 변경이 있으면 OCI backend를 같은 image tag로 올리고 Flyway/health/BFF smoke를 확인합니다.
-4. Host-client rollout이면 protected `host-rollout-r2b` ref가 exact annotated tag commit을 가리키게 push하고, `.github/workflows/host-client-rollout-evidence.yml`의 package/evidence/final-checker gate를 실행합니다.
+4. Host-client rollout이면 protected `host-rollout-r2b` ref가 exact annotated tag commit을 가리키게 push하고, fresh explicit stage approval 뒤 `.github/workflows/host-client-rollout-evidence.yml`의 no-input `workflow_dispatch`로 package/evidence/final-checker gate를 실행합니다.
 5. Workflow가 deterministic Pages tar를 직접 SHA-256으로 검증하고 attestation과 final live checker를 통과시킵니다.
 6. Reusable `.github/workflows/deploy-front.yml`이 caller ref/SHA/stage/tag를 자체 derivation하고 같은 artifact ID와 digest를 다시 검증합니다. Tar의 absolute/`..` path, symlink, hardlink, device, FIFO, privileged mode를 거부한 뒤 `dist`와 `functions`를 Cloudflare Pages production으로 함께 배포합니다.
 7. [README.md](../../README.md)의 smoke check를 실행합니다.

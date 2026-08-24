@@ -648,6 +648,48 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     if _mapping(workflow_ast.get("permissions")) != {"contents": "read", "actions": "read"}:
         errors.append("orchestrator top-level permissions are not least privilege")
 
+    active_rollout_docs = (
+        "docs/deploy/release-publish-runbook.md",
+        "docs/deploy/cloudflare-pages.md",
+        "docs/development/release-management.md",
+        "docs/development/versioning.md",
+    )
+    for path in active_rollout_docs:
+        _require(
+            sources[path],
+            "workflow_dispatch",
+            f"{path} does not name the no-input rollout trigger",
+            errors,
+        )
+        _forbid(
+            sources[path],
+            "--event push",
+            f"{path} incorrectly treats a rollout ref push as the workflow trigger",
+            errors,
+        )
+    dispatch_command = 'gh workflow run "Host Client Rollout Evidence" --ref host-rollout-r2b'
+    dispatch_lookup = (
+        'gh run list --workflow "Host Client Rollout Evidence" '
+        "--branch host-rollout-r2b --event workflow_dispatch --limit 5"
+    )
+    for path in (
+        "docs/deploy/release-publish-runbook.md",
+        "docs/development/release-management.md",
+    ):
+        _require(sources[path], dispatch_command, f"{path} omits the no-input R2b dispatch command", errors)
+        _require(sources[path], dispatch_lookup, f"{path} omits the R2b dispatch run lookup", errors)
+    runbook_sequence = (
+        "Fresh explicit R2b live approval을 확인한 뒤 no-input `workflow_dispatch`를 실행합니다. "
+        "Dispatch로 생성된 run의 environment-bound job은 그 다음 protected environment reviewer "
+        "승인을 통과해야 진행합니다."
+    )
+    _require(
+        sources["docs/deploy/release-publish-runbook.md"],
+        runbook_sequence,
+        "release runbook does not order live approval, dispatch, then run-specific environment review",
+        errors,
+    )
+
     jobs = _mapping(workflow_ast.get("jobs"))
     if set(jobs) != ROLLOUT_JOBS:
         errors.append("protected rollout orchestrator jobs are incomplete")
@@ -1613,6 +1655,39 @@ class RolloutContractTests(unittest.TestCase):
         sources = _read_sources(REPO_ROOT)
         sources[".github/workflows/sync-config.yml"] += '\nREADMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED: "true"'
         self.assertTrue(validate_structural_sources(sources))
+
+    def test_active_rollout_docs_require_explicit_no_input_dispatch(self) -> None:
+        sources = _read_sources(REPO_ROOT)
+        active_docs = (
+            "docs/deploy/release-publish-runbook.md",
+            "docs/deploy/cloudflare-pages.md",
+            "docs/development/release-management.md",
+            "docs/development/versioning.md",
+        )
+        for path in active_docs:
+            with self.subTest(path=path):
+                self.assertIn("workflow_dispatch", sources[path])
+                self.assertNotIn("--event push", sources[path])
+
+        dispatch_command = 'gh workflow run "Host Client Rollout Evidence" --ref host-rollout-r2b'
+        dispatch_lookup = (
+            'gh run list --workflow "Host Client Rollout Evidence" '
+            "--branch host-rollout-r2b --event workflow_dispatch --limit 5"
+        )
+        for path in (
+            "docs/deploy/release-publish-runbook.md",
+            "docs/development/release-management.md",
+        ):
+            with self.subTest(path=path):
+                self.assertIn(dispatch_command, sources[path])
+                self.assertIn(dispatch_lookup, sources[path])
+
+        runbook_sequence = (
+            "Fresh explicit R2b live approval을 확인한 뒤 no-input `workflow_dispatch`를 실행합니다. "
+            "Dispatch로 생성된 run의 environment-bound job은 그 다음 protected environment reviewer "
+            "승인을 통과해야 진행합니다."
+        )
+        self.assertIn(runbook_sequence, sources["docs/deploy/release-publish-runbook.md"])
 
     def test_structural_parser_rejects_human_digest_untrusted_trigger_and_malformed_yaml(self) -> None:
         workflow_path = ".github/workflows/host-client-rollout-evidence.yml"

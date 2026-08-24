@@ -171,9 +171,12 @@ Backend health와 BFF contract를 확인한 뒤 protected rollout ref가 exact a
 
 ```bash
 git push origin <r2b-commit>:host-rollout-r2b
-gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event push --limit 5
+gh workflow run "Host Client Rollout Evidence" --ref host-rollout-r2b
+gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event workflow_dispatch --limit 5
 gh run watch <host-rollout-run-id> --exit-status
 ```
+
+Ref push는 protected candidate 위치만 갱신하며 live mutation을 시작하지 않습니다. Fresh explicit R2b live approval을 확인한 뒤 no-input `workflow_dispatch`를 실행합니다. Dispatch로 생성된 run의 environment-bound job은 그 다음 protected environment reviewer 승인을 통과해야 진행합니다.
 
 Protected workflow는 ref 보호, annotated tag/checkout commit, exact candidate SHA-256, R2a/R2b evidence와 final checker를 확인한 뒤 reusable `Deploy Front`가 검증한 tar에서 추출한 `dist`와 `functions`만 Cloudflare Pages production에 배포합니다. Server image, OCI promotion, evidence checker, frontend 중 하나가 실패하면 다음 단계로 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
 

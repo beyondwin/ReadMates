@@ -146,8 +146,11 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
 
    ```bash
    git push origin <release-commit>:host-rollout-r2b
-   gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event push --limit 5
+   gh workflow run "Host Client Rollout Evidence" --ref host-rollout-r2b
+   gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event workflow_dispatch --limit 5
    ```
+
+   Protected ref push는 candidate를 승격할 뿐 live gate를 자동 실행하지 않습니다. Fresh explicit stage approval 뒤 no-input `workflow_dispatch`를 실행하고 protected environment reviewer 승인을 통과해야 합니다.
 
 8. GitHub Release를 만듭니다.
 
