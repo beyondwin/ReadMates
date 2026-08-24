@@ -108,6 +108,39 @@ data class AiOpsAdminActionResult(
     val nextStatus: JobStatus,
 )
 
+data class ConfirmAiOpsAdminCommand(
+    val previewId: UUID,
+    val idempotencyKey: String,
+    val expectedJobRevision: Long,
+    val confirmed: Boolean,
+)
+
+data class AiOpsAdminCommandPreview(
+    val previewId: UUID,
+    val jobId: UUID,
+    val action: AiOpsAction,
+    val jobStatus: JobStatus,
+    val jobRevision: Long,
+    val effectType: String,
+    val impactCodes: List<String>,
+    val expiresAt: Instant,
+    val fingerprintPrefix: String,
+)
+
+data class AiOpsAdminCommandReceipt(
+    val receiptId: UUID,
+    val previewId: UUID,
+    val jobId: UUID,
+    val action: AiOpsAction,
+    val beforeJobStatus: JobStatus,
+    val beforeJobRevision: Long,
+    val afterJobStatus: JobStatus,
+    val afterJobRevision: Long,
+    val originStatus: String,
+    val effectStatus: String,
+    val safeErrorCode: String?,
+)
+
 data class AiOpsAdminActor(
     val userId: UUID,
     val role: PlatformAdminRole,

@@ -8,6 +8,19 @@ import com.readmates.admin.takedown.application.model.PublicTakedownException
 import com.readmates.admin.takedown.application.model.PublicTakedownPreview
 import com.readmates.admin.takedown.application.port.`in`.ConfirmPublicTakedownUseCase
 import com.readmates.admin.takedown.application.port.`in`.PreviewPublicTakedownUseCase
+import com.readmates.aigen.adapter.`in`.web.AiGenerationOpsController
+import com.readmates.aigen.application.model.AiOpsAction
+import com.readmates.aigen.application.model.AiOpsAdminCommandPreview
+import com.readmates.aigen.application.model.AiOpsAdminCommandReceipt
+import com.readmates.aigen.application.model.ConfirmAiOpsAdminCommand
+import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.port.`in`.ConfirmAiOpsAdminCommandUseCase
+import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
+import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
+import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
+import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
+import com.readmates.aigen.application.port.`in`.PreviewAiOpsAdminCommandUseCase
+import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.auth.adapter.`in`.security.CurrentMemberWebConfig
 import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
 import com.readmates.auth.application.model.AuthoritySynthesisRequest
@@ -106,6 +119,7 @@ import java.util.UUID
         "readmates.security.bff.secrets=test-bff-secret",
         "readmates.bff-secret-required=true",
         "readmates.app-base-url=http://localhost:3000",
+        "readmates.aigen.enabled=true",
     ],
 )
 @AutoConfigureMockMvc
@@ -218,6 +232,45 @@ class PlatformAdminBffSecurityTest(
         commandRequest(route, path = "${route.path}%2Fnear-miss").andExpect(status().isBadRequest)
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("aiSafeCommandRoutes")
+    fun `exact ai safe command routes require trusted bff same origin active capable admin`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OPERATOR)
+        commandRequest(route).andExpect(status().isOk)
+
+        listOf<String?>(null, "wrong-secret").forEach { secret ->
+            commandRequest(route, secret = secret).andExpect(status().isUnauthorized)
+        }
+        commandRequest(route, origin = "https://attacker.example").andExpect(status().isForbidden)
+        commandRequest(route, origin = null, referer = "https://attacker.example/path")
+            .andExpect(status().isForbidden)
+
+        identities.inactiveSession()
+        commandRequest(route).andExpect(status().isUnauthorized)
+        identities.nonAdmin()
+        commandRequest(route).andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.SUPPORT)
+        commandRequest(route).andExpect(status().isForbidden)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("aiSafeCommandRoutes")
+    fun `ai safe command method suffix and encoded slash near misses stay protected`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OWNER)
+
+        commandRequest(route, method = HttpMethod.PUT).andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}/near-miss").andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}%2Fnear-miss").andExpect(status().isBadRequest)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("legacyAiOneClickRoutes")
+    fun `legacy ai one click commands remain csrf protected`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OWNER)
+
+        commandRequest(route).andExpect(status().isForbidden)
+    }
+
     private fun commandRequest(
         route: ClubCommandRoute,
         method: HttpMethod = route.method,
@@ -307,6 +360,67 @@ class PlatformAdminBffSecurityTest(
                 ),
             ).map(Arguments::of)
         }
+
+        @JvmStatic
+        fun aiSafeCommandRoutes(): List<Arguments> {
+            val jobId = "dddddddd-0000-4000-8000-000000060009"
+            val previewId = "dddddddd-0000-4000-8000-000000060010"
+            return listOf(
+                ClubCommandRoute(
+                    "ai force cancel preview",
+                    HttpMethod.POST,
+                    "/api/admin/ai-generation/jobs/$jobId/force-cancel/preview",
+                    "{}",
+                ),
+                ClubCommandRoute(
+                    "ai force cancel confirm",
+                    HttpMethod.POST,
+                    "/api/admin/ai-generation/jobs/$jobId/force-cancel/confirm",
+                    safeAiConfirmBody(previewId),
+                ),
+                ClubCommandRoute(
+                    "ai retry commit preview",
+                    HttpMethod.POST,
+                    "/api/admin/ai-generation/jobs/$jobId/retry-commit/preview",
+                    "{}",
+                ),
+                ClubCommandRoute(
+                    "ai retry commit confirm",
+                    HttpMethod.POST,
+                    "/api/admin/ai-generation/jobs/$jobId/retry-commit/confirm",
+                    safeAiConfirmBody(previewId),
+                ),
+            ).map(Arguments::of)
+        }
+
+        @JvmStatic
+        fun legacyAiOneClickRoutes(): List<Arguments> {
+            val jobId = "dddddddd-0000-4000-8000-000000060009"
+            return listOf(
+                ClubCommandRoute(
+                    "legacy ai force cancel",
+                    HttpMethod.POST,
+                    "/api/admin/ai-generation/jobs/$jobId/force-cancel",
+                    "{}",
+                ),
+                ClubCommandRoute(
+                    "legacy ai retry commit",
+                    HttpMethod.POST,
+                    "/api/admin/ai-generation/jobs/$jobId/retry-commit",
+                    "{}",
+                ),
+            ).map(Arguments::of)
+        }
+
+        private fun safeAiConfirmBody(previewId: String): String =
+            """
+            {
+              "previewId":"$previewId",
+              "idempotencyKey":"safe-key",
+              "expectedJobRevision":7,
+              "confirmed":true
+            }
+            """.trimIndent()
     }
 }
 
@@ -328,6 +442,7 @@ data class ClubCommandRoute(
     PlatformAdminPublicTakedownErrorHandler::class,
     PlatformAdminController::class,
     PlatformAdminClubController::class,
+    AiGenerationOpsController::class,
     PlatformAdminErrorHandler::class,
     SharedApplicationErrorHandler::class,
 )
@@ -492,6 +607,76 @@ class PlatformAdminBffSecurityHarnessConfiguration {
 
     @Bean
     fun confirmPublicTakedown(): ConfirmPublicTakedownUseCase = mock(ConfirmPublicTakedownUseCase::class.java)
+
+    @Bean
+    fun aiOpsSummary(): GetAiOpsSummaryUseCase = mock(GetAiOpsSummaryUseCase::class.java)
+
+    @Bean
+    fun aiOpsJobs(): ListAiOpsJobsUseCase = mock(ListAiOpsJobsUseCase::class.java)
+
+    @Bean
+    fun aiOpsJob(): GetAiOpsJobUseCase = mock(GetAiOpsJobUseCase::class.java)
+
+    @Bean
+    fun forceCancelAiOpsJob(): ForceCancelAiOpsJobUseCase = mock(ForceCancelAiOpsJobUseCase::class.java)
+
+    @Bean
+    fun retryAiOpsJobCommit(): RetryAiOpsJobCommitUseCase = mock(RetryAiOpsJobCommitUseCase::class.java)
+
+    @Bean
+    fun previewAiOpsAdminCommand(): PreviewAiOpsAdminCommandUseCase =
+        object : PreviewAiOpsAdminCommandUseCase {
+            override fun previewAdminCommand(
+                admin: PlatformActor,
+                jobId: UUID,
+                action: AiOpsAction,
+            ): AiOpsAdminCommandPreview =
+                admin.withCapability(PlatformCapability.MANAGE_AI_OPERATIONS) {
+                    AiOpsAdminCommandPreview(
+                        previewId = UUID.fromString("dddddddd-0000-4000-8000-000000060010"),
+                        jobId = jobId,
+                        action = action,
+                        jobStatus =
+                            if (action == AiOpsAction.FORCE_CANCEL) {
+                                JobStatus.RUNNING
+                            } else {
+                                JobStatus.COMMIT_RETRY
+                            },
+                        jobRevision = 7,
+                        effectType = if (action == AiOpsAction.FORCE_CANCEL) "AI_JOB_CANCEL" else "AI_COMMIT_RETRY",
+                        impactCodes = listOf("SAFE_EFFECT"),
+                        expiresAt = Instant.parse("2026-08-24T02:00:00Z"),
+                        fingerprintPrefix = "00112233",
+                    )
+                }
+        }
+
+    @Bean
+    fun confirmAiOpsAdminCommand(): ConfirmAiOpsAdminCommandUseCase =
+        object : ConfirmAiOpsAdminCommandUseCase {
+            override fun confirmAdminCommand(
+                admin: PlatformActor,
+                jobId: UUID,
+                action: AiOpsAction,
+                command: ConfirmAiOpsAdminCommand,
+            ): AiOpsAdminCommandReceipt =
+                admin.withCapability(PlatformCapability.MANAGE_AI_OPERATIONS) {
+                    val status = if (action == AiOpsAction.FORCE_CANCEL) JobStatus.RUNNING else JobStatus.COMMIT_RETRY
+                    AiOpsAdminCommandReceipt(
+                        receiptId = UUID.fromString("dddddddd-0000-4000-8000-000000060011"),
+                        previewId = command.previewId,
+                        jobId = jobId,
+                        action = action,
+                        beforeJobStatus = status,
+                        beforeJobRevision = command.expectedJobRevision,
+                        afterJobStatus = status,
+                        afterJobRevision = command.expectedJobRevision,
+                        originStatus = "ACCEPTED",
+                        effectStatus = "PENDING",
+                        safeErrorCode = null,
+                    )
+                }
+        }
 
     @Bean
     fun platformAdminSummary(): PlatformAdminSummaryUseCase = mock(PlatformAdminSummaryUseCase::class.java)

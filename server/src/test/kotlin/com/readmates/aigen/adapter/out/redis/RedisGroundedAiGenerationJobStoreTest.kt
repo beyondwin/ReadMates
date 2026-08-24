@@ -20,6 +20,7 @@ import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.model.ValidatedTranscriptTurn
+import com.readmates.aigen.application.port.out.AiGenerationAdminCancelResult
 import com.readmates.aigen.application.port.out.AiGenerationJobQueue
 import com.readmates.aigen.application.port.out.AiGenerationJobStore
 import com.readmates.aigen.application.port.out.CommitLeaseResult
@@ -74,6 +75,50 @@ class RedisGroundedAiGenerationJobStoreTest(
     @Suppress("UnusedPrivateProperty")
     @MockitoBean
     private lateinit var jobQueue: AiGenerationJobQueue
+
+    @Test
+    fun `admin cancel revision CAS atomically cancels and deletes every transient payload`() {
+        val record = groundedRecord().copy(status = JobStatus.RUNNING, revision = 3)
+        store.save(record)
+        payloadSuffixes.forEach { suffix ->
+            redisTemplate.opsForValue().set("${hashKey(record.jobId)}:$suffix", "private-$suffix")
+        }
+        redisTemplate.opsForZSet().add(PROCESSING_RECOVERY_KEY, record.jobId.toString(), 1.0)
+        redisTemplate.opsForZSet().add(PROCESSING_QUARANTINE_KEY, record.jobId.toString(), 1.0)
+        redisTemplate.opsForZSet().add(COMMIT_RECOVERY_JOBS_KEY, record.jobId.toString(), 1.0)
+
+        val result = store.cancelForAdmin(record.jobId, expectedRevision = 3)
+
+        assertThat(result).isEqualTo(AiGenerationAdminCancelResult.Cancelled(4))
+        val metadata = store.loadMetadata(record.jobId)
+        assertThat(metadata?.status).isEqualTo(JobStatus.CANCELLED)
+        assertThat(metadata?.revision).isEqualTo(4)
+        payloadSuffixes.forEach { suffix ->
+            assertThat(redisTemplate.hasKey("${hashKey(record.jobId)}:$suffix")).isFalse()
+        }
+        val id = record.jobId.toString()
+        assertThat(redisTemplate.opsForZSet().range(ACTIVE_JOBS_KEY, 0, -1).orEmpty()).doesNotContain(id)
+        assertThat(redisTemplate.opsForZSet().range(PROCESSING_RECOVERY_KEY, 0, -1).orEmpty()).doesNotContain(id)
+        assertThat(redisTemplate.opsForZSet().range(PROCESSING_QUARANTINE_KEY, 0, -1).orEmpty()).doesNotContain(id)
+        assertThat(redisTemplate.opsForZSet().range(COMMIT_RECOVERY_JOBS_KEY, 0, -1).orEmpty()).doesNotContain(id)
+        assertThat(redisTemplate.opsForZSet().range("aigen:club:${record.clubId}:jobs:active", 0, -1).orEmpty())
+            .doesNotContain(id)
+        assertThat(redisTemplate.opsForZSet().range("aigen:session:${record.sessionId}:jobs", 0, -1).orEmpty())
+            .contains(id)
+    }
+
+    @Test
+    fun `admin cancel stale revision changes neither status nor payload`() {
+        val record = groundedRecord().copy(status = JobStatus.RUNNING, revision = 3)
+        store.save(record)
+        redisTemplate.opsForValue().set("${hashKey(record.jobId)}:transcript", "private-transcript")
+
+        val result = store.cancelForAdmin(record.jobId, expectedRevision = 2)
+
+        assertThat(result).isEqualTo(AiGenerationAdminCancelResult.StateChanged(JobStatus.RUNNING, 3))
+        assertThat(redisTemplate.opsForValue().get("${hashKey(record.jobId)}:transcript"))
+            .isEqualTo("private-transcript")
+    }
 
     @Test
     fun `grounded hash is metadata only and source context stays in the turns payload`() {

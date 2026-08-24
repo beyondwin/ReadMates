@@ -99,6 +99,25 @@ interface AiGenerationJobTransitionPort {
     ): Boolean
 
     fun saveGroundedResult(command: SaveGroundedResultCommand): Boolean
+
+    /** Atomically revision-CAS the job to CANCELLED and delete all transient payloads. */
+    fun cancelForAdmin(
+        jobId: UUID,
+        expectedRevision: Long,
+    ): AiGenerationAdminCancelResult = throw UnsupportedOperationException("admin cancel is unavailable")
+}
+
+sealed interface AiGenerationAdminCancelResult {
+    data class Cancelled(
+        val revision: Long,
+    ) : AiGenerationAdminCancelResult
+
+    data object Missing : AiGenerationAdminCancelResult
+
+    data class StateChanged(
+        val status: JobStatus,
+        val revision: Long,
+    ) : AiGenerationAdminCancelResult
 }
 
 interface AiGenerationCommitStatePort {

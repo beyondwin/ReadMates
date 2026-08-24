@@ -7,6 +7,7 @@ import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.AiGenerationAdminCancelResult
 import com.readmates.aigen.application.port.out.AiGenerationJobTransitionPort
 import com.readmates.aigen.application.port.out.GroundedResultPayload
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
@@ -103,6 +104,41 @@ internal class RedisAiGenerationTransitionStore(
             }
             changed
         }.onFailure { context.recordFailure("transitionStatus") }.getOrThrow()
+
+    override fun cancelForAdmin(
+        jobId: UUID,
+        expectedRevision: Long,
+    ): AiGenerationAdminCancelResult =
+        runCatching {
+            val now = clock.instant()
+            val result =
+                checkNotNull(
+                    redisTemplate.execute(
+                        AiGenerationJobMutationRedisScripts.cancelForAdmin,
+                        listOf(
+                            keyspace.hash(jobId),
+                            keyspace.transcript(jobId),
+                            keyspace.turns(jobId),
+                            keyspace.result(jobId),
+                            keyspace.evidence(jobId),
+                            keyspace.activeJobs,
+                            keyspace.processingRecovery,
+                            keyspace.processingQuarantine,
+                            keyspace.activeIndexEpoch,
+                            keyspace.commitRecoveryJobs,
+                        ),
+                        expectedRevision.toString(),
+                        now.toString(),
+                        now.epochSecond.toString(),
+                        now.nano.toString(),
+                        properties.job.redisTtl.seconds
+                            .toString(),
+                        jobId.toString(),
+                        now.toEpochMilli().toString(),
+                    ),
+                )
+            parseAdminCancelResult(result)
+        }.onFailure { context.recordFailure("cancelForAdmin") }.getOrThrow()
 
     override fun saveResultIfStatus(
         jobId: UUID,
@@ -203,5 +239,19 @@ internal class RedisAiGenerationTransitionStore(
 
     private companion object {
         const val MAX_ERROR_MESSAGE_LEN = 512
+    }
+}
+
+private fun parseAdminCancelResult(value: String): AiGenerationAdminCancelResult {
+    val fields = value.split('|')
+    return when (fields.firstOrNull()) {
+        "MISSING" -> AiGenerationAdminCancelResult.Missing
+        "CANCELLED" -> AiGenerationAdminCancelResult.Cancelled(checkNotNull(fields.getOrNull(1)?.toLongOrNull()))
+        "STATE_CHANGED" ->
+            AiGenerationAdminCancelResult.StateChanged(
+                JobStatus.valueOf(checkNotNull(fields.getOrNull(1))),
+                checkNotNull(fields.getOrNull(2)?.toLongOrNull()),
+            )
+        else -> error("Unexpected admin cancel result")
     }
 }

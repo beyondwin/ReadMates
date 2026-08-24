@@ -1,6 +1,9 @@
 package com.readmates.aigen.adapter.`in`.web
 
+import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
+import com.readmates.aigen.application.model.AiOpsAdminCommandPreview
+import com.readmates.aigen.application.model.AiOpsAdminCommandReceipt
 import com.readmates.aigen.application.model.AiOpsCostTrend
 import com.readmates.aigen.application.model.AiOpsCostWindow
 import com.readmates.aigen.application.model.AiOpsDeltaDirection
@@ -11,16 +14,20 @@ import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsProviderCost
 import com.readmates.aigen.application.model.AiOpsSummary
 import com.readmates.aigen.application.model.AiOpsTrendAvailability
+import com.readmates.aigen.application.model.ConfirmAiOpsAdminCommand
 import com.readmates.aigen.application.model.JobStage
 import com.readmates.aigen.application.model.JobStatus
 import com.readmates.aigen.application.model.Provider
+import com.readmates.aigen.application.port.`in`.ConfirmAiOpsAdminCommandUseCase
 import com.readmates.aigen.application.port.`in`.ForceCancelAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsJobUseCase
 import com.readmates.aigen.application.port.`in`.GetAiOpsSummaryUseCase
 import com.readmates.aigen.application.port.`in`.ListAiOpsJobsUseCase
+import com.readmates.aigen.application.port.`in`.PreviewAiOpsAdminCommandUseCase
 import com.readmates.aigen.application.port.`in`.RetryAiOpsJobCommitUseCase
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
@@ -43,6 +50,7 @@ class AiGenerationOpsControllerTest {
     private val get = FakeGetUseCase()
     private val cancel = FakeForceCancelUseCase()
     private val retry = FakeRetryCommitUseCase()
+    private val safeCommands = FakeAiAdminCommands()
     private val admin =
         CurrentPlatformAdmin(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
@@ -63,6 +71,8 @@ class AiGenerationOpsControllerTest {
                         getUseCase = get,
                         forceCancelUseCase = cancel,
                         retryCommitUseCase = retry,
+                        previewAdminCommandUseCase = safeCommands,
+                        confirmAdminCommandUseCase = safeCommands,
                     ),
                 ).setControllerAdvice(AiGenerationErrorHandler())
                 .setCustomArgumentResolvers(StubCurrentPlatformAdminResolver(admin))
@@ -195,6 +205,57 @@ class AiGenerationOpsControllerTest {
         assertThat(retry.calls).containsExactly(admin to sampleJobId)
     }
 
+    @Test
+    fun `safe preview returns revision effect and fingerprint contract`() {
+        mockMvc
+            .post("/api/admin/ai-generation/jobs/$sampleJobId/force-cancel/preview")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.jobId") { value(sampleJobId.toString()) }
+                jsonPath("$.action") { value("FORCE_CANCEL") }
+                jsonPath("$.jobStatus") { value("RUNNING") }
+                jsonPath("$.jobRevision") { value(7) }
+                jsonPath("$.effectType") { value("AI_JOB_CANCEL") }
+                jsonPath("$.impactCodes[1]") { value("DELETE_TRANSIENT_PAYLOAD") }
+                jsonPath("$.fingerprintPrefix") { value("00112233") }
+            }
+
+        assertThat(safeCommands.previewCalls.single().third).isEqualTo(AiOpsAction.FORCE_CANCEL)
+    }
+
+    @Test
+    fun `safe confirm accepts exact bounded body and returns origin and effect projection`() {
+        val previewId = UUID.fromString("00000000-0000-4000-8000-000000000040")
+
+        mockMvc
+            .post("/api/admin/ai-generation/jobs/$sampleJobId/retry-commit/confirm") {
+                contentType = org.springframework.http.MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "previewId":"$previewId",
+                      "idempotencyKey":"safe-command-key",
+                      "expectedJobRevision":7,
+                      "confirmed":true
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.action") { value("RETRY_COMMIT") }
+                jsonPath("$.originStatus") { value("ACCEPTED") }
+                jsonPath("$.effectStatus") { value("PENDING") }
+                jsonPath("$.beforeJobRevision") { value(7) }
+                jsonPath("$.afterJobRevision") { value(7) }
+            }
+
+        assertThat(
+            safeCommands.confirmCalls
+                .single()
+                .command.previewId,
+        ).isEqualTo(previewId)
+        assertThat(safeCommands.confirmCalls.single().action).isEqualTo(AiOpsAction.RETRY_COMMIT)
+    }
+
     private companion object {
         val sampleJobId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000010")
         val sampleClubId: UUID = UUID.fromString("00000000-0000-0000-0000-000000000020")
@@ -222,6 +283,62 @@ class AiGenerationOpsControllerTest {
                 staleCandidate = false,
                 availableActions = setOf(com.readmates.aigen.application.model.AiOpsAction.FORCE_CANCEL),
             )
+    }
+}
+
+private data class SafeConfirmCall(
+    val actor: PlatformActor,
+    val jobId: UUID,
+    val action: AiOpsAction,
+    val command: ConfirmAiOpsAdminCommand,
+)
+
+private class FakeAiAdminCommands :
+    PreviewAiOpsAdminCommandUseCase,
+    ConfirmAiOpsAdminCommandUseCase {
+    val previewCalls = mutableListOf<Triple<PlatformActor, UUID, AiOpsAction>>()
+    val confirmCalls = mutableListOf<SafeConfirmCall>()
+
+    override fun previewAdminCommand(
+        admin: PlatformActor,
+        jobId: UUID,
+        action: AiOpsAction,
+    ): AiOpsAdminCommandPreview {
+        previewCalls += Triple(admin, jobId, action)
+        return AiOpsAdminCommandPreview(
+            UUID.fromString("00000000-0000-4000-8000-000000000040"),
+            jobId,
+            action,
+            JobStatus.RUNNING,
+            7,
+            if (action == AiOpsAction.FORCE_CANCEL) "AI_JOB_CANCEL" else "AI_COMMIT_RETRY",
+            listOf("CANCEL_JOB", "DELETE_TRANSIENT_PAYLOAD"),
+            Instant.parse("2026-05-18T00:10:00Z"),
+            "00112233",
+        )
+    }
+
+    override fun confirmAdminCommand(
+        admin: PlatformActor,
+        jobId: UUID,
+        action: AiOpsAction,
+        command: ConfirmAiOpsAdminCommand,
+    ): AiOpsAdminCommandReceipt {
+        confirmCalls += SafeConfirmCall(admin, jobId, action, command)
+        val status = if (action == AiOpsAction.FORCE_CANCEL) JobStatus.RUNNING else JobStatus.COMMIT_RETRY
+        return AiOpsAdminCommandReceipt(
+            UUID.fromString("00000000-0000-4000-8000-000000000041"),
+            command.previewId,
+            jobId,
+            action,
+            status,
+            command.expectedJobRevision,
+            status,
+            command.expectedJobRevision,
+            "ACCEPTED",
+            "PENDING",
+            null,
+        )
     }
 }
 

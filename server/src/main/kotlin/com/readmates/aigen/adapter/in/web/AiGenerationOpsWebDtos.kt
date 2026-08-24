@@ -1,13 +1,84 @@
 package com.readmates.aigen.adapter.`in`.web
 
 import com.readmates.aigen.application.model.AiOpsAdminActionResult
+import com.readmates.aigen.application.model.AiOpsAdminCommandPreview
+import com.readmates.aigen.application.model.AiOpsAdminCommandReceipt
 import com.readmates.aigen.application.model.AiOpsCostTrend
 import com.readmates.aigen.application.model.AiOpsFailureCodeCount
 import com.readmates.aigen.application.model.AiOpsJobList
 import com.readmates.aigen.application.model.AiOpsJobListItem
 import com.readmates.aigen.application.model.AiOpsProviderCost
 import com.readmates.aigen.application.model.AiOpsSummary
+import com.readmates.aigen.application.model.ConfirmAiOpsAdminCommand
+import java.time.Instant
 import java.util.UUID
+
+data class ConfirmAiOpsAdminCommandRequest(
+    val previewId: UUID,
+    val idempotencyKey: String,
+    val expectedJobRevision: Long,
+    val confirmed: Boolean,
+) {
+    fun toCommand() = ConfirmAiOpsAdminCommand(previewId, idempotencyKey, expectedJobRevision, confirmed)
+}
+
+data class AiOpsAdminCommandPreviewResponse(
+    val previewId: UUID,
+    val jobId: UUID,
+    val action: String,
+    val jobStatus: String,
+    val jobRevision: Long,
+    val effectType: String,
+    val impactCodes: List<String>,
+    val expiresAt: Instant,
+    val fingerprintPrefix: String,
+) {
+    companion object {
+        fun from(value: AiOpsAdminCommandPreview) =
+            AiOpsAdminCommandPreviewResponse(
+                value.previewId,
+                value.jobId,
+                value.action.name,
+                value.jobStatus.name,
+                value.jobRevision,
+                value.effectType,
+                value.impactCodes,
+                value.expiresAt,
+                value.fingerprintPrefix,
+            )
+    }
+}
+
+data class AiOpsAdminCommandReceiptResponse(
+    val receiptId: UUID,
+    val previewId: UUID,
+    val jobId: UUID,
+    val action: String,
+    val beforeJobStatus: String,
+    val beforeJobRevision: Long,
+    val afterJobStatus: String,
+    val afterJobRevision: Long,
+    val originStatus: String,
+    val effectStatus: String,
+    val safeErrorCode: String?,
+) {
+    companion object {
+        fun from(value: AiOpsAdminCommandReceipt) =
+            AiOpsAdminCommandReceiptResponse(
+                value.receiptId,
+                value.previewId,
+                value.jobId,
+                value.action.name,
+                value.beforeJobStatus.name,
+                value.beforeJobRevision,
+                value.afterJobStatus.name,
+                value.afterJobRevision,
+                value.originStatus,
+                value.effectStatus,
+                value.safeErrorCode,
+            )
+    }
+}
 
 data class AiOpsSummaryResponse(
     val activeJobCount: Int,

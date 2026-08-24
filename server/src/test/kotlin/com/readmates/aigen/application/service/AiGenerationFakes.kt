@@ -13,6 +13,7 @@ import com.readmates.aigen.application.model.Provider
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.SessionMeta
 import com.readmates.aigen.application.model.TokenUsage
+import com.readmates.aigen.application.port.out.AiGenerationAdminCancelResult
 import com.readmates.aigen.application.port.out.AiGenerationAuditPort
 import com.readmates.aigen.application.port.out.AiGenerationClubDefaultPort
 import com.readmates.aigen.application.port.out.AiGenerationJobPublishCommand
@@ -177,6 +178,38 @@ internal class FakeJobStore : AiGenerationJobStore {
                 costAccumulatedUsd = current.costAccumulatedUsd.add(command.cost),
             )
         return true
+    }
+
+    @Synchronized
+    @Suppress("ReturnCount")
+    override fun cancelForAdmin(
+        jobId: UUID,
+        expectedRevision: Long,
+    ): AiGenerationAdminCancelResult {
+        val current = records[jobId] ?: return AiGenerationAdminCancelResult.Missing
+        if (current.revision != expectedRevision ||
+            current.status !in setOf(JobStatus.PENDING, JobStatus.RUNNING, JobStatus.SUCCEEDED)
+        ) {
+            return AiGenerationAdminCancelResult.StateChanged(current.status, current.revision)
+        }
+        records[jobId] =
+            current.copy(
+                status = JobStatus.CANCELLED,
+                stage = null,
+                progressPct = 0,
+                error = null,
+                revision = current.revision + 1,
+                transcript = "",
+                validatedTurns = emptyList(),
+                result = null,
+                groundedDraft = null,
+                evidence = null,
+                cleanupPending = false,
+                commitLeaseExpiresAt = null,
+            )
+        transientPayloadDeleted += jobId
+        mutationOrder += "adminCancel"
+        return AiGenerationAdminCancelResult.Cancelled(current.revision + 1)
     }
 
     override fun acquireCommitLease(
