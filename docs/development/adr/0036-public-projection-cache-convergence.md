@@ -40,6 +40,7 @@ Operational lease/work row는 retention에 따라 제거할 수 있다. Immutabl
 - Origin/CDN/browser fresh·stale boundary에서 일반 120초, 긴급 60초 목표, 기존 720초 policy 소진 gate와 purge failure receipt를 integration/browser test한다.
 - 만료된 synthetic session/publication hard delete가 성공하고 operational row는 retention대로 정리되며 redacted immutable convergence bytes는 남는지 검증한다.
 - 2026-08-24 server service/API subset은 claim lease와 `PENDING` commit, transaction 밖 provider 호출, 별도 terminal commit, deterministic attempt token, bounded retry/backoff, host-authorized bounded status query를 구현했다. HTTP adapter는 provider 준비 플래그로 bean graph를 완결하지만 feature가 꺼져 있으면 work를 실행하지 않고, scheduler는 feature·scheduler·HTTP provider 삼중 opt-in에서만 동작한다. HTTP lease는 connect/read budget과 terminal-write safety margin의 합보다 엄격히 커야 하며 provider-neutral 응답은 2xx만 성공으로 인정한다. Cache header/browser/CDN evidence와 emergency control plane은 아직 후속 작업이므로 이 ADR은 `Proposed`를 유지한다.
+- 같은 날 V55 emergency server substrate가 origin deny와 generation 회전, immutable redacted admin receipt, 기존 V54 convergence link/work를 한 transaction에 연결했다. Production confirm은 protected Step 8 evidence verifier가 없어서 계속 fail closed이며, operator UI·active runbook·browser/CDN runtime evidence도 후속 작업이므로 상태는 `Proposed`다.
 
 ## 후속 작업
 

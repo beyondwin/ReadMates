@@ -153,6 +153,12 @@ private val serverSlices =
             applicationPackages = listOf("com.readmates.admin.operations.application.."),
         ),
         ServerSlice(
+            name = "admin.takedown",
+            type = ServerSliceType.WORKFLOW,
+            inboundAdapterPackages = listOf("com.readmates.admin.takedown.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.admin.takedown.application.."),
+        ),
+        ServerSlice(
             name = "observability",
             type = ServerSliceType.OPS_READ,
             inboundAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),

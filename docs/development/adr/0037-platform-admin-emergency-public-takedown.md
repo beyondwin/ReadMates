@@ -11,7 +11,7 @@
 
 ## 결정
 
-Emergency public takedown은 별도 `PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN` preview/confirm command다. 이 capability는 active platform-admin OWNER/OPERATOR에만 매핑하며 application service는 raw role 비교가 아니라 `actor.can(...)`으로 검사한다. `SUPPORT`, inactive admin, capability가 제거된 OPERATOR actor, 대상 club/session/publication mismatch는 fail closed한다. Preview는 target identity와 current public generation, TTL, reason을 고정하고 confirm에서 모두 재검증한다. Confirm 활성화 전에는 ADR-0036의 기존 720초 browser cache lifetime 소진 증거가 필요하다.
+Emergency public takedown은 별도 `PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN` preview/confirm command다. 이 capability는 active platform-admin OWNER/OPERATOR에만 매핑하며 application service는 raw role 비교가 아니라 `actor.can(...)`으로 검사한다. `SUPPORT`, inactive admin, capability가 제거된 OPERATOR actor, 대상 club/session/publication mismatch는 fail closed한다. Preview는 target identity와 current public generation/surfaces, TTL, remote-copy limitation을 고정하고 confirm에서 모두 재검증한다. Confirm은 bounded reason category와 reason을 받아 HMAC request identity에만 결합한다. Confirm 활성화 전에는 ADR-0036의 기존 720초 browser cache lifetime 소진 증거가 필요하다.
 
 Idempotency scope는 `(platformAdminUserId, EMERGENCY_PUBLIC_TAKEDOWN, clubId, publicationId, idempotencyKey)`다. Versioned canonical request HMAC은 ADR-0028의 민감 입력 규칙을 따른다. Origin deny와 generation commit은 immutable admin mutation receipt를 한 번만 만들고 `convergenceId`를 반환한다. CDN purge는 ADR-0036의 append-only convergence attempt ledger에 기록한다. Response loss 또는 failed purge 재개는 같은 receipt/convergence ID를 조회·재사용하며 새로운 mutation receipt나 중복 purge command를 만들지 않는다.
 
@@ -44,6 +44,7 @@ Immutable admin audit은 actor ID/role, reason category와 redacted reason, targ
 - capability가 있는 active `OWNER|OPERATOR` 성공, 같은 role이지만 capability가 없는 actor와 `SUPPORT`·inactive·target mismatch 거절을 authorization test한다.
 - Duplicate/same-key-different-request/response-loss/purge-failure-resume가 mutation receipt 하나와 append-only attempt를 만드는지 integration test한다.
 - Admin DTO, audit, logs, evidence artifact에 raw reason/private content/provider error가 없는지 검사한다.
+- 2026-08-24 server substrate는 V55 preview/idempotency/immutable receipt, capability-only application authorization, origin deny와 generation 회전의 단일 transaction, V54 convergence link/work 재사용, redacted platform audit를 구현했다. Production activation adapter는 조건 없이 confirm을 거절하고 test context만 typed mock으로 성공 경로를 검증한다. Protected Step 8 attestation verifier, active incident runbook, operator UI, 실제 browser/CDN runtime evidence는 아직 없으므로 이 ADR은 `Proposed`를 유지한다.
 
 ## 후속 작업
 

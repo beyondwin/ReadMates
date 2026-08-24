@@ -34,6 +34,7 @@ fun CurrentPlatformAdmin.toPlatformActor(): PlatformActor =
                         PlatformCapability.CREATE_CLUB,
                         PlatformCapability.MANAGE_CLUBS,
                         PlatformCapability.MANAGE_CLUB_DOMAINS,
+                        PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN,
                     )
                 PlatformAdminRole.SUPPORT ->
                     setOf(

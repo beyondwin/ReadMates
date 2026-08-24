@@ -83,6 +83,31 @@ class AdminAuditLedgerServiceTest {
         assertThat(item.summary).doesNotContain("previewId")
     }
 
+    @Test
+    fun `public takedown audit exposes only immutable redacted evidence`() {
+        val readPort =
+            FakeAdminAuditLedgerReadPort(
+                platformRows =
+                    listOf(
+                        platformRow(
+                            id = "takedown",
+                            occurredAt = "2026-05-27T00:01:00Z",
+                            eventType = "EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED",
+                            metadataJson = publicTakedownMetadata(),
+                        ),
+                    ),
+            )
+        val item = AdminAuditLedgerService(readPort).listLedger(owner(), query()).items.single()
+
+        assertThat(item.target.eventId).isEqualTo("receipt-1")
+        assertThat(item.summary).contains("origin")
+        assertThat(item.safeMetadata.map { it.label })
+            .contains("receiptId", "convergenceId", "reasonCategory", "reasonRedacted")
+            .doesNotContain("reason", "privateBody", "providerError")
+        assertThat(item.safeMetadata.joinToString())
+            .doesNotContain("SENSITIVE_REASON", "SENSITIVE_BODY", "EDGE_FAILURE")
+    }
+
     private fun query(limit: Int = 25): AdminAuditListQuery =
         AdminAuditListQuery(
             filter = AdminAuditFilter.defaultNow(now = NOW),
@@ -222,6 +247,23 @@ private fun replayConfirmedMetadata(): String =
       "reason":"provider recovered",
       "replayedCount":2,
       "skippedCount":0
+    }
+    """.compactJson()
+
+private fun publicTakedownMetadata(): String =
+    """
+    {
+      "receiptId":"receipt-1",
+      "convergenceId":"convergence-1",
+      "publicationId":"publication-1",
+      "committedGeneration":8,
+      "originResult":"DENIED",
+      "reasonCategory":"PRIVATE_DATA",
+      "reasonRedacted":true,
+      "remoteCopyLimitationCode":"REMOTE_STORED_OR_OFFLINE_COPY_NOT_ERASABLE",
+      "reason":"SENSITIVE_REASON",
+      "privateBody":"SENSITIVE_BODY",
+      "providerError":"EDGE_FAILURE"
     }
     """.compactJson()
 

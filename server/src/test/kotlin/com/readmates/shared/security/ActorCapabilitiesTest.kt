@@ -100,6 +100,7 @@ class ActorCapabilitiesTest {
                 PlatformCapability.CREATE_CLUB,
                 PlatformCapability.MANAGE_CLUBS,
                 PlatformCapability.MANAGE_CLUB_DOMAINS,
+                PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN,
             )
     }
 

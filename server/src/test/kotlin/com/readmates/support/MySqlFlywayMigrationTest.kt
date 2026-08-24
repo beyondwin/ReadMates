@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(12)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(13)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,11 +94,12 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("54")
+            assertThat(latestVersion).isEqualTo("55")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
+            assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -375,7 +376,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(10)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(11)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -387,11 +388,12 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("54")
+            assertThat(latestVersion).isEqualTo("55")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
+            assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1653,10 +1655,11 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("54")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("55")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54PublicProjectionConvergenceSchema(jdbc)
+            assertV55PlatformAdminPublicTakedownSchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1755,11 +1758,12 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("54")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("55")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
+            assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertThat(
                 upgradeJdbc.queryForMap(
                     """
@@ -3585,6 +3589,86 @@ class MySqlFlywayMigrationTest(
             .doesNotContain("provider_response", "provider_error", "private_body", "reason")
         assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_status_check"))
             .contains("PENDING", "SUCCEEDED", "FAILED")
+    }
+
+    private fun assertV55PlatformAdminPublicTakedownSchema(jdbcTemplate: JdbcTemplate) {
+        assertV55PreviewAndReceiptSchema(jdbcTemplate)
+        assertV55IdempotencyAndPrivacySchema(jdbcTemplate)
+    }
+
+    private fun assertV55PreviewAndReceiptSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "admin_public_takedown_previews")).containsExactlyInAnyOrder(
+            "id",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "target_generation",
+            "current_surfaces_json",
+            "expires_at",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "admin_public_takedown_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "convergence_id",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "reason_category",
+            "reason_redacted",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "committed_generation",
+            "origin_result",
+            "current_surfaces_json",
+            "remote_copy_limitation_code",
+            "created_at",
+        )
+        assertThat(
+            columnMetadata(jdbcTemplate, "admin_public_takedown_previews", "expires_at")["DATETIME_PRECISION"],
+        ).isEqualTo(6L)
+    }
+
+    private fun assertV55IdempotencyAndPrivacySchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "admin_public_takedown_idempotency")).containsExactlyInAnyOrder(
+            "actor_user_id",
+            "operation",
+            "club_id",
+            "publication_id",
+            "idempotency_key",
+            "request_hmac",
+            "canonical_schema_version",
+            "digest_key_version",
+            "receipt_id",
+            "created_at",
+            "completed_at",
+            "expires_at",
+        )
+        assertThat(importedKeys(jdbcTemplate, "admin_public_takedown_previews")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "admin_public_takedown_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "admin_public_takedown_idempotency")).isEmpty()
+        assertEquals(
+            "actor_user_id,operation,club_id,publication_id,idempotency_key",
+            indexColumns(jdbcTemplate, "admin_public_takedown_idempotency", "PRIMARY"),
+        )
+        val hmac = columnMetadata(jdbcTemplate, "admin_public_takedown_idempotency", "request_hmac")
+        assertThat(hmac["DATA_TYPE"].toString()).isEqualTo("binary")
+        assertThat(hmac["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+        listOf(
+            "admin_public_takedown_previews",
+            "admin_public_takedown_receipts",
+            "admin_public_takedown_idempotency",
+        ).forEach { table ->
+            assertThat(columns(jdbcTemplate, table)).doesNotContain(
+                "reason",
+                "private_body",
+                "provider_error",
+                "provider_response",
+                "canonical_payload",
+                "request_sha256",
+            )
+        }
     }
 
     @Suppress("LongMethod")

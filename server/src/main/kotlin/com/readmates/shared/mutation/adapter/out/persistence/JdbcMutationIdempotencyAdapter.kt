@@ -112,29 +112,81 @@ class JdbcMutationIdempotencyAdapter(
         limit: Int,
     ): Int {
         if (limit <= 0) return 0
-        return jdbcTemplate.update(
-            """
-            delete from mutation_idempotency_keys
-            where expires_at <= ?
-            order by expires_at, idempotency_key
-            limit ?
-            """.trimIndent(),
-            now.toDbTimestamp(),
-            limit,
-        )
+        val adminPurged =
+            purgeOperationalRows(
+                """
+                delete from admin_public_takedown_idempotency
+                where expires_at <= ?
+                order by expires_at, idempotency_key
+                limit ?
+                """.trimIndent(),
+                now,
+                limit,
+            )
+        val previewsPurged =
+            purgeOperationalRows(
+                """
+                delete from admin_public_takedown_previews
+                where expires_at <= ?
+                order by expires_at, id
+                limit ?
+                """.trimIndent(),
+                now,
+                limit - adminPurged,
+            )
+        val hostPurged =
+            purgeOperationalRows(
+                """
+                delete from mutation_idempotency_keys
+                where expires_at <= ?
+                order by expires_at, idempotency_key
+                limit ?
+                """.trimIndent(),
+                now,
+                limit - adminPurged - previewsPurged,
+            )
+        return adminPurged + previewsPurged + hostPurged
     }
+
+    private fun purgeOperationalRows(
+        sql: String,
+        now: Instant,
+        limit: Int,
+    ): Int =
+        if (limit <= 0) {
+            0
+        } else {
+            jdbcTemplate.update(
+                sql,
+                now.toDbTimestamp(),
+                limit,
+            )
+        }
 
     override fun countByDigestKeyVersion(digestKeyVersion: Int): Long =
         jdbcTemplate.queryForObject(
-            "select count(*) from mutation_idempotency_keys where digest_key_version = ?",
+            """
+            select
+              (select count(*) from mutation_idempotency_keys where digest_key_version = ?)
+              +
+              (select count(*) from admin_public_takedown_idempotency where digest_key_version = ?)
+            """.trimIndent(),
             Long::class.java,
+            digestKeyVersion,
             digestKeyVersion,
         ) ?: 0L
 
     override fun referencedDigestKeyVersions(): Set<Int> =
         jdbcTemplate
             .queryForList(
-                "select distinct digest_key_version from mutation_idempotency_keys",
+                """
+                select distinct digest_key_version
+                from (
+                  select digest_key_version from mutation_idempotency_keys
+                  union all
+                  select digest_key_version from admin_public_takedown_idempotency
+                ) referenced_versions
+                """.trimIndent(),
                 Int::class.java,
             ).filterNotNull()
             .toSet()
@@ -170,8 +222,14 @@ class JdbcMutationIdempotencyAdapter(
                 from mutation_idempotency_keys
                 where digest_key_version = ?
               )
+              and not exists (
+                select 1
+                from admin_public_takedown_idempotency
+                where digest_key_version = ?
+              )
             """.trimIndent(),
             at.toDbTimestamp(),
+            digestKeyVersion,
             digestKeyVersion,
             digestKeyVersion,
         )

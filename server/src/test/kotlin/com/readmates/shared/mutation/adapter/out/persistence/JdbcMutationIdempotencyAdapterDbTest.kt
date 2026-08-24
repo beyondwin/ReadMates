@@ -184,6 +184,77 @@ class JdbcMutationIdempotencyAdapterDbTest(
     }
 
     @Test
+    fun `V55 admin takedown references block key retirement and purge through shared retention`() {
+        insertAdminTakedownOperationalRows()
+        adapter.markReferenced(KEY_V1_VERSION, clock.instant)
+        val rotated =
+            service(
+                properties =
+                    keyPair(
+                        current = KEY_V2,
+                        currentVersion = KEY_V2_VERSION,
+                        previous = KEY_V1,
+                        previousVersion = KEY_V1_VERSION,
+                    ),
+            )
+
+        assertThat(adapter.countByDigestKeyVersion(KEY_V1_VERSION)).isEqualTo(1)
+        assertThat(adapter.referencedDigestKeyVersions()).contains(KEY_V1_VERSION)
+        assertThatThrownBy { rotated.retirePreviousKey() }
+            .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
+
+        clock.instant = clock.instant.plus(Duration.ofHours(24)).plusSeconds(1)
+        assertThat(rotated.purgeExpired(50)).isEqualTo(2)
+        assertThat(adminTakedownPreviewCount()).isZero()
+        assertThat(adminTakedownIdempotencyCount()).isZero()
+        assertThatThrownBy { rotated.retirePreviousKey() }
+            .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
+        clock.instant = clock.instant.plus(Duration.ofHours(24))
+        rotated.retirePreviousKey()
+    }
+
+    private fun insertAdminTakedownOperationalRows() {
+        jdbcTemplate.update(
+            """
+            insert into admin_public_takedown_previews (
+              id, actor_user_id_snapshot, actor_platform_role_snapshot,
+              club_id_snapshot, session_id_snapshot, publication_id_snapshot,
+              target_generation, current_surfaces_json, expires_at, created_at
+            ) values (?, ?, 'OWNER', ?, ?, ?, 1, json_array('ORIGIN'), ?, ?)
+            """.trimIndent(),
+            ADMIN_PREVIEW_ID.toString(),
+            ACTOR_ID.toString(),
+            CLUB_ID.toString(),
+            RESOURCE_ID.toString(),
+            RESOURCE_ID.toString(),
+            clock.instant
+                .plus(Duration.ofHours(24))
+                .atOffset(ZoneOffset.UTC)
+                .toLocalDateTime(),
+            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into admin_public_takedown_idempotency (
+              actor_user_id, operation, club_id, publication_id, idempotency_key,
+              request_hmac, canonical_schema_version, digest_key_version,
+              created_at, expires_at
+            ) values (?, 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, 'admin-retire-key',
+                      unhex(sha2('synthetic-admin-request', 256)), 1, ?, ?, ?)
+            """.trimIndent(),
+            ACTOR_ID.toString(),
+            CLUB_ID.toString(),
+            RESOURCE_ID.toString(),
+            KEY_V1_VERSION,
+            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+            clock.instant
+                .plus(Duration.ofHours(24))
+                .atOffset(ZoneOffset.UTC)
+                .toLocalDateTime(),
+        )
+    }
+
+    @Test
     fun `purge removes only operational rows older than twenty four hours`() {
         val expired = identity("expired-key")
         val live = identity("live-key")
@@ -343,6 +414,19 @@ class JdbcMutationIdempotencyAdapterDbTest(
             receiptId.toString(),
         ) ?: 0
 
+    private fun adminTakedownIdempotencyCount(): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from admin_public_takedown_idempotency where idempotency_key = 'admin-retire-key'",
+            Int::class.java,
+        ) ?: 0
+
+    private fun adminTakedownPreviewCount(): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from admin_public_takedown_previews where id = ?",
+            Int::class.java,
+            ADMIN_PREVIEW_ID.toString(),
+        ) ?: 0
+
     private fun importedKeys(tableName: String): List<String> =
         jdbcTemplate
             .queryForList(
@@ -369,6 +453,7 @@ class JdbcMutationIdempotencyAdapterDbTest(
         val CLUB_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053001")
         val ACTOR_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053002")
         val RESOURCE_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053010")
+        val ADMIN_PREVIEW_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053011")
         const val KEY_V1 = "test-mutation-identity-v1-key"
         const val KEY_V2 = "test-mutation-identity-v2-key"
         const val KEY_V1_VERSION = 5_301
@@ -395,6 +480,10 @@ class JdbcMutationIdempotencyAdapterDbTest(
 }
 
 private const val CLEANUP_MUTATION_IDEMPOTENCY_SQL = """
+delete from admin_public_takedown_previews
+where id = 'aaaaaaaa-0000-4000-8000-000000053011';
+delete from admin_public_takedown_idempotency
+where idempotency_key = 'admin-retire-key';
 delete from mutation_idempotency_keys
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from host_session_mutation_receipts

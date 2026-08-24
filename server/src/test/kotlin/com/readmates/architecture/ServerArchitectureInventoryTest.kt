@@ -12,6 +12,31 @@ import java.nio.file.Path
 @Tag("architecture")
 class ServerArchitectureInventoryTest {
     @Test
+    fun `emergency takedown authorization is capability based and evidence activation is fail closed`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val service =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/admin/takedown/application/service/PublicTakedownService.kt",
+                ),
+            )
+        assertThat(service)
+            .contains("actor.can(PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN)")
+            .doesNotContain("PlatformAdminRole", ".role ==", ".role in")
+
+        val productionEvidence =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/admin/takedown/adapter/out/evidence/" +
+                        "ProtectedPublicTakedownActivationEvidenceAdapter.kt",
+                ),
+            )
+        assertThat(productionEvidence)
+            .contains("override fun confirmEnabled(): Boolean = false")
+            .doesNotContain("@Value", "ConfigurationProperties", "System.getenv", "environment")
+    }
+
+    @Test
     fun `club application imports no auth source`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
         val clubApplicationRoot = productionSourceRoot.resolve("com/readmates/club/application")
