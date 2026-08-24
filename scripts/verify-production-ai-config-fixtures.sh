@@ -18,6 +18,7 @@ mkdir -p \
   "$fixture_root/.github/workflows" \
   "$fixture_root/deploy/oci" \
   "$fixture_root/docs/case-studies" \
+  "$fixture_root/docs/deploy" \
   "$fixture_root/docs/operations/runbooks" \
   "$fixture_root/server/src/main/resources" \
   "$fixture_root/bin" \
@@ -31,6 +32,7 @@ reset_fixture() {
   cp "$repo_root/server/src/main/resources/application.yml" "$fixture_root/server/src/main/resources/"
   cp "$repo_root/scripts/sync-config/import-from-prod-env.sh" "$fixture_root/scripts/sync-config/"
   cp "$repo_root/docs/case-studies/04-pii-safe-ai-session-generation.md" "$fixture_root/docs/case-studies/"
+  cp "$repo_root/docs/deploy/release-publish-runbook.md" "$fixture_root/docs/deploy/"
   cp "$repo_root/docs/operations/runbooks/secrets-management.md" "$fixture_root/docs/operations/runbooks/"
 }
 
@@ -85,6 +87,16 @@ printf '%s\n' \
   'READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION=9' \
   'READMATES_MUTATION_IDENTITY_PREVIOUS_KEY=fixture-mutation-previous-material' \
   'READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION=8' \
+  'READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY=fixture-admin-current-material' \
+  'READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=11' \
+  'READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY=fixture-admin-previous-material' \
+  'READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=10' \
+  'READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=false' \
+  'READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION=168h' \
+  'READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL=15m' \
+  'READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE=100' \
+  'READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL=1h' \
+  'READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER=24h' \
   > "$import_env_fixture"
 printf '%s\n' \
   '#!/usr/bin/env bash' \
@@ -99,7 +111,9 @@ for key in \
   READMATES_HOST_LIST_CURSOR_CURRENT_KEY \
   READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY \
   READMATES_MUTATION_IDENTITY_CURRENT_KEY \
-  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY; do
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY; do
   grep -Eq "^DRY   secret[[:space:]]+$key  \(len=[0-9]+\)$" "$fixture_root/import-dry-run.out" || {
     echo "production config import fixture failed to classify secret: $key" >&2
     exit 1
@@ -109,8 +123,22 @@ for key in \
   READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION \
   READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION \
   READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION \
-  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION; do
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION; do
   grep -Eq "^DRY   variable[[:space:]]+$key  = [0-9]+$" "$fixture_root/import-dry-run.out" || {
+    echo "production config import fixture failed to classify variable: $key" >&2
+    exit 1
+  }
+done
+for key in \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS \
+  READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION \
+  READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL \
+  READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE \
+  READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER; do
+  grep -Eq "^DRY   variable[[:space:]]+$key  = [^[:space:]]+$" "$fixture_root/import-dry-run.out" || {
     echo "production config import fixture failed to classify variable: $key" >&2
     exit 1
   }
@@ -128,18 +156,72 @@ grep -Fq 'Empty values are skipped; this importer never deletes existing GitHub 
 printf '%s\n' \
   'READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY=' \
   'READMATES_MUTATION_IDENTITY_PREVIOUS_KEY=' \
+  'READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY=' \
   > "$import_env_fixture"
 PATH="$fixture_root/bin:$PATH" \
   bash "$repo_root/scripts/sync-config/import-from-prod-env.sh" "$import_env_fixture" --apply \
   > "$fixture_root/import-empty-previous.out"
 for key in \
   READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY \
-  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY; do
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY; do
   grep -Eq "^SKIP  \(empty\)[[:space:]]+$key$" "$fixture_root/import-empty-previous.out" || {
     echo "production config import fixture did not preserve previous secret on empty input: $key" >&2
     exit 1
   }
 done
+
+reset_fixture
+
+remove_exact_line \
+  "$fixture_root/docs/deploy/release-publish-runbook.md" \
+  '`READMATES_MUTATION_IDENTITY_CURRENT_KEY`, `READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY`를 GitHub Secrets에'
+expect_contract_failure \
+  "missing-admin-release-provision-order" \
+  "release runbook must provision the admin command digest current key before backend startup"
+
+reset_fixture
+
+awk '
+  index($0, "gh secret delete READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY --repo") == 0 { print }
+' "$fixture_root/docs/operations/runbooks/secrets-management.md" \
+  > "$fixture_root/docs/operations/runbooks/secrets-management.md.next"
+mv \
+  "$fixture_root/docs/operations/runbooks/secrets-management.md.next" \
+  "$fixture_root/docs/operations/runbooks/secrets-management.md"
+expect_contract_failure \
+  "missing-exact-admin-previous-secret-deletion" \
+  "runbook must document exact deletion for READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY"
+
+reset_fixture
+remove_exact_line \
+  "$fixture_root/scripts/sync-config/import-from-prod-env.sh" \
+  "  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY"
+expect_contract_failure \
+  "missing-admin-command-import" \
+  "bulk config import must classify READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY"
+
+reset_fixture
+remove_exact_line \
+  "$fixture_root/.github/workflows/sync-config.yml" \
+  '      READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY: ${{ secrets.READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY }}'
+expect_contract_failure \
+  "missing-admin-command-current-key-workflow" \
+  "sync-config must source READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY as a secret"
+
+reset_fixture
+
+awk '
+  { print }
+  $0 == "            READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY" {
+    print "            READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY"
+  }
+' "$fixture_root/.github/workflows/sync-config.yml" \
+  > "$fixture_root/.github/workflows/sync-config.yml.next"
+mv "$fixture_root/.github/workflows/sync-config.yml.next" "$fixture_root/.github/workflows/sync-config.yml"
+expect_contract_failure \
+  "admin-command-previous-key-required" \
+  "sync-config must keep READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY optional"
 
 reset_fixture
 

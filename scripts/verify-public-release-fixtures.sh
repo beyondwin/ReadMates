@@ -179,6 +179,7 @@ placeholder_contract_files=(
   "deploy/oci/compose.infra.yml"
   "deploy/oci/grafana/provisioning/datasources/tempo.yml"
   "docs/operations/runbooks/secrets-management.md"
+  "docs/deploy/release-publish-runbook.md"
   "ops/tempo/tempo.yml"
   "ops/observability/local/compose.yml"
   "ops/observability/local/grafana/provisioning/datasources/tempo.yml"
@@ -359,5 +360,9 @@ do
     fail "public release candidate is missing required Google OAuth harness file: $required_oauth_file"
   fi
 done
+
+if [[ ! -f "$candidate_dir/scripts/verify-local-admin-command-startup-fixtures.sh" ]]; then
+  fail "public release candidate is missing the local admin command startup fixture"
+fi
 
 printf 'Public-release fixture checks passed.\n'

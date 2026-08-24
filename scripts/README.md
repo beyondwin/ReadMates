@@ -243,13 +243,16 @@ bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/c
 
 `validate-alertmanager-config.sh`는 `${READMATES_ALERT_*}` 환경 placeholder를 dummy 값으로 치환한 임시 파일을 lint하므로 실제 SMTP credential 없이 구조만 검증합니다. 치환 결과는 `.tmp` 아래 임시 디렉터리에 만들고 종료 시 삭제합니다.
 
-Production config validator는 host list cursor와 mutation identity의 current/previous key 및 version이
+Production config validator는 host list cursor, mutation identity, platform-admin command digest의
+current/previous key 및 version이
 `.env.example`, `sync-config` source/required/render, bulk importer classification에 모두 연결됐는지도
 검사합니다. Previous key 삭제는 safety gate 뒤 runbook의 exact GitHub UI 또는
 `gh secret delete ... --repo ...` 절차로만 수행하며 bulk importer의 빈 값은 기존 Secret을 삭제하지
-않습니다. Fixture는 외부 temp env와 mock `gh`로 dry-run importer를 실행해 secret 값은 출력하지 않고
-key 이름과 version Variable만 분류하는지, 삭제 절차 계약이 유지되는지 확인합니다. 실제 GitHub
-Secret이나 운영 env는 변경하지 않습니다.
+않습니다. Admin digest 회전은 dual-write, old-writer drain, current-only write/previous lookup, completed
+alias purge, durable zero-reference 이후 24시간 buffer, 명시적 previous Secret 삭제, sync/restart와
+database-backed startup validator 순서입니다. Fixture는 외부 temp env와 mock `gh`로 dry-run importer를
+실행해 secret 값은 출력하지 않고 key 이름과 version Variable만 분류하는지, 삭제 절차 계약이
+유지되는지 확인합니다. 실제 GitHub Secret이나 운영 env는 변경하지 않습니다.
 
 ## `observability-local-smoke.sh`
 
@@ -261,6 +264,16 @@ Secret이나 운영 env는 변경하지 않습니다.
 bash ./scripts/validate-tempo-config.sh
 bash ./scripts/observability-local-smoke.sh
 ```
+
+실제 container를 시작하지 않고 required local startup config만 검사할 때는 다음을 사용합니다.
+
+```bash
+READMATES_OBSERVABILITY_LOCAL_SMOKE_CONFIG_DRY_RUN=true ./scripts/observability-local-smoke.sh
+./scripts/verify-local-admin-command-startup-fixtures.sh
+```
+
+Google OAuth와 observability local startup runner는 `dev` profile과 공개 안전한 local-only admin command
+digest key/version을 명시합니다. Fixture는 값 자체를 출력하지 않고 config-only 경계를 확인합니다.
 
 배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 

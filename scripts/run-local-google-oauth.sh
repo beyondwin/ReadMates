@@ -51,11 +51,21 @@ export READMATES_AUTH_BASE_URL="${READMATES_AUTH_BASE_URL:-http://localhost:5173
 export READMATES_ALLOWED_ORIGINS="${READMATES_ALLOWED_ORIGINS:-http://localhost:5173}"
 export READMATES_AUTH_SESSION_COOKIE_SECURE="${READMATES_AUTH_SESSION_COOKIE_SECURE:-false}"
 export READMATES_IP_HASH_BASE_SECRET="${READMATES_IP_HASH_BASE_SECRET:-local-oauth-ip-hash-placeholder}"
+export READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY:-local-only-admin-command-digest-material}"
+export READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:-1}"
+export READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:-0}"
+
+if [[ -z "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY" ]]; then
+  fail "local admin command digest key must not be empty"
+fi
+if [[ "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION" == "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION" ]]; then
+  fail "admin command digest key versions must differ"
+fi
 
 unset google_client_id google_client_secret
 
 if [[ "${READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN:-false}" == "true" ]]; then
-  printf 'Local Google OAuth credentials are ready; no credential values were printed.\n'
+  printf 'Local Google OAuth credentials are ready; admin command digest configuration is ready; no credential values were printed.\n'
   exit 0
 fi
 

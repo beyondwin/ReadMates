@@ -36,6 +36,9 @@ chmod +x "$fixture_root/bin/security"
 run_fixture() {
   PATH="$fixture_root/bin:$PATH" \
     READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN=true \
+    READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY:-}" \
+    READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:-}" \
+    READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:-}" \
     MOCK_GOOGLE_CLIENT_ID="${MOCK_GOOGLE_CLIENT_ID:-}" \
     MOCK_GOOGLE_CLIENT_SECRET="${MOCK_GOOGLE_CLIENT_SECRET:-}" \
     "$runner" 2>&1
@@ -65,13 +68,32 @@ fi
 
 MOCK_GOOGLE_CLIENT_ID=123456789-fixture.apps.googleusercontent.com
 MOCK_GOOGLE_CLIENT_SECRET=keychain-test-value-42
+admin_digest_sentinel=fixture-oauth-admin-digest-sentinel-42
+READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="$admin_digest_sentinel"
 valid_output="$(run_fixture)"
 if [[ "$valid_output" != *"Local Google OAuth credentials are ready"* ]]; then
   printf 'expected successful dry-run evidence, got: %s\n' "$valid_output" >&2
   exit 1
 fi
-if [[ "$valid_output" == *"$MOCK_GOOGLE_CLIENT_ID"* || "$valid_output" == *"$MOCK_GOOGLE_CLIENT_SECRET"* ]]; then
+if [[ "$valid_output" != *"admin command digest configuration is ready"* ]]; then
+  printf 'expected local admin command digest readiness evidence, got: %s\n' "$valid_output" >&2
+  exit 1
+fi
+if [[ "$valid_output" == *"$MOCK_GOOGLE_CLIENT_ID"* ||
+  "$valid_output" == *"$MOCK_GOOGLE_CLIENT_SECRET"* ||
+  "$valid_output" == *"$admin_digest_sentinel"* ]]; then
   printf 'runner exposed credential material in output\n' >&2
+  exit 1
+fi
+
+if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=1 \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=1 \
+  invalid_admin_output="$(run_fixture)"; then
+  printf 'expected duplicate local admin digest versions to be rejected\n' >&2
+  exit 1
+fi
+if [[ "$invalid_admin_output" != *"admin command digest key versions must differ"* ]]; then
+  printf 'expected a safe admin digest version error, got: %s\n' "$invalid_admin_output" >&2
   exit 1
 fi
 

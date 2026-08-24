@@ -150,8 +150,9 @@ Registered club host를 같이 확인할 때는 실제 host를 Git 밖에서 `RE
 
 Production runtime rendering이 바뀐 릴리즈는 container를 먼저 재시작하지 않고 현재 `main`의 `sync-config`를 성공시킨 뒤 image promotion을 실행합니다.
 
-V52–V56이 포함된 release에서는 `READMATES_HOST_LIST_CURSOR_CURRENT_KEY`와
-`READMATES_MUTATION_IDENTITY_CURRENT_KEY`를 GitHub Secrets에 먼저 provision하고 각 current version
+V52–V57이 포함된 release에서는 `READMATES_HOST_LIST_CURSOR_CURRENT_KEY`,
+`READMATES_MUTATION_IDENTITY_CURRENT_KEY`, `READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY`를 GitHub Secrets에
+먼저 provision하고 각 current version
 Variable을 확인합니다. Previous key/version은 rotation 중에만 설정합니다. 이 provisioning과 아래
 `restart_api=false` sync가 backend startup, Flyway, health보다 반드시 먼저입니다.
 
@@ -180,7 +181,8 @@ CADDY_SITE=api.example.com \
 - GHCR package가 private이면 VM의 registry login이 Git 밖의 credential로 준비되어 있습니다.
 - `Deploy Server Image` workflow가 같은 tag에서 성공했습니다.
 - Runtime rendering이 바뀌었다면 `sync-config` workflow가 `restart_api=false`, `dry_run=false`로 성공했습니다.
-- Host cursor와 mutation identity current HMAC key가 GitHub Secrets에 provision됐고 version Variables가 의도한 값입니다. 값 자체는 로그나 evidence에 기록하지 않습니다.
+- Host cursor, mutation identity, admin command digest current HMAC key가 GitHub Secrets에 provision됐고
+  version Variables가 의도한 값입니다. 값 자체는 로그나 evidence에 기록하지 않습니다.
 
 스크립트는 legacy host `readmates-server`와 host `caddy`를 중지하고, compose stack의 `readmates-api` 이미지 ID가 기대 이미지와 같은지 확인한 뒤 `/internal/health`, BFF auth smoke, post-deploy watch를 실행합니다.
 
@@ -213,7 +215,10 @@ READMATES_SMOKE_AUTH_BASE_URL=https://readmates.pages.dev \
 ./scripts/smoke-production-integrations.sh
 ```
 
-DB migration이 있는 릴리즈는 Spring startup log 또는 Flyway schema history를 운영자 채널에서 확인합니다. 결과 전문이나 실제 DB identifier는 Git에 남기지 않습니다.
+DB migration이 있는 릴리즈는 Spring startup log 또는 Flyway schema history를 운영자 채널에서 확인합니다.
+Admin command digest가 포함된 릴리즈는 database-backed startup validator가 configured key version, alias
+reference, durable retirement state를 검증한 뒤 health가 열렸는지도 확인합니다. 결과 전문이나 실제 DB
+identifier는 Git에 남기지 않습니다.
 
 알림/SMTP/Kafka가 바뀐 릴리즈는 호스트 알림 화면에서 preview/confirm, event ledger, pending/failed delivery 상태를 sanitized summary로 확인합니다. 실제 멤버 이메일, 알림 본문, club 운영 데이터는 release note에 쓰지 않습니다.
 

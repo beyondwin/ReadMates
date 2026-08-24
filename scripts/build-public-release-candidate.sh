@@ -479,6 +479,7 @@ copy_manifest() {
   copy_optional_file "scripts/check-local-google-oauth-redirect.py"
   copy_optional_file "scripts/run-local-google-oauth-stack.sh"
   copy_optional_file "scripts/verify-local-google-oauth-keychain-fixtures.sh"
+  copy_optional_file "scripts/verify-local-admin-command-startup-fixtures.sh"
   copy_optional_file "scripts/verify-local-google-oauth-stack-fixtures.sh"
   copy_optional_file "scripts/verify-local-google-oauth-stack.sh"
   copy_optional_file "scripts/generate-slo-report.py"

@@ -6,6 +6,7 @@ workflow="$repo_root/.github/workflows/sync-config.yml"
 env_example="$repo_root/.env.example"
 import_script="$repo_root/scripts/sync-config/import-from-prod-env.sh"
 secrets_runbook="$repo_root/docs/operations/runbooks/secrets-management.md"
+release_runbook="$repo_root/docs/deploy/release-publish-runbook.md"
 application_config="$repo_root/server/src/main/resources/application.yml"
 app_compose="$repo_root/deploy/oci/compose.yml"
 infra_compose="$repo_root/deploy/oci/compose.infra.yml"
@@ -16,7 +17,7 @@ fail() {
 }
 
 for file in \
-  "$workflow" "$env_example" "$import_script" "$secrets_runbook" \
+  "$workflow" "$env_example" "$import_script" "$secrets_runbook" "$release_runbook" \
   "$application_config" "$app_compose" "$infra_compose"; do
   [ -f "$file" ] || fail "missing ${file#"$repo_root"/}"
 done
@@ -28,12 +29,16 @@ grep -Fq 'Empty values are skipped; this importer never deletes existing GitHub 
   fail "bulk config import must state that empty values never delete GitHub Secrets"
 for previous_key in \
   READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY \
-  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY; do
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY; do
   grep -Fq "gh secret delete $previous_key --repo <owner>/<repo>" "$secrets_runbook" ||
     fail "runbook must document exact deletion for $previous_key"
 done
 grep -Fq 'sync-config(restart_api=false, dry_run=false)' "$secrets_runbook" ||
   fail "runbook must sync configuration after explicit previous-secret deletion"
+grep -Fq '`READMATES_MUTATION_IDENTITY_CURRENT_KEY`, `READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY`를 GitHub Secrets에' \
+  "$release_runbook" ||
+  fail "release runbook must provision the admin command digest current key before backend startup"
 
 legacy_env='READMATES_AIGEN_''PIPELINE_MODE'
 legacy_property='readmates.aigen.pipeline''-mode'
@@ -183,6 +188,19 @@ require_config_surface() {
     fail "bulk config import must classify $key"
 }
 
+require_provisioned_config_surface() {
+  local key="$1"
+  local expected="$2"
+  [ "$(read_env_example_value "$key")" = "$expected" ] ||
+    fail "$key must use the approved default $expected"
+  grep -Fq "$key: \${{ vars.$key || '$expected' }}" "$workflow" ||
+    fail "sync-config must source $key with default $expected"
+  grep -Fq "printf '$key=%s\\n' \"\$$key\"" "$workflow" ||
+    fail "sync-config must render $key"
+  grep -Eq "^[[:space:]]{2}$key$" "$import_script" ||
+    fail "bulk config import must classify $key"
+}
+
 require_config_surface \
   READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY 5s \
   "consumer-retry-delay: \${READMATES_AIGEN_KAFKA_CONSUMER_RETRY_DELAY:5s}"
@@ -223,6 +241,8 @@ require_secret_config_surface() {
   if [ "$required" = "true" ]; then
     grep -Fxq "            $key" "$workflow" ||
       fail "sync-config must require $key"
+  elif grep -Fxq "            $key" "$workflow"; then
+    fail "sync-config must keep $key optional"
   fi
 }
 
@@ -245,10 +265,26 @@ require_secret_config_surface READMATES_HOST_LIST_CURSOR_CURRENT_KEY true
 require_secret_config_surface READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY false
 require_secret_config_surface READMATES_MUTATION_IDENTITY_CURRENT_KEY true
 require_secret_config_surface READMATES_MUTATION_IDENTITY_PREVIOUS_KEY false
+require_secret_config_surface READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY true
+require_secret_config_surface READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY false
 require_version_config_surface READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION 1
 require_version_config_surface READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION 0
 require_version_config_surface READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION 1
 require_version_config_surface READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION 0
+require_version_config_surface READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION 1
+require_version_config_surface READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION 0
+require_config_surface \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS false \
+  "write-previous-alias: \${READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS:false}"
+require_config_surface \
+  READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION 168h \
+  "retention: \${READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION:168h}"
+require_config_surface \
+  READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL 15m \
+  "initial-claim-ttl: \${READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL:15m}"
+require_provisioned_config_surface READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE 100
+require_provisioned_config_surface READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL 1h
+require_provisioned_config_surface READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER 24h
 require_config_surface \
   READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED true \
   "enabled: \${READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED:true}"

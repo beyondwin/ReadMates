@@ -69,7 +69,36 @@ Host cursor와 mutation identity HMAC key는 각자 versioned current/previous �
 6. 삭제 뒤 `sync-config(restart_api=false, dry_run=false)`를 실행해 빈 previous 값이 env에 렌더링되는지
    확인한 다음 backend를 재시작합니다.
 
-첫 V52–V56 배포는 두 current key를 backend startup/Flyway보다 먼저 provision해야 합니다. Previous
+Platform-admin command digest key는 alias lifecycle 때문에 별도 순서를 지킵니다.
+
+1. 새 key/version을 current로, 기존 key/version을 previous로 provision하고
+   `READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=true`로 설정합니다. Backend보다 먼저
+   `sync-config(restart_api=false, dry_run=false)`를 실행한 뒤 재시작하여 current/previous dual-write를
+   시작합니다. Startup의 database-backed validator가 key state와 alias reference를 잠금 조회해 통과해야
+   합니다.
+2. 이전 버전 writer가 모두 drain되었음을 확인합니다. Drain 전에는 current-only write로 전환하지 않습니다.
+3. `READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=false`로 바꾸고 sync/restart합니다. 이 단계는 새
+   alias를 current로만 쓰되 response-loss lookup에는 previous key를 유지합니다.
+4. Completion 기준 `READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION`이 지난 claim을
+   `READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE`와
+   `READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL`의 bounded purge로 제거합니다. Previous alias reference가
+   0이고 durable `unreferenced_since`가 기록되었음을 DB 운영 증거로 확인합니다.
+5. 그 `unreferenced_since`부터
+   `READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER`(기본 24시간) 이상 기다립니다. Reference 또는
+   timestamp를 확인할 수 없으면 제거하지 않습니다.
+6. 안전 경계를 확인한 뒤에만 대상 repository를 명시해 previous Secret 하나를 삭제합니다. 아래 명령은
+   runbook 예시이며 이 저장소 자동화가 대신 실행하지 않습니다.
+
+   ```bash
+   gh secret delete READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY --repo <owner>/<repo>
+   ```
+
+7. `sync-config(restart_api=false, dry_run=false)`로 빈 previous 값을 렌더링하고 backend를 재시작합니다.
+   재시작 뒤 database-backed startup validator와 health를 확인합니다. Bulk importer의 빈 previous 값은
+   기존 Secret을 삭제하지 않으므로 6단계의 명시적 삭제를 대체하지 않습니다.
+
+첫 V52–V57 배포는 host cursor, host mutation identity, admin command digest의 세 current key를 backend
+startup/Flyway보다 먼저 provision해야 합니다. Previous
 version `0`과 빈 previous key는 history가 없는 첫 배포에서만 안전한 기본값입니다.
 
 #### 시크릿 인벤토리 (현재)
@@ -89,6 +118,8 @@ version `0`과 빈 previous key는 history가 없는 첫 배포에서만 안전�
 | `READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY` | Secret | host cursor | rotation window에만 |
 | `READMATES_MUTATION_IDENTITY_CURRENT_KEY` | Secret | host mutation | versioned rotation |
 | `READMATES_MUTATION_IDENTITY_PREVIOUS_KEY` | Secret | host mutation | durable retirement 뒤 제거 |
+| `READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY` | Secret | platform-admin command | versioned rotation |
+| `READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY` | Secret | platform-admin command | alias purge와 durable retirement 뒤 제거 |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID` | Secret | OAuth | 신청 시 |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET` | Secret | OAuth | 분기 1회 (Google Cloud Console) |
 | `READMATES_AIGEN_OPENAI_API_KEY` | Secret | AI | 분기 1회 또는 사고 시 |
@@ -109,6 +140,13 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | `READMATES_ALLOWED_ORIGINS` | CORS 허용 origin (콤마 구분) |
 | `READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION` / `PREVIOUS_KEY_VERSION` | current/previous cursor key version (`1` / `0` first-deploy default) |
 | `READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION` / `PREVIOUS_KEY_VERSION` | current/previous mutation digest key version (`1` / `0` first-deploy default) |
+| `READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION` / `PREVIOUS_KEY_VERSION` | current/previous admin command digest key version (`1` / `0` first-deploy default) |
+| `READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS` | rotation dual-write overlap에서만 `true`; 기본 `false` |
+| `READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION` | completed operational claim 보존 (`168h` 기본) |
+| `READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL` | initial claim TTL (`15m` 기본) |
+| `READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE` | purge pass당 상한 (`100` 기본) |
+| `READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL` | bounded purge 간격 (`1h` 기본) |
+| `READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER` | zero-reference 확인 뒤 key 제거 전 대기 (`24h` 기본) |
 | `READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED` | provider/feature와 독립인 operational purge (`true` 기본) |
 | `READMATES_PUBLIC_CONVERGENCE_WORK_RETENTION` | work 보존 기간 (`168h` 기본, startup 범위 `1h..30d`) |
 | `READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_FIXED_DELAY` | purge 간격 (`1h` 기본, 최대 `24h`) |

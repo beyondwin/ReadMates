@@ -8,8 +8,26 @@ mysql_container="${project}-mysql"
 server_port="${READMATES_LOCAL_SERVER_MANAGEMENT_PORT:-8081}"
 tmpdir="$(mktemp -d "${TMPDIR:-/tmp}/readmates-observability-smoke.XXXXXX")"
 server_pid=""
+spring_profiles_active="${SPRING_PROFILES_ACTIVE:-dev}"
+admin_digest_current_key="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY:-local-only-admin-command-digest-material}"
+admin_digest_current_version="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:-1}"
+admin_digest_previous_version="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:-0}"
 
 cd "$repo_root"
+
+if [[ -z "$admin_digest_current_key" ]]; then
+  printf 'observability-local-smoke: local admin command digest key must not be empty\n' >&2
+  exit 2
+fi
+if [[ "$admin_digest_current_version" == "$admin_digest_previous_version" ]]; then
+  printf 'observability-local-smoke: admin command digest key versions must differ\n' >&2
+  exit 2
+fi
+
+if [[ "${READMATES_OBSERVABILITY_LOCAL_SMOKE_CONFIG_DRY_RUN:-false}" == "true" ]]; then
+  printf 'Local observability startup configuration is ready; no digest material was printed.\n'
+  exit 0
+fi
 
 require_cmd() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -127,6 +145,7 @@ docker compose -p "$project" -f "$compose_file" up -d tempo
 wait_http "Tempo ready" "$tempo_url/ready"
 
 env \
+  SPRING_PROFILES_ACTIVE="$spring_profiles_active" \
   SERVER_PORT="$app_port" \
   READMATES_MANAGEMENT_PORT="$server_port" \
   SPRING_DATASOURCE_URL="jdbc:mysql://127.0.0.1:${mysql_port}/readmates?serverTimezone=UTC" \
@@ -135,6 +154,9 @@ env \
   READMATES_BFF_SECRET_REQUIRED=false \
   READMATES_IP_HASH_BASE_SECRET=local-observability-smoke \
   READMATES_AUTH_RETURN_STATE_SECRET=local-observability-smoke \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="$admin_digest_current_key" \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION="$admin_digest_current_version" \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION="$admin_digest_previous_version" \
   READMATES_AIGEN_ENABLED=false \
   READMATES_OTLP_TRACES_ENDPOINT="$otlp_url" \
   ./server/gradlew -p server bootRun >"$tmpdir/server.log" 2>&1 &
