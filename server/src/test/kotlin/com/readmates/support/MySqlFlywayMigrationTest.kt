@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(16)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(17)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("58")
+            assertThat(latestVersion).isEqualTo("59")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -103,6 +103,7 @@ class MySqlFlywayMigrationTest(
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
+            assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -379,7 +380,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(14)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(15)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -391,7 +392,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("58")
+            assertThat(latestVersion).isEqualTo("59")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -400,6 +401,7 @@ class MySqlFlywayMigrationTest(
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
+            assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -872,7 +874,6 @@ class MySqlFlywayMigrationTest(
             assertReplayConfirmationRejected(jdbcTemplate, fixture, actorPlatformRole = invalidRole)
         }
         assertReplayConfirmationRejected(jdbcTemplate, fixture, replayedCount = -1)
-        assertReplayConfirmationRejected(jdbcTemplate, fixture, selectionHash = "A".repeat(64))
         assertReplayConfirmationRejected(jdbcTemplate, fixture, skippedCount = -1)
         insertReplayConfirmation(
             jdbcTemplate,
@@ -900,7 +901,6 @@ class MySqlFlywayMigrationTest(
         jdbcTemplate: JdbcTemplate,
         fixture: V2AdminReplayFixture,
         actorPlatformRole: String = "OWNER",
-        selectionHash: String = "a".repeat(64),
         replayedCount: Int = 1,
         skippedCount: Int = 0,
     ) {
@@ -915,7 +915,6 @@ class MySqlFlywayMigrationTest(
                 fixture.auditId,
                 replayedCount = replayedCount,
                 skippedCount = skippedCount,
-                selectionHash = selectionHash,
             )
         }
     }
@@ -951,9 +950,6 @@ class MySqlFlywayMigrationTest(
             fixture.previewId,
         )
         assertConstraintRejected {
-            jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", fixture.previewId)
-        }
-        assertConstraintRejected {
             insertV2ReplayPreview(
                 jdbcTemplate,
                 fixture.nullRolePreviewId,
@@ -968,20 +964,12 @@ class MySqlFlywayMigrationTest(
         jdbcTemplate: JdbcTemplate,
         fixture: V2AdminReplayFixture,
     ) {
-        jdbcTemplate.update(
-            """
-            update admin_notification_replay_previews
-            set consumed_at = null, consumed_confirmation_id = null
-            where id = ? and contract_version = 2
-            """.trimIndent(),
-            fixture.previewId,
-        )
+        jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", fixture.previewId)
         jdbcTemplate.update(
             "delete from admin_notification_replay_confirmations where preview_id = ?",
             fixture.previewId,
         )
         jdbcTemplate.update("delete from platform_audit_events where id = ?", fixture.auditId)
-        jdbcTemplate.update("delete from admin_notification_replay_previews where id = ?", fixture.previewId)
         jdbcTemplate.update(
             "delete from admin_notification_replay_previews where id in (?, ?)",
             fixture.operatorPreviewId,
@@ -1049,10 +1037,20 @@ class MySqlFlywayMigrationTest(
                 "preview_id",
                 "actor_user_id",
                 "actor_platform_role",
+                "actor_capabilities_json",
                 "club_id",
+                "command_type",
+                "target_kind",
+                "target_id_snapshot",
                 "selection_hash",
+                "identity_mode",
+                "canonical_schema_version",
+                "digest_key_version",
+                "request_hmac",
                 "replayed_count",
                 "skipped_count",
+                "skipped_reason_counts_json",
+                "origin_outcome",
                 "platform_audit_event_id",
                 "confirmed_at",
             )
@@ -1122,6 +1120,8 @@ class MySqlFlywayMigrationTest(
             .contains("MAIL_RETRYABLE", "MAIL_PERMANENT")
         assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_replay_confirmations_counts_check"))
             .contains("replayed_count", "skipped_count")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_confirmations_identity_check"))
+            .contains("LEGACY_SELECTION_SHA", "HMAC", "selection_hash", "request_hmac")
     }
 
     private fun assertAtomicAdminReplayForeignKeys(jdbcTemplate: JdbcTemplate) {
@@ -1141,23 +1141,9 @@ class MySqlFlywayMigrationTest(
                 "admin_notification_replay_preview_targets_preview_fk",
             ),
         )
-        mapOf(
-            "admin_notification_replay_confirmations_preview_fk" to "admin_notification_replay_previews:id",
-            "admin_notification_replay_confirmations_actor_fk" to "users:id",
-            "admin_notification_replay_confirmations_club_fk" to "clubs:id",
-            "admin_notification_replay_confirmations_audit_fk" to "platform_audit_events:id",
-        ).forEach { (constraint, expectedReference) ->
-            assertEquals(
-                expectedReference,
-                foreignKeyReference(jdbcTemplate, "admin_notification_replay_confirmations", constraint),
-            )
-            assertEquals(
-                "RESTRICT",
-                foreignKeyDeleteRule(jdbcTemplate, "admin_notification_replay_confirmations", constraint),
-            )
-        }
+        assertThat(importedKeys(jdbcTemplate, "admin_notification_replay_confirmations")).isEmpty()
         assertEquals(
-            "admin_notification_replay_confirmations:id",
+            "admin_notification_replay_confirmations:id,preview_id",
             foreignKeyReference(
                 jdbcTemplate,
                 "admin_notification_replay_previews",
@@ -1233,21 +1219,27 @@ class MySqlFlywayMigrationTest(
         auditId: String,
         replayedCount: Int = 1,
         skippedCount: Int = 0,
-        selectionHash: String = "a".repeat(64),
     ) {
         jdbcTemplate.update(
             """
             insert into admin_notification_replay_confirmations (
               id, preview_id, actor_user_id, actor_platform_role, club_id, selection_hash,
-              replayed_count, skipped_count, platform_audit_event_id, confirmed_at
-            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, '2026-08-10 00:01:00.000000')
+              actor_capabilities_json, command_type, target_kind, target_id_snapshot,
+              identity_mode, canonical_schema_version, digest_key_version, request_hmac,
+              replayed_count, skipped_count, skipped_reason_counts_json, origin_outcome,
+              platform_audit_event_id, confirmed_at
+            ) values (?, ?, ?, ?, ?, null, json_array('REPLAY_NOTIFICATIONS'),
+                      'notification.replay', 'NOTIFICATION_REPLAY_TARGET_SET', ?,
+                      'HMAC', 'notification-replay:v1', 1, ?, ?, ?, json_object(), 'SUCCEEDED', ?,
+                      '2026-08-10 00:01:00.000000')
             """.trimIndent(),
             confirmationId,
             previewId,
             actorUserId,
             actorRole,
             clubId,
-            selectionHash,
+            confirmationId,
+            ByteArray(32) { 0x51 },
             replayedCount,
             skippedCount,
             auditId,
@@ -1661,7 +1653,7 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("58")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("59")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54PublicProjectionConvergenceSchema(jdbc)
@@ -1669,6 +1661,7 @@ class MySqlFlywayMigrationTest(
             assertV56PublicConvergenceWorkRetentionIndex(jdbc)
             assertV57PlatformAdminCommandIdempotencySchema(jdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(jdbc)
+            assertV59PlatformAdminServiceCommandEvidenceSchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1767,8 +1760,8 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(7)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("58")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(8)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
@@ -1776,6 +1769,7 @@ class MySqlFlywayMigrationTest(
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
+            assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertThat(
                 upgradeJdbc.queryForMap(
                     """
@@ -1864,10 +1858,11 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("58")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
+            assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
 
             val actorId = "aaaaaaaa-0000-4000-8000-000000057002"
             val claimId = "aaaaaaaa-0000-4000-8000-000000057003"
@@ -2130,9 +2125,10 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("58")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
+            assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
             assertEquals(
                 0L,
                 upgradeJdbc.queryForObject(
@@ -2397,6 +2393,359 @@ class MySqlFlywayMigrationTest(
                     "select count(*) from platform_admin_club_command_convergence_events where convergence_id = ?",
                     Int::class.java,
                     convergenceId,
+                ),
+            )
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `mysql upgrades v58 with typed service receipts and deletion safe convergence evidence`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v58Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("58")
+                    .load()
+            assertThat(v58Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("58")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            val fixture = V59ServiceCommandFixture()
+            insertV59LegacyNotificationSources(upgradeJdbc, fixture)
+            val v58Checksum =
+                upgradeJdbc.queryForObject(
+                    "select checksum from flyway_schema_history where version = '58' and success = true",
+                    Int::class.java,
+                )
+
+            val upgradeResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    "select checksum from flyway_schema_history where version = '58' and success = true",
+                    Int::class.java,
+                ),
+            ).isEqualTo(v58Checksum)
+            assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
+
+            val legacyReceipt =
+                upgradeJdbc.queryForMap(
+                    """
+                    select identity_mode, selection_hash, canonical_schema_version, digest_key_version,
+                           request_hmac, command_type, target_kind, target_id_snapshot,
+                           actor_capabilities_json, origin_outcome
+                    from admin_notification_replay_confirmations
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.legacyNotificationReceiptId,
+                )
+            assertThat(legacyReceipt["IDENTITY_MODE"]).isEqualTo("LEGACY_SELECTION_SHA")
+            assertThat(legacyReceipt["SELECTION_HASH"]).isEqualTo("a".repeat(64))
+            assertThat(legacyReceipt["CANONICAL_SCHEMA_VERSION"]).isNull()
+            assertThat(legacyReceipt["DIGEST_KEY_VERSION"]).isNull()
+            assertThat(legacyReceipt["REQUEST_HMAC"]).isNull()
+            assertThat(legacyReceipt["COMMAND_TYPE"]).isEqualTo("notification.replay")
+            assertThat(legacyReceipt["TARGET_KIND"]).isEqualTo("NOTIFICATION_REPLAY_TARGET_SET")
+            assertThat(legacyReceipt["TARGET_ID_SNAPSHOT"]).isEqualTo(fixture.legacyNotificationReceiptId)
+            assertThat(legacyReceipt["ACTOR_CAPABILITIES_JSON"]).isNull()
+            assertThat(legacyReceipt["ORIGIN_OUTCOME"]).isEqualTo("SUCCEEDED")
+            assertEquals(
+                0,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from admin_notification_replay_confirmation_targets where confirmation_id = ?",
+                    Int::class.java,
+                    fixture.legacyNotificationReceiptId,
+                ),
+            )
+
+            insertV59NotificationPreview(upgradeJdbc, fixture.notificationPreviewId, fixture)
+            insertV59NotificationReceipt(upgradeJdbc, fixture.notificationReceiptId, fixture.notificationPreviewId, fixture)
+            insertV59NotificationReceiptTarget(upgradeJdbc, fixture.notificationReceiptId, fixture.notificationDeliveryId)
+            assertUniqueConstraintRejected("PRIMARY") {
+                insertV59NotificationReceiptTarget(
+                    upgradeJdbc,
+                    fixture.notificationReceiptId,
+                    fixture.notificationDeliveryId,
+                )
+            }
+            assertConstraintRejected {
+                insertV59NotificationReceiptTarget(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                )
+            }
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from admin_notification_replay_confirmation_targets target
+                    join admin_notification_replay_confirmations receipt on receipt.id = target.confirmation_id
+                    where receipt.id = ? and receipt.replayed_count = 1
+                    """.trimIndent(),
+                    Int::class.java,
+                    fixture.notificationReceiptId,
+                ),
+            )
+            assertConstraintRejected {
+                insertV59NotificationReceipt(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    digestKeyVersion = null,
+                    auditId = UUID.randomUUID().toString(),
+                )
+            }
+            assertConstraintRejected {
+                insertV59NotificationReceipt(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    requestHmac = null,
+                    auditId = UUID.randomUUID().toString(),
+                )
+            }
+            assertConstraintRejected {
+                insertV59NotificationReceipt(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    legacySelectionSha = "b".repeat(64),
+                    auditId = UUID.randomUUID().toString(),
+                )
+            }
+            assertUniqueConstraintRejected("admin_notification_confirmations_audit_uk") {
+                insertV59NotificationReceipt(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    fixture,
+                )
+            }
+
+            insertV59AiPreview(upgradeJdbc, fixture.aiPreviewId, fixture)
+            insertV59AiPreview(upgradeJdbc, fixture.mismatchedAiPreviewId, fixture)
+            insertV59AiReceipt(upgradeJdbc, fixture.aiReceiptId, fixture.aiPreviewId, fixture)
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select json_unquote(json_extract(actor_capabilities_json, '$[0]'))
+                    from ai_generation_admin_command_receipts
+                    where id = ?
+                    """.trimIndent(),
+                    String::class.java,
+                    fixture.aiReceiptId,
+                ),
+            ).isEqualTo("MANAGE_AI_OPERATIONS")
+            assertConstraintRejected {
+                insertV59AiPreview(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    requestHmac = ByteArray(31),
+                )
+            }
+            assertConstraintRejected {
+                insertV59AiReceipt(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    safeReasonCode = "https:" + "/" + "/private.invalid",
+                )
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update ai_generation_admin_command_previews
+                    set consumed_at = '2026-08-24 02:02:00.000000', consumed_receipt_id_snapshot = ?
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.aiReceiptId,
+                    fixture.mismatchedAiPreviewId,
+                )
+            }
+            assertThat(
+                upgradeJdbc.update(
+                    """
+                    update ai_generation_admin_command_previews
+                    set consumed_at = '2026-08-24 02:02:00.000000', consumed_receipt_id_snapshot = ?
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.aiReceiptId,
+                    fixture.aiPreviewId,
+                ),
+            ).isEqualTo(1)
+
+            assertV59TypedConvergenceRejectsMismatches(upgradeJdbc, fixture)
+            insertV59NotificationConvergence(upgradeJdbc, fixture.notificationConvergenceId, fixture)
+            insertV59AiConvergence(upgradeJdbc, fixture.aiConvergenceId, fixture)
+            assertUniqueConstraintRejected("admin_service_convergence_notification_effect_uk") {
+                insertV59NotificationConvergence(upgradeJdbc, UUID.randomUUID().toString(), fixture)
+            }
+            assertUniqueConstraintRejected("admin_service_convergence_ai_effect_uk") {
+                insertV59AiConvergence(upgradeJdbc, UUID.randomUUID().toString(), fixture)
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update admin_service_command_convergence
+                    set lease_owner = null, lease_expires_at = '2026-08-24 02:04:00.000000'
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.notificationConvergenceId,
+                )
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update admin_service_command_convergence
+                    set lease_owner = 'worker-1', lease_expires_at = null
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.notificationConvergenceId,
+                )
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update admin_service_command_convergence
+                    set state = 'SUCCEEDED', available_at = null
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.notificationConvergenceId,
+                )
+            }
+            assertConstraintRejected {
+                insertV59ConvergenceEvent(
+                    upgradeJdbc,
+                    fixture.notificationConvergenceId,
+                    fixture.notificationReceiptId,
+                    null,
+                    "NOTIFICATION_REPLAY",
+                    fixture.notificationReceiptId,
+                    attemptNo = 1,
+                    eventSeq = 1,
+                    state = "SUCCEEDED",
+                )
+            }
+            insertV59ConvergenceEvent(
+                upgradeJdbc,
+                fixture.notificationConvergenceId,
+                fixture.notificationReceiptId,
+                null,
+                "NOTIFICATION_REPLAY",
+                fixture.notificationReceiptId,
+                attemptNo = 1,
+                eventSeq = 0,
+                state = "PENDING",
+            )
+            insertV59ConvergenceEvent(
+                upgradeJdbc,
+                fixture.notificationConvergenceId,
+                fixture.notificationReceiptId,
+                null,
+                "NOTIFICATION_REPLAY",
+                fixture.notificationReceiptId,
+                attemptNo = 1,
+                eventSeq = 1,
+                state = "PENDING",
+                safeErrorCode = "DELIVERIES_STILL_PENDING",
+            )
+            assertThat(
+                upgradeJdbc.update(
+                    """
+                    update admin_service_command_convergence
+                    set attempt_count = 1, next_attempt_no = 2,
+                        last_safe_error_code = 'DELIVERIES_STILL_PENDING',
+                        available_at = '2026-08-24 02:05:00.000000',
+                        updated_at = '2026-08-24 02:03:00.000000'
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.notificationConvergenceId,
+                ),
+            ).isEqualTo(1)
+            assertConstraintRejected {
+                insertV59ConvergenceEvent(
+                    upgradeJdbc,
+                    fixture.notificationConvergenceId,
+                    fixture.notificationReceiptId,
+                    null,
+                    "NOTIFICATION_REPLAY",
+                    fixture.aiJobId,
+                    attemptNo = 2,
+                    eventSeq = 0,
+                    state = "PENDING",
+                )
+            }
+
+            assertThat(
+                upgradeJdbc.update(
+                    """
+                    update admin_notification_replay_previews
+                    set consumed_at = '2026-08-24 02:02:00.000000', consumed_confirmation_id = ?
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.notificationReceiptId,
+                    fixture.notificationPreviewId,
+                ),
+            ).isEqualTo(1)
+            assertThat(
+                upgradeJdbc.update(
+                    "delete from admin_notification_replay_previews where id in (?, ?)",
+                    fixture.legacyNotificationPreviewId,
+                    fixture.notificationPreviewId,
+                ),
+            ).isEqualTo(2)
+            assertThat(
+                upgradeJdbc.update("delete from notification_deliveries where id = ?", fixture.notificationDeliveryId),
+            ).isEqualTo(1)
+            assertThat(
+                upgradeJdbc.update("delete from notification_event_outbox where id = ?", fixture.notificationEventId),
+            ).isEqualTo(1)
+            assertThat(
+                upgradeJdbc.update("delete from memberships where id = ?", fixture.membershipId),
+            ).isEqualTo(1)
+            assertThat(upgradeJdbc.update("delete from platform_audit_events where id = ?", fixture.auditId)).isEqualTo(1)
+            assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.actorId)).isEqualTo(1)
+            assertThat(upgradeJdbc.update("delete from clubs where id = ?", fixture.clubId)).isEqualTo(1)
+            assertEquals(
+                2,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from admin_notification_replay_confirmations where actor_user_id = ?",
+                    Int::class.java,
+                    fixture.actorId,
+                ),
+            )
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from admin_notification_replay_confirmation_targets where confirmation_id = ?",
+                    Int::class.java,
+                    fixture.notificationReceiptId,
+                ),
+            )
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from ai_generation_admin_command_receipts where club_id_snapshot = ?",
+                    Int::class.java,
+                    fixture.clubId,
                 ),
             )
         }
@@ -4404,6 +4753,254 @@ class MySqlFlywayMigrationTest(
     }
 
     @Suppress("LongMethod")
+    private fun assertV59PlatformAdminServiceCommandEvidenceSchema(jdbcTemplate: JdbcTemplate) {
+        val notificationReceiptTable = "admin_notification_replay_confirmations"
+        val notificationTargetTable = "admin_notification_replay_confirmation_targets"
+        val aiPreviewTable = "ai_generation_admin_command_previews"
+        val aiReceiptTable = "ai_generation_admin_command_receipts"
+        val convergenceTable = "admin_service_command_convergence"
+        val eventTable = "admin_service_command_convergence_events"
+
+        assertThat(columns(jdbcTemplate, aiPreviewTable)).containsExactlyInAnyOrder(
+            "id",
+            "action",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "actor_capabilities_json",
+            "job_id_snapshot",
+            "club_id_snapshot",
+            "job_status_snapshot",
+            "job_revision_snapshot",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "sanitized_impact_json",
+            "expires_at",
+            "consumed_at",
+            "consumed_receipt_id_snapshot",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, notificationTargetTable)).containsExactlyInAnyOrder(
+            "confirmation_id",
+            "delivery_id_snapshot",
+        )
+        assertThat(columns(jdbcTemplate, aiReceiptTable)).containsExactlyInAnyOrder(
+            "id",
+            "preview_id_snapshot",
+            "action",
+            "effect_type_snapshot",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "actor_capabilities_json",
+            "job_id_snapshot",
+            "club_id_snapshot",
+            "before_job_status_snapshot",
+            "before_job_revision_snapshot",
+            "after_job_status_snapshot",
+            "after_job_revision_snapshot",
+            "origin_outcome",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "safe_reason_code",
+            "safe_result_json",
+            "platform_audit_event_id_snapshot",
+            "origin_at",
+        )
+        assertThat(columns(jdbcTemplate, convergenceTable)).containsExactlyInAnyOrder(
+            "id",
+            "notification_receipt_id_snapshot",
+            "ai_receipt_id_snapshot",
+            "effect_type",
+            "effect_target_id_snapshot",
+            "state",
+            "attempt_count",
+            "next_attempt_no",
+            "lease_owner",
+            "lease_expires_at",
+            "last_safe_error_code",
+            "available_at",
+            "created_at",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, eventTable)).containsExactlyInAnyOrder(
+            "convergence_id",
+            "notification_receipt_id_snapshot",
+            "ai_receipt_id_snapshot",
+            "effect_type",
+            "effect_target_id_snapshot",
+            "attempt_no",
+            "event_seq",
+            "start_event_seq",
+            "state",
+            "safe_error_code",
+            "observed_at",
+        )
+
+        listOf(
+            notificationReceiptTable to "id",
+            notificationReceiptTable to "target_id_snapshot",
+            notificationTargetTable to "confirmation_id",
+            notificationTargetTable to "delivery_id_snapshot",
+            aiPreviewTable to "id",
+            aiPreviewTable to "job_id_snapshot",
+            aiReceiptTable to "id",
+            aiReceiptTable to "job_id_snapshot",
+            convergenceTable to "id",
+            convergenceTable to "notification_receipt_id_snapshot",
+            convergenceTable to "ai_receipt_id_snapshot",
+            convergenceTable to "effect_target_id_snapshot",
+            eventTable to "convergence_id",
+            eventTable to "notification_receipt_id_snapshot",
+            eventTable to "ai_receipt_id_snapshot",
+            eventTable to "effect_target_id_snapshot",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("char")
+            assertThat(metadata["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("36")
+            assertThat(metadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
+            assertThat(metadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
+        }
+        listOf(
+            notificationReceiptTable to "request_hmac",
+            aiPreviewTable to "request_hmac",
+            aiReceiptTable to "request_hmac",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("varbinary")
+            assertThat(metadata["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+        }
+
+        assertEquals(
+            "platform_audit_event_id",
+            indexColumns(jdbcTemplate, notificationReceiptTable, "admin_notification_confirmations_audit_uk"),
+        )
+        assertThat(
+            indexNonUnique(jdbcTemplate, notificationReceiptTable, "admin_notification_confirmations_audit_uk"),
+        ).isZero()
+        assertEquals(
+            "platform_audit_event_id_snapshot",
+            indexColumns(jdbcTemplate, aiReceiptTable, "ai_generation_admin_receipts_audit_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, aiReceiptTable, "ai_generation_admin_receipts_audit_uk")).isZero()
+        assertEquals(
+            "id,notification_receipt_id_snapshot,effect_type,effect_target_id_snapshot",
+            indexColumns(jdbcTemplate, convergenceTable, "admin_service_convergence_notification_identity_uk"),
+        )
+        assertEquals(
+            "id,ai_receipt_id_snapshot,effect_type,effect_target_id_snapshot",
+            indexColumns(jdbcTemplate, convergenceTable, "admin_service_convergence_ai_identity_uk"),
+        )
+        assertEquals(
+            "notification_receipt_id_snapshot,effect_type,effect_target_id_snapshot",
+            indexColumns(jdbcTemplate, convergenceTable, "admin_service_convergence_notification_effect_uk"),
+        )
+        assertEquals(
+            "ai_receipt_id_snapshot,effect_type,effect_target_id_snapshot",
+            indexColumns(jdbcTemplate, convergenceTable, "admin_service_convergence_ai_effect_uk"),
+        )
+        assertEquals(
+            "convergence_id,attempt_no,event_seq",
+            indexColumns(jdbcTemplate, eventTable, "PRIMARY"),
+        )
+
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_confirmations_identity_check"))
+            .contains("LEGACY_SELECTION_SHA", "HMAC", "selection_hash", "canonical_schema_version", "request_hmac")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_notification_confirmations_json_check"))
+            .contains("actor_capabilities_json", "skipped_reason_counts_json", "4096", "8192")
+        assertThat(checkConstraintClause(jdbcTemplate, "ai_generation_admin_previews_json_check"))
+            .contains("actor_capabilities_json", "sanitized_impact_json", "4096", "8192")
+        assertThat(checkConstraintClause(jdbcTemplate, "ai_generation_admin_receipts_json_check"))
+            .contains("actor_capabilities_json", "safe_result_json", "4096", "8192")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_service_convergence_parent_check"))
+            .contains("notification_receipt_id_snapshot", "ai_receipt_id_snapshot", "NOTIFICATION_REPLAY")
+            .contains("AI_JOB_CANCEL", "AI_COMMIT_RETRY", "effect_target_id_snapshot")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_service_convergence_attempt_check"))
+            .contains("PENDING", "attempt_count", "next_attempt_no", "> 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "admin_service_convergence_events_contract_check"))
+            .contains("event_seq", "PENDING", "SUCCEEDED", "FAILED", "safe_error_code")
+
+        assertThat(importedKeys(jdbcTemplate, notificationReceiptTable)).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, notificationTargetTable)).containsExactly(notificationReceiptTable)
+        assertEquals(
+            "confirmation_id",
+            foreignKeyColumns(
+                jdbcTemplate,
+                notificationTargetTable,
+                "admin_notification_confirmation_targets_receipt_fk",
+            ),
+        )
+        assertEquals(
+            "RESTRICT",
+            foreignKeyDeleteRule(
+                jdbcTemplate,
+                notificationTargetTable,
+                "admin_notification_confirmation_targets_receipt_fk",
+            ),
+        )
+        assertThat(importedKeys(jdbcTemplate, aiReceiptTable)).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, aiPreviewTable)).containsExactly(aiReceiptTable)
+        assertThat(importedKeys(jdbcTemplate, convergenceTable))
+            .containsExactlyInAnyOrder(notificationReceiptTable, aiReceiptTable)
+        assertThat(importedKeys(jdbcTemplate, eventTable))
+            .containsExactlyInAnyOrder(convergenceTable, convergenceTable, eventTable)
+        assertEquals(
+            "notification_receipt_id_snapshot",
+            foreignKeyColumns(jdbcTemplate, convergenceTable, "admin_service_convergence_notification_receipt_fk"),
+        )
+        assertEquals(
+            "ai_receipt_id_snapshot,effect_type,effect_target_id_snapshot",
+            foreignKeyColumns(jdbcTemplate, convergenceTable, "admin_service_convergence_ai_receipt_fk"),
+        )
+        listOf(
+            "admin_service_convergence_notification_receipt_fk",
+            "admin_service_convergence_ai_receipt_fk",
+        ).forEach { constraint ->
+            assertEquals("RESTRICT", foreignKeyDeleteRule(jdbcTemplate, convergenceTable, constraint))
+        }
+        assertEquals(
+            "convergence_id,attempt_no,start_event_seq",
+            foreignKeyColumns(jdbcTemplate, eventTable, "admin_service_convergence_events_start_fk"),
+        )
+        assertEquals(
+            "$eventTable:convergence_id,attempt_no,event_seq",
+            foreignKeyReference(jdbcTemplate, eventTable, "admin_service_convergence_events_start_fk"),
+        )
+
+        val forbiddenColumns =
+            arrayOf(
+                "prompt",
+                "prompt_text",
+                "completion",
+                "provider",
+                "provider_payload",
+                "email",
+                "email_body",
+                "token",
+                "url",
+                "reason_text",
+                "message",
+                "raw_error",
+                "error_message",
+                "request_json",
+                "canonical_payload",
+            )
+        listOf(
+            notificationReceiptTable,
+            notificationTargetTable,
+            aiPreviewTable,
+            aiReceiptTable,
+            convergenceTable,
+            eventTable,
+        ).forEach { table ->
+            assertThat(columns(jdbcTemplate, table)).doesNotContain(*forbiddenColumns)
+        }
+        assertThat(columns(jdbcTemplate, notificationReceiptTable)).doesNotContain("updated_at", "deleted_at")
+        assertThat(columns(jdbcTemplate, aiReceiptTable)).doesNotContain("updated_at", "deleted_at")
+        assertThat(columns(jdbcTemplate, eventTable)).doesNotContain("updated_at", "deleted_at")
+    }
+
+    @Suppress("LongMethod")
     private fun assertV58PlatformAdminClubCommandEvidenceSchema(jdbcTemplate: JdbcTemplate) {
         val previewTable = "platform_admin_club_command_previews"
         val receiptTable = "platform_admin_club_command_receipts"
@@ -4662,6 +5259,352 @@ class MySqlFlywayMigrationTest(
             )
         }
         assertThat(columns(jdbcTemplate, receiptTable)).doesNotContain("updated_at", "deleted_at")
+    }
+
+    private data class V59ServiceCommandFixture(
+        val clubId: String = "aaaaaaaa-0000-4000-8000-000000059001",
+        val actorId: String = "aaaaaaaa-0000-4000-8000-000000059002",
+        val auditId: String = "aaaaaaaa-0000-4000-8000-000000059003",
+        val legacyNotificationPreviewId: String = "aaaaaaaa-0000-4000-8000-000000059004",
+        val legacyNotificationReceiptId: String = "aaaaaaaa-0000-4000-8000-000000059005",
+        val notificationPreviewId: String = "aaaaaaaa-0000-4000-8000-000000059006",
+        val notificationReceiptId: String = "aaaaaaaa-0000-4000-8000-000000059007",
+        val notificationAuditId: String = "aaaaaaaa-0000-4000-8000-000000059008",
+        val notificationConvergenceId: String = "aaaaaaaa-0000-4000-8000-000000059009",
+        val notificationDeliveryId: String = "aaaaaaaa-0000-4000-8000-000000059016",
+        val notificationEventId: String = "aaaaaaaa-0000-4000-8000-000000059017",
+        val membershipId: String = "aaaaaaaa-0000-4000-8000-000000059018",
+        val aiPreviewId: String = "aaaaaaaa-0000-4000-8000-000000059010",
+        val mismatchedAiPreviewId: String = "aaaaaaaa-0000-4000-8000-000000059011",
+        val aiReceiptId: String = "aaaaaaaa-0000-4000-8000-000000059012",
+        val aiAuditId: String = "aaaaaaaa-0000-4000-8000-000000059013",
+        val aiJobId: String = "aaaaaaaa-0000-4000-8000-000000059014",
+        val aiConvergenceId: String = "aaaaaaaa-0000-4000-8000-000000059015",
+    )
+
+    private fun insertV59LegacyNotificationSources(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V59ServiceCommandFixture,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (?, 'v59-hard-delete-target', 'V59 target', 'V59 target', 'V59 target')
+            """.trimIndent(),
+            fixture.clubId,
+        )
+        insertProfileUser(
+            jdbcTemplate,
+            fixture.actorId,
+            "v59-actor" + "@" + "example" + "." + "test",
+            "V59 Actor",
+            "V59Actor",
+        )
+        insertMembership(
+            jdbcTemplate,
+            fixture.membershipId,
+            fixture.clubId,
+            fixture.actorId,
+            "V59Member",
+            "MEMBER",
+        )
+        jdbcTemplate.update(
+            """
+            insert into notification_event_outbox (
+              id, club_id, event_type, aggregate_type, aggregate_id, payload_json,
+              kafka_key, dedupe_key
+            ) values (?, ?, 'SESSION_REMINDER_DUE', 'SESSION', ?, json_object('eventId', ?), ?, ?)
+            """.trimIndent(),
+            fixture.notificationEventId,
+            fixture.clubId,
+            fixture.notificationEventId,
+            fixture.notificationEventId,
+            fixture.clubId,
+            "v59-event-${fixture.notificationEventId}",
+        )
+        jdbcTemplate.update(
+            """
+            insert into notification_deliveries (
+              id, event_id, club_id, recipient_membership_id, channel, status,
+              dedupe_key, attempt_count, last_error
+            ) values (?, ?, ?, ?, 'EMAIL', 'FAILED', ?, 1, 'MAIL_RETRYABLE')
+            """.trimIndent(),
+            fixture.notificationDeliveryId,
+            fixture.notificationEventId,
+            fixture.clubId,
+            fixture.membershipId,
+            "v59-delivery-${fixture.notificationDeliveryId}",
+        )
+        jdbcTemplate.update(
+            """
+            insert into platform_audit_events (
+              id, actor_user_id, actor_platform_role, event_type, metadata_json, created_at
+            ) values (?, ?, 'OWNER', 'ADMIN_NOTIFICATION_REPLAY_CONFIRMED', json_object(),
+                      '2026-08-24 02:01:00.000000')
+            """.trimIndent(),
+            fixture.auditId,
+            fixture.actorId,
+        )
+        insertV2ReplayPreview(
+            jdbcTemplate,
+            fixture.legacyNotificationPreviewId,
+            fixture.actorId,
+            fixture.clubId,
+            "OWNER",
+        )
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_confirmations (
+              id, preview_id, actor_user_id, actor_platform_role, club_id, selection_hash,
+              replayed_count, skipped_count, platform_audit_event_id, confirmed_at
+            ) values (?, ?, ?, 'OWNER', ?, ?, 1, 0, ?, '2026-08-24 02:01:00.000000')
+            """.trimIndent(),
+            fixture.legacyNotificationReceiptId,
+            fixture.legacyNotificationPreviewId,
+            fixture.actorId,
+            fixture.clubId,
+            "a".repeat(64),
+            fixture.auditId,
+        )
+    }
+
+    private fun insertV59NotificationPreview(
+        jdbcTemplate: JdbcTemplate,
+        previewId: String,
+        fixture: V59ServiceCommandFixture,
+    ) {
+        insertV2ReplayPreview(jdbcTemplate, previewId, fixture.actorId, fixture.clubId, "OWNER")
+    }
+
+    private fun insertV59NotificationReceipt(
+        jdbcTemplate: JdbcTemplate,
+        receiptId: String,
+        previewId: String,
+        fixture: V59ServiceCommandFixture,
+        legacySelectionSha: String? = null,
+        digestKeyVersion: Int? = 1,
+        requestHmac: ByteArray? = ByteArray(32) { 0x61 },
+        auditId: String = fixture.notificationAuditId,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_confirmations (
+              id, preview_id, actor_user_id, actor_platform_role, actor_capabilities_json, club_id,
+              command_type, target_kind, target_id_snapshot, selection_hash, identity_mode,
+              canonical_schema_version, digest_key_version, request_hmac,
+              replayed_count, skipped_count, skipped_reason_counts_json, origin_outcome,
+              platform_audit_event_id, confirmed_at
+            ) values (?, ?, ?, 'OWNER', json_array('REPLAY_NOTIFICATIONS'), ?,
+                      'notification.replay', 'NOTIFICATION_REPLAY_TARGET_SET', ?, ?, 'HMAC',
+                      'notification-replay:v1', ?, ?, 1, 0, json_object(), 'SUCCEEDED', ?,
+                      '2026-08-24 02:01:00.000000')
+            """.trimIndent(),
+            receiptId,
+            previewId,
+            fixture.actorId,
+            fixture.clubId,
+            receiptId,
+            legacySelectionSha,
+            digestKeyVersion,
+            requestHmac,
+            auditId,
+        )
+    }
+
+    private fun insertV59NotificationReceiptTarget(
+        jdbcTemplate: JdbcTemplate,
+        receiptId: String,
+        deliveryId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_notification_replay_confirmation_targets (
+              confirmation_id, delivery_id_snapshot
+            ) values (?, ?)
+            """.trimIndent(),
+            receiptId,
+            deliveryId,
+        )
+    }
+
+    private fun insertV59AiPreview(
+        jdbcTemplate: JdbcTemplate,
+        previewId: String,
+        fixture: V59ServiceCommandFixture,
+        requestHmac: ByteArray = ByteArray(32) { 0x62 },
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into ai_generation_admin_command_previews (
+              id, action, actor_user_id_snapshot, actor_platform_role_snapshot,
+              actor_capabilities_json, job_id_snapshot, club_id_snapshot,
+              job_status_snapshot, job_revision_snapshot, canonical_schema_version,
+              digest_key_version, request_hmac, sanitized_impact_json,
+              expires_at, consumed_at, consumed_receipt_id_snapshot, created_at
+            ) values (?, 'FORCE_CANCEL', ?, 'OWNER', json_array('MANAGE_AI_OPERATIONS'), ?, ?,
+                      'RUNNING', 7, 'ai-force-cancel:v1', 1, ?,
+                      json_object('impactCodes', json_array('JOB_CANCEL_REQUESTED')),
+                      '2026-08-24 02:10:00.000000', null, null, '2026-08-24 02:00:00.000000')
+            """.trimIndent(),
+            previewId,
+            fixture.actorId,
+            fixture.aiJobId,
+            fixture.clubId,
+            requestHmac,
+        )
+    }
+
+    private fun insertV59AiReceipt(
+        jdbcTemplate: JdbcTemplate,
+        receiptId: String,
+        previewId: String,
+        fixture: V59ServiceCommandFixture,
+        safeReasonCode: String? = null,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into ai_generation_admin_command_receipts (
+              id, preview_id_snapshot, action, actor_user_id_snapshot, actor_platform_role_snapshot,
+              actor_capabilities_json, job_id_snapshot, club_id_snapshot,
+              before_job_status_snapshot, before_job_revision_snapshot,
+              after_job_status_snapshot, after_job_revision_snapshot, origin_outcome,
+              canonical_schema_version, digest_key_version, request_hmac, safe_reason_code,
+              safe_result_json, platform_audit_event_id_snapshot, origin_at
+            ) values (?, ?, 'FORCE_CANCEL', ?, 'OWNER', json_array('MANAGE_AI_OPERATIONS'), ?, ?,
+                      'RUNNING', 7, 'RUNNING', 7, 'ACCEPTED', 'ai-force-cancel:v1', 1, ?, ?,
+                      json_object('resultCode', 'AI_CANCEL_ACCEPTED'), ?,
+                      '2026-08-24 02:01:00.000000')
+            """.trimIndent(),
+            receiptId,
+            previewId,
+            fixture.actorId,
+            fixture.aiJobId,
+            fixture.clubId,
+            ByteArray(32) { 0x63 },
+            safeReasonCode,
+            fixture.aiAuditId,
+        )
+    }
+
+    private fun insertV59NotificationConvergence(
+        jdbcTemplate: JdbcTemplate,
+        convergenceId: String,
+        fixture: V59ServiceCommandFixture,
+    ) {
+        insertV59Convergence(
+            jdbcTemplate,
+            convergenceId,
+            fixture.notificationReceiptId,
+            null,
+            "NOTIFICATION_REPLAY",
+            fixture.notificationReceiptId,
+        )
+    }
+
+    private fun insertV59AiConvergence(
+        jdbcTemplate: JdbcTemplate,
+        convergenceId: String,
+        fixture: V59ServiceCommandFixture,
+    ) {
+        insertV59Convergence(
+            jdbcTemplate,
+            convergenceId,
+            null,
+            fixture.aiReceiptId,
+            "AI_JOB_CANCEL",
+            fixture.aiJobId,
+        )
+    }
+
+    private fun insertV59Convergence(
+        jdbcTemplate: JdbcTemplate,
+        convergenceId: String,
+        notificationReceiptId: String?,
+        aiReceiptId: String?,
+        effectType: String,
+        effectTargetId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_service_command_convergence (
+              id, notification_receipt_id_snapshot, ai_receipt_id_snapshot,
+              effect_type, effect_target_id_snapshot, state, attempt_count, next_attempt_no,
+              lease_owner, lease_expires_at, last_safe_error_code, available_at, created_at, updated_at
+            ) values (?, ?, ?, ?, ?, 'PENDING', 0, 1, null, null, null,
+                      '2026-08-24 02:01:00.000000', '2026-08-24 02:01:00.000000',
+                      '2026-08-24 02:01:00.000000')
+            """.trimIndent(),
+            convergenceId,
+            notificationReceiptId,
+            aiReceiptId,
+            effectType,
+            effectTargetId,
+        )
+    }
+
+    private fun assertV59TypedConvergenceRejectsMismatches(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V59ServiceCommandFixture,
+    ) {
+        listOf(
+            arrayOf(null, null, "NOTIFICATION_REPLAY", fixture.notificationReceiptId),
+            arrayOf(
+                fixture.notificationReceiptId,
+                fixture.aiReceiptId,
+                "NOTIFICATION_REPLAY",
+                fixture.notificationReceiptId,
+            ),
+            arrayOf(fixture.notificationReceiptId, null, "AI_JOB_CANCEL", fixture.notificationReceiptId),
+            arrayOf(fixture.notificationReceiptId, null, "NOTIFICATION_REPLAY", fixture.aiJobId),
+            arrayOf(null, fixture.aiReceiptId, "AI_COMMIT_RETRY", fixture.aiJobId),
+            arrayOf(null, fixture.aiReceiptId, "AI_JOB_CANCEL", fixture.notificationReceiptId),
+            arrayOf(UUID.randomUUID().toString(), null, "NOTIFICATION_REPLAY", UUID.randomUUID().toString()),
+        ).forEach { values ->
+            assertConstraintRejected {
+                insertV59Convergence(
+                    jdbcTemplate,
+                    UUID.randomUUID().toString(),
+                    values[0],
+                    values[1],
+                    values[2] ?: error("effect type"),
+                    values[3] ?: error("effect target"),
+                )
+            }
+        }
+    }
+
+    private fun insertV59ConvergenceEvent(
+        jdbcTemplate: JdbcTemplate,
+        convergenceId: String,
+        notificationReceiptId: String?,
+        aiReceiptId: String?,
+        effectType: String,
+        effectTargetId: String,
+        attemptNo: Int,
+        eventSeq: Int,
+        state: String,
+        safeErrorCode: String? = null,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into admin_service_command_convergence_events (
+              convergence_id, notification_receipt_id_snapshot, ai_receipt_id_snapshot,
+              effect_type, effect_target_id_snapshot, attempt_no, event_seq,
+              state, safe_error_code, observed_at
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?,
+                      timestampadd(second, ?, timestamp('2026-08-24 02:01:00.000000')))
+            """.trimIndent(),
+            convergenceId,
+            notificationReceiptId,
+            aiReceiptId,
+            effectType,
+            effectTargetId,
+            attemptNo,
+            eventSeq,
+            state,
+            safeErrorCode,
+            attemptNo + eventSeq,
+        )
     }
 
     private fun insertV58ClubCommandPreview(
