@@ -123,6 +123,7 @@ class AuthMeControllerTest(
                 jsonPath("$.authenticated") { value(true) }
                 jsonPath("$.currentMembership.clubSlug") { value("sample-book-club") }
                 jsonPath("$.joinedClubs.length()") { value(2) }
+                jsonPath("$.joinedClubs[0].approvalState") { value("ACTIVE") }
                 jsonPath("$.membershipId") { value(sampleMembershipId) }
                 jsonPath("$.clubId") { value("00000000-0000-0000-0000-000000000002") }
                 jsonPath("$.displayName") { value("샘플멤버5") }

@@ -20,7 +20,7 @@ class SessionApplicationErrorHandlerTest {
         assertThat(response.body).isEqualTo(
             ApiErrorResponse(
                 code = "SESSION_NOT_FOUND",
-                message = "요청한 세션을 찾을 수 없습니다.",
+                message = "요청한 모임을 찾을 수 없습니다.",
                 status = 404,
             ),
         )
@@ -34,7 +34,7 @@ class SessionApplicationErrorHandlerTest {
         assertThat(response.body).isEqualTo(
             ApiErrorResponse(
                 code = "INVALID_REQUEST",
-                message = "세션 요청 값을 확인해 주세요.",
+                message = "모임 요청 값을 확인해 주세요.",
                 status = 400,
             ),
         )
@@ -56,7 +56,7 @@ class SessionApplicationErrorHandlerTest {
         assertThat(response.body).isEqualTo(
             ApiErrorResponse(
                 code = "SESSION_DELETE_BLOCKED",
-                message = "적용 기록 또는 알림 이력이 있는 세션은 삭제할 수 없습니다.",
+                message = "적용 기록 또는 알림 이력이 있는 모임은 삭제할 수 없습니다.",
                 status = 409,
                 blockers =
                     listOf(
@@ -74,7 +74,7 @@ class SessionApplicationErrorHandlerTest {
             assertThat(response.body).isEqualTo(
                 ApiErrorResponse(
                     code = "SESSION_DELETION_NOT_ALLOWED",
-                    message = "초안 또는 진행 중인 세션만 삭제할 수 있습니다.",
+                    message = "작성 중이거나 멤버와 준비 중인 모임만 삭제할 수 있습니다.",
                     status = 409,
                 ),
             )
@@ -90,7 +90,7 @@ class SessionApplicationErrorHandlerTest {
         assertThat(response.body).isEqualTo(
             ApiErrorResponse(
                 code = "CONFLICT",
-                message = "요청한 작업이 현재 세션 상태와 충돌합니다.",
+                message = "요청한 작업이 현재 모임 상태와 충돌합니다.",
                 status = 409,
             ),
         )
@@ -119,7 +119,7 @@ class SessionApplicationErrorHandlerTest {
         val response = SessionApplicationErrorHandler().handleReopenNotAllowed()
         assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
         assertThat(response.body?.code).isEqualTo("SESSION_REOPEN_NOT_ALLOWED")
-        assertThat(response.body?.message).isEqualTo("마감된 세션만 다시 열 수 있습니다.")
+        assertThat(response.body?.message).isEqualTo("기록 정리 중인 모임만 다시 열 수 있습니다.")
         assertThat(response.body?.openSessionId).isNull()
     }
 
@@ -128,7 +128,7 @@ class SessionApplicationErrorHandlerTest {
         val response = SessionApplicationErrorHandler().handleUnpublishNotAllowed()
         assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
         assertThat(response.body?.code).isEqualTo("SESSION_UNPUBLISH_NOT_ALLOWED")
-        assertThat(response.body?.message).isEqualTo("공개된 세션만 공개를 취소할 수 있습니다.")
+        assertThat(response.body?.message).isEqualTo("게스트·멤버 노트에 게시된 모임만 게시를 취소할 수 있습니다.")
         assertThat(response.body?.openSessionId).isNull()
     }
 
@@ -137,7 +137,7 @@ class SessionApplicationErrorHandlerTest {
         val response = SessionApplicationErrorHandler().handleReturnToDraftNotAllowed()
         assertThat(response.statusCode).isEqualTo(HttpStatus.CONFLICT)
         assertThat(response.body?.code).isEqualTo("SESSION_RETURN_TO_DRAFT_NOT_ALLOWED")
-        assertThat(response.body?.message).isEqualTo("진행 중인 세션만 예정으로 되돌릴 수 있습니다.")
+        assertThat(response.body?.message).isEqualTo("멤버와 준비 중인 모임만 작성 중으로 되돌릴 수 있습니다.")
         assertThat(response.body?.openSessionId).isNull()
     }
 

@@ -275,7 +275,7 @@ describe("HostNotificationComposer", () => {
 
     const confirmed = screen.getByRole("radio", { name: "참석 확정자" });
     expect(confirmed).toBeChecked();
-    expect(screen.getByText("이 회차 참석을 확정한 멤버")).toBeInTheDocument();
+    expect(screen.getByText("이 모임 참석을 확정한 멤버")).toBeInTheDocument();
     expect(screen.getByText("추천")).toBeInTheDocument();
   });
 

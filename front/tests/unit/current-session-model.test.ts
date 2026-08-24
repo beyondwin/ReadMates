@@ -131,7 +131,7 @@ describe("current session view model", () => {
 
   it("selects viewer and suspended notices without changing existing Korean copy", () => {
     expect(getBlockedWriteValidationMessage({ isViewer: true })).toBe(
-      "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.",
+      "둘러보기 멤버입니다. 정식 멤버가 되면 참석 응답과 질문 작성 기능이 열립니다.",
     );
     expect(getBlockedWriteValidationMessage({ isViewer: false })).toBe("");
     expect(getCurrentSessionMemberNotice({ isViewer: false, isSuspended: true })).toEqual({
@@ -159,7 +159,7 @@ describe("current session view model", () => {
     expect(getCurrentSessionFeedbackAccessState({ isViewer: true, isSuspended: false })).toEqual({
       className: "rm-locked-state",
       title: "정식 멤버에게 열립니다",
-      body: "둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다.",
+      body: "둘러보기 멤버는 현재 모임 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다.",
       canOpenArchive: false,
     });
     expect(getCurrentSessionFeedbackAccessState({ isViewer: false, isSuspended: true })).toEqual({
@@ -170,8 +170,8 @@ describe("current session view model", () => {
     });
     expect(getCurrentSessionFeedbackAccessState({ isViewer: false, isSuspended: false })).toEqual({
       className: "surface-quiet",
-      title: "참석한 세션의 피드백 문서를 보존합니다",
-      body: "이번 세션 피드백은 모임 이후 호스트가 업로드하면 참석자 기준으로 열립니다.",
+      title: "참석한 모임의 피드백 문서를 보존합니다",
+      body: "이번 모임 피드백은 모임 이후 호스트가 업로드하면 참석자 기준으로 열립니다.",
       canOpenArchive: true,
     });
   });

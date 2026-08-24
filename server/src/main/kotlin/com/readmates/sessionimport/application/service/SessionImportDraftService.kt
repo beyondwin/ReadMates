@@ -65,6 +65,9 @@ class SessionImportDraftService(
             sessionId = draft.sessionId.toString(),
             draftRevision = draft.draftRevision,
             baseLiveRevision = draft.baseLiveRevision,
+            baseSessionRevision = draft.baseSessionRevision,
+            baseExposureRevision = draft.baseExposureRevision,
+            basePublicationRevision = draft.basePublicationRevision,
         )
     }
 }

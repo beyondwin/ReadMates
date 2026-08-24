@@ -5,11 +5,15 @@ import {
   READMATES_MOBILE_TAB_LABELS,
   READMATES_PRIMARY_NAV_LABELS,
 } from "./readmates-copy";
+import { hasHostRecordsReturnState } from "@/shared/routing/readmates-route-state";
+import { HOST_ROUTE_HREFS } from "@/shared/routing/host-route-destinations";
+import type { PrimaryNavigationItem } from "@/shared/model/app-club-shell";
 
 export type MobileTabBarVariant = "member" | "host";
 
 type AppLinkProps = {
   to: string;
+  replace?: boolean;
   state?: unknown;
   className?: string;
   children: ReactNode;
@@ -25,6 +29,8 @@ type MobileTabBarProps = {
   onRetryCurrentSession?: () => void;
   appBasePath?: string;
   LinkComponent?: AppLinkComponent;
+  items?: ReadonlyArray<PrimaryNavigationItem>;
+  navLabel?: string;
 };
 
 export type TabIconName =
@@ -44,6 +50,7 @@ type TabLink = {
   key: string;
   href: string | null;
   label: string;
+  replace?: boolean;
   pendingLabel?: string;
   pendingAriaLabel?: string;
   retry?: {
@@ -51,11 +58,11 @@ type TabLink = {
     pending: boolean;
   };
   icon: TabIconName;
-  state?: { readmatesWorkspace: "host" | "member" };
   current: (pathname: string) => boolean;
 };
 
-function DefaultLink({ to, state: _state, children, ...props }: AppLinkProps) {
+function DefaultLink({ to, replace: _replace, state: _state, children, ...props }: AppLinkProps) {
+  void _replace;
   void _state;
 
   return (
@@ -122,64 +129,42 @@ function hostTabs({
   currentSessionStatus: "ready" | "loading" | "error" | "retrying";
   onRetryCurrentSession?: () => void;
 }): TabLink[] {
-  const editHref =
-    currentSessionStatus !== "ready"
-      ? null
-      : currentSessionId
-          ? `/app/host/sessions/${currentSessionId}`
-          : "/app/host/sessions/new";
-  const retry =
-    onRetryCurrentSession && (currentSessionStatus === "error" || currentSessionStatus === "retrying")
-      ? {
-          onRetry: onRetryCurrentSession,
-          pending: currentSessionStatus === "retrying",
-        }
-      : undefined;
+  void currentSessionId;
+  void currentSessionStatus;
+  void onRetryCurrentSession;
 
   return [
     {
       key: "host",
-      href: "/app/host",
+      href: HOST_ROUTE_HREFS.today,
       label: READMATES_MOBILE_TAB_LABELS.hostToday,
       icon: "host",
       current: (pathname) => pathname === "/app/host" || pathname === "/app/host/notifications",
     },
     {
       key: "host-edit",
-      href: editHref,
+      href: HOST_ROUTE_HREFS.meetings,
       label: READMATES_MOBILE_TAB_LABELS.hostSession,
-      pendingLabel:
-        currentSessionStatus === "error"
-          ? "다시 확인"
-          : currentSessionStatus === "ready"
-            ? undefined
-            : READMATES_MOBILE_TAB_LABELS.hostSessionPending,
-      pendingAriaLabel:
-        currentSessionStatus === "error"
-          ? "세션 다시 확인"
-          : currentSessionStatus === "retrying"
-            ? "세션 다시 확인 중"
-            : "세션 불러오는 중",
-      retry,
       icon: "edit",
       current: (pathname) =>
-        pathname === "/app/host/sessions/new"
+        pathname === "/app/host/sessions"
+        || pathname === "/app/host/sessions/new"
         || /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(pathname),
     },
     {
       key: "host-members",
-      href: "/app/host/members",
+      href: HOST_ROUTE_HREFS.members,
       label: READMATES_MOBILE_TAB_LABELS.hostMembers,
       icon: "approve",
       current: (pathname) => pathname === "/app/host/members" || pathname === "/app/host/invitations",
     },
     {
       key: "host-records",
-      href: "/app/host/sessions",
+      href: HOST_ROUTE_HREFS.records,
       label: READMATES_MOBILE_TAB_LABELS.hostRecords,
       icon: "archive",
       current: (pathname) =>
-        pathname === "/app/host/sessions" ||
+        pathname === "/app/host/records" ||
         /^\/app\/host\/sessions\/[^/]+\/(?:closing|feedback-document)$/.test(pathname),
     },
   ];
@@ -277,34 +262,24 @@ export function TabIcon({ name }: { name: TabIconName }) {
   }
 }
 
-export function MobileTabBar({
+function MobileTabBarFrame({
   variant,
-  currentSessionId,
-  currentSessionStatus,
-  onRetryCurrentSession,
-  appBasePath = "",
-  LinkComponent = DefaultLink,
-}: MobileTabBarProps) {
-  const pathname = useLocation().pathname;
-  const appPath = appPathname(pathname);
-  const resolvedCurrentSessionStatus =
-    currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
-  const tabs = scopedTabs(
-    variant === "host"
-      ? hostTabs({
-          currentSessionId,
-          currentSessionStatus: resolvedCurrentSessionStatus,
-          onRetryCurrentSession,
-        })
-      : memberTabs,
-    appBasePath,
-  );
-
+  tabs,
+  appPath,
+  navLabel,
+  LinkComponent,
+}: {
+  variant: MobileTabBarVariant;
+  tabs: ReadonlyArray<TabLink>;
+  appPath: string;
+  navLabel: string;
+  LinkComponent: AppLinkComponent;
+}) {
   return (
     <nav
       className="m-tabbar"
       data-variant={variant}
-      aria-label="앱 탭"
+      aria-label={navLabel}
       style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}
     >
       {tabs.map((tab) =>
@@ -312,7 +287,7 @@ export function MobileTabBar({
           <LinkComponent
             key={tab.key}
             to={tab.href}
-            state={tab.state}
+            replace={tab.replace}
             className="m-tab"
             aria-current={tab.current(appPath) ? "page" : undefined}
           >
@@ -351,5 +326,93 @@ export function MobileTabBar({
         ),
       )}
     </nav>
+  );
+}
+
+function RouteAwareMobileTabBar({
+  variant,
+  currentSessionId,
+  currentSessionStatus,
+  onRetryCurrentSession,
+  appBasePath,
+  LinkComponent,
+  navLabel,
+}: Omit<MobileTabBarProps, "items"> & {
+  appBasePath: string;
+  LinkComponent: AppLinkComponent;
+  navLabel: string;
+}) {
+  const location = useLocation();
+  const pathname = location.pathname;
+  const rawAppPath = appPathname(pathname);
+  const appPath = variant === "host"
+    && /^\/app\/host\/sessions\/[^/]+(?:\/edit)?$/.test(rawAppPath)
+    && hasHostRecordsReturnState(location.state, pathname)
+    ? "/app/host/records"
+    : rawAppPath;
+  const resolvedCurrentSessionStatus =
+    currentSessionStatus ?? (currentSessionId === undefined ? "loading" : "ready");
+  const tabs = scopedTabs(
+    variant === "host"
+      ? hostTabs({
+          currentSessionId,
+          currentSessionStatus: resolvedCurrentSessionStatus,
+          onRetryCurrentSession,
+        })
+      : memberTabs,
+    appBasePath,
+  );
+
+  return (
+    <MobileTabBarFrame
+      variant={variant}
+      tabs={tabs}
+      appPath={appPath}
+      navLabel={navLabel}
+      LinkComponent={LinkComponent}
+    />
+  );
+}
+
+export function MobileTabBar({
+  variant,
+  currentSessionId,
+  currentSessionStatus,
+  onRetryCurrentSession,
+  appBasePath = "",
+  LinkComponent = DefaultLink,
+  items,
+  navLabel = "앱 탭",
+}: MobileTabBarProps) {
+  if (items) {
+    const tabs: TabLink[] = items.map((item) => ({
+      key: item.id,
+      href: item.href,
+      label: item.label,
+      icon: item.icon,
+      replace: item.navigation === "replace",
+      current: () => item.current,
+    }));
+    return (
+      <MobileTabBarFrame
+        variant={variant}
+        tabs={tabs}
+        appPath=""
+        navLabel={navLabel}
+        LinkComponent={LinkComponent}
+      />
+    );
+  }
+
+  return (
+    <RouteAwareMobileTabBar
+      variant={variant}
+      currentSessionId={currentSessionId}
+      currentSessionStatus={currentSessionStatus}
+      onRetryCurrentSession={onRetryCurrentSession}
+      appBasePath={appBasePath}
+      LinkComponent={LinkComponent}
+      navLabel={navLabel}
+    />
   );
 }

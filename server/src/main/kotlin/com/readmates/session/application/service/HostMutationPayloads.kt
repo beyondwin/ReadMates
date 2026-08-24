@@ -76,12 +76,16 @@ internal object HostMutationPayloads {
     fun exposure(command: UpdateHostSessionVisibilityCommand): CanonicalMutationPayload.Exposure =
         CanonicalMutationPayload.Exposure(
             accessScope = command.accessScope?.name ?: command.visibility.name,
+            expectedExposureRevision = command.expectedExposureRevision,
         )
 
     fun publication(command: UpsertPublicationCommand): CanonicalMutationPayload.Publication =
         CanonicalMutationPayload.Publication(
             publicSummary = command.publicSummary,
-            siteVisibility = command.siteVisibility?.name ?: "HIDDEN",
+            siteVisibility = command.siteVisibility?.name,
             accessScope = command.accessScope?.name,
+            visibility = command.visibility.name,
+            expectedPublicationRevision = command.expectedPublicationRevision,
+            expectedExposureRevision = command.expectedExposureRevision,
         )
 }

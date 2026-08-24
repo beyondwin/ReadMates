@@ -130,6 +130,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     };
     saveAigenDraft({
       version: 2,
+      clubSlug: "club-a",
       jobId: PRESEEDED_JOB_ID,
       revision: 0,
       serverSnapshot: serverSnapshot(),
@@ -156,7 +157,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
       </Wrapper>,
     );
 
-    await screen.findByText("AI로 세션 기록 생성");
+    await screen.findByText("AI로 모임 기록 생성");
 
     const file = new File(["t"], "transcript.txt", { type: "text/plain" });
     await act(async () => {
@@ -186,6 +187,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     const newerDraft = { ...newerServer, summary: "새 revision 사용자 편집" };
     saveAigenDraft({
       version: 2,
+      clubSlug: "club-a",
       jobId: PRESEEDED_JOB_ID,
       revision: 4,
       serverSnapshot: newerServer,
@@ -211,7 +213,7 @@ describe("AiGenerateTab draft restoration (PREVIEW state machine)", () => {
     });
 
     const { client, Wrapper } = createWrapper();
-    client.setQueryData(aiJobKeys.detail("s1", PRESEEDED_JOB_ID), {
+    client.setQueryData(aiJobKeys.detail("s1", PRESEEDED_JOB_ID, { clubSlug: "club-a" }), {
       ...jobResponse(),
       revision: 3,
       groundingStatus: "VALID",

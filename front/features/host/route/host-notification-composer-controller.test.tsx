@@ -26,6 +26,7 @@ import {
   type HostNotificationComposerRequest,
 } from "./host-notification-composer-controller";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
+import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 
 const contentRevision = "b".repeat(64);
 const request: HostNotificationComposerRequest = {
@@ -193,10 +194,13 @@ describe("HostNotificationComposerController", () => {
     );
 
     await userEvent.click(await screen.findByRole("button", { name: "알림 미리보기" }));
-    expect(previewManualNotification).toHaveBeenCalledWith(expect.objectContaining({
-      sessionId: "session-1",
-      contentRevision,
-    }));
+    expect(previewManualNotification).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessionId: "session-1",
+        contentRevision,
+      }),
+      { clubSlug: "reading-sai" },
+    );
   });
 
   it("never retargets a mutation request to a newer options revision", async () => {
@@ -271,6 +275,24 @@ describe("HostNotificationComposerController", () => {
 
     await userEvent.click(screen.getByRole("radio", { name: "앱 알림" }));
     expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+  });
+
+  it("synchronously clears the mounted draft and preview for the revoked club only", async () => {
+    renderController();
+
+    await userEvent.click(await screen.findByRole("radio", { name: "직접 선택" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: /첫 멤버/ }));
+    await userEvent.click(screen.getByRole("button", { name: "알림 미리보기" }));
+    expect(await screen.findByRole("region", { name: "발송 전 확인" })).toBeInTheDocument();
+
+    await hostSensitiveStorage.clearClub("other-club");
+    expect(screen.getByRole("region", { name: "발송 전 확인" })).toBeInTheDocument();
+
+    await hostSensitiveStorage.clearClub("reading-sai");
+    await waitFor(() => {
+      expect(screen.queryByRole("region", { name: "발송 전 확인" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "추천 대상 · 참석 확정자" })).toBeChecked();
+    });
   });
 
   it("keeps the centered composer preview structure and confirmation copy", async () => {

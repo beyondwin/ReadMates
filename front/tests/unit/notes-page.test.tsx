@@ -84,13 +84,13 @@ const olderFeedItems: NoteFeedItem[] = [
   {
     sessionId: "session-older",
     sessionNumber: 2,
-    bookTitle: "오래된 세션",
+    bookTitle: "오래된 모임",
     date: "2025-12-17",
     authorName: "이멤버5",
     authorShortName: "수",
     avatarKey: "cloud-green-book",
     kind: "QUESTION",
-    text: "첫 페이지 밖 세션의 기록입니다.",
+    text: "첫 페이지 밖 모임의 기록입니다.",
   },
 ];
 
@@ -327,7 +327,7 @@ describe("NotesPage", () => {
       selectedSession: {
         sessionId: "session-older",
         sessionNumber: 2,
-        bookTitle: "오래된 세션",
+        bookTitle: "오래된 모임",
         date: "2025-12-17",
         questionCount: 1,
         oneLinerCount: 0,

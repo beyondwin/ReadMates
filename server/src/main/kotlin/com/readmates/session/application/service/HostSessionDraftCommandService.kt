@@ -77,12 +77,17 @@ class HostSessionDraftCommandService(
             idempotencyKey = command.idempotencyKey,
             payload = HostMutationPayloads.sessionFields(HostMutationOperation.SESSION_BASIC_SAVE, command.session),
             mutate = {
-                HostMutationOutcome(command.sessionId, updateOnce(command))
+                val updated = updateOnce(command)
+                HostMutationOutcome(
+                    resourceId = command.sessionId,
+                    result = updated.detail,
+                    publicProjectionEffect = updated.publicProjectionEffect,
+                )
             },
             replay = { _, projection ->
                 projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException()
             },
-        ) ?: updateOnce(command)
+        ) ?: updateOnce(command).detail
 
     private fun createOnce(command: HostSessionCommand): CreatedSessionResponse {
         val created = draftPort.create(command)
@@ -93,7 +98,8 @@ class HostSessionDraftCommandService(
 
     private fun updateOnce(command: UpdateHostSessionCommand) =
         auditPort.loadBasicSnapshot(command.host, command.sessionId).let { before ->
-            val detail = draftPort.update(command)
+            val update = draftPort.update(command)
+            val detail = update.detail
             val after = auditPort.loadBasicSnapshot(command.host, command.sessionId)
             val changedFields = changedBasicFields(before, after)
             val receipt =
@@ -110,7 +116,7 @@ class HostSessionDraftCommandService(
                 }
             epochPort.bump(command.host.clubId, HostListEpochKind.MEETING, HostListEpochKind.RECORD)
             cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
-            detail.copy(changeReceipt = receipt)
+            update.copy(detail = detail.copy(changeReceipt = receipt))
         }
 }
 

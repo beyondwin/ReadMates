@@ -33,6 +33,181 @@
   flex: 0 0 auto;
 }
 
+.topnav-global-context {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.topnav-global-context > .row {
+  flex: 0 0 auto;
+}
+
+.rm-club-shell-context {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rm-context-selector {
+  position: relative;
+  min-width: 0;
+}
+
+.rm-context-selector__trigger {
+  min-width: 0;
+  min-height: 44px;
+  padding: 5px 9px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--r-2);
+  color: var(--text-2);
+  background: transparent;
+  cursor: pointer;
+  list-style: none;
+  transition:
+    background var(--motion-fast) var(--ease-standard-refined),
+    border-color var(--motion-fast) var(--ease-standard-refined),
+    color var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-context-selector__trigger::-webkit-details-marker {
+  display: none;
+}
+
+.rm-context-selector__trigger:hover,
+.rm-context-selector__trigger:focus-visible,
+.rm-context-selector[open] > .rm-context-selector__trigger {
+  border-color: var(--line);
+  color: var(--text);
+  background: var(--bg-sub);
+}
+
+.rm-context-selector__trigger:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rm-context-selector__kind {
+  flex: 0 0 auto;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-4);
+}
+
+.rm-context-selector__trigger strong {
+  min-width: 0;
+  max-width: 144px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.rm-context-selector__chevron {
+  flex: 0 0 auto;
+  color: var(--text-4);
+  transition: transform var(--motion-fast) var(--ease-standard-refined);
+}
+
+.rm-context-selector[open] .rm-context-selector__chevron {
+  transform: rotate(180deg);
+}
+
+.rm-context-selector__menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  left: 0;
+  z-index: 55;
+  width: max-content;
+  min-width: max(100%, 176px);
+  max-width: min(320px, calc(100vw - 28px));
+  padding: 6px;
+  display: grid;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-3);
+  background: var(--bg-raised);
+  box-shadow: 0 18px 50px -28px oklch(0 0 0 / 0.42);
+}
+
+.rm-context-selector__item,
+.rm-context-selector__item.rm-workspace-switch {
+  width: auto;
+  min-width: 0;
+  min-height: 44px;
+  height: auto;
+  padding: 9px 11px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  border: 0;
+  border-radius: var(--r-2);
+  color: var(--text-2);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  text-align: left;
+}
+
+.rm-context-selector__item:hover,
+.rm-context-selector__item:focus-visible {
+  color: var(--text);
+  background: var(--bg-sub);
+}
+
+.rm-context-selector__item:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: -2px;
+}
+
+.rm-context-selector__item[aria-current] {
+  color: var(--text);
+  background: color-mix(in oklch, var(--accent-soft), var(--bg) 48%);
+}
+
+@media (min-width: 768px) and (max-width: 1000px) {
+  .topnav-inner {
+    gap: 8px;
+  }
+
+  .topnav-global-context {
+    gap: 6px;
+  }
+
+  .topnav-global-context > .row > span {
+    display: none;
+  }
+
+  .rm-context-selector__kind {
+    display: none;
+  }
+
+  .rm-context-selector__trigger {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+
+  .rm-context-selector__trigger strong {
+    max-width: 88px;
+  }
+
+  .nav-links {
+    gap: 0;
+  }
+
+  .nav-link {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+}
+
 .rm-account-menu {
   position: relative;
   flex: 0 0 auto;
@@ -3397,7 +3572,7 @@ a.rm-recent-record__destination:hover {
   overflow: auto;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .rm-meeting-ledger__stage--after {
     display: flex;
     flex-direction: column;
@@ -3522,7 +3697,7 @@ a.rm-recent-record__destination:hover {
   border-top: 1px solid var(--line-soft);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .rm-upcoming-book-list__row {
     align-items: flex-start;
   }
@@ -3754,7 +3929,7 @@ a.rm-recent-record__destination:hover {
   max-width: 100%;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .rm-host-session-workspace__layout {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -5059,7 +5234,7 @@ a.rm-recent-record__destination:hover {
   padding-bottom: 72px;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .rm-host-closing-board__primary {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -6152,13 +6327,13 @@ a.rm-recent-record__destination:hover {
   line-height: 1.55;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   html {
-    scroll-padding-top: calc(var(--m-hdr-h) + 12px);
+    scroll-padding-top: calc(var(--m-hdr-h) + var(--rm-mobile-context-h) + var(--m-safe-top) + 12px);
   }
 
   [id] {
-    scroll-margin-top: calc(var(--m-hdr-h) + 12px);
+    scroll-margin-top: calc(var(--m-hdr-h) + var(--rm-mobile-context-h) + var(--m-safe-top) + 12px);
   }
 
   .desktop-only {
@@ -6188,7 +6363,7 @@ a.rm-recent-record__destination:hover {
   }
 
   .app-content {
-    min-height: calc(100vh - var(--m-hdr-h));
+    min-height: calc(100vh - var(--m-hdr-h) - var(--rm-mobile-context-h) - var(--m-safe-top));
     padding-bottom: calc(var(--m-nav-h) + 40px + var(--m-safe-bottom));
   }
 
@@ -6975,7 +7150,7 @@ a.rm-recent-record__destination:hover {
   overflow: auto;
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .aigen-review-workspace {
     display: block;
   }
@@ -9066,7 +9241,7 @@ a.rm-recent-record__destination:hover {
   color: var(--text-3);
 }
 
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .rm-my-records-page {
     width: auto;
     margin: 0 var(--m-page-x);
@@ -9516,7 +9691,7 @@ a.rm-recent-record__destination:hover {
 }
 
 /* The reading desk changes composition, not content, at the mobile breakpoint. */
-@media (max-width: 768px) {
+@media (max-width: 767px) {
   .rm-my-shelf,
   .rm-member-space {
     width: auto;

@@ -7,6 +7,7 @@ import { hostNotificationKeys } from "./host-notification-queries";
 
 vi.mock("@/features/host/api/host-api", () => ({
   closeHostSession: vi.fn(),
+  correctionPublishHostSession: vi.fn(),
   commitHostSessionImport: vi.fn(),
   createHostSession: vi.fn(),
   deleteHostSession: vi.fn(),
@@ -16,26 +17,37 @@ vi.mock("@/features/host/api/host-api", () => ({
   returnHostSessionToDraft: vi.fn(),
   saveHostSessionAttendance: vi.fn(),
   saveHostSessionPublication: vi.fn(),
+  saveHostSessionAccessScope: vi.fn(),
   saveHostSessionVisibility: vi.fn(),
   unpublishHostSession: vi.fn(),
   updateHostSession: vi.fn(),
   fetchHostSessionScheduleDefaults: vi.fn(),
+  fetchHostSessionDetail: vi.fn(),
+  fetchHostSessionClosingStatus: vi.fn(),
   fetchHostSessionTrash: vi.fn(),
   fetchHostSessionTrashList: vi.fn(),
+  fetchHostMutationReconciliation: vi.fn(),
   restoreHostSession: vi.fn(),
 }));
 
 import {
   closeHostSession,
+  correctionPublishHostSession,
   commitHostSessionImport,
   createHostSession,
   deleteHostSession,
+  fetchHostMutationReconciliation,
+  fetchHostSessionDetail,
+  fetchHostSessionClosingStatus,
+  fetchHostSessionTrash,
   openHostSession,
   publishHostSession,
   reopenHostSession,
   returnHostSessionToDraft,
+  restoreHostSession,
   saveHostSessionAttendance,
   saveHostSessionPublication,
+  saveHostSessionAccessScope,
   saveHostSessionVisibility,
   unpublishHostSession,
   updateHostSession,
@@ -43,6 +55,7 @@ import {
 import {
   hostSessionKeys,
   useCloseHostSessionMutation,
+  useCorrectionPublishHostSessionMutation,
   useCommitHostSessionImportMutation,
   useCreateHostSessionMutation,
   useDeleteHostSessionMutation,
@@ -50,12 +63,17 @@ import {
   usePublishHostSessionMutation,
   useReopenHostSessionMutation,
   useReturnHostSessionToDraftMutation,
+  useRestoreHostSessionMutation,
   useSaveHostSessionPublicationMutation,
+  useSaveHostSessionAccessScopeMutation,
   useSaveHostSessionVisibilityMutation,
   useUnpublishHostSessionMutation,
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
+  executeHostMutationWithReconciliation,
 } from "./host-session-queries";
+import { hostSessionRecordKeys } from "./host-session-record-queries";
+import { ReadmatesTransportError } from "@/shared/api/errors";
 
 function createWrapper() {
   const client = new QueryClient({
@@ -73,6 +91,30 @@ function createWrapper() {
 const context = { clubSlug: "reading-sai" };
 type CacheEntry = readonly [readonly unknown[], unknown];
 
+function authoritativeDetail() {
+  return {
+    ...visibilityResult().session,
+    versions: {
+      sessionRevision: 3,
+      exposureRevision: 2,
+      participantSetRevision: 4,
+      recordDraftRevision: 5,
+      liveRecordRevision: 2,
+      publicationRevision: 1,
+    },
+    attendanceSnapshotId: "attendance-snapshot-4",
+    attendees: [{
+      membershipId: "member-1",
+      avatarKey: "banana-green-book",
+      displayName: "멤버",
+      accountName: "member",
+      rsvpStatus: "GOING" as const,
+      attendanceStatus: "UNKNOWN" as const,
+      attendanceRevision: 6,
+    }],
+  };
+}
+
 function surfaceKeys() {
   return {
     detail: hostSessionKeys.detail("session-7", context),
@@ -81,20 +123,42 @@ function surfaceKeys() {
     dashboard: hostSessionKeys.dashboard(context),
     current: hostSessionKeys.current(context),
     manualDispatches: hostSessionKeys.manualDispatches({ sessionId: "session-7" }, context),
+    recordLedger: hostSessionRecordKeys.ledger({ page: { limit: 50 } }, context),
+    recordAttention: hostSessionRecordKeys.attentionPages(context),
+    recordEditor: hostSessionRecordKeys.editor("session-7", context),
+    recordHistory: hostSessionRecordKeys.history("session-7", { limit: 20 }, context),
     otherClubDetail: hostSessionKeys.detail("session-7", { clubSlug: "other-club" }),
+    otherClubRecordLedger: hostSessionRecordKeys.ledger(
+      { page: { limit: 50 } },
+      { clubSlug: "other-club" },
+    ),
   };
 }
 
 function seedSurfaces(client: QueryClient) {
   const keys = surfaceKeys();
   const entries = {
-    detail: [keys.detail, { surface: "detail", sessionId: "session-7" }],
-    closingStatus: [keys.closingStatus, { surface: "closing-status", state: "OPEN" }],
+    detail: [keys.detail, authoritativeDetail()],
+    closingStatus: [keys.closingStatus, {
+      session: {
+        sessionRevision: 3,
+        participantSetRevision: 4,
+        attendanceSnapshotId: "attendance-snapshot-4",
+      },
+    }],
     list: [keys.list, { surface: "list", items: ["session-7"] }],
     dashboard: [keys.dashboard, { surface: "dashboard", sessions: ["session-7"] }],
     current: [keys.current, { surface: "current", sessionId: "session-7" }],
     manualDispatches: [keys.manualDispatches, { surface: "manual-dispatches", items: ["dispatch-1"] }],
+    recordLedger: [keys.recordLedger, { surface: "record-ledger", items: ["session-7"] }],
+    recordAttention: [keys.recordAttention, { surface: "record-attention", pages: ["session-7"] }],
+    recordEditor: [keys.recordEditor, { surface: "record-editor", sessionId: "session-7" }],
+    recordHistory: [keys.recordHistory, { surface: "record-history", sessionId: "session-7" }],
     otherClubDetail: [keys.otherClubDetail, { surface: "detail", sessionId: "other-club-session-7" }],
+    otherClubRecordLedger: [
+      keys.otherClubRecordLedger,
+      { surface: "record-ledger", items: ["other-club-session-7"] },
+    ],
   } as const satisfies Record<string, CacheEntry>;
   for (const [key, value] of Object.values(entries)) {
     client.setQueryData(key, value);
@@ -125,7 +189,7 @@ function expectFresh(client: QueryClient, entries: readonly CacheEntry[]) {
 }
 
 const sessionRequest: HostSessionRequest = {
-  title: "8회차 모임",
+  title: "No.8 모임",
   bookTitle: "다음 책",
   bookAuthor: "테스트 저자",
   date: "2026-06-20",
@@ -140,13 +204,13 @@ const importRequest: SessionImportRequest = {
     meetingDate: "2026-05-20",
   },
   publication: {
-    summary: "세션 요약",
+    summary: "모임 요약",
   },
   highlights: [],
   oneLineReviews: [],
   feedbackDocument: {
     fileName: "session-7.md",
-    markdown: "# 세션 기록",
+    markdown: "# 모임 기록",
   },
   recordVisibility: "MEMBER",
 };
@@ -170,6 +234,15 @@ function visibilityResult() {
       meetingPasscode: null,
       publication: null,
       state: "OPEN" as const,
+      versions: {
+        sessionRevision: 3,
+        exposureRevision: 2,
+        participantSetRevision: 4,
+        recordDraftRevision: null,
+        liveRecordRevision: 2,
+        publicationRevision: 1,
+      },
+      attendanceSnapshotId: "attendance-snapshot-4",
       attendees: [],
       feedbackDocument: {
         uploaded: false,
@@ -192,14 +265,35 @@ beforeEach(() => {
   vi.mocked(deleteHostSession).mockReset();
   vi.mocked(openHostSession).mockReset();
   vi.mocked(closeHostSession).mockReset();
+  vi.mocked(correctionPublishHostSession).mockReset();
   vi.mocked(publishHostSession).mockReset();
   vi.mocked(reopenHostSession).mockReset();
   vi.mocked(unpublishHostSession).mockReset();
   vi.mocked(returnHostSessionToDraft).mockReset();
+  vi.mocked(restoreHostSession).mockReset();
   vi.mocked(saveHostSessionVisibility).mockReset();
+  vi.mocked(saveHostSessionAccessScope).mockReset();
   vi.mocked(saveHostSessionPublication).mockReset();
   vi.mocked(saveHostSessionAttendance).mockReset();
   vi.mocked(commitHostSessionImport).mockReset();
+  vi.mocked(fetchHostSessionDetail).mockReset().mockResolvedValue(authoritativeDetail());
+  vi.mocked(fetchHostSessionClosingStatus).mockReset().mockResolvedValue({
+    session: {
+      sessionRevision: 3,
+      participantSetRevision: 4,
+      attendanceSnapshotId: "attendance-snapshot-4",
+    },
+  } as never);
+  vi.mocked(fetchHostSessionTrash).mockReset().mockResolvedValue({
+    sessionId: "session-7",
+    sessionNumber: 7,
+    title: "함께 읽기",
+    state: "DRAFT",
+    deletedAt: "2026-08-21T10:00:00Z",
+    purgeAfter: "2026-08-28T10:00:00Z",
+    sessionRevision: 4,
+  });
+  vi.mocked(fetchHostMutationReconciliation).mockReset();
 });
 
 afterEach(() => {
@@ -207,6 +301,179 @@ afterEach(() => {
 });
 
 describe("host session mutation hooks", () => {
+  it("reconciles correction publication with its exact operation, resource, key, and envelope", async () => {
+    vi.mocked(correctionPublishHostSession)
+      .mockRejectedValueOnce(new ReadmatesTransportError())
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }) as never);
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "NOT_EXECUTED",
+      receipt: null,
+      current: null,
+      attendanceVersions: [],
+      attendanceSnapshotId: null,
+    });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCorrectionPublishHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    const firstEnvelope = vi.mocked(correctionPublishHostSession).mock.calls[0]?.[1];
+    expect(firstEnvelope).toEqual({
+      idempotencyKey: expect.any(String),
+      expected: {
+        sessionRevision: 3,
+        recordDraftRevision: 5,
+        liveRecordRevision: 2,
+        exposureRevision: 2,
+        publicationRevision: 1,
+      },
+      command: {},
+    });
+    expect(vi.mocked(correctionPublishHostSession).mock.calls[1]?.[1]).toBe(firstEnvelope);
+    expect(fetchHostMutationReconciliation).toHaveBeenCalledWith(
+      "SESSION_CORRECTION_PUBLISH",
+      "session-7",
+      firstEnvelope?.idempotencyKey,
+      context,
+    );
+  });
+
+  it("refetches authoritative detail after a committed correction publication response loss", async () => {
+    vi.mocked(correctionPublishHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "COMMITTED",
+      receipt: {
+        resourceId: "session-7",
+        projection: { attendanceSnapshotId: "att:" },
+      } as never,
+      current: null,
+      attendanceVersions: null,
+      attendanceSnapshotId: "att:",
+    });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCorrectionPublishHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    expect(correctionPublishHostSession).toHaveBeenCalledTimes(1);
+    expect(fetchHostSessionDetail).toHaveBeenCalledTimes(2);
+    expect(fetchHostSessionDetail).toHaveBeenLastCalledWith("session-7", context);
+  });
+
+  it("refetches authoritative detail after COMMITTED response loss instead of trusting receipt projection", async () => {
+    vi.mocked(openHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "COMMITTED",
+      receipt: {
+        resourceId: "session-7",
+        projection: {
+          attendanceSnapshotId: "att:",
+          attendees: [{ membershipId: "stale-receipt-row" }],
+        },
+      } as never,
+      current: null,
+      attendanceVersions: null,
+      attendanceSnapshotId: "att:",
+    });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useOpenHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    expect(openHostSession).toHaveBeenCalledTimes(1);
+    expect(fetchHostMutationReconciliation).toHaveBeenCalledTimes(1);
+    expect(fetchHostSessionDetail).toHaveBeenCalledTimes(2);
+    expect(fetchHostSessionDetail).toHaveBeenLastCalledWith("session-7", context);
+  });
+
+  it("reuses the exact idempotency envelope only after authoritative NOT_EXECUTED", async () => {
+    const envelope = {
+      idempotencyKey: "b6-response-loss-0001",
+      expected: { sessionRevision: 3 },
+      command: {},
+    };
+    const execute = vi.fn()
+      .mockRejectedValueOnce(new ReadmatesTransportError())
+      .mockResolvedValueOnce("retried");
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValue({
+      status: "NOT_EXECUTED",
+      receipt: null,
+      current: null,
+      attendanceVersions: [],
+      attendanceSnapshotId: null,
+    });
+    const states: string[] = [];
+
+    await expect(executeHostMutationWithReconciliation({
+      operation: "SESSION_OPEN",
+      resourceSlot: "session-7",
+      envelope,
+      context,
+      execute,
+      acceptCommitted: () => "committed",
+      onStateChange: (state) => states.push(state),
+    })).resolves.toBe("retried");
+
+    expect(execute).toHaveBeenNthCalledWith(1, envelope);
+    expect(execute).toHaveBeenNthCalledWith(2, envelope);
+    expect(fetchHostMutationReconciliation).toHaveBeenCalledWith(
+      "SESSION_OPEN",
+      "session-7",
+      "b6-response-loss-0001",
+      context,
+    );
+    expect(states).toEqual(["checking", "idle"]);
+  });
+
+  it("never retries a committed or pending response-loss result", async () => {
+    const envelope = {
+      idempotencyKey: "b6-response-loss-0002",
+      expected: { sessionRevision: 3 },
+      command: {},
+    };
+    const execute = vi.fn().mockRejectedValue(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "COMMITTED",
+      receipt: {} as never,
+      current: null,
+      attendanceVersions: [],
+      attendanceSnapshotId: null,
+    });
+
+    await expect(executeHostMutationWithReconciliation({
+      operation: "SESSION_OPEN",
+      resourceSlot: "session-7",
+      envelope,
+      context,
+      execute,
+      acceptCommitted: () => "committed",
+    })).resolves.toBe("committed");
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "PENDING",
+      receipt: null,
+      current: null,
+      attendanceVersions: null,
+      attendanceSnapshotId: null,
+    });
+    await expect(executeHostMutationWithReconciliation({
+      operation: "SESSION_OPEN",
+      resourceSlot: "session-7",
+      envelope,
+      context,
+      execute,
+      acceptCommitted: () => "committed",
+    })).rejects.toMatchObject({ code: "HOST_MUTATION_PENDING" });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it("invalidates lists and dashboard after a successful create response", async () => {
     vi.mocked(createHostSession).mockResolvedValue(new Response(JSON.stringify({ sessionId: "session-8" }), { status: 201 }) as never);
     const { client, Wrapper } = createWrapper();
@@ -218,14 +485,23 @@ describe("host session mutation hooks", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(createHostSession).toHaveBeenCalledWith(sessionRequest);
+    expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: {},
+      command: sessionRequest,
+    }), context);
     expectInvalidated(client, [entries.list, entries.dashboard]);
     expectFresh(client, [
       entries.detail,
       entries.closingStatus,
       entries.current,
       entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
       entries.otherClubDetail,
+      entries.otherClubRecordLedger,
     ]);
   });
 
@@ -254,15 +530,27 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request: sessionRequest });
     });
 
-    expect(updateHostSession).toHaveBeenCalledWith("session-7", sessionRequest);
+    expect(updateHostSession).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { sessionRevision: 3 },
+      command: sessionRequest,
+    }), context);
     expectInvalidated(client, [
       entries.detail,
       entries.closingStatus,
       entries.list,
       entries.dashboard,
       entries.current,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
     ]);
-    expectFresh(client, [entries.manualDispatches, entries.otherClubDetail]);
+    expectFresh(client, [
+      entries.manualDispatches,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it("does not remove detail or invalidate when delete fails", async () => {
@@ -283,11 +571,12 @@ describe("host session mutation hooks", () => {
     vi.mocked(deleteHostSession).mockResolvedValue({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "DRAFT",
       trashed: true,
       deletedAt: "2026-08-21T10:00:00Z",
       purgeAfter: "2026-08-28T10:00:00Z",
+      sessionRevision: 4,
       counts: {
         participants: 0,
         rsvpResponses: 0,
@@ -309,7 +598,11 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync("session-7");
     });
 
-    expect(deleteHostSession).toHaveBeenCalledWith("session-7", context);
+    expect(deleteHostSession).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { sessionRevision: 3 },
+      command: {},
+    }), context);
     expect(client.getQueryData(keys.detail)).toBeUndefined();
     expect(client.getQueryState(keys.detail)).toBeUndefined();
     expectInvalidated(client, [
@@ -317,8 +610,26 @@ describe("host session mutation hooks", () => {
       entries.dashboard,
       entries.current,
       entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
     ]);
-    expectFresh(client, [entries.closingStatus, entries.otherClubDetail]);
+    expect(client.getQueryState(keys.recordEditor)).toBeUndefined();
+    expect(client.getQueryState(keys.recordHistory)).toBeUndefined();
+    expectFresh(client, [entries.closingStatus, entries.otherClubDetail, entries.otherClubRecordLedger]);
+  });
+
+  it("invalidates same-club record membership and record detail caches after trash restore", async () => {
+    vi.mocked(restoreHostSession).mockResolvedValue(visibilityResult().session as never);
+    const { client, Wrapper } = createWrapper();
+    const { entries } = seedSurfaces(client);
+    const { result } = renderHook(() => useRestoreHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    expectInvalidated(client, [entries.recordLedger, entries.recordAttention, entries.recordEditor, entries.recordHistory]);
+    expectFresh(client, [entries.otherClubDetail, entries.otherClubRecordLedger]);
   });
 
   it.each([
@@ -335,20 +646,35 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync("session-7");
     });
 
-    expect(apiFn).toHaveBeenCalledWith("session-7");
+    expect(apiFn).toHaveBeenCalledWith(
+      "session-7",
+      expect.objectContaining({
+        idempotencyKey: expect.any(String),
+        expected: expect.any(Object),
+        command: {},
+      }),
+      context,
+    );
     expectInvalidated(client, [
       entries.detail,
       entries.closingStatus,
       entries.list,
       entries.dashboard,
       entries.current,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
     ]);
     if (expectsManualDispatches) {
       expectInvalidated(client, [entries.manualDispatches]);
     } else {
       expectFresh(client, [entries.manualDispatches]);
     }
-    expectFresh(client, [entries.otherClubDetail]);
+    expectFresh(client, [
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it.each([
@@ -366,7 +692,11 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request });
     });
 
-    expect(apiFn).toHaveBeenCalledWith("session-7", request);
+    expect(apiFn).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { sessionRevision: 3 },
+      command: request,
+    }), context);
     expectInvalidated(client, [
       entries.detail,
       entries.closingStatus,
@@ -374,8 +704,15 @@ describe("host session mutation hooks", () => {
       entries.dashboard,
       entries.current,
       entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
     ]);
-    expectFresh(client, [entries.otherClubDetail]);
+    expectFresh(client, [
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it("returns the visibility composer result and caches the updated session", async () => {
@@ -406,13 +743,15 @@ describe("host session mutation hooks", () => {
     );
     expect(client.getQueryData(detailKey)).toEqual(visibilityResult().session);
     expect(client.getQueryData(manualOptionsKey)).toBeUndefined();
-    expectInvalidated(client, [entries.list, entries.dashboard]);
+    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention, entries.recordEditor]);
     expectFresh(client, [
       [keys.detail, visibilityResult().session],
       entries.closingStatus,
       entries.current,
       entries.manualDispatches,
+      entries.recordHistory,
       entries.otherClubDetail,
+      entries.otherClubRecordLedger,
     ]);
   });
 
@@ -429,17 +768,50 @@ describe("host session mutation hooks", () => {
       });
     });
 
-    expectInvalidated(client, [entries.detail, entries.list, entries.dashboard, entries.manualDispatches]);
-    expectFresh(client, [entries.closingStatus, entries.current, entries.otherClubDetail]);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.list,
+      entries.dashboard,
+      entries.manualDispatches,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+    ]);
+    expectFresh(client, [
+      entries.closingStatus,
+      entries.current,
+      entries.recordHistory,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
-  it("invalidates detail and current session after attendance update", async () => {
+  it("invalidates exact-club record projections after access-scope save", async () => {
+    vi.mocked(saveHostSessionAccessScope).mockResolvedValue(visibilityResult() as never);
+    const { client, Wrapper } = createWrapper();
+    const { entries } = seedSurfaces(client);
+    const { result } = renderHook(() => useSaveHostSessionAccessScopeMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "session-7", request: { accessScope: "GUEST_READABLE" } });
+    });
+
+    expectInvalidated(client, [entries.list, entries.dashboard, entries.recordLedger, entries.recordAttention, entries.recordEditor]);
+    expectFresh(client, [entries.recordHistory, entries.otherClubDetail, entries.otherClubRecordLedger]);
+  });
+
+  it("invalidates exact-club record audit projections after attendance update", async () => {
     vi.mocked(saveHostSessionAttendance).mockResolvedValue({
       sessionId: "session-7",
       count: 1,
     } as never);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
+    const otherClubAttention = [
+      hostSessionRecordKeys.attentionPages({ clubSlug: "other-club" }),
+      { surface: "other-record-attention", pages: ["other-session-7"] },
+    ] as const satisfies CacheEntry;
+    client.setQueryData(...otherClubAttention);
     const { result } = renderHook(() => useUpdateHostSessionAttendanceMutation(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -449,16 +821,31 @@ describe("host session mutation hooks", () => {
       });
     });
 
-    expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", [
-      { membershipId: "member-1", attendanceStatus: "ATTENDED" },
-    ], context);
-    expectInvalidated(client, [entries.detail, entries.current]);
+    expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { rows: [{ membershipId: "member-1", attendanceRevision: 6 }] },
+      command: { entries: [{
+        membershipId: "member-1",
+        attendanceStatus: "ATTENDED",
+        expectedAttendanceRevision: 6,
+      }] },
+    }), context);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.current,
+      entries.recordHistory,
+      entries.recordLedger,
+      entries.recordAttention,
+    ]);
     expectFresh(client, [
       entries.closingStatus,
       entries.list,
       entries.dashboard,
       entries.manualDispatches,
+      entries.recordEditor,
       entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+      otherClubAttention,
     ]);
   });
 
@@ -478,8 +865,22 @@ describe("host session mutation hooks", () => {
     });
 
     expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest);
-    expectInvalidated(client, [entries.detail, entries.list, entries.dashboard, entries.current]);
-    expectFresh(client, [entries.closingStatus, entries.manualDispatches, entries.otherClubDetail]);
+    expectInvalidated(client, [
+      entries.detail,
+      entries.list,
+      entries.dashboard,
+      entries.current,
+      entries.recordLedger,
+      entries.recordAttention,
+      entries.recordEditor,
+      entries.recordHistory,
+    ]);
+    expectFresh(client, [
+      entries.closingStatus,
+      entries.manualDispatches,
+      entries.otherClubDetail,
+      entries.otherClubRecordLedger,
+    ]);
   });
 
   it("leaves every seeded cache unchanged when visibility save rejects", async () => {

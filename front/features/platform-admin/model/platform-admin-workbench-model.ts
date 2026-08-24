@@ -508,7 +508,7 @@ function closingRiskStateLabel(state: string): string {
 
 function closingRiskBlockerLabel(blocker: string | null): string {
   if (blocker === "FEEDBACK_DOCUMENT_INVALID") return "피드백 문서 다시 확인";
-  if (blocker === "SESSION_CLOSE_REQUIRED") return "세션 종료 필요";
+  if (blocker === "SESSION_CLOSE_REQUIRED") return "모임 종료 필요";
   if (blocker === "RECORD_PACKAGE_REQUIRED") return "기록 패키지 필요";
   if (blocker === "FEEDBACK_DOCUMENT_REQUIRED") return "피드백 문서 필요";
   if (blocker === "MEMBER_NOTIFICATION_REQUIRED") return "멤버 알림 확인";

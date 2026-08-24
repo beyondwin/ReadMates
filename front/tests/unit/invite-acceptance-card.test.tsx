@@ -56,7 +56,7 @@ describe("InviteAcceptanceRouteContent", () => {
     expect(screen.getByText("만료 2026.05.20")).toBeInTheDocument();
     expect(screen.getByText("초대 대상 Gmail 계정과 이름을 확인한 뒤 같은 Google 계정으로 수락해 주세요.")).toBeInTheDocument();
     expect(
-      screen.getByText("Google 인증이 끝나면 정식 멤버로 연결되고 현재 세션, RSVP, 질문과 서평 작성 권한이 열립니다."),
+      screen.getByText("Google 인증이 끝나면 정식 멤버로 연결되고 현재 모임, 참석 응답, 질문과 서평 작성 권한이 열립니다."),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Google로 초대 수락" })).toHaveAttribute(
       "href",

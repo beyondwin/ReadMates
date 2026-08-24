@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 import {
   AiGenerationApiError,
   cancelGeneration,
@@ -21,13 +22,27 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
+const context = { clubSlug: "reading-sai" } as const;
+
 function captureFetch(response: Response) {
-  const fetchMock = vi.fn().mockResolvedValue(response);
+  const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+    url.includes("/__internal/client-contract-status")
+      ? new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v2", "v3"],
+        }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
+      : response.clone(),
+  ));
   vi.stubGlobal("fetch", fetchMock);
   return fetchMock;
 }
 
+function apiCall(fetchMock: ReturnType<typeof vi.fn>) {
+  return fetchMock.mock.calls.find(([url]) => !String(url).includes("/__internal/client-contract-status"))!;
+}
+
 afterEach(() => {
+  __resetHostClientContractCapabilityForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -52,13 +67,13 @@ describe("startGeneration", () => {
       transcript,
       model: "claude-sonnet-4-6",
       instructions: "be brief",
-    });
+    }, context);
 
     expect(result.jobId).toBe("11111111-1111-1111-1111-111111111111");
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs");
+    const [url, init] = apiCall(fetchMock) as [string, RequestInit];
+    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs?clubSlug=reading-sai");
     expect(init.method).toBe("POST");
 
     const headers = init.headers as Headers;
@@ -87,9 +102,9 @@ describe("startGeneration", () => {
 
     await startGeneration("sid-9", {
       transcript: new File(["t"], "t.txt", { type: "text/plain" }),
-    });
+    }, context);
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = apiCall(fetchMock) as [string, RequestInit];
     const form = init.body as FormData;
     const bodyText = await (form.get("body") as Blob).text();
     const parsed = JSON.parse(bodyText) as Record<string, unknown>;
@@ -105,10 +120,10 @@ describe("startGeneration", () => {
 
     await startGeneration("sid with space", {
       transcript: new File(["t"], "t.txt", { type: "text/plain" }),
-    });
+    }, context);
 
-    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/bff/api/host/sessions/sid%20with%20space/ai-generate/jobs");
+    const [url] = apiCall(fetchMock) as [string, RequestInit];
+    expect(url).toBe("/api/bff/api/host/sessions/sid%20with%20space/ai-generate/jobs?clubSlug=reading-sai");
   });
 });
 
@@ -122,12 +137,12 @@ describe("getAvailableModels", () => {
       }),
     );
 
-    await expect(getAvailableModels("sid /1")).resolves.toMatchObject({
+    await expect(getAvailableModels("sid /1", context)).resolves.toMatchObject({
       models: [{ id: "claude-sonnet-4-6", isDefault: true }],
     });
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "/api/bff/api/host/sessions/sid%20%2F1/ai-generate/models",
+    expect(apiCall(fetchMock)?.[0]).toBe(
+      "/api/bff/api/host/sessions/sid%20%2F1/ai-generate/models?clubSlug=reading-sai",
     );
   });
 });
@@ -152,7 +167,7 @@ describe("AI-specific problem details", () => {
       transcript: new File(["화자 하나 00:00\n안녕하세요"], "transcript.txt", {
         type: "text/plain",
       }),
-    }).catch((caught: unknown) => caught);
+    }, context).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(AiGenerationApiError);
     expect(error).toMatchObject({
@@ -168,7 +183,7 @@ describe("AI-specific problem details", () => {
   it("does not trust non-JSON upstream failures", async () => {
     captureFetch(new Response("provider secret shaped failure", { status: 502 }));
 
-    const error = await getJob("sid-1", "job-1").catch((caught: unknown) => caught);
+    const error = await getJob("sid-1", "job-1", context).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(AiGenerationApiError);
     expect(error).toMatchObject({
@@ -197,7 +212,7 @@ describe("getJob", () => {
       }),
     );
 
-    await expect(getJob("sid-1", "job-1")).rejects.toThrow();
+    await expect(getJob("sid-1", "job-1", context)).rejects.toThrow();
   });
 
   it("GETs /api/host/sessions/{sid}/ai-generate/jobs/{jobId}", async () => {
@@ -216,13 +231,13 @@ describe("getJob", () => {
       }),
     );
 
-    const result = await getJob("sid-1", "job-1");
+    const result = await getJob("sid-1", "job-1", context);
     expect(result.status).toBe("RUNNING");
     expect(result.progressPct).toBe(42);
     expect(result.tokens?.cachedInput).toBe(0);
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
-    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1");
+    const [url, init] = apiCall(fetchMock) as [string, RequestInit | undefined];
+    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1?clubSlug=reading-sai");
     expect(init?.method ?? "GET").toBe("GET");
   });
 
@@ -257,7 +272,7 @@ describe("getJob", () => {
       }),
     );
 
-    await expect(getJob("sid-1", "job-1")).resolves.toMatchObject({
+    await expect(getJob("sid-1", "job-1", context)).resolves.toMatchObject({
       result: null,
       evidence: null,
       sectionReviewStatuses: null,
@@ -295,7 +310,7 @@ describe("getJob", () => {
       }),
     );
 
-    await expect(getJob("sid-1", "job-1")).resolves.toMatchObject({
+    await expect(getJob("sid-1", "job-1", context)).resolves.toMatchObject({
       revision: 2,
       result: { summary: "검증된 결과" },
       evidence: [],
@@ -331,7 +346,7 @@ describe("getJob", () => {
       sectionReviewStatuses: null,
     }));
 
-    await expect(getJob("sid-1", "legacy-job")).resolves.toMatchObject({
+    await expect(getJob("sid-1", "legacy-job", context)).resolves.toMatchObject({
       result: { summary: "레거시 결과" },
     });
   });
@@ -341,10 +356,10 @@ describe("getRecentJob", () => {
   it("GETs the recent session AI job and normalizes 204 to null", async () => {
     const fetchMock = captureFetch(new Response(null, { status: 204 }));
 
-    await expect(getRecentJob("session-1")).resolves.toBeNull();
+    await expect(getRecentJob("session-1", context)).resolves.toBeNull();
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
-    expect(url).toBe("/api/bff/api/host/sessions/session-1/ai-generate/jobs/recent");
+    const [url, init] = apiCall(fetchMock) as [string, RequestInit | undefined];
+    expect(url).toBe("/api/bff/api/host/sessions/session-1/ai-generate/jobs/recent?clubSlug=reading-sai");
     expect(init?.method ?? "GET").toBe("GET");
   });
 
@@ -365,7 +380,7 @@ describe("getRecentJob", () => {
       }),
     );
 
-    await expect(getRecentJob("session-1")).resolves.toMatchObject({
+    await expect(getRecentJob("session-1", context)).resolves.toMatchObject({
       jobId: "job-1",
       availableActions: ["START_NEW"],
     });
@@ -389,12 +404,12 @@ describe("regenerateItem", () => {
       model: "gpt-5.4-mini",
       instructions: "tighter",
       expectedRevision: 7,
-    });
+    }, context);
     expect(result.item).toBe("summary");
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = apiCall(fetchMock) as [string, RequestInit];
     expect(url).toBe(
-      "/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1/regenerate",
+      "/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1/regenerate?clubSlug=reading-sai",
     );
     expect(init.method).toBe("POST");
     expect((init.headers as Headers).get("Content-Type")).toBe("application/json");
@@ -431,10 +446,10 @@ describe("commitGeneration", () => {
         ONE_LINE_REVIEWS: "AI_GROUNDED_REVIEWED",
         FEEDBACK_DOCUMENT: "AI_GROUNDED_REVIEWED",
       },
-    });
+    }, context);
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1/commit");
+    const [url, init] = apiCall(fetchMock) as [string, RequestInit];
+    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1/commit?clubSlug=reading-sai");
     expect(init.method).toBe("POST");
     expect((init.headers as Headers).get("Content-Type")).toBe("application/json");
     const parsed = JSON.parse(init.body as string) as Record<string, unknown>;
@@ -468,11 +483,12 @@ describe("commitGeneration", () => {
         feedbackDocumentFileName: "f.md",
         feedbackDocumentMarkdown: "# t",
       },
-    });
+    }, context);
 
-    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [, init] = apiCall(fetchMock) as [string, RequestInit];
     const parsed = JSON.parse(init.body as string) as {
       result: { sessionNumber: number };
+      expectedDraftRevision: number;
     };
     expect(parsed.result.sessionNumber).toBe(3);
     expect(parsed.expectedDraftRevision).toBe(5);
@@ -485,10 +501,10 @@ describe("expandEvidence", () => {
       jsonResponse({ turnId: "turn /1", speakerName: "회원", startSeconds: 3, text: "전문" }),
     );
 
-    await expandEvidence("sid-1", "job /1", "turn /1", 9);
+    await expandEvidence("sid-1", "job /1", "turn /1", 9, context);
 
-    expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job%20%2F1/evidence/turn%20%2F1?revision=9",
+    expect(apiCall(fetchMock)?.[0]).toBe(
+      "/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job%20%2F1/evidence/turn%20%2F1?revision=9&clubSlug=reading-sai",
     );
   });
 });
@@ -497,10 +513,10 @@ describe("cancelGeneration", () => {
   it("issues DELETE /jobs/{jobId} and resolves on 204", async () => {
     const fetchMock = captureFetch(new Response(null, { status: 204 }));
 
-    await expect(cancelGeneration("sid-1", "job-1")).resolves.toBeUndefined();
+    await expect(cancelGeneration("sid-1", "job-1", context)).resolves.toBeUndefined();
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1");
+    const [url, init] = apiCall(fetchMock) as [string, RequestInit];
+    expect(url).toBe("/api/bff/api/host/sessions/sid-1/ai-generate/jobs/job-1?clubSlug=reading-sai");
     expect(init.method).toBe("DELETE");
   });
 
@@ -512,7 +528,7 @@ describe("cancelGeneration", () => {
       }),
     );
 
-    await expect(cancelGeneration("sid-1", "job-1")).rejects.toBeDefined();
+    await expect(cancelGeneration("sid-1", "job-1", context)).rejects.toBeDefined();
   });
 });
 
@@ -526,7 +542,7 @@ describe("getAiGenerationCapabilities", () => {
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
     expect(url).toBe(
-      "/api/bff/api/host/clubs/my-club/ai-generation/capabilities",
+      "/api/bff/api/host/clubs/my-club/ai-generation/capabilities?clubSlug=my-club",
     );
     expect(init?.method ?? "GET").toBe("GET");
   });
@@ -540,7 +556,7 @@ describe("getClubAiDefault", () => {
     expect(result.defaultModel).toBe("claude-sonnet-4-6");
 
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit | undefined];
-    expect(url).toBe("/api/bff/api/host/clubs/my-club/ai-defaults");
+    expect(url).toBe("/api/bff/api/host/clubs/my-club/ai-defaults?clubSlug=my-club");
     expect(init?.method ?? "GET").toBe("GET");
   });
 
@@ -559,8 +575,8 @@ describe("putClubAiDefault", () => {
 
     await putClubAiDefault("my-club", { defaultModel: "gpt-5.4-mini" });
 
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
-    expect(url).toBe("/api/bff/api/host/clubs/my-club/ai-defaults");
+    const [url, init] = apiCall(fetchMock) as [string, RequestInit];
+    expect(url).toBe("/api/bff/api/host/clubs/my-club/ai-defaults?clubSlug=my-club");
     expect(init.method).toBe("PUT");
     expect((init.headers as Headers).get("Content-Type")).toBe("application/json");
     const parsed = JSON.parse(init.body as string) as Record<string, unknown>;

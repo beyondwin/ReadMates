@@ -42,7 +42,7 @@ function renderPublicSessionRoute(sessionId: string, state?: Record<string, stri
         element: <PublicSessionPage />,
         loader: publicSessionLoaderFactory(queryClient),
         errorElement: <PublicRouteError />,
-        hydrateFallbackElement: <div>공개 세션 기록을 불러오는 중</div>,
+        hydrateFallbackElement: <div>공개 모임 기록을 불러오는 중</div>,
       },
     ],
     { initialEntries: [state ? { pathname: `/sessions/${sessionId}`, state } : `/sessions/${sessionId}`] },
@@ -183,10 +183,10 @@ describe("PublicSession", () => {
     );
     expect(screen.getByText("함께 읽기")).toBeInTheDocument();
     expect(screen.getByText("요약")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "회차 기록" })).toBeInTheDocument();
-    expect(screen.getByText("회차 하이라이트")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "모임 기록" })).toBeInTheDocument();
+    expect(screen.getByText("모임 하이라이트")).toBeInTheDocument();
     expect(screen.getByText("함께 남긴 한줄평")).toBeInTheDocument();
-    expect(screen.getByText("회차 하이라이트 · 1")).toBeInTheDocument();
+    expect(screen.getByText("모임 하이라이트 · 1")).toBeInTheDocument();
     expect(screen.getByText("함께 남긴 한줄평 · 1")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "모임에서 남은 문장" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "짧게 남긴 감상" })).toBeInTheDocument();
@@ -202,7 +202,7 @@ describe("PublicSession", () => {
     expect(container).not.toHaveTextContent("H01");
     expect(container).not.toHaveTextContent("R01");
     expect(container).not.toHaveTextContent("발행 요약");
-    expect(container).not.toHaveTextContent("공개된 세션 기록");
+    expect(container).not.toHaveTextContent("공개된 모임 기록");
     expect(screen.getByRole("link", { name: "둘러보기" })).toHaveAttribute("href", "/clubs/reading-sai/app");
     expect(screen.getByRole("link", { name: "멤버로 시작" })).toHaveAttribute(
       "href",

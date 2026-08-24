@@ -1,0 +1,14 @@
+# Canonical meeting language allowlist.
+# Fields: kind|relativePath|needle|owner|removalCondition
+# relativePath is from server/src/main/kotlin.
+# kind must be technical-identifier, parser-storage-compatibility, or historical-data.
+# needle is a literal substring on a scanned hit line.
+# Blank lines and # comments are ignored.
+
+parser-storage-compatibility|com/readmates/feedback/application/FeedbackDocumentParser.kt|독서모임|feedback|Remove when the feedback document heading contract is versioned off N차
+parser-storage-compatibility|com/readmates/archive/adapter/out/persistence/ArchiveRowMappers.kt|독서모임 ${sessionNumber}차 피드백|archive|Remove when generated feedback titles stop using the N차 heading contract
+parser-storage-compatibility|com/readmates/archive/adapter/out/persistence/JdbcArchiveDetailBatchReadAdapter.kt|독서모임 ${sessionNumber}차 피드백|archive|Remove when generated feedback titles stop using the N차 heading contract
+parser-storage-compatibility|com/readmates/aigen/application/service/DefaultSessionImportV1Validator.kt|차 피드백|aigen|Remove when AI import validation no longer requires the N차 heading
+parser-storage-compatibility|com/readmates/aigen/application/service/GroundedGenerationValidator.kt|독서모임 ${meta.sessionNumber}차 피드백|aigen|Remove when generated feedback markdown headings are versioned off N차
+technical-identifier|com/readmates/admin/analytics/application/model/AdminAnalyticsModels.kt|RSVP_RATE|admin.analytics|Remove when the analytics KPI key is renamed away from RSVP
+technical-identifier|com/readmates/admin/analytics/application/service/AdminAnalyticsService.kt|RSVP_RATE|admin.analytics|Remove when the analytics KPI key is renamed away from RSVP

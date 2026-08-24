@@ -57,7 +57,7 @@ export function noteSessionSearchPlaceholder(
   }, null);
 
   return latestSessionNumber === null
-    ? "책 제목 또는 세션 번호"
+    ? "책 제목 또는 모임 번호"
     : `책 제목 또는 ${noteSessionNumberLabel({ sessionNumber: latestSessionNumber })}`;
 }
 

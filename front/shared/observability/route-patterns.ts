@@ -63,8 +63,11 @@ const routeRules: PatternRule[] = [
   { pattern: "/app/host/invitations", regex: /^\/app\/host\/invitations\/?$/ },
   { pattern: "/app/host/notifications", regex: /^\/app\/host\/notifications\/?$/ },
   { pattern: "/app/host/operations", regex: /^\/app\/host\/operations\/?$/ },
+  { pattern: "/app/host/records", regex: /^\/app\/host\/records\/?$/ },
+  { pattern: "/app/host/sessions", regex: /^\/app\/host\/sessions\/?$/ },
   { pattern: "/app/host/sessions/new", regex: /^\/app\/host\/sessions\/new\/?$/ },
   { pattern: "/app/host/sessions/:sessionId/closing", regex: /^\/app\/host\/sessions\/[^/]+\/closing\/?$/ },
+  { pattern: "/app/host/sessions/:sessionId/feedback-document", regex: /^\/app\/host\/sessions\/[^/]+\/feedback-document\/?$/ },
   { pattern: "/app/host/sessions/:sessionId/edit", regex: /^\/app\/host\/sessions\/[^/]+\/edit\/?$/ },
   { pattern: "/app/host/sessions/:sessionId", regex: /^\/app\/host\/sessions\/[^/]+\/?$/ },
   { pattern: "/clubs/:slug/app/host", regex: /^\/clubs\/[^/]+\/app\/host\/?$/ },
@@ -72,10 +75,16 @@ const routeRules: PatternRule[] = [
   { pattern: "/clubs/:slug/app/host/invitations", regex: /^\/clubs\/[^/]+\/app\/host\/invitations\/?$/ },
   { pattern: "/clubs/:slug/app/host/notifications", regex: /^\/clubs\/[^/]+\/app\/host\/notifications\/?$/ },
   { pattern: "/clubs/:slug/app/host/operations", regex: /^\/clubs\/[^/]+\/app\/host\/operations\/?$/ },
+  { pattern: "/clubs/:slug/app/host/records", regex: /^\/clubs\/[^/]+\/app\/host\/records\/?$/ },
+  { pattern: "/clubs/:slug/app/host/sessions", regex: /^\/clubs\/[^/]+\/app\/host\/sessions\/?$/ },
   { pattern: "/clubs/:slug/app/host/sessions/new", regex: /^\/clubs\/[^/]+\/app\/host\/sessions\/new\/?$/ },
   {
     pattern: "/clubs/:slug/app/host/sessions/:sessionId/closing",
     regex: /^\/clubs\/[^/]+\/app\/host\/sessions\/[^/]+\/closing\/?$/,
+  },
+  {
+    pattern: "/clubs/:slug/app/host/sessions/:sessionId/feedback-document",
+    regex: /^\/clubs\/[^/]+\/app\/host\/sessions\/[^/]+\/feedback-document\/?$/,
   },
   {
     pattern: "/clubs/:slug/app/host/sessions/:sessionId/edit",

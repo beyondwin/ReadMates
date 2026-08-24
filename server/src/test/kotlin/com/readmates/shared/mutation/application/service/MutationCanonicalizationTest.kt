@@ -8,13 +8,14 @@ import com.readmates.shared.mutation.adapter.`in`.scheduling.MutationIdempotency
 import com.readmates.shared.mutation.application.model.CanonicalMutationPayload
 import com.readmates.shared.mutation.application.model.CanonicalRequestDigest
 import com.readmates.shared.mutation.application.model.HostMutationOperation
+import com.readmates.shared.mutation.application.model.IdempotencyKeyReusedException
 import com.readmates.shared.mutation.application.model.InvalidMutationIdempotencyKeyException
+import com.readmates.shared.mutation.application.model.MutationIdempotencyStatus
 import com.readmates.shared.mutation.application.model.MutationIdentity
 import com.readmates.shared.mutation.application.model.UnsupportedCanonicalSchemaException
 import com.readmates.shared.mutation.application.port.`in`.PurgeExpiredMutationIdempotencyUseCase
 import com.readmates.shared.mutation.application.port.out.MutationIdempotencyPort
 import com.readmates.shared.mutation.config.MutationIdempotencyProperties
-import com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -28,7 +29,6 @@ import java.security.MessageDigest
 import java.text.Normalizer
 import java.time.Clock
 import java.time.Duration
-import java.time.Instant
 import java.util.UUID
 
 class MutationCanonicalizationTest {
@@ -163,6 +163,85 @@ class MutationCanonicalizationTest {
     }
 
     @Test
+    fun `publication identity preserves omitted axes and legacy visibility`() {
+        val omitted =
+            CanonicalMutationPayload.Publication(
+                publicSummary = "요약",
+                siteVisibility = null,
+                accessScope = null,
+                visibility = "MEMBER",
+                expectedPublicationRevision = 3,
+                expectedExposureRevision = null,
+            )
+        val hidden = omitted.copy(siteVisibility = "HIDDEN")
+        val publicLegacy = omitted.copy(visibility = "PUBLIC")
+        val differentPublicationRevision = omitted.copy(expectedPublicationRevision = 4)
+        val presentExposureRevision = omitted.copy(expectedExposureRevision = 0)
+
+        assertSameDigest(service.digest(omitted), service.digest(omitted.copy()))
+        assertDifferentDigest(service.digest(omitted), service.digest(hidden))
+        assertDifferentDigest(service.digest(omitted), service.digest(publicLegacy))
+        assertDifferentDigest(service.digest(omitted), service.digest(differentPublicationRevision))
+        assertDifferentDigest(service.digest(omitted), service.digest(presentExposureRevision))
+        assertThat(service.digest(omitted).canonicalSchemaVersion)
+            .isEqualTo(CanonicalMutationPayload.PUBLICATION_SCHEMA_VERSION)
+        assertThat(CanonicalMutationPayload.PUBLICATION_SCHEMA_VERSION).isEqualTo(3)
+    }
+
+    @Test
+    fun `exposure identity binds the nullable expected revision`() {
+        val legacy =
+            CanonicalMutationPayload.Exposure(
+                accessScope = "GUEST_READABLE",
+                expectedExposureRevision = null,
+            )
+        val guarded = legacy.copy(expectedExposureRevision = 0)
+
+        assertSameDigest(service.digest(legacy), service.digest(legacy.copy()))
+        assertDifferentDigest(service.digest(legacy), service.digest(guarded))
+        assertThat(service.digest(guarded).canonicalSchemaVersion)
+            .isEqualTo(CanonicalMutationPayload.EXPOSURE_SCHEMA_VERSION)
+    }
+
+    @Test
+    fun `older stored canonical schema remains lookup only and cannot replay a current command`() {
+        val payload =
+            CanonicalMutationPayload.Publication(
+                publicSummary = "요약",
+                siteVisibility = null,
+                accessScope = null,
+                visibility = "MEMBER",
+                expectedPublicationRevision = 3,
+                expectedExposureRevision = null,
+            )
+        val identity =
+            MutationIdentity(
+                clubId = CLUB_ID,
+                actorMembershipId = ACTOR_ID,
+                operation = HostMutationOperation.SESSION_PUBLICATION.name,
+                resourceSlot = RESOURCE_SLOT,
+                idempotencyKey = "publication-old-schema-01",
+            )
+        val currentDigest = service.digest(payload)
+        val stored =
+            MutationIdempotencyPort.StoredRow(
+                identity = identity,
+                digest = currentDigest.copy(canonicalSchemaVersion = 2),
+                status = MutationIdempotencyStatus.COMPLETED,
+                receiptId = UUID.fromString("00000000-0000-4000-8000-0000000000bb"),
+                createdAt = java.time.Instant.EPOCH,
+                expiresAt =
+                    java.time.Instant.EPOCH
+                        .plusSeconds(86_400),
+            )
+        val lookupOnlyService = service(RecordingPort(stored))
+
+        assertThat(lookupOnlyService.lookup(identity)).isEqualTo(stored)
+        assertThatThrownBy { lookupOnlyService.claim(identity, payload) }
+            .isInstanceOf(IdempotencyKeyReusedException::class.java)
+    }
+
+    @Test
     fun `bulk attendance memberships are set sorted`() {
         val membershipA = UUID.fromString("aaaaaaaa-0000-4000-8000-000000000001")
         val membershipB = UUID.fromString("bbbbbbbb-0000-4000-8000-000000000002")
@@ -272,73 +351,6 @@ class MutationCanonicalizationTest {
     }
 
     @Test
-    fun `startup validator preserves first deployment with only the current key`() {
-        MutationIdempotencyStartupValidator(
-            properties =
-                MutationIdempotencyProperties(
-                    currentKey = CURRENT_KEY,
-                    currentKeyVersion = 1,
-                    previousKey = "",
-                    previousKeyVersion = 0,
-                ),
-            port = RecordingPort(),
-            environment = MockEnvironment(),
-            clock = Clock.fixed(Instant.parse("2026-08-24T00:00:00Z"), java.time.ZoneOffset.UTC),
-        ).validate()
-    }
-
-    @Test
-    fun `startup validator requires the full durable retirement buffer at restart`() {
-        val unreferencedSince = Instant.parse("2026-08-22T01:00:00Z")
-        val port =
-            RecordingPort(
-                keyStates =
-                    listOf(
-                        MutationIdempotencyPort.DigestKeyState(
-                            digestKeyVersion = 1,
-                            lastReferencedAt = Instant.parse("2026-08-22T00:00:00Z"),
-                            unreferencedSince = unreferencedSince,
-                        ),
-                    ),
-            )
-        val properties =
-            MutationIdempotencyProperties(
-                currentKey = CURRENT_KEY,
-                currentKeyVersion = 2,
-                previousKey = "",
-                previousKeyVersion = 1,
-                previousKeyRolloutBuffer = Duration.ofHours(24),
-            )
-
-        assertThatThrownBy {
-            MutationIdempotencyStartupValidator(
-                properties,
-                port,
-                MockEnvironment(),
-                Clock.fixed(unreferencedSince.plus(Duration.ofHours(24)).minusMillis(1), java.time.ZoneOffset.UTC),
-            ).validate()
-        }.isInstanceOf(IllegalStateException::class.java)
-
-        MutationIdempotencyStartupValidator(
-            properties,
-            port,
-            MockEnvironment(),
-            Clock.fixed(unreferencedSince.plus(Duration.ofHours(24)), java.time.ZoneOffset.UTC),
-        ).validate()
-    }
-
-    @Test
-    fun `purge batch sizes one and two fail startup validation`() {
-        listOf(1, 2).forEach { batchSize ->
-            val properties = TEST_PROPERTIES.copy(purgeBatchSize = batchSize)
-
-            assertThatThrownBy { properties.validate(MockEnvironment().withProperty("spring.profiles.active", "test")) }
-                .isInstanceOf(IllegalStateException::class.java)
-                .hasMessageContaining("purge-batch-size")
-        }
-    }
-
-    @Test
     fun `metrics use bounded outcome tags only`() {
         MutationIdempotencyMetrics(registry).claimOutcome("replayed")
         assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } }.toSet())
@@ -424,10 +436,20 @@ class MutationCanonicalizationTest {
             idempotencyKey = key,
         )
 
+    private fun service(port: MutationIdempotencyPort) =
+        MutationIdempotencyService(
+            port = port,
+            properties = TEST_PROPERTIES,
+            clock = Clock.systemUTC(),
+            metrics = MutationIdempotencyMetrics(SimpleMeterRegistry()),
+        )
+
     private class RecordingPort(
-        private val keyStates: List<MutationIdempotencyPort.DigestKeyState> = emptyList(),
+        private val existing: MutationIdempotencyPort.StoredRow? = null,
     ) : MutationIdempotencyPort {
-        override fun claim(row: MutationIdempotencyPort.ClaimRow) = MutationIdempotencyPort.ClaimOutcome.Claimed
+        override fun claim(row: MutationIdempotencyPort.ClaimRow) =
+            existing?.let(MutationIdempotencyPort.ClaimOutcome::Existing)
+                ?: MutationIdempotencyPort.ClaimOutcome.Claimed
 
         override fun complete(
             identity: MutationIdentity,
@@ -435,7 +457,7 @@ class MutationCanonicalizationTest {
             at: java.time.Instant,
         ) = Unit
 
-        override fun find(identity: MutationIdentity) = null
+        override fun find(identity: MutationIdentity) = existing?.takeIf { it.identity == identity }
 
         override fun purgeExpired(
             now: java.time.Instant,
@@ -446,7 +468,7 @@ class MutationCanonicalizationTest {
 
         override fun referencedDigestKeyVersions(): Set<Int> = emptySet()
 
-        override fun digestKeyStates(): List<MutationIdempotencyPort.DigestKeyState> = keyStates
+        override fun digestKeyStates(): List<MutationIdempotencyPort.DigestKeyState> = emptyList()
 
         override fun markReferenced(
             digestKeyVersion: Int,

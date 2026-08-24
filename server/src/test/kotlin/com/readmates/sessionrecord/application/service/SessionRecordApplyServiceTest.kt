@@ -12,6 +12,8 @@ import com.readmates.sessionrecord.application.model.LiveSessionRecord
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionVersions
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordDraftSource
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
@@ -153,11 +155,11 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
-    fun `session metadata drift rejects preview and apply before notification preparation`() {
+    fun `session revision drift rejects preview and apply before notification preparation`() {
         val fixture =
             Fixture(
-                liveSessionUpdatedAt = TEST_NOW.plusSeconds(1),
-                draftBaseSessionUpdatedAt = TEST_NOW,
+                liveSessionRevision = 1,
+                draftBaseSessionRevision = 0,
             )
 
         assertThrows(SessionRecordException::class.java) {
@@ -168,6 +170,55 @@ class SessionRecordApplyServiceTest {
         }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
 
         assertTrue(fixture.store.receipts.isEmpty())
+        assertFalse(fixture.replacer.committed)
+        assertNotNull(fixture.store.draft)
+    }
+
+    @Test
+    fun `participant-only timestamp drift keeps preview and apply eligible`() {
+        val fixture =
+            Fixture(
+                liveSessionUpdatedAt = TEST_NOW.plusSeconds(1),
+                draftBaseSessionUpdatedAt = TEST_NOW,
+            )
+
+        fixture.preview()
+        fixture.apply()
+
+        assertEquals(1, fixture.store.receipts.size)
+    }
+
+    @Test
+    fun `correction preview rejects a draft whose exact live base is stale`() {
+        val fixture =
+            Fixture(
+                livePublicationRevision = 1,
+                draftBasePublicationRevision = 0,
+            )
+
+        assertThrows(SessionRecordException::class.java) {
+            fixture.previewCorrection()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+
+        assertTrue(fixture.store.receipts.isEmpty())
+        assertTrue(fixture.store.revisions.isEmpty())
+        assertFalse(fixture.replacer.committed)
+        assertNotNull(fixture.store.draft)
+    }
+
+    @Test
+    fun `unknown migrated base rejects preview and apply without side effects`() {
+        val fixture = Fixture(draftBaseVectorKnown = false)
+
+        assertThrows(SessionRecordException::class.java) {
+            fixture.preview()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+        assertThrows(SessionRecordException::class.java) {
+            fixture.apply()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+
+        assertTrue(fixture.store.receipts.isEmpty())
+        assertTrue(fixture.store.revisions.isEmpty())
         assertFalse(fixture.replacer.committed)
         assertNotNull(fixture.store.draft)
     }
@@ -281,6 +332,13 @@ private class Fixture(
     draftSource: SessionRecordDraftSource = SessionRecordDraftSource.MANUAL,
     restoredFromRevisionId: UUID? = null,
     draftPublicationSummary: String = "Summary",
+    liveSessionRevision: Long = 0,
+    draftBaseSessionRevision: Long = liveSessionRevision,
+    liveExposureRevision: Long = 0,
+    draftBaseExposureRevision: Long = liveExposureRevision,
+    livePublicationRevision: Long = 0,
+    draftBasePublicationRevision: Long = livePublicationRevision,
+    draftBaseVectorKnown: Boolean = true,
     liveSessionUpdatedAt: OffsetDateTime = TEST_NOW,
     draftBaseSessionUpdatedAt: OffsetDateTime = liveSessionUpdatedAt,
 ) {
@@ -308,6 +366,9 @@ private class Fixture(
             sessionNumber = 28,
             bookTitle = "Apply Test Book",
             meetingDate = LocalDate.of(2026, 7, 23),
+            sessionRevision = liveSessionRevision,
+            exposureRevision = liveExposureRevision,
+            publicationRevision = livePublicationRevision,
             sessionUpdatedAt = liveSessionUpdatedAt,
         )
     val draft =
@@ -315,6 +376,10 @@ private class Fixture(
             sessionId = sessionId,
             clubId = clubId,
             baseLiveRevision = liveRevision,
+            baseSessionRevision = draftBaseSessionRevision,
+            baseExposureRevision = draftBaseExposureRevision,
+            basePublicationRevision = draftBasePublicationRevision,
+            baseVectorKnown = draftBaseVectorKnown,
             draftRevision = 2,
             source = draftSource,
             restoredFromRevisionId = restoredFromRevisionId,
@@ -345,6 +410,8 @@ private class Fixture(
             host,
             PreviewSessionRecordApplyCommand(sessionId, draft.draftRevision, live.revision),
         )
+
+    fun previewCorrection() = service.previewCorrection(host, sessionId)
 
     fun apply(
         expectedDraftRevision: Long = draft.draftRevision,
@@ -430,8 +497,26 @@ private class FakeApplyStore(
         sessionId: UUID,
     ): SessionRecordEditor? {
         completed = completedAfterLock ?: completed
-        return SessionRecordEditor(live, draft, draftLiveBaseStale = false)
+        return editor()
     }
+
+    override fun loadCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor = correctionEditor()
+
+    override fun lockCorrectionEditor(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+    ): SessionRecordCorrectionEditor = correctionEditor()
+
+    override fun bumpCorrectionProjectionRevisions(
+        host: AuthenticatedClubActor,
+        sessionId: UUID,
+        expectedExposureRevision: Long,
+        expectedPublicationRevision: Long,
+        exposureChanged: Boolean,
+    ): Boolean = true
 
     override fun findCompletedApply(
         host: AuthenticatedClubActor,
@@ -457,7 +542,6 @@ private class FakeApplyStore(
         revision: SessionRecordRevision,
     ) = com.readmates.sessionrecord.application.model
         .SessionRecordApplyReceipt(
-            command.applyRequestId,
             command.applyRequestId,
             host.membershipId,
             command.expectedDraftRevision,
@@ -549,6 +633,30 @@ private class FakeApplyStore(
         expectedDraftRevision: Long?,
         encoded: EncodedSessionRecordSnapshot,
     ) = draft
+
+    private fun editor() =
+        SessionRecordEditor(
+            live = live,
+            draft = draft,
+            draftLiveBaseStale =
+                draft?.isStaleAgainst(live)
+                    ?: false,
+        )
+
+    private fun correctionEditor() =
+        SessionRecordCorrectionEditor(
+            state = "PUBLISHED",
+            editor = editor(),
+            versions =
+                SessionRecordCorrectionVersions(
+                    sessionRevision = 3,
+                    exposureRevision = 2,
+                    participantSetRevision = 1,
+                    recordDraftRevision = draft?.draftRevision,
+                    liveRecordRevision = live.revision,
+                    publicationRevision = 4,
+                ),
+        )
 
     private fun revision(
         host: AuthenticatedClubActor,

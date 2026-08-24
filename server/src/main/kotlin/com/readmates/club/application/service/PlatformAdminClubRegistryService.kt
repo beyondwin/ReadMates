@@ -12,6 +12,8 @@ import com.readmates.club.application.port.`in`.GetPlatformAdminClubUseCase
 import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
 import com.readmates.club.application.port.`in`.UpdatePlatformAdminClubUseCase
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
+import com.readmates.club.application.port.out.ClubPublicProjectionMutation
+import com.readmates.club.application.port.out.ClubPublicProjectionMutationPort
 import com.readmates.club.application.port.out.PlatformAdminClubRegistryQuery
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPatch
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
@@ -30,6 +32,7 @@ class PlatformAdminClubRegistryService(
     private val updateClubPort: UpdatePlatformAdminClubPort,
     private val cursorSigner: PlatformAdminClubRegistryCursorSigner,
     private val auditEventPort: WritePlatformAuditEventPort,
+    private val publicProjection: ClubPublicProjectionMutationPort = ClubPublicProjectionMutationPort.Noop(),
 ) : ListPlatformAdminClubsUseCase,
     GetPlatformAdminClubUseCase,
     UpdatePlatformAdminClubUseCase {
@@ -104,6 +107,15 @@ class PlatformAdminClubRegistryService(
             metadataJson =
                 """{"clubId":"$clubId","beforeAdminRevision":${command.expectedAdminRevision},""" +
                     """"afterAdminRevision":${updated.adminRevision}}""",
+        )
+        publicProjection.record(
+            ClubPublicProjectionMutation(
+                clubId = updated.clubId,
+                actorUserId = admin.adminId,
+                operation = "PLATFORM_CLUB_METADATA_UPDATED",
+                exposureChanged = false,
+                exposureLock = null,
+            ),
         )
         return updated
     }

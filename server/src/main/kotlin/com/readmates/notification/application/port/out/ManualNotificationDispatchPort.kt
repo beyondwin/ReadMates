@@ -144,30 +144,30 @@ fun ManualNotificationSessionContext.manualDispatchDisabledReason(eventType: Not
     when (eventType) {
         NotificationEventType.NEXT_BOOK_PUBLISHED ->
             if (state != "DRAFT" || visibility !in setOf("MEMBER", "PUBLIC")) {
-                "멤버에게 공개된 예정 세션만 다음 책 알림을 보낼 수 있습니다."
+                "멤버에게 보이는 예정 모임만 다음 책 알림을 보낼 수 있습니다."
             } else {
                 null
             }
         NotificationEventType.SESSION_REMINDER_DUE ->
             if (state !in setOf("DRAFT", "OPEN")) {
-                "예정 또는 열린 세션만 리마인더를 보낼 수 있습니다."
+                "작성 중이거나 멤버와 준비 중인 모임만 리마인더를 보낼 수 있습니다."
             } else {
                 null
             }
         NotificationEventType.FEEDBACK_DOCUMENT_PUBLISHED ->
             if (state !in setOf("OPEN", "CLOSED", "PUBLISHED") || !feedbackDocumentUploaded) {
-                "현재 피드백 문서가 있는 열린 세션 또는 종료된 세션에서 발송할 수 있습니다."
+                "현재 피드백 문서가 있는 멤버와 준비 중 또는 지난 모임에서 발송할 수 있습니다."
             } else {
                 null
             }
-        NotificationEventType.REVIEW_PUBLISHED -> "서평 공개 알림은 수동 발송하지 않습니다."
+        NotificationEventType.REVIEW_PUBLISHED -> "새 서평 알림은 수동 발송하지 않습니다."
         NotificationEventType.SESSION_RECORD_UPDATED ->
             if (sessionRecordContentRevision == null) {
-                "반영된 세션 기록이 있어야 수정 알림을 보낼 수 있습니다."
+                "반영된 모임 기록이 있어야 수정 알림을 보낼 수 있습니다."
             } else {
                 null
             }
-        NotificationEventType.AI_GENERATION_READY -> "AI 회차 초안 완료 알림은 수동 발송하지 않습니다."
+        NotificationEventType.AI_GENERATION_READY -> "AI 모임 초안 완료 알림은 수동 발송하지 않습니다."
     }
 
 interface ManualNotificationDispatchPort {

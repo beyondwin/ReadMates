@@ -76,7 +76,7 @@ async function routeHostClosing(page: Page): Promise<void> {
       },
       overall: { state: "PUBLISHED", label: "발행 완료", primaryAction: "REVIEW_PUBLIC_PAGE" },
       checklist: [
-        { id: "SESSION_CLOSED", state: "DONE", label: "세션 종료", detail: "닫힘", href: `/app/host/sessions/${SESSION_ID}` },
+        { id: "SESSION_CLOSED", state: "DONE", label: "모임 종료", detail: "닫힘", href: `/app/host/sessions/${SESSION_ID}` },
         { id: "RECORD_PACKAGE_SAVED", state: "DONE", label: "기록 패키지 저장", detail: "저장됨", href: `/app/host/sessions/${SESSION_ID}?section=records&source=json` },
         { id: "FEEDBACK_DOCUMENT_READY", state: "DONE", label: "피드백 문서 준비", detail: "준비됨", href: `/app/host/sessions/${SESSION_ID}?section=records&source=json` },
         { id: "MEMBER_NOTIFICATION_SENT", state: "DONE", label: "멤버 알림 발송", detail: "발송됨", href: "/app/host/notifications" },

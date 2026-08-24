@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "react-router";
 import type {
@@ -20,7 +20,9 @@ import {
 } from "@/features/host/queries/host-notification-queries";
 import { HostNotificationComposer } from "@/features/host/ui/notifications/host-notification-composer";
 import { HostNotificationComposerDialog } from "@/features/host/ui/notifications/host-notification-composer-dialog";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 
 export type HostNotificationComposerRequest = {
   sessionId: string;
@@ -35,7 +37,7 @@ export type HostNotificationComposerRequest = {
 export type HostNotificationComposerControllerProps = {
   request: HostNotificationComposerRequest | null;
   open?: boolean;
-  context?: ReadmatesApiContext;
+  context?: ExplicitReadmatesApiContext;
   onClose: () => void;
   onConfirmed?: (result: ManualNotificationConfirmResponse) => void;
 };
@@ -91,11 +93,10 @@ function OpenComposerController({
   request: HostNotificationComposerRequest;
 }) {
   const params = useParams();
-  const routeContext = useMemo(
-    () => params.clubSlug ? { clubSlug: params.clubSlug } : undefined,
-    [params.clubSlug],
+  const context = useMemo(
+    () => explicitContext ?? requireHostClubContext(params.clubSlug),
+    [explicitContext, params.clubSlug],
   );
-  const context = explicitContext ?? routeContext;
   const optionsQuery = useQuery(hostNotificationManualOptionsQuery({
     sessionId: request.sessionId,
     page: { limit: MEMBER_PAGE_LIMIT },
@@ -174,7 +175,7 @@ function ReadyComposerController({
   onConfirmed,
 }: {
   request: HostNotificationComposerRequest;
-  context?: ReadmatesApiContext;
+  context: ExplicitReadmatesApiContext;
   initialOptions: ManualNotificationOptionsResponse;
   onClose: () => void;
   onConfirmed?: (result: ManualNotificationConfirmResponse) => void;
@@ -183,7 +184,7 @@ function ReadyComposerController({
   const template = initialOptions.templates.find(
     (item) => item.eventType === request.eventType,
   )!;
-  const previewMutation = usePreviewManualNotificationMutation();
+  const previewMutation = usePreviewManualNotificationMutation(context);
   const confirmMutation = useConfirmManualNotificationMutation(context);
   const [options, setOptions] = useState(initialOptions);
   const [draft, setDraft] = useState<HostNotificationComposerDraft>({
@@ -199,6 +200,24 @@ function ReadyComposerController({
   const [search, setSearch] = useState("");
   const [membersLoading, setMembersLoading] = useState(false);
   const busy = previewMutation.isPending || confirmMutation.isPending;
+
+  useEffect(() => registerHostSensitiveState({
+    clubSlug: context.clubSlug,
+    resourceKey: `notification-preview:${request.sessionId}:${request.eventType}`,
+    clear: () => {
+      setDraft({
+        sessionId: request.sessionId,
+        eventType: request.eventType,
+        contentRevision: request.contentRevision,
+        recipientMode: recipientModeFromAudience(template.defaultAudience),
+        requestedChannels: template.defaultChannels,
+        selectedMembershipIds: [],
+      });
+      setPreview(null);
+      setError(null);
+      setSearch("");
+    },
+  }), [context.clubSlug, request.contentRevision, request.eventType, request.sessionId, template.defaultAudience, template.defaultChannels]);
 
   const disableCurrentTemplate = () => {
     setOptions((current) => ({
@@ -233,7 +252,7 @@ function ReadyComposerController({
       setPreview(null);
       return code === "MANUAL_NOTIFICATION_RECIPIENTS_CHANGED"
         ? "미리보기 이후 수신 대상이 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요."
-        : "알림 내용 또는 세션 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요.";
+        : "알림 내용 또는 모임 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요.";
     }
     if (
       code === "MANUAL_NOTIFICATION_PREVIEW_EXPIRED"

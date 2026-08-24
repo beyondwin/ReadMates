@@ -131,12 +131,12 @@ test("anonymous visitors enter from public surfaces and browse guest-readable cl
 
   await page.goto(`${appBase}/session/current`);
   await expect(page.getByRole("heading", { name: "E2E 현재 세션 책" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "세션 준비" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "모임 준비" })).toBeVisible();
   await expectReadOnlyCurrentSessionControls(page);
   await expectNoPersistentGuestConversion(page);
 
   await page.goto(`${appBase}/notes`);
-  await expect(page.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeVisible();
+  await expect(page.getByText("모임을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeVisible();
   await expectNoPersistentGuestConversion(page);
 
   await page.goto(`${appBase}/archive`);
@@ -176,7 +176,7 @@ test("guest note session links keep public route continuity without opening a co
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`${appBase}/notes?filter=highlights`);
 
-  const nextSession = page.getByRole("link", { name: "No.05 지대넓얕 무한 세션 보기" });
+  const nextSession = page.getByRole("link", { name: "No.05 지대넓얕 무한 모임 보기" });
   await expect(nextSession).toBeVisible();
   await nextSession.click();
 
@@ -362,7 +362,7 @@ test("public entry and every guest reading surface remain responsive at mobile a
     { path: clubBase, target: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), clearanceTarget: () => page.getByRole("link", { name: "둘러보기", exact: true }).first(), app: false },
     { path: appBase, target: () => page.locator(".rm-member-home-desktop:visible h1, .rm-member-home-mobile:visible h1").first(), clearanceTarget: () => page.locator(".rm-member-home-desktop:visible h1, .rm-member-home-mobile:visible h1").first(), app: true },
     { path: `${appBase}/session/current`, target: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), clearanceTarget: () => page.getByRole("heading", { name: "E2E 현재 세션 책" }), app: true },
-    { path: `${appBase}/notes`, target: () => page.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다."), clearanceTarget: () => page.getByRole("button", { name: /^전체/ }).first(), app: true },
+    { path: `${appBase}/notes`, target: () => page.getByText("모임을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다."), clearanceTarget: () => page.getByRole("button", { name: /^전체/ }).first(), app: true },
     { path: `${appBase}/archive`, target: () => page.locator(".rm-archive-page h1:visible"), clearanceTarget: () => page.getByRole("link", { name: /No\.1 .* 열기/ }), app: true },
     { path: seededArchivePath, target: () => page.getByRole("button", { name: "피드백 보기", exact: true }), clearanceTarget: () => page.getByRole("button", { name: "피드백 보기", exact: true }), app: true },
   ];

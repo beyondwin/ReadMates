@@ -44,7 +44,7 @@ test("host creates invite and member is directed to Google acceptance", async ({
   await loginWithGoogleFixture(page, "host@example.com");
 
   await page.goto("/app/host/invitations");
-  await expect(page.getByLabel("수락하면 이번 세션에도 추가")).toBeChecked();
+  await expect(page.getByLabel("수락하면 이번 모임에도 추가")).toBeChecked();
   await page.getByLabel("이름").fill("테스트멤버");
   await page.getByLabel("초대 이메일").fill(invitedEmail);
   await page.getByRole("button", { name: "초대 링크 만들기" }).click();

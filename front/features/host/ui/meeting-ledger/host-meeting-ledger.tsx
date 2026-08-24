@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from "react";
+import type { ComponentType, CSSProperties, ReactNode } from "react";
 import {
   previousRecordAttentionHref,
   resolveViewedMeeting,
@@ -13,6 +13,7 @@ import type {
   UpcomingBookListItem,
 } from "@/features/host/model/upcoming-book-list-model";
 import { HostSessionAttentionSummary } from "../host-session-ledger";
+import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
 import { MeetingPhaseRail } from "./meeting-phase-rail";
 import { UpcomingBookList } from "./upcoming-book-list";
 
@@ -23,12 +24,14 @@ export type HostMeetingLedgerLinkProps = {
   to: string;
   className?: string;
   children: ReactNode;
+  state?: unknown;
   "aria-label"?: string;
 };
 
 export type HostMeetingLedgerLinkComponent = ComponentType<HostMeetingLedgerLinkProps>;
 
-function DefaultLink({ to, children, ...props }: HostMeetingLedgerLinkProps) {
+function DefaultLink({ to, children, state: _state, ...props }: HostMeetingLedgerLinkProps) {
+  void _state;
   return <a {...props} href={to}>{children}</a>;
 }
 
@@ -52,6 +55,7 @@ export function HostMeetingLedger({
   sessionAttention,
   attentionError = false,
   onRetryAttention,
+  overviewOnly = false,
 }: {
   items: readonly MeetingListItem[];
   sessionId?: string;
@@ -69,15 +73,66 @@ export function HostMeetingLedger({
   sessionAttention?: HostSessionAttentionData | null;
   attentionError?: boolean;
   onRetryAttention?: () => void;
+  overviewOnly?: boolean;
 }) {
   const active = resolveViewedMeeting(items, sessionId);
+  const attentionCount = attentionPage?.summary.needsAttentionCount ?? 0;
+
+  if (overviewOnly) {
+    return (
+      <main>
+        <section className="page-header-compact">
+          <div className="container stack" style={{ "--stack": "18px" } as CSSProperties}>
+            <div>
+              <p className="eyebrow" style={{ margin: 0 }}>호스트 · 오늘</p>
+              <h1 className="h1 editorial" style={{ margin: "8px 0 8px" }}>오늘</h1>
+              <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
+                여러 모임의 확인할 일과 안전한 다음 행동을 살핍니다.
+              </p>
+            </div>
+            {active ? (
+              <div className="row" style={{ gap: 10, flexWrap: "wrap" }}>
+                <LinkComponent
+                  to={`/app/host/sessions/${encodeURIComponent(active.sessionId)}`}
+                  state={readmatesReturnState({ href: "/app/host", label: "오늘로" })}
+                  className="btn btn-primary"
+                >
+                  지금 다루는 모임 열기
+                </LinkComponent>
+                <LinkComponent to="/app/host/sessions" className="btn btn-quiet">모임 목록</LinkComponent>
+              </div>
+            ) : (
+              <div className="rm-empty-state rm-meeting-ledger__empty">
+                <h2 className="h2 editorial" style={{ margin: 0 }}>아직 열린 모임이 없습니다</h2>
+                <LinkComponent to={NEW_MEETING_HREF} className="btn btn-primary">첫 모임 만들기</LinkComponent>
+              </div>
+            )}
+            {attentionError ? (
+              <div className="rm-host-ledger__error" role="alert">
+                <span>확인 필요 목록을 불러오지 못했습니다.</span>
+                {onRetryAttention ? <button type="button" className="btn btn-ghost btn-sm" onClick={onRetryAttention}>다시 시도</button> : null}
+              </div>
+            ) : attentionPage && attentionCount > 0 ? (
+              <section aria-label="확인 필요">
+                <p className="small" style={{ margin: "0 0 12px", color: "var(--text-2)" }}>확인 필요 {attentionCount}건</p>
+                <HostSessionAttentionSummary
+                  page={attentionPage}
+                  maxItems={1}
+                  allHref={attentionCount > 1 ? OPERATIONS_HREF : undefined}
+                  LinkComponent={LinkComponent}
+                />
+              </section>
+            ) : null}
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (!active) {
     if (sessionId) {
       return children ?? null;
     }
-
-    const attentionCount = attentionPage?.summary.needsAttentionCount ?? 0;
 
     return (
       <main>

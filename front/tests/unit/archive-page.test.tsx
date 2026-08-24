@@ -41,7 +41,7 @@ const seededSessions: ArchiveSessionItem[] = [
   {
     sessionId: "session-6",
     sessionNumber: 6,
-    title: "6회차 모임 · 가난한 찰리의 연감",
+    title: "No.6 모임 · 가난한 찰리의 연감",
     bookTitle: "가난한 찰리의 연감",
     bookAuthor: "찰리 멍거",
     bookImageUrl: "https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg",
@@ -54,7 +54,7 @@ const seededSessions: ArchiveSessionItem[] = [
   {
     sessionId: "session-5",
     sessionNumber: 5,
-    title: "5회차 모임 · 지대넓얕 무한",
+    title: "No.5 모임 · 지대넓얕 무한",
     bookTitle: "지대넓얕 무한",
     bookAuthor: "채사장",
     bookImageUrl: "https://image.aladin.co.kr/product/35301/70/cover500/k692035972_1.jpg",
@@ -67,7 +67,7 @@ const seededSessions: ArchiveSessionItem[] = [
   {
     sessionId: "session-4",
     sessionNumber: 4,
-    title: "4회차 모임 · 내 안에서 나를 만드는 것들",
+    title: "No.4 모임 · 내 안에서 나를 만드는 것들",
     bookTitle: "내 안에서 나를 만드는 것들",
     bookAuthor: "러셀 로버츠",
     bookImageUrl: "https://image.aladin.co.kr/product/6882/97/cover500/8933870644_2.jpg",
@@ -80,7 +80,7 @@ const seededSessions: ArchiveSessionItem[] = [
   {
     sessionId: "session-3",
     sessionNumber: 3,
-    title: "3회차 모임 · 우리가 겨울을 지나온 방식",
+    title: "No.3 모임 · 우리가 겨울을 지나온 방식",
     bookTitle: "우리가 겨울을 지나온 방식",
     bookAuthor: "문미순",
     bookImageUrl: "https://image.aladin.co.kr/product/32901/55/cover500/k602936626_2.jpg",
@@ -93,7 +93,7 @@ const seededSessions: ArchiveSessionItem[] = [
   {
     sessionId: "session-2",
     sessionNumber: 2,
-    title: "2회차 모임 · 냉정한 이타주의자",
+    title: "No.2 모임 · 냉정한 이타주의자",
     bookTitle: "냉정한 이타주의자",
     bookAuthor: "윌리엄 맥어스킬",
     bookImageUrl: "https://image.aladin.co.kr/product/10044/19/cover500/8960515833_3.jpg",
@@ -106,7 +106,7 @@ const seededSessions: ArchiveSessionItem[] = [
   {
     sessionId: "session-1",
     sessionNumber: 1,
-    title: "1회차 모임 · 팩트풀니스",
+    title: "No.1 모임 · 팩트풀니스",
     bookTitle: "팩트풀니스",
     bookAuthor: "한스 로슬링",
     bookImageUrl: "https://image.aladin.co.kr/product/34538/43/cover500/8934933879_1.jpg",
@@ -277,7 +277,7 @@ describe("ArchivePage", () => {
     );
     const desktop = getDesktop(container);
 
-    for (const tabName of ["세션", "피드백 문서", "내 질문", "내 서평"]) {
+    for (const tabName of ["모임", "피드백 문서", "내 질문", "내 서평"]) {
       expect(desktop.getByRole("button", { name: tabName })).toBeVisible();
     }
     expect(screen.queryByText("피드백 문서는 정식 멤버에게 열립니다")).not.toBeInTheDocument();
@@ -302,13 +302,13 @@ describe("ArchivePage", () => {
 
     expect(desktop.getByText("기록 저장소")).toBeInTheDocument();
     expect(desktop.getByText("지난 모임과 내가 쓴 문장들을 회고합니다. 속도감보다 축적감.")).toBeInTheDocument();
-    expect(desktop.getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
-    expect(within(mobile as HTMLElement).getByText("지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
-    expect(screen.queryByText("지난 회차를 연도별로 정리한 독서모임 보존 기록입니다.")).not.toBeInTheDocument();
+    expect(desktop.getByText("지난 모임의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
+    expect(within(mobile as HTMLElement).getByText("지난 모임의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.")).toBeInTheDocument();
+    expect(screen.queryByText("지난 모임를 연도별로 정리한 독서모임 보존 기록입니다.")).not.toBeInTheDocument();
     expect(screen.queryByText("SESSION RECORDS")).not.toBeInTheDocument();
     expect(desktop.queryByText("AI-assisted")).not.toBeInTheDocument();
     expect(desktop.getByText("함께 읽은 흔적")).toBeInTheDocument();
-    const desktopSessionTab = desktop.getByRole("button", { name: "세션" });
+    const desktopSessionTab = desktop.getByRole("button", { name: "모임" });
     expect(desktopSessionTab).toBeInTheDocument();
     expect(desktopSessionTab).toHaveStyle({
       border: "1px solid var(--text)",
@@ -328,7 +328,7 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("팩트풀니스")).toBeInTheDocument();
     expect(desktop.getByLabelText("No.06 · 04.15")).toBeInTheDocument();
-    expect(desktop.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(desktop.queryByText("지난 모임")).not.toBeInTheDocument();
     expect(desktop.queryByText("공개됨")).not.toBeInTheDocument();
     expect(desktop.queryByText("문서 있음")).not.toBeInTheDocument();
     expect(desktop.getAllByText("공개")).toHaveLength(seededSessions.length);
@@ -341,7 +341,7 @@ describe("ArchivePage", () => {
     const nextSession: ArchiveSessionItem = {
       sessionId: "session-0",
       sessionNumber: 0,
-      title: "0회차 모임 · 오래된 책",
+      title: "No.0 모임 · 오래된 책",
       bookTitle: "오래된 책",
       bookAuthor: "기록 작가",
       bookImageUrl: null,
@@ -446,7 +446,7 @@ describe("ArchivePage", () => {
     const sessionWithMissingDate: ArchiveSessionItem = {
       sessionId: "session-missing-date",
       sessionNumber: 9,
-      title: "9회차 모임 · 날짜 미정 책",
+      title: "No.9 모임 · 날짜 미정 책",
       bookTitle: "날짜 미정 책",
       bookAuthor: "미정 작가",
       bookImageUrl: null,
@@ -480,7 +480,7 @@ describe("ArchivePage", () => {
     const sessionWithMissingDate: ArchiveSessionItem = {
       sessionId: "session-missing-date",
       sessionNumber: 9,
-      title: "9회차 모임 · 날짜 미정 책",
+      title: "No.9 모임 · 날짜 미정 책",
       bookTitle: "날짜 미정 책",
       bookAuthor: "미정 작가",
       bookImageUrl: null,
@@ -522,7 +522,7 @@ describe("ArchivePage", () => {
     expect(scoped.getByText("아카이브")).toBeInTheDocument();
     expect(scoped.getByRole("heading", { name: "읽어 온 자리" })).toBeInTheDocument();
     expect(scoped.getByText("6권 · 1개의 질문 · 1개의 서평")).toBeInTheDocument();
-    const sessionChip = scoped.getByRole("button", { name: "세션" });
+    const sessionChip = scoped.getByRole("button", { name: "모임" });
     expect(sessionChip).toHaveClass("m-chip", "is-on");
     expect(sessionChip).toHaveAttribute("aria-pressed", "true");
     expect(sessionChip).toHaveStyle({
@@ -559,7 +559,7 @@ describe("ArchivePage", () => {
     });
     expect(latestSessionCard.querySelector(".rm-archive-session-card__meta")).not.toBeNull();
     expect(within(latestSessionCard).getAllByText(/^No\.06/)).toHaveLength(1);
-    expect(scoped.queryByText("지난 회차")).not.toBeInTheDocument();
+    expect(scoped.queryByText("지난 모임")).not.toBeInTheDocument();
     expect(scoped.queryByText("공개됨")).not.toBeInTheDocument();
     expect(scoped.queryByText("문서 있음")).not.toBeInTheDocument();
     expect(scoped.getByText("가난한 찰리의 연감")).toBeInTheDocument();
@@ -591,7 +591,7 @@ describe("ArchivePage", () => {
     expect(scoped.getByRole("button", { name: "내 서평" })).toHaveAttribute("aria-pressed", "true");
     expect(scoped.getByText("2026.04.15 · 가난한 찰리의 연감")).toBeInTheDocument();
     expect(scoped.getByText("내가 모르는 영역을 인정하는 태도가 가장 현실적인 지혜처럼 느껴졌다.")).toBeInTheDocument();
-    const mobileReviewLink = scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" });
+    const mobileReviewLink = scoped.getByRole("link", { name: "No.6 가난한 찰리의 연감 모임으로" });
     expect(mobileReviewLink).toHaveAttribute("href", "/app/sessions/session-6#mobile-my-records");
     expect(mobileReviewLink).toHaveStyle({
       display: "grid",
@@ -608,7 +608,7 @@ describe("ArchivePage", () => {
     expect(scoped.getByRole("button", { name: "내 질문" })).toHaveAttribute("aria-pressed", "true");
     expect(scoped.getByText("Q1 · 2025.11.26")).toHaveStyle({ color: "var(--text-3)" });
     expect(scoped.getByText("데이터 기반 사고가 일상 판단과 멀어지는 순간을 묻는다.")).toBeInTheDocument();
-    expect(scoped.getByRole("link", { name: "Q1 팩트풀니스 세션으로" })).toHaveAttribute(
+    expect(scoped.getByRole("link", { name: "Q1 팩트풀니스 모임으로" })).toHaveAttribute(
       "href",
       "/app/sessions/session-1#mobile-my-records",
     );
@@ -644,7 +644,7 @@ describe("ArchivePage", () => {
       />,
     );
     const desktop = getDesktop(container);
-    const questionLink = desktop.getByRole("link", { name: "Q1 팩트풀니스 세션으로" });
+    const questionLink = desktop.getByRole("link", { name: "Q1 팩트풀니스 모임으로" });
     const sessionMeta = within(questionLink).getByText(/팩트풀니스/, { selector: ".tiny" });
 
     expect(sessionMeta).not.toHaveClass("mono");
@@ -725,7 +725,7 @@ describe("ArchivePage", () => {
     );
     const desktop = getDesktop(container);
 
-    const sessionTab = desktop.getByRole("button", { name: "세션" });
+    const sessionTab = desktop.getByRole("button", { name: "모임" });
     sessionTab.focus();
     expect(sessionTab).toHaveFocus();
 
@@ -849,7 +849,7 @@ describe("ArchivePage", () => {
     const unpublishedArchiveSession: ArchiveSessionItem = {
       sessionId: "session-unpublished-showcase",
       sessionNumber: 8,
-      title: "8회차 모임 · 비공개 쇼케이스 책",
+      title: "No.8 모임 · 비공개 쇼케이스 책",
       bookTitle: "비공개 쇼케이스 책",
       bookAuthor: "아카이브 작가",
       bookImageUrl: null,
@@ -896,7 +896,7 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("서평 · 2026-04-15")).toBeInTheDocument();
     expect(desktop.getByText("가난한 찰리의 연감")).toBeInTheDocument();
     expect(desktop.getByText("나")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "No.6 가난한 찰리의 연감 모임으로" })).toHaveAttribute(
       "href",
       "/app/sessions/session-6#my-records",
     );
@@ -908,7 +908,7 @@ describe("ArchivePage", () => {
     expect(desktop.getByText("Q1 · 2025.11.26")).toHaveStyle({ color: "var(--text-3)" });
     expect(desktop.queryByText("저장된 질문 Q1 · 2025.11.26")).not.toBeInTheDocument();
     expect(desktop.getByText("10가지 본능 중에서 본인에게 가장 강하게 작용한다고 느낀 것은 무엇인가요?")).toBeInTheDocument();
-    expect(desktop.getByRole("link", { name: "Q1 팩트풀니스 세션으로" })).toHaveAttribute(
+    expect(desktop.getByRole("link", { name: "Q1 팩트풀니스 모임으로" })).toHaveAttribute(
       "href",
       "/app/sessions/session-1#my-records",
     );
@@ -995,7 +995,7 @@ describe("ArchivePage", () => {
       </MemoryRouter>,
     );
 
-    await user.click(screen.getAllByRole("link", { name: "No.6 가난한 찰리의 연감 세션으로" })[0]);
+    await user.click(screen.getAllByRole("link", { name: "No.6 가난한 찰리의 연감 모임으로" })[0]);
 
     expect(screen.getByTestId("return-to")).toHaveTextContent("/app/archive?view=reviews");
     expect(screen.getByTestId("return-label")).toHaveTextContent("아카이브로");
@@ -1026,7 +1026,7 @@ describe("ArchivePage", () => {
       </MemoryRouter>,
     );
 
-    expect(getDesktop(container).getByRole("button", { name: "세션" })).toHaveAttribute("aria-pressed", "true");
+    expect(getDesktop(container).getByRole("button", { name: "모임" })).toHaveAttribute("aria-pressed", "true");
 
     await user.click(getByRole("button", { name: "search report" }));
 
@@ -1073,7 +1073,7 @@ describe("ArchivePage", () => {
       {
         sessionId: encodedSessionId,
         sessionNumber: 7,
-        title: "7회차 모임 · URL 책",
+        title: "No.7 모임 · URL 책",
         bookTitle: "URL 책",
         bookAuthor: "링크 작가",
         bookImageUrl: null,
@@ -1091,7 +1091,7 @@ describe("ArchivePage", () => {
         bookTitle: "URL 책",
         date: "2026-05-20",
         priority: 2,
-        text: "특수 문자가 있는 세션도 열리나요?",
+        text: "특수 문자가 있는 모임도 열리나요?",
         draftThought: null,
       },
     ];
@@ -1130,10 +1130,10 @@ describe("ArchivePage", () => {
     expect(desktop.getByRole("link", { name: "No.7 URL 책 열기" })).toHaveAttribute("href", encodedSessionHref);
 
     await user.click(desktop.getByRole("button", { name: "내 서평" }));
-    expect(desktop.getByRole("link", { name: "No.7 URL 책 세션으로" })).toHaveAttribute("href", encodedRecordsHref);
+    expect(desktop.getByRole("link", { name: "No.7 URL 책 모임으로" })).toHaveAttribute("href", encodedRecordsHref);
 
     await user.click(desktop.getByRole("button", { name: "내 질문" }));
-    expect(desktop.getByRole("link", { name: "Q2 URL 책 세션으로" })).toHaveAttribute("href", encodedRecordsHref);
+    expect(desktop.getByRole("link", { name: "Q2 URL 책 모임으로" })).toHaveAttribute("href", encodedRecordsHref);
 
     await user.click(desktop.getByRole("button", { name: "피드백 문서" }));
     expect(desktop.getByRole("link", { name: "No.07 URL 책 피드백 문서 읽기" })).toHaveAttribute(

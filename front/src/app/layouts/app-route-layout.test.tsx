@@ -109,7 +109,7 @@ function renderHostLayout({
 }
 
 function expectSessionLinks(href: string) {
-  const links = screen.getAllByRole("link", { name: "세션" });
+  const links = screen.getAllByRole("link", { name: "모임" });
   expect(links).toHaveLength(2);
   for (const link of links) {
     expect(link).toHaveAttribute("href", href);
@@ -214,54 +214,32 @@ describe("AppRouteLayout host session navigation", () => {
   it.each([
     {
       operation: "open" as const,
-      initialSessionId: null,
-      nextSessionId: "session-7",
-      initialHref: "/app/host/sessions/new",
-      nextHref: "/app/host/sessions/session-7",
       mutationPath: "/api/bff/api/host/sessions/session-7/open",
       mutationMethod: "POST",
     },
     {
       operation: "close" as const,
-      initialSessionId: "session-7",
-      nextSessionId: null,
-      initialHref: "/app/host/sessions/session-7",
-      nextHref: "/app/host/sessions/new",
       mutationPath: "/api/bff/api/host/sessions/session-7/close",
       mutationMethod: "POST",
     },
     {
       operation: "delete" as const,
-      initialSessionId: "session-7",
-      nextSessionId: null,
-      initialHref: "/app/host/sessions/session-7",
-      nextHref: "/app/host/sessions/new",
       mutationPath: "/api/bff/api/host/sessions/session-7",
       mutationMethod: "DELETE",
     },
   ])(
-    "refreshes the session destination after a successful $operation mutation",
+    "keeps the meeting-list destination stable after a successful $operation mutation",
     async ({
       operation,
-      initialSessionId,
-      nextSessionId,
-      initialHref,
-      nextHref,
       mutationPath,
       mutationMethod,
     }) => {
-      let currentSessionId = initialSessionId;
       const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const path = input.toString();
         if (path === "/api/bff/api/sessions/current") {
-          return Promise.resolve(
-            jsonResponse({
-              currentSession: currentSessionId === null ? null : { sessionId: currentSessionId },
-            }),
-          );
+          return Promise.resolve(jsonResponse({ currentSession: null }));
         }
         if (path === mutationPath && init?.method === mutationMethod) {
-          currentSessionId = nextSessionId;
           if (mutationMethod === "DELETE") {
             return Promise.resolve(jsonResponse({
               sessionId: "session-7",
@@ -303,26 +281,20 @@ describe("AppRouteLayout host session navigation", () => {
         child: <SessionMutationHarness operation={operation} />,
       });
 
-      await waitFor(() => expectSessionLinks(initialHref));
+      expectSessionLinks("/app/host/sessions");
       await user.click(screen.getByRole("button", { name: operation }));
-      await waitFor(() => expectSessionLinks(nextHref));
+      await waitFor(() => expect(fetchMock).toHaveBeenCalledWith(
+        mutationPath,
+        expect.objectContaining({ method: mutationMethod }),
+      ));
+      expectSessionLinks("/app/host/sessions");
 
-      expect(
-        fetchMock.mock.calls.filter(([input]) => input.toString() === "/api/bff/api/sessions/current"),
-      ).toHaveLength(2);
     },
   );
 
-  it("distinguishes loading from failure and recovers a transient current-session lookup", async () => {
-    const initialRequest = deferred<Response>();
-    const retryRequest = deferred<Response>();
-    let currentRequest = 0;
+  it("does not fetch current-session identity for stable shell destinations", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const path = input.toString();
-      if (path === "/api/bff/api/sessions/current") {
-        currentRequest += 1;
-        return currentRequest === 1 ? initialRequest.promise : retryRequest.promise;
-      }
       return Promise.reject(new Error(`Unexpected fetch: ${path}`));
     });
     vi.stubGlobal("fetch", fetchMock);
@@ -332,36 +304,17 @@ describe("AppRouteLayout host session navigation", () => {
         mutations: { retry: false },
       },
     });
-    const user = userEvent.setup();
-
     renderHostLayout({
       queryClient,
       child: <main>host child</main>,
     });
 
-    expect(screen.getAllByLabelText("세션 불러오는 중")).toHaveLength(2);
-
-    await act(async () => {
-      initialRequest.resolve(jsonResponse({ title: "Unavailable" }, 503));
-      await initialRequest.promise;
-    });
-
-    const retryButtons = await screen.findAllByRole("button", { name: "세션 다시 확인" });
-    expect(retryButtons).toHaveLength(2);
-    expect(screen.queryByLabelText("세션 불러오는 중")).not.toBeInTheDocument();
-
-    await user.click(retryButtons[0]);
-
-    expect(await screen.findAllByRole("button", { name: "세션 다시 확인 중" })).toHaveLength(2);
-    expect(screen.getAllByRole("button", { name: "세션 다시 확인 중" })[0]).toBeDisabled();
-
-    await act(async () => {
-      retryRequest.resolve(jsonResponse({ currentSession: { sessionId: "session-9" } }));
-      await retryRequest.promise;
-    });
-
-    await waitFor(() => expectSessionLinks("/app/host/sessions/session-9"));
-    expect(currentRequest).toBe(2);
+    expectSessionLinks("/app/host/sessions");
+    expect(screen.queryByLabelText("모임 불러오는 중")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "모임 다시 확인" })).not.toBeInTheDocument();
+    expect(
+      fetchMock.mock.calls.filter(([input]) => input.toString() === "/api/bff/api/sessions/current"),
+    ).toHaveLength(0);
   });
 });
 
@@ -407,6 +360,142 @@ describe("AppRouteLayout guest shell", () => {
     expect(screen.queryByLabelText("게스트 계정")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "공개 홈으로 나가기" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();
+  });
+});
+
+describe("AppRouteLayout workspace authority", () => {
+  it("derives the same-meeting host role-switch destination in app chrome", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+            <MemoryRouter initialEntries={["/clubs/reading-sai/app/sessions/meeting-7"]}>
+              <Routes>
+                <Route
+                  path="/clubs/:clubSlug/app/sessions/:sessionId"
+                  element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />}
+                >
+                  <Route index element={<main>member record</main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(screen.getAllByRole("link", { name: "호스트 공간" })).toHaveLength(2);
+    for (const link of screen.getAllByRole("link", { name: "호스트 공간" })) {
+      expect(link).toHaveAttribute("href", "/clubs/reading-sai/app/host/sessions/meeting-7");
+    }
+    expect(document.querySelectorAll("[data-app-route-security-controller]")).toHaveLength(1);
+  });
+
+  it("replaces a revoked host route with its member-safe destination", async () => {
+    window.sessionStorage.removeItem("readmates:last-safe-workspace-target:member");
+    window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: memberAuth }}>
+            <MemoryRouter initialEntries={["/clubs/reading-sai/app/host/sessions/meeting-7"]}>
+              <Routes>
+                <Route path="/clubs/:clubSlug/app" element={<AppRouteLayout scopedAuth={memberAuth} audience="MEMBER" />}>
+                  <Route path="host/sessions/:sessionId" element={<main>revoked host record</main>} />
+                  <Route path="archive" element={<main>member archive</main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("member archive")).toBeInTheDocument();
+  });
+
+  it("keeps a canonical member record route in member chrome despite a stale host workspace hint", () => {
+    window.sessionStorage.setItem("readmates:mobile-workspace", "host");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((input: RequestInfo | URL) => {
+        if (input.toString().includes("/api/bff/api/sessions/current")) {
+          return Promise.resolve(jsonResponse({ currentSession: null }));
+        }
+        return Promise.reject(new Error(`Unexpected fetch: ${input.toString()}`));
+      }),
+    );
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+            <MemoryRouter initialEntries={["/clubs/reading-sai/app/sessions/meeting-7"]}>
+              <Routes>
+                <Route
+                  path="/clubs/:clubSlug/app/sessions/:sessionId"
+                  element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />}
+                >
+                  <Route index element={<main>member record</main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    expect(document.querySelector(".mobile-only .m-hdr")).toHaveAttribute("data-workspace", "member");
+    expect(document.querySelector(".mobile-only .m-tabbar")).toHaveAttribute("data-variant", "member");
+  });
+
+  it("falls back inside the current club when member record return state points at another club", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={queryClient}>
+        <AuthActionsContext.Provider value={{ markLoggedOut: vi.fn(), refreshAuth: vi.fn() }}>
+          <AuthContext.Provider value={{ status: "ready", auth: hostAuth }}>
+            <MemoryRouter initialEntries={[{
+              pathname: "/clubs/reading-sai/app/sessions/meeting-7",
+              state: {
+                readmatesReturnTo: "/clubs/another-club/app/archive?view=report#meeting-7",
+                readmatesReturnLabel: "다른 클럽 기록으로",
+              },
+            }]}>
+              <Routes>
+                <Route
+                  path="/clubs/:clubSlug/app/sessions/:sessionId"
+                  element={<AppRouteLayout scopedAuth={hostAuth} audience="MEMBER" />}
+                >
+                  <Route index element={<main><h1>멤버 기록</h1></main>} />
+                </Route>
+              </Routes>
+            </MemoryRouter>
+          </AuthContext.Provider>
+        </AuthActionsContext.Provider>
+      </QueryClientProvider>,
+    );
+
+    const mobileHeader = document.querySelector<HTMLElement>(".mobile-only .m-hdr");
+    expect(mobileHeader).not.toBeNull();
+    expect(within(mobileHeader!).getByRole("link", { name: "뒤로" })).toHaveAttribute(
+      "href",
+      "/clubs/reading-sai/app/archive?view=sessions",
+    );
   });
 });
 
@@ -540,7 +629,7 @@ describe("AppRouteLayout session expiry recovery", () => {
         return Promise.resolve(jsonResponse({
           sessionId: "session-7",
           sessionNumber: 7,
-          title: "검증할 세션",
+          title: "검증할 모임",
           bookTitle: "검증할 책",
           bookAuthor: "작가",
           bookImageUrl: null,
@@ -584,7 +673,7 @@ describe("AppRouteLayout session expiry recovery", () => {
     const detail = {
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "공개 세션",
+      title: "공개 모임",
       bookTitle: "책",
       bookAuthor: "작가",
       bookImageUrl: null,

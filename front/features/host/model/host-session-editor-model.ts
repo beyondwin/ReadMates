@@ -296,7 +296,7 @@ export function getDestructiveActionAvailability(
     guidance: state === "DRAFT"
       ? "목록에서 지웁니다. 되돌릴 수 없습니다."
       : canDelete
-        ? "세션과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다."
-        : "닫히거나 공개된 세션은 삭제할 수 없습니다.",
+        ? "모임과 관련 준비 기록이 모두 제거됩니다. 되돌릴 수 없습니다."
+        : "닫히거나 공개된 모임은 삭제할 수 없습니다.",
   };
 }

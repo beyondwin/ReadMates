@@ -2,17 +2,19 @@ import type { HostSessionDetailResponse } from "@/features/host/model/host-view-
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 
 export function feedbackPreviewStateForSession(
-  session: HostSessionDetailResponse | null | undefined,
+  session: Pick<HostSessionDetailResponse, "sessionId"> | null | undefined,
   returnTarget: ReadmatesReturnTarget,
   readmatesReturnState: (target: ReadmatesReturnTarget) => ReadmatesReturnState,
+  clubSlug?: string,
 ) {
   if (!session) {
     return undefined;
   }
 
+  const appBasePath = clubSlug ? `/clubs/${encodeURIComponent(clubSlug)}/app` : "/app";
   return readmatesReturnState({
-    href: `/app/host/sessions/${encodeURIComponent(session.sessionId)}`,
-    label: "세션 문서로",
+    href: `${appBasePath}/host/sessions/${encodeURIComponent(session.sessionId)}`,
+    label: "모임 문서로",
     state: readmatesReturnState(returnTarget),
   });
 }

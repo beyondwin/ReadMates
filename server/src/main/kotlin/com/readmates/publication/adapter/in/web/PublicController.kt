@@ -19,8 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
-private const val PUBLIC_CLUB_CACHE_CONTROL = "public, max-age=60, must-revalidate"
-private const val PUBLIC_DETAIL_CACHE_CONTROL = "public, max-age=60, must-revalidate"
+private const val PUBLIC_CACHE_CONTROL = "public, max-age=60, must-revalidate"
 
 @RestController
 @RequestMapping("/api/public")
@@ -38,12 +37,11 @@ class PublicController(
         val result =
             getPublicClubUseCase.getClub(clubSlug)
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val response = result.toResponse()
         return ResponseEntity
             .ok()
-            .header("Cache-Control", PUBLIC_CLUB_CACHE_CONTROL)
-            .eTag("public-club-${result.cacheGeneration}")
-            .body(response)
+            .header("Cache-Control", PUBLIC_CACHE_CONTROL)
+            .eTag("\"public-club-g${result.projectionGeneration}\"")
+            .body(result.toResponse())
     }
 
     @GetMapping("/sessions/{sessionId}")
@@ -63,12 +61,11 @@ class PublicController(
         val result =
             getPublicSessionUseCase.getSession(clubSlug, id)
                 ?: throw ResponseStatusException(HttpStatus.NOT_FOUND)
-        val response = result.toResponse()
         return ResponseEntity
             .ok()
-            .header("Cache-Control", PUBLIC_DETAIL_CACHE_CONTROL)
-            .eTag("public-session-${result.cacheGeneration}")
-            .body(response)
+            .header("Cache-Control", PUBLIC_CACHE_CONTROL)
+            .eTag("\"public-record-g${result.projectionGeneration}-r${result.liveRecordRevision}\"")
+            .body(result.toResponse())
     }
 
     private fun PublicClubResult.toResponse() =

@@ -118,6 +118,7 @@ class HostSessionTrashControllerDbTest(
         mockMvc.get("/api/host/sessions/$first/trash") { withHost() }.andExpect {
             status { isOk() }
             jsonPath("$.trashed") { value(true) }
+            jsonPath("$.sessionRevision") { value(1) }
             jsonPath("$.counts.questions") { value(1) }
         }
 

@@ -5,6 +5,8 @@ import com.readmates.auth.application.MemberProfileException
 import com.readmates.auth.application.model.ReplaceOwnMemberProfileCommand
 import com.readmates.auth.application.model.UpdateMemberAvatarCommand
 import com.readmates.auth.application.model.UpdateMemberProfileCommand
+import com.readmates.auth.application.port.out.AuthPublicProjectionLock
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.HostMemberListRow
 import com.readmates.auth.application.port.out.MemberProfileRow
 import com.readmates.auth.application.port.out.MemberProfileStorePort
@@ -184,6 +186,35 @@ class MemberProfileServiceTest {
     }
 
     @Test
+    fun `public session prelock precedes profile store club lock`() {
+        val calls = mutableListOf<String>()
+        val store = RecordingMemberProfileStorePort(calls = calls)
+        val projection =
+            object : AuthPublicProjectionMutationPort {
+                override fun lockPotentiallyAffectedSessions(clubId: UUID): AuthPublicProjectionLock {
+                    calls += "projection-prelock"
+                    return TestProjectionLock
+                }
+
+                override fun record(
+                    lock: AuthPublicProjectionLock,
+                    mutation: com.readmates.auth.application.port.out.AuthPublicProjectionMutation,
+                ): Int {
+                    calls += "projection-record"
+                    return 1
+                }
+            }
+
+        MemberProfileService(store, publicProjection = projection)
+            .updateOwnProfile("member@example.com", UpdateMemberProfileCommand("새이름"))
+
+        assertEquals(
+            listOf("projection-prelock", "profile-club-lock", "projection-record"),
+            calls,
+        )
+    }
+
+    @Test
     fun `updates own avatar after trimming a valid avatar key`() {
         val store = RecordingMemberProfileStorePort()
         val invalidation = RecordingReadCacheInvalidationPort()
@@ -281,7 +312,7 @@ class MemberProfileServiceTest {
             }
 
         assertEquals(MemberProfileError.MEMBER_NOT_FOUND, exception.error)
-        assertEquals(1, store.profileMemberForUpdateLookups)
+        assertEquals(2, store.profileMemberForUpdateLookups)
     }
 
     @Test
@@ -303,7 +334,7 @@ class MemberProfileServiceTest {
             }
 
         assertEquals(MemberProfileError.MEMBERSHIP_NOT_ALLOWED, exception.error)
-        assertEquals(1, store.profileMemberForUpdateLookups)
+        assertEquals(2, store.profileMemberForUpdateLookups)
     }
 
     private inner class RecordingMemberProfileStorePort(
@@ -313,6 +344,7 @@ class MemberProfileServiceTest {
         private val duplicateDisplayName: Boolean = false,
         private val updateOwnProfileResult: Boolean = true,
         private val statusAfterFailedProfileUpdate: MembershipStatus? = null,
+        private val calls: MutableList<String>? = null,
     ) : MemberProfileStorePort {
         val avatarUpdates = mutableListOf<AvatarUpdate>()
         val profileUpdates = mutableListOf<OwnProfileUpdate>()
@@ -348,7 +380,10 @@ class MemberProfileServiceTest {
             return row.takeIf { it.clubId == clubId && it.membershipId == membershipId }
         }
 
-        override fun lockClubProfileNames(clubId: UUID) = row.clubId == clubId
+        override fun lockClubProfileNames(clubId: UUID): Boolean {
+            calls?.add("profile-club-lock")
+            return row.clubId == clubId
+        }
 
         override fun displayNameExistsInClub(
             clubId: UUID,
@@ -429,4 +464,6 @@ class MemberProfileServiceTest {
             clubs += clubId
         }
     }
+
+    private data object TestProjectionLock : AuthPublicProjectionLock
 }

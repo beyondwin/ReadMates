@@ -29,6 +29,8 @@ import {
   useCommitAiJobMutation,
 } from "./aigen-job-queries";
 
+const context = { clubSlug: "reading-sai" } as const;
+
 function recentJob(status: AiRecentJobResponse["status"]): AiRecentJobResponse {
   return {
     jobId: "job-1",
@@ -67,11 +69,10 @@ function cacheState(client: QueryClient) {
 }
 
 function seedCommitSurfaces(client: QueryClient) {
-  const context = { clubSlug: "reading-sai" };
   const invalidatedEntries = [
-    [aiJobKeys.recent("session-1"), recentJob("SUCCEEDED")],
-    [aiJobKeys.detail("session-1", "job-1"), { jobId: "job-1", status: "SUCCEEDED" }],
-    [aiJobKeys.models("session-1"), { models: [{ id: "model-1", provider: "test", isDefault: true }] }],
+    [aiJobKeys.recent("session-1", context), recentJob("SUCCEEDED")],
+    [aiJobKeys.detail("session-1", "job-1", context), { jobId: "job-1", status: "SUCCEEDED" }],
+    [aiJobKeys.models("session-1", context), { models: [{ id: "model-1", provider: "test", isDefault: true }] }],
     [hostSessionKeys.detail("session-1", context), { sessionId: "session-1" }],
     [hostSessionKeys.closingStatus("session-1", context), { status: "OPEN" }],
     [hostSessionKeys.list({ limit: 50 }, context), { items: [{ sessionId: "session-1" }] }],
@@ -80,7 +81,7 @@ function seedCommitSurfaces(client: QueryClient) {
   ] as const;
   const controlEntries = [
     [hostSessionKeys.manualDispatches({ sessionId: "session-1" }, context), { items: ["dispatch-1"] }],
-    [aiJobKeys.recent("session-2"), recentJob("RUNNING")],
+    [aiJobKeys.recent("session-2", context), recentJob("RUNNING")],
     [
       hostSessionKeys.detail("session-1", { clubSlug: "other-club" }),
       { sessionId: "other-club-session-1" },
@@ -94,16 +95,18 @@ function seedCommitSurfaces(client: QueryClient) {
 
 describe("AI job query helpers", () => {
   it("scopes recent and detail keys by host session", () => {
-    expect(aiJobKeys.recent("session-1")).toEqual([
+    expect(aiJobKeys.recent("session-1", context)).toEqual([
       "host",
+      "reading-sai",
       "aigen",
       "jobs",
       "session",
       "session-1",
       "recent",
     ]);
-    expect(aiJobKeys.detail("session-1", "job-1")).toEqual([
+    expect(aiJobKeys.detail("session-1", "job-1", context)).toEqual([
       "host",
+      "reading-sai",
       "aigen",
       "jobs",
       "session",
@@ -111,8 +114,8 @@ describe("AI job query helpers", () => {
       "detail",
       "job-1",
     ]);
-    expect(aiJobKeys.models("session-1")).toEqual([
-      "host", "aigen", "jobs", "session", "session-1", "models",
+    expect(aiJobKeys.models("session-1", context)).toEqual([
+      "host", "reading-sai", "aigen", "jobs", "session", "session-1", "models",
     ]);
   });
 
@@ -129,9 +132,9 @@ describe("AI job query helpers", () => {
     vi.mocked(getJob).mockResolvedValue(detail);
     vi.mocked(getAvailableModels).mockResolvedValue(models);
     const { client } = createWrapper();
-    const recentOptions = recentAiJobQuery("session-1");
-    const detailOptions = aiJobDetailQuery("session-1", "job-1");
-    const modelsOptions = availableAiModelsQuery("session-1");
+    const recentOptions = recentAiJobQuery("session-1", context);
+    const detailOptions = aiJobDetailQuery("session-1", "job-1", context);
+    const modelsOptions = availableAiModelsQuery("session-1", context);
 
     await Promise.all([
       client.fetchQuery(recentOptions),
@@ -139,19 +142,19 @@ describe("AI job query helpers", () => {
       client.fetchQuery(modelsOptions),
     ]);
 
-    expect(recentOptions.queryKey).toEqual(aiJobKeys.recent("session-1"));
-    expect(detailOptions.queryKey).toEqual(aiJobKeys.detail("session-1", "job-1"));
-    expect(modelsOptions.queryKey).toEqual(aiJobKeys.models("session-1"));
-    expect(getRecentJob).toHaveBeenCalledWith("session-1");
-    expect(getJob).toHaveBeenCalledWith("session-1", "job-1");
-    expect(getAvailableModels).toHaveBeenCalledWith("session-1");
-    expect(client.getQueryData(aiJobKeys.recent("session-1"))).toEqual(recent);
-    expect(client.getQueryData(aiJobKeys.detail("session-1", "job-1"))).toEqual(detail);
-    expect(client.getQueryData(aiJobKeys.models("session-1"))).toEqual(models);
+    expect(recentOptions.queryKey).toEqual(aiJobKeys.recent("session-1", context));
+    expect(detailOptions.queryKey).toEqual(aiJobKeys.detail("session-1", "job-1", context));
+    expect(modelsOptions.queryKey).toEqual(aiJobKeys.models("session-1", context));
+    expect(getRecentJob).toHaveBeenCalledWith("session-1", context);
+    expect(getJob).toHaveBeenCalledWith("session-1", "job-1", context);
+    expect(getAvailableModels).toHaveBeenCalledWith("session-1", context);
+    expect(client.getQueryData(aiJobKeys.recent("session-1", context))).toEqual(recent);
+    expect(client.getQueryData(aiJobKeys.detail("session-1", "job-1", context))).toEqual(detail);
+    expect(client.getQueryData(aiJobKeys.models("session-1", context))).toEqual(models);
   });
 
   it("polls recent recoverable jobs until the server stops returning one", () => {
-    const options = recentAiJobQuery("session-1");
+    const options = recentAiJobQuery("session-1", context);
     const interval = options.refetchInterval;
     if (typeof interval !== "function") {
       throw new Error("Expected functional refetchInterval");
@@ -190,6 +193,7 @@ describe("AI job query helpers", () => {
       "session-1",
       "job-1",
       { recordVisibility: "MEMBER" },
+      context,
     );
     for (const [key, value] of invalidatedEntries) {
       expect(client.getQueryState(key)?.isInvalidated, JSON.stringify(key)).toBe(true);

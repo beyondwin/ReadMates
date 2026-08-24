@@ -4,6 +4,7 @@ import {
   parseHostSessionDetailResponse,
 } from "./host-contracts";
 import {
+  HostSessionRestoreMutationEnvelopeSchema,
   parseHostSessionChangeReceipt,
   parseOptionalHostSessionChangeReceipt,
   parseHostSessionHistoryRecovery,
@@ -37,6 +38,15 @@ function hostSessionDetail(overrides: Record<string, unknown> = {}) {
     visibility: "MEMBER",
     publication: null,
     state: "OPEN",
+    versions: {
+      sessionRevision: 3,
+      exposureRevision: 2,
+      participantSetRevision: 4,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 1,
+    },
+    attendanceSnapshotId: "attendance-snapshot-4",
     attendees: [],
     feedbackDocument: {
       uploaded: false,
@@ -48,6 +58,27 @@ function hostSessionDetail(overrides: Record<string, unknown> = {}) {
 }
 
 describe("host session recovery contracts", () => {
+  it("rejects missing, extra, and wrong-domain restore expected revisions", () => {
+    const valid = {
+      idempotencyKey: "b6-restore-change-0001",
+      expected: { sessionRevision: 3 },
+      command: { expectedCurrentHash: "a".repeat(64) },
+    };
+    expect(HostSessionRestoreMutationEnvelopeSchema.safeParse(valid).success).toBe(true);
+    expect(HostSessionRestoreMutationEnvelopeSchema.safeParse({
+      ...valid,
+      expected: {},
+    }).success).toBe(false);
+    expect(HostSessionRestoreMutationEnvelopeSchema.safeParse({
+      ...valid,
+      expected: { sessionRevision: 3, attendanceRevision: 2 },
+    }).success).toBe(false);
+    expect(HostSessionRestoreMutationEnvelopeSchema.safeParse({
+      ...valid,
+      expected: { publicationRevision: 3 },
+    }).success).toBe(false);
+  });
+
   it("parses a change receipt", () => {
     expect(parseHostSessionChangeReceipt(receipt)).toEqual(receipt);
   });

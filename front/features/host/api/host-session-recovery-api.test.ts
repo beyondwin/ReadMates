@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { saveHostSessionAttendance } from "./host-api";
+import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 import {
   fetchHostSessionRestorePreview,
   restoreHostSessionChange,
@@ -29,6 +30,7 @@ const preview = {
 };
 
 afterEach(() => {
+  __resetHostClientContractCapabilityForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -51,17 +53,29 @@ describe("host session recovery API", () => {
   });
 
   it("posts the expected current hash with scoped club context", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
-      changeId: "change-2",
-      kind: "BASIC_INFO",
-      undoAvailable: true,
-    }));
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v2", "v3"],
+          }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
+        : jsonResponse({
+            changeId: "change-2",
+            kind: "BASIC_INFO",
+            undoAvailable: true,
+          }),
+    ));
     vi.stubGlobal("fetch", fetchMock);
+    const envelope = {
+      idempotencyKey: "b6-restore-change-0001",
+      expected: { sessionRevision: 3 },
+      command: { expectedCurrentHash: "d".repeat(64) },
+    };
 
     await expect(restoreHostSessionChange(
       "session/7",
       "change/1",
-      { expectedCurrentHash: "d".repeat(64) },
+      envelope,
       { clubSlug: "reading-sai" },
     )).resolves.toEqual({
       changeId: "change-2",
@@ -69,30 +83,52 @@ describe("host session recovery API", () => {
       undoAvailable: true,
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(2,
       "/api/bff/api/host/sessions/session%2F7/changes/change%2F1/restore?clubSlug=reading-sai",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify({ expectedCurrentHash: "d".repeat(64) }),
+        body: JSON.stringify(envelope),
       }),
     );
+    await expect(restoreHostSessionChange(
+      "session/7",
+      "change/1",
+      { ...envelope, expected: {} } as never,
+      { clubSlug: "reading-sai" },
+    )).rejects.toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it("parses an attendance save receipt without a second request", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
-      sessionId: "session-7",
-      count: 1,
-      changeReceipt: {
-        changeId: "change-attendance-1",
-        kind: "ATTENDANCE",
-        undoAvailable: true,
-      },
-    }));
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v2", "v3"],
+          }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
+        : jsonResponse({
+            sessionId: "session-7",
+            count: 1,
+            changeReceipt: {
+              changeId: "change-attendance-1",
+              kind: "ATTENDANCE",
+              undoAvailable: true,
+            },
+          }),
+    ));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(saveHostSessionAttendance(
       "session 7",
-      [{ membershipId: "membership-1", attendanceStatus: "ATTENDED" }],
+      {
+        idempotencyKey: "b6-attendance-0001",
+        expected: { rows: [{ membershipId: "membership-1", attendanceRevision: 4 }] },
+        command: { entries: [{
+          membershipId: "membership-1",
+          attendanceStatus: "ATTENDED",
+          expectedAttendanceRevision: 4,
+        }] },
+      },
       { clubSlug: "reading-sai" },
     )).resolves.toEqual({
       sessionId: "session-7",
@@ -104,27 +140,46 @@ describe("host session recovery API", () => {
       },
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(2,
       "/api/bff/api/host/sessions/session%207/attendance?clubSlug=reading-sai",
       expect.objectContaining({
         method: "POST",
-        body: JSON.stringify([{ membershipId: "membership-1", attendanceStatus: "ATTENDED" }]),
+        body: JSON.stringify({
+          idempotencyKey: "b6-attendance-0001",
+          expected: { rows: [{ membershipId: "membership-1", attendanceRevision: 4 }] },
+          command: { entries: [{
+            membershipId: "membership-1",
+            attendanceStatus: "ATTENDED",
+            expectedAttendanceRevision: 4,
+          }] },
+        }),
       }),
     );
   });
 
   it("converts a stale restore conflict into an API error", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
-      code: "HOST_SESSION_RESTORE_STALE",
-      message: "그 사이 다른 변경이 있습니다.",
-      status: 409,
-    }, 409));
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v3"],
+          }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
+        : jsonResponse({
+            code: "HOST_SESSION_RESTORE_STALE",
+            message: "그 사이 다른 변경이 있습니다.",
+            status: 409,
+          }, 409),
+    ));
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(restoreHostSessionChange(
       "session-7",
       "change-1",
-      { expectedCurrentHash: "e".repeat(64) },
+      {
+        idempotencyKey: "b6-restore-change-0002",
+        expected: { sessionRevision: 7 },
+        command: { expectedCurrentHash: "e".repeat(64) },
+      },
       { clubSlug: "reading-sai" },
     )).rejects.toMatchObject({
       code: "HOST_SESSION_RESTORE_STALE",

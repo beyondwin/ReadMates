@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { HostSessionState } from "./host-session-editor-model";
 import {
   buildHostSessionReverseRequest,
@@ -15,7 +15,7 @@ describe("reverseLifecycleAction", () => {
   it.each([
     ["OPEN", { kind: "return-to-draft", label: "작성 중으로 되돌리기" }],
     ["CLOSED", { kind: "reopen", label: "다시 준비 중으로" }],
-    ["PUBLISHED", { kind: "unpublish", label: "공개 취소" }],
+    ["PUBLISHED", { kind: "unpublish", label: "게스트·멤버 노트에서 기록 내리기" }],
     ["DRAFT", null],
   ] as const satisfies ReadonlyArray<
     [HostSessionState, { kind: "reopen" | "unpublish" | "return-to-draft"; label: string } | null]
@@ -25,6 +25,38 @@ describe("reverseLifecycleAction", () => {
 });
 
 describe("lifecycleConfirmCopy", () => {
+  it("gets publication confirmation actions from the canonical formatter", async () => {
+    vi.resetModules();
+    vi.doMock("@/shared/model/meeting-language", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("@/shared/model/meeting-language")>();
+      return {
+        ...actual,
+        formatPublicationAction: (
+          action: "publishMemberNotes" | "removeMemberNotes",
+          form: "action" | "completed" = "action",
+        ) => `canonical:${form}:${action}`,
+      };
+    });
+
+    try {
+      const { lifecycleConfirmCopy: getLifecycleConfirmCopy } = await import("./host-session-lifecycle-model");
+
+      expect(getLifecycleConfirmCopy("publish")).toMatchObject({
+        title: "canonical:action:publishMemberNotes",
+        confirmLabel: "canonical:action:publishMemberNotes",
+        successFlash: "canonical:completed:publishMemberNotes",
+      });
+      expect(getLifecycleConfirmCopy("unpublish")).toMatchObject({
+        title: "canonical:action:removeMemberNotes",
+        confirmLabel: "canonical:action:removeMemberNotes",
+        successFlash: "canonical:completed:removeMemberNotes",
+      });
+    } finally {
+      vi.doUnmock("@/shared/model/meeting-language");
+      vi.resetModules();
+    }
+  });
+
   it("returns open confirmation copy", () => {
     expect(lifecycleConfirmCopy("open")).toEqual({
       kind: "open",
@@ -50,10 +82,10 @@ describe("lifecycleConfirmCopy", () => {
       "publish",
       {
         kind: "publish",
-        title: "기록 공개",
+        title: "게스트·멤버 노트에 기록 게시",
         body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
-        confirmLabel: "기록 공개",
-        successFlash: "기록을 공개했습니다.",
+        confirmLabel: "게스트·멤버 노트에 기록 게시",
+        successFlash: "게스트·멤버 노트에 기록을 게시했습니다.",
       },
     ],
     [
@@ -70,10 +102,10 @@ describe("lifecycleConfirmCopy", () => {
       "unpublish",
       {
         kind: "unpublish",
-        title: "공개 취소",
+        title: "게스트·멤버 노트에서 기록 내리기",
         body: "공개 사이트에서 내려갑니다. 기록과 이미 보낸 알림은 남습니다.",
-        confirmLabel: "공개 취소",
-        successFlash: "공개를 취소했습니다.",
+        confirmLabel: "게스트·멤버 노트에서 기록 내리기",
+        successFlash: "게스트·멤버 노트에서 기록을 내렸습니다.",
       },
     ],
     [

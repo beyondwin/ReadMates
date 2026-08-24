@@ -37,6 +37,6 @@ class ArchiveErrorHandler {
         when (this) {
             ArchiveApplicationError.MEMBER_APP_ACCESS_REQUIRED -> "멤버 공간에 접근할 권한이 없습니다."
             ArchiveApplicationError.REVIEW_BODY_REQUIRED -> "서평 내용을 입력해 주세요."
-            ArchiveApplicationError.SESSION_NOT_FOUND -> "요청한 세션을 찾을 수 없습니다."
+            ArchiveApplicationError.SESSION_NOT_FOUND -> "요청한 모임을 찾을 수 없습니다."
         }
 }

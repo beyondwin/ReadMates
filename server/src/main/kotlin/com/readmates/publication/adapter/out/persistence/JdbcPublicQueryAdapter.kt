@@ -1,6 +1,7 @@
 package com.readmates.publication.adapter.out.persistence
 
 import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
+import com.readmates.publication.application.model.PublicClubProjectionGeneration
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicHighlightResult
@@ -20,6 +21,95 @@ import java.util.UUID
 class JdbcPublicQueryAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : LoadPublishedPublicDataPort {
+    override fun loadClubProjectionGeneration(clubSlug: String): PublicClubProjectionGeneration? =
+        jdbcTemplate
+            .query(
+                """
+                select clubs.id,
+                       coalesce(generations.generation, 0) as generation,
+                       case
+                         when generations.club_id is null then
+                           binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                         else
+                           generations.origin_readable
+                           and binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                       end as origin_readable
+                from clubs
+                left join public_club_projection_generations generations on generations.club_id = clubs.id
+                where clubs.slug = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    PublicClubProjectionGeneration(
+                        clubId = rs.uuid("id"),
+                        generation = rs.getLong("generation"),
+                        originReadable = rs.getBoolean("origin_readable"),
+                    )
+                },
+                clubSlug,
+            ).firstOrNull()
+
+    override fun loadSessionProjectionGeneration(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicProjectionGeneration? =
+        jdbcTemplate
+            .query(
+                """
+                select sessions.id as session_id,
+                       sessions.club_id,
+                       publications.id as publication_id,
+                       coalesce(current_projection.generation, 0) as generation,
+                       coalesce(current_projection.club_generation, club_generation.generation, 0) as club_generation,
+                       coalesce(
+                         current_projection.live_record_revision,
+                         (select max(revisions.version)
+                          from session_record_revisions revisions
+                          where revisions.club_id = sessions.club_id
+                            and revisions.session_id = sessions.id),
+                         0
+                       ) as live_record_revision,
+                       case
+                         when current_projection.session_id is null then
+                           sessions.deleted_at is null
+                           and binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                           and binary sessions.state = binary 'PUBLISHED'
+                           and binary sessions.access_scope = binary 'GUEST_READABLE'
+                           and binary publications.site_visibility = binary 'PUBLIC_RECORD'
+                         else
+                           current_projection.origin_readable
+                           and sessions.deleted_at is null
+                           and binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                           and binary sessions.state = binary 'PUBLISHED'
+                           and binary sessions.access_scope = binary 'GUEST_READABLE'
+                           and binary publications.site_visibility = binary 'PUBLIC_RECORD'
+                       end as origin_readable
+                from sessions
+                join clubs on clubs.id = sessions.club_id
+                left join public_session_publications publications
+                  on publications.club_id = sessions.club_id and publications.session_id = sessions.id
+                left join public_projection_current current_projection on current_projection.session_id = sessions.id
+                left join public_club_projection_generations club_generation on club_generation.club_id = sessions.club_id
+                where clubs.slug = ? and sessions.id = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    PublicProjectionGeneration(
+                        publicationId = rs.getString("publication_id")?.let(UUID::fromString),
+                        clubId = rs.uuid("club_id"),
+                        sessionId = rs.uuid("session_id"),
+                        generation = rs.getLong("generation"),
+                        clubGeneration = rs.getLong("club_generation"),
+                        liveRecordRevision = rs.getLong("live_record_revision"),
+                        originReadable = rs.getBoolean("origin_readable"),
+                    )
+                },
+                clubSlug,
+                sessionId.dbString(),
+            ).firstOrNull()
+
     override fun loadClub(): PublicClubResult? = loadClub(LEGACY_PUBLIC_CLUB_SLUG)
 
     override fun loadClub(clubSlug: String): PublicClubResult? =
@@ -40,25 +130,8 @@ class JdbcPublicQueryAdapter(
                         about = rs.getString("about"),
                         stats = publicStats(jdbcTemplate, clubId),
                         recentSessions = publicSessions(jdbcTemplate, clubId),
-                        cacheGeneration = loadClubGeneration(clubSlug) ?: 0,
                     )
                 },
-                clubSlug,
-            ).firstOrNull()
-
-    override fun loadClubGeneration(clubSlug: String): Long? =
-        jdbcTemplate
-            .query(
-                """
-                select coalesce(sum(generation.generation), 0) as cache_generation
-                from clubs
-                left join public_projection_generations generation on generation.club_id = clubs.id
-                where clubs.slug = ?
-                  and clubs.status = 'ACTIVE'
-                  and clubs.public_visibility = 'PUBLIC'
-                group by clubs.id
-                """.trimIndent(),
-                { resultSet, _ -> resultSet.getLong("cache_generation") },
                 clubSlug,
             ).firstOrNull()
 
@@ -72,14 +145,11 @@ class JdbcPublicQueryAdapter(
             .query(
                 """
                 select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.book_author, sessions.book_image_url, sessions.session_date,
-                       public_session_publications.public_summary, public_projection_generations.generation
+                       public_session_publications.public_summary
                 from active_sessions sessions
                 join clubs on clubs.id = sessions.club_id
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
-                join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
-                  and public_projection_generations.club_id = sessions.club_id
-                  and public_projection_generations.session_id = sessions.id
                 where clubs.slug = ?
                   and clubs.status = 'ACTIVE'
                   and clubs.public_visibility = 'PUBLIC'
@@ -87,8 +157,6 @@ class JdbcPublicQueryAdapter(
                   and sessions.state = 'PUBLISHED'
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
-                  and public_projection_generations.origin_readable = true
-                  and public_projection_generations.emergency_denied = false
                 """.trimIndent(),
                 { rs, _ ->
                     PublicSessionDetailResult(
@@ -101,43 +169,13 @@ class JdbcPublicQueryAdapter(
                         summary = rs.getString("public_summary"),
                         highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), sessionId),
                         oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), sessionId),
-                        cacheGeneration = rs.getLong("generation").let { if (rs.wasNull()) 0 else it },
                     )
                 },
                 clubSlug,
                 sessionId.dbString(),
             ).firstOrNull()
 
-    override fun loadSessionGeneration(
-        clubSlug: String,
-        sessionId: UUID,
-    ): PublicProjectionGeneration? =
-        jdbcTemplate
-            .query(
-                """
-                select generation.publication_id, generation.generation,
-                       generation.live_record_revision, generation.origin_readable
-                from public_projection_generations generation
-                join clubs on clubs.id = generation.club_id
-                where clubs.slug = ?
-                  and clubs.status = 'ACTIVE'
-                  and clubs.public_visibility = 'PUBLIC'
-                  and generation.session_id = ?
-                """.trimIndent(),
-                { resultSet, _ ->
-                    val liveRevision = resultSet.getLong("live_record_revision")
-                    val liveRevisionOrNull = if (resultSet.wasNull()) null else liveRevision
-                    PublicProjectionGeneration(
-                        publicationId = resultSet.uuid("publication_id"),
-                        generation = resultSet.getLong("generation"),
-                        liveRecordRevision = liveRevisionOrNull,
-                        originReadable = resultSet.getBoolean("origin_readable"),
-                    )
-                },
-                clubSlug,
-                sessionId.dbString(),
-            ).firstOrNull()
-
+    // for_next_tasks: task_3 will rewrite publicSessions() — do not touch lines 125-188
     private fun publicStats(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
@@ -150,30 +188,26 @@ class JdbcPublicQueryAdapter(
                 from active_sessions sessions
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
-                join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
-                  and public_projection_generations.club_id = sessions.club_id
-                  and public_projection_generations.session_id = sessions.id
+                join public_projection_current projection on projection.session_id = sessions.id
+                  and projection.club_id = sessions.club_id
+                  and projection.origin_readable = true
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
-                  and public_projection_generations.origin_readable = true
-                  and public_projection_generations.emergency_denied = false
               ) as session_count,
               (
                 select count(distinct sessions.book_title)
                 from active_sessions sessions
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
-                join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
-                  and public_projection_generations.club_id = sessions.club_id
-                  and public_projection_generations.session_id = sessions.id
+                join public_projection_current projection on projection.session_id = sessions.id
+                  and projection.club_id = sessions.club_id
+                  and projection.origin_readable = true
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
-                  and public_projection_generations.origin_readable = true
-                  and public_projection_generations.emergency_denied = false
               ) as book_count,
               (
                 select count(*)
@@ -219,9 +253,9 @@ class JdbcPublicQueryAdapter(
             from active_sessions sessions
             join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
-            join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
-              and public_projection_generations.club_id = sessions.club_id
-              and public_projection_generations.session_id = sessions.id
+            join public_projection_current projection on projection.session_id = sessions.id
+              and projection.club_id = sessions.club_id
+              and projection.origin_readable = true
             left join (
               select highlights.session_id, count(*) as cnt
               from highlights
@@ -246,8 +280,6 @@ class JdbcPublicQueryAdapter(
               and sessions.state = 'PUBLISHED'
               and sessions.access_scope = 'GUEST_READABLE'
               and public_session_publications.site_visibility = 'PUBLIC_RECORD'
-              and public_projection_generations.origin_readable = true
-              and public_projection_generations.emergency_denied = false
             order by sessions.number desc
             limit 6
             """.trimIndent(),

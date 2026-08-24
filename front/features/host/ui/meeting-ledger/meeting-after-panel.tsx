@@ -121,7 +121,7 @@ export function MeetingAfterPanel({
             aria-describedby={blockedReason ? publishReasonId : undefined}
             onClick={() => onPublish?.()}
           >
-            기록 공개
+            게스트·멤버 노트에 기록 게시
           </button>
         ) : null}
       </div>

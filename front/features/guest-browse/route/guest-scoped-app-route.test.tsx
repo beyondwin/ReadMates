@@ -56,15 +56,15 @@ describe("guest notes route pagination", () => {
     const user = userEvent.setup();
     mount();
 
-    expect(screen.getByText("세션을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeVisible();
-    expect(screen.getByLabelText("세션 검색")).toBeVisible();
+    expect(screen.getByText("모임을 먼저 고르고, 하이라이트·한줄평·질문을 작성자와 함께 훑는 클럽 기록장입니다.")).toBeVisible();
+    expect(screen.getByLabelText("모임 검색")).toBeVisible();
     expect(screen.getByRole("button", { name: "전체 보기" })).toBeVisible();
     expect(screen.getByLabelText("클럽 노트 필터")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "하이라이트 1" }));
 
     expect(screen.getByLabelText("guest notes route")).toHaveTextContent("/clubs/alpha/app/notes?sessionId=s1&source=guest&filter=highlights");
-    const selectedLinks = screen.getAllByRole("link", { name: "No.01 책 세션 보기" });
+    const selectedLinks = screen.getAllByRole("link", { name: "No.01 책 모임 보기" });
     expect(selectedLinks.some((link) => link.getAttribute("href") === "/clubs/alpha/app/notes?sessionId=s1&filter=highlights")).toBe(true);
   });
 
@@ -121,20 +121,20 @@ describe("guest notes route pagination", () => {
     fireEvent.click(loadMore);
     fireEvent.click(loadMore);
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    resolve(new Response(JSON.stringify({ items: [{ sessionId: "s2", sessionNumber: 2, bookTitle: "다음 세션 책", date: "2026-08-09", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 0 }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
-    expect((await screen.findAllByText("다음 세션 책")).length).toBe(2);
+    resolve(new Response(JSON.stringify({ items: [{ sessionId: "s2", sessionNumber: 2, bookTitle: "다음 모임 책", date: "2026-08-09", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 0 }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    expect((await screen.findAllByText("다음 모임 책")).length).toBe(2);
   });
 
   it("keeps note-session pagination retryable after rejection", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn()
       .mockResolvedValueOnce(new Response("busy", { status: 503 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ sessionId: "s2", sessionNumber: 2, bookTitle: "복구 세션 책", date: "2026-08-09", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 0 }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
+      .mockResolvedValueOnce(new Response(JSON.stringify({ items: [{ sessionId: "s2", sessionNumber: 2, bookTitle: "복구 모임 책", date: "2026-08-09", questionCount: 0, oneLinerCount: 0, longReviewCount: 0, highlightCount: 0, totalCount: 0 }], nextCursor: null }), { status: 200, headers: { "Content-Type": "application/json" } }));
     vi.stubGlobal("fetch", fetchMock);
     mount({ ...notes(), sessions: { ...notes().sessions, nextCursor: "session-cursor" }, feed: { ...notes().feed, nextCursor: null } });
     await user.click(screen.getAllByRole("button", { name: "더 보기" })[0]);
     await user.click(await screen.findByRole("button", { name: "다시 시도" }));
-    expect((await screen.findAllByText("복구 세션 책")).length).toBe(2);
+    expect((await screen.findAllByText("복구 모임 책")).length).toBe(2);
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 });
@@ -248,7 +248,7 @@ describe("guest archive route pagination", () => {
     const [, setSearchParams] = useSearchParams();
 
     return <main>
-      {["세션", "피드백 문서", "내 질문", "내 서평"].map((tab) => <button key={tab} type="button" onClick={() => {
+      {["모임", "피드백 문서", "내 질문", "내 서평"].map((tab) => <button key={tab} type="button" onClick={() => {
         if (tab === "피드백 문서") {
           setSearchParams({ view: "report" }, { replace: true });
           setShowFeedback(true);
@@ -270,7 +270,7 @@ describe("guest archive route pagination", () => {
       </MemoryRouter>,
     );
 
-    for (const tabName of ["세션", "피드백 문서", "내 질문", "내 서평"]) {
+    for (const tabName of ["모임", "피드백 문서", "내 질문", "내 서평"]) {
       expect(screen.getByRole("button", { name: tabName })).toBeVisible();
     }
     expect(screen.queryByRole("link", { name: "멤버로 시작" })).not.toBeInTheDocument();

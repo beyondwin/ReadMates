@@ -1,10 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   readReadmatesReturnTarget,
-  readReadmatesWorkspaceState,
-  readStoredReadmatesMobileWorkspace,
   rememberReadmatesListScroll,
-  rememberReadmatesMobileWorkspace,
   resetReadmatesNavigationScroll,
   restoreReadmatesListScroll,
 } from "@/src/app/route-continuity";
@@ -72,18 +69,6 @@ describe("route continuity", () => {
     expect(scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "auto" });
   });
 
-  it("reads valid mobile workspace state from router state", () => {
-    expect(readReadmatesWorkspaceState({ readmatesWorkspace: "host" })).toBe("host");
-    expect(readReadmatesWorkspaceState({ readmatesWorkspace: "member" })).toBe("member");
-    expect(readReadmatesWorkspaceState({ readmatesWorkspace: "other" })).toBeNull();
-  });
-
-  it("stores mobile workspace in session storage", () => {
-    rememberReadmatesMobileWorkspace("host");
-
-    expect(readStoredReadmatesMobileWorkspace()).toBe("host");
-  });
-
   it("rejects external return targets", () => {
     const fallback = { href: "/app", label: "앱으로" };
 
@@ -96,6 +81,19 @@ describe("route continuity", () => {
         fallback,
       ),
     ).toEqual(fallback);
+  });
+
+  it("bounds cyclic nested return state without overflowing", () => {
+    const cyclic: Record<string, unknown> = {
+      readmatesReturnTo: "/app/host/sessions/session-6",
+      readmatesReturnLabel: "모임으로",
+    };
+    cyclic.readmatesReturnState = cyclic;
+
+    expect(readReadmatesReturnTarget(cyclic, { href: "/app", label: "앱으로" })).toEqual({
+      href: "/app/host/sessions/session-6",
+      label: "모임으로",
+    });
   });
 
   it("scopes public links from club app routes", () => {

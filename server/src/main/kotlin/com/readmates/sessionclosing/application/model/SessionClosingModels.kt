@@ -74,6 +74,9 @@ data class SessionClosingSnapshot(
     val publicVisible: Boolean,
     val publicRecordHref: String?,
     val memberReflectionHref: String?,
+    val sessionRevision: Long = 0,
+    val participantSetRevision: Long = 0,
+    val attendanceSnapshotId: String = "att:",
 )
 
 data class HostSessionClosingStatus(
@@ -90,6 +93,9 @@ data class ClosingSessionSummary(
     val meetingDate: LocalDate,
     val state: String,
     val recordVisibility: SessionRecordVisibility,
+    val sessionRevision: Long = 0,
+    val participantSetRevision: Long = 0,
+    val attendanceSnapshotId: String = "att:",
 )
 
 data class ClosingOverall(

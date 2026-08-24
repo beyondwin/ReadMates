@@ -56,11 +56,9 @@ export function attentionItems(page: Pick<HostSessionAttentionData, "items">): H
   return page.items;
 }
 
-const SESSION_STATES = new Set<SessionState>(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]);
 const RECORD_STATUSES = new Set<HostSessionLedgerRecordStatus>(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]);
 
 export function normalizeHostSessionLedgerFilters(params: URLSearchParams): HostSessionLedgerFilters {
-  const state = params.get("state");
   const recordStatus = params.get("recordStatus");
   const needsAttention = params.get("needsAttention");
   const view = params.get("view") === "trash" ? "trash" : "active";
@@ -68,9 +66,7 @@ export function normalizeHostSessionLedgerFilters(params: URLSearchParams): Host
   return {
     view,
     search: view === "trash" ? "" : params.get("search")?.trim().replace(/\s+/g, " ") ?? "",
-    state: view === "trash"
-      ? null
-      : SESSION_STATES.has(state as SessionState) ? state as SessionState : null,
+    state: null,
     recordStatus: view === "trash"
       ? null
       : RECORD_STATUSES.has(recordStatus as HostSessionLedgerRecordStatus)
@@ -90,9 +86,6 @@ export function toHostSessionLedgerSearch(filters: HostSessionLedgerFilters) {
   const search = filters.search.trim().replace(/\s+/g, " ");
   if (search) {
     params.set("search", search);
-  }
-  if (filters.state) {
-    params.set("state", filters.state);
   }
   if (filters.recordStatus) {
     params.set("recordStatus", filters.recordStatus);

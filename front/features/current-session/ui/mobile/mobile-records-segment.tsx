@@ -48,7 +48,7 @@ export function MobileRecordsSegment({
             한줄평 내용
           </label>
           <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-            세션 참여자에게 보이는 한 문장입니다.
+            모임 참여자에게 보이는 한 문장입니다.
           </p>
           <input
             id="mobile-one-line-review"
@@ -60,7 +60,7 @@ export function MobileRecordsSegment({
           />
           <div className="rm-current-session-mobile__save-row">
             <span className="tiny" style={{ color: "var(--text-3)" }}>
-              세션 참여자 공개
+              모임 참여자 공개
             </span>
             <div className="m-row" style={{ gap: 10, justifyContent: "flex-end" }}>
               <SaveFeedback scope="oneLineReview" status={oneLineReviewSaveStatus} />
@@ -128,7 +128,7 @@ export function MobileRecordsSegment({
         <div className={canReadFeedback ? "m-card-quiet" : "m-card-quiet rm-locked-state"} role="note">
           <div className="eyebrow">피드백 문서 접근</div>
           <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
-            {canReadFeedback ? "세션 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다." : feedbackAccess.body}
+            {canReadFeedback ? "모임 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다." : feedbackAccess.body}
           </p>
         </div>
       </section>

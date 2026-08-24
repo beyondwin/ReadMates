@@ -68,7 +68,7 @@ async function openEditorSection(
       await closeWorkspaceSheets(page);
       await trigger.click();
     }
-    await expect(page.getByLabel("세션 제목")).toBeVisible();
+    await expect(page.getByLabel("모임 제목")).toBeVisible();
     return;
   }
   if (name === "변경 기록") {
@@ -231,11 +231,11 @@ test("1. host finds and opens a past session at the default overview", async ({ 
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions/new`);
   await openEditorSection(page, "기본 정보");
-  await page.getByLabel("세션 제목").fill("Revision Workflow Session");
+  await page.getByLabel("모임 제목").fill("Revision Workflow Session");
   await page.getByLabel("책 제목").fill(RECORD_BOOK);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
@@ -274,10 +274,10 @@ where id = '${recordSessionId}';
 `);
 
   await page.goto(`${HOST_PATH}/sessions`);
-  await expect(page.getByRole("heading", { name: "세션 기록 장부" })).toBeVisible();
-  await page.getByRole("searchbox", { name: "세션 기록 검색" }).fill(RECORD_BOOK);
+  await expect(page.getByRole("heading", { name: "모임 기록 장부" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "모임 기록 검색" }).fill(RECORD_BOOK);
   await page.getByRole("button", { name: "검색" }).click();
-  const rowAction = page.getByRole("link", { name: new RegExp(`^${recordSessionNumber}회차`) }).first();
+  const rowAction = page.getByRole("link", { name: new RegExp(`^No\\.${recordSessionNumber}\\b`) }).first();
   await expect(rowAction).toBeVisible();
   await rowAction.click();
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
@@ -298,7 +298,7 @@ test("2. basic information and attendance save immediately with metadata-only au
   await openRecordEditor(page);
   await openEditorSection(page, "기본 정보");
 
-  await page.getByLabel("세션 제목").fill("Revision Workflow Session Updated");
+  await page.getByLabel("모임 제목").fill("Revision Workflow Session Updated");
   const basicSave = page.waitForResponse(
     (response) =>
       response.request().method() === "PATCH" &&
@@ -416,7 +416,7 @@ test("4. stale draft requires an exact live metadata review before apply", async
 
   await page.reload();
   await openEditorSection(page, "기록");
-  await expect(page.getByText(/세션 기본 정보 또는 현재 적용본이 변경되어/)).toBeVisible();
+  await expect(page.getByText(/모임 기본 정보 또는 현재 적용본이 변경되어/)).toBeVisible();
   const reviewButton = page.locator("#workspace-panel-records").getByRole("button", { name: "반영 전 확인" });
   await expect(reviewButton).toBeDisabled();
   const staleScreenshot = await page.screenshot({
@@ -533,10 +533,10 @@ where id = '${recordSessionId}';
 `);
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions`);
-  await expect(page.getByRole("heading", { name: "세션 기록 장부" })).toBeVisible();
-  await page.getByRole("searchbox", { name: "세션 기록 검색" }).fill(RECORD_BOOK);
+  await expect(page.getByRole("heading", { name: "모임 기록 장부" })).toBeVisible();
+  await page.getByRole("searchbox", { name: "모임 기록 검색" }).fill(RECORD_BOOK);
   await page.getByRole("button", { name: "검색" }).click();
-  await page.getByRole("link", { name: new RegExp(`^${recordSessionNumber}회차`) }).first().click();
+  await page.getByRole("link", { name: new RegExp(`^No\\.${recordSessionNumber}\\b`) }).first().click();
   await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
   await expect(page.getByRole("tab", { name: "개요" })).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
@@ -561,7 +561,7 @@ where id = '${recordSessionId}';
   const refreshed = await refreshResponse;
   expect(refreshed.status(), await refreshed.text()).toBe(200);
   await expect(refreshDraft).toHaveCount(0);
-  await expect(page.getByText(/세션 기본 정보 또는 현재 적용본이 변경되어/)).toHaveCount(0);
+  await expect(page.getByText(/모임 기본 정보 또는 현재 적용본이 변경되어/)).toHaveCount(0);
 
   const longMobileSummary =
     "모바일 확인용 미적용 초안 EnglishVeryLongWordWithoutNaturalBreaks "

@@ -71,9 +71,9 @@ export function analyticsSearchFromWindow(window: AnalyticsWindow): URLSearchPar
 
 const KPI_LABELS: Record<KpiKey, string> = {
   ACTIVE_MEMBERS: "활성 멤버",
-  SESSION_COMPLETION: "세션 완료율",
-  RSVP_RATE: "RSVP 응답률",
-  AI_COST_PER_SESSION: "AI 비용/세션",
+  SESSION_COMPLETION: "모임 완료율",
+  RSVP_RATE: "참석 응답률",
+  AI_COST_PER_SESSION: "AI 비용/모임",
   NOTIFICATION_DELIVERY: "알림 도달률",
 };
 

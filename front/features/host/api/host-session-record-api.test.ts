@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  HostSessionRecordApplyMutationEnvelopeSchema,
   HostSessionHistoryPageResponseSchema,
   HostSessionRecordApplyResultResponseSchema,
   HostSessionRecordEditorResponseSchema,
   SessionRecordSnapshotResponseSchema,
 } from "./host-session-record-contracts";
+import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 import {
   applyHostSessionRecord,
   deleteHostSessionRecordDraft,
@@ -35,20 +37,70 @@ function snapshot(): SessionRecordSnapshot {
     oneLineReviews: [],
     feedbackDocument: {
       fileName: "session-28.md",
-      title: "28회차 피드백",
+      title: "No.28 피드백",
       markdown: "# 피드백",
     },
   };
 }
 
 afterEach(() => {
+  __resetHostClientContractCapabilityForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("host session record API", () => {
+  it("uses the strict record apply envelope and explicit club context", async () => {
+    const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/__internal/client-contract-status")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v2", "v3"],
+        }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }));
+      }
+      return Promise.resolve(jsonResponse({
+        revisionId: "revision-3",
+        liveRevision: 3,
+        composer: {
+          sessionId: "session-28",
+          eventType: "SESSION_RECORD_UPDATED",
+          contentRevision: "b".repeat(64),
+        },
+      }));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const envelope = {
+      idempotencyKey: "test-apply",
+      expected: { draftRevision: 3, liveRevision: 2 },
+      command: { applyRequestId: "apply-request-1", expectedDraftHash: "a".repeat(64) },
+    };
+
+    await applyHostSessionRecord("session/28", envelope, { clubSlug: "reading-sai" });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "/api/bff/api/host/sessions/session%2F28/record-apply?clubSlug=reading-sai",
+      expect.objectContaining({ method: "POST", body: JSON.stringify(envelope) }),
+    );
+    expect(HostSessionRecordApplyMutationEnvelopeSchema.safeParse({
+      ...envelope,
+      expected: { ...envelope.expected, sessionRevision: 1 },
+    }).success).toBe(false);
+    expect(() => applyHostSessionRecord("session/28", {
+      ...envelope,
+      expected: { draftRevision: 3 } as never,
+    }, { clubSlug: "reading-sai" })).toThrow();
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("uses club-scoped URLs and exact record apply bodies", async () => {
     const fetchMock = vi.fn().mockImplementation((url: string) => {
+      if (url.includes("/__internal/client-contract-status")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v3"],
+        }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }));
+      }
       if (url.includes("/record-editor")) {
         return Promise.resolve(jsonResponse({
           sessionId: "session-28",
@@ -90,10 +142,12 @@ describe("host session record API", () => {
       snapshot: snapshot(),
     }, context);
     await applyHostSessionRecord("session-28", {
-      applyRequestId: "apply-request-1",
-      expectedDraftRevision: 3,
-      expectedLiveRevision: 2,
-      expectedDraftHash: "a".repeat(64),
+      idempotencyKey: "test-apply",
+      expected: { draftRevision: 3, liveRevision: 2 },
+      command: {
+        applyRequestId: "apply-request-1",
+        expectedDraftHash: "a".repeat(64),
+      },
     }, context);
 
     expect(fetchMock).toHaveBeenNthCalledWith(
@@ -102,7 +156,7 @@ describe("host session record API", () => {
       expect.objectContaining({ cache: "no-store" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
+      3,
       "/api/bff/api/host/sessions/session-28/record-draft?clubSlug=reading-sai",
       expect.objectContaining({
         method: "PATCH",
@@ -113,30 +167,38 @@ describe("host session record API", () => {
       }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
-      3,
+      4,
       "/api/bff/api/host/sessions/session-28/record-apply?clubSlug=reading-sai",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          applyRequestId: "apply-request-1",
-          expectedDraftRevision: 3,
-          expectedLiveRevision: 2,
-          expectedDraftHash: "a".repeat(64),
+          idempotencyKey: "test-apply",
+          expected: { draftRevision: 3, liveRevision: 2 },
+          command: {
+            applyRequestId: "apply-request-1",
+            expectedDraftHash: "a".repeat(64),
+          },
         }),
       }),
     );
   });
 
   it("binds draft rebase to the exact live metadata version reviewed by the host", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
-      sessionId: "session-28",
-      baseLiveRevision: 2,
-      draftRevision: 4,
-      source: "MANUAL",
-      restoredFromRevisionId: null,
-      snapshot: snapshot(),
-      updatedAt: "2026-07-23T10:01:00+09:00",
-    }));
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({ schemaVersion: 1, supportedHostClientContracts: ["v3"] }), {
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          })
+        : jsonResponse({
+            sessionId: "session-28",
+            baseLiveRevision: 2,
+            draftRevision: 4,
+            source: "MANUAL",
+            restoredFromRevisionId: null,
+            snapshot: snapshot(),
+            updatedAt: "2026-07-23T10:01:00+09:00",
+          }),
+    ));
     vi.stubGlobal("fetch", fetchMock);
 
     await rebaseHostSessionRecordDraft("session/28", {
@@ -145,7 +207,7 @@ describe("host session record API", () => {
       expectedSessionUpdatedAt: "2026-07-23T10:00:00+09:00",
     }, { clubSlug: "reading-sai" });
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(2,
       "/api/bff/api/host/sessions/session%2F28/record-draft/rebase?clubSlug=reading-sai",
       expect.objectContaining({
         method: "POST",
@@ -176,6 +238,12 @@ describe("host session record API", () => {
 
   it("mirrors capability, ledger, preview, delete, and restore endpoints", async () => {
     const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) => {
+      if (url.includes("/__internal/client-contract-status")) {
+        return Promise.resolve(new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v3"],
+        }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }));
+      }
       if (url.includes("/capabilities")) {
         return Promise.resolve(jsonResponse({
           sessionRecordDrafts: true,
@@ -250,8 +318,9 @@ describe("host session record API", () => {
       ["GET", "/api/bff/api/host/capabilities?clubSlug=reading-sai"],
       [
         "GET",
-        "/api/bff/api/host/sessions?search=Moby+Dick&state=CLOSED&recordStatus=INCOMPLETE&needsAttention=true&limit=50&cursor=ledger+page&clubSlug=reading-sai",
+        "/api/bff/api/host/sessions?mode=record&search=Moby+Dick&recordStatus=INCOMPLETE&needsAttention=true&limit=50&cursor=ledger+page&clubSlug=reading-sai",
       ],
+      ["GET", "/api/bff/__internal/client-contract-status"],
       ["POST", "/api/bff/api/host/sessions/session%2F28/record-apply-preview?clubSlug=reading-sai"],
       [
         "DELETE",
@@ -262,23 +331,29 @@ describe("host session record API", () => {
         "/api/bff/api/host/sessions/session%2F28/revisions/revision%2F2/restore-to-draft?clubSlug=reading-sai",
       ],
     ]);
-    expect(fetchMock.mock.calls[2]?.[1]).toEqual(expect.objectContaining({
+    expect(fetchMock.mock.calls[3]?.[1]).toEqual(expect.objectContaining({
       body: JSON.stringify({ expectedDraftRevision: 3, expectedLiveRevision: 2 }),
     }));
-    expect(fetchMock.mock.calls[4]?.[1]).toEqual(expect.objectContaining({
+    expect(fetchMock.mock.calls[5]?.[1]).toEqual(expect.objectContaining({
       body: JSON.stringify({ expectedDraftRevision: 3 }),
     }));
   });
 
   it("preserves structured API errors when draft deletion fails", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
-      code: "SESSION_RECORD_DRAFT_STALE",
-      message: "다른 호스트가 먼저 초안을 수정했습니다.",
-      status: 409,
-    }), {
-      status: 409,
-      headers: { "Content-Type": "application/json" },
-    })));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({ schemaVersion: 1, supportedHostClientContracts: ["v3"] }), {
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          })
+        : new Response(JSON.stringify({
+            code: "SESSION_RECORD_DRAFT_STALE",
+            message: "다른 호스트가 먼저 초안을 수정했습니다.",
+            status: 409,
+          }), {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          }),
+    )));
 
     await expect(deleteHostSessionRecordDraft("session-28", 3, {
       clubSlug: "reading-sai",

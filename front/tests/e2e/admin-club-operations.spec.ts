@@ -249,7 +249,7 @@ test("owner views aggregate club operations without host-owned commands", async 
   ).toHaveCount(0);
   await expect(
     page.getByRole("button", {
-      name: /RSVP|출석|세션 편집|발행|세션 종료|알림 발송/,
+      name: /RSVP|참석 응답|출석|세션 편집|모임 편집|발행|세션 종료|모임 종료|알림 발송/,
     }),
   ).toHaveCount(0);
 });

@@ -1,4 +1,4 @@
-import { type ChangeEvent, useState } from "react";
+import { type ChangeEvent, useEffect, useRef, useState } from "react";
 import {
   buildComposerSelection,
   type HostNotificationComposerDraft,
@@ -11,6 +11,7 @@ import type {
   ManualNotificationPreviewRequest,
   ManualNotificationPreviewResponse,
 } from "@/features/host/model/host-view-types";
+import { formatMeetingOrdinal } from "@/shared/model/meeting-language";
 import { HostNotificationComposer } from "./host-notification-composer";
 import { HostNotificationComposerDialog } from "./host-notification-composer-dialog";
 import {
@@ -19,8 +20,10 @@ import {
   manualTemplateDescriptions,
 } from "./manual-notification-labels";
 import { ManualNotificationPreviewConfirmation } from "./manual-notification-preview";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 
 type ManualNotificationWorkbenchProps = {
+  clubSlug: string;
   options: ManualNotificationOptionsResponse;
   hostSessions: HostSessionListItem[];
   initialSessionId: string | null;
@@ -88,11 +91,12 @@ function ManualNotificationWorkbenchState({
   onLoadManualOptions,
   onLoadMoreManualMembers,
   onDraftInvalidated,
+  clubSlug,
   initialTemplate,
   onEventTypeSelected,
 }: ManualNotificationWorkbenchProps & {
   initialTemplate: ManualNotificationOptionsResponse["templates"][number] | undefined;
-  onEventTypeSelected: (eventType: HostNotificationEventType) => void;
+  onEventTypeSelected: (eventType: HostNotificationEventType | null) => void;
 }) {
   const [draft, setDraft] = useState<HostNotificationComposerDraft>({
     sessionId: initialSessionId ?? "",
@@ -104,6 +108,27 @@ function ManualNotificationWorkbenchState({
   });
   const [search, setSearch] = useState("");
   const [memberError, setMemberError] = useState<string | null>(null);
+  const authorityEpochRef = useRef(0);
+
+  useEffect(() => registerHostSensitiveState({
+    clubSlug,
+    resourceKey: `notification-preview:workbench:${initialSessionId ?? "none"}`,
+    clear: () => {
+      authorityEpochRef.current += 1;
+      setDraft({
+        sessionId: "",
+        eventType: "SESSION_REMINDER_DUE",
+        contentRevision: "",
+        recipientMode: "ALL_ACTIVE_MEMBERS",
+        requestedChannels: "BOTH",
+        selectedMembershipIds: [],
+      });
+      setSearch("");
+      setMemberError(null);
+      onEventTypeSelected(null);
+      onDraftInvalidated?.();
+    },
+  }), [clubSlug, initialSessionId, onDraftInvalidated, onEventTypeSelected]);
 
   const changeDraft = (next: HostNotificationComposerDraft) => {
     setDraft(next);
@@ -127,10 +152,13 @@ function ManualNotificationWorkbenchState({
   };
 
   const runMemberLoad = async (callback: () => Promise<unknown>) => {
+    const epoch = authorityEpochRef.current;
     try {
       await callback();
+      if (epoch !== authorityEpochRef.current) return;
       setMemberError(null);
     } catch {
+      if (epoch !== authorityEpochRef.current) return;
       setMemberError("멤버를 불러오지 못했습니다. 다시 시도해 주세요.");
     }
   };
@@ -198,22 +226,22 @@ function ManualNotificationWorkbenchState({
           <header className="rm-notification-workbench__decision-heading">
             <span className="rm-notification-workbench__step">01</span>
             <div>
-              <h3 id="manual-notification-session-title">대상 회차</h3>
+              <h3 id="manual-notification-session-title">대상 모임</h3>
               <p>알림의 기준이 되는 모임</p>
             </div>
           </header>
           <div className="rm-notification-workbench__decision-control">
             {hostSessions.length === 0 ? (
               <div className="rm-notification-workbench__empty">
-                <p>선택 가능한 세션이 없습니다.</p>
+                <p>선택 가능한 모임이 없습니다.</p>
                 <a className="btn btn-quiet btn-sm" href="/app/host/sessions">
-                  세션 관리로 이동
+                  모임 관리로 이동
                 </a>
               </div>
             ) : (
               <>
                 <label className="label" htmlFor="manual-notification-session">
-                  세션 선택
+                  모임 선택
                 </label>
                 <select
                   id="manual-notification-session"
@@ -224,7 +252,7 @@ function ManualNotificationWorkbenchState({
                 >
                   {hostSessions.map((session) => (
                     <option key={session.sessionId} value={session.sessionId}>
-                      {session.sessionNumber}회차 · {session.bookTitle} · {session.date}
+                      {formatMeetingOrdinal(session.sessionNumber, "folio")} · {session.bookTitle} · {session.date}
                     </option>
                   ))}
                 </select>

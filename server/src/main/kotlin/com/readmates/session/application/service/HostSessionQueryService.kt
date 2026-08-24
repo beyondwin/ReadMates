@@ -98,6 +98,7 @@ class HostSessionQueryService(
         return HostSessionListPage(page.items, nextCursor, page.summary)
     }
 
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     override fun detail(command: HostSessionIdCommand) = queryPort.detail(command)
 
     override fun dashboard(host: CurrentMember) = queryPort.dashboard(host)

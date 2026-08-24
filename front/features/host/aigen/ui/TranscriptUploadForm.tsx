@@ -87,7 +87,7 @@ export function TranscriptUploadForm({
 
   return (
     <div className="stack" style={{ "--stack": "14px" } as CSSProperties}>
-      <h2 style={{ margin: 0 }}>AI로 세션 기록 생성</h2>
+      <h2 style={{ margin: 0 }}>AI로 모임 기록 생성</h2>
       <p className="small" style={{ color: "var(--text-2)" }}>
         UTF-8 대본(.txt, 1 MB 이하)을 업로드해 호스트 검토용 기록을 만듭니다. 각 발화는
         현재 활성 멤버의 이름과 정확히 같은 <code>이름 MM:SS</code> 줄로 시작해야 합니다.

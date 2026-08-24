@@ -239,7 +239,7 @@ private class PublicTakedownReviewFixture(
         )
         val stale = createPreview()
         jdbcTemplate.update(
-            "update public_projection_generations set generation = generation + 1 where publication_id = ?",
+            "update public_projection_current set generation = generation + 1 where publication_id_snapshot = ?",
             REVIEW_PUBLICATION_ID,
         )
         mockMvc.assertReviewConfirmError(
@@ -249,7 +249,7 @@ private class PublicTakedownReviewFixture(
             "GENERATION_MISMATCH",
         )
         jdbcTemplate.update(
-            "update public_projection_generations set generation = 7 where publication_id = ?",
+            "update public_projection_current set generation = 7 where publication_id_snapshot = ?",
             REVIEW_PUBLICATION_ID,
         )
         reviewMismatchedPreviewRequests().forEach { mockMvc.assertReviewTargetNotFound(sessionCookie(), it) }
@@ -388,15 +388,22 @@ private fun insertReviewTarget(jdbcTemplate: JdbcTemplate) {
         REVIEW_CLUB_ID,
         REVIEW_SESSION_ID,
     )
+    jdbcTemplate.update(
+        """
+        insert into public_projection_current (
+          session_id, club_id, publication_id_snapshot, generation, club_generation,
+          live_record_revision, origin_readable, convergence_id
+        ) values (?, ?, ?, 7, 1, 1, true, null)
+        """.trimIndent(),
+        REVIEW_SESSION_ID,
+        REVIEW_CLUB_ID,
+        REVIEW_PUBLICATION_ID,
+    )
 }
 
 private fun cleanupReviewTarget(jdbcTemplate: JdbcTemplate) {
     val convergenceReceiptScope =
         "select convergence_id from admin_public_takedown_receipts where publication_id_snapshot = ?"
-    jdbcTemplate.update(
-        "delete from public_convergence_events where convergence_id in ($convergenceReceiptScope)",
-        REVIEW_PUBLICATION_ID,
-    )
     jdbcTemplate.update(
         "delete from public_convergence_work where convergence_id in ($convergenceReceiptScope)",
         REVIEW_PUBLICATION_ID,
@@ -425,6 +432,7 @@ private fun cleanupReviewTarget(jdbcTemplate: JdbcTemplate) {
         """.trimIndent(),
         REVIEW_PUBLICATION_ID,
     )
+    jdbcTemplate.update("delete from public_projection_current where publication_id_snapshot = ?", REVIEW_PUBLICATION_ID)
     jdbcTemplate.update("delete from public_projection_generations where publication_id = ?", REVIEW_PUBLICATION_ID)
     jdbcTemplate.update("delete from public_session_publications where id = ?", REVIEW_PUBLICATION_ID)
     jdbcTemplate.update("delete from session_publication_versions where session_id = ?", REVIEW_SESSION_ID)
@@ -452,7 +460,7 @@ private fun reviewCount(
 
 private fun reviewGeneration(jdbcTemplate: JdbcTemplate): Long =
     jdbcTemplate.queryForObject(
-        "select generation from public_projection_generations where publication_id = ?",
+        "select generation from public_projection_current where publication_id_snapshot = ?",
         Long::class.java,
         REVIEW_PUBLICATION_ID,
     ) ?: -1

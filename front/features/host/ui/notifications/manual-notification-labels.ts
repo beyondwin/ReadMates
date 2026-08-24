@@ -19,15 +19,15 @@ export const manualChannelDescriptions: Record<ManualNotificationRequestedChanne
 
 export const manualAudienceLabels: Record<ManualNotificationAudience, string> = {
   ALL_ACTIVE_MEMBERS: "전체 활성 멤버",
-  SESSION_PARTICIPANTS: "세션 참가자",
+  SESSION_PARTICIPANTS: "모임 참가자",
   CONFIRMED_ATTENDEES: "참석 확정자",
   SELECTED_MEMBERS: "직접 선택",
 };
 
 export const manualAudienceDescriptions: Record<ManualNotificationAudience, string> = {
   ALL_ACTIVE_MEMBERS: "현재 모임에 참여 중인 활성 멤버 모두",
-  SESSION_PARTICIPANTS: "이 회차에 참여 중인 멤버",
-  CONFIRMED_ATTENDEES: "이 회차 참석을 확정한 멤버",
+  SESSION_PARTICIPANTS: "이 모임에 참여 중인 멤버",
+  CONFIRMED_ATTENDEES: "이 모임 참석을 확정한 멤버",
   SELECTED_MEMBERS: "검색해 한 명 이상 직접 지정",
 };
 

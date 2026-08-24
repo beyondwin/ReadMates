@@ -127,8 +127,8 @@ test("host can preview a manual reminder from the notifications tab without typi
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/clubs/reading-sai/app/host/notifications");
 
-  await expect(page.getByLabel("세션 선택")).toBeVisible();
-  await expect(page.getByLabel("세션 선택")).toHaveValue(sessionId);
+  await expect(page.getByLabel("모임 선택")).toBeVisible();
+  await expect(page.getByLabel("모임 선택")).toHaveValue(sessionId);
   await expect(page.getByText("진행 중 · 호스트 전용 · 피드백 문서 준비 전", { exact: true })).toBeVisible();
 
   await page.getByRole("radio", { name: "모임 전날 리마인더" }).check();
@@ -201,7 +201,7 @@ test("host can change the selected session before previewing a manual reminder",
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/clubs/reading-sai/app/host/notifications");
 
-  await page.getByLabel("세션 선택").selectOption(secondSessionId);
+  await page.getByLabel("모임 선택").selectOption(secondSessionId);
   await expect(page.getByText("진행 중 · 호스트 전용 · 피드백 문서 준비 전", { exact: true })).toBeVisible();
 
   await page.getByRole("radio", { name: "모임 전날 리마인더" }).check();

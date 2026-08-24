@@ -40,7 +40,7 @@ object NotificationEmailTemplatePreview {
                 copy = NotificationEmailTemplates.testMailCopy(clubName = clubName),
             ),
             EmailPreviewSample(
-                name = "다음 책 공개",
+                name = "다음 책 확정",
                 eventLabel = "next book",
                 copy =
                     eventCopy(
@@ -66,7 +66,7 @@ object NotificationEmailTemplatePreview {
                     ),
             ),
             EmailPreviewSample(
-                name = "피드백 문서 공개",
+                name = "피드백 문서 등록",
                 eventLabel = "feedback document",
                 copy =
                     eventCopy(
@@ -79,7 +79,7 @@ object NotificationEmailTemplatePreview {
                     ),
             ),
             EmailPreviewSample(
-                name = "새 서평 공개",
+                name = "새 서평",
                 eventLabel = "new review",
                 copy =
                     eventCopy(

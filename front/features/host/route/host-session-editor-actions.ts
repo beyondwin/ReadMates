@@ -21,6 +21,7 @@ import {
   type SessionLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
+import { readHostResponseJson } from "@/shared/api/host-authority-event";
 
 export type HostSessionEditorActions = {
   loadDeletionPreview: (sessionId: string) => Promise<HostSessionDeletionPreviewResponse>;
@@ -127,7 +128,7 @@ export function wrapHostSessionEditorActionsForUndo(
 
 async function readResponseJson(response: Response): Promise<unknown> {
   try {
-    return await response.clone().json();
+    return await readHostResponseJson(response.clone());
   } catch {
     return null;
   }

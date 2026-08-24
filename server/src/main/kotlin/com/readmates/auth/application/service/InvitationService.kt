@@ -6,6 +6,8 @@ import com.readmates.auth.application.InvitationDomainException
 import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
 import com.readmates.auth.application.port.`in`.ManageHostInvitationsUseCase
 import com.readmates.auth.application.port.`in`.PreviewInvitationUseCase
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutation
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.HostInvitationListRow
@@ -71,6 +73,7 @@ class InvitationService(
     private val avatarAllocation: MemberAvatarAllocationPort,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
+    private val publicProjection: AuthPublicProjectionMutationPort = AuthPublicProjectionMutationPort.Noop(),
 ) : ManageHostInvitationsUseCase,
     PreviewInvitationUseCase,
     AcceptGoogleInvitationUseCase {
@@ -145,6 +148,7 @@ class InvitationService(
     }
 
     @Transactional
+    @Suppress("LongMethod", "ThrowsCount")
     override fun acceptGoogleInvitation(
         rawToken: String,
         googleSubjectId: String,
@@ -153,7 +157,16 @@ class InvitationService(
         profileImageUrl: String?,
         expectedClubSlug: String?,
     ): CurrentMember {
+        val unlockedInvitation = queryInvitationByToken(rawToken, forUpdate = false)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(unlockedInvitation.clubId)
         val invitation = queryInvitationByToken(rawToken, forUpdate = true)
+        if (invitation.id != unlockedInvitation.id || invitation.clubId != unlockedInvitation.clubId) {
+            throw InvitationDomainException(
+                "INVITATION_NOT_FOUND",
+                InvitationDomainError.NOT_FOUND,
+                "Invitation not found",
+            )
+        }
         if (expectedClubSlug != null && invitation.clubSlug != expectedClubSlug) {
             throw InvitationDomainException("INVITATION_CLUB_MISMATCH", InvitationDomainError.NOT_FOUND, "Invitation not found")
         }
@@ -186,7 +199,7 @@ class InvitationService(
                 profileImageUrl = profileImageUrl,
             )
         val avatarKey = avatarAllocation.allocate(invitation.clubId, userId)
-        val membershipId = invitationStore.upsertActiveMembership(invitation.clubId, userId, invitation.role, avatarKey)
+        val membership = invitationStore.upsertActiveMembership(invitation.clubId, userId, invitation.role, avatarKey)
 
         if (!invitationStore.acceptInvitation(invitation.id, userId)) {
             throw InvitationDomainException(
@@ -197,7 +210,19 @@ class InvitationService(
         }
 
         googleAccountStore.recordLastLogin(userId)
-        return invitationStore.findCurrentMember(membershipId)
+        if (membership.becameActive) {
+            publicProjection.record(
+                projectionLock,
+                AuthPublicProjectionMutation(
+                    invitation.clubId,
+                    actorMembershipId = null,
+                    subjectMembershipId = membership.membershipId,
+                    operation = "INVITATION_ACCEPTED",
+                    clubBodyChanged = true,
+                ),
+            )
+        }
+        return invitationStore.findCurrentMember(membership.membershipId)
             ?: throw InvitationDomainException(
                 "MEMBERSHIP_NOT_FOUND",
                 InvitationDomainError.CONFLICT,

@@ -104,7 +104,7 @@ describe("HostInvitations", () => {
     expect(screen.queryByRole("link", { name: /운영 대시보드/ })).not.toBeInTheDocument();
     expect(screen.getByText("pending@example.com · 만료 2026.05.20")).toBeInTheDocument();
     expect(screen.getByText("accepted@example.com · 만료 2026.05.20")).toBeInTheDocument();
-    expect(screen.getByLabelText("수락하면 이번 세션에도 추가")).toBeChecked();
+    expect(screen.getByLabelText("수락하면 이번 모임에도 추가")).toBeChecked();
     expect(screen.getByRole("button", { name: "pending@example.com 초대 취소" })).toBeEnabled();
     expect(screen.getByRole("button", { name: "pending@example.com 초대 취소" })).toHaveTextContent(/^초대 취소$/);
     expect(screen.getByRole("button", { name: "pending@example.com 새 링크 발급" })).toBeEnabled();
@@ -262,7 +262,7 @@ describe("HostInvitations", () => {
     render(<HostInvitationsForTest initialInvitations={[]} />);
     await user.type(screen.getByLabelText("이름"), "새멤버");
     await user.type(screen.getByLabelText("초대 이메일"), "new@example.com");
-    await user.click(screen.getByLabelText("수락하면 이번 세션에도 추가"));
+    await user.click(screen.getByLabelText("수락하면 이번 모임에도 추가"));
     await user.click(screen.getByRole("button", { name: "초대 링크 만들기" }));
 
     await waitFor(() => expect(fetchMock).toHaveBeenCalled());

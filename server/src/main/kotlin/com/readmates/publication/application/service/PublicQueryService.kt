@@ -19,57 +19,48 @@ class PublicQueryService(
     private val resolveClubContextUseCase: ResolveClubContextUseCase? = null,
 ) : GetPublicClubUseCase,
     GetPublicSessionUseCase {
+    @Suppress("ReturnCount")
     override fun getClub(clubSlug: String): PublicClubResult? {
-        val clubId = resolveClubId(clubSlug)
-        return if (clubId != null) {
-            val generation = authoritativeClubGenerationOrNull(clubSlug)
-            if (generation == null) {
-                loadPublishedPublicDataPort.loadClub(clubSlug)
-            } else {
-                cache.getClub(clubId, generation) ?: loadPublishedPublicDataPort.loadClub(clubSlug)?.also {
-                    cache.putClub(clubId, generation, it)
+        resolveClubId(clubSlug)
+        val markerResult = runCatching { loadPublishedPublicDataPort.loadClubProjectionGeneration(clubSlug) }
+        if (markerResult.isFailure) return null
+        val marker = markerResult.getOrNull() ?: return loadPublishedPublicDataPort.loadClub(clubSlug)
+        if (!marker.originReadable) return null
+
+        return cache.getClub(marker.clubId, marker.generation)
+            ?: loadPublishedPublicDataPort
+                .loadClub(clubSlug)
+                ?.copy(
+                    projectionGeneration = marker.generation,
+                )?.also {
+                    cache.putClub(marker.clubId, marker.generation, it)
                 }
-            }
-        } else {
-            loadPublishedPublicDataPort.loadClub(clubSlug)
-        }
     }
 
+    @Suppress("ReturnCount")
     override fun getSession(
         clubSlug: String,
         sessionId: UUID,
     ): PublicSessionDetailResult? {
-        val clubId = resolveClubId(clubSlug)
-        return if (clubId != null) {
-            val marker = authoritativeSessionGenerationOrNull(clubSlug, sessionId)
-            when {
-                marker == null -> loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)
-                !marker.originReadable -> null
-                else ->
-                    cache.getSession(clubId, sessionId, marker.generation)
-                        ?: loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)?.also {
-                            cache.putSession(clubId, sessionId, marker.generation, it)
-                        }
+        resolveClubId(clubSlug)
+        val markerResult =
+            runCatching {
+                loadPublishedPublicDataPort.loadSessionProjectionGeneration(clubSlug, sessionId)
             }
-        } else {
-            loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)
-        }
-    }
+        if (markerResult.isFailure) return null
+        val marker = markerResult.getOrNull() ?: return loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)
+        if (!marker.originReadable) return null
 
-    private fun authoritativeClubGenerationOrNull(clubSlug: String): Long? =
-        try {
-            loadPublishedPublicDataPort.loadClubGeneration(clubSlug)
-        } catch (_: RuntimeException) {
-            null
-        }
-
-    private fun authoritativeSessionGenerationOrNull(
-        clubSlug: String,
-        sessionId: UUID,
-    ) = try {
-        loadPublishedPublicDataPort.loadSessionGeneration(clubSlug, sessionId)
-    } catch (_: RuntimeException) {
-        null
+        return cache.getSession(marker.clubId, marker.clubGeneration, marker.generation, sessionId)
+            ?: loadPublishedPublicDataPort
+                .loadSession(clubSlug, sessionId)
+                ?.copy(
+                    projectionGeneration = marker.generation,
+                    clubProjectionGeneration = marker.clubGeneration,
+                    liveRecordRevision = marker.liveRecordRevision ?: 0,
+                )?.also {
+                    cache.putSession(marker.clubId, marker.clubGeneration, marker.generation, sessionId, it)
+                }
     }
 
     private fun resolveClubId(clubSlug: String): UUID? =

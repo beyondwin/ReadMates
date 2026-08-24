@@ -36,12 +36,12 @@ describe("HostClubOperationsCard", () => {
     const card = screen.getByRole("region", { name: "운영 신호" });
     expect(within(card).getByRole("heading", { name: "운영 신호" })).toBeInTheDocument();
     expect(within(card).getByText("READY")).toBeInTheDocument();
-    expect(within(card).getByText("현재 막힌 항목은 없습니다. 열린 세션을 기준으로 운영을 이어갈 수 있습니다.")).toBeInTheDocument();
-    expect(within(card).getByText("열린 세션")).toBeInTheDocument();
+    expect(within(card).getByText("현재 막힌 항목은 없습니다. 열린 모임을 기준으로 운영을 이어갈 수 있습니다.")).toBeInTheDocument();
+    expect(within(card).getByText("열린 모임")).toBeInTheDocument();
     expect(within(card).getByText("마감 대기")).toBeInTheDocument();
     expect(within(card).getByText("AI 실패")).toBeInTheDocument();
     expect(within(card).getByText("전주 대비")).toBeInTheDocument();
-    expect(within(card).getByRole("link", { name: "세션 문서 열기" })).toHaveAttribute("href", "/app/host/sessions/new");
+    expect(within(card).getByRole("link", { name: "모임 문서 열기" })).toHaveAttribute("href", "/app/host/sessions/new");
     expect(within(card).getByRole("link", { name: "알림 장부 보기" })).toHaveAttribute("href", "/app/host/notifications");
     expect(within(card).queryByRole("button")).toBeNull();
   });
@@ -105,7 +105,7 @@ describe("HostClubOperationsCard", () => {
     );
 
     const card = screen.getByRole("region", { name: "운영 신호" });
-    expect(within(card).getByText("마감 대기 중인 세션 기록이 있습니다. 공개 전 기록 완성을 먼저 확인하세요.")).toBeInTheDocument();
+    expect(within(card).getByText("마감 대기 중인 모임 기록이 있습니다. 공개 전 기록 완성을 먼저 확인하세요.")).toBeInTheDocument();
     expect(within(card).getByText("2")).toBeInTheDocument();
   });
 
@@ -126,7 +126,7 @@ describe("HostClubOperationsCard", () => {
     );
 
     const card = screen.getByRole("region", { name: "운영 신호" });
-    expect(within(card).getByText("최근 AI 실패가 늘었습니다. 알림 장부와 세션 준비 상태를 함께 확인하세요.")).toBeInTheDocument();
+    expect(within(card).getByText("최근 AI 실패가 늘었습니다. 알림 장부와 모임 준비 상태를 함께 확인하세요.")).toBeInTheDocument();
     expect(within(card).getByText("+2")).toBeInTheDocument();
   });
 

@@ -4,12 +4,14 @@ import { useLoaderData, useParams } from "react-router";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { hostSessionRecordLedgerQuery } from "@/features/host/queries/host-session-record-queries";
+import { meetingListItemsFromHostSources } from "@/features/host/model/host-meeting-ledger-model";
 import type { HostLinkComponent } from "@/features/host/ui/host-link-types";
 import {
   HostMeetingLedger,
   type HostMeetingLedgerLinkComponent,
 } from "@/features/host/ui/meeting-ledger/host-meeting-ledger";
 import { HOST_HOME_ATTENTION_LIMIT, type HostDashboardRouteData } from "./host-dashboard-data";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 export function HostDashboardRoute({
   LinkComponent,
@@ -21,7 +23,7 @@ export function HostDashboardRoute({
 }) {
   const loaderData = useLoaderData() as HostDashboardRouteData;
   const { clubSlug } = useParams<{ clubSlug: string }>();
-  const context = useMemo(() => ({ clubSlug }), [clubSlug]);
+  const context = useMemo(() => requireHostClubContext(clubSlug), [clubSlug]);
   const attentionQuery = useQuery({
     ...hostSessionRecordLedgerQuery({
       needsAttention: true,
@@ -47,10 +49,15 @@ export function HostDashboardRoute({
       );
     };
   }, [LinkComponent]);
+  const meetingItems = useMemo(
+    () => meetingListItemsFromHostSources(loaderData.hostSessions.items),
+    [loaderData.hostSessions.items],
+  );
 
   return (
     <HostMeetingLedger
-      items={[]}
+      items={meetingItems}
+      overviewOnly
       attentionPage={attentionPage}
       attentionError={attentionError}
       onRetryAttention={() => {

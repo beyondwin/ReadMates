@@ -44,7 +44,7 @@ function overviewInput() {
 
 describe("host session editor view model", () => {
   it.each([
-    [null, "새 예정 세션"],
+    [null, "새 예정 모임"],
     ["DRAFT", "예정"],
     ["OPEN", "준비 중"],
     ["CLOSED", "마감"],

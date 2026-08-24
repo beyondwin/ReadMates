@@ -47,6 +47,9 @@ class JdbcPublicConvergenceAdapter(
             ).firstOrNull()
 
     override fun loadReceipt(mutationReceiptId: String): PublicMutationConvergenceReceipt? =
+        loadLegacyReceipt(mutationReceiptId) ?: loadProjectionLinkReceipt(mutationReceiptId)
+
+    private fun loadLegacyReceipt(mutationReceiptId: String): PublicMutationConvergenceReceipt? =
         jdbcTemplate
             .query(
                 """
@@ -61,6 +64,28 @@ class JdbcPublicConvergenceAdapter(
                         convergenceId = resultSet.uuid("convergence_id"),
                         publicationIdSnapshot = resultSet.uuid("publication_id_snapshot"),
                         sessionIdSnapshot = resultSet.uuid("session_id_snapshot"),
+                        committedGeneration = resultSet.getLong("committed_generation"),
+                        originReadable = resultSet.getBoolean("origin_readable"),
+                    )
+                },
+                mutationReceiptId,
+            ).firstOrNull()
+
+    private fun loadProjectionLinkReceipt(mutationReceiptId: String): PublicMutationConvergenceReceipt? =
+        jdbcTemplate
+            .query(
+                """
+                select mutation_receipt_id, convergence_id, publication_id_snapshot,
+                       session_id_snapshot, committed_generation, origin_readable
+                from public_mutation_convergence_links
+                where mutation_receipt_id = ?
+                """.trimIndent(),
+                { resultSet, _ ->
+                    PublicMutationConvergenceReceipt(
+                        mutationReceiptId = resultSet.getString("mutation_receipt_id"),
+                        convergenceId = resultSet.uuid("convergence_id"),
+                        publicationIdSnapshot = resultSet.getString("publication_id_snapshot")?.let(UUID::fromString),
+                        sessionIdSnapshot = resultSet.getString("session_id_snapshot")?.let(UUID::fromString),
                         committedGeneration = resultSet.getLong("committed_generation"),
                         originReadable = resultSet.getBoolean("origin_readable"),
                     )
@@ -128,6 +153,10 @@ class JdbcPublicConvergenceAdapter(
             delete from public_convergence_work
             where created_at <= ?
               and (lease_expires_at is null or lease_expires_at <= ?)
+              and exists (
+                select 1 from public_mutation_convergence_receipts receipt
+                where receipt.convergence_id = public_convergence_work.convergence_id
+              )
             order by created_at, convergence_id
             limit ?
             """.trimIndent(),
@@ -139,7 +168,12 @@ class JdbcPublicConvergenceAdapter(
 
     override fun countWorkBacklog(): Long =
         jdbcTemplate.queryForObject(
-            "select count(*) from public_convergence_work",
+            """
+            select count(*)
+            from public_convergence_work work
+            join public_mutation_convergence_receipts receipt
+              on receipt.convergence_id = work.convergence_id
+            """.trimIndent(),
             Long::class.java,
         ) ?: 0L
 

@@ -68,20 +68,20 @@ export function FeedSections({
   copy?: NotesFeedCopy;
 }) {
   if (!hasNoteSessions || !selectedSession) {
-    return <NotesEmptyState message={hasNoteSessions ? "이 세션에는 해당 기록이 없습니다." : "아직 발행된 세션 기록이 없습니다."} />;
+    return <NotesEmptyState message={hasNoteSessions ? "이 모임에는 해당 기록이 없습니다." : "아직 발행된 모임 기록이 없습니다."} />;
   }
 
   const visibleItems = items.filter((item) => item.kind !== "LONG_REVIEW");
 
   if (visibleItems.length === 0) {
-    return <NotesEmptyState message="이 세션에는 해당 기록이 없습니다." />;
+    return <NotesEmptyState message="이 모임에는 해당 기록이 없습니다." />;
   }
 
   const selectedKind = filterKind(filter);
   const filteredItems = selectedKind ? byKind(visibleItems, selectedKind) : visibleItems;
 
   if (filteredItems.length === 0) {
-    return <NotesEmptyState message="이 세션에는 해당 기록이 없습니다." />;
+    return <NotesEmptyState message="이 모임에는 해당 기록이 없습니다." />;
   }
 
   const highlights = byKind(visibleItems, "HIGHLIGHT");

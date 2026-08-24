@@ -9,7 +9,7 @@ data class PublicClubResult(
     val about: String,
     val stats: PublicClubStatsResult,
     val recentSessions: List<PublicSessionSummaryResult>,
-    val cacheGeneration: Long = 0,
+    val projectionGeneration: Long = 0,
 )
 
 data class PublicClubStatsResult(
@@ -40,7 +40,9 @@ data class PublicSessionDetailResult(
     val summary: String,
     val highlights: List<PublicHighlightResult>,
     val oneLiners: List<PublicOneLinerResult>,
-    val cacheGeneration: Long = 1,
+    val projectionGeneration: Long = 0,
+    val clubProjectionGeneration: Long = 0,
+    val liveRecordRevision: Long = 0,
 )
 
 data class PublicHighlightResult(

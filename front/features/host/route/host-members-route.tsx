@@ -1,14 +1,20 @@
 import { useMemo } from "react";
-import { useLoaderData } from "react-router";
+import { useLoaderData, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import type { HostMemberListPage } from "@/features/host/api/host-contracts";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
 import { createHostMembersActions } from "./host-members-data";
 
 export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMembersLinkComponent }) {
   const members = useLoaderData() as HostMemberListPage;
+  const { clubSlug = "" } = useParams<{ clubSlug: string }>();
   const queryClient = useQueryClient();
-  const actions = useMemo(() => createHostMembersActions(queryClient), [queryClient]);
+  const context = requireHostClubContext(clubSlug);
+  const actions = useMemo(
+    () => createHostMembersActions(queryClient, context),
+    [context, queryClient],
+  );
 
   return (
     <main className="rm-host-members-page">
@@ -19,7 +25,7 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
             멤버 관리
           </h1>
           <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
-            멤버 상태와 이번 세션 참여 여부를 함께 확인합니다.
+            멤버 상태와 이번 모임 참여 여부를 함께 확인합니다.
           </p>
         </div>
       </section>

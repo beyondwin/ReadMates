@@ -32,18 +32,18 @@ function operatingSummary(snapshot: HostClubOperationsSnapshot): string {
   }
 
   if (snapshot.sessionProgress.incompleteRecordCount > 0) {
-    return "마감 대기 중인 세션 기록이 있습니다. 공개 전 기록 완성을 먼저 확인하세요.";
+    return "마감 대기 중인 모임 기록이 있습니다. 공개 전 기록 완성을 먼저 확인하세요.";
   }
 
   if (snapshot.aiUsage.failedRecentJobs > 0 || aiDelta > 0) {
-    return "최근 AI 실패가 늘었습니다. 알림 장부와 세션 준비 상태를 함께 확인하세요.";
+    return "최근 AI 실패가 늘었습니다. 알림 장부와 모임 준비 상태를 함께 확인하세요.";
   }
 
   if (snapshot.readiness.state === "READY") {
-    return "현재 막힌 항목은 없습니다. 열린 세션을 기준으로 운영을 이어갈 수 있습니다.";
+    return "현재 막힌 항목은 없습니다. 열린 모임을 기준으로 운영을 이어갈 수 있습니다.";
   }
 
-  return "운영 상태 확인이 필요합니다. 세션 문서와 알림 장부를 함께 점검하세요.";
+  return "운영 상태 확인이 필요합니다. 모임 문서와 알림 장부를 함께 점검하세요.";
 }
 
 function operatingMetrics(snapshot: HostClubOperationsSnapshot): OperatingMetric[] {
@@ -51,7 +51,7 @@ function operatingMetrics(snapshot: HostClubOperationsSnapshot): OperatingMetric
 
   return [
     {
-      label: "열린 세션",
+      label: "열린 모임",
       value: String(nonNegative(snapshot.sessionProgress.currentOpenCount)),
       helper: "현재 진행 중",
     },
@@ -120,7 +120,7 @@ export function HostClubOperationsCard({
 
       <div className="host-club-ops__actions" aria-label="운영 신호 조치">
         <LinkComponent className="btn btn-quiet btn-sm" to="/app/host/sessions/new">
-          세션 문서 열기
+          모임 문서 열기
         </LinkComponent>
         <LinkComponent className="btn btn-ghost btn-sm" to="/app/host/notifications">
           알림 장부 보기

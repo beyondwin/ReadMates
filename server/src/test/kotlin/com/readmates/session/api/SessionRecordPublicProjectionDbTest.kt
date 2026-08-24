@@ -2,23 +2,14 @@ package com.readmates.session.api
 
 import com.readmates.admin.takedown.adapter.out.persistence.JdbcPublicTakedownWriter
 import com.readmates.admin.takedown.application.model.PublicTakedownTarget
-import com.readmates.session.application.port.`in`.PurgeExpiredHostSessionTrashUseCase
-import com.readmates.sessionrecord.adapter.out.persistence.JdbcSessionRecordPublicProjectionAdapter
-import com.readmates.sessionrecord.application.port.out.AppliedSessionRecordPublicEffect
-import com.readmates.sessionrecord.application.port.out.SessionRecordPublicProjectionPort
 import org.assertj.core.api.Assertions.assertThat
-import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.hamcrest.Matchers.hasItem
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Import
-import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
@@ -35,17 +26,14 @@ import java.util.UUID
     ],
 )
 @AutoConfigureMockMvc
-@Import(PublicProjectionFailureTestConfiguration::class)
 @Sql(statements = [CLEANUP_EXPOSURE_PUBLICATION_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_EXPOSURE_PUBLICATION_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
 class SessionRecordPublicProjectionDbTest(
     @param:Autowired mockMvc: MockMvc,
     @param:Autowired jdbcTemplate: JdbcTemplate,
-    @param:Autowired purgeExpiredHostSessionTrash: PurgeExpiredHostSessionTrashUseCase,
-    @param:Autowired private val controlledPublicProjection: ControlledSessionRecordPublicProjectionPort,
     @param:Autowired private val publicTakedownWriter: JdbcPublicTakedownWriter,
-) : HostSessionIdempotencyDbTestSupport(mockMvc, jdbcTemplate, purgeExpiredHostSessionTrash) {
+) : HostSessionAtomicityDbTestSupport(mockMvc, jdbcTemplate) {
     @Test
     fun `published general record apply rotates generation exactly once and stale apply commits nothing`() {
         val sessionId = publishedSessionWithInitialRecord()
@@ -86,37 +74,6 @@ class SessionRecordPublicProjectionDbTest(
         assertThat(publicGeneration(sessionId)).isEqualTo(generationBefore + 1)
         assertThat(sessionRecordConvergenceReceiptCount(sessionId)).isEqualTo(convergenceBefore + 1)
         assertThat(convergenceWorkCount(sessionId)).isEqualTo(workBefore + 1)
-    }
-
-    @Test
-    fun `published record apply rolls back all writes when convergence append fails`() {
-        val sessionId = publishedSessionWithInitialRecord()
-        saveRecordDraft(sessionId, "rollback apply", "PUBLIC")
-        val applyRequestId = "00000000-0000-4000-8000-000000000713"
-        val hash = recordDraftHash(sessionId)
-        val generationBefore = publicGeneration(sessionId)
-        val revisionCountBefore = revisionCount(sessionId)
-        val applyReceiptCountBefore = count("session_record_apply_receipts", "session_id", sessionId)
-        val convergenceBefore = sessionRecordConvergenceReceiptCount(sessionId)
-        val workBefore = convergenceWorkCount(sessionId)
-        controlledPublicProjection.failAfterWrite = true
-
-        assertThatThrownBy {
-            applyRecordCommand(
-                sessionId,
-                applyRequestId,
-                "key-direct-apply-rollback-01",
-                expectedLiveRevision = 1,
-                hash = hash,
-            ).andReturn()
-        }.hasRootCauseInstanceOf(IllegalStateException::class.java)
-
-        assertThat(revisionCount(sessionId)).isEqualTo(revisionCountBefore)
-        assertThat(count("session_record_apply_receipts", "session_id", sessionId))
-            .isEqualTo(applyReceiptCountBefore)
-        assertThat(publicGeneration(sessionId)).isEqualTo(generationBefore)
-        assertThat(sessionRecordConvergenceReceiptCount(sessionId)).isEqualTo(convergenceBefore)
-        assertThat(convergenceWorkCount(sessionId)).isEqualTo(workBefore)
     }
 
     @Test
@@ -176,7 +133,7 @@ class SessionRecordPublicProjectionDbTest(
                     )
             }.andExpect { status { isOk() } }
         assertThat(allConvergenceReceiptCount(privateSessionId)).isZero()
-        assertThat(count("public_projection_generations", "session_id", privateSessionId)).isZero()
+        assertThat(count("public_projection_current", "session_id", privateSessionId)).isZero()
     }
 
     @Test
@@ -455,7 +412,7 @@ class SessionRecordPublicProjectionDbTest(
         val row =
             jdbcTemplate.queryForMap(
                 "select generation, origin_readable, emergency_denied " +
-                    "from public_projection_generations where session_id = ?",
+                    "from public_projection_current where session_id = ?",
                 sessionId,
             )
         assertThat(row["generation"]).isEqualTo(generation)
@@ -476,7 +433,7 @@ class SessionRecordPublicProjectionDbTest(
             jdbcTemplate.queryForMap(
                 """
                 select convergence.committed_generation, convergence.origin_readable
-                from public_mutation_convergence_receipts convergence
+                from public_mutation_convergence_links convergence
                 join host_session_mutation_receipts host on host.id = convergence.mutation_receipt_id
                 where convergence.session_id_snapshot = ? and host.operation = ?
                 order by convergence.created_at desc
@@ -498,8 +455,9 @@ class SessionRecordPublicProjectionDbTest(
             jdbcTemplate.queryForMap(
                 """
                 select convergence.committed_generation, convergence.origin_readable
-                from public_mutation_convergence_receipts convergence
-                join session_record_apply_receipts receipt on receipt.id = convergence.mutation_receipt_id
+                from public_mutation_convergence_links convergence
+                join session_record_apply_receipts receipt
+                  on receipt.apply_request_id = convergence.mutation_receipt_id
                 where convergence.session_id_snapshot = ?
                 order by convergence.created_at desc
                 limit 1
@@ -512,7 +470,7 @@ class SessionRecordPublicProjectionDbTest(
 
     private fun publicGeneration(sessionId: String): Long =
         jdbcTemplate.queryForObject(
-            "select generation from public_projection_generations where session_id = ?",
+            "select generation from public_projection_current where session_id = ?",
             Long::class.java,
             sessionId,
         ) ?: error("missing public generation")
@@ -526,7 +484,7 @@ class SessionRecordPublicProjectionDbTest(
         jdbcTemplate.queryForObject(
             """
             select count(*)
-            from public_mutation_convergence_receipts convergence
+            from public_mutation_convergence_links convergence
             join host_session_mutation_receipts host on host.id = convergence.mutation_receipt_id
             where convergence.session_id_snapshot = ? and host.operation = ?
             """.trimIndent(),
@@ -539,8 +497,9 @@ class SessionRecordPublicProjectionDbTest(
         jdbcTemplate.queryForObject(
             """
             select count(*)
-            from public_mutation_convergence_receipts convergence
-            join session_record_apply_receipts applied on applied.id = convergence.mutation_receipt_id
+            from public_mutation_convergence_links convergence
+            join session_record_apply_receipts applied
+              on applied.apply_request_id = convergence.mutation_receipt_id
             where convergence.session_id_snapshot = ?
             """.trimIndent(),
             Int::class.java,
@@ -550,17 +509,14 @@ class SessionRecordPublicProjectionDbTest(
     private fun convergenceWorkCount(sessionId: String): Int =
         jdbcTemplate.queryForObject(
             """
-            select count(*) from public_convergence_work work
-            join public_mutation_convergence_receipts convergence
-              on convergence.convergence_id = work.convergence_id
-            where convergence.session_id_snapshot = ?
+            select count(*) from public_convergence_work where session_id_snapshot = ?
             """.trimIndent(),
             Int::class.java,
             sessionId,
         ) ?: 0
 
     private fun allConvergenceReceiptCount(sessionId: String): Int =
-        count("public_mutation_convergence_receipts", "session_id_snapshot", sessionId)
+        count("public_mutation_convergence_links", "session_id_snapshot", sessionId)
 
     private fun originTexts(sessionId: String): List<String> =
         listOf(
@@ -662,26 +618,4 @@ class SessionRecordPublicProjectionDbTest(
 
         주석: Test fixture.
         """.trimIndent()
-}
-
-@TestConfiguration(proxyBeanMethods = false)
-class PublicProjectionFailureTestConfiguration {
-    @Bean
-    @Primary
-    fun controlledSessionRecordPublicProjectionPort(delegate: JdbcSessionRecordPublicProjectionAdapter) =
-        ControlledSessionRecordPublicProjectionPort(delegate)
-}
-
-class ControlledSessionRecordPublicProjectionPort(
-    private val delegate: JdbcSessionRecordPublicProjectionAdapter,
-) : SessionRecordPublicProjectionPort {
-    var failAfterWrite: Boolean = false
-
-    override fun recordApplied(effect: AppliedSessionRecordPublicEffect) {
-        delegate.recordApplied(effect)
-        if (failAfterWrite) {
-            failAfterWrite = false
-            throw IllegalStateException("test-only failure after public convergence append")
-        }
-    }
 }

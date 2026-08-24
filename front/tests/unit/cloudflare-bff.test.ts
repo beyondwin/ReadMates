@@ -891,103 +891,19 @@ describe("Cloudflare BFF function", () => {
 });
 
 describe("Cloudflare BFF cache layer", () => {
-  it.each([403, 404, 500])(
-    "forces an upstream public %s without cache metadata to no-store",
-    async (status) => {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn(async () => new Response('{"denied":true}', { status })),
-      );
-      const cachePut = vi.fn(async () => undefined);
-      const ctx = context(
-        new Request(
-          "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/sessions/session-1",
-        ),
-        { path: ["api", "public", "clubs", "reading-sai", "sessions", "session-1"] },
-      );
-      vi.stubGlobal("caches", {
-        default: { match: vi.fn(async () => undefined), put: cachePut },
-      });
-
-      const response = await onRequest(ctx);
-
-      expect(response.status).toBe(status);
-      expect(response.headers.get("Cache-Control")).toBe("no-store");
-      expect(cachePut).not.toHaveBeenCalled();
-      expect(ctx.waitUntil).not.toHaveBeenCalled();
-    },
-  );
-
-  it("clamps an old public detail policy before returning or storing it", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async () =>
-        new Response('{"generation":2}', {
-          status: 200,
-          headers: {
-            "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
-          },
-        }),
-      ),
-    );
-    const cacheMatch = vi.fn(async () => undefined);
-    const cachePut = vi.fn(async () => undefined);
-    const ctx = context(
-      new Request(
-        "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/sessions/session-1",
-      ),
-      { path: ["api", "public", "clubs", "reading-sai", "sessions", "session-1"] },
-    );
-    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
-
-    const response = await onRequest(ctx);
-
-    expect(response.headers.get("Cache-Control")).toBe("public, max-age=60, must-revalidate");
-    expect(ctx.waitUntil).toHaveBeenCalledOnce();
-    await vi.waitFor(() => expect(cachePut).toHaveBeenCalledOnce());
-    const [, stored] = cachePut.mock.calls[0] as unknown as [Request, Response];
-    expect(stored.headers.get("Cache-Control")).toBe("public, max-age=60, must-revalidate");
-  });
-
-  it("ignores an unsafe cached response and revalidates against origin", async () => {
-    const fetchMock = vi.fn(async () =>
-      new Response('{"fresh":true}', {
-        status: 200,
-        headers: { "Cache-Control": "public, max-age=60" },
-      }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const cacheMatch = vi.fn(async () =>
-      new Response('{"revokedBody":true}', {
-        status: 200,
-        headers: { "Cache-Control": "private, max-age=120" },
-      }),
-    );
-    const cachePut = vi.fn(async () => undefined);
-    const cacheDelete = vi.fn(async () => true);
-    vi.stubGlobal("caches", {
-      default: { match: cacheMatch, put: cachePut, delete: cacheDelete },
-    });
-
-    const response = await onRequest(
-      context(
-        new Request("https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai"),
-        { path: ["api", "public", "clubs", "reading-sai"] },
-      ),
-    );
-
-    expect(fetchMock).toHaveBeenCalledOnce();
-    await expect(response.json()).resolves.toEqual({ fresh: true });
-    expect(cacheDelete).toHaveBeenCalledOnce();
-  });
-
-  it("returns cached response on cache hit without calling upstream fetch", async () => {
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+  it("does not resurrect a cached public body after authoritative origin deny", async () => {
+    const fetchMock = vi.fn(async () => new Response('{"code":"RESOURCE_NOT_FOUND"}', {
+      status: 404,
+      headers: { "Cache-Control": "no-store" },
+    }));
     vi.stubGlobal("fetch", fetchMock);
 
-    const cachedResponse = new Response('{"cached":true}', {
+    const cachedResponse = new Response('{"revoked":"body"}', {
       status: 200,
-      headers: { "Cache-Control": "public, max-age=120" },
+      headers: {
+        "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
+        ETag: '"public-record-g1-r1"',
+      },
     });
     const cacheMatch = vi.fn(async () => cachedResponse);
     const cachePut = vi.fn(async () => undefined);
@@ -1000,18 +916,22 @@ describe("Cloudflare BFF cache layer", () => {
       ),
     );
 
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(response.status).toBe(200);
-    const body = await response.json();
-    expect(body).toEqual({ cached: true });
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(cacheMatch).not.toHaveBeenCalled();
+    expect(cachePut).not.toHaveBeenCalled();
+    expect(response.status).toBe(404);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
   });
 
-  it("fetches from upstream and stores in cache on cache miss for cacheable public path", async () => {
+  it("preserves generation validator and disables custom and CDN cache for public projections", async () => {
     const fetchMock = vi.fn(
       async () =>
         new Response('{"fresh":true}', {
           status: 200,
-          headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=600" },
+          headers: {
+            "Cache-Control": "public, max-age=60, must-revalidate",
+            ETag: '"public-record-g7-r3"',
+          },
         }),
     );
     vi.stubGlobal("fetch", fetchMock);
@@ -1028,7 +948,66 @@ describe("Cloudflare BFF cache layer", () => {
 
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(response.status).toBe(200);
-    expect(ctx.waitUntil).toHaveBeenCalledOnce();
+    expect(response.headers.get("ETag")).toBe('"public-record-g7-r3"');
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=60, must-revalidate");
+    expect(response.headers.get("CDN-Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Cloudflare-CDN-Cache-Control")).toBe("no-store");
+    expect(cacheMatch).not.toHaveBeenCalled();
+    expect(cachePut).not.toHaveBeenCalled();
+    expect(ctx.waitUntil).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["legacy club", ["api", "public", "club"]],
+    ["legacy session detail", ["api", "public", "sessions", "00000000-0000-0000-0000-000000000306"]],
+  ])("disables CDN cache for the %s public projection route", async (_label, path) => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response('{"fresh":true}', {
+          status: 200,
+          headers: { "Cache-Control": "public, max-age=60, must-revalidate" },
+        })),
+    );
+    const cacheMatch = vi.fn(async () => undefined);
+    const cachePut = vi.fn(async () => undefined);
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+
+    const response = await onRequest(
+      context(
+        new Request(`https://readmates.pages.dev/api/bff/${path.join("/")}`),
+        { path },
+      ),
+    );
+
+    expect(response.headers.get("CDN-Cache-Control")).toBe("no-store");
+    expect(response.headers.get("Cloudflare-CDN-Cache-Control")).toBe("no-store");
+    expect(cacheMatch).not.toHaveBeenCalled();
+    expect(cachePut).not.toHaveBeenCalled();
+  });
+
+  it("does not classify the unrelated records prefix as a public projection route", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response('{"ok":true}', {
+          status: 200,
+          headers: { "Cache-Control": "public, max-age=60" },
+        })),
+    );
+    vi.stubGlobal("caches", {
+      default: { match: vi.fn(async () => undefined), put: vi.fn(async () => undefined) },
+    });
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/public/records/example"),
+        { path: ["api", "public", "records", "example"] },
+      ),
+    );
+
+    expect(response.headers.get("CDN-Cache-Control")).toBeNull();
+    expect(response.headers.get("Cloudflare-CDN-Cache-Control")).toBeNull();
   });
 
   it("does not store in cache when upstream response has Set-Cookie", async () => {
@@ -1105,7 +1084,7 @@ describe("Cloudflare BFF cache layer", () => {
       "RM_SESSION=first-placeholder",
       "RM_SESSION=second-placeholder",
     ]);
-    expect(cacheMatch).toHaveBeenCalledTimes(2);
+    expect(cacheMatch).not.toHaveBeenCalled();
     expect(cachePut).not.toHaveBeenCalled();
     expect(firstContext.waitUntil).not.toHaveBeenCalled();
     expect(secondContext.waitUntil).not.toHaveBeenCalled();

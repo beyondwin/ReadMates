@@ -62,7 +62,7 @@ function attentionItem(overrides: Partial<HostSessionLedgerItem> = {}): HostSess
   return {
     sessionId: "closed-1",
     sessionNumber: 12,
-    title: "12회차",
+    title: "No.12",
     bookTitle: "닫힌 책",
     bookAuthor: "저자",
     bookImageUrl: null,
@@ -179,7 +179,7 @@ describe("HostDashboardRoute", () => {
     expect(screen.getByRole("heading", { name: "아직 열린 모임이 없습니다" })).toBeInTheDocument();
     expect(screen.getByRole("alert")).toHaveTextContent("확인 필요 목록을 불러오지 못했습니다.");
     expect(screen.queryByText("확인 필요 0건")).not.toBeInTheDocument();
-    expect(screen.queryByText("확인 필요한 세션 기록이 없습니다.")).not.toBeInTheDocument();
+    expect(screen.queryByText("확인 필요한 모임 기록이 없습니다.")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(routeMocks.refetchAttention).toHaveBeenCalled();
   });

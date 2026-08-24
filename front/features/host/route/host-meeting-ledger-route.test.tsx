@@ -49,7 +49,7 @@ vi.mock("@tanstack/react-query", () => ({
 vi.mock("@/features/host/queries/host-session-queries", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/features/host/queries/host-session-queries")>()),
   DEFAULT_HOST_SESSION_LIST_LIMIT: 50,
-  hostSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
+  hostMeetingSessionListQuery: () => ({ testData: routeMocks.hostSessions }),
   hostSessionDetailQuery: (sessionId: string) => ({ testData: routeMocks.details[sessionId] }),
   invalidateHostSessionManualDispatches: vi.fn(),
   useCreateHostSessionMutation: () => ({
@@ -97,10 +97,10 @@ function PathProbe() {
 
 function renderMeetingSurface(sessionId: string) {
   return render(
-    <MemoryRouter initialEntries={[`/app/host/sessions/${sessionId}`]}>
+    <MemoryRouter initialEntries={[`/clubs/reading-sai/app/host/sessions/${sessionId}`]}>
       <Routes>
         <Route
-          path="/app/host/sessions/:sessionId"
+          path="/clubs/:clubSlug/app/host/sessions/:sessionId"
           element={(
             <HostMeetingLedgerRoute
               LinkComponent={({ to, children }) => (
@@ -459,7 +459,7 @@ describe("HostMeetingLedgerRoute", () => {
       items: [{
         sessionId: "deep-1",
         sessionNumber: 2,
-        title: "2회차",
+        title: "No.2",
         bookTitle: "깊은 기록",
         bookAuthor: "저자",
         bookImageUrl: null,

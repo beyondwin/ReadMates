@@ -2,6 +2,7 @@ package com.readmates.sessionrecord.application.model
 
 import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.shared.exposure.v45CompatibilityProjection
 import java.time.LocalDate
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -60,6 +61,10 @@ data class SessionRecordDraft(
     val sessionId: UUID,
     val clubId: UUID,
     val baseLiveRevision: Long,
+    val baseSessionRevision: Long = 0,
+    val baseExposureRevision: Long = 0,
+    val basePublicationRevision: Long = 0,
+    val baseVectorKnown: Boolean,
     val draftRevision: Long,
     val source: SessionRecordDraftSource,
     val restoredFromRevisionId: UUID?,
@@ -68,7 +73,14 @@ data class SessionRecordDraft(
     val createdAt: OffsetDateTime,
     val updatedAt: OffsetDateTime,
     val baseSessionUpdatedAt: OffsetDateTime = LEGACY_SESSION_RECORD_TIMESTAMP,
-)
+) {
+    fun isStaleAgainst(live: LiveSessionRecord): Boolean =
+        !baseVectorKnown ||
+            baseSessionRevision != live.sessionRevision ||
+            baseLiveRevision != live.revision ||
+            baseExposureRevision != live.exposureRevision ||
+            basePublicationRevision != live.publicationRevision
+}
 
 data class SessionRecordRevision(
     val id: UUID,
@@ -90,6 +102,9 @@ data class LiveSessionRecord(
     val sessionNumber: Int = 0,
     val bookTitle: String = "",
     val meetingDate: LocalDate = LocalDate.MIN,
+    val sessionRevision: Long = 0,
+    val exposureRevision: Long = 0,
+    val publicationRevision: Long = 0,
     val sessionUpdatedAt: OffsetDateTime = LEGACY_SESSION_RECORD_TIMESTAMP,
 )
 
@@ -107,11 +122,26 @@ data class SaveSessionRecordDraftCommand(
     val restoredFromRevisionId: UUID? = null,
 )
 
+sealed interface RebaseSessionRecordBaseExpectation {
+    val expectedLiveRevision: Long
+
+    data class LegacyTimestamp(
+        override val expectedLiveRevision: Long,
+        val expectedSessionUpdatedAt: OffsetDateTime,
+    ) : RebaseSessionRecordBaseExpectation
+
+    data class ExactRevisions(
+        val expectedSessionRevision: Long,
+        override val expectedLiveRevision: Long,
+        val expectedExposureRevision: Long,
+        val expectedPublicationRevision: Long,
+    ) : RebaseSessionRecordBaseExpectation
+}
+
 data class RebaseSessionRecordDraftCommand(
     val sessionId: UUID,
     val expectedDraftRevision: Long,
-    val expectedLiveRevision: Long,
-    val expectedSessionUpdatedAt: OffsetDateTime,
+    val expectedBase: RebaseSessionRecordBaseExpectation,
 )
 
 data class RestoreSessionRecordDraftCommand(
@@ -188,35 +218,28 @@ data class SessionRecordAudienceProjection(
 )
 
 fun SessionRecordVisibility.toAudienceProjection(state: String): SessionRecordAudienceProjection =
-    when (this) {
-        SessionRecordVisibility.HOST_ONLY ->
-            SessionRecordAudienceProjection(
-                accessScope = SessionRecordAccessScope.HOST_ONLY,
-                siteVisibility = SessionRecordSiteVisibility.HIDDEN,
-                visibility = SessionRecordVisibility.HOST_ONLY,
-                sessionCompatibilityVisibility =
-                    if (state == "PUBLISHED") SessionRecordVisibility.MEMBER else SessionRecordVisibility.HOST_ONLY,
-                publicationVisibility = SessionRecordVisibility.MEMBER,
-                isPublic = false,
-            )
-        SessionRecordVisibility.MEMBER ->
-            SessionRecordAudienceProjection(
-                accessScope = SessionRecordAccessScope.GUEST_READABLE,
-                siteVisibility = SessionRecordSiteVisibility.HIDDEN,
-                visibility = SessionRecordVisibility.MEMBER,
-                sessionCompatibilityVisibility = SessionRecordVisibility.MEMBER,
-                publicationVisibility = SessionRecordVisibility.MEMBER,
-                isPublic = false,
-            )
-        SessionRecordVisibility.PUBLIC ->
-            SessionRecordAudienceProjection(
-                accessScope = SessionRecordAccessScope.GUEST_READABLE,
-                siteVisibility = SessionRecordSiteVisibility.PUBLIC_RECORD,
-                visibility = SessionRecordVisibility.PUBLIC,
-                sessionCompatibilityVisibility = SessionRecordVisibility.PUBLIC,
-                publicationVisibility = SessionRecordVisibility.PUBLIC,
-                isPublic = true,
-            )
+    run {
+        val accessScope =
+            when (this) {
+                SessionRecordVisibility.HOST_ONLY -> SessionRecordAccessScope.HOST_ONLY
+                SessionRecordVisibility.MEMBER, SessionRecordVisibility.PUBLIC ->
+                    SessionRecordAccessScope.GUEST_READABLE
+            }
+        val siteVisibility =
+            if (this == SessionRecordVisibility.PUBLIC && state in setOf("CLOSED", "PUBLISHED")) {
+                SessionRecordSiteVisibility.PUBLIC_RECORD
+            } else {
+                SessionRecordSiteVisibility.HIDDEN
+            }
+        val compatibility = v45CompatibilityProjection(state, accessScope.name, siteVisibility.name)
+        SessionRecordAudienceProjection(
+            accessScope = accessScope,
+            siteVisibility = siteVisibility,
+            visibility = this,
+            sessionCompatibilityVisibility = SessionRecordVisibility.valueOf(compatibility.sessionVisibility),
+            publicationVisibility = SessionRecordVisibility.valueOf(compatibility.publicationVisibility),
+            isPublic = compatibility.isPublic,
+        )
     }
 
 data class SessionRecordCorrectionPreview(
@@ -227,6 +250,7 @@ data class SessionRecordCorrectionPreview(
 
 sealed interface PublishSessionRecordCorrectionResult {
     data class Applied(
+        val receiptId: UUID,
         val result: SessionRecordApplyResult,
     ) : PublishSessionRecordCorrectionResult
 
@@ -282,7 +306,6 @@ data class CompletedSessionRecordApply(
 )
 
 data class SessionRecordApplyReceipt(
-    val receiptId: UUID,
     val applyRequestId: UUID,
     val hostMembershipId: UUID,
     val expectedDraftRevision: Long,
@@ -301,6 +324,7 @@ enum class SessionRecordError {
     PREVIEW_ALREADY_CONSUMED,
     APPLY_REQUEST_ALREADY_USED,
     INVALID_APPLY_CONTRACT,
+    INVALID_REBASE_CONTRACT,
 }
 
 class SessionRecordException(

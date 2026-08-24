@@ -71,7 +71,7 @@ export function AdminClubOperationsPage({
           </article>
         ) : null}
         <Metric
-          label="열린 세션"
+          label="열린 모임"
           value={snapshot.sessionProgress.currentOpenCount}
         />
         <Metric
@@ -288,13 +288,13 @@ function ClosingRiskPanel({
         </div>
       ) : (
         <p className="admin-club-operations__closing-risk-empty muted">
-          확인 필요한 회차 없음
+          확인 필요한 모임 없음
         </p>
       )}
 
       {overflowCount > 0 ? (
         <p className="admin-club-operations__closing-risk-overflow tiny muted">
-          외 {overflowCount}개 회차
+          외 {overflowCount}개 모임
         </p>
       ) : null}
 

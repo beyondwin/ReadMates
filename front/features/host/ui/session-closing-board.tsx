@@ -38,9 +38,9 @@ export function SessionClosingBoard({ view, LinkComponent = PlainSessionClosingL
       </section>
 
       <section className="container rm-host-closing-board__body">
-        <section className="rm-reading-desk rm-host-closing-board__primary" aria-label="이번 회차 다음 조치">
+        <section className="rm-reading-desk rm-host-closing-board__primary" aria-label="이번 모임 다음 조치">
           <div className="rm-host-closing-board__primary-copy">
-            <div className="eyebrow">이번 회차 다음 조치</div>
+            <div className="eyebrow">이번 모임 다음 조치</div>
             <p className="h3 editorial">{view.primaryAction.label}</p>
             <p className="body muted">{view.primaryAction.reason}</p>
           </div>

@@ -324,7 +324,15 @@ internal class PublicConvergenceHostQueryRepository(
                        work.next_attempt_no,
                        current.attempt_no, current.event_seq, current.status,
                        current.observed_at, current.result_category
-                from public_mutation_convergence_receipts receipt
+                from (
+                  select mutation_receipt_id, convergence_id, publication_id_snapshot,
+                         session_id_snapshot, committed_generation, origin_readable
+                  from public_mutation_convergence_receipts
+                  union all
+                  select mutation_receipt_id, convergence_id, publication_id_snapshot,
+                         session_id_snapshot, committed_generation, origin_readable
+                  from public_mutation_convergence_links
+                ) receipt
                 left join public_convergence_work work on work.convergence_id = receipt.convergence_id
                 join active_sessions sessions on sessions.id = receipt.session_id_snapshot
                 left join public_convergence_current current on current.convergence_id = receipt.convergence_id
@@ -336,8 +344,9 @@ internal class PublicConvergenceHostQueryRepository(
                         PublicMutationConvergenceReceipt(
                             mutationReceiptId = resultSet.getString("mutation_receipt_id"),
                             convergenceId = resultSet.uuid("convergence_id"),
-                            publicationIdSnapshot = resultSet.uuid("publication_id_snapshot"),
-                            sessionIdSnapshot = resultSet.uuid("session_id_snapshot"),
+                            publicationIdSnapshot =
+                                resultSet.getString("publication_id_snapshot")?.let(UUID::fromString),
+                            sessionIdSnapshot = resultSet.getString("session_id_snapshot")?.let(UUID::fromString),
                             committedGeneration = resultSet.getLong("committed_generation"),
                             originReadable = resultSet.getBoolean("origin_readable"),
                         )

@@ -93,9 +93,9 @@ class JdbcPublicTakedownAdapter(
     override fun confirmNew(command: StorePublicTakedownCommand): PublicTakedownReceipt {
         if (!writer.claimIdempotency(command)) return replayExisting(command)
         val target = lockAndValidateTarget(command)
-        val committedGeneration = writer.denyOrigin(target)
         val receiptId = UUID.randomUUID()
         val convergenceId = UUID.randomUUID()
+        val committedGeneration = writer.denyOrigin(target, convergenceId)
         writer.insertReceipt(command, target, receiptId, convergenceId, committedGeneration)
         writer.insertConvergence(command, target, receiptId, convergenceId, committedGeneration)
         writer.insertAudit(command, receiptId, convergenceId, committedGeneration)
@@ -145,20 +145,29 @@ class JdbcPublicTakedownAdapter(
         publicationId: UUID,
         lock: Boolean,
     ): PublicTakedownTarget? {
-        val suffix = if (lock) " for update" else ""
+        if (lock) {
+            jdbcTemplate.queryForObject(
+                "select id from sessions where club_id = ? and id = ? for update",
+                String::class.java,
+                clubId.dbString(),
+                sessionId.dbString(),
+            ) ?: return null
+        }
         return jdbcTemplate
             .query(
                 """
-                select generation.club_id, generation.session_id, generation.publication_id,
-                       generation.generation, generation.origin_readable
-                from public_projection_generations generation
+                select projection.club_id, projection.session_id,
+                       projection.publication_id_snapshot as publication_id,
+                       projection.generation, projection.origin_readable
+                from public_projection_current projection
                 join active_sessions session
-                  on session.id = generation.session_id and session.club_id = generation.club_id
+                  on session.id = projection.session_id and session.club_id = projection.club_id
                 join public_session_publications publication
-                  on publication.id = generation.publication_id
-                 and publication.session_id = generation.session_id
-                 and publication.club_id = generation.club_id
-                where generation.club_id = ? and generation.session_id = ? and generation.publication_id = ?$suffix
+                  on publication.id = projection.publication_id_snapshot
+                 and publication.session_id = projection.session_id
+                 and publication.club_id = projection.club_id
+                where projection.club_id = ? and projection.session_id = ?
+                  and projection.publication_id_snapshot = ?
                 """.trimIndent(),
                 { resultSet, _ ->
                     val readable = resultSet.getBoolean("origin_readable")

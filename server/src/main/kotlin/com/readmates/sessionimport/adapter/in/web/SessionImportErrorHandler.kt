@@ -15,6 +15,6 @@ class SessionImportErrorHandler {
         apiErrorResponse(
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_SESSION_IMPORT",
-            message = exception.issues.firstOrNull()?.message ?: "세션 import 파일을 확인해 주세요.",
+            message = exception.issues.firstOrNull()?.message ?: "모임 import 파일을 확인해 주세요.",
         )
 }

@@ -132,12 +132,12 @@ export function SessionRecordDraftPanelBody({
         data-navigation-blocked={saveState === "error" || saveState === "stale" || saveState === "dirty"}
         style={{ padding: 14, minWidth: 0, overflowWrap: "anywhere" }}
       >
-        {draftLiveBaseStale ? "세션 기본 정보 또는 현재 적용본이 변경되어 초안을 다시 확인해야 합니다. " : null}
+        {draftLiveBaseStale ? "모임 기본 정보 또는 현재 적용본이 변경되어 초안을 다시 확인해야 합니다. " : null}
         {saveStateMessage(saveState)}
         {draftLiveBaseStale && onRebaseDraft ? (
           <div className="stack" style={{ "--stack": "8px", marginTop: 10 } as CSSProperties}>
             <p className="small" style={{ margin: 0 }}>
-              현재 적용된 기록과 최신 세션 정보를 확인한 뒤 초안의 기준을 갱신해 주세요.
+              현재 적용된 기록과 최신 모임 정보를 확인한 뒤 초안의 기준을 갱신해 주세요.
             </p>
             <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
               <button

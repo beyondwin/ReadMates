@@ -226,31 +226,41 @@ sealed class CanonicalMutationPayload {
             require(schemaVersion > 0) { "schemaVersion must be positive" }
         }
 
-        override fun toString(): String {
-            val redacted = "Reverse(operation=$operation, reasonCode=$reasonCode, schemaVersion=$schemaVersion)"
-            return redacted
-        }
+        override fun toString(): String = "Reverse(operation=$operation, reasonCode=$reasonCode, schemaVersion=$schemaVersion)"
     }
 
     data class Exposure(
         val accessScope: String,
-        override val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
+        val expectedExposureRevision: Long?,
+        override val schemaVersion: Int = EXPOSURE_SCHEMA_VERSION,
         override val operation: HostMutationOperation = HostMutationOperation.SESSION_EXPOSURE,
     ) : CanonicalMutationPayload() {
         init {
             require(schemaVersion > 0) { "schemaVersion must be positive" }
+            require(expectedExposureRevision == null || expectedExposureRevision >= 0) {
+                "expectedExposureRevision must be null or non-negative"
+            }
         }
     }
 
     data class Publication(
         val publicSummary: String,
-        val siteVisibility: String,
+        val siteVisibility: String?,
         val accessScope: String? = null,
-        override val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
+        val visibility: String,
+        val expectedPublicationRevision: Long?,
+        val expectedExposureRevision: Long?,
+        override val schemaVersion: Int = PUBLICATION_SCHEMA_VERSION,
         override val operation: HostMutationOperation = HostMutationOperation.SESSION_PUBLICATION,
     ) : CanonicalMutationPayload() {
         init {
             require(schemaVersion > 0) { "schemaVersion must be positive" }
+            require(expectedPublicationRevision == null || expectedPublicationRevision >= 0) {
+                "expectedPublicationRevision must be null or non-negative"
+            }
+            require(expectedExposureRevision == null || expectedExposureRevision >= 0) {
+                "expectedExposureRevision must be null or non-negative"
+            }
         }
     }
 
@@ -267,6 +277,8 @@ sealed class CanonicalMutationPayload {
 
     companion object {
         const val CURRENT_SCHEMA_VERSION = 1
+        const val EXPOSURE_SCHEMA_VERSION = 2
+        const val PUBLICATION_SCHEMA_VERSION = 3
         const val DEFAULT_START_TIME = "20:00"
         const val DEFAULT_END_TIME = "22:00"
         const val DEFAULT_ACCESS_SCOPE = "HOST_ONLY"

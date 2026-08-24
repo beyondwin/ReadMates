@@ -149,8 +149,8 @@ function AdminAnalyticsBenchmarkTable({
         <tr>
           <th scope="col">클럽</th>
           <th scope="col">활성 멤버</th>
-          <th scope="col">세션 완료율</th>
-          <th scope="col">RSVP 응답률</th>
+          <th scope="col">모임 완료율</th>
+          <th scope="col">참석 응답률</th>
           <th scope="col">AI 비용</th>
           <th scope="col">알림 도달률</th>
         </tr>

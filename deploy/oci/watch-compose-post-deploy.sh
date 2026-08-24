@@ -19,7 +19,8 @@ APP_BASE_URL="${READMATES_SMOKE_BASE_URL:-https://readmates.pages.dev}"
 APP_BASE_URL="${APP_BASE_URL%/}"
 AUTH_BASE_URL="${READMATES_SMOKE_AUTH_BASE_URL:-$APP_BASE_URL}"
 AUTH_BASE_URL="${AUTH_BASE_URL%/}"
-SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-accept-new}"
+SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-yes}"
+SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:-}"
 REMOTE_LEDGER="${READMATES_DEPLOY_LEDGER:-/var/log/readmates/deploy-attempts.jsonl}"
 # Parent deploy attempt id wins; fall back to local ATTEMPT_ID; "unknown" only
 # as a last resort. See docs/operations/runbooks/deploy-attempts.md and ADR-0016.
@@ -29,11 +30,20 @@ if [ "$WATCH_DRY_RUN" = "true" ]; then
   printf 'attemptId=%s\n' "$WATCH_ATTEMPT_ID"
   exit 0
 fi
+if [[ "$SSH_STRICT_HOST_KEY_CHECKING" != "yes" ]]; then
+  echo "SSH_STRICT_HOST_KEY_CHECKING must be yes; TOFU modes are forbidden" >&2
+  exit 1
+fi
+if [[ ! -f "$SSH_KNOWN_HOSTS" || -L "$SSH_KNOWN_HOSTS" || ! -s "$SSH_KNOWN_HOSTS" ]]; then
+  echo "SSH_KNOWN_HOSTS must be a non-empty regular non-symlink file" >&2
+  exit 1
+fi
 WATCH_STARTED_EPOCH="$(date -u +%s)"
 WATCH_LEDGER_FORMAT="${READMATES_LEDGER_FORMAT:-both}"
 SSH_OPTIONS=(
   -i "$SSH_KEY"
-  -o "StrictHostKeyChecking=${SSH_STRICT_HOST_KEY_CHECKING}"
+  -o "StrictHostKeyChecking=yes"
+  -o "UserKnownHostsFile=${SSH_KNOWN_HOSTS}"
   -o "BatchMode=yes"
   -o "ConnectTimeout=10"
   -o "ServerAliveInterval=10"

@@ -14,6 +14,7 @@ import com.readmates.session.application.model.HostMeetingListMode
 import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.requireHost
+import com.readmates.session.domain.SessionParticipationStatus
 import com.readmates.sessionclosing.application.model.SessionRecordReadinessPolicy
 import com.readmates.sessionrecord.application.model.SessionRecordStatus
 import com.readmates.shared.db.dbString
@@ -351,6 +352,7 @@ internal class HostSessionQueries(
         sessionId: UUID,
     ) = findHostSessionWithoutHostCheck(jdbcTemplate, member, sessionId)
 
+    @Suppress("LongMethod")
     private fun findHostSessionWithoutHostCheck(
         jdbcTemplate: JdbcTemplate,
         member: CurrentMember,
@@ -376,6 +378,12 @@ internal class HostSessionQueries(
               state,
               visibility,
               access_scope,
+              session_revision,
+              exposure_revision,
+              participant_set_revision,
+              draft.draft_revision,
+              coalesce(revision.live_revision, 0) as live_revision,
+              coalesce(publication_version.publication_revision, 0) as publication_revision,
               coalesce((
                 select site_visibility
                 from public_session_publications
@@ -384,18 +392,41 @@ internal class HostSessionQueries(
                 limit 1
               ), 'HIDDEN') as site_visibility
             from active_sessions sessions
-            where id = ?
-              and club_id = ?
+            left join session_record_drafts draft
+              on draft.club_id = sessions.club_id
+             and draft.session_id = sessions.id
+            left join (
+              select club_id, session_id, max(version) as live_revision
+              from session_record_revisions
+              group by club_id, session_id
+            ) revision
+              on revision.club_id = sessions.club_id
+             and revision.session_id = sessions.id
+            left join session_publication_versions publication_version
+              on publication_version.session_id = sessions.id
+            where sessions.id = ?
+              and sessions.club_id = ?
             """.trimIndent(),
             { resultSet, _ -> resultSet.toHostSessionDetailBase() },
             sessionId.dbString(),
             member.clubId.dbString(),
         ).firstOrNull()
-        ?.copy(
-            attendees = findHostSessionAttendees(jdbcTemplate, sessionId, member.clubId),
-            feedbackDocument = findHostSessionFeedbackDocument(jdbcTemplate, sessionId, member.clubId),
-            publication = findHostSessionPublication(jdbcTemplate, sessionId, member.clubId),
-        ) ?: throw HostSessionNotFoundException()
+        ?.let { detail ->
+            val attendees = findHostSessionAttendees(jdbcTemplate, sessionId, member.clubId)
+            val attendanceRows =
+                attendees
+                    .filter { attendee -> attendee.participationStatus == SessionParticipationStatus.ACTIVE }
+                    .sortedBy { attendee -> attendee.membershipId }
+                    .joinToString(",") { attendee ->
+                        "${attendee.membershipId}:${attendee.attendanceRevision}"
+                    }
+            detail.copy(
+                attendees = attendees,
+                feedbackDocument = findHostSessionFeedbackDocument(jdbcTemplate, sessionId, member.clubId),
+                publication = findHostSessionPublication(jdbcTemplate, sessionId, member.clubId),
+                attendanceSnapshotId = "att:$attendanceRows",
+            )
+        } ?: throw HostSessionNotFoundException()
 
     fun requireHostSession(
         jdbcTemplate: JdbcTemplate,
@@ -472,7 +503,8 @@ internal class HostSessionQueries(
           memberships.status as attendee_membership_status,
           session_participants.rsvp_status,
           session_participants.attendance_status,
-          session_participants.participation_status
+          session_participants.participation_status,
+          session_participants.attendance_revision
         from session_participants
         join memberships on memberships.id = session_participants.membership_id
           and memberships.club_id = session_participants.club_id

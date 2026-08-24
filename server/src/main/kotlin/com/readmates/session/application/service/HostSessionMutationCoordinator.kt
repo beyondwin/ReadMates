@@ -3,6 +3,7 @@ package com.readmates.session.application.service
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.model.HostMutationReceiptRecord
 import com.readmates.session.application.model.HostProjectionSnapshot
+import com.readmates.session.application.model.HostPublicProjectionEffect
 import com.readmates.session.application.model.NotificationDecision
 import com.readmates.session.application.port.out.HostMutationReceiptPort
 import com.readmates.session.application.port.out.HostSessionProjectionPort
@@ -24,6 +25,7 @@ data class HostMutationOutcome<T>(
     val notificationDecision: NotificationDecision = NotificationDecision.NOT_SENT,
     val dispatchReceiptId: UUID? = null,
     val receiptId: UUID? = null,
+    val publicProjectionEffect: HostPublicProjectionEffect? = null,
 )
 
 @Service
@@ -79,6 +81,7 @@ class HostSessionMutationCoordinator(
                         notificationDecision = outcome.notificationDecision,
                         dispatchReceiptId = outcome.dispatchReceiptId,
                         createdAt = clock.instant(),
+                        publicProjectionEffect = outcome.publicProjectionEffect,
                     )
                 receipts.insert(record)
                 idempotency.complete(identity, record.receiptId)

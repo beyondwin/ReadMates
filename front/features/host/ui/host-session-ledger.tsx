@@ -9,12 +9,15 @@ import {
 } from "@/features/host/model/host-session-ledger-model";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import { resolvedSessionExposure, sessionExposureCopy } from "@/features/host/model/session-exposure-model";
+import { formatMeetingOrdinal } from "@/shared/model/meeting-language";
 import { formatDateOnlyLabel } from "@/shared/ui/readmates-display";
+import { readmatesReturnState } from "@/shared/routing/readmates-route-state";
 
 type LedgerLinkProps = {
   to: string;
   className?: string;
   children: ReactNode;
+  state?: unknown;
   "aria-label"?: string;
 };
 
@@ -46,15 +49,16 @@ export type HostSessionLedgerProps = {
   errorMessage?: string | null;
   loadMoreError?: string | null;
   onRetry?: () => void;
-  newSessionHref?: string;
   trashItems?: HostSessionLedgerTrashItem[];
   trashHref?: string;
   activeHref?: string;
+  recordReturnHref?: string;
   onRestore?: (sessionId: string) => void;
   onRetryRestore?: (sessionId: string) => void;
 };
 
-function DefaultLink({ to, children, ...props }: LedgerLinkProps) {
+function DefaultLink({ to, children, state: _state, ...props }: LedgerLinkProps) {
+  void _state;
   return <a {...props} href={to}>{children}</a>;
 }
 
@@ -117,36 +121,18 @@ function LedgerFilters({
       }}
     >
       <label className="stack" style={{ "--stack": "6px", minWidth: 0 } as React.CSSProperties}>
-        <span className="tiny">세션 기록 검색</span>
+        <span className="tiny">모임 기록 검색</span>
         <span className="row" style={{ gap: 8, minWidth: 0 }}>
           <input
             className="input"
             type="search"
-            aria-label="세션 기록 검색"
+            aria-label="모임 기록 검색"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             style={{ minWidth: 0 }}
           />
           <button className="btn btn-primary btn-sm" type="submit">검색</button>
         </span>
-      </label>
-      <label className="stack" style={{ "--stack": "6px" } as React.CSSProperties}>
-        <span className="tiny">세션 상태</span>
-        <select
-          className="input"
-          aria-label="세션 상태"
-          value={filters.state ?? ""}
-          onChange={(event) => onFiltersChange({
-            ...filters,
-            state: (event.target.value || null) as HostSessionLedgerFilters["state"],
-          })}
-        >
-          <option value="">전체</option>
-          <option value="DRAFT">예정</option>
-          <option value="OPEN">진행 중</option>
-          <option value="CLOSED">종료</option>
-          <option value="PUBLISHED">공개됨</option>
-        </select>
       </label>
       <label className="stack" style={{ "--stack": "6px" } as React.CSSProperties}>
         <span className="tiny">기록 상태</span>
@@ -188,19 +174,21 @@ function LedgerFilters({
 function DesktopLedger({
   items,
   LinkComponent,
+  recordReturnHref,
 }: {
   items: HostSessionLedgerItem[];
   LinkComponent: HostSessionLedgerLinkComponent;
+  recordReturnHref: string;
 }) {
   return (
     <div className="desktop-only rm-document-panel" style={{ overflowX: "auto" }}>
       <table
-        aria-label="세션 기록 장부"
+        aria-label="모임 기록 장부"
         style={{ width: "100%", minWidth: 820, borderCollapse: "collapse", textAlign: "left" }}
       >
         <thead>
           <tr>
-            {["회차", "책과 세션", "일정", "상태", "기록", "공개 범위", "마지막 수정", ""].map((label) => (
+            {["No.", "책과 모임", "일정", "상태", "기록", "공개 범위", "마지막 수정", ""].map((label) => (
               <th key={label} scope="col" className="tiny" style={{ padding: "13px 16px", borderBottom: "1px solid var(--line)" }}>
                 {label}
               </th>
@@ -228,8 +216,9 @@ function DesktopLedger({
               <td style={{ padding: 16, verticalAlign: "top" }}>
                 <LinkComponent
                   to={sessionRecordHref(item.sessionId)}
+                  state={readmatesReturnState({ href: recordReturnHref, label: "기록으로" })}
                   className="btn btn-ghost btn-sm"
-                  aria-label={`${item.sessionNumber}회차 ${hostSessionLedgerActionLabel(item)}`}
+                  aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
                 >
                   {hostSessionLedgerActionLabel(item)}
                 </LinkComponent>
@@ -245,9 +234,11 @@ function DesktopLedger({
 function MobileLedger({
   items,
   LinkComponent,
+  recordReturnHref,
 }: {
   items: HostSessionLedgerItem[];
   LinkComponent: HostSessionLedgerLinkComponent;
+  recordReturnHref: string;
 }) {
   return (
     <div className="mobile-only stack" style={{ "--stack": "10px", minWidth: 0 } as React.CSSProperties}>
@@ -275,8 +266,9 @@ function MobileLedger({
           <div style={{ marginTop: 12 }}><LedgerBadges item={item} /></div>
           <LinkComponent
             to={sessionRecordHref(item.sessionId)}
+            state={readmatesReturnState({ href: recordReturnHref, label: "기록으로" })}
             className="btn btn-primary"
-            aria-label={`${item.sessionNumber}회차 ${hostSessionLedgerActionLabel(item)}`}
+            aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} ${hostSessionLedgerActionLabel(item)}`}
           >
             {hostSessionLedgerActionLabel(item)}
           </LinkComponent>
@@ -331,7 +323,7 @@ function TrashLedger({
               className="btn btn-primary btn-sm"
               type="button"
               disabled={item.restoreDisabled || item.restoring}
-              aria-label={`${item.sessionNumber}회차 복원`}
+              aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} 복원`}
               onClick={() => onRestore?.(item.sessionId)}
             >
               복원
@@ -364,10 +356,10 @@ export function HostSessionLedger({
   errorMessage = null,
   loadMoreError = null,
   onRetry,
-  newSessionHref = "/app/host/sessions/new",
   trashItems = [],
   trashHref = "?view=trash",
-  activeHref = "/app/host/sessions",
+  activeHref = "/app/host/records",
+  recordReturnHref = "/app/host/records",
   onRestore,
   onRetryRestore,
 }: HostSessionLedgerProps) {
@@ -380,20 +372,17 @@ export function HostSessionLedger({
         <span className="small" style={{ color: "var(--text-2)" }}>
           {trashView
             ? "삭제된 모임을 남은 기간 동안 복원할 수 있습니다."
-            : "회차별 기록과 저장된 초안을 확인합니다."}
+            : "모임별 기록과 저장된 초안을 확인합니다."}
         </span>
         <div className="row" style={{ gap: 8, flexWrap: "wrap" }}>
           {trashView ? (
-            <LinkComponent to={activeHref} className="btn btn-quiet btn-sm">
-              세션 기록 장부
+              <LinkComponent to={activeHref} className="btn btn-quiet btn-sm">
+              기록 목록
             </LinkComponent>
           ) : (
             <>
               <LinkComponent to={trashHref} className="btn btn-quiet btn-sm">
                 휴지통
-              </LinkComponent>
-              <LinkComponent to={newSessionHref} className="btn btn-primary btn-sm">
-                새 세션 만들기
               </LinkComponent>
             </>
           )}
@@ -409,11 +398,11 @@ export function HostSessionLedger({
         </div>
       ) : loading ? (
         <div className="surface-quiet small" role="status" style={{ padding: 18 }}>
-          {trashView ? "휴지통을 불러오는 중입니다." : "세션 기록을 불러오는 중입니다."}
+          {trashView ? "휴지통을 불러오는 중입니다." : "모임 기록을 불러오는 중입니다."}
         </div>
       ) : visibleItems.length === 0 ? (
         <div className="surface-quiet small" style={{ padding: 18 }}>
-          {trashView ? "휴지통이 비어 있습니다." : "조건에 맞는 세션 기록이 없습니다."}
+          {trashView ? "휴지통이 비어 있습니다." : "조건에 맞는 모임 기록이 없습니다."}
         </div>
       ) : trashView ? (
         <TrashLedger
@@ -424,8 +413,8 @@ export function HostSessionLedger({
         />
       ) : (
         <>
-          <DesktopLedger items={items} LinkComponent={LinkComponent} />
-          <MobileLedger items={items} LinkComponent={LinkComponent} />
+          <DesktopLedger items={items} LinkComponent={LinkComponent} recordReturnHref={recordReturnHref} />
+          <MobileLedger items={items} LinkComponent={LinkComponent} recordReturnHref={recordReturnHref} />
         </>
       )}
       {nextCursor ? (
@@ -455,13 +444,13 @@ export function HostSessionAttentionSummary({
 
   if (visibleItems.length === 0) {
     return hideEmpty ? null : (
-      <p className="rm-host-attention__empty">확인 필요한 세션 기록이 없습니다.</p>
+      <p className="rm-host-attention__empty">확인 필요한 모임 기록이 없습니다.</p>
     );
   }
 
   return (
     <>
-      <ol className="rm-host-attention" aria-label="확인 필요한 세션 기록">
+      <ol className="rm-host-attention" aria-label="확인 필요한 모임 기록">
         {visibleItems.map((item) => {
           const status = hostSessionLedgerBadges(item)[0] ?? {
             label: "기록 확인",
@@ -473,7 +462,7 @@ export function HostSessionAttentionSummary({
               <LinkComponent
                 to={sessionRecordHref(item.sessionId)}
                 className="rm-host-attention__row"
-                aria-label={`${item.sessionNumber}회차 기록 열기`}
+                aria-label={`${formatMeetingOrdinal(item.sessionNumber, "folio")} 기록 열기`}
               >
                 <span className="rm-host-attention__number ledger-number">No.{item.sessionNumber}</span>
                 <span className="rm-host-attention__copy">

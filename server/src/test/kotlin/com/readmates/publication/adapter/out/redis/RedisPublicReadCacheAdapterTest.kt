@@ -131,14 +131,17 @@ class RedisPublicReadCacheAdapterTest(
     }
 
     @Test
-    fun `generation scoped session lookup cannot return an older cached body`() {
+    fun `generation scoped session cache never returns an older generation`() {
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
-        adapter.putSession(BASELINE_CLUB_ID, sessionId, 1, publicSession(sessionId))
+        val old = publicSession(sessionId).copy(summary = "Old generation")
+        val current = publicSession(sessionId).copy(summary = "Current generation")
 
-        assertNull(adapter.getSession(BASELINE_CLUB_ID, sessionId, 2))
+        adapter.putSession(BASELINE_CLUB_ID, 6, 2, sessionId, old)
+        adapter.putSession(BASELINE_CLUB_ID, 7, 3, sessionId, current)
 
-        adapter.putSession(BASELINE_CLUB_ID, sessionId, 2, publicSession(sessionId))
-        assertEquals(publicSession(sessionId), adapter.getSession(BASELINE_CLUB_ID, sessionId, 2))
+        assertThat(adapter.getSession(BASELINE_CLUB_ID, 7, 3, sessionId)?.summary)
+            .isEqualTo("Current generation")
+        assertThat(adapter.getSession(BASELINE_CLUB_ID, 7, 2, sessionId)).isNull()
     }
 
     @Test
@@ -282,9 +285,9 @@ class RedisPublicReadCacheAdapterTest(
 
     companion object {
         private val BASELINE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
-        private val CLUB_KEY = "public:club:$BASELINE_CLUB_ID:generation:1:home:v2"
+        private val CLUB_KEY = "public:club:$BASELINE_CLUB_ID:home:v1"
 
-        private fun sessionKey(sessionId: UUID) = "public:club:$BASELINE_CLUB_ID:generation:1:session:$sessionId:v2"
+        private fun sessionKey(sessionId: UUID) = "public:club:$BASELINE_CLUB_ID:session:$sessionId:v1"
     }
 }
 

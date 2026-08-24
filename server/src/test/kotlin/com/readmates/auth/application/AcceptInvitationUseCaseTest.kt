@@ -1,6 +1,9 @@
 package com.readmates.auth.application
 
 import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
+import com.readmates.auth.application.port.out.ActiveMembershipUpsertResult
+import com.readmates.auth.application.port.out.AuthPublicProjectionLock
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.GoogleAccountStorePort
 import com.readmates.auth.application.port.out.HostInvitationStorePort
 import com.readmates.auth.application.port.out.InvitationTokenRow
@@ -42,6 +45,8 @@ class AcceptInvitationUseCaseTest {
         val memberIdentityLookup = mock(MemberIdentityLookupPort::class.java)
         val googleAccountStore = mock(GoogleAccountStorePort::class.java)
         val avatarAllocation = mock(MemberAvatarAllocationPort::class.java)
+        val publicProjection = mock(AuthPublicProjectionMutationPort::class.java)
+        val projectionLock = mock(AuthPublicProjectionLock::class.java)
         val tokenService = InvitationTokenService()
         val clubId = UUID.randomUUID()
         val invitationId = UUID.randomUUID()
@@ -75,13 +80,19 @@ class AcceptInvitationUseCaseTest {
                 avatarKey = allocatedKey.wireValue,
             )
         val rawToken = "accepted-avatar-token"
-        `when`(invitationStore.findInvitationByTokenHash(tokenService.hashToken(rawToken), true)).thenReturn(invitation)
+        `when`(
+            invitationStore.findInvitationByTokenHash(tokenService.hashToken(rawToken), false),
+        ).thenReturn(invitation)
+        `when`(publicProjection.lockPotentiallyAffectedSessions(clubId)).thenReturn(projectionLock)
+        `when`(
+            invitationStore.findInvitationByTokenHash(tokenService.hashToken(rawToken), true),
+        ).thenReturn(invitation)
         `when`(memberIdentityLookup.findAnyUserIdByEmail(invitation.email)).thenReturn(userId)
         `when`(googleAccountStore.connectGoogleSubject(userId, "google-invited-avatar", null)).thenReturn(true)
         `when`(avatarAllocation.allocate(clubId, userId)).thenReturn(allocatedKey)
         `when`(
             invitationStore.upsertActiveMembership(clubId, userId, invitation.role, allocatedKey),
-        ).thenReturn(membershipId)
+        ).thenReturn(ActiveMembershipUpsertResult(membershipId, becameActive = true))
         `when`(invitationStore.acceptInvitation(invitationId, userId)).thenReturn(true)
         `when`(invitationStore.findCurrentMember(membershipId)).thenReturn(currentMember)
         val service =
@@ -92,6 +103,7 @@ class AcceptInvitationUseCaseTest {
                 googleAccountStore,
                 avatarAllocation,
                 "http://localhost:3000",
+                publicProjection,
             )
         val acceptGoogleInvitationUseCase: AcceptGoogleInvitationUseCase = service
 
@@ -105,6 +117,11 @@ class AcceptInvitationUseCaseTest {
             )
 
         assertEquals(currentMember, actual)
+        inOrder(invitationStore, publicProjection).apply {
+            verify(invitationStore).findInvitationByTokenHash(tokenService.hashToken(rawToken), false)
+            verify(publicProjection).lockPotentiallyAffectedSessions(clubId)
+            verify(invitationStore).findInvitationByTokenHash(tokenService.hashToken(rawToken), true)
+        }
         inOrder(avatarAllocation, invitationStore).apply {
             verify(avatarAllocation).allocate(clubId, userId)
             verify(invitationStore).upsertActiveMembership(clubId, userId, invitation.role, allocatedKey)

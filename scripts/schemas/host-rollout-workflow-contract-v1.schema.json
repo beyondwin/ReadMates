@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readmates.example/schemas/host-rollout-workflow-contract-v1.schema.json",
+  "title": "ReadMates host rollout executable workflow contract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "canonicalization", "workflows"],
+  "properties": {
+    "schemaVersion": {
+      "const": "readmates.host-rollout.workflow-contract.v1"
+    },
+    "canonicalization": {
+      "const": "supported-yaml-parsed-ast-json-order-v1"
+    },
+    "workflows": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        ".github/workflows/ci.yml",
+        ".github/workflows/deploy-front.yml",
+        ".github/workflows/deploy-server.yml",
+        ".github/workflows/host-client-rollout-evidence.yml",
+        ".github/workflows/sync-config.yml"
+      ],
+      "properties": {
+        ".github/workflows/ci.yml": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        ".github/workflows/deploy-front.yml": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        ".github/workflows/deploy-server.yml": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        ".github/workflows/host-client-rollout-evidence.yml": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        },
+        ".github/workflows/sync-config.yml": {
+          "type": "string",
+          "pattern": "^sha256:[0-9a-f]{64}$"
+        }
+      }
+    }
+  }
+}

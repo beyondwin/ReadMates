@@ -12,6 +12,7 @@ import { getJob } from "@/features/host/aigen/api/aigen-api";
 import { aiGenerationJobKeys, useAiGenerationJob } from "./useAiGenerationJob";
 
 const mockedGetJob = vi.mocked(getJob);
+const context = { clubSlug: "reading-sai" } as const;
 
 function jobResponse(status: AiGenerationStatus): AiGenerationJobResponse {
   return {
@@ -49,9 +50,10 @@ async function advancePollingClock(milliseconds: number) {
 
 describe("aiGenerationJobKeys", () => {
   it("namespaces by session and job id", () => {
-    expect(aiGenerationJobKeys.all).toEqual(["host", "aigen", "jobs"]);
-    expect(aiGenerationJobKeys.detail("s1", "j1")).toEqual([
+    expect(aiGenerationJobKeys.scope(context)).toEqual(["host", "reading-sai", "aigen", "jobs"]);
+    expect(aiGenerationJobKeys.detail("s1", "j1", context)).toEqual([
       "host",
+      "reading-sai",
       "aigen",
       "jobs",
       "session",
@@ -75,7 +77,7 @@ describe("useAiGenerationJob", () => {
 
   it("does not fetch when jobId is null", async () => {
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useAiGenerationJob("s1", null), {
+    const { result } = renderHook(() => useAiGenerationJob("s1", null, { context }), {
       wrapper: Wrapper,
     });
 
@@ -86,7 +88,7 @@ describe("useAiGenerationJob", () => {
 
   it("does not fetch when jobId is undefined", async () => {
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useAiGenerationJob("s1", undefined), {
+    const { result } = renderHook(() => useAiGenerationJob("s1", undefined, { context }), {
       wrapper: Wrapper,
     });
 
@@ -97,7 +99,7 @@ describe("useAiGenerationJob", () => {
 
   it("does not fetch when enabled is false", async () => {
     const { Wrapper } = createWrapper();
-    renderHook(() => useAiGenerationJob("s1", "j1", { enabled: false }), {
+    renderHook(() => useAiGenerationJob("s1", "j1", { enabled: false, context }), {
       wrapper: Wrapper,
     });
 
@@ -110,7 +112,7 @@ describe("useAiGenerationJob", () => {
     async (status) => {
       mockedGetJob.mockResolvedValue(jobResponse(status));
       const { Wrapper } = createWrapper();
-      const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
+      const { result } = renderHook(() => useAiGenerationJob("s1", "j1", { context }), {
         wrapper: Wrapper,
       });
 
@@ -128,7 +130,7 @@ describe("useAiGenerationJob", () => {
     async (status) => {
       mockedGetJob.mockResolvedValue(jobResponse(status));
       const { Wrapper } = createWrapper();
-      renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
+      renderHook(() => useAiGenerationJob("s1", "j1", { context }), { wrapper: Wrapper });
 
       await advancePollingClock(0);
       expect(mockedGetJob).toHaveBeenCalledTimes(1);
@@ -150,7 +152,7 @@ describe("useAiGenerationJob", () => {
     });
 
     const { Wrapper } = createWrapper();
-    renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
+    renderHook(() => useAiGenerationJob("s1", "j1", { context }), { wrapper: Wrapper });
 
     await advancePollingClock(0);
     expect(mockedGetJob).toHaveBeenCalledTimes(1);
@@ -172,7 +174,7 @@ describe("useAiGenerationJob", () => {
     mockedGetJob.mockResolvedValue(jobResponse("RUNNING"));
 
     const { Wrapper } = createWrapper();
-    renderHook(() => useAiGenerationJob("s1", "j1"), { wrapper: Wrapper });
+    renderHook(() => useAiGenerationJob("s1", "j1", { context }), { wrapper: Wrapper });
 
     await advancePollingClock(0);
     expect(mockedGetJob).toHaveBeenCalledTimes(1);
@@ -192,7 +194,7 @@ describe("useAiGenerationJob", () => {
     });
 
     const { Wrapper } = createWrapper();
-    const { result } = renderHook(() => useAiGenerationJob("s1", "j1"), {
+    const { result } = renderHook(() => useAiGenerationJob("s1", "j1", { context }), {
       wrapper: Wrapper,
     });
 

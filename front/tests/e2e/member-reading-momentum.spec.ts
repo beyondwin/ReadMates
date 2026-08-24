@@ -105,7 +105,7 @@ test("member current-session captures reading prep visual evidence", async ({ pa
   const desktopSession = page.locator("main.rm-current-session-desktop");
   await expect(desktopSession.getByText("멤버 준비 필요")).toBeVisible();
   await expect(
-    desktopSession.getByText("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다."),
+    desktopSession.getByText("참석 응답을 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다."),
   ).toBeVisible();
   await expectNoMemberPrivateSentinels(page);
   const desktopScreenshot = await page.screenshot({
@@ -136,8 +136,8 @@ test("member home captures notes continuity visual evidence", async ({ page }, t
   await page.goto("/clubs/club-one/app");
   const desktopHome = page.locator(".rm-member-home-desktop");
   await expect(desktopHome.getByText("다음 할 일")).toBeVisible();
-  await expect(desktopHome.getByText("RSVP를 먼저 선택해 주세요.")).toBeVisible();
-  await expect(desktopHome.getByRole("link", { name: /세션 열기/ })).toHaveAttribute(
+  await expect(desktopHome.getByText("참석 응답을 먼저 선택해 주세요.")).toBeVisible();
+  await expect(desktopHome.getByRole("link", { name: /모임 열기/ })).toHaveAttribute(
     "href",
     "/clubs/club-one/app/session/current",
   );
@@ -153,7 +153,7 @@ test("member home captures notes continuity visual evidence", async ({ page }, t
   await page.goto("/clubs/club-one/app");
   const mobileHome = page.locator(".rm-member-home-mobile");
   await expect(mobileHome.getByText("오늘 할 일")).toBeVisible();
-  await expect(mobileHome.getByRole("link", { name: /RSVP/ })).toBeVisible();
+  await expect(mobileHome.getByRole("link", { name: /참석 응답/ })).toBeVisible();
   await expect(mobileHome.getByText("지난 세션 기록입니다.")).toBeVisible();
   await expectNoMemberPrivateSentinels(page);
   const mobileScreenshot = await page.screenshot({

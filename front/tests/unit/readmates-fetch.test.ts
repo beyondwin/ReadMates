@@ -1,17 +1,88 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { readmatesApiPath, readmatesFetch, readmatesFetchResponse, ReadMatesSessionExpiredError, __resetRedirectGuardForTest } from "@/shared/api/client";
-import { isReadmatesApiError } from "@/shared/api/errors";
+import { isReadmatesApiError, ReadmatesTransportError } from "@/shared/api/errors";
 import { frontendObservability } from "@/shared/observability/frontend-observability";
 import { normalizedClubSlug } from "@/shared/security/club-slug";
+import {
+  HostClientUpdateRequiredError,
+  __resetHostClientContractCapabilityForTest,
+  requireHostClientContractV3,
+} from "@/shared/api/host-client-contract";
+import { cancelClubHostRequests } from "@/shared/api/host-authority-event";
 
 afterEach(() => {
   __resetRedirectGuardForTest();
+  __resetHostClientContractCapabilityForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
   window.history.pushState({}, "", "/");
 });
 
 describe("readmatesFetchResponse", () => {
+  it("registers an explicit host request so exact-club purge aborts the network response", async () => {
+    let requestSignal: AbortSignal | undefined;
+    const fetchMock = vi.fn().mockImplementation((_url: string, init?: RequestInit) => {
+      requestSignal = init?.signal ?? undefined;
+      return new Promise<Response>((_resolve, reject) => {
+        requestSignal?.addEventListener("abort", () => reject(new DOMException("aborted", "AbortError")));
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const request = readmatesFetchResponse(
+      "/api/host/sessions/session-1",
+      undefined,
+      { clubSlug: "reading-sai" },
+    );
+    await Promise.resolve();
+    cancelClubHostRequests("reading-sai");
+
+    await expect(request).rejects.toMatchObject({ name: "AbortError" });
+    expect(requestSignal?.aborted).toBe(true);
+  });
+
+  it("rejects a host response whose body finishes after its club was purged", async () => {
+    let bodyController!: ReadableStreamDefaultController<Uint8Array>;
+    const response = new Response(new ReadableStream<Uint8Array>({
+      start(controller) {
+        bodyController = controller;
+      },
+    }), { headers: { "Content-Type": "application/json" } });
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response));
+
+    const request = readmatesFetch<{ secret: string }>(
+      "/api/host/sessions/session-1",
+      undefined,
+      { clubSlug: "reading-sai" },
+    );
+    await Promise.resolve();
+    cancelClubHostRequests("reading-sai");
+    bodyController.enqueue(new TextEncoder().encode(JSON.stringify({ secret: "late" })));
+    bodyController.close();
+
+    await expect(request).rejects.toMatchObject({
+      name: "HostRequestPurgedError",
+      code: "HOST_REQUEST_PURGED",
+    });
+  });
+
+  it("maps only fetch-boundary TypeErrors to a safe typed transport failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(
+      new TypeError("provider socket detail must not escape"),
+    ));
+
+    await expect(readmatesFetchResponse("/api/app/me")).rejects.toMatchObject({
+      name: "ReadmatesTransportError",
+      message: "네트워크 연결을 확인해 주세요.",
+    });
+    await expect(readmatesFetchResponse("/api/app/me")).rejects.toBeInstanceOf(
+      ReadmatesTransportError,
+    );
+    await expect(readmatesFetchResponse("/api/app/me")).rejects.not.toThrow(
+      /provider socket detail/,
+    );
+  });
+
   it("normalizes club slugs through the shared BFF helper contract", () => {
     expect(normalizedClubSlug(" Reading-Sai ")).toBe("reading-sai");
     expect(normalizedClubSlug("bad--slug")).toBe("");
@@ -54,7 +125,12 @@ describe("readmatesFetchResponse", () => {
   });
 
   it("preserves FormData uploads by leaving Content-Type unset", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        schemaVersion: 1,
+        supportedHostClientContracts: ["v2", "v3"],
+      }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
     const formData = new FormData();
     formData.append("file", new File(["feedback"], "feedback.md", { type: "text/markdown" }));
     vi.stubGlobal("fetch", fetchMock);
@@ -64,7 +140,7 @@ describe("readmatesFetchResponse", () => {
       body: formData,
     });
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(2,
       "/api/bff/api/host/sessions/session-1/feedback-document",
       expect.objectContaining({
         body: formData,
@@ -72,26 +148,100 @@ describe("readmatesFetchResponse", () => {
         method: "POST",
       }),
     );
-    const headers = fetchMock.mock.calls[0]?.[1]?.headers;
+    const headers = fetchMock.mock.calls[1]?.[1]?.headers;
     expect(headers).toBeInstanceOf(Headers);
     expect((headers as Headers).has("Content-Type")).toBe(false);
-    expect((headers as Headers).get("X-Readmates-Client-Contract")).toBe("v2");
+    expect((headers as Headers).get("X-Readmates-Client-Contract")).toBe("v3");
   });
 
-  it("declares the v2 client contract only for host mutations", async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+  it("preflights once and declares v3 only for host mutations", async () => {
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        schemaVersion: 1,
+        supportedHostClientContracts: ["v2", "v3"],
+      }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }))
+      .mockResolvedValue(new Response(null, { status: 204 }));
     vi.stubGlobal("fetch", fetchMock);
 
     await readmatesFetchResponse("/api/host/sessions/session-1", { method: "PATCH" });
     await readmatesFetchResponse("/api/host/sessions/session-1");
     await readmatesFetchResponse("/api/sessions/current/rsvp", { method: "POST" });
 
-    const hostMutationHeaders = fetchMock.mock.calls[0]?.[1]?.headers as Headers;
-    const hostReadHeaders = fetchMock.mock.calls[1]?.[1]?.headers as Headers;
-    const memberMutationHeaders = fetchMock.mock.calls[2]?.[1]?.headers as Headers;
-    expect(hostMutationHeaders.get("X-Readmates-Client-Contract")).toBe("v2");
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/bff/__internal/client-contract-status");
+    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ cache: "no-store" }));
+    const hostMutationHeaders = fetchMock.mock.calls[1]?.[1]?.headers as Headers;
+    const hostReadHeaders = fetchMock.mock.calls[2]?.[1]?.headers as Headers;
+    const memberMutationHeaders = fetchMock.mock.calls[3]?.[1]?.headers as Headers;
+    expect(hostMutationHeaders.get("X-Readmates-Client-Contract")).toBe("v3");
     expect(hostReadHeaders.get("X-Readmates-Client-Contract")).toBeNull();
     expect(memberMutationHeaders.get("X-Readmates-Client-Contract")).toBeNull();
+  });
+
+  it.each([
+    {
+      name: "v3 is absent",
+      body: { schemaVersion: 1, supportedHostClientContracts: ["v2"] },
+      headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+    },
+    {
+      name: "schema version is unknown",
+      body: { schemaVersion: 2, supportedHostClientContracts: ["v2", "v3"] },
+      headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+    },
+    {
+      name: "generation is unknown",
+      body: { schemaVersion: 1, supportedHostClientContracts: ["v2", "v4"] },
+      headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+    },
+    {
+      name: "response is cacheable",
+      body: { schemaVersion: 1, supportedHostClientContracts: ["v2", "v3"] },
+      headers: { "Content-Type": "application/json" },
+    },
+  ])("blocks the host write when capability $name", async ({ body, headers }) => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { headers }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(readmatesFetchResponse(
+      "/api/host/sessions/session-1",
+      { method: "PATCH" },
+      { clubSlug: "reading-sai" },
+    )).rejects.toMatchObject({
+      name: "HostClientUpdateRequiredError",
+      code: "CLIENT_UPDATE_REQUIRED",
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[0]).toBe("/api/bff/__internal/client-contract-status");
+  });
+
+  it("shares one validated capability request across concurrent host writes", async () => {
+    let resolveCapability!: (response: Response) => void;
+    const capability = new Promise<Response>((resolve) => {
+      resolveCapability = resolve;
+    });
+    const fetchMock = vi.fn()
+      .mockImplementationOnce(() => capability)
+      .mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const first = readmatesFetchResponse("/api/host/sessions/a/open", { method: "POST" });
+    const second = readmatesFetchResponse("/api/host/sessions/b/open", { method: "POST" });
+    resolveCapability(new Response(JSON.stringify({
+      schemaVersion: 1,
+      supportedHostClientContracts: ["v2", "v3"],
+    }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } }));
+
+    await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("exposes a typed fail-closed capability error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      schemaVersion: 1,
+      supportedHostClientContracts: ["v2"],
+    }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })));
+
+    await expect(requireHostClientContractV3()).rejects.toBeInstanceOf(HostClientUpdateRequiredError);
   });
 
   it("adds the current scoped app club slug to BFF API requests", async () => {
@@ -158,7 +308,7 @@ describe("readmatesFetchResponse", () => {
     const response = new Response(
       JSON.stringify({
         code: "SESSION_NOT_FOUND",
-        message: "요청한 세션을 찾을 수 없습니다.",
+        message: "요청한 모임을 찾을 수 없습니다.",
         status: 404,
       }),
       {
@@ -171,7 +321,7 @@ describe("readmatesFetchResponse", () => {
 
     await expect(readmatesFetch("/api/archive/sessions/missing")).rejects.toMatchObject({
       name: "ReadmatesApiError",
-      message: "요청한 세션을 찾을 수 없습니다.",
+      message: "요청한 모임을 찾을 수 없습니다.",
       status: 404,
       code: "SESSION_NOT_FOUND",
       fallback: false,
@@ -270,7 +420,7 @@ describe("readmatesFetchResponse", () => {
         new Response(
           JSON.stringify({
             code: "SESSION_NOT_FOUND",
-            message: "요청한 세션을 찾을 수 없습니다.",
+            message: "요청한 모임을 찾을 수 없습니다.",
             status: 404,
           }),
           {

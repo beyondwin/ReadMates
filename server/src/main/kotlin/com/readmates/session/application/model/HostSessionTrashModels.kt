@@ -15,6 +15,7 @@ data class HostSessionTrashResponse(
     val deletedAt: String,
     val purgeAfter: String,
     val counts: HostSessionDeletionCounts,
+    val sessionRevision: Long = 0,
 )
 
 data class HostSessionTrashPage(
@@ -30,6 +31,7 @@ data class HostSessionTrashRecord(
     val deletedAt: OffsetDateTime,
     val purgeAfter: OffsetDateTime,
     val restorable: Boolean,
+    val sessionRevision: Long = 0,
 )
 
 data class HostSessionTrashPurgeTarget(

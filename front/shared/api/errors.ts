@@ -26,6 +26,17 @@ export type ReadmatesApiErrorMetadata = {
   type: ResponseType;
 };
 
+export class ReadmatesTransportError extends Error {
+  constructor() {
+    super("네트워크 연결을 확인해 주세요.");
+    this.name = "ReadmatesTransportError";
+  }
+}
+
+export function isReadmatesTransportError(error: unknown): error is ReadmatesTransportError {
+  return error instanceof ReadmatesTransportError;
+}
+
 type FallbackApiError = ReadmatesApiErrorBody & {
   fallback: true;
 };

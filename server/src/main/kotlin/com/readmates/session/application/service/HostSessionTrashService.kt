@@ -148,4 +148,5 @@ private fun HostSessionTrashRecord.toResponse(counts: HostSessionDeletionCounts)
         deletedAt = deletedAt.toString(),
         purgeAfter = purgeAfter.toString(),
         counts = counts,
+        sessionRevision = sessionRevision,
     )

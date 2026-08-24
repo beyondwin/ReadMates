@@ -26,7 +26,8 @@ import {
   useUpdateHostNotificationPolicyMutation,
   type ManualOptionsQueryRequest,
 } from "@/features/host/queries/host-notification-queries";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import {
   appendCursor,
   combineCursorPages,
@@ -39,8 +40,8 @@ const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
 const MANUAL_MEMBER_PAGE_LIMIT = 50;
 
-function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext | undefined {
-  return clubSlug ? { clubSlug } : undefined;
+function contextFromClubSlug(clubSlug?: string): ExplicitReadmatesApiContext {
+  return requireHostClubContext(clubSlug);
 }
 
 export function HostNotificationsRoute() {
@@ -104,7 +105,7 @@ export function HostNotificationsRoute() {
   const retryMutation = useRetryHostNotificationMutation(context);
   const restoreMutation = useRestoreHostNotificationMutation(context);
   const testMailMutation = useSendHostNotificationTestMailMutation(context);
-  const previewManualMutation = usePreviewManualNotificationMutation();
+  const previewManualMutation = usePreviewManualNotificationMutation(context);
   const confirmManualMutation = useConfirmManualNotificationMutation(context);
   const updatePolicyMutation = useUpdateHostNotificationPolicyMutation(context);
   const isAnyQueryFetching =
@@ -159,6 +160,7 @@ export function HostNotificationsRoute() {
 
   return (
     <HostNotificationsPage
+      clubSlug={context.clubSlug}
       summary={summaryQuery.data ?? { pending: 0, failed: 0, dead: 0, sentLast24h: 0, latestFailures: [] }}
       events={events.items}
       deliveries={deliveries.items}

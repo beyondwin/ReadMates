@@ -1,12 +1,20 @@
 package com.readmates.publication.application.port.out
 
 import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
+import com.readmates.publication.application.model.PublicClubProjectionGeneration
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicProjectionGeneration
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import java.util.UUID
 
 interface LoadPublishedPublicDataPort {
+    fun loadClubProjectionGeneration(clubSlug: String): PublicClubProjectionGeneration? = null
+
+    fun loadSessionProjectionGeneration(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicProjectionGeneration? = null
+
     fun loadClub(): PublicClubResult?
 
     fun loadClub(clubSlug: String): PublicClubResult? = if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) loadClub() else null

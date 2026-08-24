@@ -371,6 +371,7 @@ fi
 for required_workspace_file in \
   ".node-version" \
   ".github/workflows/deploy-server.yml" \
+  ".github/workflows/host-client-rollout-evidence.yml" \
   "package.json" \
   "pnpm-lock.yaml" \
   "pnpm-workspace.yaml" \
@@ -378,7 +379,20 @@ for required_workspace_file in \
   "design/system/package.json" \
   "design/docs/package.json" \
   "scripts/check-deploy-workflow-contract.py" \
+  "scripts/check-host-client-rollout-contract.py" \
   "scripts/check-flyway-migration-immutability.py" \
+  "scripts/host-rollout-evidence-reporter.py" \
+  "scripts/host-rollout-cache-evidence.py" \
+  "scripts/host-rollout-test-contract.json" \
+  "scripts/host-rollout-workflow-contract.json" \
+  "scripts/test-host-rollout-evidence-reporter.py" \
+  "scripts/test-host-rollout-cache-evidence.py" \
+  "scripts/validate-host-rollout-candidate.py" \
+  "scripts/verify-host-client-rollout-evidence.py" \
+  "scripts/schemas/host-client-rollout-evidence-v1.schema.json" \
+  "scripts/schemas/host-rollout-test-report-v1.schema.json" \
+  "scripts/schemas/host-rollout-workflow-contract-v1.schema.json" \
+  "scripts/tooling/gh-attestation-lock.json" \
   "scripts/fixtures/public-release-candidate-coverage.txt"
 do
   if [[ ! -f "$candidate_dir/$required_workspace_file" ]]; then
@@ -415,6 +429,22 @@ then
   sed 's/^/  /' "$fixture_root/flyway-checker-self-test.out" >&2
   sed 's/^/  /' "$fixture_root/flyway-checker-self-test.err" >&2
   fail "public release candidate Flyway checker self-test failed without Git metadata"
+fi
+
+if ! (
+  cd "$candidate_dir"
+  python3 -B scripts/check-host-client-rollout-contract.py --self-test
+  python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
+  python3 -B scripts/test-host-rollout-evidence-reporter.py
+  python3 -B scripts/test-host-rollout-cache-evidence.py
+  python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready
+  python3 -B scripts/validate-host-rollout-candidate.py --self-test
+  python3 -B scripts/check-host-client-rollout-contract.py
+) > "$fixture_root/host-rollout-checkers.out" 2> "$fixture_root/host-rollout-checkers.err"
+then
+  sed 's/^/  /' "$fixture_root/host-rollout-checkers.out" >&2
+  sed 's/^/  /' "$fixture_root/host-rollout-checkers.err" >&2
+  fail "public release candidate host rollout contract checks failed"
 fi
 
 for required_oauth_file in \

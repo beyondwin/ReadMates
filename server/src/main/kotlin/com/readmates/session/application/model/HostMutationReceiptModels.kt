@@ -18,6 +18,7 @@ data class HostMutationReceiptRecord(
     val notificationDecision: NotificationDecision,
     val dispatchReceiptId: UUID?,
     val createdAt: Instant,
+    val publicProjectionEffect: HostPublicProjectionEffect? = null,
 ) {
     init {
         require(operation.isNotBlank()) { "operation must not be blank" }
@@ -32,3 +33,14 @@ data class HostMutationReceiptRecord(
         "HostMutationReceiptRecord(receiptId=$receiptId, operation=$operation, resourceId=$resourceId, " +
             "notificationDecision=$notificationDecision)"
 }
+
+data class HostPublicProjectionEffect(
+    val convergenceId: UUID,
+    val clubId: UUID,
+    val sessionId: UUID,
+    val publicationId: UUID?,
+    val generation: Long,
+    val clubGeneration: Long,
+    val liveRecordRevision: Long?,
+    val originReadable: Boolean,
+)

@@ -15,8 +15,8 @@ interface PublicReadCachePort {
 
     fun getClub(
         clubId: UUID,
-        generation: Long,
-    ): PublicClubResult? = if (generation == 1L) getClub(clubId) else null
+        clubGeneration: Long,
+    ): PublicClubResult? = getClub(clubId)
 
     fun putClub(result: PublicClubResult)
 
@@ -31,22 +31,18 @@ interface PublicReadCachePort {
 
     fun putClub(
         clubId: UUID,
-        generation: Long,
-        result: PublicClubResult,
-    ) {
-        if (generation == 1L) {
-            putClub(clubId, result)
-        }
-    }
-
-    fun putClub(
-        clubId: UUID,
         result: PublicClubResult,
     ) {
         if (clubId == UUID.fromString(LEGACY_PUBLIC_CLUB_ID)) {
             putClub(result)
         }
     }
+
+    fun putClub(
+        clubId: UUID,
+        clubGeneration: Long,
+        result: PublicClubResult,
+    ) = putClub(clubId, result)
 
     fun getSession(sessionId: UUID): PublicSessionDetailResult?
 
@@ -62,9 +58,10 @@ interface PublicReadCachePort {
 
     fun getSession(
         clubId: UUID,
-        sessionId: UUID,
+        clubGeneration: Long,
         generation: Long,
-    ): PublicSessionDetailResult? = if (generation == 1L) getSession(clubId, sessionId) else null
+        sessionId: UUID,
+    ): PublicSessionDetailResult? = getSession(clubId, sessionId)
 
     fun putSession(
         sessionId: UUID,
@@ -93,14 +90,11 @@ interface PublicReadCachePort {
 
     fun putSession(
         clubId: UUID,
-        sessionId: UUID,
+        clubGeneration: Long,
         generation: Long,
+        sessionId: UUID,
         result: PublicSessionDetailResult,
-    ) {
-        if (generation == 1L) {
-            putSession(clubId, sessionId, result)
-        }
-    }
+    ) = putSession(clubId, sessionId, result)
 
     fun getClubId(clubSlug: String): UUID? = if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) UUID.fromString(LEGACY_PUBLIC_CLUB_ID) else null
 
@@ -122,12 +116,15 @@ interface PublicReadCachePort {
         ) = Unit
     }
 
+    @Suppress("TooManyFunctions")
     class InMemoryForTest(
         private var club: PublicClubResult? = null,
     ) : PublicReadCachePort {
         private val sessions = mutableMapOf<UUID, PublicSessionDetailResult>()
         private val clubsById = mutableMapOf<UUID, PublicClubResult>()
+        private val versionedClubsById = mutableMapOf<Pair<UUID, Long>, PublicClubResult>()
         private val sessionsByClubId = mutableMapOf<Pair<UUID, UUID>, PublicSessionDetailResult>()
+        private val versionedSessionsByClubId = mutableMapOf<VersionedSessionKey, PublicSessionDetailResult>()
         private val clubIdsBySlug = mutableMapOf<String, UUID>()
 
         override fun getClub(): PublicClubResult? = club
@@ -154,6 +151,19 @@ interface PublicReadCachePort {
             clubsById[clubId] = result
         }
 
+        override fun getClub(
+            clubId: UUID,
+            clubGeneration: Long,
+        ): PublicClubResult? = versionedClubsById[clubId to clubGeneration]
+
+        override fun putClub(
+            clubId: UUID,
+            clubGeneration: Long,
+            result: PublicClubResult,
+        ) {
+            versionedClubsById[clubId to clubGeneration] = result
+        }
+
         override fun getSession(
             clubId: UUID,
             sessionId: UUID,
@@ -167,6 +177,26 @@ interface PublicReadCachePort {
             sessionsByClubId[clubId to sessionId] = result
         }
 
+        override fun getSession(
+            clubId: UUID,
+            clubGeneration: Long,
+            generation: Long,
+            sessionId: UUID,
+        ): PublicSessionDetailResult? =
+            versionedSessionsByClubId[
+                VersionedSessionKey(clubId, clubGeneration, generation, sessionId),
+            ]
+
+        override fun putSession(
+            clubId: UUID,
+            clubGeneration: Long,
+            generation: Long,
+            sessionId: UUID,
+            result: PublicSessionDetailResult,
+        ) {
+            versionedSessionsByClubId[VersionedSessionKey(clubId, clubGeneration, generation, sessionId)] = result
+        }
+
         override fun getClubId(clubSlug: String): UUID? = clubIdsBySlug[clubSlug] ?: super.getClubId(clubSlug)
 
         override fun putClubId(
@@ -175,5 +205,12 @@ interface PublicReadCachePort {
         ) {
             clubIdsBySlug[clubSlug] = clubId
         }
+
+        private data class VersionedSessionKey(
+            val clubId: UUID,
+            val clubGeneration: Long,
+            val generation: Long,
+            val sessionId: UUID,
+        )
     }
 }

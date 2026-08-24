@@ -64,38 +64,34 @@ describe("host session query keys", () => {
   it("scopes all host session keys by club slug", () => {
     expect(hostSessionKeys.list({ limit: 50 }, { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "list",
       { limit: 50, cursor: null },
     ]);
     expect(hostSessionKeys.detail("session-7", { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "detail",
       "session-7",
     ]);
     expect(hostSessionKeys.current({ clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "current",
     ]);
     expect(hostSessionKeys.scheduleDefaults({ clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "scheduleDefaults",
     ]);
   });
 
-  it("uses a null club scope for unscoped host routes", () => {
-    expect(hostSessionKeys.scope()).toEqual(["host", "sessions", "scope", null]);
+  it("rejects an unscoped host query key at runtime", () => {
+    expect(() => hostSessionKeys.scope(undefined as never)).toThrow();
   });
 
   it("normalizes equivalent first page requests to the same key", () => {
@@ -122,7 +118,7 @@ describe("host session query keys", () => {
     vi.mocked(fetchHostSessionDetail).mockResolvedValue({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       bookTitle: "테스트 책",
       bookAuthor: "테스트 저자",
       bookLink: null,
@@ -143,7 +139,7 @@ describe("host session query keys", () => {
     vi.mocked(fetchHostSessionDeletionPreview).mockResolvedValue({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "OPEN",
       canDelete: true,
       counts: {
@@ -212,17 +208,15 @@ describe("host session query keys", () => {
   it("scopes trash list and detail keys by club slug", () => {
     expect(hostSessionKeys.trashList({ limit: 50 }, { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "trash",
       { limit: 50, cursor: null },
     ]);
     expect(hostSessionKeys.trashDetail("session-7", { clubSlug: "reading-sai" })).toEqual([
       "host",
-      "sessions",
-      "scope",
       "reading-sai",
+      "sessions",
       "trashDetail",
       "session-7",
     ]);
@@ -241,19 +235,29 @@ describe("host session query keys", () => {
       { limit: 50 },
     );
     expect(fetchHostSessionTrash).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
-    await restoreHostSession("session-7", { clubSlug: "reading-sai" });
-    expect(restoreHostSession).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
+    const restoreEnvelope = {
+      idempotencyKey: "b6-trash-restore-0001",
+      expected: { sessionRevision: 4 },
+      command: {},
+    };
+    await restoreHostSession("session-7", restoreEnvelope, { clubSlug: "reading-sai" });
+    expect(restoreHostSession).toHaveBeenCalledWith(
+      "session-7",
+      restoreEnvelope,
+      { clubSlug: "reading-sai" },
+    );
   });
 
   it("parses DELETE trash payloads from trashed, not deleted", () => {
     expect(parseHostSessionDeletionResponse({
       sessionId: "session-7",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "DRAFT",
       trashed: true,
       deletedAt: "2026-08-21T10:00:00Z",
       purgeAfter: "2026-08-28T10:00:00Z",
+      sessionRevision: 4,
       counts: emptyCounts(),
     })).toMatchObject({
       sessionId: "session-7",
@@ -430,10 +434,11 @@ function trashItem() {
   return {
     sessionId: "session-7",
     sessionNumber: 7,
-    title: "7회차 모임",
+    title: "No.7 모임",
     state: "DRAFT" as const,
     deletedAt: "2026-08-21T10:00:00Z",
     purgeAfter: "2026-08-28T10:00:00Z",
+    sessionRevision: 4,
   };
 }
 
@@ -441,7 +446,7 @@ function sessionDetail() {
   return {
     sessionId: "session-7",
     sessionNumber: 7,
-    title: "7회차 모임",
+    title: "No.7 모임",
     bookTitle: "테스트 책",
     bookAuthor: "테스트 저자",
     bookLink: null,
@@ -456,6 +461,15 @@ function sessionDetail() {
     visibility: "HOST_ONLY" as const,
     publication: null,
     state: "DRAFT" as const,
+    versions: {
+      sessionRevision: 4,
+      exposureRevision: 0,
+      participantSetRevision: 0,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-0",
     attendees: [],
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
   };

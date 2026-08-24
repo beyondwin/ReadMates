@@ -62,7 +62,7 @@ function attentionItem(overrides: Partial<HostSessionLedgerItem> = {}): HostSess
   return {
     sessionId: "closed-1",
     sessionNumber: 12,
-    title: "12회차",
+    title: "No.12",
     bookTitle: "닫힌 책",
     bookAuthor: "저자",
     bookImageUrl: null,
@@ -189,7 +189,7 @@ describe("HostOperationsRoute", () => {
     expect(await within(attention).findByText("첫 번째 책")).toBeInTheDocument();
     expect(within(attention).getByText("두 번째 책")).toBeInTheDocument();
     expect(within(attention).queryByText("공개된 책")).not.toBeInTheDocument();
-    expect(within(attention).getByRole("link", { name: "1회차 기록 열기" })).toHaveAttribute(
+    expect(within(attention).getByRole("link", { name: "No.1 기록 열기" })).toHaveAttribute(
       "href",
       "/app/host/sessions/att-1",
     );
@@ -198,7 +198,7 @@ describe("HostOperationsRoute", () => {
 
     expect(await within(attention).findByText("공개된 책")).toBeInTheDocument();
     expect(within(attention).getByText("세 번째 책")).toBeInTheDocument();
-    expect(within(attention).getByRole("link", { name: "4회차 기록 열기" })).toHaveAttribute(
+    expect(within(attention).getByRole("link", { name: "No.4 기록 열기" })).toHaveAttribute(
       "href",
       "/app/host/sessions/att-4",
     );
@@ -226,14 +226,14 @@ describe("HostOperationsRoute", () => {
       "href",
       "/app/host/notifications",
     );
-    expect(screen.queryByText("열린 세션")).not.toBeInTheDocument();
+    expect(screen.queryByText("열린 모임")).not.toBeInTheDocument();
 
     const readiness = screen.getByRole("region", { name: "클럽 준비도" });
     expect(within(readiness).getByRole("heading", { name: "운영 신호" })).toBeInTheDocument();
     expect(within(readiness).getByRole("alert")).toHaveTextContent("클럽 준비도를 불러오지 못했습니다.");
     await user.click(within(readiness).getByRole("button", { name: "다시 시도" }));
 
-    expect(await screen.findByText("열린 세션")).toBeInTheDocument();
+    expect(await screen.findByText("열린 모임")).toBeInTheDocument();
     expect(screen.getByText("남은 기록")).toBeInTheDocument();
   });
 

@@ -416,7 +416,7 @@ export default function HostInvitations({
                   checked={applyToCurrentSession}
                   onChange={(event) => setApplyToCurrentSession(event.currentTarget.checked)}
                 />
-                <span className="small">수락하면 이번 세션에도 추가</span>
+                <span className="small">수락하면 이번 모임에도 추가</span>
               </label>
             </div>
             {lastCreated?.acceptUrl ? (
@@ -500,7 +500,7 @@ export default function HostInvitations({
                         <span className={inviteStatusClass(invitation.effectiveStatus)}>
                           {statusLabels[invitation.effectiveStatus]}
                         </span>
-                        {invitation.applyToCurrentSession ? <span className="badge">이번 세션 포함</span> : null}
+                        {invitation.applyToCurrentSession ? <span className="badge">이번 모임 포함</span> : null}
                       </div>
                       <div className="small" style={{ marginTop: 2 }}>
                         {invitation.email} · 만료 {formatDateOnlyLabel(invitation.expiresAt)}

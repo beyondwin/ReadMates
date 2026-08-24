@@ -41,12 +41,12 @@ async function fillNewMeetingBasics(
   page: Page,
   input: { title: string; bookTitle: string; author: string; date: string },
 ) {
-  await expect(page.getByLabel("세션 제목")).toBeVisible();
-  await page.getByLabel("세션 제목").fill(input.title);
+  await expect(page.getByLabel("모임 제목")).toBeVisible();
+  await page.getByLabel("모임 제목").fill(input.title);
   await page.getByLabel("책 제목").fill(input.bookTitle);
   await page.getByLabel("저자").fill(input.author);
   await page.getByLabel("모임 날짜").fill(input.date);
-  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
   await expectCanonicalMeetingUrl(page);
 }
 
@@ -67,7 +67,7 @@ async function confirmLifecycle(page: Page, name: string, pathIncludes: string) 
   page.on("dialog", onDialog);
   try {
     const triggerName = name === "멤버에게 열기" ? "멤버와 준비 시작" : name;
-    const checkAttendance = page.getByRole("button", { name: "출석 확인하기" }).locator("visible=true");
+    const checkAttendance = page.getByRole("button", { name: "실제 출석 확인" }).locator("visible=true");
     const finish = page.getByRole("button", { name: "모임 마치기" }).locator("visible=true");
     if (name === "모임 마치기") {
       await expect(checkAttendance.or(finish)).toBeVisible({ timeout: 10_000 });
@@ -130,8 +130,8 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await expectCanonicalMeetingUrl(page);
 
   await page.goto("/app/host/sessions/new");
-  await expect(page.getByLabel("세션 제목")).toBeVisible();
-  await page.getByLabel("세션 제목").fill("E2E 예정 모임");
+  await expect(page.getByLabel("모임 제목")).toBeVisible();
+  await page.getByLabel("모임 제목").fill("E2E 예정 모임");
   await page.getByLabel("책 제목").fill("E2E 예정 책");
   await page.getByLabel("저자").fill("E2E 저자");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
@@ -142,7 +142,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
       && !response.url().includes("/sessions/")
       && response.ok(),
   );
-  await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
   const created = await createResponse;
   expect(created.ok()).toBe(true);
   await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
@@ -183,11 +183,11 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 
   await loginAsDevAccount(page, /멤버1/);
   await page.goto("/app");
-  await expect(page.locator(".rm-member-home-desktop").getByText("RSVP를 먼저 선택해 주세요.")).toBeVisible();
+  await expect(page.locator(".rm-member-home-desktop").getByText("참석 응답을 먼저 선택해 주세요.")).toBeVisible();
   await page.goto("/app/session/current");
   const currentSessionDesktop = page.locator(".rm-current-session-desktop");
   await expect(currentSessionDesktop.getByText("멤버 준비 필요")).toBeVisible();
-  await expect(currentSessionDesktop.getByText("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
+  await expect(currentSessionDesktop.getByText("참석 응답을 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
 
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");

@@ -112,7 +112,7 @@ describe("session import model", () => {
 
     expect(review.canCommit).toBe(false);
     expect(review.statusLabel).toBe("확인 필요");
-    expect(review.blockingMessages).toContain("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.");
+    expect(review.blockingMessages).toContain("기록 보기 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.");
   });
 
   it("surfaces invalid feedback document and server issues as blocking messages", () => {
@@ -167,7 +167,7 @@ describe("session import model", () => {
     expect(result).toEqual({
       tone: "success",
       title: "초안 저장 완료",
-      message: "가져온 세션 기록을 공유 초안으로 저장했습니다.",
+      message: "가져온 모임 기록을 공유 초안으로 저장했습니다.",
       visibilityLabel: "게스트 공개",
       items: [
         "공개 요약 초안 교체",
@@ -212,13 +212,13 @@ describe("session import model", () => {
       "저장 전 검증 상태가 바뀌었습니다. 미리보기를 다시 실행한 뒤 저장해 주세요.",
     );
     expect(sessionImportFailureMessage("commit-permission")).toBe(
-      "가져온 세션 기록 저장에 실패했습니다. 현재 클럽과 호스트 권한을 확인해 주세요.",
+      "가져온 모임 기록 저장에 실패했습니다. 현재 클럽과 호스트 권한을 확인해 주세요.",
     );
     expect(sessionImportFailureMessage("commit-network")).toBe(
-      "가져온 세션 기록 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
+      "가져온 모임 기록 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.",
     );
     expect(sessionImportFailureMessage("refresh")).toBe(
-      "저장은 완료되었을 수 있습니다. 세션 문서를 새로 불러와 저장 결과를 확인해 주세요.",
+      "저장은 완료되었을 수 있습니다. 모임 문서를 새로 불러와 저장 결과를 확인해 주세요.",
     );
   });
 });

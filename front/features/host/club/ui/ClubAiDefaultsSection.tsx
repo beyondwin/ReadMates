@@ -17,6 +17,8 @@ import {
   getClubAiDefault,
   putClubAiDefault,
 } from "@/features/host/aigen/api/aigen-api";
+import { aiClubKeys } from "@/features/host/aigen/queries/aigen-job-queries";
+import { hostMutationKey } from "@/features/host/queries/host-state-purge";
 import {
   CLUB_AI_MODEL_OPTIONS,
   CLUB_AI_OPENAI_DEFAULT_MODEL_ID,
@@ -27,24 +29,21 @@ export type ClubAiDefaultsSectionProps = {
   variant?: "default" | "compact";
 };
 
-function clubAiDefaultQueryKey(clubSlug: string): readonly unknown[] {
-  return ["host", "aigen", "club-ai-default", clubSlug] as const;
-}
-
 export function ClubAiDefaultsSection({
   clubSlug,
   variant = "default",
 }: ClubAiDefaultsSectionProps) {
   const queryClient = useQueryClient();
+  const context = { clubSlug };
   const capabilitiesQuery = useQuery({
-    queryKey: ["host", "aigen", "capabilities", clubSlug],
+    queryKey: aiClubKeys.capabilities(context),
     queryFn: () => getAiGenerationCapabilities(clubSlug),
     staleTime: 0,
   });
   const aiGenerationEnabled =
     capabilitiesQuery.data?.enabled === true && !capabilitiesQuery.isFetching;
   const defaultsQuery = useQuery({
-    queryKey: clubAiDefaultQueryKey(clubSlug),
+    queryKey: aiClubKeys.defaults(context),
     queryFn: () => getClubAiDefault(clubSlug),
     enabled: aiGenerationEnabled,
   });
@@ -69,12 +68,13 @@ export function ClubAiDefaultsSection({
   }, [serverModel, selected]);
 
   const mutation = useMutation({
+    mutationKey: hostMutationKey(clubSlug, "aigen", "club-default"),
     mutationFn: (model: string) =>
       putClubAiDefault(clubSlug, { defaultModel: model }),
     onSuccess: async () => {
       setShowSavedNotice(true);
       await queryClient.invalidateQueries({
-        queryKey: clubAiDefaultQueryKey(clubSlug),
+        queryKey: aiClubKeys.defaults(context),
       });
     },
   });
@@ -111,8 +111,8 @@ export function ClubAiDefaultsSection({
         </h2>
         <p className="small" style={{ color: "var(--text-2)", margin: "4px 0 0" }}>
           {variant === "compact"
-            ? "새 세션 AI 생성에 적용할 기본값입니다."
-            : "새 세션 AI 생성에 사용할 기본 모델입니다. 호스트가 업로드 시 다른 모델로 바꿀 수도 있습니다."}
+            ? "새 모임 AI 생성에 적용할 기본값입니다."
+            : "새 모임 AI 생성에 사용할 기본 모델입니다. 호스트가 업로드 시 다른 모델로 바꿀 수도 있습니다."}
         </p>
       </header>
 

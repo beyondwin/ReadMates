@@ -227,7 +227,7 @@ describe("CurrentSession", () => {
           path: "/",
           element: <CurrentSessionRoute />,
           loader: () => ({ auth: routeAuthFixture, current: currentSessionData }),
-          hydrateFallbackElement: <div>세션을 불러오는 중</div>,
+          hydrateFallbackElement: <div>모임을 불러오는 중</div>,
         },
       ],
       { initialEntries: ["/"] },
@@ -270,7 +270,7 @@ describe("CurrentSession", () => {
           element: <CurrentSessionRoute />,
           loader: currentSessionLoaderFactory(client),
           errorElement: <div>route error</div>,
-          hydrateFallbackElement: <div>세션을 불러오는 중</div>,
+          hydrateFallbackElement: <div>모임을 불러오는 중</div>,
         },
       ],
       { initialEntries: ["/"] },
@@ -319,7 +319,7 @@ describe("CurrentSession", () => {
           element: <CurrentSessionRoute />,
           loader: currentSessionLoaderFactory(client),
           errorElement: <div>route error</div>,
-          hydrateFallbackElement: <div>세션을 불러오는 중</div>,
+          hydrateFallbackElement: <div>모임을 불러오는 중</div>,
         },
       ],
       { initialEntries: ["/clubs/reading-sai/app/session/current"] },
@@ -364,26 +364,26 @@ describe("CurrentSession", () => {
     expect(
       screen.getByText("새 모임이 등록되면 참석 여부, 읽기 진행률, 질문 작성이 열립니다."),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/6회차는 종료되었습니다/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/No.6는 종료되었습니다/)).not.toBeInTheDocument();
   });
 
   it("shows the no-session create action only for hosts", () => {
     const { rerender } = render(<CurrentSession auth={activeMemberAuthFixture} data={{ currentSession: null }} />);
 
     expect(screen.queryByRole("link", { name: "첫 모임 만들기" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "세션 문서 만들기" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "모임 문서 만들기" })).not.toBeInTheDocument();
 
     rerender(<CurrentSession auth={{ ...activeMemberAuthFixture, role: "HOST" }} data={{ currentSession: null }} />);
 
     expect(screen.getByRole("link", { name: "첫 모임 만들기" })).toHaveAttribute("href", "/app/host/sessions/new");
   });
 
-  it("shows RSVP, check-in, and question sections", () => {
+  it("shows 참석 응답, check-in, and question sections", () => {
     const { container } = render(<CurrentSession data={currentSessionData} />);
     const desktop = getDesktop(container);
     const rsvpEditWindow = within(desktop).getByText("변경 가능 · 모임 당일까지");
 
-    expect(within(desktop).getAllByText("RSVP").length).toBeGreaterThan(0);
+    expect(within(desktop).getAllByText("참석 응답").length).toBeGreaterThan(0);
     expect(rsvpEditWindow).toHaveClass("small");
     expect(rsvpEditWindow).not.toHaveClass("tiny", "mono");
     expect(within(desktop).getByText("참석 여부")).toBeInTheDocument();
@@ -425,9 +425,9 @@ describe("CurrentSession", () => {
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     expect(desktopScope.getByText("멤버 준비 필요")).toBeVisible();
-    expect(desktopScope.getByText("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
+    expect(desktopScope.getByText("참석 응답을 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
     expect(mobileScope.getByText("멤버 준비 필요")).toBeVisible();
-    expect(mobileScope.getByText("RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
+    expect(mobileScope.getByText("참석 응답을 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.")).toBeVisible();
   });
 
   it("disables personal save actions for suspended members", () => {
@@ -456,8 +456,8 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     expect(desktopScope.getByText("읽기 전용")).toBeVisible();
-    expect(desktopScope.getByText("세션 준비됨")).toBeVisible();
-    expect(desktopScope.getByText("세션 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
+    expect(desktopScope.getByText("모임 준비됨")).toBeVisible();
+    expect(desktopScope.getByText("모임 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
     for (const label of ["참석", "아직 미정", "불참", "진행률 저장", "질문 저장", "한줄평 저장", "서평 저장"]) {
       expect(desktopScope.getByRole("button", { name: label })).toBeDisabled();
     }
@@ -468,7 +468,7 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
     expect(desktopScope.getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("API에서 온 한줄평");
     expect(desktopScope.getByRole("textbox", { name: "서평 내용" })).toHaveValue("API에서 온 장문 서평");
-    expect(desktopScope.queryByText("읽기 전용 세션 상세")).not.toBeInTheDocument();
+    expect(desktopScope.queryByText("읽기 전용 모임 상세")).not.toBeInTheDocument();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -481,7 +481,7 @@ describe("CurrentSession", () => {
     expect(desktopScope.getByRole("button", { name: "참석" })).toBeInTheDocument();
     expect(desktopScope.getByRole("button", { name: "진행률 저장" })).toBeInTheDocument();
     expect(desktopScope.queryByText("호스트 맥락")).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "세션 운영으로" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "모임 운영으로" })).not.toBeInTheDocument();
   });
 
   it("keeps saved viewer values in disabled mobile member controls without mutations", async () => {
@@ -496,8 +496,8 @@ describe("CurrentSession", () => {
     const mobileScope = within(await screen.findByTestId("current-session-mobile"));
 
     expect(mobileScope.getByText("읽기 전용")).toBeVisible();
-    expect(mobileScope.getByText("세션 준비됨")).toBeVisible();
-    expect(mobileScope.getByText("세션 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
+    expect(mobileScope.getByText("모임 준비됨")).toBeVisible();
+    expect(mobileScope.getByText("모임 내용을 읽고 공동 보드를 확인할 수 있습니다.")).toBeVisible();
     for (const label of ["참석", "아직 미정", "불참", "진행률 저장", "질문 저장"]) {
       expect(mobileScope.getByRole("button", { name: label })).toBeDisabled();
     }
@@ -507,7 +507,7 @@ describe("CurrentSession", () => {
     expect(mobileScope.getAllByRole("textbox").every((input) => input.hasAttribute("disabled"))).toBe(true);
     expect(mobileScope.getByRole("button", { name: "참석" })).toHaveStyle({ background: "var(--text)" });
     expect(mobileScope.getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("API에서 온 내 질문");
-    expect(mobileScope.queryByText("읽기 전용 세션 상세")).not.toBeInTheDocument();
+    expect(mobileScope.queryByText("읽기 전용 모임 상세")).not.toBeInTheDocument();
 
     await user.click(mobileScope.getByRole("button", { name: "내 기록" }));
 
@@ -519,9 +519,9 @@ describe("CurrentSession", () => {
     expect(mobileScope.getByRole("button", { name: "서평 저장" })).toBeDisabled();
     expect(mobileScope.getAllByRole("textbox").every((input) => input.hasAttribute("disabled"))).toBe(true);
     expect(
-      mobileScope.getByText("둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다."),
+      mobileScope.getByText("둘러보기 멤버는 현재 모임 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다."),
     ).toBeVisible();
-    expect(mobileScope.queryByText("세션 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다.")).not.toBeInTheDocument();
+    expect(mobileScope.queryByText("모임 후 호스트가 피드백 문서를 업로드하면 active 정식 멤버에게 열립니다.")).not.toBeInTheDocument();
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -534,7 +534,7 @@ describe("CurrentSession", () => {
     expect(mobile).toBeInTheDocument();
     expect(container.querySelector(".rm-current-session-desktop")).toBeInTheDocument();
     expect(
-      within(within(mobile).getByRole("group", { name: "세션 보기" }))
+      within(within(mobile).getByRole("group", { name: "모임 보기" }))
         .getAllByRole("button")
         .map((tab) => tab.textContent),
     ).toEqual(["내 준비", "내 기록", "공동 보드"]);
@@ -581,9 +581,9 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
     const mobileScope = within(screen.getByTestId("current-session-mobile"));
 
-    expect(desktopScope.getByRole("group", { name: "No.14 · D-3 · 이번 세션" })).toBeInTheDocument();
+    expect(desktopScope.getByRole("group", { name: "No.14 · D-3 · 이번 모임" })).toBeInTheDocument();
     expect(desktopScope.getByText("D-3")).toHaveClass("rm-session-identity__chip", "rm-state", "rm-state--pending");
-    const mobileIdentity = mobileScope.getByRole("group", { name: "No.14 · D-3 · 이번 세션" });
+    const mobileIdentity = mobileScope.getByRole("group", { name: "No.14 · D-3 · 이번 모임" });
     expect(mobileIdentity).toBeInTheDocument();
     expect(within(mobileIdentity).getByText("D-3")).toHaveClass(
       "rm-session-identity__chip",
@@ -640,7 +640,7 @@ describe("CurrentSession", () => {
         ...currentSessionData.currentSession!,
         sessionId: "session-8",
         sessionNumber: 8,
-        title: "8회차 모임 · 다음 테스트 책",
+        title: "No.8 모임 · 다음 테스트 책",
         bookTitle: "다음 테스트 책",
         myCheckin: {
           readingProgress: 21,
@@ -648,18 +648,18 @@ describe("CurrentSession", () => {
         myQuestions: [
           {
             priority: 1,
-            text: "새 세션 질문",
-            draftThought: "새 세션 초안",
+            text: "새 모임 질문",
+            draftThought: "새 모임 초안",
             authorName: "이멤버5",
             authorShortName: "수",
             avatarKey: "cloud-green-book",
           },
         ],
         myOneLineReview: {
-          text: "새 세션 한줄평",
+          text: "새 모임 한줄평",
         },
         myLongReview: {
-          body: "새 세션 장문 서평",
+          body: "새 모임 장문 서평",
         },
       },
     };
@@ -673,13 +673,13 @@ describe("CurrentSession", () => {
     expect(desktopScope().getByText("다음 테스트 책")).toBeInTheDocument();
     expect(desktopScope().getByDisplayValue("21")).toBeInTheDocument();
     expect(desktopScope().queryByLabelText(removedLabel("체크", "인 메모"))).not.toBeInTheDocument();
-    expect(desktopScope().getByText("새 세션 질문")).toBeInTheDocument();
-    expect(desktopScope().queryByDisplayValue("새 세션 초안")).not.toBeInTheDocument();
+    expect(desktopScope().getByText("새 모임 질문")).toBeInTheDocument();
+    expect(desktopScope().queryByDisplayValue("새 모임 초안")).not.toBeInTheDocument();
     expect(desktopScope().queryByRole("button", { name: "질문 2 삭제" })).not.toBeInTheDocument();
-    expect(desktopScope().getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("새 세션 질문");
+    expect(desktopScope().getByRole("textbox", { name: "질문 1 내용" })).toHaveValue("새 모임 질문");
     expect(desktopScope().getByRole("textbox", { name: "질문 2 내용" })).toHaveValue("");
-    expect(desktopScope().getByDisplayValue("새 세션 장문 서평")).toBeInTheDocument();
-    expect(desktopScope().getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("새 세션 한줄평");
+    expect(desktopScope().getByDisplayValue("새 모임 장문 서평")).toBeInTheDocument();
+    expect(desktopScope().getByRole("textbox", { name: "한줄평 내용" })).toHaveValue("새 모임 한줄평");
   });
 
   it("shows post-session prep, roster, and shared board layers", async () => {
@@ -1029,7 +1029,7 @@ describe("CurrentSession", () => {
     const desktopScope = within(getDesktop(container));
 
     await user.click(desktopScope.getByRole("button", { name: "참석" }));
-    expect(await desktopScope.findByText("RSVP 저장됨")).toHaveClass("small");
+    expect(await desktopScope.findByText("참석 응답 저장됨")).toHaveClass("small");
 
     await user.click(desktopScope.getByRole("button", { name: "진행률 저장" }));
     expect(await desktopScope.findByText("진행률 저장됨")).toHaveClass("small");
@@ -1097,7 +1097,7 @@ describe("CurrentSession", () => {
     expect(await desktopScope.findByText("진행률 저장됨")).toBeInTheDocument();
   });
 
-  it("restores the previous RSVP state when saving RSVP fails", async () => {
+  it("restores the previous 참석 응답 state when saving 참석 응답 fails", async () => {
     const user = userEvent.setup();
     const fetchMock = vi.fn().mockResolvedValue({ ok: false });
     const onSaveSuccess = vi.fn();
@@ -1110,7 +1110,7 @@ describe("CurrentSession", () => {
 
     await user.click(desktopScope.getByRole("button", { name: "참석" }));
 
-    expect(await desktopScope.findByText("RSVP 저장 실패 · 다시 시도해 주세요")).toBeInTheDocument();
+    expect(await desktopScope.findByText("참석 응답 저장 실패 · 다시 시도해 주세요")).toBeInTheDocument();
     expect(desktopScope.getByText("현재 상태: 미응답")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/sessions/current/rsvp",

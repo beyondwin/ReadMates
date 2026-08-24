@@ -115,4 +115,5 @@ fun HostProjectionSnapshot.toDetail(sessionId: UUID = UUID.fromString(this.sessi
         visibility = visibility,
         accessScope = accessScope,
         siteVisibility = siteVisibility,
+        versions = versions,
     )

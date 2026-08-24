@@ -119,6 +119,7 @@ function authResponse(role: FixtureRole = "HOST", avatarKey = "banana-green-book
         membershipId: "member-host",
         role,
         status: "ACTIVE",
+        approvalState: "ACTIVE",
         primaryHost: null,
       },
     ],

@@ -11,6 +11,9 @@ import com.readmates.auth.application.port.`in`.ReplaceOwnMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateHostMemberProfileUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberAvatarUseCase
 import com.readmates.auth.application.port.`in`.UpdateOwnMemberProfileUseCase
+import com.readmates.auth.application.port.out.AuthPublicProjectionLock
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutation
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.MemberProfileRow
 import com.readmates.auth.application.port.out.MemberProfileStorePort
 import com.readmates.auth.application.toHostMemberListItem
@@ -28,6 +31,7 @@ import java.util.UUID
 class MemberProfileService(
     private val memberProfileStore: MemberProfileStorePort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
+    private val publicProjection: AuthPublicProjectionMutationPort = AuthPublicProjectionMutationPort.Noop(),
 ) : ReplaceOwnMemberProfileUseCase,
     UpdateOwnMemberProfileUseCase,
     UpdateOwnMemberAvatarUseCase,
@@ -44,6 +48,7 @@ class MemberProfileService(
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         val displayName = validateDisplayName(command.displayName)
         val avatarKey = validateAvatarKey(command.avatarKey)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(currentClubId)
         val lockedMember = lockOwnProfileForUpdate(currentClubId, member.membershipId)
         requireEditableUniqueProfile(currentClubId, lockedMember, displayName)
         if (!memberProfileStore.updateOwnProfile(currentClubId, member.membershipId, displayName, avatarKey)) {
@@ -54,6 +59,7 @@ class MemberProfileService(
                 .findProfileMemberByEmail(email, currentClubId)
                 ?.toMemberProfile()
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        recordProfileChange(projectionLock, lockedMember, profile, member.membershipId, "PROFILE_REPLACED")
         cacheInvalidation.evictClubContentAfterCommit(currentClubId)
         return profile
     }
@@ -102,12 +108,14 @@ class MemberProfileService(
         }
 
         val displayName = validateDisplayName(command.displayName)
-        updateOwnDisplayName(member.clubId, member.membershipId, displayName)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(member.clubId)
+        val before = updateOwnDisplayName(member.clubId, member.membershipId, displayName)
         val profile =
             memberProfileStore
                 .findProfileMemberByEmail(email)
                 ?.toMemberProfile()
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        recordProfileChange(projectionLock, before, profile, member.membershipId, "PROFILE_DISPLAY_NAME_UPDATED")
         cacheInvalidation.evictClubContentAfterCommit(member.clubId)
         return profile
     }
@@ -121,6 +129,11 @@ class MemberProfileService(
         val email = authenticatedEmail(authenticationEmail)
         val member = memberProfileStore.findOwnAvatarMutableMember(email, currentClubId)
         val avatarKey = validateAvatarKey(command.avatarKey)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(member.clubId)
+        val before = lockOwnProfileForUpdate(member.clubId, member.membershipId)
+        if (!before.toCurrentMember().canEditOwnProfile) {
+            throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
+        }
         if (!memberProfileStore.updateOwnAvatarKey(member.clubId, member.membershipId, avatarKey)) {
             memberProfileStore.recheckAvatarUpdateFailure(member.clubId, member.membershipId)
         }
@@ -129,6 +142,7 @@ class MemberProfileService(
                 .findProfileMemberByEmail(email, member.clubId)
                 ?.toMemberProfile()
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        recordProfileChange(projectionLock, before, profile, member.membershipId, "PROFILE_AVATAR_UPDATED")
         cacheInvalidation.evictClubContentAfterCommit(member.clubId)
         return profile
     }
@@ -155,12 +169,19 @@ class MemberProfileService(
         }
 
         val displayName = validateDisplayName(command.displayName)
-        updateHostDisplayName(host.clubId, membershipId, displayName)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(host.clubId)
+        val before = updateHostDisplayName(host.clubId, membershipId, displayName)
         val member =
             memberProfileStore
                 .findHostMemberListItem(host.clubId, membershipId)
                 ?.toHostMemberListItem(host.membershipId)
                 ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+        if (before.displayName != member.displayName) {
+            publicProjection.record(
+                projectionLock,
+                AuthPublicProjectionMutation(host.clubId, host.membershipId, membershipId, "HOST_PROFILE_UPDATED"),
+            )
+        }
         cacheInvalidation.evictClubContentAfterCommit(host.clubId)
         return member
     }
@@ -169,7 +190,7 @@ class MemberProfileService(
         clubId: UUID,
         membershipId: UUID,
         displayName: String,
-    ) {
+    ): MemberProfileRow {
         if (!memberProfileStore.lockClubProfileNames(clubId)) {
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
@@ -185,13 +206,28 @@ class MemberProfileService(
         if (!memberProfileStore.updateDisplayName(clubId, membershipId, displayName)) {
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
+        return target
+    }
+
+    private fun recordProfileChange(
+        projectionLock: AuthPublicProjectionLock,
+        before: MemberProfileRow,
+        after: MemberProfile,
+        actorMembershipId: UUID,
+        operation: String,
+    ) {
+        if (before.displayName == after.displayName && before.avatarKey == after.avatarKey) return
+        publicProjection.record(
+            projectionLock,
+            AuthPublicProjectionMutation(before.clubId, actorMembershipId, before.membershipId, operation),
+        )
     }
 
     private fun updateOwnDisplayName(
         clubId: UUID,
         membershipId: UUID,
         displayName: String,
-    ) {
+    ): MemberProfileRow {
         if (!memberProfileStore.lockClubProfileNames(clubId)) {
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
@@ -213,6 +249,7 @@ class MemberProfileService(
             }
             throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
         }
+        return currentMember
     }
 
     private fun validateDisplayName(rawDisplayName: String?): String {

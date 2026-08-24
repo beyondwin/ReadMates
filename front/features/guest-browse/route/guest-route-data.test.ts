@@ -283,7 +283,7 @@ describe("guest route loaders", () => {
             authorShortName: "공",
             avatarKey: "book",
             kind: "QUESTION",
-            text: "오래된 세션 질문",
+            text: "오래된 모임 질문",
           }],
           nextCursor: null,
         }));

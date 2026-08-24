@@ -26,7 +26,7 @@ const unreadNotification = {
   id: "00000000-0000-0000-0000-000000000001",
   eventType: "NEXT_BOOK_PUBLISHED" as const,
   title: "다음 책이 공개되었습니다",
-  body: "12회차 책을 확인해 주세요.",
+  body: "No.12 책을 확인해 주세요.",
   deepLinkPath: "/sessions/00000000-0000-0000-0000-000000000002",
   readAt: null,
   createdAt: "2026-04-29T00:00:00Z",

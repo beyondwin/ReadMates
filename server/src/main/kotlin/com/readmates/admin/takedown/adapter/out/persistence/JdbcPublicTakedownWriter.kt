@@ -42,24 +42,64 @@ class JdbcPublicTakedownWriter(
                 if (inserted == 1) markDigestKeyReferenced(command)
             } == 1
 
-    fun denyOrigin(target: PublicTakedownTarget): Long {
+    fun denyOrigin(
+        target: PublicTakedownTarget,
+        convergenceId: UUID = UUID.randomUUID(),
+    ): Long {
         val committedGeneration = target.generation + 1
+        jdbcTemplate.update(
+            """
+            insert into public_club_projection_generations (
+              club_id, generation, origin_readable, convergence_id, updated_at
+            )
+            select clubs.id, 1,
+                   (binary clubs.status = binary 'ACTIVE' and binary clubs.public_visibility = binary 'PUBLIC'),
+                   null, utc_timestamp(6)
+            from clubs where clubs.id = ?
+            on duplicate key update generation = generation + 1, updated_at = utc_timestamp(6)
+            """.trimIndent(),
+            target.clubId.dbString(),
+        )
+        val clubGeneration =
+            checkNotNull(
+                jdbcTemplate.queryForObject(
+                    "select generation from public_club_projection_generations where club_id = ?",
+                    Long::class.java,
+                    target.clubId.dbString(),
+                ),
+            )
         val denied =
             jdbcTemplate.update(
                 """
-                update public_projection_generations
-                set generation = ?, origin_readable = false, emergency_denied = true,
+                update public_projection_current
+                set generation = ?, club_generation = ?, origin_readable = false,
+                    emergency_denied = true,
+                    convergence_id = ?,
                     updated_at = utc_timestamp(6)
-                where publication_id = ? and club_id = ? and session_id = ?
-                  and generation = ? and origin_readable = true and emergency_denied = false
+                where publication_id_snapshot = ? and club_id = ? and session_id = ?
+                  and generation = ? and origin_readable = true
                 """.trimIndent(),
                 committedGeneration,
+                clubGeneration,
+                convergenceId.dbString(),
                 target.publicationId.dbString(),
                 target.clubId.dbString(),
                 target.sessionId.dbString(),
                 target.generation,
             )
         if (denied != 1) fail(PublicTakedownError.GENERATION_MISMATCH)
+        jdbcTemplate.update(
+            """
+            update public_projection_generations
+            set generation = generation + 1, origin_readable = false, emergency_denied = true,
+                updated_at = utc_timestamp(6)
+            where publication_id = ? and club_id = ? and session_id = ?
+              and origin_readable = true and emergency_denied = false
+            """.trimIndent(),
+            target.publicationId.dbString(),
+            target.clubId.dbString(),
+            target.sessionId.dbString(),
+        )
         return committedGeneration
     }
 

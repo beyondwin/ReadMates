@@ -210,7 +210,7 @@ export function HostSessionDeletionPreviewDialog({
 function DeletionPreviewCounts({ preview }: { preview: HostSessionDeletionPreviewResponse }) {
   const rows = [
     ["참석 대상", `${preview.counts.participants}명`],
-    ["RSVP 응답", `${preview.counts.rsvpResponses}개`],
+    ["참석 응답 응답", `${preview.counts.rsvpResponses}개`],
     ["질문", `${preview.counts.questions}개`],
     ["체크인", `${preview.counts.checkins}개`],
     ["한줄평", `${preview.counts.oneLineReviews}개`],

@@ -56,7 +56,7 @@ const SUMMARY_LABELS: Record<AdminOperationSummaryCode, AdminOperationSummaryLab
     description: "작업 상태를 확인하세요.",
   },
   SESSION_CLOSING_BLOCKED: {
-    title: "회차 마감이 완료되지 않았습니다",
+    title: "모임 마감이 완료되지 않았습니다",
     description: "호스트 클로징 보드를 확인하세요.",
   },
 };
@@ -84,7 +84,7 @@ const SOURCE_LABELS: Record<AdminOperationSourceType, string> = {
   CLUB_READINESS: "클럽 준비",
   NOTIFICATION: "알림",
   AI_JOB: "AI 작업",
-  CLOSING_RISK: "회차 마감",
+  CLOSING_RISK: "모임 마감",
 };
 
 const SOURCE_STATUS_LABELS: Record<AdminOperationSourceStatus, string> = {

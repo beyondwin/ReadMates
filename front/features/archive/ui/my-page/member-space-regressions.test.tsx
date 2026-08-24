@@ -42,7 +42,7 @@ describe("member-space unaffected presentation", () => {
     expect(utilities.compareDocumentPosition(records) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("link", { name: /알림/ })).toHaveAttribute("href", "/notifications");
     expect(screen.getByRole("link", { name: /계정 설정/ })).toHaveAttribute("href", "/settings");
-    expect(screen.getByRole("link", { name: "최근 함께 읽은 책 회차 기록" })).toHaveAttribute("href", "/app/sessions/session-7");
+    expect(screen.getByRole("link", { name: "최근 함께 읽은 책 모임 기록" })).toHaveAttribute("href", "/app/sessions/session-7");
     expect(screen.getByText("테스트 저자")).toBeVisible();
   });
 

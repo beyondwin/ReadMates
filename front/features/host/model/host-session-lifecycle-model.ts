@@ -1,4 +1,5 @@
 import type { HostSessionReverseRequest } from "../api/host-session-record-contracts";
+import { formatPublicationAction } from "@/shared/model/meeting-language";
 import type { HostSessionState } from "./host-session-editor-model";
 import type { HostSessionDetailResponse } from "./host-view-types";
 
@@ -29,6 +30,11 @@ type ReverseLifecycleAction = {
   label: string;
 };
 
+const publishMemberNotes = formatPublicationAction("publishMemberNotes");
+const removeMemberNotes = formatPublicationAction("removeMemberNotes");
+const publishMemberNotesCompleted = formatPublicationAction("publishMemberNotes", "completed");
+const removeMemberNotesCompleted = formatPublicationAction("removeMemberNotes", "completed");
+
 const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleConfirmCopy> = {
   open: {
     kind: "open",
@@ -46,10 +52,10 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
   },
   publish: {
     kind: "publish",
-    title: "기록 공개",
+    title: publishMemberNotes,
     body: "멤버 노트·아카이브에 나갑니다. 공개 배치가 켜져 있으면 사이트에도 나갑니다.",
-    confirmLabel: "기록 공개",
-    successFlash: "기록을 공개했습니다.",
+    confirmLabel: publishMemberNotes,
+    successFlash: publishMemberNotesCompleted,
   },
   reopen: {
     kind: "reopen",
@@ -60,10 +66,10 @@ const confirmCopyByKind: Record<SessionLifecycleConfirmKind, SessionLifecycleCon
   },
   unpublish: {
     kind: "unpublish",
-    title: "공개 취소",
+    title: removeMemberNotes,
     body: "공개 사이트에서 내려갑니다. 기록과 이미 보낸 알림은 남습니다.",
-    confirmLabel: "공개 취소",
-    successFlash: "공개를 취소했습니다.",
+    confirmLabel: removeMemberNotes,
+    successFlash: removeMemberNotesCompleted,
   },
   "return-to-draft": {
     kind: "return-to-draft",
@@ -82,7 +88,7 @@ export function reverseLifecycleAction(state: HostSessionState): ReverseLifecycl
     return { kind: "reopen", label: "다시 준비 중으로" };
   }
   if (state === "PUBLISHED") {
-    return { kind: "unpublish", label: "공개 취소" };
+    return { kind: "unpublish", label: removeMemberNotes };
   }
   return null;
 }

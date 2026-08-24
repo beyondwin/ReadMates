@@ -111,8 +111,8 @@ function primaryAction(status: SessionClosingStatusInput): SessionClosingBoardVi
   switch (status.overall.primaryAction) {
     case "CLOSE_SESSION":
       return {
-        label: "세션 종료 확인",
-        reason: "열린 세션을 먼저 닫아야 기록 패키지와 알림 상태를 판단할 수 있습니다.",
+        label: "모임 종료 확인",
+        reason: "열린 모임을 먼저 닫아야 기록 패키지와 알림 상태를 판단할 수 있습니다.",
         tone: "warn",
         href: `/app/host/sessions/${status.session.sessionId}/edit`,
       };
@@ -125,7 +125,7 @@ function primaryAction(status: SessionClosingStatusInput): SessionClosingBoardVi
       };
     case "PUBLISH_RECORDS":
       return {
-        label: "기록 공개 범위 확인",
+        label: "기록 보기 범위 확인",
         reason: "멤버 또는 공개 표면에 기록을 열기 전 공개 범위를 점검해야 합니다.",
         tone: "warn",
         href: `/app/host/sessions/${status.session.sessionId}/edit`,

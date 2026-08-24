@@ -125,6 +125,27 @@ class HostSessionLifecycleController(
         HostSessionIdCommand(member, parseHostSessionId(sessionId)),
     )
 
+    @PostMapping("/{sessionId}/reopen")
+    fun reopen(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.reopen(reverseCommand(member, sessionId, body))
+
+    @PostMapping("/{sessionId}/unpublish")
+    fun unpublish(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.unpublish(reverseCommand(member, sessionId, body))
+
+    @PostMapping("/{sessionId}/return-to-draft")
+    fun returnToDraft(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+        @RequestBody body: JsonNode,
+    ) = hostSessionLifecycleUseCase.returnToDraft(reverseCommand(member, sessionId, body))
+
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,
@@ -148,34 +169,6 @@ class HostSessionLifecycleController(
         expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
         idempotencyKey = envelope.idempotencyKey,
     )
-}
-
-@RestController
-@RequestMapping("/api/host/sessions")
-class HostSessionReverseLifecycleController(
-    private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
-    private val envelopes: HostMutationEnvelopeReader,
-) {
-    @PostMapping("/{sessionId}/reopen")
-    fun reopen(
-        member: CurrentMember,
-        @PathVariable sessionId: String,
-        @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.reopen(reverseCommand(member, sessionId, body))
-
-    @PostMapping("/{sessionId}/unpublish")
-    fun unpublish(
-        member: CurrentMember,
-        @PathVariable sessionId: String,
-        @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.unpublish(reverseCommand(member, sessionId, body))
-
-    @PostMapping("/{sessionId}/return-to-draft")
-    fun returnToDraft(
-        member: CurrentMember,
-        @PathVariable sessionId: String,
-        @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.returnToDraft(reverseCommand(member, sessionId, body))
 
     private fun reverseCommand(
         member: CurrentMember,

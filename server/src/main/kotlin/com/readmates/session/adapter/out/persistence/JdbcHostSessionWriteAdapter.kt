@@ -55,11 +55,13 @@ class JdbcHostSessionWriteAdapter(
     private val scheduleDefaultsQueries = HostSessionScheduleDefaultsQueries()
     private val writeQueries = HostSessionWriteQueries(jdbcTemplate, queries)
     private val writePolicy = HostSessionWritePolicy
-    private val draftWrites = HostSessionDraftWriteOperations(jdbcTemplate, writeQueries, writePolicy)
+    private val publicProjection = HostPublicProjectionWriteOperations(jdbcTemplate)
+    private val draftWrites = HostSessionDraftWriteOperations(jdbcTemplate, writeQueries, writePolicy, publicProjection)
     private val attendance = HostSessionAttendanceWriteOperations(jdbcTemplate, writeQueries, writePolicy)
-    private val publication = HostSessionPublicationWriteOperations(jdbcTemplate, writeQueries, writePolicy)
-    private val lifecycle = HostSessionLifecycleWriteOperations(jdbcTemplate, writeQueries, writePolicy)
-    private val reverse = HostSessionReverseWriteOperations(jdbcTemplate, writeQueries)
+    private val publication =
+        HostSessionPublicationWriteOperations(jdbcTemplate, writeQueries, writePolicy, publicProjection)
+    private val lifecycle =
+        HostSessionLifecycleWriteOperations(jdbcTemplate, writeQueries, writePolicy, publicProjection)
 
     override fun create(command: HostSessionCommand) = draftWrites.create(command)
 
@@ -145,7 +147,7 @@ class JdbcHostSessionWriteAdapter(
     override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)
 
     override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot =
-        writeQueries.locks.lockVisibilitySnapshot(command)
+        writeQueries.lockVisibilitySnapshot(command)
 
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) = draftWrites.updateVisibility(command)
 
@@ -155,30 +157,30 @@ class JdbcHostSessionWriteAdapter(
 
     override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.publish(command)
 
-    override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult = reverse.reopen(command)
+    override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.reopen(command)
 
-    override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult = reverse.unpublish(command)
+    override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.unpublish(command)
 
-    override fun returnToDraft(command: HostSessionIdCommand) = reverse.returnToDraft(command)
+    override fun returnToDraft(command: HostSessionIdCommand) = lifecycle.returnToDraft(command)
 
     override fun loadProjection(
         host: CurrentMember,
         sessionId: UUID,
         includeTrashed: Boolean,
-    ): HostProjectionSnapshot? =
-        if (includeTrashed) {
-            deletionQueries.loadProjection(host, sessionId)
-        } else {
-            writeQueries.revisions.loadProjection(host, sessionId)
-        }
+    ): HostProjectionSnapshot? = writeQueries.loadProjection(host, sessionId, includeTrashed)
 
     override fun loadVersionVector(
         host: CurrentMember,
         sessionId: UUID,
-    ): SessionVersionVector? = writeQueries.revisions.loadVersionVector(host, sessionId)
+    ): SessionVersionVector? = writeQueries.loadVersionVector(host, sessionId)
 
     override fun attendanceSnapshotId(
         host: CurrentMember,
         sessionId: UUID,
-    ): String = writeQueries.revisions.attendanceSnapshotId(host, sessionId)
+    ): String = writeQueries.attendanceSnapshotId(host, sessionId)
+
+    override fun loadAttendanceVersions(
+        host: CurrentMember,
+        sessionId: UUID,
+    ) = writeQueries.loadAttendanceVersions(host, sessionId)
 }

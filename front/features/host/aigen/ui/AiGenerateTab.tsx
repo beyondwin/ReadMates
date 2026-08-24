@@ -36,6 +36,7 @@ import {
   saveAigenDraft,
   type AiGenerationDraftEnvelope,
 } from "@/features/host/aigen/storage/aigen-draft-storage";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { AiRecoveryStrip } from "./AiRecoveryStrip";
 import { GenerationProgressView } from "./GenerationProgressView";
 import { PreviewView } from "./PreviewView";
@@ -165,6 +166,7 @@ function restoredReviewState(
 
 export function AiGenerateTab({
   sessionId,
+  clubSlug,
   expectedDraftRevision = null,
   onCommitted,
 }: AiGenerateTabProps) {
@@ -183,13 +185,14 @@ export function AiGenerateTab({
   const pendingDraftRef = useRef<AiGenerationDraftEnvelope | null>(null);
   const draftTimerRef = useRef<number | null>(null);
 
-  const modelsQuery = useQuery(availableAiModelsQuery(sessionId));
+  const context = { clubSlug };
+  const modelsQuery = useQuery(availableAiModelsQuery(sessionId, context));
   const activeJobId = stage.tag === "active" ? stage.jobId : null;
-  const startMutation = useStartAiJobMutation(sessionId);
-  const cancelMutation = useCancelAiJobMutation(sessionId);
-  const commitMutation = useCommitAiJobMutation(sessionId, activeJobId ?? "");
-  const recentJobQuery = useQuery({ ...recentAiJobQuery(sessionId), enabled: stage.tag === "idle" });
-  const jobQuery = useAiGenerationJob(sessionId, activeJobId);
+  const startMutation = useStartAiJobMutation(sessionId, context);
+  const cancelMutation = useCancelAiJobMutation(sessionId, context);
+  const commitMutation = useCommitAiJobMutation(sessionId, activeJobId ?? "", context);
+  const recentJobQuery = useQuery({ ...recentAiJobQuery(sessionId, context), enabled: stage.tag === "idle" });
+  const jobQuery = useAiGenerationJob(sessionId, activeJobId, { context });
   const jobStatus = jobQuery.data?.status;
   const jobProblemCode = jobQuery.error instanceof AiGenerationApiError
     ? jobQuery.error.problem.code
@@ -231,7 +234,7 @@ export function AiGenerateTab({
     if (data.status !== "SUCCEEDED" || !data.result) return false;
     const grounded = typeof data.revision === "number" && data.groundingStatus === "VALID" && Array.isArray(data.evidence);
     const revision = grounded ? data.revision as number : 0;
-    const restored = loadAigenDraft(jobId, revision);
+    const restored = loadAigenDraft(clubSlug, jobId, revision);
     const draft = restored?.draft ?? data.result;
     const currentEvidence = grounded ? data.evidence ?? [] : [];
     setServerSnapshot(data.result);
@@ -241,7 +244,7 @@ export function AiGenerateTab({
     setRevisionConflict(null);
     adoptedRevisionRef.current = `${jobId}:${revision}`;
     return true;
-  }, []);
+  }, [clubSlug]);
 
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "SUCCEEDED" || !jobQuery.data) return;
@@ -253,17 +256,18 @@ export function AiGenerateTab({
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "CANCELLED") return;
     discardPendingDraft();
-    clearAigenDraft(stage.jobId);
+    clearAigenDraft(clubSlug, stage.jobId);
     adoptedRevisionRef.current = null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- terminal server event resets local workspace
     clearWorkspace();
     setStage({ tag: "idle", startError: null });
-  }, [stage, jobStatus, clearWorkspace, discardPendingDraft]);
+  }, [clubSlug, stage, jobStatus, clearWorkspace, discardPendingDraft]);
 
   useEffect(() => {
     if (stage.tag !== "active" || !serverSnapshot || !editedSnapshot || !reviewState) return;
     pendingDraftRef.current = {
       version: 2,
+      clubSlug,
       jobId: stage.jobId,
       revision: reviewState.revision,
       serverSnapshot,
@@ -272,7 +276,16 @@ export function AiGenerateTab({
     };
     if (draftTimerRef.current !== null) window.clearTimeout(draftTimerRef.current);
     draftTimerRef.current = window.setTimeout(() => flushPendingDraft(true), 250);
-  }, [stage, serverSnapshot, editedSnapshot, reviewState, flushPendingDraft]);
+  }, [clubSlug, stage, serverSnapshot, editedSnapshot, reviewState, flushPendingDraft]);
+
+  useEffect(() => registerHostSensitiveState({
+    clubSlug,
+    resourceKey: `ai-draft:${sessionId}`,
+    clear: () => {
+      discardPendingDraft();
+      clearWorkspace();
+    },
+  }), [clubSlug, sessionId, clearWorkspace, discardPendingDraft]);
 
   useEffect(() => {
     const handlePageHide = () => flushPendingDraft(false);
@@ -289,26 +302,26 @@ export function AiGenerateTab({
       (jobStatus !== "FAILED" && jobProblemCode !== "JOB_EXPIRED")
     ) return;
     discardPendingDraft();
-    clearAigenDraft(stage.jobId);
-  }, [stage, jobStatus, jobProblemCode, discardPendingDraft]);
+    clearAigenDraft(clubSlug, stage.jobId);
+  }, [clubSlug, stage, jobStatus, jobProblemCode, discardPendingDraft]);
 
   useEffect(() => {
     if (stage.tag !== "active" || jobStatus !== "COMMITTED") return;
     discardPendingDraft();
-    clearAigenDraft(stage.jobId);
+    clearAigenDraft(clubSlug, stage.jobId);
     adoptedRevisionRef.current = null;
     // eslint-disable-next-line react-hooks/set-state-in-effect -- committed server event clears local draft state
     clearWorkspace();
     setStage({ tag: "committed", result: null });
     onCommitted(null);
-  }, [stage, jobStatus, onCommitted, clearWorkspace, discardPendingDraft]);
+  }, [clubSlug, stage, jobStatus, onCommitted, clearWorkspace, discardPendingDraft]);
 
   const handleStart = useCallback(async (payload: StartGenerationRequest) => {
     setSubmittingStart(true);
     setStage({ tag: "idle", startError: null });
     try {
       const response = await startMutation.mutateAsync(payload);
-      purgeAigenDrafts(response.jobId);
+      purgeAigenDrafts(clubSlug, response.jobId);
       adoptedRevisionRef.current = null;
       clearWorkspace();
       setStage({ tag: "active", jobId: response.jobId, cancelling: false });
@@ -320,17 +333,17 @@ export function AiGenerateTab({
     } finally {
       setSubmittingStart(false);
     }
-  }, [startMutation, clearWorkspace]);
+  }, [clubSlug, startMutation, clearWorkspace]);
 
   const handleCancelJob = useCallback(async (jobId: string) => {
     setStage({ tag: "active", jobId, cancelling: true });
     try { await cancelMutation.mutateAsync(jobId); } catch { /* Return to safe idle even if already terminal. */ }
     discardPendingDraft();
-    clearAigenDraft(jobId);
+    clearAigenDraft(clubSlug, jobId);
     adoptedRevisionRef.current = null;
     clearWorkspace();
     setStage({ tag: "idle", startError: null });
-  }, [cancelMutation, clearWorkspace, discardPendingDraft]);
+  }, [clubSlug, cancelMutation, clearWorkspace, discardPendingDraft]);
 
   const handleSnapshotChange = useCallback((next: SessionImportV1, section?: ReviewSection) => {
     setCommitError(null);
@@ -384,7 +397,7 @@ export function AiGenerateTab({
       };
       const result = await commitMutation.mutateAsync(request);
       discardPendingDraft();
-      clearAigenDraft(stage.jobId);
+      clearAigenDraft(clubSlug, stage.jobId);
       adoptedRevisionRef.current = null;
       clearWorkspace();
       setStage({ tag: "committed", result });
@@ -399,7 +412,7 @@ export function AiGenerateTab({
     } finally {
       setCommitting(false);
     }
-  }, [stage, editedSnapshot, reviewState, serverSnapshot, recordVisibility, expectedDraftRevision, commitMutation, onCommitted, clearWorkspace, jobQuery, discardPendingDraft]);
+  }, [clubSlug, stage, editedSnapshot, reviewState, serverSnapshot, recordVisibility, expectedDraftRevision, commitMutation, onCommitted, clearWorkspace, jobQuery, discardPendingDraft]);
 
   const handleReloadRevision = useCallback(async () => {
     if (stage.tag !== "active") return;
@@ -434,6 +447,7 @@ export function AiGenerateTab({
         : true;
       return (
         <PreviewView
+          clubSlug={clubSlug}
           sessionId={sessionId}
           jobId={stage.jobId}
           snapshot={editedSnapshot}
@@ -451,7 +465,8 @@ export function AiGenerateTab({
           onSnapshotChange={handleSnapshotChange}
           onReviewStateChange={setReviewState}
           onRegenerated={handleRegenerated}
-          onExpandEvidence={(turnId, revision) => expandEvidence(sessionId, stage.jobId, turnId, revision)}
+          onExpandEvidence={(turnId, revision) =>
+            expandEvidence(sessionId, stage.jobId, turnId, revision, context)}
           onReloadRevision={handleReloadRevision}
           onVisibilityChange={setRecordVisibility}
           onCommit={handleCommit}

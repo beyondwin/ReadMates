@@ -1,5 +1,5 @@
 
-import { type FormEvent, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import { HostNotificationOperationsRail } from "./notifications/host-notification-operations-rail";
 import { ManualNotificationWorkbench } from "./notifications/manual-notification-workbench";
 import { NotificationOperationsDisclosure } from "./notifications/notification-operations-disclosure";
@@ -22,8 +22,10 @@ import {
 } from "./notifications/notification-formatters";
 import { RestoreNotificationDialog } from "./notifications/restore-notification-dialog";
 import { ManualNotificationDispatchLedger } from "./notifications/manual-notification-dispatch-ledger";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 
 type HostNotificationsPageProps = {
+  clubSlug: string;
   summary: HostNotificationSummary;
   events: HostNotificationEventItem[];
   deliveries: HostNotificationDeliveryItem[];
@@ -78,6 +80,7 @@ type PendingAction =
   | { kind: "test-mail" };
 
 export function HostNotificationsPage({
+  clubSlug,
   summary,
   events,
   deliveries,
@@ -122,8 +125,19 @@ export function HostNotificationsPage({
   const [message, setMessage] = useState<HostNotificationMessage | null>(null);
   const [manualPreview, setManualPreview] = useState<ManualNotificationPreviewResponse | null>(null);
   const [manualError, setManualError] = useState<string | null>(null);
+  const manualAuthorityEpochRef = useRef(0);
   const manualBusy = manualPending;
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
+
+  useEffect(() => registerHostSensitiveState({
+    clubSlug,
+    resourceKey: "notification-preview:notifications-page",
+    clear: () => {
+      manualAuthorityEpochRef.current += 1;
+      setManualPreview(null);
+      setManualError(null);
+    },
+  }), [clubSlug]);
   const processableCount = Math.max(0, summary.pending) + Math.max(0, summary.failed);
   const hasVisibleProcessableDelivery = deliveries.some(
     (item) =>
@@ -222,11 +236,14 @@ export function HostNotificationsPage({
 
     setManualError(null);
     setManualPreview(null);
+    const epoch = manualAuthorityEpochRef.current;
     try {
       const preview = await onPreviewManual(request);
+      if (epoch !== manualAuthorityEpochRef.current) return;
       setManualPreview(preview);
     } catch {
-      setManualError("미리보기를 만들지 못했습니다. 세션과 대상 조건을 확인해 주세요.");
+      if (epoch !== manualAuthorityEpochRef.current) return;
+      setManualError("미리보기를 만들지 못했습니다. 모임과 대상 조건을 확인해 주세요.");
     }
   };
 
@@ -236,11 +253,14 @@ export function HostNotificationsPage({
     }
 
     setManualError(null);
+    const epoch = manualAuthorityEpochRef.current;
     try {
       await onConfirmManual(request);
+      if (epoch !== manualAuthorityEpochRef.current) return;
       setManualPreview(null);
       setMessage({ kind: "status", text: "수동 알림 발송을 요청했습니다." });
     } catch {
+      if (epoch !== manualAuthorityEpochRef.current) return;
       setManualError("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요.");
     }
   };
@@ -252,7 +272,7 @@ export function HostNotificationsPage({
     try {
       return await onLoadManualOptions(sessionId, undefined);
     } catch (error) {
-      setManualError("세션 정보를 불러오지 못했습니다.");
+      setManualError("모임 정보를 불러오지 못했습니다.");
       throw error;
     }
   };
@@ -302,6 +322,7 @@ export function HostNotificationsPage({
         />
 
         <ManualNotificationWorkbench
+          clubSlug={clubSlug}
           options={visibleManualOptions}
           hostSessions={hostSessions}
           initialSessionId={initialManualSelection.sessionId}

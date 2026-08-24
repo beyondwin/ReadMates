@@ -9,6 +9,7 @@ import type {
 
 export type RegenerateModalProps = {
   open: boolean;
+  clubSlug: string;
   sessionId: string;
   jobId: string;
   item: AiGenerationItem;
@@ -33,11 +34,12 @@ const ITEM_LABEL: Record<AiGenerationItem, string> = {
   summary: "요약",
   highlights: "하이라이트",
   oneLineReviews: "한줄평",
-  feedbackDocument: "회차 피드백 문서",
+  feedbackDocument: "모임 피드백 문서",
 };
 
 export function RegenerateModal({
   open,
+  clubSlug,
   sessionId,
   jobId,
   item,
@@ -65,7 +67,7 @@ export function RegenerateModal({
         ...(instructions.trim() ? { instructions } : {}),
         ...(expectedRevision !== undefined ? { expectedRevision } : {}),
       } satisfies RegenerateRequest;
-      const response = await regenerateItem(sessionId, jobId, request);
+      const response = await regenerateItem(sessionId, jobId, request, { clubSlug });
       onSuccess(response);
     } catch (caught) {
       const message = caught instanceof Error ? caught.message : "재생성에 실패했습니다.";

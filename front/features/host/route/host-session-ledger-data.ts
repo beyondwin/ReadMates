@@ -11,6 +11,8 @@ import {
 } from "@/features/host/queries/host-session-record-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
+import { recoverableHostListLoaderFailure } from "./host-list-loader-recovery";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 
 export const HOST_SESSION_LEDGER_PAGE_LIMIT = 50;
 
@@ -21,8 +23,13 @@ export type HostSessionLedgerRouteData = {
 };
 
 export function hostSessionLedgerFiltersFromRequest(request?: Request) {
+  const url = request ? new URL(request.url) : null;
+  const params = url?.searchParams ?? new URLSearchParams();
+  if (url && /\/host\/records\/?$/.test(url.pathname)) {
+    params.delete("view");
+  }
   return normalizeHostSessionLedgerFilters(
-    request ? new URL(request.url).searchParams : new URLSearchParams(),
+    params,
   );
 }
 
@@ -30,7 +37,7 @@ export function hostSessionLedgerLoaderFactory(client: QueryClient) {
   return async (args?: LoaderFunctionArgs): Promise<HostSessionLedgerRouteData> => {
     await requireHostLoaderAuth(args);
     const filters = hostSessionLedgerFiltersFromRequest(args?.request);
-    const context = { clubSlug: clubSlugFromLoaderArgs(args) };
+    const context = requireHostClubContext(clubSlugFromLoaderArgs(args));
     const request = {
       ...filters,
       page: { limit: HOST_SESSION_LEDGER_PAGE_LIMIT },
@@ -39,12 +46,12 @@ export function hostSessionLedgerLoaderFactory(client: QueryClient) {
     if (filters.view === "trash") {
       const trashPage = await client.fetchQuery(
         hostSessionTrashListQuery({ limit: HOST_SESSION_LEDGER_PAGE_LIMIT }, context),
-      ).catch(() => null);
+      ).catch(recoverableHostListLoaderFailure);
       return { filters, page: null, trashPage };
     }
 
     const page = await client.fetchQuery(hostSessionRecordLedgerQuery(request, context))
-      .catch(() => null);
+      .catch(recoverableHostListLoaderFailure);
 
     return { filters, page, trashPage: null };
   };

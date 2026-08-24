@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import type { ComponentProps } from "react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -8,6 +8,7 @@ import type {
   ManualNotificationPreviewResponse,
 } from "@/features/host/model/host-view-types";
 import { ManualNotificationWorkbench } from "./manual-notification-workbench";
+import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 
 const contentRevision = "a".repeat(64);
 
@@ -50,7 +51,7 @@ const options: ManualNotificationOptionsResponse = {
 const sessions: HostSessionListItem[] = [{
   sessionId: "session-9",
   sessionNumber: 9,
-  title: "9회차 모임",
+  title: "No.9 모임",
   bookTitle: "Example Book",
   bookAuthor: "Example Author",
   bookImageUrl: null,
@@ -96,6 +97,7 @@ type WorkbenchProps = ComponentProps<typeof ManualNotificationWorkbench>;
 
 function renderWorkbench(overrides: Partial<WorkbenchProps> = {}) {
   const props: WorkbenchProps = {
+    clubSlug: "reading-sai",
     options,
     hostSessions: sessions,
     initialSessionId: "session-9",
@@ -112,6 +114,49 @@ function renderWorkbench(overrides: Partial<WorkbenchProps> = {}) {
 }
 
 describe("ManualNotificationWorkbench", () => {
+  it("clears its mounted draft and search for only the revoked club", async () => {
+    const user = userEvent.setup();
+    const selectableOptions: ManualNotificationOptionsResponse = {
+      ...options,
+      templates: options.templates.map((template) => template.eventType === "SESSION_REMINDER_DUE"
+        ? { ...template, allowedAudiences: [...template.allowedAudiences, "SELECTED_MEMBERS"] }
+        : template),
+      members: {
+        items: [{
+          membershipId: "membership-secret",
+          displayName: "비공개 멤버",
+          maskedEmail: "s***@example.com",
+          role: "MEMBER",
+          membershipStatus: "ACTIVE",
+          sessionParticipationStatus: "ACTIVE",
+          attendanceStatus: null,
+          emailEligibility: "ELIGIBLE",
+          inAppEligibility: "ELIGIBLE",
+        }],
+        nextCursor: null,
+      },
+    };
+    renderWorkbench({
+      options: selectableOptions,
+      onLoadManualOptions: vi.fn().mockResolvedValue(selectableOptions),
+    });
+
+    await user.click(screen.getByRole("radio", { name: "직접 선택" }));
+    await user.type(screen.getByRole("searchbox", { name: "멤버 검색" }), "private member search");
+    await user.click(screen.getByRole("button", { name: "검색" }));
+    await user.click(screen.getByRole("checkbox", { name: /비공개 멤버/ }));
+
+    await act(() => hostSensitiveStorage.clearClub("other-club"));
+    expect(screen.getByRole("radio", { name: "직접 선택" })).toBeChecked();
+    expect(screen.getByRole("searchbox", { name: "멤버 검색" })).toHaveValue("private member search");
+
+    await act(() => hostSensitiveStorage.clearClub("reading-sai"));
+    await waitFor(() => {
+      expect(screen.getByRole("radio", { name: "전체 활성 멤버" })).toBeChecked();
+      expect(screen.queryByRole("searchbox", { name: "멤버 검색" })).not.toBeInTheDocument();
+    });
+  });
+
   it("renders the safe guided-ledger hierarchy without raw enums", () => {
     renderWorkbench();
 
@@ -130,7 +175,7 @@ describe("ManualNotificationWorkbench", () => {
       .map((heading) => heading.textContent);
 
     expect(decisionHeadings).toEqual([
-      "대상 회차",
+      "대상 모임",
       "알림 종류",
       "대상과 채널",
     ]);

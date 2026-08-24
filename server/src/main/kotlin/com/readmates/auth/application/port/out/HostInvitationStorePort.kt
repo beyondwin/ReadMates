@@ -9,6 +9,11 @@ import com.readmates.shared.security.CurrentMember
 import java.time.OffsetDateTime
 import java.util.UUID
 
+data class ActiveMembershipUpsertResult(
+    val membershipId: UUID,
+    val becameActive: Boolean,
+)
+
 data class HostInvitationListRow(
     val invitationId: UUID,
     val clubSlug: String,
@@ -88,7 +93,7 @@ interface HostInvitationStorePort {
         userId: UUID,
         role: MembershipRole,
         avatarKey: BookClubAvatarKey,
-    ): UUID
+    ): ActiveMembershipUpsertResult
 
     fun acceptInvitation(
         invitationId: UUID,

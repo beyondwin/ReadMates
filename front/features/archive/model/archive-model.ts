@@ -205,7 +205,7 @@ const JOINED_MONTH_PATTERN = /^(\d{4})-(\d{2})$/;
 const UNKNOWN_PROFILE_SAVE_ERROR_MESSAGE = "이름 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.";
 
 export const archiveTabs: Array<{ key: ArchiveView; label: string }> = [
-  { key: "sessions", label: "세션" },
+  { key: "sessions", label: "모임" },
   { key: "report", label: "피드백 문서" },
   { key: "questions", label: "내 질문" },
   { key: "reviews", label: "내 서평" },
@@ -264,7 +264,7 @@ export function feedbackDocumentCopy(status: ArchiveFeedbackDocumentStatus): Arc
   return {
     badge: "피드백 없음",
     ariaLabel: "아직 열람 가능한 피드백 문서가 없습니다.",
-    helper: "호스트가 피드백 문서를 등록하면 이 회차에서 확인할 수 있습니다.",
+    helper: "호스트가 피드백 문서를 등록하면 이 모임에서 확인할 수 있습니다.",
   };
 }
 
@@ -393,7 +393,7 @@ export function selectedArchiveSectionMeta(view: ArchiveView) {
     return {
       title: "내 서평",
       contextLabel: "다 읽고 남긴 감상",
-      body: "회차별로 흩어진 감상을 한 권의 발췌 노트처럼 모았습니다.",
+      body: "모임별로 흩어진 감상을 한 권의 발췌 노트처럼 모았습니다.",
     };
   }
 
@@ -414,9 +414,9 @@ export function selectedArchiveSectionMeta(view: ArchiveView) {
   }
 
   return {
-    title: "세션 기록",
+    title: "모임 기록",
     contextLabel: "함께 읽은 흔적",
-    body: "지난 회차의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.",
+    body: "지난 모임의 책과 기록을 한곳에 모아둔 독서모임 기록입니다.",
   };
 }
 

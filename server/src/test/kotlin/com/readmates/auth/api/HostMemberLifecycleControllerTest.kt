@@ -46,6 +46,7 @@ class HostMemberLifecycleControllerTest(
     @AfterEach
     fun cleanupCreatedRows() {
         try {
+            deleteWhereIn("highlights", "membership_id", createdMembershipIds)
             deleteWhereIn("session_participants", "membership_id", createdMembershipIds)
             deleteWhereIn("session_participants", "session_id", createdSessionIds)
             deleteWhereIn("sessions", "id", createdSessionIds)
@@ -209,6 +210,81 @@ class HostMemberLifecycleControllerTest(
 
         assertEquals("LEFT", membershipStatus(membershipId))
         assertEquals("REMOVED", participationStatus(sessionId, membershipId))
+    }
+
+    @Suppress("LongMethod")
+    @Test
+    fun `member withdrawal rotates public participant projection atomically and conflict rolls back`() {
+        val hostCookie = sessionCookieForEmail("host@example.com")
+        val membershipId = insertLifecycleMember("deactivate.public.projection", "ACTIVE")
+        val publicSessionId = "00000000-0000-0000-0000-000000000306"
+        addParticipant(publicSessionId, membershipId, "ACTIVE")
+        jdbcTemplate.update(
+            """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, 'Synthetic withdrawal projection', 98)
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            publicSessionId,
+            membershipId,
+        )
+        val before = projectionGeneration(publicSessionId)
+
+        mockMvc
+            .post("/api/host/members/$membershipId/deactivate") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"NEXT_SESSION"}"""
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.member.status") { value("LEFT") }
+            }
+
+        val changed = projectionGeneration(publicSessionId)
+        assertEquals(before + 1, changed)
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from auth_public_projection_mutation_receipts receipts
+                join public_mutation_convergence_links links on links.mutation_receipt_id = receipts.id
+                join public_convergence_work work on work.convergence_id = links.convergence_id
+                where receipts.subject_membership_id_snapshot = ?
+                  and receipts.session_id_snapshot = ?
+                  and receipts.operation = 'MEMBER_DEACTIVATED'
+                """.trimIndent(),
+                Int::class.java,
+                membershipId,
+                publicSessionId,
+            ),
+        )
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$publicSessionId") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.highlights[?(@.text == 'Synthetic withdrawal projection')].authorName") {
+                    value("탈퇴한 멤버")
+                }
+                jsonPath("$.highlights[?(@.text == 'Synthetic withdrawal projection')].avatarKey") {
+                    value("cloud-green-book")
+                }
+            }
+
+        mockMvc
+            .post("/api/host/members/$membershipId/deactivate") {
+                cookie(hostCookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"currentSessionPolicy":"NEXT_SESSION"}"""
+            }.andExpect { status { isConflict() } }
+        assertEquals(changed, projectionGeneration(publicSessionId))
     }
 
     @Test
@@ -745,6 +821,13 @@ class HostMemberLifecycleControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected avatar key for $membershipId")
+
+    private fun projectionGeneration(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select coalesce((select generation from public_projection_current where session_id = ?), 0)",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
 
     private fun participationStatus(
         sessionId: String,

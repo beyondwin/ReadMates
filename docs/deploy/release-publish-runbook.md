@@ -16,7 +16,7 @@
 - `Deploy Front` workflow가 backend promotion 뒤 같은 `release_tag` 입력으로 성공해 Cloudflare Pages production을 배포했습니다.
 - `Deploy Server Image` workflow가 같은 tag에서 성공해 GHCR `readmates-server:vMAJOR.MINOR.PATCH` 이미지를 scan/promote했습니다.
 - Release에서 production runtime rendering이 바뀌면 `sync-config` workflow가 `restart_api=false`, `dry_run=false`로 성공해 다음 container start가 새 설정을 읽도록 준비했습니다.
-- Major host-write contract release이면 sync된 env에 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`가 있고, backend-first 창의 구 client write 동결과 same-tag frontend 배포 후 재개를 확인했습니다.
+- Host-client generation release이면 stage에 맞는 `READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE`와 서로 다른 immutable tag를 확인하고, protected evidence gate를 통과했습니다.
 - 서버 변경이나 DB migration이 있으면 OCI Compose stack이 같은 GHCR tag로 재시작됐고 `/internal/health`, BFF auth smoke, OAuth redirect smoke가 통과했습니다.
 - 공개 릴리즈 후보 검사가 통과했거나, blocker와 남은 리스크가 release note에 명확히 남아 있습니다.
 
@@ -50,6 +50,9 @@ pnpm --dir front build
 ./server/gradlew -p server integrationTest
 python3 -B scripts/check-deploy-workflow-contract.py --self-test
 python3 -B scripts/check-deploy-workflow-contract.py
+python3 -B scripts/check-host-client-rollout-contract.py --self-test
+python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
+python3 -B scripts/check-host-client-rollout-contract.py
 ./scripts/build-public-release-candidate.sh
 ./scripts/public-release-check.sh .tmp/public-release-candidate
 ```
@@ -61,6 +64,73 @@ pnpm --dir front test:e2e
 ```
 
 E2E를 실행하지 못하면 release note와 최종 배포 보고에 스킵 사유를 남깁니다.
+
+## Host client v3 staged rollout
+
+이 절은 ADR-0034와 ADR-0036의 R1 → R2a → R2b → R3 순서를 실행하는 공개 안전 runbook입니다. 저장소 구현 승인이나 checker 통과는 운영 변경 권한이 아닙니다. 각 R1, R2a, R2b, R3 직전에 해당 stage를 지목한 **fresh explicit live-mutation approval**이 별도로 있어야 하며, 없으면 artifact/runbook-ready 상태에서 멈춥니다. 실제 digest, run ID, actor/resource ID, host, trace path, timestamp는 tracked 문서가 아니라 protected CI artifact/운영 ledger에만 둡니다.
+
+### 공통 evidence와 신뢰 경계
+
+- 일반 CI와 공개 릴리즈 후보는 `check-host-client-rollout-contract.py --self-test`, `verify-host-client-rollout-evidence.py --self-test`, reporter self-test, `check-config --artifact-ready`, structural default mode만 실행합니다. `artifact-ready`는 후속 C1/D3/D5 task 소유 spec이 아직 없을 수 있음을 정직하게 허용하지만 live gate는 missing/empty/skip/no-op spec과 structured report 누락을 fail closed합니다. Live manifest 검증을 일반 PR이나 untrusted ref에서 실행하지 않습니다.
+- Protected exact `host-rollout-r2a`/`host-rollout-r2b` ref에서 운영자가 no-input `workflow_dispatch`를 실행한 경우만 `cache-safety.manifest.json`, `compatibility.manifest.json`, `security.manifest.json`과 각각 별도 `.intoto.jsonl` bundle을 생성합니다. Push/tag/PR은 live mutation을 자동 시작하지 않으며 dispatch에는 evidence data input이 없습니다. Signer는 다운로드한 report를 exact producer artifact ID와 report SHA-256으로 재검증하지만, 다운로드하거나 입력받은 manifest를 서명하지 않고 exact protected job output으로 manifest를 직접 만듭니다.
+- Pages digest는 deterministic candidate tar 자체에 `sha256sum`을 적용한 값이고, backend digest는 trusted build/deployment job output입니다. `upload-artifact`의 artifact-container digest나 human input을 candidate/backend digest로 쓰지 않습니다. C1 source set은 C1 checkpoint가 직접 소유한 exact path의 mode/type/blob/path tuple만 canonical digest로 만들고 R2a/R2b candidate에서 그 entry의 content, mode, 삭제 drift를 거부합니다. D3/D5가 소유한 sibling spec 추가는 C1 identity 범위에 포함하지 않습니다.
+- Official GitHub CLI checksum lock과 `gh attestation verify`가 signature, certificate identity, transparency/timestamp, subject, repository, workflow, source ref/SHA를 검증합니다. Python checker는 성공한 JSON의 schema, candidate, digest, time, command/case, provenance policy만 확인합니다.
+- Live verifier에서 GitHub CLI download/checksum, network, trust root, signature, transparency, subject, verified timestamp 중 하나라도 확인할 수 없으면 abort입니다. Code presence나 tracked Markdown은 attested evidence의 대체물이 아닙니다.
+
+Live preflight 전에 `host-rollout-r2a`, `host-rollout-r2b` branch protection과 `host-client-rollout-source`, `host-client-rollout-r2a`, `host-client-rollout-evidence`, `production` environment를 GitHub에 별도로 구성합니다. 각 environment는 required reviewer가 한 명 이상이고 `prevent self-review`가 켜져 있어야 하며 custom deployment branch policy가 exact rollout branch만 허용해야 합니다. R2a environment는 `host-rollout-r2a`, production은 두 rollout branch만 허용합니다. Workflow는 GitHub API로 이 설정을 read-only 재검증하고 누락 시 abort합니다. 저장소 파일이나 structural checker만으로 GitHub branch/environment 설정의 현재 존재·활성 상태를 증명할 수 없으며, 아직 branch/environment가 준비되지 않은 checkout은 artifact-ready 경계에 머뭅니다.
+
+### R1 — support window
+
+**preflight:** 새 immutable tag의 backend가 `SUPPORT_V2_V3`, Pages Functions가 v2/v3 allowlist/pass-through, browser가 v2임을 확인합니다. Session뿐 아니라 member approval, invite, notification policy/preview/confirm/dispatch, manual resend confirmation, test-mail family의 pre-production regression을 확인합니다. 이 단계는 구 browser write를 동결하지 않습니다.
+
+**success:** backend와 Pages capability probe가 v2와 v3를 허용하고 browser는 계속 v2를 보내며, missing/unknown은 fail closed하고 read는 영향받지 않습니다.
+
+**abort:** v2 write가 거절되거나 BFF가 header를 downgrade/변환하거나 non-session family 의미가 달라지면 다음 stage로 가지 않습니다.
+
+**rollback:** R1 이전의 backend/Pages pair로 함께 복귀합니다. 이미 발행한 tag는 이동하지 않고 새 patch tag로 forward-fix합니다.
+
+### R2a — A7+C1 safety와 720초 cache gate
+
+**preflight:** R1 support가 유지된 별도 immutable tag를 사용합니다. A7 public-effect와 C1 origin/cache generation이 같은 backend candidate에 있고, deterministic Pages candidate가 v2 browser bundle과 C1 public cache/BFF policy를 함께 포함하는지 확인합니다. `host-client-rollout-r2a` protected environment에는 실제 서로 다른 HTTPS origin/BFF/CDN base URL, reserved `rollout-synthetic-*` club 아래의 public club/stable-session/revoked-session path, 전용 synthetic club UUID, published revoked-session의 expected revision, `readmates-rollout-synthetic-{UUID}` marker value와 club/slug/session/marker를 함께 HMAC한 `READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY`를 vars로 둡니다. Marker value는 credential이 아니라 pre-provisioned public fixture의 exact operational marker이며 manifest/log에는 raw value를 남기지 않습니다. Origin은 IDNA, host case와 trailing dot, 기본 HTTPS port를 canonicalize한 뒤 비교하므로 같은 host와 `:443` alias는 서로 다른 boundary로 인정하지 않습니다. 같은 environment의 secrets에는 그 synthetic fixture 전용 `readmates_session` cookie와 evidence HMAC key만 둡니다. Idempotency key는 secret이 아니며 workflow가 `rollout-r2a-run-{runId}-attempt-{runAttempt}`로 직접 만들고 서버 grammar `[A-Za-z0-9._-]{8,128}`을 적용합니다. Reconciliation API의 path/access log에 보일 수 있는 redacted operational identifier로 취급하고 credential로 문서화하거나 저장하지 않습니다.
+
+Protected BFF는 새 전용 route를 요구하지 않습니다. Helper는 기존 authenticated `GET /api/bff/api/host/club-operations`와 `GET /api/bff/api/host/sessions/{sessionId}`를 순서대로 읽습니다. Host club response는 exact schema와 protected club UUID/reserved slug/marker name을, host detail은 exact session UUID, `PUBLISHED`, `PUBLIC`, `GUEST_READABLE`, `PUBLIC_RECORD`, required publication/publicSummary marker, empty attendees, `uploaded=false` feedback/null metadata, null meeting URL/passcode/book links/images/change receipt, 그리고 marker 외 content-bearing free-text가 없음을 증명해야 합니다. 두 normalized response와 exact public paths의 HMAC을 profile transport와 manifest의 `ownershipResponseIdentity`에 묶습니다. 전용 non-member fixture가 미리 provisioning되지 않았거나 assertion이 다르면 live gate는 fail closed입니다. Localhost, HTTP, example/test boundary, member/private target, real domain/path/token의 tracked 저장은 금지되며 값 누락이나 fixture가 prechange 200/old `ETag`/120+600 policy가 아니면 workflow가 abort합니다. Cookie가 있는 ownership/revoke/reconciliation request와 cookie가 없는 origin/BFF/CDN public probe는 모두 redirect를 전혀 따르지 않고 exact canonical origin, path, final URL만 허용합니다. Cross-origin뿐 아니라 same-origin 3xx도 abort합니다. Workflow 도중 operator가 target을 바꾸는 숨은 단계는 허용하지 않습니다. R2a 배포 직전 C1 `@prechange` Playwright가 old-policy response를 clean persistent Chromium profile에 seed하고 state의 실제 `primedAt`을 `preChangeCachedAt`으로 사용합니다. Workflow는 helper-derived exact URL을 `READMATES_HOST_ROLLOUT_EXPECTED_ORIGIN_REVOKED_URL`, `READMATES_HOST_ROLLOUT_EXPECTED_BFF_REVOKED_URL`, `READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL`, `READMATES_HOST_ROLLOUT_EXPECTED_CDN_CLUB_URL`, `READMATES_HOST_ROLLOUT_EXPECTED_CDN_STABLE_SESSION_URL`로 C1에 전달합니다. C1 Playwright는 각 HTTP response의 final URL/`response.url()`도 exact 값과 비교해야 하며, 그 C1 변경 전에는 combined live gate가 준비된 것으로 보지 않습니다. OCI SSH는 `OCI_SSH_KNOWN_HOSTS`의 pinned known-host material, `StrictHostKeyChecking=yes`, 전용 `UserKnownHostsFile`만 사용하며 TOFU/`accept-new`는 abort입니다.
+
+**success:** Prime job은 C1 PASS report를 만들지 않고 public HTTP cache, nonce marker, state만 deterministic public-only tar로 만들어 1일 retention artifact로 올립니다. Cookie/token/auth storage, symlink/hardlink/traversal/special/oversized member는 fail closed입니다. C1 state가 쓰는 run/attempt-bound profile identity와 upload 후 GitHub가 반환한 numeric transport artifact ID는 별도 값이며, downstream job은 numeric ID로 exact artifact를 내려받습니다. Transport를 `O_NOFOLLOW`로 한 번만 읽고 tar 구조, tar/profile/state digest, target/boundary/ownership-marker/normalized ownership-response HMAC, profile marker와 state identity를 메모리에서 모두 검증한 뒤에만 새 destination을 만들므로 untrusted bytes를 먼저 추출하거나 검증 후 archive를 다시 읽지 않습니다. Exact backend digest와 exact deterministic Pages tar를 모두 실제 배포하고 backend health와 Pages runtime health가 끝난 뒤, workflow가 같은 revoked-session UUID에 expected revision과 run-derived non-secret idempotency identifier로 `SESSION_REVERSE`를 호출하고 reconciliation의 exact `COMMITTED` receipt, next revision, `CLOSED`/`PRIVATE` projection을 확인합니다. 그 뒤에만 둘을 하나의 deployed pair로 묶어 `policyDeployedAt`을 기록하고 origin/BFF/CDN deny report를 생성합니다. `waitCompletedAt - max(preChangeCachedAt, policyDeployedAt) >= 720초` 이후 browser job은 exact numeric artifact ID로 받은 동일 profile/state를 재사용해 post-wait seed PASS와 C1 browser proof를 생성합니다. 각 partial/combined cache report는 `run-{producer.runId}-attempt-{producer.runAttempt}-r2a-public-cache` profile identity를 동일하게 묶고 signer와 durable verifier가 producer identity와 다시 비교합니다. Fresh/local profile은 old-browser case를 만족할 수 없습니다. Manifest에는 raw URL/path/cookie/marker가 아니라 numeric artifact ID, profile identity, tar/profile/state SHA-256, target와 boundary category별 HMAC, synthetic marker HMAC, normalized existing-endpoint ownership response HMAC, sanitized mutation receipt digest만 둡니다. A7+C1 provenance와 candidate tree로 재검증한 C1 source-set digest도 `cache-safety.manifest.json`에 묶습니다. CDN purge 성공만으로 720초 wait를 대체하지 않습니다.
+
+**abort:** wait가 720초보다 짧거나 browser proof가 wait보다 이르거나 origin/BFF/CDN/browser case 하나라도 실패하거나 cache source-set이 불명확하면 R2b candidate를 배포하지 않습니다.
+
+**rollback:** browser가 v2인 상태에서 R2a safety backend/cache pair의 이전 검증 tag로 함께 복귀합니다. Mutation receipt와 convergence ledger는 삭제하거나 수정하지 않습니다.
+
+### R2b — browser v3 Pages-only stage
+
+**preflight:** R2a cache attestation이 성공한 뒤 별도 immutable tag와 Pages digest를 사용합니다. `r2bBackendDigest == r2aBackendDigest`, `r2bPagesDigest != r2aPagesDigest`, R2a SHA ancestry, 동일 C1 source-set digest를 확인합니다. Compatibility와 security manifest는 같은 R2b SHA/candidate/backend/Pages digest에 묶고, D3와 B7+C1+D5 provenance 및 exact bounded command/case를 포함합니다. Backend가 달라지면 R2b가 아니라 별도 승인된 backend deploy/health/provenance stage로 되돌아갑니다.
+
+**success:** Compatibility matrix와 모든 non-session family regression, BFF capability probe, B7 authority-loss purge, C1 deterministic cache rerun이 protected producer에서 통과하고 final live checker가 성공한 뒤에만, attested deterministic tar의 exact bytes를 v3 Pages candidate로 배포합니다. 이후 named observation window는 24시간입니다. `Host Client Contract Adoption` dashboard는 실제 Micrometer counter `readmates.host.client_contract`의 Prometheus 이름 `readmates_host_client_contract_total`과 low-cardinality label `generation`, `mode`만 사용합니다. R2b 관측 mode는 `support`입니다.
+
+```promql
+(sum(increase(readmates_host_client_contract_total{generation="v2",mode="support"}[24h])) or vector(0)) == 0
+(sum(increase(readmates_host_client_contract_total{generation="v3",mode="support"}[24h])) or vector(0)) > 0
+(sum(increase(readmates_host_client_contract_total{generation="missing",mode="support"}[24h])) or vector(0)) == 0
+(sum(increase(readmates_host_client_contract_total{generation="unknown",mode="support"}[24h])) or vector(0)) == 0
+```
+
+24시간 success threshold는 `v2 writes == 0`, `v3 writes > 0`, `missing/unknown == 0`, BFF capability probe success, 그리고 모든 non-session operation family의 safe pre-production regression 유지입니다.
+
+**abort:** v2 또는 missing/unknown이 1건이라도 생기거나 v3가 0이거나 capability probe/operation family/authority/cache regression이 발생하면 R3로 가지 않습니다. Club, resource, member, actor identifier를 metric label이나 evidence에 추가하지 않습니다.
+
+**rollback:** v3-capable backend를 유지한 채 이전 검증 v3 Pages tag로 복귀합니다. Pre-v3 backend로의 backend-only rollback은 금지합니다. 꼭 필요하면 Pages/browser와 coordinated rollback을 하고, 이미 열린 v3 tab은 incompatible backend/BFF에서 fail closed하도록 둡니다.
+
+### R3 — residue-zero 뒤 enforcement
+
+**preflight:** R2b 24시간 evidence와 rollback target을 다시 확인하고, `READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=ENFORCE_V3` 변경에 대한 fresh explicit live-mutation approval을 받습니다.
+
+**success:** Backend가 v3 host write만 허용하고 BFF는 v2/v3 allowlist/pass-through를 유지합니다. Read와 capability probe는 정상이며 missing/unknown/v2 rejection이 controller/domain side effect를 만들지 않습니다.
+
+**abort:** 관측 window가 미완료이거나 v2/missing/unknown residue가 0이 아니거나 rollback target이 없으면 enforcement를 시작하지 않습니다.
+
+**rollback:** `SUPPORT_V2_V3`인 v3-capable backend mode로 복귀합니다. Pages/browser는 검증된 v3 candidate를 유지할 수 있습니다.
+
+각 stage smoke는 읽기, capability, 합성·pre-production case로 제한합니다. 실제 **production email** 발송이나 AI/provider 등 **billable** smoke는 이 runbook 권한에 포함되지 않으며 별도 명시 승인이 있어야 합니다.
 
 ## Tag 발행
 
@@ -74,7 +144,7 @@ git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-`main` push는 production 배포를 시작하지 않습니다. exact `vMAJOR.MINOR.PATCH` tag push는 GHCR server image publish workflow만 시작합니다. Server workflow는 annotated tag 자체를 checkout하고 tag가 가리키는 commit과 `HEAD`가 일치하는지 build 전에 검증합니다. Cloudflare Pages production은 server image scan/promote와 OCI backend health 확인 뒤 같은 tag를 `release_tag`로 입력해 수동 배포합니다.
+`main` push는 production 배포를 시작하지 않습니다. exact `vMAJOR.MINOR.PATCH` tag push는 GHCR server image publish workflow만 시작합니다. Server workflow는 annotated tag 자체를 checkout하고 tag가 가리키는 commit과 `HEAD`가 일치하는지 build 전에 검증합니다. Host-client rollout의 Cloudflare Pages production은 protected `host-rollout-r2b` ref에서 package → attestation/evidence → final checker 순서를 통과한 exact candidate artifact만 reusable `Deploy Front`에 전달합니다.
 
 Branch protection bypass 정책은 [release-management.md#branch-protection-bypass-policy](../development/release-management.md#branch-protection-bypass-policy)를 참조합니다. `main` direct push (admin bypass) 허용 조건, release PR 강제 조건, emergency bypass ledger 기록 기준이 그 절에 정리되어 있습니다. Release tag push 직전에는 `./scripts/pre-push-check.sh --release`를 실행해 `CHANGELOG Unreleased` 가드를 통과시키고, 통과가 어려운 emergency 상황에서만 `--no-changelog-check`로 우회합니다.
 
@@ -97,15 +167,15 @@ gh workflow run "Deploy Server Image" --ref vX.Y.Z -f image_tag=vX.Y.Z
 
 Workflow는 generic Docker tag, lightweight tag, tag commit과 checkout `HEAD` 불일치를 build 전에 거절합니다. Pushed tag와 manual dispatch는 같은 release-tag concurrency key를 사용하고, Trivy가 검사한 digest와 release tag로 promote하는 digest가 다르면 실패해야 합니다. 실패한 source tag는 이동하거나 덮어쓰지 않고 수정한 commit에서 새 patch tag를 발행합니다.
 
-Backend health와 BFF contract를 확인한 뒤 frontend workflow를 같은 release tag로 수동 실행합니다.
+Backend health와 BFF contract를 확인한 뒤 protected rollout ref가 exact annotated release tag commit을 가리키도록 승격합니다. `Deploy Front`를 수동 실행하거나 artifact ID/digest/SHA/tag를 사람이 입력하는 경로는 없습니다.
 
 ```bash
-gh workflow run "Deploy Front" --ref main -f release_tag=vX.Y.Z
-gh run list --workflow "Deploy Front" --event workflow_dispatch --limit 5
-gh run watch <deploy-front-run-id> --exit-status
+git push origin <r2b-commit>:host-rollout-r2b
+gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event push --limit 5
+gh run watch <host-rollout-run-id> --exit-status
 ```
 
-`Deploy Front`는 입력 tag 형식을 검사하고 checkout commit이 그 tag를 가리키는지 확인한 뒤 `front/dist`와 `front/functions`를 Cloudflare Pages production에 배포합니다. Server image, OCI promotion, frontend 중 하나가 실패하면 다음 단계로 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
+Protected workflow는 ref 보호, annotated tag/checkout commit, exact candidate SHA-256, R2a/R2b evidence와 final checker를 확인한 뒤 reusable `Deploy Front`가 검증한 tar에서 추출한 `dist`와 `functions`만 Cloudflare Pages production에 배포합니다. Server image, OCI promotion, evidence checker, frontend 중 하나가 실패하면 다음 단계로 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
 
 ## GitHub Release 생성
 
@@ -165,7 +235,7 @@ gh run list --workflow sync-config.yml --event workflow_dispatch --limit 5
 gh run watch <sync-config-run-id> --exit-status
 ```
 
-`restart_api=false`는 구 image를 새 설정으로 먼저 재시작하지 않기 위한 값입니다. `dry_run=false`는 검증만 하는 것이 아니라 운영 env 파일을 실제 동기화합니다. Major host-write contract release에서는 이 단계가 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 기록하고, v2 image가 시작될 때부터 구 client write를 fail closed하도록 준비합니다. Workflow가 실패하면 OCI promotion을 시작하지 않습니다.
+`restart_api=false`는 구 image를 새 설정으로 먼저 재시작하지 않기 위한 값입니다. `dry_run=false`는 검증만 하는 것이 아니라 운영 env 파일을 실제 동기화합니다. Host-client rollout에서는 repository variable의 typed mode가 `DISABLED|V2_ONLY|SUPPORT_V2_V3|ENFORCE_V3` 중 현재 승인 stage와 일치해야 합니다. Workflow가 실패하면 OCI promotion을 시작하지 않습니다.
 
 ```bash
 READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
@@ -186,17 +256,16 @@ CADDY_SITE=api.example.com \
 
 스크립트는 legacy host `readmates-server`와 host `caddy`를 중지하고, compose stack의 `readmates-api` 이미지 ID가 기대 이미지와 같은지 확인한 뒤 `/internal/health`, BFF auth smoke, post-deploy watch를 실행합니다.
 
-Major host-write contract release에서는 실데이터 mutation 없이 배포 창을 확인합니다. 아래 probe는 인증 cookie를 보내지 않으므로 controller mutation에 도달하지 않습니다.
+Host-client contract release에서는 실데이터 mutation 없이 배포 창을 확인합니다. 아래 probe는 인증 cookie를 보내지 않으므로 controller mutation에 도달하지 않습니다. Stage별 기대 generation은 이 절의 R1/R2a/R2b/R3 계약을 따릅니다.
 
 ```bash
-# Backend promotion 후/Frontend 배포 전: 구 BFF가 contract를 전달하지 않아 409.
+# Contract 누락은 typed mode에 따라 fail closed합니다.
 curl -sS -o /dev/null -w '%{http_code}\n' \
   -X POST \
   -H 'Origin: https://readmates.pages.dev' \
   https://readmates.pages.dev/api/bff/api/host/notifications/process
 
-# Frontend + Pages Functions 배포 후에도 contract 누락은 409.
-# 정확한 v2 선언은 contract gate를 통과한 뒤 인증 계층에서 401이어야 합니다.
+# SUPPORT_V2_V3에서는 정확한 v2/v3 선언이 contract gate를 통과한 뒤 인증 계층에 도달합니다.
 curl -sS -o /dev/null -w '%{http_code}\n' \
   -X POST \
   -H 'Origin: https://readmates.pages.dev' \
@@ -228,7 +297,7 @@ identifier는 Git에 남기지 않습니다.
 
 Frontend만 실패하면 이전 정상 tag의 Cloudflare Pages 배포를 재배포하거나 새 patch tag를 발행합니다.
 
-v2 host-write gate가 켜진 backend에서 frontend만 이전 tag로 rollback하면 host mutation이 409로 동결되는 것이 정상입니다. 쓰기를 복구하려면 호환 frontend를 다시 배포하거나 backend도 schema를 보존한 호환 image로 rollback/forward-fix합니다.
+R2b 이후에는 pre-v3 backend-only rollback을 하지 않습니다. 검증된 v3-capable backend를 유지하거나 Pages/browser까지 coordinated rollback하고, 이미 열린 v3 tab은 incompatible pair에서 fail closed하도록 둡니다. R1/R2a는 각각 해당 stage 이전의 검증 backend/Pages pair로 복귀합니다.
 
 서버 image만 되돌릴 때는 [compose-stack.md](compose-stack.md#rollback)의 rollback 절차를 따릅니다.
 

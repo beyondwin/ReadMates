@@ -1,8 +1,17 @@
-import { apiErrorFromResponse } from "@/shared/api/errors";
+import { apiErrorFromResponse, ReadmatesTransportError } from "@/shared/api/errors";
+import {
+  assertHostResponseActive,
+  hostRequestGeneration,
+  hostApiErrorFromResponse,
+  registerHostRequest,
+  registerHostResponseLease,
+  releaseHostResponse,
+} from "@/shared/api/host-authority-event";
 import { parseReadmatesResponse } from "@/shared/api/response";
 import { signalSessionExpired } from "@/shared/auth/session-expiry";
 import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
 import { recordFrontendApiFailure } from "@/shared/observability/frontend-observability";
+import { requireHostClientContractV3 } from "@/shared/api/host-client-contract";
 
 export class ReadMatesSessionExpiredError extends Error {
   constructor() {
@@ -15,7 +24,7 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 let lastLoginRedirectAt = 0;
 const REDIRECT_COOL_OFF_MS = 1500;
 const HOST_WRITE_CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract";
-const HOST_WRITE_CLIENT_CONTRACT = "v2";
+const HOST_WRITE_CLIENT_CONTRACT = "v3";
 
 export function __resetRedirectGuardForTest() {
   lastLoginRedirectAt = 0;
@@ -23,6 +32,10 @@ export function __resetRedirectGuardForTest() {
 
 export type ReadmatesApiContext = {
   clubSlug?: string;
+};
+
+export type ExplicitReadmatesApiContext = {
+  clubSlug: string;
 };
 
 export type ReadmatesRequestPolicy = {
@@ -63,6 +76,17 @@ export function readmatesApiPath(path: string, context?: ReadmatesApiContext) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+async function readmatesTransportFetch(input: RequestInfo | URL, init?: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new ReadmatesTransportError();
+    }
+    throw error;
+  }
+}
+
 export async function readmatesFetchResponse(
   path: string,
   init?: RequestInit,
@@ -78,18 +102,52 @@ export async function readmatesFetchResponse(
   }
 
   if (MUTATING_METHODS.has(method) && path.startsWith("/api/host/")) {
+    await requireHostClientContractV3();
     headers.set(HOST_WRITE_CLIENT_CONTRACT_HEADER, HOST_WRITE_CLIENT_CONTRACT);
   } else {
     headers.delete(HOST_WRITE_CLIENT_CONTRACT_HEADER);
   }
 
-  const response = await fetch(`/api/bff${readmatesApiPath(path, context)}`, {
-    ...init,
-    headers,
-    cache: "no-store",
-  });
+  const hostRequestController = path.startsWith("/api/host/") && context?.clubSlug
+    ? new AbortController()
+    : null;
+  const hostRequestGenerationAtStart = context?.clubSlug
+    ? hostRequestGeneration(context.clubSlug)
+    : null;
+  const unregisterHostRequest = hostRequestController && context?.clubSlug
+    ? registerHostRequest(context.clubSlug, hostRequestController)
+    : null;
+  const forwardAbort = () => hostRequestController?.abort();
+  init?.signal?.addEventListener("abort", forwardAbort, { once: true });
+  let response: Response;
+  try {
+    response = await readmatesTransportFetch(`/api/bff${readmatesApiPath(path, context)}`, {
+      ...init,
+      headers,
+      cache: "no-store",
+      signal: hostRequestController?.signal ?? init?.signal,
+    });
+  } catch (error) {
+    unregisterHostRequest?.();
+    throw error;
+  } finally {
+    init?.signal?.removeEventListener("abort", forwardAbort);
+  }
+
+  if (
+    unregisterHostRequest
+    && context?.clubSlug
+    && hostRequestGenerationAtStart !== null
+  ) {
+    registerHostResponseLease(response, {
+      clubSlug: context.clubSlug,
+      generation: hostRequestGenerationAtStart,
+      release: unregisterHostRequest,
+    });
+  }
 
   if (response.status === 401) {
+    releaseHostResponse(response);
     if (policy?.sessionExpiry) {
       signalSessionExpired(policy.sessionExpiry === "recover-write" ? "write" : "read");
     } else {
@@ -115,12 +173,23 @@ export async function readmatesFetch<T>(
   const response = await readmatesFetchResponse(path, init, context, policy);
 
   if (!response.ok) {
-    const error = await apiErrorFromResponse(response);
+    const error = path.startsWith("/api/host/") && context?.clubSlug
+      ? await hostApiErrorFromResponse(response, {
+          clubSlug: context.clubSlug,
+          requestKind: `${init?.method?.toUpperCase() ?? "GET"} ${path}`,
+        })
+      : await apiErrorFromResponse(response);
     recordFrontendApiFailure({ path, status: error.status, errorCode: error.code });
     throw error;
   }
 
-  return parseReadmatesResponse<T>(response);
+  try {
+    const value = await parseReadmatesResponse<T>(response);
+    assertHostResponseActive(response);
+    return value;
+  } finally {
+    releaseHostResponse(response);
+  }
 }
 
 /**
@@ -135,7 +204,7 @@ export async function readmatesPublicFetchResponse(path: string, init?: RequestI
     headers.set("Content-Type", "application/json");
   }
 
-  return fetch(`/api/bff${readmatesApiPath(path, { clubSlug: undefined })}`, {
+  return readmatesTransportFetch(`/api/bff${readmatesApiPath(path, { clubSlug: undefined })}`, {
     ...init,
     headers,
     cache: "no-store",

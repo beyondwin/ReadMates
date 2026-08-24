@@ -99,7 +99,7 @@ export function RsvpPanel({
       <div className="row-between" style={{ alignItems: "flex-start", marginBottom: "16px" }}>
         <div>
           <div className="eyebrow">
-            RSVP
+            참석 응답
           </div>
           <div className="h4 editorial" style={{ marginTop: "6px" }}>
             이번 모임에 참석하시나요?
@@ -230,7 +230,7 @@ export function OneLineReviewPanel({
         한줄평 내용
       </label>
       <p className="tiny" style={{ color: "var(--text-3)", margin: "0 0 8px" }}>
-        저장하면 이번 세션 참여자가 함께 볼 수 있습니다.
+        저장하면 이번 모임 참여자가 함께 볼 수 있습니다.
       </p>
       <input
         id={reviewId}
@@ -242,7 +242,7 @@ export function OneLineReviewPanel({
       />
       <div className="row-between" style={{ marginTop: "10px" }}>
         <div className="tiny" style={{ color: "var(--text-3)" }}>
-          세션 참여자 공개
+          모임 참여자 공개
         </div>
         <div className="row" style={{ gap: "10px", justifyContent: "flex-end" }}>
           <SaveFeedback scope="oneLineReview" status={saveStatus} />
@@ -327,7 +327,7 @@ export function MyStatusCard({
   hasOneLineReview: boolean;
 }) {
   const items = [
-    { label: "RSVP", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
+    { label: "참석 응답", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
     { label: "읽기 진행률", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress > 0 },
     {
       label: "질문",
@@ -335,7 +335,7 @@ export function MyStatusCard({
       ok: writtenQuestionCount > 0,
     },
     { label: "한줄평", value: hasOneLineReview ? "작성 완료" : "기록 전", ok: hasOneLineReview },
-    { label: "피드백 문서", value: "세션 후", ok: false },
+    { label: "피드백 문서", value: "모임 후", ok: false },
   ];
 
   return (
@@ -374,7 +374,7 @@ export function SessionMeta({ session }: { session: CurrentSession }) {
   return (
     <div className="surface-quiet" style={{ padding: "22px" }}>
       <div className="eyebrow" style={{ marginBottom: "14px" }}>
-        세션 정보
+        모임 정보
       </div>
       <dl className="rm-session-meta-list">
         <div className="rm-session-meta-row">
@@ -475,7 +475,7 @@ export function HostContextPanel({
         멤버 준비를 유지한 채 운영 문서로 이동
       </div>
       <p className="small" style={{ color: "var(--text-2)", margin: "8px 0 0" }}>
-        이 화면에서는 멤버로 RSVP, 진행률, 질문, 서평을 남기고, 운영 화면에서 세션 정보와 참석 확정을 관리합니다.
+        이 화면에서는 멤버로 참석 응답, 진행률, 질문, 서평을 남기고, 운영 화면에서 모임 정보와 참석 확정을 관리합니다.
       </p>
       <InternalLink href={`/app/host/sessions/${sessionId}/edit`} className="btn btn-ghost btn-sm" style={{ marginTop: "14px" }}>
         운영 문서 열기

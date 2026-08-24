@@ -48,11 +48,12 @@ const pending: Record<ReviewSection, SectionReviewState> = {
 function envelope(): AiGenerationDraftEnvelope {
   return {
     version: 2,
+    clubSlug: "reading-sai",
     jobId: "job-1",
     revision: 4,
     serverSnapshot: snapshot(),
     draft: snapshot("사용자 수정 요약"),
-    sectionReviews: pending,
+    sectionReviews: { ...pending },
   };
 }
 
@@ -71,8 +72,8 @@ describe("aigen-draft-storage v2", () => {
 
   it("stores only the versioned browser review envelope", () => {
     expect(saveAigenDraft(envelope())).toBe(true);
-    expect(loadAigenDraft("job-1", 4)).toEqual(envelope());
-    const raw = window.localStorage.getItem(draftStorageKey("job-1")) ?? "";
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toEqual(envelope());
+    const raw = window.localStorage.getItem(draftStorageKey("reading-sai", "job-1")) ?? "";
     expect(raw).not.toContain("evidence");
     expect(raw).not.toContain("turnId");
     expect(raw).not.toContain("transcript");
@@ -80,16 +81,16 @@ describe("aigen-draft-storage v2", () => {
 
   it("preserves a newer stored revision when an older cached response is inspected", () => {
     saveAigenDraft(envelope());
-    expect(loadAigenDraft("job-1", 3)).toBeNull();
-    expect(loadAigenDraft("job-1", 4)).toEqual(envelope());
+    expect(loadAigenDraft("reading-sai", "job-1", 3)).toBeNull();
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toEqual(envelope());
   });
 
   it("purges a stored draft after the server-aligned six-hour TTL", () => {
     saveAigenDraft(envelope());
     vi.advanceTimersByTime(AIGEN_DRAFT_TTL_MS);
 
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
-    expect(loadAigenDraft("job-1", 4)).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("reading-sai", "job-1"))).toBeNull();
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toBeNull();
   });
 
   it("does not extend the fixed six-hour retention anchor on autosave", () => {
@@ -98,8 +99,8 @@ describe("aigen-draft-storage v2", () => {
     saveAigenDraft({ ...envelope(), draft: snapshot("만료 직전 수정") });
     vi.setSystemTime(Date.now() + 1_001);
 
-    expect(loadAigenDraft("job-1", 4)).toBeNull();
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("reading-sai", "job-1"))).toBeNull();
   });
 
   it("refuses to rewrite a physically expired revision", () => {
@@ -107,52 +108,52 @@ describe("aigen-draft-storage v2", () => {
     vi.setSystemTime(Date.now() + AIGEN_DRAFT_TTL_MS + 1);
 
     expect(saveAigenDraft({ ...envelope(), draft: snapshot("만료 후 수정") })).toBe(false);
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("reading-sai", "job-1"))).toBeNull();
   });
 
   it("purges an older revision when the current server revision is newer", () => {
     saveAigenDraft(envelope());
 
-    expect(loadAigenDraft("job-1", 5)).toBeNull();
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
+    expect(loadAigenDraft("reading-sai", "job-1", 5)).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("reading-sai", "job-1"))).toBeNull();
   });
 
   it("purges malformed and inactive job drafts when a new job starts", () => {
     saveAigenDraft(envelope());
     saveAigenDraft({ ...envelope(), jobId: "job-current" });
-    window.localStorage.setItem(draftStorageKey("malformed"), "{bad-json");
+    window.localStorage.setItem(draftStorageKey("reading-sai", "malformed"), "{bad-json");
     window.localStorage.setItem("unrelated", "keep");
 
-    purgeAigenDrafts("job-current");
+    purgeAigenDrafts("reading-sai", "job-current");
 
-    expect(window.localStorage.getItem(draftStorageKey("job-1"))).toBeNull();
-    expect(window.localStorage.getItem(draftStorageKey("malformed"))).toBeNull();
-    expect(loadAigenDraft("job-current", 4)).toEqual({ ...envelope(), jobId: "job-current" });
+    expect(window.localStorage.getItem(draftStorageKey("reading-sai", "job-1"))).toBeNull();
+    expect(window.localStorage.getItem(draftStorageKey("reading-sai", "malformed"))).toBeNull();
+    expect(loadAigenDraft("reading-sai", "job-current", 4)).toEqual({ ...envelope(), jobId: "job-current" });
     expect(window.localStorage.getItem("unrelated")).toBe("keep");
   });
 
   it("rejects malformed and legacy unversioned data", () => {
-    window.localStorage.setItem(draftStorageKey("bad"), "{bad-json");
-    expect(loadAigenDraft("bad", 1)).toBeNull();
-    window.localStorage.setItem(draftStorageKey("legacy"), JSON.stringify(snapshot()));
-    expect(loadAigenDraft("legacy", 1)).toBeNull();
+    window.localStorage.setItem(draftStorageKey("reading-sai", "bad"), "{bad-json");
+    expect(loadAigenDraft("reading-sai", "bad", 1)).toBeNull();
+    window.localStorage.setItem(draftStorageKey("reading-sai", "legacy"), JSON.stringify(snapshot()));
+    expect(loadAigenDraft("reading-sai", "legacy", 1)).toBeNull();
   });
 
   it("rejects malformed authored text, unsafe session numbers, and extra review keys", () => {
     const malformed = envelope() as unknown as Record<string, unknown>;
     malformed.draft = { ...snapshot(), highlights: [{ authorName: "공개 회원", text: 42 }] };
-    window.localStorage.setItem(draftStorageKey("job-1"), JSON.stringify(malformed));
-    expect(loadAigenDraft("job-1", 4)).toBeNull();
+    window.localStorage.setItem(draftStorageKey("reading-sai", "job-1"), JSON.stringify(malformed));
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toBeNull();
 
     const unsafeSession = envelope();
     unsafeSession.draft = { ...unsafeSession.draft, sessionNumber: Number.NaN };
-    window.localStorage.setItem(draftStorageKey("job-1"), JSON.stringify(unsafeSession));
-    expect(loadAigenDraft("job-1", 4)).toBeNull();
+    window.localStorage.setItem(draftStorageKey("reading-sai", "job-1"), JSON.stringify(unsafeSession));
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toBeNull();
 
     const extraReview = envelope() as AiGenerationDraftEnvelope & { sectionReviews: Record<string, SectionReviewState> };
     extraReview.sectionReviews.EXTRA = "PENDING";
-    window.localStorage.setItem(draftStorageKey("job-1"), JSON.stringify(extraReview));
-    expect(loadAigenDraft("job-1", 4)).toBeNull();
+    window.localStorage.setItem(draftStorageKey("reading-sai", "job-1"), JSON.stringify(extraReview));
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toBeNull();
   });
 
   it("returns false on storage failure so the UI can warn without losing memory state", () => {
@@ -164,7 +165,20 @@ describe("aigen-draft-storage v2", () => {
 
   it("clears best-effort", () => {
     saveAigenDraft(envelope());
-    clearAigenDraft("job-1");
-    expect(loadAigenDraft("job-1", 4)).toBeNull();
+    clearAigenDraft("reading-sai", "job-1");
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toBeNull();
+  });
+
+  it("never purges another club's draft with the same job id", () => {
+    saveAigenDraft(envelope());
+    saveAigenDraft({ ...envelope(), clubSlug: "other-club" });
+
+    purgeAigenDrafts("reading-sai", "new-job");
+
+    expect(loadAigenDraft("reading-sai", "job-1", 4)).toBeNull();
+    expect(loadAigenDraft("other-club", "job-1", 4)).toEqual({
+      ...envelope(),
+      clubSlug: "other-club",
+    });
   });
 });

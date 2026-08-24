@@ -184,20 +184,20 @@ class SessionImportService(
             issues += SessionImportIssue("INVALID_FORMAT", "이 파일은 readmates-session-import:v1 형식이 아닙니다.")
         }
         if (!allowHostOnlyVisibility && command.recordVisibility == SessionRecordVisibility.HOST_ONLY) {
-            issues += SessionImportIssue("HOST_ONLY_VISIBILITY", "호스트 전용 공개 범위에서는 세션 기록 import를 저장할 수 없습니다.")
+            issues += SessionImportIssue("HOST_ONLY_VISIBILITY", "호스트만 보기 범위에서는 모임 기록 import를 저장할 수 없습니다.")
         }
         if (command.session.number != target.sessionNumber) {
             issues +=
                 SessionImportIssue(
                     "SESSION_NUMBER_MISMATCH",
-                    "${command.session.number}회차 파일인데 현재 화면은 ${target.sessionNumber}회차입니다.",
+                    "No.${command.session.number} 파일인데 현재 화면은 No.${target.sessionNumber}입니다.",
                 )
         }
         if (command.session.bookTitle.trim() != target.bookTitle) {
-            issues += SessionImportIssue("BOOK_TITLE_MISMATCH", "책 제목이 현재 세션과 일치하지 않습니다.")
+            issues += SessionImportIssue("BOOK_TITLE_MISMATCH", "책 제목이 현재 모임과 일치하지 않습니다.")
         }
         if (!command.session.meetingDate.isEqual(target.meetingDate)) {
-            issues += SessionImportIssue("MEETING_DATE_MISMATCH", "모임 날짜가 현재 세션과 일치하지 않습니다.")
+            issues += SessionImportIssue("MEETING_DATE_MISMATCH", "모임 날짜가 현재 모임과 일치하지 않습니다.")
         }
     }
 
@@ -273,7 +273,7 @@ class SessionImportService(
             issues += SessionImportIssue("RECORD_TEXT_REQUIRED", "기록 문구가 비어 있습니다.")
         }
         if (attendee == null) {
-            issues += SessionImportIssue(issueCode, "작성자 '$trimmedAuthorName'를 이 회차 참석자에서 찾을 수 없습니다.")
+            issues += SessionImportIssue(issueCode, "작성자 '$trimmedAuthorName'를 이 모임 참석자에서 찾을 수 없습니다.")
         }
         return SessionImportRecordPreview(
             trimmedAuthorName,

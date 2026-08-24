@@ -1,11 +1,19 @@
-import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
-import { apiErrorFromResponse } from "@/shared/api/errors";
+import {
+  readmatesFetch,
+  readmatesFetchResponse,
+  type ExplicitReadmatesApiContext,
+} from "@/shared/api/client";
+import {
+  hostApiErrorFromResponse,
+  readHostResponseJson,
+} from "@/shared/api/host-authority-event";
 import {
   parseHostSessionChangeReceipt,
   parseHostSessionRestorePreview,
   type HostSessionChangeReceipt,
   type HostSessionRestorePreview,
-  type HostSessionRestoreRequest,
+  HostSessionRestoreMutationEnvelopeSchema,
+  type HostSessionRestoreMutationEnvelope,
 } from "./host-session-recovery-contracts";
 
 function changePath(sessionId: string, changeId: string, suffix: string) {
@@ -15,7 +23,7 @@ function changePath(sessionId: string, changeId: string, suffix: string) {
 export function fetchHostSessionRestorePreview(
   sessionId: string,
   changeId: string,
-  context?: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
 ): Promise<HostSessionRestorePreview> {
   return readmatesFetch<HostSessionRestorePreview>(
     changePath(sessionId, changeId, "restore-preview"),
@@ -27,20 +35,23 @@ export function fetchHostSessionRestorePreview(
 export async function restoreHostSessionChange(
   sessionId: string,
   changeId: string,
-  request: HostSessionRestoreRequest,
-  context?: ReadmatesApiContext,
+  request: HostSessionRestoreMutationEnvelope,
+  context: ExplicitReadmatesApiContext,
 ): Promise<HostSessionChangeReceipt> {
   const response = await readmatesFetchResponse(
     changePath(sessionId, changeId, "restore"),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify(HostSessionRestoreMutationEnvelopeSchema.parse(request)),
     },
     context,
   );
   if (!response.ok) {
-    throw await apiErrorFromResponse(response);
+    throw await hostApiErrorFromResponse(response, {
+      clubSlug: context.clubSlug,
+      requestKind: "SESSION_CHANGE_RESTORE",
+    });
   }
-  return parseHostSessionChangeReceipt(await response.json());
+  return parseHostSessionChangeReceipt(await readHostResponseJson(response));
 }

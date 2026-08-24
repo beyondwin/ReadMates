@@ -1718,6 +1718,98 @@ class MySqlFlywayMigrationTest(
 
     @Test
     @Suppress("LongMethod")
+    fun `v53 marks only timestamp matched legacy draft bases as known current`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v52Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("52")
+                    .load()
+            assertThat(v52Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("52")
+            val jdbc = JdbcTemplate(dataSource)
+            val clubId = "aaaaaaaa-0000-4000-8000-000000053001"
+            val freshSessionId = "aaaaaaaa-0000-4000-8000-000000053010"
+            val staleSessionId = "aaaaaaaa-0000-4000-8000-000000053011"
+            insertV52RevisionClubGraph(jdbc, clubId, "v53-draft-base")
+            listOf(freshSessionId, staleSessionId).forEachIndexed { index, sessionId ->
+                insertV52RevisionSession(jdbc, sessionId, clubId, number = index + 1, state = "PUBLISHED")
+                jdbc.update(
+                    """
+                    update sessions
+                    set session_revision = 4, exposure_revision = 5,
+                        updated_at = '2026-08-23 10:00:00.123456'
+                    where id = ?
+                    """.trimIndent(),
+                    sessionId,
+                )
+                jdbc.update(
+                    "insert into session_publication_versions (session_id, publication_revision) values (?, 6)",
+                    sessionId,
+                )
+            }
+            jdbc.update(
+                """
+                insert into session_record_drafts (
+                  session_id, club_id, base_live_revision, base_session_updated_at,
+                  draft_revision, source, snapshot_json, snapshot_sha256, updated_by_membership_id
+                ) values (?, ?, 2, '2026-08-23 10:00:00.123456', 1, 'MANUAL', '{}', ?, ?),
+                         (?, ?, 2, '2026-08-23 09:00:00.123456', 1, 'MANUAL', '{}', ?, ?)
+                """.trimIndent(),
+                freshSessionId,
+                clubId,
+                "a".repeat(64),
+                V52_EMPTY_HOST_MEMBERSHIP_ID,
+                staleSessionId,
+                clubId,
+                "b".repeat(64),
+                V52_EMPTY_HOST_MEMBERSHIP_ID,
+            )
+
+            val upgrade =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("53")
+                    .load()
+                    .migrate()
+
+            assertThat(upgrade.migrationsExecuted).isEqualTo(1)
+            assertThat(
+                jdbc.queryForMap(
+                    """
+                    select base_vector_known, base_session_revision,
+                           base_exposure_revision, base_publication_revision
+                    from session_record_drafts where session_id = ?
+                    """.trimIndent(),
+                    freshSessionId,
+                ),
+            ).containsEntry("base_vector_known", true)
+                .containsEntry("base_session_revision", 4L)
+                .containsEntry("base_exposure_revision", 5L)
+                .containsEntry("base_publication_revision", 6L)
+            assertThat(
+                jdbc.queryForMap(
+                    """
+                    select base_vector_known, base_session_revision,
+                           base_exposure_revision, base_publication_revision
+                    from session_record_drafts where session_id = ?
+                    """.trimIndent(),
+                    staleSessionId,
+                ),
+            ).containsEntry("base_vector_known", false)
+                .containsEntry("base_session_revision", 0L)
+                .containsEntry("base_exposure_revision", 0L)
+                .containsEntry("base_publication_revision", 0L)
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
     fun `mysql upgrades populated v51 rows with revision backfill without changing publication content`() {
         FlywayUpgradeMySqlContainer().use { database ->
             database.start()
@@ -1800,6 +1892,29 @@ class MySqlFlywayMigrationTest(
             assertEquals(
                 "V51 preserved public summary",
                 publicSummaryBefore,
+            )
+            assertEquals(
+                false,
+                upgradeJdbc.queryForObject(
+                    "select origin_readable from public_projection_current where session_id = ?",
+                    Boolean::class.java,
+                    fixtures.publishedSessionId,
+                ),
+                "V54 backfill must deny a publication owned by a private club",
+            )
+            assertEquals(
+                false,
+                upgradeJdbc.queryForObject(
+                    """
+                    select club_generation.origin_readable
+                    from public_club_projection_generations club_generation
+                    join sessions on sessions.club_id = club_generation.club_id
+                    where sessions.id = ?
+                    """.trimIndent(),
+                    Boolean::class.java,
+                    fixtures.publishedSessionId,
+                ),
+                "V54 club backfill must deny an inactive or private club",
             )
             assertEquals(
                 1,
@@ -4812,6 +4927,40 @@ class MySqlFlywayMigrationTest(
             .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
         assertThat(columns(jdbcTemplate, "host_session_mutation_receipts"))
             .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
+        assertThat(columns(jdbcTemplate, "session_record_drafts")).contains(
+            "base_session_revision",
+            "base_exposure_revision",
+            "base_publication_revision",
+            "base_vector_known",
+        )
+        assertThat(columnMetadata(jdbcTemplate, "session_record_drafts", "base_session_revision")["IS_NULLABLE"])
+            .isEqualTo("NO")
+        assertThat(columnMetadata(jdbcTemplate, "session_record_drafts", "base_vector_known")["IS_NULLABLE"])
+            .isEqualTo("NO")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_session_revision_check"))
+            .contains("base_session_revision", ">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_exposure_revision_check"))
+            .contains("base_exposure_revision", ">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_publication_revision_check"))
+            .contains("base_publication_revision", ">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_vector_known_check"))
+            .contains("base_vector_known")
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from session_record_drafts d
+                join sessions s on s.id = d.session_id and s.club_id = d.club_id
+                join session_publication_versions p on p.session_id = d.session_id
+                where d.base_vector_known = true
+                  and (d.base_session_revision <> s.session_revision
+                    or d.base_exposure_revision <> s.exposure_revision
+                    or d.base_publication_revision <> p.publication_revision)
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
         assertThat(checkConstraintClause(jdbcTemplate, "mutation_idempotency_keys_status_check"))
             .contains("IN_PROGRESS", "COMPLETED")
         assertThat(checkConstraintClause(jdbcTemplate, "host_session_mutation_receipts_decision_check"))
@@ -4838,33 +4987,121 @@ class MySqlFlywayMigrationTest(
             "origin_readable",
             "created_at",
         )
+        assertThat(columns(jdbcTemplate, "public_club_projection_generations")).containsExactlyInAnyOrder(
+            "club_id",
+            "generation",
+            "origin_readable",
+            "convergence_id",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_projection_current")).containsExactlyInAnyOrder(
+            "session_id",
+            "club_id",
+            "publication_id_snapshot",
+            "generation",
+            "club_generation",
+            "live_record_revision",
+            "origin_readable",
+            "emergency_denied",
+            "convergence_id",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_links")).containsExactlyInAnyOrder(
+            "mutation_receipt_id",
+            "convergence_id",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "committed_generation",
+            "committed_club_generation",
+            "live_record_revision",
+            "origin_readable",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "auth_public_projection_mutation_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "mutation_group_id",
+            "club_id_snapshot",
+            "actor_membership_id_snapshot",
+            "subject_membership_id_snapshot",
+            "session_id_snapshot",
+            "operation",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "club_public_projection_mutation_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "mutation_group_id",
+            "club_id_snapshot",
+            "actor_user_id_snapshot",
+            "session_id_snapshot",
+            "operation",
+            "created_at",
+        )
         assertThat(columns(jdbcTemplate, "public_convergence_work")).containsExactlyInAnyOrder(
             "convergence_id",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
             "next_attempt_no",
             "lease_owner",
             "lease_expires_at",
             "available_at",
+            "retention_until",
             "created_at",
             "updated_at",
         )
         assertThat(columns(jdbcTemplate, "public_convergence_events")).containsExactlyInAnyOrder(
             "convergence_id",
-            "publication_id_snapshot",
-            "session_id_snapshot",
             "attempt_no",
             "event_seq",
+            "pending_event_seq",
             "status",
             "observed_at",
             "result_category",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "created_at",
         )
         assertThat(importedKeys(jdbcTemplate, "public_mutation_convergence_receipts")).isEmpty()
-        assertThat(importedKeys(jdbcTemplate, "public_convergence_events")).isEmpty()
         assertThat(columns(jdbcTemplate, "public_mutation_convergence_receipts"))
             .doesNotContain("provider_response", "provider_error", "private_body", "reason")
-        assertThat(columns(jdbcTemplate, "public_convergence_events"))
-            .doesNotContain("provider_response", "provider_error", "private_body", "reason")
-        assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_status_check"))
+        assertEquals(
+            "convergence_id,attempt_no,event_seq",
+            indexColumns(jdbcTemplate, "public_convergence_events", "PRIMARY"),
+        )
+        assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_sequence_check"))
             .contains("PENDING", "SUCCEEDED", "FAILED")
+        assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_pending_reference_check"))
+            .contains("pending_event_seq", "= 0")
+        assertThat(importedKeys(jdbcTemplate, "public_mutation_convergence_links")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_convergence_work")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_projection_current")).isEmpty()
+        assertThat(checkConstraintClause(jdbcTemplate, "public_projection_current_emergency_deny_check"))
+            .contains("emergency_denied", "origin_readable")
+        assertThat(importedKeys(jdbcTemplate, "auth_public_projection_mutation_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "club_public_projection_mutation_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_convergence_events"))
+            .containsExactlyInAnyOrder("public_convergence_events")
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_links"))
+            .doesNotContain("provider_response", "private_body", "credentials", "reason")
+        assertThat(
+            columnMetadata(jdbcTemplate, "public_mutation_convergence_links", "session_id_snapshot")["IS_NULLABLE"],
+        ).isEqualTo("YES")
+        assertThat(
+            columnMetadata(jdbcTemplate, "public_convergence_work", "session_id_snapshot")["IS_NULLABLE"],
+        ).isEqualTo("YES")
+        assertThat(
+            columnMetadata(
+                jdbcTemplate,
+                "auth_public_projection_mutation_receipts",
+                "session_id_snapshot",
+            )["IS_NULLABLE"],
+        ).isEqualTo("YES")
+        assertThat(columns(jdbcTemplate, "public_convergence_events"))
+            .doesNotContain("provider_response", "provider_error", "private_body", "credentials", "reason")
+        assertThat(columns(jdbcTemplate, "auth_public_projection_mutation_receipts"))
+            .doesNotContain("provider_response", "private_body", "credentials", "reason")
     }
 
     private fun assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate: JdbcTemplate) {

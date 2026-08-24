@@ -14,6 +14,7 @@ const singleClubAuth = {
       membershipId: "membership-1",
       role: "HOST",
       status: "ACTIVE",
+      approvalState: "ACTIVE",
       primaryHost: "reading-sai.example.test",
     },
   ],
@@ -29,6 +30,7 @@ const multiClubAuth = {
       membershipId: "membership-1",
       role: "HOST",
       status: "ACTIVE",
+      approvalState: "ACTIVE",
       primaryHost: "reading-sai.example.test",
     },
     {
@@ -38,6 +40,7 @@ const multiClubAuth = {
       membershipId: "membership-2",
       role: "MEMBER",
       status: "VIEWER",
+      approvalState: "VIEWER",
       primaryHost: null,
     },
   ],

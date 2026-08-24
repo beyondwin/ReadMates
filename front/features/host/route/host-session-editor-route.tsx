@@ -13,7 +13,9 @@ import HostSessionEditor, {
 } from "@/features/host/ui/host-session-editor";
 import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
 import {
   wrapHostSessionEditorActionsForUndo,
@@ -162,8 +164,8 @@ export type HostSessionRecordsChangedEvent = {
   clubSlug?: string;
 };
 
-function contextFromClubSlug(clubSlug?: string): ReadmatesApiContext {
-  return { clubSlug };
+function contextFromClubSlug(clubSlug?: string): ExplicitReadmatesApiContext {
+  return requireHostClubContext(clubSlug);
 }
 
 function isOverlayPanel(
@@ -324,9 +326,9 @@ function HostSessionEditorQueryState({
       {hideTitle ? null : (
         <section className="page-header-compact">
           <div className="container">
-            <div className="eyebrow">세션 운영 문서</div>
+            <div className="eyebrow">모임 운영 문서</div>
             <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
-              세션 문서 편집
+              모임 문서 편집
             </h1>
           </div>
         </section>
@@ -335,12 +337,12 @@ function HostSessionEditorQueryState({
         <div className="container">
           {status === "loading" ? (
             <div className="surface-quiet small" role="status" style={{ padding: 18 }}>
-              세션 기록 편집 정보를 불러오는 중입니다.
+              모임 기록 편집 정보를 불러오는 중입니다.
             </div>
           ) : (
             <div className="surface-quiet stack" role="alert" style={{ padding: 18 }}>
               <p className="small" style={{ margin: 0 }}>
-                세션 기록 편집 정보를 불러오지 못했습니다.
+                모임 기록 편집 정보를 불러오지 못했습니다.
               </p>
               {onRetry ? (
                 <div>
@@ -452,7 +454,7 @@ function HostSessionTrashTombstoneRoute({
 }
 
 function useHostSessionEditorActions(
-  context: ReadmatesApiContext,
+  context: ExplicitReadmatesApiContext,
   onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>,
 ): HostSessionEditorActions {
   const queryClient = useQueryClient();
@@ -474,12 +476,15 @@ function useHostSessionEditorActions(
     mutate: () => Promise<Response>,
     sessionId: string,
   ) => {
-    const result = await hostSessionLifecycleResultFromResponse(await mutate());
+    const result = await hostSessionLifecycleResultFromResponse(await mutate(), {
+      clubSlug: context.clubSlug,
+      requestKind: "SESSION_LIFECYCLE",
+    });
     if (result.ok) {
       await onSessionRecordsChanged?.(sessionId);
     }
     return result;
-  }, [onSessionRecordsChanged]);
+  }, [context.clubSlug, onSessionRecordsChanged]);
 
   return useMemo<HostSessionEditorActions>(() => ({
     loadDeletionPreview: (sessionId) =>
@@ -501,7 +506,7 @@ function useHostSessionEditorActions(
         : updateSession({ sessionId, request }),
     updateAttendance: (sessionId, attendance) =>
       updateAttendance({ sessionId, attendance }),
-    previewSessionImport: hostSessionEditorPreviewActions.previewSessionImport,
+    previewSessionImport: hostSessionEditorPreviewActions(context).previewSessionImport,
     commitSessionImport: async (sessionId, request) => {
       const result = await commitImport({ sessionId, request });
       await onSessionRecordsChanged?.(sessionId);
@@ -762,7 +767,7 @@ export function EditHostSessionRecordWorkflow({
   historyPage: HostSessionHistoryPage;
   loadHistoryPage: (cursor: string) => Promise<HostSessionHistoryPage>;
   notificationDispatches: ManualNotificationDispatchListItem[];
-  context: ReadmatesApiContext;
+  context: ExplicitReadmatesApiContext;
   actions: HostSessionEditorActions;
   reloadRecordEditor: () => Promise<HostSessionRecordEditor | undefined>;
   returnTarget?: ReadmatesReturnTarget;
@@ -832,6 +837,7 @@ export function EditHostSessionRecordWorkflow({
     nextCursor: historyPage.nextCursor,
   });
   const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [returnStatePurged, setReturnStatePurged] = useState(false);
   const effectiveHistory = historyState.firstPage === historyPage
     ? historyState
     : {
@@ -845,6 +851,54 @@ export function EditHostSessionRecordWorkflow({
     onReload: reloadRecordEditor,
   });
   useDraftRouteNavigationGuard(controller.shouldBlockNavigation);
+
+  useEffect(() => {
+    const registrations = [
+      {
+        resourceKey: `record-draft:${recordEditor.sessionId}` as const,
+        clear: controller.clearSensitiveState,
+      },
+      {
+        resourceKey: `mutation-receipt:${recordEditor.sessionId}` as const,
+        clear: () => {
+          pendingUndoRef.current = null;
+          setPendingUndo(null);
+          setUndoConfirm(null);
+          setRestoreNotice(null);
+        },
+      },
+      {
+        resourceKey: `reconciliation:${recordEditor.sessionId}` as const,
+        clear: () => {
+          setApplyPreview(null);
+          setPendingApply(null);
+          setComposerRequest(null);
+          setConfirmationOpen(false);
+          setApplyPreviewRefreshing(false);
+          setRebaseError(null);
+          setConfirmationMessage(null);
+          rebasedDraftRevisionRef.current = null;
+        },
+      },
+      {
+        resourceKey: `history:${recordEditor.sessionId}` as const,
+        clear: () => {
+          setHistoryState({ firstPage: historyPage, items: [], nextCursor: null });
+          setHistoryLoadingMore(false);
+        },
+      },
+      {
+        resourceKey: `host-return-state:${recordEditor.sessionId}` as const,
+        clear: () => setReturnStatePurged(true),
+      },
+    ];
+    const unregister = registrations.map(({ resourceKey, clear }) => registerHostSensitiveState({
+      clubSlug: context.clubSlug,
+      resourceKey,
+      clear,
+    }));
+    return () => unregister.forEach((dispose) => dispose());
+  }, [context.clubSlug, controller.clearSensitiveState, historyPage, recordEditor.sessionId]);
 
   const reloadAuthoritativeDraft = useCallback(async () => {
     rebasedDraftRevisionRef.current = null;
@@ -892,7 +946,7 @@ export function EditHostSessionRecordWorkflow({
           }
           if (latest.draftLiveBaseStale) {
             setRebaseError(
-              "재확인 중 세션이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.",
+              "재확인 중 모임이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요.",
             );
           }
         }
@@ -912,7 +966,7 @@ export function EditHostSessionRecordWorkflow({
       const code = apiErrorCode(error);
       setRebaseError(
         code === "SESSION_RECORD_DRAFT_STALE" || code === "SESSION_RECORD_LIVE_STALE"
-          ? "세션 또는 초안이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요."
+          ? "모임 또는 초안이 다시 변경되었습니다. 최신 내용을 확인한 뒤 다시 시도해 주세요."
           : "재확인 결과를 확인하지 못했습니다. 최신 상태를 불러온 뒤 다시 시도해 주세요.",
       );
     }
@@ -1245,7 +1299,7 @@ export function EditHostSessionRecordWorkflow({
       <HostSessionEditor
         session={session}
         notificationDispatches={notificationDispatches}
-        returnTarget={returnTarget}
+        returnTarget={returnStatePurged ? undefined : returnTarget}
         actions={editorActions}
         pendingUndo={pendingUndoView}
         undoConfirm={undoConfirmView}
@@ -1253,7 +1307,7 @@ export function EditHostSessionRecordWorkflow({
         clubSlug={clubSlug}
         LinkComponent={LinkComponent}
         hostDashboardReturnTarget={hostDashboardReturnTarget}
-        readmatesReturnState={readmatesReturnState}
+        readmatesReturnState={returnStatePurged ? undefined : readmatesReturnState}
         onSessionRecordsChanged={onSessionRecordsChanged}
         onSessionTrashed={onSessionTrashed}
         navigation={navigation}

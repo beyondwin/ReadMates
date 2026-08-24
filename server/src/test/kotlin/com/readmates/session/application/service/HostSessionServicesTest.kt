@@ -29,8 +29,8 @@ import com.readmates.session.application.HostSessionRecordStagingRequiredExcepti
 import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
-import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.ConfirmAttendanceCommand
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
 import com.readmates.session.application.model.HostDashboardResult
 import com.readmates.session.application.model.HostMeetingListTuple
@@ -58,6 +58,7 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.model.normalized
+import com.readmates.session.application.port.out.HostPublicationWriteResult
 import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
@@ -89,18 +90,16 @@ import org.junit.jupiter.api.Assertions.assertDoesNotThrow
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.parallel.Isolated
 import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.transaction.support.TransactionSynchronizationManager
-import java.time.Instant
 import java.time.OffsetDateTime
+import java.time.Instant
 import java.util.UUID
 import kotlin.reflect.full.primaryConstructor
 
 @Suppress("LargeClass")
-@Isolated
 class HostSessionServicesTest {
     @Test
     fun `correction publisher is a mandatory production dependency`() {
@@ -346,6 +345,130 @@ class HostSessionServicesTest {
     }
 
     @Test
+    fun `semantic access no-op leaves cache and record epoch unchanged`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                currentAccessScope = SessionAccessScope.GUEST_READABLE
+                currentVisibility = SessionRecordVisibility.MEMBER
+                visibilityExposureChanged = false
+                visibilityCompatibilityChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                accessScope = SessionAccessScope.GUEST_READABLE,
+            ),
+        )
+
+        assertThat(invalidation.clubs).isEmpty()
+        assertThat(epochs.bumps).isEmpty()
+    }
+
+    @Test
+    fun `actual access change evicts cache and bumps record epoch exactly once`() {
+        val port = RecordingHostSessionPorts()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                accessScope = SessionAccessScope.GUEST_READABLE,
+            ),
+        )
+
+        assertThat(invalidation.clubs).containsExactly(host.clubId)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
+    fun `actual legacy placement change evicts cache and bumps record epoch exactly once`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityExposureChanged = false
+                visibilityPublicationChanged = true
+                visibilityCompatibilityChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                visibility = SessionRecordVisibility.PUBLIC,
+            ),
+        )
+
+        assertThat(invalidation.clubs).containsExactly(host.clubId)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
+    fun `legacy visibility compatibility repair evicts cache and bumps record epoch exactly once`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityExposureChanged = false
+                visibilityPublicationChanged = false
+                visibilityCompatibilityChanged = true
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                visibility = SessionRecordVisibility.MEMBER,
+            ),
+        )
+
+        assertThat(invalidation.clubs).containsExactly(host.clubId)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
     fun `service delegates open transition`() {
         val port = RecordingHostSessionPorts()
         val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
@@ -531,10 +654,7 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries =
-                    listOf(
-                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
-                    ),
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0)),
             )
 
         service.confirmAttendance(command)
@@ -589,10 +709,7 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries =
-                    listOf(
-                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
-                    ),
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0)),
             )
 
         val result = service.confirmAttendance(command)
@@ -612,10 +729,7 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries =
-                    listOf(
-                        AttendanceEntryCommand(membershipId.toString(), "UNKNOWN", expectedAttendanceRevision = 2),
-                    ),
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "UNKNOWN", expectedAttendanceRevision = 2)),
             )
 
         val result = service.confirmAttendance(command)
@@ -662,10 +776,7 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries =
-                    listOf(
-                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 4),
-                    ),
+                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 4)),
             )
 
         service.confirmAttendance(command)
@@ -700,6 +811,56 @@ class HostSessionServicesTest {
         service.upsertPublication(command)
 
         assertEquals(listOf(host.clubId), invalidation.clubs)
+    }
+
+    @Test
+    fun `compatibility-only publication repair evicts cache and bumps record epoch once`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                publicationExposureChanged = false
+                publicationChanged = false
+                publicationCompatibilityChanged = true
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service = HostSessionPublicationService(port, invalidation, epochs)
+
+        service.upsertPublication(
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.HOST_ONLY,
+            ),
+        )
+
+        assertEquals(listOf(host.clubId), invalidation.clubs)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
+    fun `semantic publication no-op leaves cache and record epoch unchanged`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                publicationExposureChanged = false
+                publicationChanged = false
+                publicationCompatibilityChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service = HostSessionPublicationService(port, invalidation, epochs)
+
+        service.upsertPublication(
+            UpsertPublicationCommand(
+                host = host,
+                sessionId = sessionId,
+                publicSummary = "요약",
+                visibility = SessionRecordVisibility.HOST_ONLY,
+            ),
+        )
+
+        assertThat(invalidation.clubs).isEmpty()
+        assertThat(epochs.bumps).isEmpty()
     }
 
     @Test
@@ -1672,6 +1833,9 @@ class HostSessionServicesTest {
         var returnToDraftFailure: RuntimeException? = null
         var lifecycleStateWriteCount = 0
         var throwOnUpsertPublication = false
+        var publicationExposureChanged = true
+        var publicationChanged = true
+        var publicationCompatibilityChanged = false
         var visibilityState = "OPEN"
         var currentVisibility = SessionRecordVisibility.HOST_ONLY
         var currentAccessScope = SessionAccessScope.HOST_ONLY
@@ -1679,6 +1843,9 @@ class HostSessionServicesTest {
         var visibilityUpdatedAt = OffsetDateTime.parse("2026-07-23T10:00:00Z")
         var visibilityUpdateCount = 0
         var visibilityLockCount = 0
+        var visibilityExposureChanged = true
+        var visibilityPublicationChanged = false
+        var visibilityCompatibilityChanged = false
         val basicSnapshots = ArrayDeque<HostSessionBasicAuditSnapshot>()
         var basicAuditBefore: HostSessionBasicAuditSnapshot? = null
         var basicAuditAfter: HostSessionBasicAuditSnapshot? = null
@@ -1719,7 +1886,12 @@ class HostSessionServicesTest {
             query: CanonicalHostSessionListQuery,
             evaluatedAt: Instant,
             cursor: HostMeetingListTuple?,
-        ) = HostMeetingListPageRead(emptyList(), null, false, HostSessionListSummary(0, 0, 0))
+        ) = HostMeetingListPageRead(
+            items = emptyList(),
+            last = null,
+            hasMore = false,
+            summary = HostSessionListSummary(0, 0, 0),
+        )
 
         override fun create(command: HostSessionCommand) =
             CreatedSessionResponse(
@@ -1788,7 +1960,9 @@ class HostSessionServicesTest {
             hostSessionDetail(command.sessionId).also { calls += "detail:${command.sessionId}" }
 
         override fun update(command: UpdateHostSessionCommand) =
-            hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" }
+            com.readmates.session.application.port.out.HostSessionDraftUpdateResult(
+                hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" },
+            )
 
         override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot {
             visibilityLockCount += 1
@@ -1835,6 +2009,9 @@ class HostSessionServicesTest {
                         accessScope = currentAccessScope,
                         bookTitle = visibilityBookTitle,
                     ),
+                exposureChanged = visibilityExposureChanged,
+                publicationChanged = visibilityPublicationChanged,
+                compatibilityChanged = visibilityCompatibilityChanged,
             )
         }
 
@@ -2010,14 +2187,20 @@ class HostSessionServicesTest {
                 count = command.entries.size,
             ).also { calls += "confirmAttendance:${command.sessionId}:${command.entries.size}" }
 
-        override fun upsertPublication(command: UpsertPublicationCommand): HostPublicationResponse {
+        override fun upsertPublication(command: UpsertPublicationCommand): HostPublicationWriteResult {
             if (throwOnUpsertPublication) {
                 throw IllegalStateException("write failed")
             }
-            return HostPublicationResponse(
-                sessionId = command.sessionId.toString(),
-                publicSummary = command.publicSummary,
-                visibility = command.visibility,
+            return HostPublicationWriteResult(
+                response =
+                    HostPublicationResponse(
+                        sessionId = command.sessionId.toString(),
+                        publicSummary = command.publicSummary,
+                        visibility = command.visibility,
+                    ),
+                exposureChanged = publicationExposureChanged,
+                publicationChanged = publicationChanged,
+                compatibilityChanged = publicationCompatibilityChanged,
             ).also { calls += "upsertPublication:${command.sessionId}:${command.visibility}" }
         }
 

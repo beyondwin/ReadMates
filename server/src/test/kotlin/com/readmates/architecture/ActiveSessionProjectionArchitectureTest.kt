@@ -72,11 +72,14 @@ class ActiveSessionProjectionArchitectureTest {
         match: MatchResult,
     ): Boolean {
         val windowStart = (match.range.first - 80).coerceAtLeast(0)
-        val windowEnd = (match.range.last + 40).coerceAtMost(source.length)
+        val windowEnd = (match.range.last + 180).coerceAtMost(source.length)
+        val window = collapseWhitespace(source.substring(windowStart, windowEnd))
         val inMaxNumberWindow =
-            MAX_NUMBER_ALLOCATION_COLLAPSED in collapseWhitespace(source.substring(windowStart, windowEnd))
+            MAX_NUMBER_ALLOCATION_COLLAPSED in window
+        val inProjectionLockWindow = PUBLIC_PROJECTION_LOCK_COLLAPSED in window
         return when {
             sourceFile.name == "HostSessionDeletionQueries.kt" -> true
+            sourceFile.name in PUBLIC_PROJECTION_LOCK_FILES -> inProjectionLockWindow
             sourceFile.name != "HostSessionWriteQueries.kt" -> false
             else -> inMaxNumberWindow
         }
@@ -131,6 +134,13 @@ class ActiveSessionProjectionArchitectureTest {
         val SESSION_UPDATE_SCAN = Regex("""(?i)\bupdate\s+sessions\b""")
         const val MAX_NUMBER_ALLOCATION_COLLAPSED =
             "select coalesce(max(number), 0) + 1 from sessions where club_id = ?"
+        const val PUBLIC_PROJECTION_LOCK_COLLAPSED =
+            "select id from sessions where club_id = ? and deleted_at is null order by id for update"
+        val PUBLIC_PROJECTION_LOCK_FILES =
+            setOf(
+                "JdbcAuthPublicProjectionMutationAdapter.kt",
+                "JdbcClubPublicProjectionMutationAdapter.kt",
+            )
 
         fun collapseWhitespace(value: String): String = value.replace(Regex("""\s+"""), " ")
     }

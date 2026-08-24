@@ -49,16 +49,16 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
               <div>
                 <div className="eyebrow">요약</div>
                 <h2 className="h2 editorial" style={{ margin: "8px 0 0" }}>
-                  회차 기록
+                  모임 기록
                 </h2>
                 <span className="badge badge-dot public-session-document__badge">{showcaseStateLabel}</span>
                 <p className="small muted" style={{ margin: "8px 0 0" }}>
                   {recordDensityLabel}
                 </p>
               </div>
-              <dl className="public-session-meta" aria-label="공개 세션 메타데이터">
+              <dl className="public-session-meta" aria-label="공개 기록 메타데이터">
                 <div>
-                  <dt>회차 하이라이트</dt>
+                  <dt>모임 하이라이트</dt>
                   <dd>{highlightCount}</dd>
                 </div>
                 <div>
@@ -77,7 +77,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
           <div className="public-section-head">
             <div>
               <div className="eyebrow" style={{ marginBottom: 8 }}>
-                회차 하이라이트 · {highlightCount}
+                모임 하이라이트 · {highlightCount}
               </div>
               <h2 className="h2 editorial" style={{ margin: 0 }}>
                 모임에서 남은 문장
@@ -88,7 +88,7 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
             <div className="public-note-highlight-list">
               {session.highlights.map((highlight, index) => {
                 const authorName = displayText(highlight.authorName, "읽는사이");
-                const text = displayText(highlight.text, "회차 하이라이트가 준비 중입니다.");
+                const text = displayText(highlight.text, "모임 하이라이트가 준비 중입니다.");
 
                 return (
                   <article className="public-note-highlight-row" key={`${index}-${highlight.sortOrder}-${highlight.authorName ?? "readmates"}-${highlight.text}`}>
@@ -103,9 +103,9 @@ export default function PublicSession({ session, returnTarget = publicRecordsRet
             </div>
           ) : (
             <div className="rm-empty-state public-empty-record">
-              <div className="eyebrow">회차 하이라이트</div>
+              <div className="eyebrow">모임 하이라이트</div>
               <div className="h3 editorial" style={{ marginTop: 10 }}>
-                아직 회차 하이라이트가 없습니다
+                아직 모임 하이라이트가 없습니다
               </div>
               <p className="body" style={{ margin: "12px 0 0" }}>
                 이번 기록은 요약 중심으로 발행되었습니다. 대표 문장이 정리되면 이 영역에 보관됩니다.

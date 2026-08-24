@@ -2,6 +2,7 @@ package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostPublicationWriteResult
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.db.dbString
 import org.springframework.jdbc.core.JdbcTemplate
@@ -11,41 +12,98 @@ internal class HostSessionPublicationWriteOperations(
     private val jdbcTemplate: JdbcTemplate,
     private val queries: HostSessionWriteQueries,
     private val policy: HostSessionWritePolicy,
+    private val publicProjection: HostPublicProjectionWriteOperations,
 ) {
     fun upsert(
         command: UpsertPublicationCommand,
         stagingRequired: Boolean,
-    ): HostPublicationResponse {
-        val locked = queries.locks.lockExposure(command.host, command.sessionId)
+    ): HostPublicationWriteResult {
+        val locked = queries.lockExposure(command.host, command.sessionId)
         command.expectedExposureRevision?.let { expected ->
             if (locked.exposureRevision != expected) {
-                queries.revisions.throwIfStale(0, command.host, command.sessionId)
+                queries.throwIfStale(0, command.host, command.sessionId)
             }
         }
         command.expectedPublicationRevision?.let { expected ->
             if (locked.publicationRevision != expected) {
-                queries.revisions.throwIfStale(0, command.host, command.sessionId)
+                queries.throwIfStale(0, command.host, command.sessionId)
             }
         }
         if (stagingRequired && command.siteVisibility == null) {
-            queries.locks.requireLegacyPublicationWriteAllowed(command.host, command.sessionId)
+            queries.requireLegacyPublicationWriteAllowed(command.host, command.sessionId)
         }
         val exposure = policy.publicationExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
-        updateSessionExposure(
-            command,
-            exposure.accessScope.name,
-            compatibility.sessionVisibility,
-            bumpExposureRevision = command.expectedExposureRevision != null,
+        val changes =
+            HostPublicationSemanticChanges(
+                access = exposure.accessScope != locked.exposure.accessScope,
+                placement = exposure.siteVisibility != locked.exposure.siteVisibility,
+                summary = !locked.publicationExists || command.publicSummary != locked.publicSummary,
+                sessionCompatibility = compatibility.sessionVisibility != locked.sessionVisibility,
+                publicationCompatibility =
+                    !locked.publicationExists ||
+                        compatibility.publicationVisibility != locked.publicationVisibility ||
+                        compatibility.isPublic != locked.publicationIsPublic,
+            )
+        if (changes.changed) {
+            updateSessionExposure(
+                command,
+                exposure.accessScope.name,
+                compatibility.sessionVisibility,
+                bumpExposureRevision = changes.access,
+            )
+        }
+        if (changes.publicationWrite) {
+            upsertPublication(
+                command,
+                exposure.siteVisibility.name,
+                compatibility.publicationVisibility,
+                compatibility.isPublic,
+            )
+        }
+        bumpPublicationRevision(command, changes.publication)
+        return HostPublicationWriteResult(
+            response =
+                HostPublicationResponse(
+                    sessionId = command.sessionId.toString(),
+                    publicSummary = command.publicSummary,
+                    visibility = SessionRecordVisibility.valueOf(compatibility.sessionVisibility),
+                    accessScope = exposure.accessScope,
+                    siteVisibility = exposure.siteVisibility,
+                ),
+            exposureChanged = changes.access,
+            publicationChanged = changes.publication,
+            compatibilityChanged = changes.compatibilityOnly,
+            publicProjectionEffect = rotatePublicProjection(command, changes),
         )
-        upsertPublication(
-            command,
-            exposure.siteVisibility.name,
-            compatibility.publicationVisibility,
-            compatibility.isPublic,
-        )
-        command.expectedPublicationRevision?.let { expected ->
-            val bumped =
+    }
+
+    private fun rotatePublicProjection(
+        command: UpsertPublicationCommand,
+        changes: HostPublicationSemanticChanges,
+    ) = if (changes.changed) {
+        publicProjection.rotate(command.host.clubId, command.sessionId)
+    } else {
+        null
+    }
+
+    private fun bumpPublicationRevision(
+        command: UpsertPublicationCommand,
+        publicationChanged: Boolean,
+    ) {
+        if (!publicationChanged) return
+        val expected = command.expectedPublicationRevision
+        val bumped =
+            if (expected == null) {
+                jdbcTemplate.update(
+                    """
+                    update session_publication_versions
+                    set publication_revision = publication_revision + 1
+                    where session_id = ?
+                    """.trimIndent(),
+                    command.sessionId.dbString(),
+                )
+            } else {
                 jdbcTemplate.update(
                     """
                     update session_publication_versions
@@ -56,15 +114,8 @@ internal class HostSessionPublicationWriteOperations(
                     command.sessionId.dbString(),
                     expected,
                 )
-            queries.revisions.throwIfStale(bumped, command.host, command.sessionId)
-        }
-        return HostPublicationResponse(
-            sessionId = command.sessionId.toString(),
-            publicSummary = command.publicSummary,
-            visibility = SessionRecordVisibility.valueOf(compatibility.sessionVisibility),
-            accessScope = exposure.accessScope,
-            siteVisibility = exposure.siteVisibility,
-        )
+            }
+        queries.throwIfStale(bumped, command.host, command.sessionId)
     }
 
     private fun updateSessionExposure(
@@ -79,7 +130,7 @@ internal class HostSessionPublicationWriteOperations(
             set access_scope = ?,
                 visibility = ?,
                 exposure_revision = exposure_revision + ?,
-                updated_at = utc_timestamp(6)
+                updated_at = greatest(utc_timestamp(6), timestampadd(microsecond, 1, updated_at))
             where id = ?
               and club_id = ?
               and deleted_at is null
@@ -123,4 +174,18 @@ internal class HostSessionPublicationWriteOperations(
             isPublic,
         )
     }
+}
+
+private data class HostPublicationSemanticChanges(
+    val access: Boolean,
+    val placement: Boolean,
+    val summary: Boolean,
+    val sessionCompatibility: Boolean,
+    val publicationCompatibility: Boolean,
+) {
+    val publication: Boolean = placement || summary
+    val compatibilityOnly: Boolean =
+        !access && !publication && (sessionCompatibility || publicationCompatibility)
+    val publicationWrite: Boolean = publication || publicationCompatibility
+    val changed: Boolean = access || publication || sessionCompatibility || publicationCompatibility
 }

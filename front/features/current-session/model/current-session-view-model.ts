@@ -1,3 +1,4 @@
+import { MEETING_RESPONSE_LABEL } from "@/shared/model/meeting-language";
 import {
   deriveReadingLoopState,
   READING_LOOP_LABELS,
@@ -8,7 +9,7 @@ import {
 import type { ReadSurfaceCapabilities } from "@/shared/model/read-surface-capabilities";
 
 export const SUSPENDED_MEMBER_NOTICE = "멤버십이 일시 정지되어 새 기록을 남길 수 없습니다.";
-export const VIEWER_MEMBER_NOTICE = "둘러보기 멤버입니다. 정식 멤버가 되면 RSVP와 질문 작성 기능이 열립니다.";
+export const VIEWER_MEMBER_NOTICE = "둘러보기 멤버입니다. 정식 멤버가 되면 참석 응답과 질문 작성 기능이 열립니다.";
 export const VIEWER_MEMBER_SHORT_NOTICE = "정식 멤버가 되면 참여 기능과 작성 기능이 열립니다.";
 
 export type CurrentSessionAccessAuth = {
@@ -44,7 +45,7 @@ export type CurrentSessionReadingLoopSummaryInput = {
 };
 
 const saveScopeLabels: Record<CurrentSessionSaveScope, string> = {
-  rsvp: "RSVP",
+  rsvp: MEETING_RESPONSE_LABEL,
   checkin: "진행률",
   question: "질문",
   longReview: "서평",
@@ -102,7 +103,7 @@ export function getCurrentSessionFeedbackAccessState(access: { isViewer: boolean
     return {
       className: "rm-locked-state",
       title: "정식 멤버에게 열립니다",
-      body: "둘러보기 멤버는 현재 세션 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다.",
+      body: "둘러보기 멤버는 현재 모임 내용은 읽을 수 있지만, 참석자 피드백 문서와 작성 기능은 제한됩니다.",
       canOpenArchive: false,
     } as const;
   }
@@ -118,8 +119,8 @@ export function getCurrentSessionFeedbackAccessState(access: { isViewer: boolean
 
   return {
     className: "surface-quiet",
-    title: "참석한 세션의 피드백 문서를 보존합니다",
-    body: "이번 세션 피드백은 모임 이후 호스트가 업로드하면 참석자 기준으로 열립니다.",
+    title: "참석한 모임의 피드백 문서를 보존합니다",
+    body: "이번 모임 피드백은 모임 이후 호스트가 업로드하면 참석자 기준으로 열립니다.",
     canOpenArchive: true,
   } as const;
 }
@@ -158,7 +159,7 @@ export function getCurrentSessionReadingLoopSummary(
     return {
       state,
       label: READING_LOOP_LABELS[state],
-      body: "세션 내용을 읽고 공동 보드를 확인할 수 있습니다.",
+      body: "모임 내용을 읽고 공동 보드를 확인할 수 있습니다.",
     };
   }
 
@@ -180,7 +181,7 @@ export function getCurrentSessionReadingLoopSummary(
       return {
         state,
         label: READING_LOOP_LABELS[state],
-        body: "RSVP를 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.",
+        body: "참석 응답을 먼저 선택하고, 읽기 진행률과 질문을 이어서 정리합니다.",
       };
     }
 

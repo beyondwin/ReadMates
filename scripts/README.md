@@ -33,6 +33,36 @@ python3 -B scripts/check-deploy-workflow-contract.py
 
 다른 candidate나 fixture의 workflow를 검사할 때만 `--workflow <path>`를 사용합니다. 이 검사는 workflow를 실행하거나 image를 publish하지 않습니다.
 
+## Host client rollout evidence checkers
+
+`check-host-client-rollout-contract.py`는 R1 → R2a → R2b → R3 host-client rollout의 구조 계약과 최종 세 manifest 결합 정책을 검사합니다. 일반 CI와 공개 릴리즈 후보에서는 self-test와 인자 없는 structural mode만 실행합니다.
+
+```bash
+python3 -B scripts/check-host-client-rollout-contract.py --self-test
+python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
+python3 -B scripts/test-host-rollout-evidence-reporter.py
+python3 -B scripts/test-host-rollout-cache-evidence.py
+python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready
+python3 -B scripts/validate-host-rollout-candidate.py --self-test
+python3 -B scripts/check-host-client-rollout-contract.py
+```
+
+`host-rollout-evidence-reporter.py`와 `host-rollout-test-contract.json`은 test command, substantive spec/config path, case set, reporter source를 함께 고정합니다. `check-config --artifact-ready`는 아직 후속 D3/D5/C1 task가 소유한 spec이 없더라도 계약 구조만 검사합니다. Live `run-command`는 해당 stage의 모든 prerequisite가 실제 tracked non-empty file이고 각 test가 bounded structured JSON을 생성할 때만 통과합니다. 따라서 repository-only structural PASS는 live evidence PASS가 아닙니다.
+
+`host-rollout-cache-evidence.py`는 protected R2a 환경의 실제 HTTPS origin/BFF/CDN boundary를 IDNA/default-port/host-case/trailing-dot까지 canonicalize하고 reserved `rollout-synthetic-*` public fixture 계약을 검증합니다. 새 전용 endpoint 대신 기존 authenticated host club-operations와 host session detail을 BFF로 읽어 protected club/slug/session과 exact content-free public marker/publication/privacy 계약을 검증하고 normalized response HMAC을 반환합니다. Cookie가 있는 ownership/revoke/reconciliation request와 unauthenticated public probe는 same-origin을 포함한 모든 redirect를 거부하고 exact final URL만 허용합니다. Helper-derived origin/BFF/CDN revoked URL과 CDN club/stable-session URL은 C1 Playwright에 exact expected URL env로 전달되며, C1은 response final URL을 별도로 확인해야 합니다. Idempotency identifier는 secret input이 아니라 GitHub run/attempt에서 exact `[A-Za-z0-9._-]{8,128}` grammar로 파생합니다. Prime은 C1 `@prechange` Playwright를 직접 실행하며 PASS report를 만들지 않습니다. Helper는 공개 HTTP cache와 C1 nonce marker/state만 deterministic tar로 옮기고 cookie, token, link, traversal, 특수 파일, oversized transport를 거부합니다. 이후 job은 GitHub의 실제 numeric artifact ID를 사용하고, tar를 no-follow single-read한 뒤 transport/profile/state digest와 target/boundary/synthetic-marker/ownership-response HMAC을 extraction 전에 모두 검증합니다. C1 state의 `artifactId`는 upload 전에 정할 수 있는 run/attempt-bound profile identity이고, attested manifest의 `cacheTransport.artifactId`는 upload 후 GitHub가 반환한 numeric transport artifact ID입니다. Partial/combined report와 producer run/attempt도 같은 profile identity를 가져야 하며, 두 identity와 redacted HMAC, sanitized mutation receipt digest가 함께 묶이지 않으면 실패합니다.
+
+`host-rollout-workflow-contract.json`은 `ci.yml`, rollout orchestrator, config sync, front/server deploy workflow의 supported parsed YAML AST 전체를 고정합니다. 따라서 trigger, permissions, concurrency, job/step 순서와 identity, environment, exact action/reusable-workflow pin, 모든 `run` script 변경은 review된 digest와 다르면 fail closed입니다. Workflow를 의도적으로 바꿀 때는 executable diff를 먼저 review하고 아래 read-only 명령의 출력을 확인한 뒤 해당 workflow의 digest만 수동으로 contract에 반영합니다. Schema를 의도적으로 바꿀 때도 schema diff를 별도로 review하고 platform checksum 명령으로 확인한 값을 `WORKFLOW_CONTRACT_SCHEMA_DIGEST`에 수동 반영합니다. Checker는 contract나 schema를 자동 생성하거나 수정하지 않습니다.
+
+```bash
+python3 -B scripts/check-host-client-rollout-contract.py --print-workflow-digests
+python3 -B scripts/check-host-client-rollout-contract.py --self-test
+python3 -B scripts/check-host-client-rollout-contract.py
+```
+
+`verify-host-client-rollout-evidence.py`는 별도로 전달된 manifest와 attestation bundle만 받습니다. JSON Schema와 exact command/case/provenance allowlist를 먼저 검사하고, GitHub 공식 release checksum으로 고정한 `gh` binary가 `gh attestation verify`에 성공한 JSON만 추가 policy input으로 사용합니다. Python은 signature, certificate chain, transparency log, timestamp authority를 재구현하지 않습니다. GitHub CLI download/checksum/trust root/network/verified timestamp 중 하나라도 사용할 수 없으면 실패합니다.
+
+세 artifact를 결합하는 live-evidence mode는 protected `host-client-rollout-evidence` no-input manual workflow가 직접 생성·attest한 manifest/bundle, structured reporter artifact, protected SHA와 exact job digest만 내려받은 뒤 실행합니다. `workflow_dispatch` evidence input은 없고 manifest/digest/SHA/tag/time을 받지 않습니다. Pages identity는 upload container digest가 아니라 deterministic candidate tar 자체의 SHA-256이며 final checker가 그 tar의 별도 attestation까지 검증합니다. R2a cache manifest, R2b compatibility manifest, R2b security manifest의 실제 호출 형식은 [release publish runbook](../docs/deploy/release-publish-runbook.md#host-client-v3-staged-rollout)을 따릅니다. 구조 checker 통과는 live evidence, 배포, 720초 대기, 24시간 adoption 관측을 수행했다는 뜻이 아닙니다.
+
 ## `check-flyway-migration-immutability.py`
 
 기준 commit에 존재하는 production Flyway migration을 현재 worktree와 비교해 과거 SQL의 수정, 삭제,

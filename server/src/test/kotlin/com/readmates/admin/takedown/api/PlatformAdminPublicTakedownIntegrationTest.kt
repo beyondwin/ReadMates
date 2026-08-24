@@ -524,15 +524,20 @@ class PlatformAdminPublicTakedownIntegrationTest(
             CLUB_ID,
             SESSION_ID,
         )
+        jdbcTemplate.update(
+            """
+            insert into public_projection_current (
+              session_id, club_id, publication_id_snapshot, generation, club_generation,
+              live_record_revision, origin_readable, convergence_id
+            ) values (?, ?, ?, 7, 1, 1, true, null)
+            """.trimIndent(),
+            SESSION_ID,
+            CLUB_ID,
+            PUBLICATION_ID,
+        )
     }
 
     private fun cleanupFixture() {
-        jdbcTemplate.update(
-            """
-            delete from public_convergence_events
-            where convergence_id in (select convergence_id from admin_public_takedown_receipts)
-            """.trimIndent(),
-        )
         jdbcTemplate.update(
             """
             delete from public_convergence_work
@@ -553,6 +558,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
                 "where event_type = 'EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED'",
         )
         listOf(
+            "delete from public_projection_current where publication_id_snapshot = ?",
             "delete from public_projection_generations where publication_id = ?",
             "delete from public_session_publications where id = ?",
         ).forEach { sql -> jdbcTemplate.update(sql, PUBLICATION_ID) }

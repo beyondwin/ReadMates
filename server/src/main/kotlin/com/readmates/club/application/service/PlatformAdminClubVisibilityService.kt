@@ -13,6 +13,8 @@ import com.readmates.club.application.port.`in`.ConfirmPlatformAdminClubVisibili
 import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubVisibilityUseCase
 import com.readmates.club.application.port.out.LoadPlatformAdminClubCommandPreviewResult
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
+import com.readmates.club.application.port.out.ClubPublicProjectionMutation
+import com.readmates.club.application.port.out.ClubPublicProjectionMutationPort
 import com.readmates.club.application.port.out.LockedPlatformAdminClubVisibilityState
 import com.readmates.club.application.port.out.PlatformAdminClubCommandPort
 import com.readmates.club.application.port.out.PlatformAdminClubVisibilityLockPort
@@ -45,6 +47,7 @@ class PlatformAdminClubVisibilityService(
     private val idempotencyService: AdminCommandIdempotencyService,
     private val properties: AdminCommandIdempotencyProperties,
     private val clock: Clock,
+    private val publicProjection: ClubPublicProjectionMutationPort = ClubPublicProjectionMutationPort.Noop(),
 ) : PreviewPlatformAdminClubVisibilityUseCase,
     ConfirmPlatformAdminClubVisibilityUseCase {
     override fun previewVisibility(
@@ -135,6 +138,7 @@ class PlatformAdminClubVisibilityService(
                 LoadPlatformAdminClubCommandPreviewResult.CommandMismatch -> fail(PlatformAdminError.PREVIEW_MISMATCH)
             }
         validatePreview(preview, admin, clubId, command, identity, request)
+        val exposureLock = publicProjection.lockForExposure(clubId)
         val current =
             visibilityLockPort.lockVisibilityState(
                 clubId,
@@ -146,6 +150,15 @@ class PlatformAdminClubVisibilityService(
             VisibilityPolicy.storedReceipt(
                 commandPort.storeVisibility(storeCommand(preview, current, admin, claim)),
             )
+        publicProjection.record(
+            ClubPublicProjectionMutation(
+                clubId = clubId,
+                actorUserId = admin.adminId,
+                operation = "PLATFORM_CLUB_EXPOSURE_UPDATED",
+                exposureChanged = true,
+                exposureLock = exposureLock,
+            ),
+        )
         complete(claim, receipt)
         return receipt
     }

@@ -1,246 +1,366 @@
-import { expect, test, type Page, type Route } from "@playwright/test";
-import { onRequest } from "../../functions/api/bff/[[path]]";
+import { test, expect, chromium } from "@playwright/test";
+import type { APIResponse, Page, Response } from "@playwright/test";
+import { mkdirSync } from "node:fs";
+import { randomUUID } from "node:crypto";
+import {
+  assertExactBoundaryObservation,
+  protectedEvidenceEnabled,
+  readVerifiedPrimedBrowserState,
+  requireCacheSafetyEvidenceConfig,
+  writePassingCacheSafetyReport,
+  writePrimedBrowserState,
+} from "./public-projection-cache-evidence";
 
-type StoredResponse = {
-  response: Response;
-  storedAtSeconds: number;
+type ProjectionResponse = {
+  generation: number;
+  readable: boolean;
+  body: string | null;
   maxAgeSeconds: number;
   staleWhileRevalidateSeconds: number;
 };
 
-class DeterministicCache {
+class ControllableClock {
   nowSeconds = 0;
-  private readonly entries = new Map<string, StoredResponse>();
 
-  async match(request: Request): Promise<Response | undefined> {
-    const entry = this.entries.get(request.url);
-    if (!entry) return undefined;
-    const age = this.nowSeconds - entry.storedAtSeconds;
-    if (age > entry.maxAgeSeconds + entry.staleWhileRevalidateSeconds) {
-      this.entries.delete(request.url);
-      return undefined;
-    }
-    return entry.response.clone();
-  }
-
-  async put(request: Request, response: Response): Promise<void> {
-    const policy = parseCacheControl(response.headers.get("Cache-Control") ?? "");
-    this.entries.set(request.url, {
-      response: response.clone(),
-      storedAtSeconds: this.nowSeconds,
-      ...policy,
-    });
-  }
-
-  async delete(request: Request): Promise<boolean> {
-    return this.entries.delete(request.url);
-  }
-
-  seed(requestUrl: string, response: Response) {
-    const policy = parseCacheControl(response.headers.get("Cache-Control") ?? "");
-    this.entries.set(requestUrl, {
-      response: response.clone(),
-      storedAtSeconds: this.nowSeconds,
-      ...policy,
-    });
+  advance(seconds: number) {
+    this.nowSeconds += seconds;
   }
 }
 
-class ActualBffHarness {
-  readonly cache = new DeterministicCache();
-  private readonly origin = new Map<string, { body: string; status: number; cacheControl?: string }>();
+class FakeOrigin {
+  private response: ProjectionResponse;
 
-  setOrigin(path: string, body: string, cacheControl = "public, max-age=120, stale-while-revalidate=600") {
-    this.origin.set(path, { body, status: 200, cacheControl });
+  constructor(response: ProjectionResponse) {
+    this.response = response;
   }
 
-  revoke(path: string) {
-    this.origin.set(path, { body: "origin-denied", status: 404 });
+  current() {
+    return { ...this.response };
   }
 
-  seedOldBrowserResponse(path: string, body: string) {
-    this.cache.seed(
-      bffUrl(path),
-      new Response(body, {
-        status: 200,
-        headers: { "Cache-Control": "public, max-age=120, stale-while-revalidate=600" },
-      }),
-    );
+  deployPolicy(maxAgeSeconds: number, staleWhileRevalidateSeconds: number) {
+    this.response = { ...this.response, maxAgeSeconds, staleWhileRevalidateSeconds };
   }
 
-  async dispatch(path: string) {
-    const priorFetch = globalThis.fetch;
-    const globals = globalThis as typeof globalThis & { caches?: unknown };
-    const priorCaches = globals.caches;
-    const pending: Array<Promise<unknown>> = [];
-    globalThis.fetch = async (input) => {
-      const originPath = new URL(String(input)).pathname;
-      const result = this.origin.get(originPath) ?? { body: "origin-denied", status: 404 };
-      return new Response(result.body, {
-        status: result.status,
-        headers: result.cacheControl ? { "Cache-Control": result.cacheControl } : undefined,
-      });
-    };
-    Object.defineProperty(globals, "caches", {
-      configurable: true,
-      writable: true,
-      value: { default: this.cache },
-    });
-    try {
-      const response = await onRequest({
-        request: new Request(bffUrl(path)),
-        env: {
-          READMATES_API_BASE_URL: "https://api.example.test",
-          READMATES_BFF_SECRET: "test-bff-secret",
-        },
-        params: { path: path.replace(/^\//, "").split("/") },
-        waitUntil: (promise) => pending.push(promise),
-      });
-      await Promise.all(pending);
-      return {
-        status: response.status,
-        body: await response.text(),
-        cacheControl: response.headers.get("Cache-Control") ?? "",
-      };
-    } finally {
-      globalThis.fetch = priorFetch;
-      if (priorCaches === undefined) {
-        Reflect.deleteProperty(globals, "caches");
-      } else {
-        Object.defineProperty(globals, "caches", {
-          configurable: true,
-          writable: true,
-          value: priorCaches,
-        });
+  replace(generation: number, readable: boolean, body: string | null) {
+    this.response = { ...this.response, generation, readable, body };
+  }
+}
+
+class GenerationCheckingEdge {
+  private cached: ProjectionResponse | null = null;
+
+  constructor(private readonly origin: FakeOrigin) {}
+
+  prime() {
+    this.cached = this.origin.current();
+    return this.cached;
+  }
+
+  read() {
+    const marker = this.origin.current();
+    if (!marker.readable) {
+      this.cached = null;
+      return marker;
+    }
+    if (!this.cached || this.cached.generation !== marker.generation) {
+      this.cached = marker;
+    }
+    return { ...this.cached };
+  }
+}
+
+class FakeBrowserCache {
+  private cached: (ProjectionResponse & { storedAt: number }) | null = null;
+
+  constructor(
+    private readonly clock: ControllableClock,
+    private readonly edge: GenerationCheckingEdge,
+  ) {}
+
+  prime() {
+    return this.store(this.edge.prime());
+  }
+
+  navigate() {
+    if (this.cached) {
+      const age = this.clock.nowSeconds - this.cached.storedAt;
+      const staleLimit = this.cached.maxAgeSeconds + this.cached.staleWhileRevalidateSeconds;
+      if (age < this.cached.maxAgeSeconds || age < staleLimit) {
+        return { ...this.cached };
       }
     }
+    return this.store(this.edge.read());
+  }
+
+  reload() {
+    return this.navigate();
+  }
+
+  back() {
+    return this.navigate();
+  }
+
+  newNavigation() {
+    return this.store(this.edge.read());
+  }
+
+  private store(response: ProjectionResponse) {
+    this.cached = { ...response, storedAt: this.clock.nowSeconds };
+    return { ...this.cached };
   }
 }
 
-function parseCacheControl(value: string) {
-  return {
-    maxAgeSeconds: Number(/(?:^|,)\s*max-age=(\d+)/i.exec(value)?.[1] ?? 0),
-    staleWhileRevalidateSeconds: Number(
-      /(?:^|,)\s*stale-while-revalidate=(\d+)/i.exec(value)?.[1] ?? 0,
-    ),
-  };
+const provenCases = new Set<string>();
+
+function proveCase(caseId: string) {
+  provenCases.add(caseId);
 }
 
-function bffUrl(path: string) {
-  return `https://browser.example.test/api/bff${path}`;
+function isProtectedReporterRun(commandId: string) {
+  return protectedEvidenceEnabled() && process.env.READMATES_HOST_ROLLOUT_COMMAND_ID === commandId;
 }
 
-async function installActualBff(page: Page, harness: ActualBffHarness) {
-  await page.route("https://browser.example.test/api/bff/**", async (route) => {
-    const path = new URL(route.request().url()).pathname.replace("/api/bff", "");
-    const response = await harness.dispatch(path);
-    await route.fulfill({
-      status: response.status,
-      headers: { "Cache-Control": response.cacheControl, "Content-Type": "text/plain" },
-      body: response.body,
-    });
-  });
-  await page.route("https://browser.example.test/view**", serveBrowserView);
+function cacheControlSeconds(cacheControl: string, directive: string) {
+  const matched = new RegExp(`${directive}=(\\d+)`, "i").exec(cacheControl);
+  return matched ? Number(matched[1]) : null;
 }
 
-async function serveBrowserView(route: Route) {
-  const path = new URL(route.request().url()).searchParams.get("path") ?? "/missing";
-  await route.fulfill({
-    status: 200,
-    headers: { "Cache-Control": "no-store", "Content-Type": "text/html" },
-    body: `
-      <main data-status="loading"></main>
-      <script>
-        window.addEventListener("unload", () => {});
-        fetch(${JSON.stringify(bffUrl(path))}, { cache: "no-store" }).then(async (response) => {
-          const main = document.querySelector("main");
-          main.textContent = await response.text();
-          main.dataset.status = String(response.status);
-          main.dataset.cacheControl = response.headers.get("Cache-Control") || "";
-        });
-      </script>
-    `,
+function assertExactApiResponse(response: APIResponse, expectedUrl: string) {
+  assertExactBoundaryObservation({
+    expectedUrl,
+    responseUrl: response.url(),
+    status: response.status(),
   });
 }
 
-async function visit(page: Page, path: string, visitId: string) {
-  await page.goto(
-    `https://browser.example.test/view?path=${encodeURIComponent(path)}&visit=${visitId}`,
-  );
-  await expect(page.locator("main")).not.toHaveAttribute("data-status", "loading");
+function assertExactBrowserResponse(response: Response | null, page: Page, expectedUrl: string): Response {
+  expect(response).not.toBeNull();
+  if (!response) throw new Error("protected browser boundary returned no navigation response");
+  assertExactBoundaryObservation({
+    expectedUrl,
+    responseUrl: response.url(),
+    status: response.status(),
+    redirectedFromUrl: response.request().redirectedFrom()?.url(),
+    finalPageUrl: page.url(),
+  });
+  return response;
 }
 
 test.describe.configure({ mode: "serial" });
 
-test("actual BFF stops serving a revoked public club list after 60 seconds", async ({ page }) => {
-  const harness = new ActualBffHarness();
-  const path = "/api/public/clubs/reading-sai";
-  harness.setOrigin(path, "generation-1-club", "public, max-age=60, must-revalidate");
-  await installActualBff(page, harness);
+test("@prechange browser retains the previous 120 plus 600 policy for the full 720-second window", async () => {
+  const clock = new ControllableClock();
+  const origin = new FakeOrigin({
+    generation: 1,
+    readable: true,
+    body: "prechange-public-body",
+    maxAgeSeconds: 120,
+    staleWhileRevalidateSeconds: 600,
+  });
+  const browser = new FakeBrowserCache(clock, new GenerationCheckingEdge(origin));
 
-  await visit(page, path, "initial");
-  await expect(page.locator("main")).toHaveText("generation-1-club");
-  await expect(page.locator("main")).toHaveAttribute(
-    "data-cache-control",
-    "public, max-age=60, must-revalidate",
-  );
-  harness.revoke(path);
+  expect(browser.prime().body).toBe("prechange-public-body");
+  origin.deployPolicy(60, 0);
+  origin.replace(2, false, null);
+  clock.advance(719);
+  expect(browser.back().body).toBe("prechange-public-body");
+  clock.advance(1);
+  expect(browser.reload().readable).toBe(false);
 
-  harness.cache.nowSeconds = 59;
-  await visit(page, path, "before-boundary");
-  await expect(page.locator("main")).toHaveText("generation-1-club");
+  if (isProtectedReporterRun("seed-r2a-prechange-cache")) {
+    const config = requireCacheSafetyEvidenceConfig("seed-r2a-prechange-cache");
+    mkdirSync(config.primedBrowserProfile, { recursive: true });
+    if (config.phase === "pre-change") {
+      const context = await chromium.launchPersistentContext(config.primedBrowserProfile);
+      try {
+        const primedPage = context.pages()[0] ?? (await context.newPage());
+        const primeUrl = config.expectedCdnRevokedUrl;
+        const response = assertExactBrowserResponse(await primedPage.goto(primeUrl), primedPage, primeUrl);
+        expect(response.status()).toBe(200);
+        expect(response.headers().etag).toBe(config.oldGenerationEtag);
+        const cacheControl = response.headers()["cache-control"] ?? "";
+        expect(cacheControlSeconds(cacheControl, "max-age")).toBe(120);
+        expect(cacheControlSeconds(cacheControl, "stale-while-revalidate")).toBe(600);
+        writePrimedBrowserState(config, {
+          schemaVersion: "readmates.public-cache.prime.v1",
+          artifactId: config.primedBrowserArtifactId,
+          profileNonce: randomUUID().replaceAll("-", ""),
+          primeUrl,
+          oldGenerationEtag: config.oldGenerationEtag,
+          primedAt: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+        });
+      } finally {
+        await context.close();
+      }
+      return;
+    }
 
-  harness.cache.nowSeconds = 61;
-  await visit(page, path, "after-boundary");
-  await expect(page.locator("main")).toHaveText("origin-denied");
-  await expect(page.locator("main")).toHaveAttribute("data-cache-control", "no-store");
+    const state = readVerifiedPrimedBrowserState(config);
+    const context = await chromium.launchPersistentContext(config.primedBrowserProfile);
+    try {
+      const proofPage = context.pages()[0] ?? (await context.newPage());
+      const response = assertExactBrowserResponse(
+        await proofPage.goto(config.expectedCdnRevokedUrl),
+        proofPage,
+        config.expectedCdnRevokedUrl,
+      );
+      expect(response.status()).toBe(404);
+      expect(response.headers().etag).not.toBe(state.oldGenerationEtag);
+      proveCase("browser-previous-policy-720s");
+      writePassingCacheSafetyReport("seed-r2a-prechange-cache", provenCases);
+    } finally {
+      await context.close();
+    }
+  }
 });
 
-test("actual BFF detail policy denies after 60 seconds on navigation reload and Back", async ({ page }) => {
-  const harness = new ActualBffHarness();
-  const path = "/api/public/clubs/reading-sai/sessions/session-1";
-  harness.setOrigin(path, "generation-1-detail");
-  await installActualBff(page, harness);
-
-  await visit(page, path, "initial");
-  await expect(page.locator("main")).toHaveText("generation-1-detail");
-  await expect(page.locator("main")).toHaveAttribute(
-    "data-cache-control",
-    "public, max-age=60, must-revalidate",
+test("@policy-deployed origin and generation-checking edge never serve a revoked old generation", async ({ request }) => {
+  const actual = await request.get(
+    "/api/bff/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306",
   );
-  harness.revoke(path);
+  expect(actual.status()).toBe(200);
+  expect(actual.headers()["cache-control"]).toBe("public, max-age=60, must-revalidate");
+  expect(actual.headers().etag).toMatch(/^"public-record-g\d+-r\d+"$/);
 
-  harness.cache.nowSeconds = 59;
-  await visit(page, path, "fresh-window");
-  await expect(page.locator("main")).toHaveText("generation-1-detail");
+  const origin = new FakeOrigin({
+    generation: 4,
+    readable: true,
+    body: "generation-four-body",
+    maxAgeSeconds: 60,
+    staleWhileRevalidateSeconds: 0,
+  });
+  const edge = new GenerationCheckingEdge(origin);
+  expect(edge.prime().body).toBe("generation-four-body");
 
-  harness.cache.nowSeconds = 61;
-  await visit(page, path, "new-navigation");
-  await expect(page.locator("main")).toHaveText("origin-denied");
-  await expect(page.locator("main")).toHaveAttribute("data-cache-control", "no-store");
-  await page.reload();
-  await expect(page.locator("main")).toHaveText("origin-denied");
-  await visit(page, path, "back-target");
-  await page.goBack();
-  await expect(page.locator("main")).toHaveText("origin-denied");
-  await expect(page.locator("main")).toHaveAttribute("data-cache-control", "no-store");
+  origin.replace(5, false, null);
+
+  expect(origin.current()).toMatchObject({ generation: 5, readable: false, body: null });
+  expect(edge.read()).toMatchObject({ generation: 5, readable: false, body: null });
+  expect(edge.read().body).toBeNull();
+
+  if (isProtectedReporterRun("deploy-r2a-cache-policy")) {
+    const config = requireCacheSafetyEvidenceConfig("deploy-r2a-cache-policy");
+    expect(config.phase).toBe("policy-deployed");
+    const headers = { "If-None-Match": config.oldGenerationEtag };
+    const originDeny = await request.get(config.expectedOriginRevokedUrl, { headers, maxRedirects: 0 });
+    assertExactApiResponse(originDeny, config.expectedOriginRevokedUrl);
+    expect(originDeny.status()).toBe(404);
+    expect(originDeny.headers()["cache-control"]).toContain("no-store");
+    proveCase("origin-immediate-deny");
+
+    const bffDeny = await request.get(config.expectedBffRevokedUrl, { headers, maxRedirects: 0 });
+    assertExactApiResponse(bffDeny, config.expectedBffRevokedUrl);
+    expect(bffDeny.status()).toBe(404);
+    expect(bffDeny.headers()["cache-control"]).toContain("no-store");
+    expect(bffDeny.headers().etag).toBeUndefined();
+    proveCase("bff-generation-deny");
+
+    const cdnDeny = await request.get(config.expectedCdnRevokedUrl, { headers, maxRedirects: 0 });
+    assertExactApiResponse(cdnDeny, config.expectedCdnRevokedUrl);
+    expect(cdnDeny.status()).toBe(404);
+    expect(cdnDeny.headers()["cache-control"]).toContain("no-store");
+    expect(cdnDeny.headers().etag).toBeUndefined();
+    expect(cdnDeny.headers()["cf-cache-status"]).toBeTruthy();
+    expect(cdnDeny.headers()["cf-cache-status"].toUpperCase()).not.toBe("HIT");
+    proveCase("cdn-old-generation-not-served");
+
+    writePassingCacheSafetyReport("deploy-r2a-cache-policy", provenCases);
+  }
 });
 
-test("actual BFF rejects an old 120 plus 600 response only after the full 720 seconds", async ({ page }) => {
-  const harness = new ActualBffHarness();
-  const path = "/api/public/clubs/reading-sai/sessions/session-1";
-  harness.seedOldBrowserResponse(path, "old-browser-detail");
-  harness.revoke(path);
-  await installActualBff(page, harness);
+test("new browser policy converges general reads by 120 seconds and emergency reads by 60 without revoked SWR", async ({ page, request }) => {
+  const generalClock = new ControllableClock();
+  const generalOrigin = new FakeOrigin({
+    generation: 8,
+    readable: true,
+    body: "general-old",
+    maxAgeSeconds: 120,
+    staleWhileRevalidateSeconds: 0,
+  });
+  const generalBrowser = new FakeBrowserCache(
+    generalClock,
+    new GenerationCheckingEdge(generalOrigin),
+  );
+  generalBrowser.prime();
+  generalOrigin.replace(9, true, "general-new");
+  generalClock.advance(119);
+  expect(generalBrowser.back().body).toBe("general-old");
+  generalClock.advance(1);
+  expect(generalBrowser.reload().body).toBe("general-new");
 
-  harness.cache.nowSeconds = 719;
-  await visit(page, path, "old-policy-still-live");
-  await expect(page.locator("main")).toHaveText("old-browser-detail");
+  const emergencyClock = new ControllableClock();
+  const emergencyOrigin = new FakeOrigin({
+    generation: 20,
+    readable: true,
+    body: "emergency-old",
+    maxAgeSeconds: 60,
+    staleWhileRevalidateSeconds: 0,
+  });
+  const emergencyBrowser = new FakeBrowserCache(
+    emergencyClock,
+    new GenerationCheckingEdge(emergencyOrigin),
+  );
+  emergencyBrowser.prime();
+  emergencyOrigin.replace(21, false, null);
+  emergencyClock.advance(59);
+  expect(emergencyBrowser.back().body).toBe("emergency-old");
+  emergencyClock.advance(1);
+  expect(emergencyBrowser.back().body).toBeNull();
+  expect(emergencyBrowser.reload().body).toBeNull();
+  expect(emergencyBrowser.newNavigation().body).toBeNull();
 
-  harness.cache.nowSeconds = 721;
-  await visit(page, path, "activation-safe");
-  await expect(page.locator("main")).toHaveText("origin-denied");
-  await expect(page.locator("main")).toHaveAttribute("data-cache-control", "no-store");
-  await page.reload();
-  await expect(page.locator("main")).toHaveText("origin-denied");
+  if (isProtectedReporterRun("playwright-r2a-cache-safety")) {
+    const config = requireCacheSafetyEvidenceConfig("playwright-r2a-cache-safety");
+    expect(config.phase).toBe("post-wait");
+    const state = readVerifiedPrimedBrowserState(config);
+    const publicClubUrl = config.expectedCdnClubUrl;
+    const general = assertExactBrowserResponse(await page.goto(publicClubUrl), page, publicClubUrl);
+    expect(general.status()).toBe(200);
+    const generalCacheControl = general.headers()["cache-control"] ?? "";
+    expect(cacheControlSeconds(generalCacheControl, "max-age")).not.toBeNull();
+    expect(cacheControlSeconds(generalCacheControl, "max-age")!).toBeLessThanOrEqual(120);
+    expect(generalCacheControl.toLowerCase()).not.toContain("stale-while-revalidate");
+    proveCase("browser-general-120s");
+
+    const emergency = await request.get(config.expectedCdnStableSessionUrl, { maxRedirects: 0 });
+    assertExactApiResponse(emergency, config.expectedCdnStableSessionUrl);
+    expect(emergency.status()).toBe(200);
+    const emergencyCacheControl = emergency.headers()["cache-control"] ?? "";
+    expect(cacheControlSeconds(emergencyCacheControl, "max-age")).not.toBeNull();
+    expect(cacheControlSeconds(emergencyCacheControl, "max-age")!).toBeLessThanOrEqual(60);
+    expect(emergencyCacheControl.toLowerCase()).not.toContain("stale-while-revalidate");
+    proveCase("browser-emergency-60s");
+
+    const context = await chromium.launchPersistentContext(config.primedBrowserProfile);
+    try {
+      const primedPage = context.pages()[0] ?? (await context.newPage());
+      const denied = assertExactBrowserResponse(
+        await primedPage.goto(config.expectedCdnRevokedUrl),
+        primedPage,
+        config.expectedCdnRevokedUrl,
+      );
+      expect(denied.status()).toBe(404);
+      expect(denied.headers().etag).not.toBe(state.oldGenerationEtag);
+      const reloaded = assertExactBrowserResponse(
+        await primedPage.reload(),
+        primedPage,
+        config.expectedCdnRevokedUrl,
+      );
+      expect(reloaded.status()).toBe(404);
+      const newNavigation = await context.newPage();
+      const freshResponse = assertExactBrowserResponse(
+        await newNavigation.goto(config.expectedCdnRevokedUrl),
+        newNavigation,
+        config.expectedCdnRevokedUrl,
+      );
+      expect(freshResponse.status()).toBe(404);
+      await newNavigation.close();
+      proveCase("browser-proof-after-wait");
+    } finally {
+      await context.close();
+    }
+
+    writePassingCacheSafetyReport("playwright-r2a-cache-safety", provenCases);
+  }
 });

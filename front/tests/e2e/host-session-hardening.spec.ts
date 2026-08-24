@@ -68,7 +68,7 @@ async function openWorkspacePanel(
       await closeWorkspaceSheets(page);
       await trigger.click();
     }
-    await expect(page.getByLabel("세션 제목")).toBeVisible();
+    await expect(page.getByLabel("모임 제목")).toBeVisible();
     return;
   }
   if (name === "변경 기록") {
@@ -704,8 +704,8 @@ test("three reverse transitions record reason and history", async ({ page }) => 
   await expectHistoryReason(page, closedId, "REOPENED", "MEETING_RESCHEDULED", "모임 일정이 바뀜");
 
   await openHostSession(page, publishedId);
-  await page.getByRole("button", { name: "공개 취소" }).click();
-  await confirmReverse(page, "공개 취소", "CONTENT_CORRECTION");
+  await page.getByRole("button", { name: "게스트·멤버 노트에서 기록 내리기" }).click();
+  await confirmReverse(page, "게스트·멤버 노트에서 기록 내리기", "CONTENT_CORRECTION");
   await expectHistoryReason(page, publishedId, "UNPUBLISHED", "CONTENT_CORRECTION", "내용을 바로잡기 위함");
 });
 
@@ -729,7 +729,7 @@ test("previous online meeting secrets stay out of create until explicit adoption
   });
   try {
     await page.goto(`${HOST_PATH}/sessions/new`);
-    await expect(page.getByLabel("세션 제목")).toBeVisible();
+    await expect(page.getByLabel("모임 제목")).toBeVisible();
     await expect(page.getByRole("button", { name: "이전 온라인 모임 정보 사용" })).toBeVisible();
     await expect(page.getByLabel("미팅 URL")).toHaveValue("");
     await expect(page.getByLabel("Passcode · 선택")).toHaveValue("");
@@ -738,11 +738,11 @@ test("previous online meeting secrets stay out of create until explicit adoption
       hostOperationTelemetryTypes(telemetry.payloads).includes("HOST_SCHEDULE_DEFAULTS")
     )).toBe(true);
 
-    await page.getByLabel("세션 제목").fill("명시적 채택 모임");
+    await page.getByLabel("모임 제목").fill("명시적 채택 모임");
     await page.getByLabel("책 제목").fill("명시적 채택 책");
     await page.getByLabel("저자").fill("테스트 저자");
     await page.getByLabel("모임 날짜").fill("2026-07-01");
-    await page.locator("form#host-session-editor").getByRole("button", { name: "세션 문서 저장" }).click();
+    await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
     await expect.poll(() => creates.bodies.length).toBe(1);
     expect(creates.bodies).not.toContainEqual(expect.objectContaining({ meetingPasscode: FIXTURE_PASSCODE }));
     expect(JSON.stringify(creates.bodies)).not.toContain(FIXTURE_PASSCODE);
@@ -750,7 +750,7 @@ test("previous online meeting secrets stay out of create until explicit adoption
 
     await page.goto(`${HOST_PATH}/sessions/new`);
     await expect(page).toHaveURL(/\/sessions\/new/);
-    await expect(page.getByLabel("세션 제목")).toBeVisible();
+    await expect(page.getByLabel("모임 제목")).toBeVisible();
     await page.getByRole("button", { name: "이전 온라인 모임 정보 사용" }).click();
     await page.getByRole("button", { name: "현재 모임에 적용" }).click();
     await expect(page.getByLabel("Passcode · 선택")).toHaveValue(FIXTURE_PASSCODE);
@@ -797,7 +797,7 @@ test("home shows top-one attention and operations lists the full set including P
   const homeCountText = await page.getByText(/확인 필요 \d+건/).innerText();
   const homeCount = Number((homeCountText.match(/(\d+)/) ?? [])[1]);
   expect(homeCount).toBeGreaterThanOrEqual(4);
-  const homeRows = page.getByRole("list", { name: "확인 필요한 세션 기록" }).getByRole("listitem");
+  const homeRows = page.getByRole("list", { name: "확인 필요한 모임 기록" }).getByRole("listitem");
   await expect(homeRows).toHaveCount(1);
   await expect(homeRows.first()).toContainText("주의 공개 초안");
   await expect(page.getByRole("link", { name: "모두 보기" })).toBeVisible();
@@ -806,7 +806,7 @@ test("home shows top-one attention and operations lists the full set including P
   await expect(page).toHaveURL(/\/app\/host\/operations\/?$/);
   await expect(page.getByRole("heading", { name: "운영 허브" })).toBeVisible();
   await expect(page.getByText(`확인 필요 ${homeCount}건`)).toBeVisible();
-  const operationsList = page.getByRole("list", { name: "확인 필요한 세션 기록" });
+  const operationsList = page.getByRole("list", { name: "확인 필요한 모임 기록" });
   await expect(operationsList.getByText("주의 공개 초안")).toBeVisible();
   await expect(operationsList.getByText("주의 공개 미완")).toBeVisible();
   await expect(operationsList.getByText("주의 마감 초안")).toBeVisible();
@@ -938,7 +938,7 @@ test("legacy revision-zero applied summary publishes first revision as 1", async
   await openHostSession(page, sessionId);
   await openWorkspacePanel(page, "기록");
   await expect(page.getByLabel("멤버에게 보이는 기록").getByText(LEGACY_SUMMARY)).toBeVisible();
-  await expect(page.getByRole("button", { name: "기록 공개" }).locator("visible=true")).toBeEnabled();
+  await expect(page.getByRole("button", { name: "게스트·멤버 노트에 기록 게시" }).locator("visible=true")).toBeEnabled();
 
   await openWorkspacePanel(page, "기록");
   const sourceTabs = page.getByRole("tablist", { name: "초안 만들기" });

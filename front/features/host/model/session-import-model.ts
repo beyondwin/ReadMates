@@ -116,8 +116,8 @@ export function buildSessionImportCommitResult(
     tone: "success",
     title: "초안 저장 완료",
     message: committed.liveApplied
-      ? "가져온 세션 기록의 적용 상태를 다시 확인해 주세요."
-      : "가져온 세션 기록을 공유 초안으로 저장했습니다.",
+      ? "가져온 모임 기록의 적용 상태를 다시 확인해 주세요."
+      : "가져온 모임 기록을 공유 초안으로 저장했습니다.",
     visibilityLabel: recordVisibilityLabel(recordVisibility),
     items: [
       "공개 요약 초안 교체",
@@ -139,14 +139,14 @@ export function sessionImportFailureMessage(stage: SessionImportFailureStage): s
   }
 
   if (stage === "commit-permission") {
-    return "가져온 세션 기록 저장에 실패했습니다. 현재 클럽과 호스트 권한을 확인해 주세요.";
+    return "가져온 모임 기록 저장에 실패했습니다. 현재 클럽과 호스트 권한을 확인해 주세요.";
   }
 
   if (stage === "refresh") {
-    return "저장은 완료되었을 수 있습니다. 세션 문서를 새로 불러와 저장 결과를 확인해 주세요.";
+    return "저장은 완료되었을 수 있습니다. 모임 문서를 새로 불러와 저장 결과를 확인해 주세요.";
   }
 
-  return "가져온 세션 기록 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
+  return "가져온 모임 기록 저장에 실패했습니다. 네트워크 연결을 확인한 뒤 다시 시도해 주세요.";
 }
 
 export function buildSessionImportReview(
@@ -269,7 +269,7 @@ function buildSessionImportBlockingMessages(
   const messages: string[] = [];
 
   if (!isSaveableVisibility(recordVisibility)) {
-    messages.push("기록 공개 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.");
+    messages.push("기록 보기 범위를 MEMBER 또는 PUBLIC으로 바꾼 뒤 저장할 수 있습니다.");
   }
   if (!preview.feedbackDocument.valid) {
     messages.push("피드백 문서 구조를 확인해 주세요.");

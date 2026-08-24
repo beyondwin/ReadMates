@@ -21,6 +21,7 @@ test("MobileHeader keeps host workspace switching and the explicit account trigg
     <MemoryRouter initialEntries={["/app/host"]}>
       <MobileHeader
         variant="host"
+        workspaceAction={{ href: "/app", label: "멤버 공간", navigation: "push" }}
         accountControl={
           <button type="button" className="rm-account-menu__trigger" aria-label="아주 긴 호스트 이름 계정 메뉴">
             <span className="rm-account-menu__trigger-avatar" aria-hidden="true">
@@ -37,7 +38,7 @@ test("MobileHeader keeps host workspace switching and the explicit account trigg
 
   const account = header.getByRole("button", { name: "아주 긴 호스트 이름 계정 메뉴" });
   await expect(account).toContainText("계정");
-  await expect(header.getByRole("link", { name: "멤버 화면으로" })).toBeVisible();
+  await expect(header.getByRole("link", { name: "멤버 공간" })).toBeVisible();
   await expect(account).toHaveCSS("min-height", "44px");
   await expect(account.locator(".rm-avatar-chip")).toHaveAttribute("data-avatar-size-role", "navigation");
   expect((await account.locator(".rm-avatar-chip").boundingBox())?.width).toBe(36);

@@ -30,6 +30,10 @@ internal object SessionClosingStatusSql {
           sessions.state,
           sessions.visibility,
           sessions.access_scope,
+          sessions.session_revision,
+          sessions.participant_set_revision,
+          closing_participant.membership_id as attendance_membership_id,
+          closing_participant.attendance_revision,
           public_session_publications.public_summary,
           public_session_publications.is_public,
           public_session_publications.site_visibility,
@@ -56,8 +60,13 @@ internal object SessionClosingStatusSql {
         left join public_session_publications
           on public_session_publications.club_id = sessions.club_id
          and public_session_publications.session_id = sessions.id
+        left join session_participants closing_participant
+          on closing_participant.club_id = sessions.club_id
+         and closing_participant.session_id = sessions.id
+         and closing_participant.participation_status = 'ACTIVE'
         where sessions.id = ?
           and sessions.club_id = ?
+        order by closing_participant.membership_id
         """.trimIndent()
 
     val LATEST_NOTIFICATION_EVENT =
@@ -80,17 +89,24 @@ class JdbcSessionClosingStatusAdapter(
         host: CurrentMember,
         sessionId: UUID,
     ): SessionClosingSnapshot? {
-        val base =
+        val rows =
             jdbcTemplate
                 .query(
                     SessionClosingStatusSql.CLOSING_BASE,
-                    { rs, _ -> rs.toClosingBase(host.clubSlug) },
+                    { rs, _ -> rs.toClosingStatusRow(host.clubSlug) },
                     sessionId.dbString(),
                     host.clubId.dbString(),
-                ).firstOrNull()
+                )
+        val base =
+            rows.firstOrNull()?.snapshot
                 ?: return null
+        val attendanceSnapshotId =
+            "att:${rows.mapNotNull { it.attendanceVersion }.joinToString(",")}"
 
-        return base.copy(latestNotificationEvent = latestNotificationEvent(sessionId, host.clubId))
+        return base.copy(
+            latestNotificationEvent = latestNotificationEvent(sessionId, host.clubId),
+            attendanceSnapshotId = attendanceSnapshotId,
+        )
     }
 
     private fun latestNotificationEvent(
@@ -144,8 +160,23 @@ private fun ResultSet.toClosingBase(clubSlug: String): SessionClosingSnapshot {
         publicVisible = publicReady,
         publicRecordHref = if (publicReady) "/clubs/$clubSlug/sessions/$sessionId" else null,
         memberReflectionHref = "/clubs/$clubSlug/app/sessions/$sessionId",
+        sessionRevision = getLong("session_revision"),
+        participantSetRevision = getLong("participant_set_revision"),
     )
 }
+
+private fun ResultSet.toClosingStatusRow(clubSlug: String): SessionClosingStatusRow {
+    val membershipId = getString("attendance_membership_id")
+    return SessionClosingStatusRow(
+        snapshot = toClosingBase(clubSlug),
+        attendanceVersion = membershipId?.let { "$it:${getLong("attendance_revision")}" },
+    )
+}
+
+private data class SessionClosingStatusRow(
+    val snapshot: SessionClosingSnapshot,
+    val attendanceVersion: String?,
+)
 
 private fun String.toNotificationClosingStatus(): NotificationClosingStatus =
     when (this) {

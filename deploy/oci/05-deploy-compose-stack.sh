@@ -9,7 +9,8 @@ set -euo pipefail
 
 SSH_KEY="${SSH_KEY:-$HOME/.ssh/readmates_oci}"
 REMOTE_USER="${REMOTE_USER:-ubuntu}"
-SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-accept-new}"
+SSH_STRICT_HOST_KEY_CHECKING="${SSH_STRICT_HOST_KEY_CHECKING:-yes}"
+SSH_KNOWN_HOSTS="${SSH_KNOWN_HOSTS:?SSH_KNOWN_HOSTS must point to pinned known-host material}"
 APP_BASE_URL="${READMATES_APP_BASE_URL:-https://readmates.pages.dev}"
 IMAGE_TAG="${READMATES_SERVER_IMAGE:-readmates-server:local}"
 IMAGE_ARCHIVE="${TMPDIR:-/tmp}/readmates-server-image.tar"
@@ -24,7 +25,19 @@ ATTEMPT_STAGE="init"
 REMOTE_LEDGER="${READMATES_DEPLOY_LEDGER:-/var/log/readmates/deploy-attempts.jsonl}"
 LEDGER_FORMAT="${READMATES_LEDGER_FORMAT:-both}"
 
-SSH_OPTIONS=(-i "$SSH_KEY" -o "StrictHostKeyChecking=${SSH_STRICT_HOST_KEY_CHECKING}")
+if [[ "$SSH_STRICT_HOST_KEY_CHECKING" != "yes" ]]; then
+  echo "SSH_STRICT_HOST_KEY_CHECKING must be yes; TOFU modes are forbidden" >&2
+  exit 1
+fi
+if [[ ! -f "$SSH_KNOWN_HOSTS" || -L "$SSH_KNOWN_HOSTS" || ! -s "$SSH_KNOWN_HOSTS" ]]; then
+  echo "SSH_KNOWN_HOSTS must be a non-empty regular non-symlink file" >&2
+  exit 1
+fi
+SSH_OPTIONS=(
+  -i "$SSH_KEY"
+  -o "StrictHostKeyChecking=yes"
+  -o "UserKnownHostsFile=${SSH_KNOWN_HOSTS}"
+)
 trap on_deploy_error ERR
 
 require_file() {
@@ -283,6 +296,7 @@ if [ "$READMATES_RUN_POST_DEPLOY_WATCH" = "true" ]; then
   SSH_KEY="$SSH_KEY" \
   REMOTE_USER="$REMOTE_USER" \
   SSH_STRICT_HOST_KEY_CHECKING="$SSH_STRICT_HOST_KEY_CHECKING" \
+  SSH_KNOWN_HOSTS="$SSH_KNOWN_HOSTS" \
   READMATES_DEPLOY_ATTEMPT_ID="$ATTEMPT_ID" \
   ./deploy/oci/watch-compose-post-deploy.sh
   remote_ledger_append "POST_DEPLOY_WATCH_PASSED" "RUNNING" "watch=true"

@@ -17,7 +17,7 @@ const urgentPace: ReadingPace = {
 const session: NonNullable<CurrentSessionReadPageData["currentSession"]> = {
   sessionId: "session-9",
   sessionNumber: 9,
-  title: "9회차 모임",
+  title: "No.9 모임",
   bookTitle: "돈의 심리학",
   bookAuthor: "모건 하우절",
   bookLink: null,
@@ -68,7 +68,7 @@ describe("MemberHomeNextActionPace", () => {
     );
     expect(screen.getByText(/질문 마감/)).toHaveClass("rm-member-session-card__deadline");
 
-    const sessionLink = screen.getByRole("link", { name: "세션 열기" });
+    const sessionLink = screen.getByRole("link", { name: "모임 열기" });
     expect(sessionLink).toHaveAttribute("href", "/app/session/current");
     expect(sessionLink.querySelector("path")).toHaveAttribute("d", "M9 5l7 7-7 7");
   });

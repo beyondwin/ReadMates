@@ -15,15 +15,44 @@ class SessionRecordErrorHandlerTest {
 
     @Test
     fun `maps record conflicts and invalid data to stable public codes`() {
-        assertRecordError(SessionRecordError.DRAFT_STALE, 409, "SESSION_RECORD_DRAFT_STALE")
-        assertRecordError(SessionRecordError.LIVE_STALE, 409, "SESSION_RECORD_LIVE_STALE")
-        assertRecordError(SessionRecordError.INVALID_RECORD, 422, "SESSION_RECORD_INVALID")
-        assertRecordError(SessionRecordError.SESSION_NOT_FOUND, 404, "SESSION_RECORD_NOT_FOUND")
-        assertRecordError(SessionRecordError.REVISION_NOT_FOUND, 404, "SESSION_RECORD_NOT_FOUND")
+        assertRecordError(SessionRecordError.DRAFT_STALE, 409, "SESSION_RECORD_DRAFT_STALE", "모임 기록 초안이 변경되었습니다.")
+        assertRecordError(SessionRecordError.LIVE_STALE, 409, "SESSION_RECORD_LIVE_STALE", "현재 모임 기록이 변경되었습니다.")
+        assertRecordError(SessionRecordError.INVALID_RECORD, 422, "SESSION_RECORD_INVALID", "모임 기록 내용을 확인해 주세요.")
+        assertRecordError(
+            SessionRecordError.SESSION_NOT_FOUND,
+            404,
+            "SESSION_RECORD_NOT_FOUND",
+            "요청한 모임 기록을 찾을 수 없습니다.",
+        )
+        assertRecordError(
+            SessionRecordError.REVISION_NOT_FOUND,
+            404,
+            "SESSION_RECORD_NOT_FOUND",
+            "요청한 모임 기록을 찾을 수 없습니다.",
+        )
         assertRecordError(
             SessionRecordError.PREVIEW_ALREADY_CONSUMED,
             409,
             "NOTIFICATION_PREVIEW_ALREADY_CONSUMED",
+            "이미 사용된 알림 확인입니다.",
+        )
+        assertRecordError(
+            SessionRecordError.APPLY_REQUEST_ALREADY_USED,
+            409,
+            "SESSION_RECORD_APPLY_REQUEST_ALREADY_USED",
+            "이미 사용된 모임 기록 반영 요청입니다.",
+        )
+        assertRecordError(
+            SessionRecordError.INVALID_APPLY_CONTRACT,
+            400,
+            "SESSION_RECORD_INVALID_APPLY_CONTRACT",
+            "모임 기록 반영 요청을 확인해 주세요.",
+        )
+        assertRecordError(
+            SessionRecordError.INVALID_REBASE_CONTRACT,
+            400,
+            "SESSION_RECORD_INVALID_REBASE_CONTRACT",
+            "모임 기록 초안 기준 요청을 확인해 주세요.",
         )
     }
 
@@ -46,9 +75,11 @@ class SessionRecordErrorHandlerTest {
             )
         assertThat(missingSession.statusCode.value()).isEqualTo(404)
         assertThat(missingSession.body?.code).isEqualTo("SESSION_RECORD_NOT_FOUND")
+        assertThat(missingSession.body?.message).isEqualTo("요청한 모임 기록을 찾을 수 없습니다.")
         val missingParent = handler.handleNotificationSessionNotFound()
         assertThat(missingParent.statusCode.value()).isEqualTo(404)
         assertThat(missingParent.body?.code).isEqualTo("SESSION_RECORD_NOT_FOUND")
+        assertThat(missingParent.body?.message).isEqualTo("요청한 모임 기록을 찾을 수 없습니다.")
         assertThat(NotificationSessionNotFoundException().message).isEqualTo("Notification session is missing")
     }
 
@@ -65,10 +96,12 @@ class SessionRecordErrorHandlerTest {
         error: SessionRecordError,
         status: Int,
         code: String,
+        message: String,
     ) {
         val response = handler.handleSessionRecord(SessionRecordException(error, "private detail"))
         assertThat(response.statusCode.value()).isEqualTo(status)
         assertThat(response.body?.code).isEqualTo(code)
+        assertThat(response.body?.message).isEqualTo(message)
         assertThat(response.body?.message).doesNotContain("private detail")
     }
 

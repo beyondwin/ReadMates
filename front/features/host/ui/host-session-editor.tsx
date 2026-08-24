@@ -33,6 +33,8 @@ import type {
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
 } from "@/features/host/model/host-session-workspace-navigation";
+import { readHostResponseJson } from "@/shared/api/host-authority-event";
+import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
   hostSessionTrashDeletedAtLabel,
@@ -171,7 +173,7 @@ type HostSessionRecordWorkflow = {
   onReverseLifecycle?: () => void;
 };
 
-const emptyManagementMessage = "세션을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
+const emptyManagementMessage = "모임을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
 
 async function runSessionLifecycleAction(
   actions: HostSessionEditorActions,
@@ -335,6 +337,51 @@ export default function HostSessionEditor({
     () => new Set(navigation.location.panel === "records" ? [navigation.location.source] : []),
   );
 
+  useEffect(() => {
+    if (!clubSlug) return;
+    return registerHostSensitiveState({
+      clubSlug,
+      resourceKey: `meeting-form-draft:${session?.sessionId ?? "new"}`,
+      clear: () => {
+        dispatch({ type: "CLEAR_SENSITIVE" });
+        setSaveState("idle");
+        setLifecycleSaveState("idle");
+        setLifecycleConfirm(null);
+        setLifecycleError(null);
+        setToast(null);
+      },
+    });
+  }, [clubSlug, session?.sessionId]);
+
+  useEffect(() => {
+    if (!clubSlug) return;
+    return registerHostSensitiveState({
+      clubSlug,
+      resourceKey: `record-draft:previews:${session?.sessionId ?? "new"}`,
+      clear: () => {
+        setDeleteModalOpen(false);
+        setDeletePreview(null);
+        setDeleteError(null);
+        setDeletePreviewLoading(false);
+        setDeleteSubmitting(false);
+        setSessionImportRequest(null);
+        setSessionImportPreview(null);
+        setSessionImportCommitResult(null);
+        setSessionImportStatus("idle");
+        setSessionImportError(null);
+        setTrashedSession(null);
+        setTrashRestoreState({
+          restoring: false,
+          success: false,
+          disabled: false,
+          disabledReason: null,
+          error: null,
+          conflict: null,
+        });
+      },
+    });
+  }, [clubSlug, session?.sessionId]);
+
   const sessionIdForAigen = session?.sessionId;
   const workspaceLocation = !session && navigation.location.panel === "focus"
     ? { panel: "basic" as const, source: navigation.location.source }
@@ -414,12 +461,13 @@ export default function HostSessionEditor({
     session,
     returnTarget,
     readmatesReturnState,
+    clubSlug,
   );
-  const editorTitle = isNewSession ? "세션 문서 만들기" : null;
+  const editorTitle = isNewSession ? "모임 문서 만들기" : null;
   const basicSaveLabel = saveState === "saving"
     ? "기본 정보를 저장하는 중"
     : isNewSession
-      ? "세션 문서 저장"
+      ? "모임 문서 저장"
       : "기본 정보 저장";
   const showReturnLink =
     returnTarget.href !== hostDashboardReturnTarget.href || returnTarget.label !== hostDashboardReturnTarget.label;
@@ -735,7 +783,7 @@ export default function HostSessionEditor({
         if (response.ok) {
           setSaveState("saved");
           if (isNewSession) {
-            const created = (await response.json()) as { sessionId: string };
+            const created = await readHostResponseJson<{ sessionId: string }>(response);
             globalThis.location.href = scopedHostSessionEditHref(created.sessionId, clubSlug);
             return;
           }
@@ -1298,7 +1346,7 @@ export default function HostSessionEditor({
                     ? "기본 정보를 저장하고 있습니다."
                     : saveState === "saved"
                       ? isNewSession
-                        ? "저장되었습니다. 세션 문서 편집 화면으로 이동합니다."
+                        ? "저장되었습니다. 모임 문서 편집 화면으로 이동합니다."
                         : "저장되었습니다."
                       : saveState === "error"
                         ? "저장에 실패했습니다. 입력값을 확인한 뒤 다시 시도하세요."
@@ -1506,7 +1554,7 @@ function MemberResponseSummary({
         <ul className="stack" style={{ "--stack": "8px", margin: 0, padding: 0, listStyle: "none" } as CSSProperties}>
           {active.map((attendee) => (
             <li key={attendee.membershipId} className="small">
-              {attendee.displayName} · RSVP {rsvpLabel(attendee.rsvpStatus)}
+              {attendee.displayName} · 참석 응답 {rsvpLabel(attendee.rsvpStatus)}
             </li>
           ))}
         </ul>

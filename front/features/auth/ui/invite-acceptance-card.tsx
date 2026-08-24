@@ -119,7 +119,7 @@ export default function InviteAcceptanceCard({
           {canAccept ? (
             <>
               <p className="small auth-card__next-step">
-                Google 인증이 끝나면 정식 멤버로 연결되고 현재 세션, RSVP, 질문과 서평 작성 권한이 열립니다.
+                Google 인증이 끝나면 정식 멤버로 연결되고 현재 모임, 참석 응답, 질문과 서평 작성 권한이 열립니다.
               </p>
               <div className="auth-card__actions auth-card__actions--primary">
                 <a className="btn btn-primary btn-lg" href={acceptHref}>

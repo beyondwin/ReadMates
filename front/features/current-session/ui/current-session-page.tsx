@@ -413,7 +413,7 @@ export function CurrentSessionBoard({
               <div className="row" style={{ alignItems: "flex-start", gap: "16px", minWidth: 0 }}>
                 <BookCover title={session.bookTitle} author={session.bookAuthor} imageUrl={session.bookImageUrl} width={72} />
                 <div style={{ minWidth: 0 }}>
-                  <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 세션" />
+                  <SessionTimingIdentity sessionNumber={session.sessionNumber} date={session.date} phaseLabel="이번 모임" />
                   <h1 className="h1 editorial" style={{ margin: "8px 0 4px" }}>
                     {session.bookTitle}
                   </h1>
@@ -433,9 +433,9 @@ export function CurrentSessionBoard({
         <section style={{ padding: "28px 0 24px" }} aria-labelledby="current-session-prep-heading">
           <div className="container">
             <div style={{ marginBottom: "18px" }}>
-              <span className="eyebrow">현재 세션</span>
+              <span className="eyebrow">현재 모임</span>
               <h2 id="current-session-prep-heading" className="h3 editorial" style={{ margin: "6px 0 0" }}>
-                세션 준비
+                모임 준비
               </h2>
               <p className="small" style={{ color: "var(--text-2)", margin: "6px 0 0" }}>
                 참석 여부, 읽은 분량, 질문을 모임 전에 정리합니다.
@@ -450,7 +450,7 @@ export function CurrentSessionBoard({
 
             <div className="ws-grid">
               <div className="stack" style={{ "--stack": "20px" } as CSSProperties}>
-                {!canWrite ? <ReadOnlyMemberNotice message={memberNotice?.message ?? "현재 세션은 읽기 전용입니다."} /> : null}
+                {!canWrite ? <ReadOnlyMemberNotice message={memberNotice?.message ?? "현재 모임은 읽기 전용입니다."} /> : null}
                 <fieldset
                   className="stack"
                   disabled={!canWrite}

@@ -120,6 +120,10 @@ class MutationIdempotencyService(
         payload: CanonicalMutationPayload,
         stored: MutationIdempotencyPort.StoredRow,
     ): MutationClaimResult {
+        if (stored.digest.canonicalSchemaVersion != payload.schemaVersion) {
+            metrics.claimOutcome("conflict")
+            throw IdempotencyKeyReusedException()
+        }
         val key =
             properties.keyBytes(stored.digest.digestKeyVersion)
                 ?: throw DigestKeyUnavailableException()
@@ -167,7 +171,13 @@ class MutationIdempotencyService(
     }
 
     private fun requireSupported(payload: CanonicalMutationPayload) {
-        if (payload.schemaVersion != CanonicalMutationPayload.CURRENT_SCHEMA_VERSION) {
+        val expected =
+            when (payload) {
+                is CanonicalMutationPayload.Exposure -> CanonicalMutationPayload.EXPOSURE_SCHEMA_VERSION
+                is CanonicalMutationPayload.Publication -> CanonicalMutationPayload.PUBLICATION_SCHEMA_VERSION
+                else -> CanonicalMutationPayload.CURRENT_SCHEMA_VERSION
+            }
+        if (payload.schemaVersion != expected) {
             throw UnsupportedCanonicalSchemaException()
         }
     }

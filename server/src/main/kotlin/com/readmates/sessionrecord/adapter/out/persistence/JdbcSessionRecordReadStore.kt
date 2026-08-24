@@ -28,6 +28,8 @@ internal class JdbcSessionRecordReadStore(
                     select s.state, s.visibility, s.access_scope,
                            coalesce(p.site_visibility, 'HIDDEN') as site_visibility,
                            s.number, s.book_title, s.session_date, s.updated_at,
+                           s.session_revision, s.exposure_revision,
+                           coalesce(pv.publication_revision, 0) as publication_revision,
                            coalesce((
                              select max(r.version)
                              from session_record_revisions r
@@ -36,6 +38,8 @@ internal class JdbcSessionRecordReadStore(
                     from active_sessions s
                     left join public_session_publications p
                       on p.club_id = s.club_id and p.session_id = s.id
+                    left join session_publication_versions pv
+                      on pv.session_id = s.id
                     where s.id = ? and s.club_id = ?
                     ${if (forUpdate) "for update" else ""}
                     """.trimIndent(),
@@ -80,7 +84,10 @@ internal class JdbcSessionRecordReadStore(
         jdbcTemplate
             .query(
                 """
-                select session_id, club_id, base_live_revision, base_session_updated_at,
+                select session_id, club_id, base_live_revision,
+                       base_session_revision, base_exposure_revision, base_publication_revision,
+                       base_vector_known,
+                       base_session_updated_at,
                        draft_revision, source, restored_from_revision_id,
                        snapshot_json, updated_by_membership_id, created_at, updated_at
                 from session_record_drafts

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { ExpectedSessionRevision, HostMutationEnvelope } from "./host-contracts";
 
 export const HOST_SESSION_CHANGE_KINDS = ["BASIC_INFO", "ATTENDANCE", "LIFECYCLE"] as const;
 export type HostSessionChangeKind = (typeof HOST_SESSION_CHANGE_KINDS)[number];
@@ -21,6 +22,10 @@ export type HostSessionChangeReceipt = {
 };
 
 export type HostSessionRestoreRequest = { expectedCurrentHash: string };
+export type HostSessionRestoreMutationEnvelope = HostMutationEnvelope<
+  HostSessionRestoreRequest,
+  ExpectedSessionRevision
+>;
 
 export type HostSessionRestoreItem = {
   field: string;
@@ -54,6 +59,12 @@ export const HostSessionChangeReceiptSchema = z.object({
 
 export const HostSessionRestoreRequestSchema = z.object({
   expectedCurrentHash: z.string().min(1),
+}).strict();
+
+export const HostSessionRestoreMutationEnvelopeSchema = z.object({
+  idempotencyKey: z.string().regex(/^[A-Za-z0-9._-]{8,128}$/),
+  expected: z.object({ sessionRevision: z.number().int().nonnegative() }).strict(),
+  command: HostSessionRestoreRequestSchema,
 }).strict();
 
 export const HostSessionRestoreItemSchema = z.object({

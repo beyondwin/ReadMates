@@ -61,7 +61,7 @@ export function MobilePrepSegment({
     <>
       <section className="m-sec">
         <div className="eyebrow" style={{ marginBottom: 10 }}>
-          RSVP
+          참석 응답
         </div>
         <div className="m-card">
           <div className="h4 editorial" style={{ marginBottom: 12 }}>
@@ -183,7 +183,7 @@ function MobilePrepMeta({
 }) {
   const attendees = activeAttendees(session);
   const statusItems = [
-    { label: "RSVP", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
+    { label: "참석 응답", value: rsvpLabel(rsvp), ok: rsvp === "GOING" },
     { label: "읽기", value: readingProgress >= 100 ? "완독" : `${readingProgress}%`, ok: readingProgress >= 100 },
     {
       label: "질문",
@@ -197,7 +197,7 @@ function MobilePrepMeta({
       <div className="m-eyebrow-row">
         <span className="eyebrow">내 상태</span>
         <span className="tiny mono" style={{ color: "var(--text-3)" }}>
-          세션 정보
+          모임 정보
         </span>
       </div>
       <div className="rm-current-session-mobile__meta-grid">
@@ -223,7 +223,7 @@ function MobilePrepMeta({
 
         <div className="m-card-quiet">
           <div className="eyebrow" style={{ marginBottom: 12 }}>
-            세션 정보
+            모임 정보
           </div>
           <dl className="rm-current-session-mobile__details">
             <dt>날짜</dt>

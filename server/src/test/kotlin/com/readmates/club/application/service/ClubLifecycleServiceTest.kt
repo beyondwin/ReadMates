@@ -3,6 +3,11 @@ package com.readmates.club.application.service
 import com.readmates.club.application.ClubLifecycleError
 import com.readmates.club.application.ClubLifecycleException
 import com.readmates.club.application.port.out.ClubLifecyclePort
+import com.readmates.club.application.port.out.ClubLifecycleState
+import com.readmates.club.application.port.out.ClubPublicProjectionLock
+import com.readmates.club.application.port.out.ClubPublicProjectionMutation
+import com.readmates.club.application.port.out.ClubPublicProjectionMutationPort
+import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
@@ -74,6 +79,40 @@ class ClubLifecycleServiceTest {
     }
 
     @Test
+    fun `lifecycle exposure locks sorted sessions before club transition and projection rotation`() {
+        val calls = mutableListOf<String>()
+        val sessionIds =
+            listOf(
+                UUID.fromString("00000000-0000-0000-0000-000000000306"),
+                UUID.fromString("00000000-0000-0000-0000-000000000305"),
+            ).sortedBy(UUID::toString)
+        val port = RecordingClubLifecyclePort(initialStatus = ClubStatus.ACTIVE, calls = calls)
+        val projection = RecordingPublicProjectionPort(calls, sessionIds)
+        val service = ClubLifecycleService(port, objectMapper, projection)
+
+        service.suspend(clubId, admin, "Policy violation")
+
+        assertEquals(
+            listOf("session-locks", "club-current-for-update", "club-transition", "projection-record"),
+            calls,
+        )
+    }
+
+    @Test
+    fun `repeated lifecycle target is a semantic no-op without projection or audit duplication`() {
+        val calls = mutableListOf<String>()
+        val port = RecordingClubLifecyclePort(initialStatus = ClubStatus.SUSPENDED, calls = calls)
+        val projection = RecordingPublicProjectionPort(calls, emptyList())
+        val service = ClubLifecycleService(port, objectMapper, projection)
+
+        service.suspend(clubId, admin, "Repeated synthetic reason")
+
+        assertEquals(ClubStatus.SUSPENDED, port.currentStatus)
+        assertEquals(emptyList<AuditEventRecord>(), port.auditEvents)
+        assertEquals(null, projection.recordedMutation)
+    }
+
+    @Test
     fun `throws CLUB_NOT_FOUND when club does not exist`() {
         val port = RecordingClubLifecyclePort(initialStatus = null)
         val service = ClubLifecycleService(port, objectMapper)
@@ -110,11 +149,17 @@ class ClubLifecycleServiceTest {
 
     private inner class RecordingClubLifecyclePort(
         private var initialStatus: ClubStatus?,
+        private val calls: MutableList<String>? = null,
     ) : ClubLifecyclePort {
         var currentStatus: ClubStatus? = initialStatus
         val auditEvents = mutableListOf<AuditEventRecord>()
 
-        override fun loadCurrentStatus(clubId: UUID): ClubStatus? = currentStatus
+        override fun loadCurrentForUpdate(clubId: UUID): ClubLifecycleState? {
+            calls?.add("club-current-for-update")
+            return currentStatus?.let {
+                ClubLifecycleState(clubId, it, ClubPublicVisibility.PUBLIC)
+            }
+        }
 
         override fun transitionStatus(
             clubId: UUID,
@@ -122,6 +167,7 @@ class ClubLifecycleServiceTest {
             to: ClubStatus,
         ): Boolean {
             if (currentStatus != from) return false
+            calls?.add("club-transition")
             currentStatus = to
             return true
         }
@@ -136,6 +182,26 @@ class ClubLifecycleServiceTest {
             auditEvents += AuditEventRecord(actorUserId, actorPlatformRole, eventType, metadataJson)
         }
     }
+
+    private class RecordingPublicProjectionPort(
+        private val calls: MutableList<String>,
+        private val sessionIds: List<UUID>,
+    ) : ClubPublicProjectionMutationPort {
+        var recordedMutation: ClubPublicProjectionMutation? = null
+
+        override fun lockForExposure(clubId: UUID): ClubPublicProjectionLock {
+            calls += "session-locks"
+            return TestClubProjectionLock
+        }
+
+        override fun record(mutation: ClubPublicProjectionMutation): Int {
+            calls += "projection-record"
+            recordedMutation = mutation
+            return sessionIds.size + 1
+        }
+    }
+
+    private data object TestClubProjectionLock : ClubPublicProjectionLock
 
     private data class AuditEventRecord(
         val actorUserId: UUID?,

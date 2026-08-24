@@ -37,9 +37,9 @@ function ddayLabel(date: string, now = new Date()) {
 }
 
 function phaseLabel(state: SessionState) {
-  if (state === "DRAFT") return "예정 세션";
-  if (state === "OPEN") return "이번 세션";
-  return "지난 회차";
+  if (state === "DRAFT") return "예정 모임";
+  if (state === "OPEN") return "이번 모임";
+  return "지난 모임";
 }
 
 function stateLabel(state: SessionState, published: boolean) {
@@ -76,7 +76,7 @@ export function SessionIdentity({
   const phase = phaseLabel(state);
   const items = [
     { value: `No.${padSessionNumber(sessionNumber)}`, className: "rm-session-identity__number" },
-    hidePastPhaseLabel && phase === "지난 회차" ? null : { value: phase, className: "rm-session-identity__chip" },
+    hidePastPhaseLabel && phase === "지난 모임" ? null : { value: phase, className: "rm-session-identity__chip" },
     { value: stateLabel(state, published), className: stateChipClass(state, published) },
     dday ? { value: dday, className: "rm-session-identity__chip rm-state rm-state--pending" } : null,
     feedbackDocumentAvailable && !hideFeedbackDocumentLabel

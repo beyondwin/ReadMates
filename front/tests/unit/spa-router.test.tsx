@@ -150,7 +150,7 @@ function guestScopedFetchMock(input: RequestInfo | URL) {
       currentSession: {
         sessionId: "guest-session-current",
         sessionNumber: 12,
-        title: "게스트 현재 세션",
+        title: "게스트 현재 모임",
         bookTitle: "게스트 책",
         bookAuthor: "게스트 작가",
         bookLink: null,
@@ -331,6 +331,7 @@ describe("SPA router", () => {
               role: "HOST",
               membershipStatus: "ACTIVE",
               approvalState: "ACTIVE",
+              currentMembership: { clubSlug: "reading-sai" },
             }),
           );
         }
@@ -732,7 +733,7 @@ describe("SPA router", () => {
       await screen.findByRole("heading", { name: "기록은 읽을 수 있고, 참여 기능은 승인 뒤 열립니다." }),
     ).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "아카이브 둘러보기" })).toHaveAttribute("href", "/app/archive");
-    expect(screen.getByRole("link", { name: "이번 세션 보기" })).toHaveAttribute("href", "/app/session/current");
+    expect(screen.getByRole("link", { name: "이번 모임 보기" })).toHaveAttribute("href", "/app/session/current");
     expect(fetchMock).not.toHaveBeenCalledWith("/api/bff/api/app/pending", expect.anything());
   });
 
@@ -980,6 +981,51 @@ describe("SPA router", () => {
     expectNoMemberHomeChildDataFetch(fetchMock);
   });
 
+  it("replaces bare app entry with the loader-authorized current club instead of rendering club selection", async () => {
+    const currentClubAuth = {
+      authenticated: true,
+      userId: "multi-club-user",
+      membershipId: "reading-sai-membership",
+      clubId: "reading-sai-club",
+      email: "multi-club@example.com",
+      displayName: "읽는사이 멤버",
+      accountName: "멀티클럽",
+      role: "MEMBER",
+      membershipStatus: "ACTIVE",
+      approvalState: "ACTIVE",
+      currentMembership: {
+        membershipId: "reading-sai-membership",
+        clubId: "reading-sai-club",
+        clubSlug: "reading-sai",
+        displayName: "읽는사이 멤버",
+        role: "MEMBER",
+        membershipStatus: "ACTIVE",
+        approvalState: "ACTIVE",
+        avatarKey: "cloud-green-book",
+      },
+      joinedClubs: [],
+    };
+    const fetchMock = vi.fn((input: RequestInfo | URL) => {
+      const url = input.toString();
+      if (url === "/api/bff/api/auth/me" || url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
+        return Promise.resolve(jsonResponse(currentClubAuth));
+      }
+      return Promise.resolve(jsonResponse({ message: "not needed" }, 404));
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    installRouterRequestShim();
+    const router = createMemoryRouter(routes, { initialEntries: ["/app"] });
+
+    renderWithRoutesQueryClient(
+      <AuthProvider>
+        <RouterProvider router={router} />
+      </AuthProvider>,
+    );
+
+    await waitFor(() => expect(router.state.location.pathname).toBe("/clubs/reading-sai/app"));
+    expect(screen.queryByRole("heading", { name: "클럽을 선택하세요" })).not.toBeInTheDocument();
+  });
+
   it("shows club selection for inactive member home navigation before child data fetches", async () => {
     const fetchMock = vi.fn((input: RequestInfo | URL) => {
       const url = input.toString();
@@ -1032,7 +1078,7 @@ describe("SPA router", () => {
             {
               sessionId: "session-6",
               sessionNumber: 6,
-              title: "6회차 모임 · 가난한 찰리의 연감",
+              title: "No.6 모임 · 가난한 찰리의 연감",
               bookTitle: "가난한 찰리의 연감",
               bookAuthor: "찰리 멍거",
               bookImageUrl: null,
@@ -1097,7 +1143,7 @@ describe("SPA router", () => {
             {
               sessionId: "session-6",
               sessionNumber: 6,
-              title: "6회차 모임 · 가난한 찰리의 연감",
+              title: "No.6 모임 · 가난한 찰리의 연감",
               bookTitle: "가난한 찰리의 연감",
               bookAuthor: "찰리 멍거",
               bookImageUrl: null,

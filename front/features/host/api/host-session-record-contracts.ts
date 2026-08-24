@@ -3,6 +3,10 @@ import type { SessionState } from "@/shared/model/readmates-types";
 import type { PageRequest, PagedResponse } from "@/shared/model/paging";
 import type { HostSessionHistoryRecovery } from "./host-session-recovery-contracts";
 import { HostSessionHistoryRecoverySchema } from "./host-session-recovery-contracts";
+import {
+  HostMutationIdempotencyKeySchema,
+  type HostMutationEnvelope,
+} from "./host-contracts";
 
 export type NotificationDecision = "SEND" | "SKIP";
 export type SessionRecordStatus = "NOT_STARTED" | "INCOMPLETE" | "COMPLETE";
@@ -107,6 +111,21 @@ export type HostSessionRecordApplyRequest = {
   expectedDraftHash: string;
 };
 
+export type HostSessionRecordApplyExpected = {
+  draftRevision: number;
+  liveRevision: number;
+};
+
+export type HostSessionRecordApplyCommand = {
+  applyRequestId: string;
+  expectedDraftHash: string;
+};
+
+export type HostSessionRecordApplyMutationEnvelope = HostMutationEnvelope<
+  HostSessionRecordApplyCommand,
+  HostSessionRecordApplyExpected
+>;
+
 export type HostNotificationComposerContext = {
   sessionId: string;
   eventType: "NEXT_BOOK_PUBLISHED" | "FEEDBACK_DOCUMENT_PUBLISHED" | "SESSION_RECORD_UPDATED";
@@ -121,7 +140,7 @@ export type HostSessionRecordApplyPreview = {
 export type HostSessionRecordApplyResult = {
   revisionId: string;
   liveRevision: number;
-  composer: HostNotificationComposerContext;
+  composer: HostNotificationComposerContext | null;
 };
 
 export type RestoreHostSessionRecordDraftRequest = {
@@ -242,6 +261,18 @@ export const HostSessionRecordApplyPreviewResponseSchema = z.object({
   expectedDraftHash: z.string(),
 }).strict();
 
+export const HostSessionRecordApplyMutationEnvelopeSchema = z.object({
+  idempotencyKey: HostMutationIdempotencyKeySchema,
+  expected: z.object({
+    draftRevision: positiveInteger,
+    liveRevision: nonNegativeInteger,
+  }).strict(),
+  command: z.object({
+    applyRequestId: z.string().min(1),
+    expectedDraftHash: z.string().min(1),
+  }).strict(),
+}).strict();
+
 export const HostSessionRecordApplyResultResponseSchema = z.object({
   revisionId: z.string(),
   liveRevision: positiveInteger,
@@ -308,6 +339,8 @@ export const HostSessionRecordLedgerPageResponseSchema = z.object({
     locationLabel: z.string(),
     state: z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]),
     visibility: SessionRecordVisibilitySchema,
+    accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]).optional(),
+    siteVisibility: z.enum(["HIDDEN", "LISTED"]).optional(),
     recordStatus: z.enum(["NOT_STARTED", "INCOMPLETE", "COMPLETE"]),
     needsAttention: z.boolean(),
     hasDraft: z.boolean(),
@@ -321,7 +354,17 @@ export const HostSessionRecordLedgerPageResponseSchema = z.object({
     incompletePublishedCount: nonNegativeInteger,
     draftCount: nonNegativeInteger,
   }).strict(),
-}).strict();
+}).strict().superRefine((page, context) => {
+  page.items.forEach((item, index) => {
+    if (item.state !== "CLOSED" && item.state !== "PUBLISHED") {
+      context.addIssue({
+        code: "custom",
+        path: ["items", index, "state"],
+        message: "record 목록은 CLOSED 또는 PUBLISHED만 허용합니다.",
+      });
+    }
+  });
+});
 
 export function parseHostSessionRecordEditor(value: unknown): HostSessionRecordEditor {
   return HostSessionRecordEditorResponseSchema.parse(value) as HostSessionRecordEditor;

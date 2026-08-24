@@ -98,7 +98,7 @@ export function closingRiskBlockerLabel(code: string | null): string {
     case "FEEDBACK_DOCUMENT_INVALID":
       return "피드백 문서 확인 필요";
     case "SESSION_CLOSE_REQUIRED":
-      return "세션 종료 필요";
+      return "모임 종료 필요";
     case "RECORD_PACKAGE_REQUIRED":
       return "기록 패키지 필요";
     case "FEEDBACK_DOCUMENT_REQUIRED":

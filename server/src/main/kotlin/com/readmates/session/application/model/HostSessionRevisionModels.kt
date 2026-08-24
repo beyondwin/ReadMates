@@ -74,6 +74,12 @@ data class CorrectionPublicationVersionVector(
         require(exposureRevision >= 0) { "exposureRevision must be non-negative" }
         require(publicationRevision >= 0) { "publicationRevision must be non-negative" }
     }
+
+    fun snapshotIdentity(resourceId: UUID): ProjectionSnapshotIdentity =
+        ProjectionSnapshotIdentity(
+            "$resourceId:$sessionRevision:$recordDraftRevision:$liveRecordRevision:" +
+                "$exposureRevision:$publicationRevision",
+        )
 }
 
 data class CorrectionPublicationPreview(

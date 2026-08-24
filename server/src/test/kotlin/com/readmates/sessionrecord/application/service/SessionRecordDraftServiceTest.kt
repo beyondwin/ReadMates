@@ -6,6 +6,7 @@ import com.readmates.sessionrecord.adapter.out.codec.JacksonSessionRecordSnapsho
 import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.EncodedSessionRecordSnapshot
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
+import com.readmates.sessionrecord.application.model.RebaseSessionRecordBaseExpectation
 import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
@@ -149,17 +150,52 @@ class SessionRecordDraftServiceTest {
     }
 
     @Test
-    fun `basic metadata drift marks draft live base stale`() {
-        val store =
-            FakeStore(
-                live = live(sessionUpdatedAt = NOW.plusSeconds(1)),
-                draft = draft(baseSessionUpdatedAt = NOW),
+    fun `each correction-owned base revision marks the draft stale`() {
+        val base = live()
+        val changedLives =
+            listOf(
+                base.copy(sessionRevision = base.sessionRevision + 1),
+                base.copy(revision = base.revision + 1),
+                base.copy(exposureRevision = base.exposureRevision + 1),
+                base.copy(publicationRevision = base.publicationRevision + 1),
             )
+
+        changedLives.forEach { changed ->
+            val editor = SessionRecordDraftService(FakeStore(changed, draft()), codec).getEditor(host, sessionId)
+            assertThat(editor.draftLiveBaseStale).isTrue()
+        }
+    }
+
+    @Test
+    fun `participant-only session timestamp change does not stale an unchanged correction vector`() {
+        val store = FakeStore(live = live(sessionUpdatedAt = NOW.plusSeconds(1)), draft = draft())
+
+        val editor: SessionRecordEditor = SessionRecordDraftService(store, codec).getEditor(host, sessionId)
+
+        assertThat(editor.draftLiveBaseStale).isFalse()
+    }
+
+    @Test
+    fun `unknown migrated base is stale until rebase records an exact known vector`() {
+        val currentLive = live()
+        val originalDraft = draft(baseVectorKnown = false)
+        val store = FakeStore(live = currentLive, draft = originalDraft)
         val service = SessionRecordDraftService(store, codec)
 
-        val editor: SessionRecordEditor = service.getEditor(host, sessionId)
+        assertThat(service.getEditor(host, sessionId).draftLiveBaseStale).isTrue()
 
-        assertThat(editor.draftLiveBaseStale).isTrue()
+        val rebased =
+            service.rebase(
+                host,
+                RebaseSessionRecordDraftCommand(
+                    sessionId = sessionId,
+                    expectedDraftRevision = originalDraft.draftRevision,
+                    expectedBase = currentLive.exactRebaseExpectation(),
+                ),
+            )
+
+        assertThat(rebased.baseVectorKnown).isTrue()
+        assertThat(service.getEditor(host, sessionId).draftLiveBaseStale).isFalse()
     }
 
     @Test
@@ -181,14 +217,15 @@ class SessionRecordDraftServiceTest {
                 RebaseSessionRecordDraftCommand(
                     sessionId = sessionId,
                     expectedDraftRevision = originalDraft.draftRevision,
-                    expectedLiveRevision = currentLive.revision,
-                    expectedSessionUpdatedAt = currentLive.sessionUpdatedAt,
+                    expectedBase = currentLive.exactRebaseExpectation(),
                 ),
             )
 
         assertThat(rebased.draftRevision).isEqualTo(originalDraft.draftRevision + 1)
         assertThat(rebased.baseLiveRevision).isEqualTo(currentLive.revision)
-        assertThat(rebased.baseSessionUpdatedAt).isEqualTo(currentLive.sessionUpdatedAt)
+        assertThat(rebased.baseSessionRevision).isEqualTo(currentLive.sessionRevision)
+        assertThat(rebased.baseExposureRevision).isEqualTo(currentLive.exposureRevision)
+        assertThat(rebased.basePublicationRevision).isEqualTo(currentLive.publicationRevision)
         assertThat(rebased.snapshot).isEqualTo(originalDraft.snapshot)
         assertThat(rebased.source).isEqualTo(SessionRecordDraftSource.RESTORED)
         assertThat(rebased.restoredFromRevisionId).isEqualTo(restoredFrom)
@@ -196,9 +233,9 @@ class SessionRecordDraftServiceTest {
     }
 
     @Test
-    fun `rebase rejects live metadata changed after the host loaded it without touching the draft`() {
-        val currentLive = live(sessionUpdatedAt = NOW.plusSeconds(2))
-        val originalDraft = draft(baseSessionUpdatedAt = NOW)
+    fun `rebase rejects a correction vector changed after the host loaded it without touching the draft`() {
+        val currentLive = live(publicationRevision = 10)
+        val originalDraft = draft()
         val store = FakeStore(live = currentLive, draft = originalDraft)
         val service = SessionRecordDraftService(store, codec)
         val before = store.state()
@@ -209,8 +246,10 @@ class SessionRecordDraftServiceTest {
                 RebaseSessionRecordDraftCommand(
                     sessionId = sessionId,
                     expectedDraftRevision = originalDraft.draftRevision,
-                    expectedLiveRevision = currentLive.revision,
-                    expectedSessionUpdatedAt = NOW.plusSeconds(1),
+                    expectedBase =
+                        currentLive.exactRebaseExpectation(
+                            publicationRevision = currentLive.publicationRevision - 1,
+                        ),
                 ),
             )
         }.isInstanceOf(SessionRecordException::class.java)
@@ -233,8 +272,7 @@ class SessionRecordDraftServiceTest {
                 RebaseSessionRecordDraftCommand(
                     sessionId = sessionId,
                     expectedDraftRevision = 1,
-                    expectedLiveRevision = currentLive.revision,
-                    expectedSessionUpdatedAt = currentLive.sessionUpdatedAt,
+                    expectedBase = currentLive.exactRebaseExpectation(),
                 ),
             )
         }.isInstanceOf(SessionRecordException::class.java)
@@ -245,23 +283,44 @@ class SessionRecordDraftServiceTest {
 
     private fun live(
         revision: Long = 4,
+        sessionRevision: Long = 7,
+        exposureRevision: Long = 8,
+        publicationRevision: Long = 9,
         sessionUpdatedAt: OffsetDateTime = NOW,
     ) = LiveSessionRecord(
         sessionId,
         host.clubId,
         revision,
         snapshot(),
+        sessionRevision = sessionRevision,
+        exposureRevision = exposureRevision,
+        publicationRevision = publicationRevision,
         sessionUpdatedAt = sessionUpdatedAt,
     )
 
+    private fun LiveSessionRecord.exactRebaseExpectation(publicationRevision: Long = this.publicationRevision) =
+        RebaseSessionRecordBaseExpectation.ExactRevisions(
+            expectedSessionRevision = sessionRevision,
+            expectedLiveRevision = revision,
+            expectedExposureRevision = exposureRevision,
+            expectedPublicationRevision = publicationRevision,
+        )
+
     private fun draft(
         baseLiveRevision: Long = 4,
+        baseSessionRevision: Long = 7,
+        baseExposureRevision: Long = 8,
+        basePublicationRevision: Long = 9,
         draftRevision: Long = 1,
         baseSessionUpdatedAt: OffsetDateTime = NOW,
+        baseVectorKnown: Boolean = true,
     ) = SessionRecordDraft(
         sessionId = sessionId,
         clubId = host.clubId,
         baseLiveRevision = baseLiveRevision,
+        baseSessionRevision = baseSessionRevision,
+        baseExposureRevision = baseExposureRevision,
+        basePublicationRevision = basePublicationRevision,
         draftRevision = draftRevision,
         source = SessionRecordDraftSource.MANUAL,
         restoredFromRevisionId = null,
@@ -270,6 +329,7 @@ class SessionRecordDraftServiceTest {
         createdAt = NOW,
         updatedAt = NOW,
         baseSessionUpdatedAt = baseSessionUpdatedAt,
+        baseVectorKnown = baseVectorKnown,
     )
 
     private fun revision() =
@@ -324,16 +384,40 @@ class SessionRecordDraftServiceTest {
                     it,
                     draft,
                     draft?.let { current ->
-                        current.baseLiveRevision != it.revision ||
-                            current.baseSessionUpdatedAt != it.sessionUpdatedAt
+                        current.isStaleAgainst(it)
                     } ?: false,
                 )
             }
+
+        override fun loadCorrectionEditor(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+        ): com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor? = null
+
+        override fun lockCorrectionEditor(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+        ): com.readmates.sessionrecord.application.model.SessionRecordCorrectionEditor? = null
+
+        override fun bumpCorrectionProjectionRevisions(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            expectedExposureRevision: Long,
+            expectedPublicationRevision: Long,
+            exposureChanged: Boolean,
+        ): Boolean = false
 
         override fun findCompletedApply(
             host: AuthenticatedClubActor,
             previewId: UUID,
         ): com.readmates.sessionrecord.application.model.CompletedSessionRecordApply? = null
+
+        override fun findApplyReceipt(
+            host: AuthenticatedClubActor,
+            sessionId: UUID,
+            applyRequestId: UUID,
+            forUpdate: Boolean,
+        ): SessionRecordApplyReceipt? = null
 
         override fun insertApplyReceipt(
             host: AuthenticatedClubActor,
@@ -342,7 +426,6 @@ class SessionRecordDraftServiceTest {
             composerEventType: NotificationEventType,
             revision: SessionRecordRevision,
         ) = SessionRecordApplyReceipt(
-            receiptId = command.applyRequestId,
             applyRequestId = command.applyRequestId,
             hostMembershipId = host.membershipId,
             expectedDraftRevision = command.expectedDraftRevision,
@@ -419,7 +502,11 @@ class SessionRecordDraftServiceTest {
                 current
                     .copy(
                         baseLiveRevision = live.revision,
+                        baseSessionRevision = live.sessionRevision,
+                        baseExposureRevision = live.exposureRevision,
+                        basePublicationRevision = live.publicationRevision,
                         baseSessionUpdatedAt = live.sessionUpdatedAt,
+                        baseVectorKnown = true,
                         draftRevision = current.draftRevision + 1,
                         updatedByMembershipId = host.membershipId,
                         updatedAt = NOW,
@@ -472,6 +559,10 @@ class SessionRecordDraftServiceTest {
             sessionId = live.sessionId,
             clubId = live.clubId,
             baseLiveRevision = live.revision,
+            baseSessionRevision = live.sessionRevision,
+            baseExposureRevision = live.exposureRevision,
+            basePublicationRevision = live.publicationRevision,
+            baseVectorKnown = true,
             draftRevision = (draft?.draftRevision ?: 0) + 1,
             source = source,
             restoredFromRevisionId = restoredFromRevisionId,

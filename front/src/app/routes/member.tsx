@@ -1,6 +1,6 @@
 import { lazy, Suspense, type ComponentType, type ReactNode } from "react";
 import type { QueryClient } from "@tanstack/react-query";
-import { useLoaderData, type LoaderFunction, type RouteObject } from "react-router";
+import { redirect, useLoaderData, type LoaderFunction, type LoaderFunctionArgs, type RouteObject } from "react-router";
 import type { InternalLinkComponent } from "@/features/current-session";
 import { CurrentSessionRouteError } from "@/features/current-session/route/current-session-route-error";
 import { notesFeedShouldRevalidate } from "@/features/archive/route/notes-feed-revalidation";
@@ -29,6 +29,9 @@ import { ClubMemberAppRouteLayout } from "@/src/app/layouts/club-app-route-layou
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
+import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
+import { canonicalizeCompatibilityEntry } from "@/src/app/workspace-route-model";
+import { clubSelectionLoader } from "@/features/club-selection/route/club-selection-data";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 import { GuestHomeContent } from "@/src/pages/guest-home";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
@@ -57,7 +60,7 @@ const LazyGuestSessionDetailContent = lazy(async () => ({
 // eslint-disable-next-line react-refresh/only-export-components
 function GuestSessionDetailContentBoundary(props: GuestSessionDetailContentProps) {
   return (
-    <Suspense fallback={<ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />}>
+    <Suspense fallback={<ArchiveRouteLoading label="지난 모임 기록을 불러오는 중" />}>
       <LazyGuestSessionDetailContent {...props} />
     </Suspense>
   );
@@ -75,6 +78,30 @@ type ScopedRouteModule = {
   Component: ComponentType;
   loader: LoaderFunction;
 };
+
+async function canonicalMemberCompatibilityLoader(args: LoaderFunctionArgs) {
+  const access = await loadMemberAppAuth(args);
+  const clubSlug = access.auth.currentMembership?.clubSlug;
+
+  if (!access.allowed || !clubSlug) {
+    return null;
+  }
+
+  const url = new URL(args.request.url);
+  throw redirect(
+    canonicalizeCompatibilityEntry({
+      pathname: url.pathname,
+      search: url.search,
+      hash: url.hash,
+      currentClubSlug: clubSlug,
+    }),
+  );
+}
+
+async function canonicalMemberEntryLoader(args: LoaderFunctionArgs) {
+  await canonicalMemberCompatibilityLoader(args);
+  return clubSelectionLoader();
+}
 
 function componentForScopedAudience(Component: ComponentType, _scoped: boolean) {
   void _scoped;
@@ -186,7 +213,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedMemberRoute({
       path: "session/current",
       ErrorBoundary: CurrentSessionRouteError,
-      fallback: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      fallback: <ReadmatesRouteLoading label="모임을 불러오는 중" variant="member" />,
       guestLoader: guestCurrentSessionLoader,
       GuestCurrentSessionContent,
       load: async () => {
@@ -294,7 +321,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
     scopedMemberRoute({
       path: "sessions/:sessionId",
       errorElement: <ArchiveRouteError />,
-      fallback: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+      fallback: <ArchiveRouteLoading label="지난 모임 기록을 불러오는 중" />,
       guestLoader: guestArchiveDetailLoader,
       GuestSessionDetailContent: GuestSessionDetailContentBoundary,
       load: async () => {
@@ -349,7 +376,7 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
     ...(includeIndex ? [memberHomeRoute(false)] : []),
     {
       path: "session/current",
-      hydrateFallbackElement: <ReadmatesRouteLoading label="세션을 불러오는 중" variant="member" />,
+      hydrateFallbackElement: <ReadmatesRouteLoading label="모임을 불러오는 중" variant="member" />,
       loader: scoped
         ? scopedGuestRouteLoader(async () => (await import("@/features/current-session")).currentSessionLoaderFactory(queryClient))
         : undefined,
@@ -495,7 +522,7 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
     {
       path: "sessions/:sessionId",
       errorElement: <ArchiveRouteError />,
-      hydrateFallbackElement: <ArchiveRouteLoading label="지난 세션 기록을 불러오는 중" />,
+      hydrateFallbackElement: <ArchiveRouteLoading label="지난 모임 기록을 불러오는 중" />,
       loader: scoped
         ? scopedGuestRouteLoader(async () => (await import("@/features/archive/route/member-session-detail-data")).memberSessionDetailLoaderFactory(queryClient))
         : undefined,
@@ -565,11 +592,9 @@ export function memberRoutes(queryClient: QueryClient): RouteObject[] {
           index: true,
           errorElement: <ArchiveRouteError />,
           hydrateFallbackElement: <ReadmatesRouteLoading label="클럽을 확인하는 중" variant="member" />,
+          loader: canonicalMemberEntryLoader,
           lazy: async () => {
-            const [{ ClubSelectionRoute }, { clubSelectionLoader }] = await Promise.all([
-              import("@/features/club-selection/route/club-selection-route"),
-              import("@/features/club-selection/route/club-selection-data"),
-            ]);
+            const { ClubSelectionRoute } = await import("@/features/club-selection/route/club-selection-route");
 
             function ClubSelectionRouteElement() {
               return (
@@ -579,11 +604,13 @@ export function memberRoutes(queryClient: QueryClient): RouteObject[] {
               );
             }
 
-            return { Component: ClubSelectionRouteElement, loader: clubSelectionLoader };
+            return { Component: ClubSelectionRouteElement };
           },
         },
         {
           id: "app",
+          loader: canonicalMemberCompatibilityLoader,
+          hydrateFallbackElement: <ReadmatesRouteLoading label="클럽을 확인하는 중" variant="member" />,
           element: (
             <RequireMemberApp>
               <AppRouteLayout />

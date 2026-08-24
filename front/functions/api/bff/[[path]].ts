@@ -9,7 +9,6 @@ import {
 } from "../../_shared/proxy";
 import { bffErrorResponse } from "../../_shared/errors";
 import {
-  boundedPublicCacheControl,
   buildPublicCacheKey,
   isCacheableUpstreamResponse,
   isPublicCacheableRequest,
@@ -39,6 +38,17 @@ type PagesFunction<Env> = (context: {
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const MAX_AI_GENERATION_MULTIPART_BYTES = 2 * 1024 * 1024;
+
+function isAuthoritativePublicProjectionRequest(method: string, path: string) {
+  return (
+    method === "GET" &&
+    (
+      path === "/api/public/club" ||
+      /^\/api\/public\/sessions\/[^/]+$/.test(path) ||
+      /^\/api\/public\/clubs\/[^/]+(?:\/sessions\/[^/]+)?$/.test(path)
+    )
+  );
+}
 
 function isAiGenerationTranscriptUpload(method: string, path: string, contentType: string | null) {
   return (
@@ -170,16 +180,8 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
     const cacheKey = buildPublicCacheKey(context.request);
     const cached = await caches.default.match(cacheKey);
-    if (cached && isCacheableUpstreamResponse(cached)) {
-      const bounded = new Response(cached.body, cached);
-      bounded.headers.set(
-        "Cache-Control",
-        boundedPublicCacheControl(upstreamPath, cached.headers.get("Cache-Control") ?? ""),
-      );
-      return bounded;
-    }
     if (cached) {
-      await caches.default.delete(cacheKey);
+      return cached;
     }
   }
 
@@ -262,25 +264,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   });
   outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
 
-  if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
-    if (!isCacheableUpstreamResponse(outboundResponse)) {
-      outboundResponse.headers.set("Cache-Control", "no-store");
-    } else {
-      outboundResponse.headers.set(
-        "Cache-Control",
-        boundedPublicCacheControl(
-          upstreamPath,
-          outboundResponse.headers.get("Cache-Control") ?? "",
-        ),
-      );
-    }
+  if (isAuthoritativePublicProjectionRequest(context.request.method, upstreamPath)) {
+    outboundResponse.headers.set("CDN-Cache-Control", "no-store");
+    outboundResponse.headers.set("Cloudflare-CDN-Cache-Control", "no-store");
   }
 
-  if (
-    isPublicCacheableRequest(context.request.method, upstreamPath) &&
-    isCacheableUpstreamResponse(upstream) &&
-    isCacheableUpstreamResponse(outboundResponse)
-  ) {
+  if (isPublicCacheableRequest(context.request.method, upstreamPath) && isCacheableUpstreamResponse(upstream)) {
     const cacheKey = buildPublicCacheKey(context.request);
     context.waitUntil(caches.default.put(cacheKey, outboundResponse.clone()));
   }

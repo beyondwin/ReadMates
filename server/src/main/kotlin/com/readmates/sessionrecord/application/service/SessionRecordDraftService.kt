@@ -1,6 +1,7 @@
 package com.readmates.sessionrecord.application.service
 
 import com.readmates.sessionrecord.application.model.LiveSessionRecord
+import com.readmates.sessionrecord.application.model.RebaseSessionRecordBaseExpectation
 import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
@@ -155,13 +156,18 @@ class SessionRecordDraftService(
     private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
 }
 
-private fun SessionRecordDraft.isStaleAgainst(live: LiveSessionRecord): Boolean =
-    baseLiveRevision != live.revision || baseSessionUpdatedAt != live.sessionUpdatedAt
-
 private fun LiveSessionRecord.requireReviewed(command: RebaseSessionRecordDraftCommand) {
-    if (revision != command.expectedLiveRevision ||
-        !sessionUpdatedAt.isEqual(command.expectedSessionUpdatedAt)
-    ) {
+    val stale =
+        when (val expected = command.expectedBase) {
+            is RebaseSessionRecordBaseExpectation.LegacyTimestamp ->
+                revision != expected.expectedLiveRevision || sessionUpdatedAt != expected.expectedSessionUpdatedAt
+            is RebaseSessionRecordBaseExpectation.ExactRevisions ->
+                sessionRevision != expected.expectedSessionRevision ||
+                    revision != expected.expectedLiveRevision ||
+                    exposureRevision != expected.expectedExposureRevision ||
+                    publicationRevision != expected.expectedPublicationRevision
+        }
+    if (stale) {
         throw SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
     }
 }

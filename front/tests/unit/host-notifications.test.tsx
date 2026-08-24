@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { createMemoryRouter } from "react-router";
+import { createMemoryRouter, MemoryRouter } from "react-router";
 import { RouterProvider } from "react-router/dom";
 import type { LoaderFunctionArgs } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -32,6 +32,9 @@ import type {
   ManualNotificationPreviewResponse,
   NotificationTestMailAuditItem,
 } from "@/features/host/api/host-contracts";
+import { HostAuthorityLossController } from "@/src/app/host-authority-loss-controller";
+import { hostClubQueryPrefix } from "@/features/host/queries/host-state-purge";
+import { signalHostAuthorityLoss } from "@/shared/api/host-authority-event";
 
 const summary: HostNotificationSummary = {
   pending: 2,
@@ -94,7 +97,7 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
       eventType: "FEEDBACK_DOCUMENT_PUBLISHED",
       label: "피드백 문서 등록",
       enabled: false,
-      disabledReason: "닫힌 세션의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
+      disabledReason: "닫힌 모임의 피드백 문서가 등록된 뒤 발송할 수 있습니다.",
       defaultAudience: "CONFIRMED_ATTENDEES",
       allowedAudiences: ["CONFIRMED_ATTENDEES", "SESSION_PARTICIPANTS"],
       defaultChannels: "BOTH",
@@ -107,7 +110,7 @@ const manualOptionsFixture: ManualNotificationOptionsResponse = {
 const hostSessionOpen = {
   sessionId: "session-open",
   sessionNumber: 9,
-  title: "9회차 모임",
+  title: "No.9 모임",
   bookTitle: "돈의 심리학",
   bookAuthor: "모건 하우절",
   bookImageUrl: null,
@@ -123,7 +126,7 @@ const hostSessionDraft = {
   ...hostSessionOpen,
   sessionId: "session-draft",
   sessionNumber: 10,
-  title: "10회차 모임",
+  title: "No.10 모임",
   bookTitle: "다음 책",
   date: "2026-08-19",
   state: "DRAFT",
@@ -133,7 +136,7 @@ const hostSessionCurrent: HostSessionListItem = {
   ...hostSessionOpen,
   sessionId: "session-1",
   sessionNumber: 8,
-  title: "8회차 모임",
+  title: "No.8 모임",
   bookTitle: "Example Book",
   bookAuthor: "Example Author",
   date: "2026-05-20",
@@ -218,6 +221,7 @@ function renderPage({
 } = {}) {
   render(
     <HostNotificationsPage
+      clubSlug="reading-sai"
       summary={summaryData}
       events={events}
       deliveries={deliveries}
@@ -561,6 +565,18 @@ describe("HostNotificationsRoute", () => {
       const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const url = input.toString();
 
+        if (url === "/api/bff/__internal/client-contract-status") {
+          return Promise.resolve(new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v3"],
+          }), {
+            headers: {
+              "Cache-Control": "no-store",
+              "Content-Type": "application/json",
+            },
+          }));
+        }
+
         if (
           url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
           && init?.method === "PUT"
@@ -638,6 +654,18 @@ describe("HostNotificationsRoute", () => {
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
 
+      if (url === "/api/bff/__internal/client-contract-status") {
+        return Promise.resolve(new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v3"],
+        }), {
+          headers: {
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+          },
+        }));
+      }
+
       if (
         url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
         && init?.method === "PUT"
@@ -678,6 +706,18 @@ describe("HostNotificationsRoute", () => {
     let policyGetCount = 0;
     const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
       const url = input.toString();
+
+      if (url === "/api/bff/__internal/client-contract-status") {
+        return Promise.resolve(new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v3"],
+        }), {
+          headers: {
+            "Cache-Control": "no-store",
+            "Content-Type": "application/json",
+          },
+        }));
+      }
 
       if (
         url === "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"
@@ -790,7 +830,7 @@ describe("HostNotificationsRoute", () => {
     const previewButton = screen.getByRole("button", { name: "미리보기 열기" });
     expect(previewButton).not.toBeDisabled();
 
-    const sessionSelect = screen.getByLabelText("세션 선택");
+    const sessionSelect = screen.getByLabelText("모임 선택");
     await userEvent.selectOptions(sessionSelect, "session-draft");
 
     await waitFor(() => {
@@ -870,6 +910,118 @@ describe("HostNotificationsRoute", () => {
 });
 
 describe("HostNotificationsPage", () => {
+  it("clears actual workbench draft/search and page preview/error before authority replacement", async () => {
+    const user = userEvent.setup();
+    const client = testQueryClient();
+    const selectableOptions: ManualNotificationOptionsResponse = {
+      ...manualOptionsFixture,
+      templates: manualOptionsFixture.templates.map((template) => template.eventType === "SESSION_REMINDER_DUE"
+        ? { ...template, allowedAudiences: [...template.allowedAudiences, "SELECTED_MEMBERS"] }
+        : template),
+      members: {
+        items: [{
+          membershipId: "membership-secret",
+          displayName: "비공개 멤버",
+          maskedEmail: "s***@example.com",
+          role: "MEMBER",
+          membershipStatus: "ACTIVE",
+          sessionParticipationStatus: "ACTIVE",
+          attendanceStatus: null,
+          emailEligibility: "ELIGIBLE",
+          inAppEligibility: "ELIGIBLE",
+        }],
+        nextCursor: null,
+      },
+    };
+    const preview: ManualNotificationPreviewResponse = {
+      previewId: "preview-sensitive",
+      expiresAt: "2026-08-25T02:00:00+09:00",
+      template: {
+        eventType: "SESSION_REMINDER_DUE",
+        label: "모임 전날 리마인더",
+        subject: "비공개 미리보기",
+        bodyPreview: "권한 해제 전에만 보이는 내용",
+      },
+      audience: {
+        baseGroup: "SELECTED_MEMBERS",
+        baseCount: 0,
+        excludedCount: 0,
+        includedCount: 1,
+        finalTargetCount: 1,
+      },
+      channels: {
+        requested: "BOTH",
+        inAppEligibleCount: 1,
+        emailEligibleCount: 1,
+        emailSkippedByPreferenceCount: 0,
+        emailMissingCount: 0,
+      },
+      duplicates: { requiresResendConfirmation: false, recentDispatches: [] },
+      warnings: [],
+    };
+    const stateWhenHandled: Array<{ preview: boolean; error: boolean; search: string | null }> = [];
+    const otherClubKey = [...hostClubQueryPrefix("other-club"), "authority-proof"];
+    client.setQueryData(otherClubKey, "remove");
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/clubs/reading-sai/app/host/notifications"]}>
+          <HostAuthorityLossController
+            onHandled={() => stateWhenHandled.push({
+              preview: Boolean(screen.queryByRole("dialog", { name: "발송 전 확인" })),
+              error: screen.queryAllByText("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요.").length > 0,
+              search: (screen.queryByRole("searchbox", { name: "멤버 검색" }) as HTMLInputElement | null)?.value ?? null,
+            })}
+          />
+          <HostNotificationsPage
+            clubSlug="reading-sai"
+            summary={summary}
+            events={[]}
+            deliveries={[]}
+            audit={[]}
+            hostSessions={[hostSessionCurrent]}
+            manualOptions={selectableOptions}
+            initialManualSelection={{ sessionId: "session-1", eventType: "SESSION_REMINDER_DUE" }}
+            onProcess={vi.fn()}
+            onRetry={vi.fn()}
+            onRestore={vi.fn()}
+            onSendTestMail={vi.fn()}
+            onPreviewManual={vi.fn().mockResolvedValue(preview)}
+            onConfirmManual={vi.fn().mockRejectedValue(new Error("confirm failed"))}
+            onLoadManualOptions={vi.fn().mockResolvedValue(selectableOptions)}
+          />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    await user.click(screen.getByRole("radio", { name: "직접 선택" }));
+    await user.type(screen.getByRole("searchbox", { name: "멤버 검색" }), "private member search");
+    await user.click(screen.getByRole("button", { name: "검색" }));
+    await user.click(screen.getByRole("checkbox", { name: /비공개 멤버/ }));
+    await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
+    await user.click(await screen.findByRole("button", { name: "1명에게 알림 발송" }));
+    expect(await screen.findAllByText("발송을 요청하지 못했습니다. 미리보기 만료 또는 중복 발송 여부를 확인해 주세요."))
+      .not.toHaveLength(0);
+
+    signalHostAuthorityLoss({
+      code: "CROSS_CLUB_SCOPE",
+      clubSlug: "other-club",
+      requestKind: "NOTIFICATIONS_MANUAL_CONFIRM",
+    });
+    await waitFor(() => expect(client.getQueryData(otherClubKey)).toBeUndefined());
+    expect(screen.getByRole("dialog", { name: "발송 전 확인" })).toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "멤버 검색" })).toHaveValue("private member search");
+    expect(stateWhenHandled).toEqual([]);
+
+    signalHostAuthorityLoss({
+      code: "HOST_AUTHORITY_REVOKED",
+      clubSlug: "reading-sai",
+      requestKind: "NOTIFICATIONS_MANUAL_CONFIRM",
+    });
+    await waitFor(() => expect(stateWhenHandled).toHaveLength(1));
+    expect(stateWhenHandled).toEqual([{ preview: false, error: false, search: null }]);
+  });
+
   it("preserves the selected enabled template when session options change", async () => {
     const user = userEvent.setup();
     const sessionOneOptions = {
@@ -893,6 +1045,7 @@ describe("HostNotificationsPage", () => {
       })),
     } satisfies ManualNotificationOptionsResponse;
     const workbenchProps = {
+      clubSlug: "reading-sai",
       hostSessions: [hostSessionCurrent, hostSessionDraft],
       initialSessionId: "session-1",
       initialEventType: null,
@@ -913,7 +1066,7 @@ describe("HostNotificationsPage", () => {
     await user.click(screen.getByRole("radio", { name: "피드백 문서 등록" }));
     expect(screen.getByRole("radio", { name: "피드백 문서 등록" })).toBeChecked();
 
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
     view.rerender(
       <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
     );
@@ -943,11 +1096,12 @@ describe("HostNotificationsPage", () => {
         contentRevision: `${index + 3}`.repeat(64),
         enabled: template.eventType !== "FEEDBACK_DOCUMENT_PUBLISHED",
         disabledReason: template.eventType === "FEEDBACK_DOCUMENT_PUBLISHED"
-          ? "이 세션에서는 사용할 수 없습니다."
+          ? "이 모임에서는 사용할 수 없습니다."
           : null,
       })),
     } satisfies ManualNotificationOptionsResponse;
     const workbenchProps = {
+      clubSlug: "reading-sai",
       hostSessions: [hostSessionCurrent, hostSessionDraft],
       initialSessionId: "session-1",
       initialEventType: null,
@@ -966,7 +1120,7 @@ describe("HostNotificationsPage", () => {
     );
 
     await user.click(screen.getByRole("radio", { name: "피드백 문서 등록" }));
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
     view.rerender(
       <ManualNotificationWorkbench {...workbenchProps} options={sessionTwoOptions} />,
     );
@@ -982,7 +1136,7 @@ describe("HostNotificationsPage", () => {
 
     expect(screen.getAllByRole("radio", { name: /전체 활성 멤버/ })).toHaveLength(1);
     expect(screen.queryByRole("radio", { name: /추천 대상/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("radio", { name: "세션 참가자" }));
+    await user.click(screen.getByRole("radio", { name: "모임 참가자" }));
     await user.click(screen.getByRole("button", { name: "미리보기 열기" }));
 
     expect(onPreviewManual).toHaveBeenCalledWith(expect.objectContaining({
@@ -1053,10 +1207,10 @@ describe("HostNotificationsPage", () => {
   it("renders a session selector instead of a raw session id field", () => {
     renderPage();
 
-    expect(screen.getByLabelText("세션 선택")).toHaveValue("session-1");
-    expect(screen.queryByLabelText("세션 ID")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("모임 선택")).toHaveValue("session-1");
+    expect(screen.queryByLabelText("모임 ID")).not.toBeInTheDocument();
     expect(screen.getByRole("option", {
-      name: "8회차 · Example Book · 2026-05-20",
+      name: "No.8 · Example Book · 2026-05-20",
     })).toBeInTheDocument();
     expect(screen.getByText(/진행 중.*게스트 공개.*피드백 문서 준비됨/)).toBeInTheDocument();
     expect(screen.queryByText(/OPEN|HOST_ONLY/)).not.toBeInTheDocument();
@@ -1069,7 +1223,7 @@ describe("HostNotificationsPage", () => {
       initialManualSelection: { sessionId: null, eventType: null },
     });
 
-    expect(screen.getByText("선택 가능한 세션이 없습니다.")).toBeInTheDocument();
+    expect(screen.getByText("선택 가능한 모임이 없습니다.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "미리보기 열기" })).toBeDisabled();
   });
 
@@ -1079,7 +1233,7 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onLoadManualOptions });
 
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
 
     expect(onLoadManualOptions).toHaveBeenCalledWith("session-draft", undefined);
   });
@@ -1090,9 +1244,9 @@ describe("HostNotificationsPage", () => {
 
     renderPage({ onLoadManualOptions });
 
-    await user.selectOptions(screen.getByLabelText("세션 선택"), "session-draft");
+    await user.selectOptions(screen.getByLabelText("모임 선택"), "session-draft");
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("세션 정보를 불러오지 못했습니다.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("모임 정보를 불러오지 못했습니다.");
   });
 
   it("searches manual notification members and loads more", async () => {
@@ -1360,6 +1514,7 @@ describe("HostNotificationsPage", () => {
 
     render(
       <HostNotificationsPage
+        clubSlug="reading-sai"
         summary={summary}
         events={[pendingEvent]}
         deliveries={[pendingItem]}
@@ -1474,6 +1629,7 @@ describe("HostNotificationsPage", () => {
       .mockResolvedValue(preview);
     const { rerender } = render(
       <HostNotificationsPage
+        clubSlug="reading-sai"
         summary={summary}
         events={[pendingEvent]}
         deliveries={[deadDelivery]}
@@ -1498,6 +1654,7 @@ describe("HostNotificationsPage", () => {
 
     rerender(
       <HostNotificationsPage
+        clubSlug="reading-sai"
         summary={{ ...summary, sentLast24h: summary.sentLast24h + 1 }}
         events={[{ ...pendingEvent, attemptCount: 2 }]}
         deliveries={[deadDelivery]}

@@ -29,7 +29,7 @@ export function MemberSummary({
       >
         <MemberCount label="둘러보기" value={viewerCount} helper="둘러보기 멤버" tone={viewerCount > 0 ? "accent" : "default"} />
         <MemberCount label="활성" value={activeCount} helper="정식 멤버" tone="ok" />
-        <MemberCount label="이번 세션" value={currentSessionParticipantCount} helper="참여 중" tone="ok" />
+        <MemberCount label="이번 모임" value={currentSessionParticipantCount} helper="참여 중" tone="ok" />
         <MemberCount
           label="미포함"
           value={activeOutsideCurrentSessionCount}

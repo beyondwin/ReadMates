@@ -2,6 +2,7 @@ package com.readmates.publication.application.service
 
 import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
+import com.readmates.publication.application.model.PublicClubProjectionGeneration
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicProjectionGeneration
@@ -10,7 +11,6 @@ import com.readmates.publication.application.port.out.LoadPublishedPublicDataPor
 import com.readmates.publication.application.port.out.PublicReadCachePort
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
@@ -18,52 +18,46 @@ class PublicQueryServiceCacheTest {
     private val clubId = UUID.fromString("00000000-0000-0000-0000-000000000099")
 
     @Test
-    fun `authoritative origin replaces a stale cached public club body`() {
-        val cache =
-            PublicReadCachePort.InMemoryForTest(
-                club = publicClub(clubName = "Cached club before mutation"),
-            )
+    fun `old generation cache entry cannot reappear after the authoritative marker advances`() {
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+        val cache = PublicReadCachePort.InMemoryForTest()
+        cache.putSession(
+            clubId = clubId,
+            clubGeneration = 7,
+            generation = 3,
+            sessionId = sessionId,
+            result = publicSession(sessionId, summary = "Cached before revoke"),
+        )
         val loader =
             RecordingPublicLoader(
-                club = publicClub(clubName = "Refetched club from source"),
-                clubGeneration = 2,
+                session = publicSession(sessionId, summary = "Authoritative generation four"),
+                sessionMarker = sessionMarker(sessionId, generation = 4, clubGeneration = 8),
             )
-        val service = PublicQueryService(loader, cache)
+        val service = PublicQueryService(loader, cache, StaticClubContextResolver(clubId))
 
-        val result = service.getClub()
+        val result = service.getSession("sample-book-club", sessionId)
 
-        assertEquals("Refetched club from source", result?.clubName)
-        assertEquals(1, loader.clubLoads)
+        assertEquals("Authoritative generation four", result?.summary)
+        assertEquals(1, loader.sessionLoads)
+        assertEquals(
+            "Authoritative generation four",
+            cache.getSession(clubId, 8, 4, sessionId)?.summary,
+        )
     }
 
     @Test
     fun `cache miss returns refetched source content and stores that content`() {
         val cache = PublicReadCachePort.InMemoryForTest()
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
-        val loader =
-            RecordingPublicLoader(
-                session = publicSession(sessionId, summary = "Refetched source summary"),
-            )
-        val service = PublicQueryService(loader, cache)
+        val loader = RecordingPublicLoader(session = publicSession(sessionId, summary = "Refetched source summary"))
+        val service = PublicQueryService(loader, cache, StaticClubContextResolver(clubId))
 
-        val firstResult = service.getSession(sessionId)
-        val secondResult = service.getSession(sessionId)
+        val firstResult = service.getSession("sample-book-club", sessionId)
+        val secondResult = service.getSession("sample-book-club", sessionId)
 
         assertEquals("Refetched source summary", firstResult?.summary)
         assertEquals("Refetched source summary", secondResult?.summary)
         assertEquals(1, loader.sessionLoads)
-    }
-
-    @Test
-    fun `authoritative revoke denies a stale cached public session body`() {
-        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
-        val cache = PublicReadCachePort.InMemoryForTest()
-        cache.putSession(sessionId, publicSession(sessionId, summary = "Revoked cached summary"))
-        val loader = RecordingPublicLoader(session = null)
-        val service = PublicQueryService(loader, cache)
-
-        assertNull(service.getSession(sessionId))
-        assertEquals(0, loader.sessionLoads)
     }
 
     @Test
@@ -85,49 +79,61 @@ class PublicQueryServiceCacheTest {
     }
 
     @Test
-    fun `old generation cache entry cannot satisfy a newer authoritative marker`() {
-        val cache = PublicReadCachePort.InMemoryForTest()
+    fun `origin unreadable marker denies without consulting an old cached allow`() {
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
-        cache.putSession(clubId, sessionId, 1, publicSession(sessionId, "generation one"))
+        val cache = PublicReadCachePort.InMemoryForTest()
+        cache.putSession(clubId, 4, 9, sessionId, publicSession(sessionId, "Revoked body"))
         val loader =
             RecordingPublicLoader(
-                session = publicSession(sessionId, "generation two"),
-                sessionGeneration = 2,
+                session = publicSession(sessionId, "Origin must not load"),
+                sessionMarker = sessionMarker(sessionId, generation = 10, clubGeneration = 5, originReadable = false),
             )
         val service = PublicQueryService(loader, cache, StaticClubContextResolver(clubId))
 
-        assertEquals("generation two", service.getSession("sample-book-club", sessionId)?.summary)
-        assertEquals(1, loader.sessionLoads)
+        assertNull(service.getSession("sample-book-club", sessionId))
+        assertEquals(0, loader.sessionLoads)
     }
 
     @Test
-    fun `marker miss falls back to authoritative DB instead of a cached allow`() {
-        val cache = PublicReadCachePort.InMemoryForTest()
+    fun `marker failure fails closed without consulting database body or cached allow`() {
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
-        cache.putSession(clubId, sessionId, 1, publicSession(sessionId, "cached stale body"))
+        val cache = PublicReadCachePort.InMemoryForTest()
+        cache.putSession(clubId, 1, 1, sessionId, publicSession(sessionId, "Untrusted cache body"))
         val loader =
             RecordingPublicLoader(
-                session = publicSession(sessionId, "authoritative body"),
-                markerMissing = true,
+                session = publicSession(sessionId, "Database fallback body"),
+                markerFailure = true,
             )
         val service = PublicQueryService(loader, cache, StaticClubContextResolver(clubId))
 
-        assertEquals("authoritative body", service.getSession("sample-book-club", sessionId)?.summary)
-        assertEquals(1, loader.sessionLoads)
+        assertNull(service.getSession("sample-book-club", sessionId))
+        assertEquals(0, loader.sessionLoads)
     }
 
     @Test
-    fun `marker and authoritative DB failure never fall back to a cached allow`() {
+    fun `club marker failure fails closed without consulting database body or cached allow`() {
         val cache = PublicReadCachePort.InMemoryForTest()
-        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
-        cache.putSession(clubId, sessionId, 1, publicSession(sessionId, "cached stale body"))
-        val loader = RecordingPublicLoader(markerFailure = true, sessionLoadFailure = true)
+        cache.putClub(clubId, 1, publicClub())
+        val loader = RecordingPublicLoader(markerFailure = true)
         val service = PublicQueryService(loader, cache, StaticClubContextResolver(clubId))
 
-        assertThrows(IllegalStateException::class.java) {
-            service.getSession("sample-book-club", sessionId)
-        }
-        assertEquals(1, loader.sessionLoads)
+        assertNull(service.getClub("sample-book-club"))
+        assertEquals(0, loader.clubLoads)
+    }
+
+    @Test
+    fun `missing marker falls back to authoritative database and does not populate generation cache`() {
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+        val cache = PublicReadCachePort.InMemoryForTest()
+        val loader =
+            RecordingPublicLoader(
+                session = publicSession(sessionId, "Unversioned database fallback"),
+                sessionMarker = null,
+            )
+        val service = PublicQueryService(loader, cache, StaticClubContextResolver(clubId))
+
+        assertEquals("Unversioned database fallback", service.getSession("sample-book-club", sessionId)?.summary)
+        assertNull(cache.getSession(clubId, 1, 1, sessionId))
     }
 
     @Test
@@ -141,11 +147,11 @@ class PublicQueryServiceCacheTest {
         assertNull(service.getSession("sample-book-club", sessionId))
 
         assertEquals(1, loader.clubLoads)
-        assertEquals(0, loader.sessionLoads)
+        assertEquals(1, loader.sessionLoads)
     }
 
     @Test
-    fun `authoritative missing public session is denied before loading a body`() {
+    fun `does not cache missing public session`() {
         val cache = PublicReadCachePort.InMemoryForTest()
         val loader = RecordingPublicLoader(session = null)
         val service = PublicQueryService(loader, cache)
@@ -154,7 +160,7 @@ class PublicQueryServiceCacheTest {
         assertNull(service.getSession(sessionId))
         assertNull(service.getSession(sessionId))
 
-        assertEquals(0, loader.sessionLoads)
+        assertEquals(2, loader.sessionLoads)
     }
 
     private class RecordingPublicLoader(
@@ -163,14 +169,31 @@ class PublicQueryServiceCacheTest {
             publicSession(
                 UUID.fromString("00000000-0000-0000-0000-000000000301"),
             ),
-        private val sessionGeneration: Long = 1,
-        private val clubGeneration: Long = 1,
-        private val markerMissing: Boolean = false,
+        private val clubMarker: PublicClubProjectionGeneration? =
+            PublicClubProjectionGeneration(
+                clubId = UUID.fromString("00000000-0000-0000-0000-000000000099"),
+                generation = 1,
+                originReadable = true,
+            ),
+        private val sessionMarker: PublicProjectionGeneration? =
+            sessionMarker(UUID.fromString("00000000-0000-0000-0000-000000000301")),
         private val markerFailure: Boolean = false,
-        private val sessionLoadFailure: Boolean = false,
     ) : LoadPublishedPublicDataPort {
         var clubLoads = 0
         var sessionLoads = 0
+
+        override fun loadClubProjectionGeneration(clubSlug: String): PublicClubProjectionGeneration? {
+            if (markerFailure) error("marker database unavailable")
+            return clubMarker
+        }
+
+        override fun loadSessionProjectionGeneration(
+            clubSlug: String,
+            sessionId: UUID,
+        ): PublicProjectionGeneration? {
+            if (markerFailure) error("marker database unavailable")
+            return sessionMarker
+        }
 
         override fun loadClub(): PublicClubResult? {
             clubLoads += 1
@@ -182,8 +205,6 @@ class PublicQueryServiceCacheTest {
             return club
         }
 
-        override fun loadClubGeneration(clubSlug: String): Long? = clubGeneration
-
         override fun loadSession(sessionId: UUID): PublicSessionDetailResult? {
             sessionLoads += 1
             return session ?: return null
@@ -194,28 +215,7 @@ class PublicQueryServiceCacheTest {
             sessionId: UUID,
         ): PublicSessionDetailResult? {
             sessionLoads += 1
-            if (sessionLoadFailure) {
-                throw IllegalStateException("authoritative DB unavailable")
-            }
             return session ?: return null
-        }
-
-        override fun loadSessionGeneration(
-            clubSlug: String,
-            sessionId: UUID,
-        ): PublicProjectionGeneration? {
-            if (markerFailure) {
-                throw IllegalStateException("marker lookup unavailable")
-            }
-            if (markerMissing) {
-                return null
-            }
-            return PublicProjectionGeneration(
-                publicationId = UUID.fromString("00000000-0000-0000-0000-000000000401"),
-                generation = sessionGeneration,
-                liveRecordRevision = 1,
-                originReadable = session != null,
-            )
         }
     }
 
@@ -239,6 +239,21 @@ class PublicQueryServiceCacheTest {
     }
 
     companion object {
+        fun sessionMarker(
+            sessionId: UUID,
+            generation: Long = 1,
+            clubGeneration: Long = 1,
+            originReadable: Boolean = true,
+        ) = PublicProjectionGeneration(
+            publicationId = UUID.fromString("00000000-0000-0000-0000-000000000401"),
+            clubId = UUID.fromString("00000000-0000-0000-0000-000000000099"),
+            sessionId = sessionId,
+            generation = generation,
+            clubGeneration = clubGeneration,
+            liveRecordRevision = 0,
+            originReadable = originReadable,
+        )
+
         fun publicClub(clubName: String = "ReadMates") =
             PublicClubResult(
                 clubName = clubName,

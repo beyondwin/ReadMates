@@ -26,6 +26,8 @@ internal class JdbcSessionRecordApplyStore(
     private val draftStore: SessionRecordDraftStorePort,
     private val rows: SessionRecordPersistenceRows,
 ) : SessionRecordApplyStorePort {
+    private val publicProjection = SessionRecordPublicProjectionWriteOperations(jdbcTemplate)
+
     override fun lockEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,
@@ -41,12 +43,7 @@ internal class JdbcSessionRecordApplyStore(
         return SessionRecordEditor(
             live = live,
             draft = draft,
-            draftLiveBaseStale =
-                draft != null &&
-                    (
-                        draft.baseLiveRevision != live.revision ||
-                            draft.baseSessionUpdatedAt != live.sessionUpdatedAt
-                    ),
+            draftLiveBaseStale = draft?.isStaleAgainst(live) == true,
         )
     }
 
@@ -182,7 +179,6 @@ internal class JdbcSessionRecordApplyStore(
             .query(
                 """
                 select a.apply_request_id,
-                       a.id as apply_receipt_id,
                        a.host_membership_id,
                        a.expected_draft_revision,
                        a.expected_live_revision,
@@ -202,7 +198,6 @@ internal class JdbcSessionRecordApplyStore(
                 """.trimIndent(),
                 { rs, _ ->
                     SessionRecordApplyReceipt(
-                        receiptId = rs.uuid("apply_receipt_id"),
                         applyRequestId = rs.uuid("apply_request_id"),
                         hostMembershipId = rs.uuid("host_membership_id"),
                         expectedDraftRevision = rs.getLong("expected_draft_revision"),
@@ -225,7 +220,6 @@ internal class JdbcSessionRecordApplyStore(
         revision: SessionRecordRevision,
     ): SessionRecordApplyReceipt {
         val applyRequestId = requireNotNull(command.applyRequestId)
-        val receiptId = UUID.randomUUID()
         jdbcTemplate.update(
             """
             insert into session_record_apply_receipts (
@@ -234,7 +228,7 @@ internal class JdbcSessionRecordApplyStore(
               composer_event_type, revision_id
             ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """.trimIndent(),
-            receiptId.dbString(),
+            UUID.randomUUID().dbString(),
             applyRequestId.dbString(),
             host.clubId.dbString(),
             command.sessionId.dbString(),
@@ -245,6 +239,7 @@ internal class JdbcSessionRecordApplyStore(
             composerEventType.name,
             revision.id.dbString(),
         )
+        publicProjection.rotateAffected(host.clubId, command.sessionId, applyRequestId)
         return requireNotNull(findApplyReceipt(host, command.sessionId, applyRequestId))
     }
 

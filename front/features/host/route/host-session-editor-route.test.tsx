@@ -10,6 +10,7 @@ const loaderApiMocks = vi.hoisted(() => ({
   fetchHostSessionDetail: vi.fn(),
   fetchHostSessionTrash: vi.fn(),
   fetchHostSessions: vi.fn(),
+  fetchHostSessionList: vi.fn(),
   fetchManualNotificationDispatches: vi.fn(),
   fetchHostSessionRecordEditor: vi.fn(),
   fetchHostSessionHistory: vi.fn(),
@@ -32,6 +33,7 @@ const routeMocks = vi.hoisted(() => ({
   adoptDraftRevision: vi.fn(),
   adoptEditor: vi.fn(),
   updateSnapshot: vi.fn(),
+  clearSensitiveState: vi.fn(),
   snapshotRevisionAfterUpdate: null as number | null,
   expectedDraftRevision: 4 as number | null,
   saveState: "idle" as "idle" | "dirty" | "saving" | "saved" | "error" | "stale",
@@ -120,6 +122,7 @@ vi.mock("@/features/host/hooks/use-session-record-draft-controller", () => ({
         routeMocks.adoptEditor(nextEditor);
         setExpectedDraftRevision(nextEditor.draft?.draftRevision ?? null);
       },
+      clearSensitiveState: routeMocks.clearSensitiveState,
     };
   },
 }));
@@ -154,6 +157,7 @@ vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
   fetchHostSessionDetail: loaderApiMocks.fetchHostSessionDetail,
   fetchHostSessionTrash: loaderApiMocks.fetchHostSessionTrash,
   fetchHostSessions: loaderApiMocks.fetchHostSessions,
+  fetchHostSessionList: loaderApiMocks.fetchHostSessionList,
   fetchManualNotificationDispatches: loaderApiMocks.fetchManualNotificationDispatches,
   deleteHostSession: loaderApiMocks.deleteHostSession,
   restoreHostSession: loaderApiMocks.restoreHostSession,
@@ -287,6 +291,7 @@ import type {
   HostSessionWorkspaceLocation,
 } from "@/features/host/model/host-session-workspace-navigation";
 import { appendUniqueSessionHistory } from "@/features/host/ui/session-editor/session-history-model";
+import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 
 const snapshot = {
   schema: "readmates-session-record:v1" as const,
@@ -326,6 +331,15 @@ function sessionDetail(overrides: Record<string, unknown> = {}) {
     visibility: "MEMBER",
     publication: null,
     state: "OPEN",
+    versions: {
+      sessionRevision: 3,
+      exposureRevision: 2,
+      participantSetRevision: 1,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-1",
     attendees: [],
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
     ...overrides,
@@ -357,10 +371,16 @@ function renderWorkflow(
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
   });
+  const workflowSession = options?.session ?? sessionDetail();
+  loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(workflowSession);
+  client.setQueryData(
+    hostSessionKeys.detail("session-1", { clubSlug: "club-a" }),
+    workflowSession,
+  );
   const rendered = render(
     <QueryClientProvider client={client}>
       <EditHostSessionRecordWorkflow
-        session={(options?.session ?? { sessionId: "session-1" }) as never}
+        session={workflowSession as never}
         recordEditor={editor}
         historyPage={{ items: [], nextCursor: null }}
         loadHistoryPage={vi.fn()}
@@ -1304,7 +1324,7 @@ describe("EditHostSessionRecordWorkflow", () => {
       onConfirm: () => void;
     };
     expect(confirm.items[0]).toMatchObject({
-      label: "세션 제목",
+      label: "모임 제목",
       currentValue: "새 제목",
       sensitive: false,
     });
@@ -1313,11 +1333,49 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(routeMocks.restoreChange).toHaveBeenCalledWith(
       "session-1",
       "change-basic-1",
-      { expectedCurrentHash: "a".repeat(64) },
+      expect.objectContaining({
+        expected: { sessionRevision: 3 },
+        command: { expectedCurrentHash: "a".repeat(64) },
+      }),
       { clubSlug: "club-a" },
     );
     expect((routeMocks.capturedProps?.pendingUndo as { description: string }).description)
       .toBe("모임 정보를 저장했습니다.");
+  });
+
+  it("clears mounted draft, receipt, and reconciliation state for the revoked club only", async () => {
+    const saveSession = vi.fn(async () => jsonResponse({
+      changeReceipt: { changeId: "change-basic-sensitive", kind: "BASIC_INFO", undoAvailable: true },
+    }));
+    routeMocks.preview.mockResolvedValue({
+      eventType: "SESSION_RECORD_UPDATED",
+      expectedDraftHash: "a".repeat(64),
+    });
+    renderWorkflow(recordEditor, vi.fn(), undefined, {
+      session: sessionDetail(),
+      actions: { saveSession },
+    });
+
+    await act(async () => {
+      await (routeMocks.capturedProps?.actions as { saveSession: typeof saveSession })
+        .saveSession("session-1", { title: "비공개 변경" } as never);
+      await workflow().confirmation.onReview();
+    });
+    expect(routeMocks.capturedProps?.pendingUndo).not.toBeNull();
+    expect(workflow().confirmation.open).toBe(true);
+
+    await hostSensitiveStorage.clearClub("other-club");
+    expect(routeMocks.capturedProps?.pendingUndo).not.toBeNull();
+    expect(workflow().confirmation.open).toBe(true);
+    expect(routeMocks.clearSensitiveState).not.toHaveBeenCalled();
+
+    await act(async () => hostSensitiveStorage.clearClub("club-a"));
+    expect(routeMocks.clearSensitiveState).toHaveBeenCalledTimes(1);
+    expect(routeMocks.capturedProps?.pendingUndo).toBeNull();
+    expect(routeMocks.capturedProps?.undoConfirm).toBeNull();
+    expect(routeMocks.capturedProps?.restoreNotice).toBeNull();
+    expect(workflow().confirmation.open).toBe(false);
+    expect(workflow().confirmation.message).toBeNull();
   });
 
   it("clears the undo bar when restore completes without a new undoable receipt", async () => {
@@ -1470,7 +1528,10 @@ describe("EditHostSessionRecordWorkflow", () => {
     expect(routeMocks.restoreChange).toHaveBeenCalledWith(
       "session-1",
       "change-att-1",
-      { expectedCurrentHash: "d".repeat(64) },
+      expect.objectContaining({
+        expected: { sessionRevision: 3 },
+        command: { expectedCurrentHash: "d".repeat(64) },
+      }),
       { clubSlug: "club-a" },
     );
   });
@@ -1699,9 +1760,10 @@ function trashDetail() {
   return {
     sessionId: "session-1",
     sessionNumber: 7,
-    title: "7회차 모임",
+    title: "No.7 모임",
     state: "DRAFT" as const,
     trashed: true as const,
+    sessionRevision: 4,
     deletedAt: "2026-08-21T10:00:00Z",
     purgeAfter: "2026-08-28T10:00:00Z",
     counts: {
@@ -1724,6 +1786,7 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     loaderApiMocks.fetchHostSessionDetail.mockReset();
     loaderApiMocks.fetchHostSessionTrash.mockReset();
     loaderApiMocks.fetchHostSessions.mockReset().mockResolvedValue({ items: [], nextCursor: null });
+    loaderApiMocks.fetchHostSessionList.mockReset().mockResolvedValue({ items: [], nextCursor: null });
     loaderApiMocks.fetchManualNotificationDispatches.mockReset().mockResolvedValue({
       items: [],
       nextCursor: null,
@@ -1747,6 +1810,23 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     };
   }
 
+  it("prefetches the meeting-owned list with mode=meeting for an active editor", async () => {
+    loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(sessionDetail());
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).resolves.toEqual({
+      sessionId: "session-1",
+      mode: "active",
+    });
+
+    expect(loaderApiMocks.fetchHostSessionList).toHaveBeenCalledWith(
+      "meeting",
+      { clubSlug: "reading-sai" },
+      { limit: 50 },
+    );
+    expect(loaderApiMocks.fetchHostSessions).not.toHaveBeenCalled();
+  });
+
   it("returns mode trash only when active detail is an exact 404", async () => {
     loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(404, "RESOURCE_NOT_FOUND"));
     loaderApiMocks.fetchHostSessionTrash.mockResolvedValue(trashDetail());
@@ -1767,17 +1847,82 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     expect(loaderApiMocks.fetchManualNotificationDispatches).not.toHaveBeenCalled();
   });
 
-  it.each([401, 403, 500])("does not fetch trash when active detail is %s", async (status) => {
+  it.each([401, 403])("replaces an unreadable host counterpart with a safe host target when active detail is %s", async (status) => {
     loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(status));
     const client = new QueryClient({
       defaultOptions: { queries: { retry: false } },
     });
 
-    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({
-      status,
-    });
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({ status: 302 });
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
+    }
     expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
     expect(loaderApiMocks.fetchHostSessionRecordEditor).not.toHaveBeenCalled();
+  });
+
+  it("does not fetch trash when active detail is 500", async () => {
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(500));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({ status: 500 });
+    expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
+  });
+
+  it("replaces to a safe host fallback when both active and trash detail are not found", async () => {
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(404, "RESOURCE_NOT_FOUND"));
+    loaderApiMocks.fetchHostSessionTrash.mockRejectedValue(loaderApiError(404, "RESOURCE_NOT_FOUND"));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    await expect(hostSessionEditorLoaderFactory(client)(loaderArgs() as never)).rejects.toMatchObject({ status: 302 });
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
+    }
+  });
+
+  it("uses only a same-club safe host last-safe candidate when the detail is unavailable", async () => {
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", "/clubs/reading-sai/app/host/notifications");
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(403));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host/notifications");
+    }
+
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", "/clubs/other-club/app/host/notifications");
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+    } finally {
+      window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
+    }
+  });
+
+  it("does not replace an unavailable host detail with the same stored last-safe pathname", async () => {
+    const unavailablePath = "/clubs/reading-sai/app/host/sessions/session-1";
+    window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", unavailablePath);
+    loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(403));
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+
+    try {
+      await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
+      throw new Error("Expected replacement redirect");
+    } catch (response) {
+      expect(response).toBeInstanceOf(Response);
+      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("Location")).not.toBe(unavailablePath);
+    } finally {
+      window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
+    }
   });
 });
 
@@ -1806,6 +1951,7 @@ describe("EditHostSessionRoute trash ownership", () => {
     loaderApiMocks.fetchHostSessionDetail.mockReset();
     loaderApiMocks.fetchHostSessionTrash.mockReset();
     loaderApiMocks.fetchHostSessions.mockReset().mockResolvedValue({ items: [], nextCursor: null });
+    loaderApiMocks.fetchHostSessionList.mockReset().mockResolvedValue({ items: [], nextCursor: null });
     loaderApiMocks.fetchManualNotificationDispatches.mockReset().mockResolvedValue({
       items: [],
       nextCursor: null,
@@ -1833,10 +1979,11 @@ describe("EditHostSessionRoute trash ownership", () => {
     client.setQueryData(hostSessionKeys.trashDetail("session-1", context), {
       sessionId: "session-1",
       sessionNumber: 7,
-      title: "7회차 모임",
+      title: "No.7 모임",
       state: "DRAFT",
       deletedAt: "2026-08-21T10:00:00Z",
       purgeAfter: "2026-08-28T10:00:00Z",
+      sessionRevision: 4,
     });
     client.setQueryData(hostSessionRecordKeys.editor("session-1", context), recordEditor);
     loaderApiMocks.fetchHostSessionTrash.mockResolvedValue(trashDetail());
@@ -1845,7 +1992,7 @@ describe("EditHostSessionRoute trash ownership", () => {
 
     renderEditSessionRoute(client, { sessionId: "session-1", mode: "trash" });
 
-    expect(await screen.findByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "No.7 모임" })).toBeVisible();
     await user.click(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" })[0]!);
 
     expect(await screen.findByRole("status")).toHaveTextContent("모임을 복원했습니다.");
@@ -1873,13 +2020,13 @@ describe("EditHostSessionRoute trash ownership", () => {
     expect(await screen.findByText("record workflow route ready")).toBeVisible();
     await user.click(screen.getByRole("button", { name: "route-delete-session" }));
 
-    expect(await screen.findByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(await screen.findByRole("heading", { level: 1, name: "No.7 모임" })).toBeVisible();
     expect(screen.queryByText("record workflow route ready")).not.toBeInTheDocument();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
 
     await user.click(screen.getAllByRole("button", { name: "방금 삭제한 모임 복구" })[0]!);
     expect(await screen.findByRole("alert")).toHaveTextContent("모임을 복원하지 못했습니다.");
-    expect(screen.getByRole("heading", { level: 1, name: "7회차 모임" })).toBeVisible();
+    expect(screen.getByRole("heading", { level: 1, name: "No.7 모임" })).toBeVisible();
     expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("모임을 복원하지 못했습니다.");

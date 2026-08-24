@@ -9,7 +9,7 @@ export function RecentReadingRow(
     <a
       className="rm-recent-reading-row rm-recent-reading-row--archive-aligned"
       href={item.href}
-      aria-label={`${item.bookTitle} 회차 기록`}
+      aria-label={`${item.bookTitle} 모임 기록`}
     >
       <span className="rm-recent-reading-row__cover-frame">
         <RecentReadingCover item={item} />

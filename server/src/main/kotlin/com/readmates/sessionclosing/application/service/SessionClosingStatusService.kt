@@ -20,12 +20,15 @@ import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.springframework.stereotype.Service
+import org.springframework.transaction.annotation.Isolation
+import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
 class SessionClosingStatusService(
     private val loadPort: LoadSessionClosingStatusPort,
 ) : GetHostSessionClosingStatusUseCase {
+    @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
     override fun getHostSessionClosingStatus(
         host: CurrentMember,
         sessionId: UUID,
@@ -45,7 +48,18 @@ private fun SessionClosingSnapshot.toClosingStatus(): HostSessionClosingStatus {
     val signals = closingSignals()
 
     return HostSessionClosingStatus(
-        session = ClosingSessionSummary(sessionId, sessionNumber, bookTitle, meetingDate, state, recordVisibility),
+        session =
+            ClosingSessionSummary(
+                sessionId,
+                sessionNumber,
+                bookTitle,
+                meetingDate,
+                state,
+                recordVisibility,
+                sessionRevision,
+                participantSetRevision,
+                attendanceSnapshotId,
+            ),
         overall = overall(signals),
         checklist = checklistItems(signals),
         evidence = evidence(),

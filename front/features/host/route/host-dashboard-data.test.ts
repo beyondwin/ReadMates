@@ -30,6 +30,12 @@ const emptyAttention = {
   },
 };
 
+const emptyMeetingPage = {
+  items: [],
+  nextCursor: null,
+  summary: emptyAttention.summary,
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -45,11 +51,18 @@ function createTestQueryClient() {
   });
 }
 
+function loaderArgs(url = "https://readmates.test/clubs/reading-sai/app/host") {
+  return {
+    request: new Request(url),
+    params: { clubSlug: "reading-sai" },
+  } as unknown as LoaderFunctionArgs;
+}
+
 function attentionItem(overrides: Record<string, unknown> = {}) {
   return {
     sessionId: "closed-1",
     sessionNumber: 12,
-    title: "12회차",
+    title: "No.12",
     bookTitle: "닫힌 책",
     bookAuthor: "저자",
     bookImageUrl: null,
@@ -107,36 +120,34 @@ describe("hostDashboardLoaderFactory", () => {
     const fetchMock = fetchMockFor({
       "/api/bff/api/auth/me": hostAuth,
       "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?limit=50": { items: [], nextCursor: null },
-      "/api/bff/api/host/sessions?needsAttention=true&limit=1": emptyAttention,
+      "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": emptyAttention,
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host"),
-    } as unknown as LoaderFunctionArgs);
+    await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
     const urls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(urls).toEqual(expect.arrayContaining([
-      "/api/bff/api/auth/me",
-      "/api/bff/api/sessions/current",
-      "/api/bff/api/host/sessions?limit=50",
-      "/api/bff/api/host/sessions?needsAttention=true&limit=1",
+      "/api/bff/api/auth/me?clubSlug=reading-sai",
+      "/api/bff/api/sessions/current?clubSlug=reading-sai",
+      "/api/bff/api/host/sessions?mode=meeting&limit=50&clubSlug=reading-sai",
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1&clubSlug=reading-sai",
     ]));
     expect(urls.some((url) => url.includes("/host/dashboard"))).toBe(false);
     expect(urls.some((url) => url.includes("/host/notifications"))).toBe(false);
     expect(urls.some((url) => url.includes("/host/club-operations"))).toBe(false);
   });
 
-  it("redirects an active meeting before dashboard, notification, or club-operations fetches begin", async () => {
+  it("keeps today as the owner when an active meeting exists", async () => {
     const fetchMock = fetchMockFor({
       "/api/bff/api/auth/me": hostAuth,
       "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?limit=50": {
+      "/api/bff/api/host/sessions?mode=meeting&limit=50": {
         items: [{
           sessionId: "open-1",
           sessionNumber: 8,
-          title: "8회차",
+          title: "No.8",
           bookTitle: "열린 책",
           bookAuthor: "저자",
           bookImageUrl: null,
@@ -154,35 +165,34 @@ describe("hostDashboardLoaderFactory", () => {
           lastModifiedAt: null,
         }],
         nextCursor: null,
+        summary: emptyAttention.summary,
       },
-      "/api/bff/api/host/sessions?needsAttention=true&limit=1": emptyAttention,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": emptyAttention,
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host?from=mail#board"),
-    } as unknown as LoaderFunctionArgs);
-
-    expect(result).toBeInstanceOf(Response);
-    expect((result as Response).status).toBe(302);
-    expect((result as Response).headers.get("Location")).toBe(
-      "/app/host/sessions/open-1?from=mail#board",
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())(
+      loaderArgs("https://readmates.test/clubs/reading-sai/app/host?from=mail#board"),
     );
+
+    expect(result).toMatchObject({
+      hostSessions: { items: [expect.objectContaining({ sessionId: "open-1", state: "OPEN" })] },
+    });
     const urls = fetchMock.mock.calls.map(([url]) => String(url));
     expect(urls.some((url) => url.includes("/host/dashboard"))).toBe(false);
     expect(urls.some((url) => url.includes("/host/notifications"))).toBe(false);
     expect(urls.some((url) => url.includes("/host/club-operations"))).toBe(false);
   });
 
-  it("preserves search and hash on a scoped canonical redirect", async () => {
+  it("keeps scoped today data without redirecting into a draft editor", async () => {
     const fetchMock = fetchMockFor({
       "/api/bff/api/auth/me?clubSlug=reading-sai": hostAuth,
       "/api/bff/api/sessions/current?clubSlug=reading-sai": { currentSession: null },
-      "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai": {
+      "/api/bff/api/host/sessions?mode=meeting&limit=50&clubSlug=reading-sai": {
         items: [{
           sessionId: "draft-1",
           sessionNumber: 9,
-          title: "9회차",
+          title: "No.9",
           bookTitle: "다음 책",
           bookAuthor: "저자",
           bookImageUrl: null,
@@ -200,8 +210,9 @@ describe("hostDashboardLoaderFactory", () => {
           lastModifiedAt: null,
         }],
         nextCursor: null,
+        summary: emptyAttention.summary,
       },
-      "/api/bff/api/host/sessions?needsAttention=true&limit=1&clubSlug=reading-sai": emptyAttention,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1&clubSlug=reading-sai": emptyAttention,
     });
     vi.stubGlobal("fetch", fetchMock);
 
@@ -210,10 +221,9 @@ describe("hostDashboardLoaderFactory", () => {
       request: new Request("https://readmates.test/clubs/reading-sai/app/host?tab=prep#top"),
     } as unknown as LoaderFunctionArgs);
 
-    expect(result).toBeInstanceOf(Response);
-    expect((result as Response).headers.get("Location")).toBe(
-      "/clubs/reading-sai/app/host/sessions/draft-1?tab=prep#top",
-    );
+    expect(result).toMatchObject({
+      hostSessions: { items: [expect.objectContaining({ sessionId: "draft-1", state: "DRAFT" })] },
+    });
   });
 
   it("returns empty-ledger attention data including PUBLISHED without starting discarded fetches", async () => {
@@ -227,8 +237,8 @@ describe("hostDashboardLoaderFactory", () => {
     const fetchMock = fetchMockFor({
       "/api/bff/api/auth/me": hostAuth,
       "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?limit=50": { items: [], nextCursor: null },
-      "/api/bff/api/host/sessions?needsAttention=true&limit=1": {
+      "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": {
         items: [published],
         nextCursor: "more",
         summary: {
@@ -240,9 +250,7 @@ describe("hostDashboardLoaderFactory", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host"),
-    } as unknown as LoaderFunctionArgs);
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
     expect(result).toMatchObject({
       current: { currentSession: null },
@@ -262,17 +270,15 @@ describe("hostDashboardLoaderFactory", () => {
     const fetchMock = fetchMockFor({
       "/api/bff/api/auth/me": hostAuth,
       "/api/bff/api/sessions/current": { currentSession: null },
-      "/api/bff/api/host/sessions?limit=50": { items: [], nextCursor: null },
-      "/api/bff/api/host/sessions?needsAttention=true&limit=1": new Response(
+      "/api/bff/api/host/sessions?mode=meeting&limit=50": emptyMeetingPage,
+      "/api/bff/api/host/sessions?mode=record&needsAttention=true&limit=1": new Response(
         JSON.stringify({ message: "attention unavailable" }),
         { status: 503, headers: { "Content-Type": "application/json" } },
       ),
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await hostDashboardLoaderFactory(createTestQueryClient())({
-      request: new Request("https://readmates.test/app/host"),
-    } as unknown as LoaderFunctionArgs);
+    const result = await hostDashboardLoaderFactory(createTestQueryClient())(loaderArgs());
 
     expect(result).toMatchObject({
       current: { currentSession: null },

@@ -13,6 +13,7 @@ import com.readmates.sessionrecord.application.model.HostSessionHistoryAttendanc
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.HostSessionHistoryRecovery
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.model.RebaseSessionRecordBaseExpectation
 import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
@@ -86,16 +87,36 @@ data class SaveSessionRecordDraftRequest(
 
 data class RebaseSessionRecordDraftRequest(
     @field:Positive val expectedDraftRevision: Long,
-    @field:PositiveOrZero val expectedLiveRevision: Long,
-    val expectedSessionUpdatedAt: OffsetDateTime,
+    @field:PositiveOrZero val expectedSessionRevision: Long? = null,
+    @field:PositiveOrZero val expectedLiveRevision: Long? = null,
+    @field:PositiveOrZero val expectedExposureRevision: Long? = null,
+    @field:PositiveOrZero val expectedPublicationRevision: Long? = null,
+    val expectedSessionUpdatedAt: OffsetDateTime? = null,
 ) {
-    fun toCommand(sessionId: UUID) =
-        RebaseSessionRecordDraftCommand(
-            sessionId = sessionId,
-            expectedDraftRevision = expectedDraftRevision,
-            expectedLiveRevision = expectedLiveRevision,
-            expectedSessionUpdatedAt = expectedSessionUpdatedAt,
-        )
+    fun toCommand(sessionId: UUID): RebaseSessionRecordDraftCommand {
+        val exactFields = listOf(expectedSessionRevision, expectedExposureRevision, expectedPublicationRevision)
+        val expectedBase =
+            when {
+                expectedSessionUpdatedAt != null && exactFields.all { it == null } && expectedLiveRevision != null ->
+                    RebaseSessionRecordBaseExpectation.LegacyTimestamp(
+                        expectedLiveRevision = expectedLiveRevision,
+                        expectedSessionUpdatedAt = expectedSessionUpdatedAt,
+                    )
+                expectedSessionUpdatedAt == null && exactFields.all { it != null } && expectedLiveRevision != null ->
+                    RebaseSessionRecordBaseExpectation.ExactRevisions(
+                        expectedSessionRevision = requireNotNull(expectedSessionRevision),
+                        expectedLiveRevision = expectedLiveRevision,
+                        expectedExposureRevision = requireNotNull(expectedExposureRevision),
+                        expectedPublicationRevision = requireNotNull(expectedPublicationRevision),
+                    )
+                else ->
+                    throw SessionRecordException(
+                        SessionRecordError.INVALID_REBASE_CONTRACT,
+                        "Rebase requires exactly one reviewed live base",
+                    )
+            }
+        return RebaseSessionRecordDraftCommand(sessionId, expectedDraftRevision, expectedBase)
+    }
 }
 
 data class PreviewSessionRecordApplyRequest(
@@ -217,11 +238,16 @@ data class SessionRecordFeedbackDocumentResponse(
 data class SessionRecordDraftResponse(
     val sessionId: String,
     val baseLiveRevision: Long,
+    val baseSessionRevision: Long,
+    val baseExposureRevision: Long,
+    val basePublicationRevision: Long,
+    val baseVectorKnown: Boolean,
     val draftRevision: Long,
     val source: SessionRecordDraftSource,
     val restoredFromRevisionId: String?,
     val snapshot: SessionRecordSnapshotResponse,
     val updatedAt: OffsetDateTime,
+    val liveSessionUpdatedAt: OffsetDateTime,
 )
 
 data class SessionRecordValidationSummaryResponse(
@@ -232,6 +258,9 @@ data class SessionRecordValidationSummaryResponse(
 data class SessionRecordEditorResponse(
     val sessionId: String,
     val liveRevision: Long,
+    val liveSessionRevision: Long,
+    val liveExposureRevision: Long,
+    val livePublicationRevision: Long,
     val liveSessionUpdatedAt: OffsetDateTime,
     val liveSnapshot: SessionRecordSnapshotResponse,
     val draft: SessionRecordDraftResponse?,
@@ -296,6 +325,9 @@ fun SessionRecordEditor.toResponse() =
     SessionRecordEditorResponse(
         sessionId = live.sessionId.toString(),
         liveRevision = live.revision,
+        liveSessionRevision = live.sessionRevision,
+        liveExposureRevision = live.exposureRevision,
+        livePublicationRevision = live.publicationRevision,
         liveSessionUpdatedAt = live.sessionUpdatedAt,
         liveSnapshot = live.snapshot.toResponse(),
         draft = draft?.toResponse(),
@@ -311,11 +343,16 @@ fun SessionRecordDraft.toResponse() =
     SessionRecordDraftResponse(
         sessionId = sessionId.toString(),
         baseLiveRevision = baseLiveRevision,
+        baseSessionRevision = baseSessionRevision,
+        baseExposureRevision = baseExposureRevision,
+        basePublicationRevision = basePublicationRevision,
+        baseVectorKnown = baseVectorKnown,
         draftRevision = draftRevision,
         source = source,
         restoredFromRevisionId = restoredFromRevisionId?.toString(),
         snapshot = snapshot.toResponse(),
         updatedAt = updatedAt,
+        liveSessionUpdatedAt = baseSessionUpdatedAt,
     )
 
 fun SessionRecordApplyPreview.toResponse() =

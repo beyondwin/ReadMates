@@ -85,7 +85,7 @@ const importPreview: SessionImportPreviewResponse = {
 const importCommitResult: SessionImportCommitResult = {
   tone: "success",
   title: "초안 저장 완료",
-  message: "가져온 세션 기록을 공유 초안으로 저장했습니다.",
+  message: "가져온 모임 기록을 공유 초안으로 저장했습니다.",
   visibilityLabel: "게스트 공개",
   items: ["공개 요약 초안 교체"],
   nextAction: "공통 초안을 검토해 주세요.",
@@ -192,7 +192,7 @@ describe("SessionRecordWorkspace", () => {
     expect(within(sourceTabs).queryByRole("tab", { name: "외부 JSON" })).not.toBeInTheDocument();
     expect(within(applied).getByText("이전 적용본")).toBeVisible();
     expect(screen.queryByText("버전 0")).not.toBeInTheDocument();
-    expect(screen.queryByText("세션 기록 완성")).not.toBeInTheDocument();
+    expect(screen.queryByText("모임 기록 완성")).not.toBeInTheDocument();
     expect(screen.queryByText("공개 기록 초안")).not.toBeInTheDocument();
     expect(screen.queryByText(/live revision/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/draft revision/i)).not.toBeInTheDocument();
@@ -496,7 +496,7 @@ describe("SessionRecordWorkspace", () => {
 
     expect(onReviewDraft).not.toHaveBeenCalled();
     expect(screen.getByRole("tab", { name: "정리본 올리기" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.queryByRole("region", { name: "세션 기록 초안 저장 결과" }))
+    expect(screen.queryByRole("region", { name: "모임 기록 초안 저장 결과" }))
       .not.toBeInTheDocument();
     expect(screen.getByRole("region", { name: "멤버에게 보이는 기록" }))
       .toHaveTextContent("현재 멤버 화면에 적용된 요약");

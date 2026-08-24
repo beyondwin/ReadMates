@@ -11,6 +11,11 @@ const hostAuth: AuthMeResponse = {
   approvalState: "ACTIVE",
 };
 
+const memberAuth: AuthMeResponse = {
+  ...hostAuth,
+  role: "MEMBER",
+};
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -54,6 +59,30 @@ describe("requireHostLoaderAuth", () => {
 
     await expect(requireHostLoaderAuth(args)).resolves.toEqual(hostAuth);
     expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("marks scoped host authority loss as a history replacement", async () => {
+    vi.stubGlobal("fetch", vi.fn(() => Promise.resolve(jsonResponse(memberAuth))));
+
+    await expect(
+      requireHostLoaderAuth({
+        params: { clubSlug: "alpha" },
+        request: new Request("https://readmates.local/clubs/alpha/app/host"),
+      }),
+    ).rejects.toMatchObject({
+      status: 302,
+      headers: expect.objectContaining({ get: expect.any(Function) }),
+    });
+
+    try {
+      await requireHostLoaderAuth({
+        params: { clubSlug: "alpha" },
+        request: new Request("https://readmates.local/clubs/alpha/app/host"),
+      });
+    } catch (response) {
+      expect((response as Response).headers.get("Location")).toBe("/clubs/alpha/app");
+      expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
+    }
   });
 
   it("keeps unscoped host authorization requests independent", async () => {

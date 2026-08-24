@@ -37,6 +37,38 @@ class ServerArchitectureInventoryTest {
     }
 
     @Test
+    fun `mutation owners expose neutral public effects without importing publication application`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val mutationOwnerApplications =
+            listOf("auth/application", "club/application", "session/application", "sessionrecord/application")
+        mutationOwnerApplications.forEach { relative ->
+            Files.walk(productionSourceRoot.resolve("com/readmates/$relative")).use { paths ->
+                paths
+                    .filter(Files::isRegularFile)
+                    .filter { sourceFile -> sourceFile.fileName.toString().endsWith(".kt") }
+                    .forEach { sourceFile ->
+                        assertThat(Files.readString(sourceFile))
+                            .doesNotContain("import com.readmates.publication.application")
+                    }
+            }
+        }
+        assertThat(
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/publication/adapter/out/persistence/JdbcPublicConvergenceAdapter.kt",
+                ),
+            ),
+        ).contains("PublicConvergencePort")
+        assertThat(PublicConvergencePort::class.java.declaredMethods.map { it.name })
+            .containsExactlyInAnyOrder("loadReceipt", "loadWork", "loadCurrentEvent", "appendEvent")
+        assertThat(
+            PublicConvergencePort::class.java.methods
+                .single { it.name == "appendEvent" }
+                .parameterCount,
+        ).isEqualTo(1)
+    }
+
+    @Test
     fun `club application imports no auth source`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
         val clubApplicationRoot = productionSourceRoot.resolve("com/readmates/club/application")
@@ -94,48 +126,6 @@ class ServerArchitectureInventoryTest {
     }
 
     @Test
-    fun `public convergence writes preserve transaction ownership and immutable port shape`() {
-        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
-        listOf("session/application", "sessionrecord/application").forEach { relative ->
-            Files.walk(productionSourceRoot.resolve("com/readmates/$relative")).use { paths ->
-                paths
-                    .filter(Files::isRegularFile)
-                    .filter { it.fileName.toString().endsWith(".kt") }
-                    .forEach { sourceFile ->
-                        assertThat(Files.readString(sourceFile)).doesNotContain("import com.readmates.publication.")
-                    }
-            }
-        }
-
-        val ownerAdapter =
-            Files.readString(
-                productionSourceRoot.resolve(
-                    "com/readmates/session/adapter/out/persistence/JdbcHostMutationReceiptAdapter.kt",
-                ),
-            )
-        assertThat(ownerAdapter)
-            .contains("insert into public_projection_generations")
-            .contains("insert into public_mutation_convergence_receipts")
-            .contains("insert into public_convergence_work")
-            .doesNotContain("import com.readmates.publication.")
-
-        val convergencePort =
-            Files.readString(
-                productionSourceRoot.resolve(
-                    "com/readmates/publication/application/port/out/PublicConvergencePort.kt",
-                ),
-            )
-        assertThat(convergencePort)
-            .doesNotContain("updateReceipt", "deleteReceipt", "updateEvent", "deleteEvent")
-        assertThat(
-            PublicConvergencePort::class.java.methods
-                .single { it.name == "appendEvent" }
-                .parameterCount,
-        ).isEqualTo(1)
-    }
-
-    @Test
-    @Suppress("LongMethod")
     fun `mutation idempotency substrate stays shared and session receipts stay session owned`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
         val mutationRoot = productionSourceRoot.resolve("com/readmates/shared/mutation")
@@ -194,8 +184,7 @@ class ServerArchitectureInventoryTest {
         val confirmTest =
             Files.readString(
                 projectRoot().resolve(
-                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/" +
-                        "JdbcManualNotificationDispatchAdapterTest.kt",
+                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcManualNotificationDispatchAdapterTest.kt",
                 ),
             )
         assertThat(confirmTest).doesNotContain("HostMutationReceipt")

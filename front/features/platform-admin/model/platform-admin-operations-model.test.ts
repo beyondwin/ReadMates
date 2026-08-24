@@ -152,7 +152,7 @@ describe("platform admin operations model", () => {
         description: "작업 상태를 확인하세요.",
       },
       SESSION_CLOSING_BLOCKED: {
-        title: "회차 마감이 완료되지 않았습니다",
+        title: "모임 마감이 완료되지 않았습니다",
         description: "호스트 클로징 보드를 확인하세요.",
       },
     };

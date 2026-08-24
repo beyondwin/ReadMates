@@ -18,14 +18,11 @@ import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.sessionrecord.application.model.SessionRecordError
 import com.readmates.sessionrecord.application.model.SessionRecordException
-import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.application.model.toAudienceProjection
 import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
-import com.readmates.sessionrecord.application.port.out.AppliedSessionRecordPublicEffect
 import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
-import com.readmates.sessionrecord.application.port.out.SessionRecordPublicProjectionPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.listing.application.model.HostListEpochKind
@@ -50,7 +47,6 @@ class SessionRecordApplyService(
     private val replacer: ReplaceSessionRecordContentPort,
     private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
     private val idempotency: MutationIdempotencyService? = null,
-    private val publicProjection: SessionRecordPublicProjectionPort = SessionRecordPublicProjectionPort.Noop(),
 ) : ApplySessionRecordUseCase {
     @Transactional(readOnly = true)
     override fun previewCorrection(
@@ -59,6 +55,9 @@ class SessionRecordApplyService(
     ): SessionRecordCorrectionPreview? {
         requireHost(host)
         val correction = store.loadCorrectionEditor(host, sessionId) ?: throw notFound()
+        if (correction.editor.draftLiveBaseStale) {
+            throw liveStale()
+        }
         val draft = correction.editor.draft
         return if (correction.state == "PUBLISHED" && draft != null) {
             SessionRecordCorrectionPreview(
@@ -90,7 +89,6 @@ class SessionRecordApplyService(
     }
 
     @Transactional
-    @Suppress("ReturnCount", "ThrowsCount")
     override fun apply(
         host: CurrentMember,
         command: ApplySessionRecordCommand,
@@ -162,20 +160,20 @@ class SessionRecordApplyService(
                 .toAudienceProjection(correction.state)
         val exposureChanged =
             targetAudience.accessScope != liveAudience.accessScope
+        val receiptId = UUID.randomUUID()
         val result =
             applyLocked(
                 host = host,
                 command =
                     ApplySessionRecordCommand(
                         sessionId = command.sessionId,
-                        applyRequestId = UUID.randomUUID(),
+                        applyRequestId = receiptId,
                         expectedDraftRevision = command.expectedDraftRevision,
                         expectedLiveRevision = command.expectedLiveRevision,
                         expectedDraftHash = requestHash,
                     ),
                 editor = correction.editor,
                 allowHostOnlyVisibility = true,
-                recordPublicProjection = false,
                 afterReplacement = {
                     check(
                         store.bumpCorrectionProjectionRevisions(
@@ -188,7 +186,7 @@ class SessionRecordApplyService(
                     ) { "Locked correction projection revisions changed unexpectedly" }
                 },
             )
-        return PublishSessionRecordCorrectionResult.Applied(result)
+        return PublishSessionRecordCorrectionResult.Applied(receiptId, result)
     }
 
     @Suppress("LongMethod", "ThrowsCount")
@@ -198,7 +196,6 @@ class SessionRecordApplyService(
         editor: SessionRecordEditor,
         identity: MutationIdentity? = null,
         allowHostOnlyVisibility: Boolean = false,
-        recordPublicProjection: Boolean = true,
         afterReplacement: () -> Unit = {},
     ): SessionRecordApplyResult {
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId, forUpdate = true)?.let { completed ->
@@ -250,18 +247,7 @@ class SessionRecordApplyService(
         val encodedDraft = codec.encode(canonicalSnapshot)
         afterReplacement()
         val revision = store.insertAppliedRevision(host, editor, encodedDraft)
-        val receipt = store.insertApplyReceipt(host, command, requestHash, eventType, revision)
-        if (recordPublicProjection) {
-            publicProjection.recordApplied(
-                AppliedSessionRecordPublicEffect(
-                    receiptId = receipt.receiptId,
-                    clubId = revision.clubId,
-                    sessionId = revision.sessionId,
-                    liveRecordRevision = revision.version,
-                    committedAt = revision.appliedAt,
-                ),
-            )
-        }
+        store.insertApplyReceipt(host, command, requestHash, eventType, revision)
         if (identity != null) {
             idempotency?.complete(identity, command.applyRequestId)
         }
@@ -318,10 +304,7 @@ class SessionRecordApplyService(
         expectedDraftRevision: Long,
     ) {
         if (draft.draftRevision != expectedDraftRevision) throw draftStale()
-        if (live.revision != expectedLiveRevision ||
-            draft.baseLiveRevision != live.revision ||
-            draft.baseSessionUpdatedAt != live.sessionUpdatedAt
-        ) {
+        if (live.revision != expectedLiveRevision || draft.isStaleAgainst(live)) {
             throw SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
         }
     }
@@ -367,6 +350,8 @@ private fun SessionRecordDraft.trustedAuthorBindings(): Map<String, UUID> =
         }
 
 private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE, "Session record draft is stale")
+
+private fun liveStale() = SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
 
 private fun notFound() = SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
 

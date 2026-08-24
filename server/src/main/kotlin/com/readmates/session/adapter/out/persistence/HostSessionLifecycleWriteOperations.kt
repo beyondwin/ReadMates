@@ -18,33 +18,24 @@ internal class HostSessionLifecycleWriteOperations(
     private val jdbcTemplate: JdbcTemplate,
     private val queries: HostSessionWriteQueries,
     private val policy: HostSessionWritePolicy,
+    private val publicProjection: HostPublicProjectionWriteOperations,
 ) {
     fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
         queries.lockClub(command.host.clubId)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        val changed =
-            if (policy.openDecision(state) == HostSessionTransitionDecision.UNCHANGED) {
-                verifyRevision(command)
-                false
-            } else {
-                openDraft(command)
-            }
-        return result(command, changed)
-    }
-
-    private fun openDraft(command: HostSessionIdCommand): Boolean {
-        val clubId = command.host.clubId
-        val membershipId = command.host.membershipId
-        val sessionId = command.sessionId
-        val openSessionId = queries.findOpenSessionId(clubId)
+        if (policy.openDecision(state) == HostSessionTransitionDecision.UNCHANGED) {
+            verifyRevision(command)
+            return result(command, false)
+        }
+        val openSessionId = queries.findOpenSessionId(command.host.clubId)
         if (openSessionId != null) throw OpenSessionAlreadyExistsException(openSessionId)
-        queries.locks.requireActiveClubAndMembership(clubId, membershipId, hostRequired = true)
-        val locked = queries.locks.lockSession(clubId, sessionId) ?: throw HostSessionNotFoundException()
+        queries.requireActiveClubAndMembership(command.host.clubId, command.host.membershipId, hostRequired = true)
+        val locked = queries.lockSession(command.host.clubId, command.sessionId) ?: throw HostSessionNotFoundException()
         if (locked.state != "DRAFT") {
             verifyRevision(command)
             policy.openDecision(locked.state)
-            return false
+            return result(command, false)
         }
         val updated =
             jdbcTemplate.update(
@@ -67,18 +58,16 @@ internal class HostSessionLifecycleWriteOperations(
                 command.host.clubId.dbString(),
                 queries.expectedRevision(command.expectedSessionRevision),
             )
-        queries.revisions.throwIfStale(updated, command.host, command.sessionId)
+        queries.throwIfStale(updated, command.host, command.sessionId)
         hidePublicPlacement(command)
         createActiveParticipants(command.host.clubId, command.sessionId)
-        return true
+        return result(command, true, rotatePublicProjection = true)
     }
 
     fun close(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
-        val clubId = command.host.clubId
-        val membershipId = command.host.membershipId
-        queries.locks.requireActiveClubAndMembership(clubId, membershipId, hostRequired = true)
-        val locked = queries.locks.lockSession(clubId, command.sessionId) ?: throw HostSessionNotFoundException()
+        queries.requireActiveClubAndMembership(command.host.clubId, command.host.membershipId, hostRequired = true)
+        val locked = queries.lockSession(command.host.clubId, command.sessionId) ?: throw HostSessionNotFoundException()
         verifyCloseExpected(command)
         if (locked.state != "OPEN") {
             verifyRevision(command)
@@ -102,7 +91,7 @@ internal class HostSessionLifecycleWriteOperations(
                 command.host.clubId.dbString(),
                 queries.expectedRevision(command.expectedSessionRevision),
             )
-        queries.revisions.throwIfStale(closedRows, command.host, command.sessionId)
+        queries.throwIfStale(closedRows, command.host, command.sessionId)
         return result(command, true)
     }
 
@@ -141,32 +130,126 @@ internal class HostSessionLifecycleWriteOperations(
             return result(command, false)
         }
         exposePublicPublication(command)
-        return result(command, true)
+        return result(command, true, rotatePublicProjection = true)
+    }
+
+    fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult {
+        requireHost(command.host)
+        queries.lockClub(command.host.clubId)
+        val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        if (reopenDecision(state) == HostSessionTransitionDecision.UNCHANGED) {
+            verifyRevision(command)
+            return result(command, false)
+        }
+        return result(command, reopenClosedSession(command), rotatePublicProjection = true)
+    }
+
+    fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult {
+        requireHost(command.host)
+        val unpublishedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'CLOSED',
+                    session_revision = session_revision + 1,
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and deleted_at is null
+                  and state = 'PUBLISHED'
+                  and session_revision = ?
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+                queries.expectedRevision(command.expectedSessionRevision),
+            )
+        if (unpublishedRows > 0) return result(command, true, rotatePublicProjection = true)
+        verifyRevision(command)
+        val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        unpublishDecision(state)
+        return result(command, false)
+    }
+
+    fun returnToDraft(command: HostSessionIdCommand): HostSessionTransitionResult {
+        requireHost(command.host)
+        queries.lockClub(command.host.clubId)
+        val returnedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'DRAFT',
+                    session_revision = session_revision + 1,
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and deleted_at is null
+                  and state = 'OPEN'
+                  and session_revision = ?
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+                queries.expectedRevision(command.expectedSessionRevision),
+            )
+        if (returnedRows > 0) return result(command, true)
+        verifyRevision(command)
+        val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        returnToDraftDecision(state)
+        return result(command, false)
+    }
+
+    private fun reopenClosedSession(command: HostSessionIdCommand): Boolean {
+        val openSessionId = queries.findOpenSessionId(command.host.clubId)
+        if (openSessionId != null && openSessionId != command.sessionId) {
+            throw OpenSessionAlreadyExistsException(openSessionId)
+        }
+        val reopenedRows =
+            jdbcTemplate.update(
+                """
+                update sessions
+                set state = 'OPEN',
+                    session_revision = session_revision + 1,
+                    updated_at = utc_timestamp(6)
+                where id = ?
+                  and club_id = ?
+                  and deleted_at is null
+                  and state = 'CLOSED'
+                  and session_revision = ?
+                """.trimIndent(),
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+                queries.expectedRevision(command.expectedSessionRevision),
+            )
+        if (reopenedRows > 0) {
+            hidePublicPlacement(command)
+            return true
+        }
+        queries.throwIfStale(0, command.host, command.sessionId)
+        val latest = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        reopenDecision(latest)
+        return false
     }
 
     private fun verifyCloseExpected(command: HostSessionIdCommand) {
         command.expectedParticipantSetRevision?.let { expected ->
             val current =
-                queries.locks.lockParticipantSetRevision(command.host, command.sessionId)
+                queries.lockParticipantSetRevision(command.host, command.sessionId)
                     ?: throw HostSessionNotFoundException()
             if (current != expected) {
-                queries.revisions.throwIfStale(0, command.host, command.sessionId)
+                queries.throwIfStale(0, command.host, command.sessionId)
             }
         }
         command.expectedAttendanceSnapshotId?.let { expected ->
-            if (queries.revisions.attendanceSnapshotId(command.host, command.sessionId) != expected) {
-                queries.revisions.throwIfStale(0, command.host, command.sessionId)
+            if (queries.attendanceSnapshotId(command.host, command.sessionId) != expected) {
+                queries.throwIfStale(0, command.host, command.sessionId)
             }
         }
     }
 
     private fun verifyRevision(command: HostSessionIdCommand) {
         val expected = queries.expectedRevision(command.expectedSessionRevision)
-        val current =
-            queries.locks.sessionRevision(command.host, command.sessionId)
-                ?: throw HostSessionNotFoundException()
+        val current = queries.sessionRevision(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         if (current != expected) {
-            queries.revisions.throwIfStale(0, command.host, command.sessionId)
+            queries.throwIfStale(0, command.host, command.sessionId)
         }
     }
 
@@ -252,8 +335,15 @@ internal class HostSessionLifecycleWriteOperations(
     private fun result(
         command: HostSessionIdCommand,
         changed: Boolean,
+        rotatePublicProjection: Boolean = false,
     ) = HostSessionTransitionResult(
         detail = queries.detail(command.host, command.sessionId),
         changed = changed,
+        publicProjectionEffect =
+            if (changed && rotatePublicProjection) {
+                publicProjection.rotate(command.host.clubId, command.sessionId)
+            } else {
+                null
+            },
     )
 }

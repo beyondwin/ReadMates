@@ -81,6 +81,7 @@ async function routePlatformAdminHostWorkspace(page: Page) {
             membershipId: "membership-host",
             role: "HOST",
             status: "ACTIVE",
+            approvalState: "ACTIVE",
             primaryHost: null,
           },
         ],
