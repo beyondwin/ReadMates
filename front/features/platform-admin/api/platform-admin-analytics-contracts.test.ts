@@ -7,10 +7,13 @@ const validOverview = {
   kpis: [
     {
       key: "SESSION_COMPLETION",
+      label: "모임 완료율",
+      definition: "완료된 모임 비율",
       unit: "PERCENT",
       availability: "AVAILABLE",
       current: 80,
       prior: 60,
+      delta: 20,
       deltaDirection: "UP",
     },
   ],
@@ -50,16 +53,34 @@ describe("platform-admin analytics zod parser", () => {
 
   it("normalizes an older overview payload without KPI series", async () => {
     const { parseAdminAnalyticsOverview } = await import("./platform-admin-analytics-contracts");
+    const legacyKpi = { ...validOverview.kpis[0] };
+    delete (legacyKpi as Partial<typeof legacyKpi>).label;
+    delete (legacyKpi as Partial<typeof legacyKpi>).definition;
+    delete (legacyKpi as Partial<typeof legacyKpi>).delta;
     const legacyPayload = {
       ...validOverview,
       schema: "admin.analytics_overview.v1",
+      kpis: [legacyKpi],
     };
     delete (legacyPayload as { series?: unknown }).series;
 
     expect(parseAdminAnalyticsOverview(legacyPayload)).toMatchObject({
       schema: "admin.analytics_overview.v2",
       series: [],
-      kpis: [{ key: "SESSION_COMPLETION" }],
+      kpis: [{ key: "SESSION_COMPLETION", label: "모임 완료율", definition: "", delta: null, deltaDirection: "NONE" }],
+    });
+  });
+
+  it("normalizes additive KPI fields missing during a v2 deployment skew", async () => {
+    const { parseAdminAnalyticsOverview } = await import("./platform-admin-analytics-contracts");
+    const skewedKpi = { ...validOverview.kpis[0] };
+    delete (skewedKpi as Partial<typeof skewedKpi>).label;
+    delete (skewedKpi as Partial<typeof skewedKpi>).definition;
+    delete (skewedKpi as Partial<typeof skewedKpi>).delta;
+
+    expect(parseAdminAnalyticsOverview({ ...validOverview, kpis: [skewedKpi] })).toMatchObject({
+      schema: "admin.analytics_overview.v2",
+      kpis: [{ key: "SESSION_COMPLETION", label: "모임 완료율", definition: "", delta: null, deltaDirection: "NONE" }],
     });
   });
 

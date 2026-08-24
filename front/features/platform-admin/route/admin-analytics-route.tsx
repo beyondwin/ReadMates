@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
+import { fetchAdminAnalyticsExport } from "@/features/platform-admin/api/platform-admin-analytics-api";
 import {
   analyticsSearchFromWindow,
   analyticsWindowFromSearchParams,
@@ -15,9 +16,30 @@ export function AdminAnalyticsRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const window = useMemo(() => analyticsWindowFromSearchParams(searchParams), [searchParams]);
   const query = useQuery(platformAdminAnalyticsOverviewQuery(window));
+  const [exportStatus, setExportStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
 
   function changeWindow(next: AnalyticsWindow) {
     setSearchParams(analyticsSearchFromWindow(next));
+    setExportStatus("idle");
+  }
+
+  async function exportCsv() {
+    setExportStatus("pending");
+    try {
+      const exported = await fetchAdminAnalyticsExport(window);
+      const objectUrl = URL.createObjectURL(exported.blob);
+      try {
+        const link = document.createElement("a");
+        link.href = objectUrl;
+        link.download = exported.filename;
+        link.click();
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+      setExportStatus("success");
+    } catch {
+      setExportStatus("error");
+    }
   }
 
   return (
@@ -27,6 +49,8 @@ export function AdminAnalyticsRoute() {
       loading={query.isLoading}
       error={query.isError ? GENERIC_ERROR : null}
       onWindowChange={changeWindow}
+      exportStatus={exportStatus}
+      onExport={exportCsv}
     />
   );
 }

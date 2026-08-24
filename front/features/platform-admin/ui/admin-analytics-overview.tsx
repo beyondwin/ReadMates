@@ -1,7 +1,6 @@
+import type { KeyboardEvent } from "react";
 import {
   analyticsActionForKpi,
-  analyticsCsvFilename,
-  analyticsCsvHref,
   deltaLabel,
   formatKpiValue,
   formatSeriesPointValue,
@@ -20,6 +19,8 @@ export type AdminAnalyticsOverviewViewProps = {
   loading: boolean;
   error: string | null;
   onWindowChange: (window: AnalyticsWindow) => void;
+  exportStatus: "idle" | "pending" | "success" | "error";
+  onExport: () => void;
 };
 
 const WINDOWS: AnalyticsWindow[] = ["7d", "30d", "90d"];
@@ -30,7 +31,23 @@ export function AdminAnalyticsOverviewView({
   loading,
   error,
   onWindowChange,
+  exportStatus,
+  onExport,
 }: AdminAnalyticsOverviewViewProps) {
+  function handleWindowKeyDown(event: KeyboardEvent<HTMLButtonElement>, value: AnalyticsWindow) {
+    const index = WINDOWS.indexOf(value);
+    if (event.key === "ArrowRight") {
+      event.preventDefault();
+      onWindowChange(WINDOWS[(index + 1) % WINDOWS.length]);
+    } else if (event.key === "ArrowLeft") {
+      event.preventDefault();
+      onWindowChange(WINDOWS[(index - 1 + WINDOWS.length) % WINDOWS.length]);
+    } else if (event.key === "Home" || event.key === "End") {
+      event.preventDefault();
+      onWindowChange(event.key === "Home" ? WINDOWS[0] : WINDOWS[WINDOWS.length - 1]);
+    }
+  }
+
   return (
     <section className="admin-analytics" aria-labelledby="admin-analytics-heading">
       <header className="admin-analytics__header">
@@ -43,6 +60,7 @@ export function AdminAnalyticsOverviewView({
               className="admin-analytics__window"
               aria-pressed={value === window}
               onClick={() => onWindowChange(value)}
+              onKeyDown={(event) => handleWindowKeyDown(event, value)}
             >
               {labelWindow(value)}
             </button>
@@ -56,13 +74,16 @@ export function AdminAnalyticsOverviewView({
       {overview ? (
         <>
           <div className="admin-analytics__actions">
-            <a
+            <button
+              type="button"
               className="admin-analytics__export"
-              href={analyticsCsvHref(overview)}
-              download={analyticsCsvFilename(overview)}
+              disabled={exportStatus === "pending"}
+              onClick={onExport}
             >
-              CSV 내려받기
-            </a>
+              {exportStatus === "pending" ? "CSV 내려받는 중" : "CSV 내려받기"}
+            </button>
+            {exportStatus === "success" ? <p className="admin-analytics__export-status" role="status">CSV 파일을 내려받았습니다.</p> : null}
+            {exportStatus === "error" ? <p className="admin-analytics__export-error" role="alert">CSV 파일을 만들지 못했습니다. 다시 시도해 주세요.</p> : null}
           </div>
           <ul className="admin-analytics__kpis" aria-label="핵심 지표">
             {overview.kpis.map((card) => (
@@ -82,7 +103,8 @@ function AdminAnalyticsKpiTile({ card }: { card: AdminAnalyticsKpiCard }) {
   const action = analyticsActionForKpi(card.key);
   return (
     <li className={`admin-analytics__kpi${unavailable ? " admin-analytics__kpi--empty" : ""}`}>
-      <span className="admin-analytics__kpi-label">{labelKpi(card.key)}</span>
+      <span className="admin-analytics__kpi-label">{card.label || labelKpi(card.key)}</span>
+      {card.definition ? <span className="admin-analytics__kpi-definition">{card.definition}</span> : null}
       <span className="admin-analytics__kpi-value">{formatKpiValue(card)}</span>
       <span className="admin-analytics__kpi-delta">{deltaLabel(card)}</span>
       <a className="admin-analytics__kpi-action small" href={action.href}>
@@ -97,7 +119,7 @@ function AdminAnalyticsSeriesTable({ series }: { series: AdminAnalyticsKpiSeries
     return <p className="admin-analytics__benchmark-empty">KPI 추세를 만들 충분한 데이터가 없습니다.</p>;
   }
 
-  const bucketStarts = series[0]?.points.map((point) => point.bucketStart) ?? [];
+  const bucketStarts = [...new Set(series.flatMap((item) => item.points.map((point) => point.bucketStart)))].sort();
 
   return (
     <section className="admin-analytics__trend" aria-labelledby="admin-analytics-trends-heading">
@@ -144,23 +166,25 @@ function AdminAnalyticsBenchmarkTable({
     return <p className="admin-analytics__benchmark-empty">클럽 비교에 충분한 데이터가 없습니다.</p>;
   }
   return (
-    <table className="admin-analytics__benchmark" aria-label="클럽 비교">
-      <thead>
-        <tr>
-          <th scope="col">클럽</th>
-          <th scope="col">활성 멤버</th>
-          <th scope="col">모임 완료율</th>
-          <th scope="col">참석 응답률</th>
-          <th scope="col">AI 비용</th>
-          <th scope="col">알림 도달률</th>
-        </tr>
-      </thead>
-      <tbody>
-        {benchmark.rows.map((row) => (
-          <AdminAnalyticsBenchmarkRowView key={row.clubId} row={row} />
-        ))}
-      </tbody>
-    </table>
+    <div className="admin-analytics__benchmark-scroll">
+      <table className="admin-analytics__benchmark" aria-label="클럽 비교">
+        <thead>
+          <tr>
+            <th scope="col">클럽</th>
+            <th scope="col">활성 멤버</th>
+            <th scope="col">모임 완료율</th>
+            <th scope="col">참석 응답률</th>
+            <th scope="col">AI 비용</th>
+            <th scope="col">알림 도달률</th>
+          </tr>
+        </thead>
+        <tbody>
+          {benchmark.rows.map((row) => (
+            <AdminAnalyticsBenchmarkRowView key={row.clubId} row={row} />
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
 
@@ -168,11 +192,11 @@ function AdminAnalyticsBenchmarkRowView({ row }: { row: AdminAnalyticsBenchmarkR
   return (
     <tr>
       <th scope="row">{row.name}</th>
-      <td>{row.activeMembers}</td>
-      <td>{percentOrDash(row.sessionCompletionRate)}</td>
-      <td>{percentOrDash(row.rsvpRate)}</td>
-      <td>${row.aiCostUsd}</td>
-      <td>{percentOrDash(row.notificationDeliveryRate)}</td>
+      <td data-label="활성 멤버">{row.activeMembers}</td>
+      <td data-label="모임 완료율">{percentOrDash(row.sessionCompletionRate)}</td>
+      <td data-label="참석 응답률">{percentOrDash(row.rsvpRate)}</td>
+      <td data-label="AI 비용">${row.aiCostUsd}</td>
+      <td data-label="알림 도달률">{percentOrDash(row.notificationDeliveryRate)}</td>
     </tr>
   );
 }

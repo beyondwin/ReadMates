@@ -7413,7 +7413,9 @@ a.rm-recent-record__destination:hover {
 .admin-analytics {
   display: grid;
   gap: 24px;
+  width: 100%;
   max-width: 1160px;
+  min-width: 0;
 }
 
 .admin-analytics__header {
@@ -7446,7 +7448,10 @@ a.rm-recent-record__destination:hover {
 
 .admin-analytics__actions {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
 .admin-analytics__export {
@@ -7456,6 +7461,22 @@ a.rm-recent-record__destination:hover {
   color: inherit;
   text-decoration: none;
   background: var(--bg);
+  cursor: pointer;
+}
+
+.admin-analytics__export:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.admin-analytics__export-status,
+.admin-analytics__export-error {
+  margin: 0;
+  font-size: var(--type-size-supporting);
+}
+
+.admin-analytics__export-error {
+  color: var(--danger);
 }
 
 .admin-analytics__export:focus-visible,
@@ -7489,6 +7510,13 @@ a.rm-recent-record__destination:hover {
 .admin-analytics__kpi-label {
   color: var(--muted);
   font-size: 13px;
+}
+
+.admin-analytics__kpi-definition {
+  color: var(--muted);
+  font-size: var(--type-size-supporting);
+  line-height: var(--type-leading-supporting);
+  overflow-wrap: anywhere;
 }
 
 .admin-analytics__kpi-value {
@@ -7590,13 +7618,18 @@ a.rm-recent-record__destination:hover {
   white-space: nowrap;
 }
 
-.admin-analytics__benchmark {
+.admin-analytics__benchmark-scroll {
   width: 100%;
-  border-collapse: collapse;
+  overflow-x: auto;
   border: 1px solid var(--line);
   border-radius: var(--r-3);
   background: var(--bg);
-  overflow: hidden;
+}
+
+.admin-analytics__benchmark {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
 }
 
 .admin-analytics__benchmark th,
@@ -7623,9 +7656,58 @@ a.rm-recent-record__destination:hover {
 }
 
 @media (max-width: 720px) {
+  .admin-analytics__actions {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .admin-analytics__benchmark-scroll {
+    overflow: visible;
+    border: 0;
+    background: transparent;
+  }
+
   .admin-analytics__benchmark {
     display: block;
-    overflow-x: auto;
+    min-width: 0;
+  }
+
+  .admin-analytics__benchmark thead {
+    display: none;
+  }
+
+  .admin-analytics__benchmark tbody,
+  .admin-analytics__benchmark tr,
+  .admin-analytics__benchmark th,
+  .admin-analytics__benchmark td {
+    display: block;
+    width: 100%;
+  }
+
+  .admin-analytics__benchmark tr {
+    margin-bottom: 12px;
+    border: 1px solid var(--line);
+    border-radius: var(--r-3);
+    background: var(--bg);
+    overflow: hidden;
+  }
+
+  .admin-analytics__benchmark th,
+  .admin-analytics__benchmark td {
+    border-bottom: 1px solid var(--line);
+  }
+
+  .admin-analytics__benchmark td {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+    overflow-wrap: anywhere;
+  }
+
+  .admin-analytics__benchmark td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-weight: 600;
   }
 }
 

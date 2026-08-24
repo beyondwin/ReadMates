@@ -1,10 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
-  analyticsCsvFilename,
   analyticsActionForKpi,
   analyticsSearchFromWindow,
   analyticsWindowFromSearchParams,
-  buildAnalyticsCsv,
+  deltaLabel,
   formatAvailabilityLabel,
   formatKpiValue,
   formatSeriesPointValue,
@@ -20,7 +19,10 @@ function card(partial: Partial<AdminAnalyticsKpiCard>): AdminAnalyticsKpiCard {
     availability: "AVAILABLE",
     current: 80,
     prior: 50,
+    delta: 30,
     deltaDirection: "UP",
+    label: "모임 완료율",
+    definition: "기간 내 완료된 모임 비율",
     ...partial,
   };
 }
@@ -41,6 +43,15 @@ describe("platform-admin-analytics-model", () => {
     expect(formatKpiValue(card({ unit: "USD", current: 1.5 }))).toBe("$1.5000");
     expect(formatKpiValue(card({ unit: "COUNT", current: 12 }))).toBe("12");
     expect(formatKpiValue(card({ availability: "NOT_ENOUGH_DATA", current: null }))).toBe("데이터 부족");
+  });
+
+  it("uses the server-projected numeric delta without recalculating it", () => {
+    expect(deltaLabel(card({ current: 80, prior: 50, delta: 12.5, deltaDirection: "UP" }))).toBe(
+      "▲ +12.5 (이전 구간 대비)",
+    );
+    expect(deltaLabel(card({ current: 0, prior: 0, delta: 0, deltaDirection: "FLAT" }))).toBe(
+      "→ 0 (이전 구간 대비)",
+    );
   });
 
   it("formats measurement unavailable separately from not enough data", () => {
@@ -77,12 +88,12 @@ describe("platform-admin-analytics-model", () => {
       .toBe("$0.5000");
   });
 
-  it("builds a CSV export from KPI series and club benchmark rows", () => {
+  it("keeps zero values distinct from unavailable values", () => {
     const overview: AdminAnalyticsOverview = {
       schema: "admin.analytics_overview.v2",
       generatedAt: "2026-05-30T00:00:00Z",
       window: "30d",
-      kpis: [card({ key: "SESSION_COMPLETION", unit: "PERCENT", current: 80, prior: 50 })],
+      kpis: [card({ key: "SESSION_COMPLETION", unit: "PERCENT", current: 0, prior: 0, delta: 0 })],
       clubBenchmark: {
         availability: "AVAILABLE",
         rows: [
@@ -110,43 +121,7 @@ describe("platform-admin-analytics-model", () => {
       ],
     };
 
-    const csv = buildAnalyticsCsv(overview);
-
-    expect(csv).toContain("section,window,kpi,bucketStart,value,availability,clubSlug,clubName");
-    expect(csv).toContain("series,30d,모임 완료율,2026-05-01,75%,AVAILABLE,,");
-    expect(csv).toContain("series,30d,모임 완료율,2026-05-08,데이터 부족,NOT_ENOUGH_DATA,,");
-    expect(csv).toContain("benchmark,30d,,,,AVAILABLE,fiction,Fiction Club");
-    expect(analyticsCsvFilename(overview)).toBe("readmates-admin-analytics-30d-2026-05-30.csv");
-  });
-
-  it("builds a CSV export when KPI series are unavailable", () => {
-    const overview: AdminAnalyticsOverview = {
-      schema: "admin.analytics_overview.v2",
-      generatedAt: "2026-05-30T00:00:00Z",
-      window: "30d",
-      kpis: [card({ key: "SESSION_COMPLETION", unit: "PERCENT", current: 80, prior: 50 })],
-      clubBenchmark: {
-        availability: "AVAILABLE",
-        rows: [
-          {
-            clubId: "club-1",
-            slug: "fiction",
-            name: "Fiction Club",
-            activeMembers: 8,
-            sessionCompletionRate: 75,
-            rsvpRate: 90,
-            aiCostUsd: "1.0000",
-            notificationDeliveryRate: 95,
-          },
-        ],
-      },
-      series: [],
-    };
-
-    const csv = buildAnalyticsCsv(overview);
-
-    expect(csv).toContain("section,window,kpi,bucketStart,value,availability,clubSlug,clubName");
-    expect(csv).not.toContain("series,30d");
-    expect(csv).toContain("benchmark,30d,,,,AVAILABLE,fiction,Fiction Club");
+    expect(formatKpiValue(overview.kpis[0])).toBe("0%");
+    expect(formatKpiValue(card({ availability: "MEASUREMENT_UNAVAILABLE", current: null }))).toBe("측정 불가");
   });
 });

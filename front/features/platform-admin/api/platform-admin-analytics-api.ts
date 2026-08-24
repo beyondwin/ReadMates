@@ -1,4 +1,4 @@
-import { readmatesFetch } from "@/shared/api/client";
+import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
 import { parseAdminAnalyticsOverview } from "@/features/platform-admin/api/platform-admin-analytics-contracts";
 import {
   analyticsSearchFromWindow,
@@ -12,4 +12,30 @@ export function fetchAdminAnalyticsOverview(window: AnalyticsWindow) {
     undefined,
     { clubSlug: undefined },
   ).then(parseAdminAnalyticsOverview);
+}
+
+export type AdminAnalyticsExport = {
+  blob: Blob;
+  filename: string;
+};
+
+export async function fetchAdminAnalyticsExport(window: AnalyticsWindow): Promise<AdminAnalyticsExport> {
+  const response = await readmatesFetchResponse(
+    `/api/admin/analytics/export.csv?${analyticsSearchFromWindow(window).toString()}`,
+    undefined,
+    { clubSlug: undefined },
+  );
+  if (!response.ok) {
+    throw new Error(`Analytics export failed (${response.status})`);
+  }
+  return {
+    blob: await response.blob(),
+    filename: attachmentFilename(response.headers.get("Content-Disposition"))
+      ?? `readmates-admin-analytics-${window}.csv`,
+  };
+}
+
+function attachmentFilename(contentDisposition: string | null): string | null {
+  const match = contentDisposition?.match(/filename="([^"]+)"/i);
+  return match?.[1] ?? null;
 }

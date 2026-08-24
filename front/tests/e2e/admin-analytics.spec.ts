@@ -52,11 +52,11 @@ function overview(windowValue: "7d" | "30d" | "90d") {
     generatedAt: "2026-05-30T00:00:00Z",
     window: windowValue,
     kpis: [
-      { key: "SESSION_COMPLETION", unit: "PERCENT", availability: "AVAILABLE", current: windowValue === "7d" ? 70 : 80, prior: 50, deltaDirection: "UP" },
-      { key: "RSVP_RATE", unit: "PERCENT", availability: "NOT_ENOUGH_DATA", current: null, prior: null, deltaDirection: "NONE" },
-      { key: "ACTIVE_MEMBERS", unit: "COUNT", availability: "AVAILABLE", current: 12, prior: 9, deltaDirection: "UP" },
-      { key: "AI_COST_PER_SESSION", unit: "USD", availability: "AVAILABLE", current: 1.5, prior: 1.2, deltaDirection: "UP" },
-      { key: "NOTIFICATION_DELIVERY", unit: "PERCENT", availability: "AVAILABLE", current: 95, prior: 95, deltaDirection: "FLAT" },
+      { key: "SESSION_COMPLETION", label: "모임 완료율", definition: "완료된 모임 비율", unit: "PERCENT", availability: "AVAILABLE", current: windowValue === "7d" ? 70 : 80, prior: 50, delta: windowValue === "7d" ? 20 : 30, deltaDirection: "UP" },
+      { key: "RSVP_RATE", label: "참석 응답률", definition: "참석 응답 비율", unit: "PERCENT", availability: "NOT_ENOUGH_DATA", current: null, prior: null, delta: null, deltaDirection: "NONE" },
+      { key: "ACTIVE_MEMBERS", label: "활성 멤버", definition: "활성 멤버 수", unit: "COUNT", availability: "AVAILABLE", current: 12, prior: 9, delta: 3, deltaDirection: "UP" },
+      { key: "AI_COST_PER_SESSION", label: "AI 비용/모임", definition: "모임당 AI 비용", unit: "USD", availability: "AVAILABLE", current: 1.5, prior: 1.2, delta: 0.3, deltaDirection: "UP" },
+      { key: "NOTIFICATION_DELIVERY", label: "알림 도달률", definition: "종결 알림 전송 비율", unit: "PERCENT", availability: "AVAILABLE", current: 95, prior: 95, delta: 0, deltaDirection: "FLAT" },
     ],
     clubBenchmark: {
       availability: "AVAILABLE",
@@ -92,6 +92,14 @@ async function routeAnalytics(page: Page): Promise<void> {
     const windowParam = (url.searchParams.get("window") ?? "30d") as "7d" | "30d" | "90d";
     await json(route, 200, overview(windowParam));
   });
+  await page.route("**/api/bff/api/admin/analytics/export.csv**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "text/csv; charset=utf-8",
+      headers: { "Content-Disposition": 'attachment; filename="readmates-admin-analytics-30d-2026-05-30.csv"' },
+      body: "record_type,window\r\nmetadata,30d\r\n",
+    });
+  });
 }
 
 async function expectNoPrivateSentinels(page: Page): Promise<void> {
@@ -115,10 +123,10 @@ test("owner reviews admin analytics overview and switches window", async ({ page
   await expect(trendTable.getByText("2026-05-01")).toBeVisible();
   await expect(trendTable.getByText("75%")).toBeVisible();
   await expect(page.getByText("Fiction Club")).toBeVisible();
-  await expect(page.getByRole("link", { name: "CSV 내려받기" })).toHaveAttribute(
-    "download",
-    /readmates-admin-analytics-30d-2026-05-30\.csv/,
-  );
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "CSV 내려받기" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe("readmates-admin-analytics-30d-2026-05-30.csv");
   await expect(page.getByRole("link", { name: "알림 운영 보기" })).toHaveAttribute("href", "/admin/notifications");
   await expect(page.getByRole("link", { name: "AI Ops 보기" })).toHaveAttribute("href", "/admin/ai-ops");
   await expect(page.getByRole("link", { name: "클럽 운영 보기" }).first()).toHaveAttribute("href", "/admin/clubs");
@@ -149,7 +157,7 @@ test("owner captures public-safe analytics visual evidence on desktop and mobile
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/admin/analytics");
   await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "CSV 내려받기" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "CSV 내려받기" })).toBeVisible();
   const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-analytics-mobile.png"),
     fullPage: true,

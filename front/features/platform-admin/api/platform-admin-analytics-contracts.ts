@@ -1,7 +1,9 @@
 import { z } from "zod";
-import type {
+import {
+  labelKpi,
+  type AdminAnalyticsKpiCard,
   AdminAnalyticsKpiSeries,
-  AdminAnalyticsOverview,
+  type AdminAnalyticsOverview,
 } from "@/features/platform-admin/model/platform-admin-analytics-model";
 
 const KpiKeySchema = z.enum([
@@ -15,13 +17,19 @@ const KpiKeySchema = z.enum([
 const UnitSchema = z.enum(["COUNT", "PERCENT", "USD"]);
 const AvailabilitySchema = z.enum(["AVAILABLE", "NOT_ENOUGH_DATA", "MEASUREMENT_UNAVAILABLE"]);
 
-const KpiSchema = z.object({
+const LegacyKpiSchema = z.object({
   key: KpiKeySchema,
   unit: UnitSchema,
   availability: AvailabilitySchema,
   current: z.number().nullable(),
   prior: z.number().nullable(),
   deltaDirection: z.enum(["UP", "DOWN", "FLAT", "NONE"]),
+});
+
+const KpiSchema = LegacyKpiSchema.extend({
+  label: z.string().optional(),
+  definition: z.string().optional(),
+  delta: z.number().nullable().optional(),
 });
 
 const BenchmarkSchema = z.object({
@@ -55,18 +63,32 @@ const SeriesSchema = z.array(
 );
 
 export const AdminAnalyticsWireOverviewSchema = import.meta.env.DEV
-  ? z.object({
-      schema: z.enum(["admin.analytics_overview.v1", "admin.analytics_overview.v2"]),
-      generatedAt: z.string(),
-      window: z.enum(["7d", "30d", "90d"]),
-      kpis: z.array(KpiSchema),
-      clubBenchmark: BenchmarkSchema,
-      series: SeriesSchema.optional().default([]),
-    })
+  ? z.discriminatedUnion("schema", [
+      z.object({
+        schema: z.literal("admin.analytics_overview.v1"),
+        generatedAt: z.string(),
+        window: z.enum(["7d", "30d", "90d"]),
+        kpis: z.array(LegacyKpiSchema),
+        clubBenchmark: BenchmarkSchema,
+        series: SeriesSchema.optional().default([]),
+      }),
+      z.object({
+        schema: z.literal("admin.analytics_overview.v2"),
+        generatedAt: z.string(),
+        window: z.enum(["7d", "30d", "90d"]),
+        kpis: z.array(KpiSchema),
+        clubBenchmark: BenchmarkSchema,
+        series: SeriesSchema.optional().default([]),
+      }),
+    ])
   : (null as never);
 
-type AdminAnalyticsWireOverview = Omit<AdminAnalyticsOverview, "schema" | "series"> & {
+type AdminAnalyticsWireKpi = Omit<AdminAnalyticsKpiCard, "label" | "definition" | "delta"> &
+  Partial<Pick<AdminAnalyticsKpiCard, "label" | "definition" | "delta">>;
+
+type AdminAnalyticsWireOverview = Omit<AdminAnalyticsOverview, "schema" | "kpis" | "series"> & {
   schema: "admin.analytics_overview.v1" | "admin.analytics_overview.v2";
+  kpis: AdminAnalyticsWireKpi[];
   series?: AdminAnalyticsKpiSeries[];
 };
 
@@ -74,6 +96,13 @@ function normalizeAdminAnalyticsOverview(value: AdminAnalyticsWireOverview): Adm
   return {
     ...value,
     schema: "admin.analytics_overview.v2",
+    kpis: value.kpis.map((card) => ({
+      ...card,
+      label: card.label ?? labelKpi(card.key),
+      definition: card.definition ?? "",
+      delta: card.delta ?? null,
+      deltaDirection: Object.hasOwn(card, "delta") ? card.deltaDirection : "NONE",
+    })),
     series: Array.isArray(value.series) ? value.series : [],
   };
 }

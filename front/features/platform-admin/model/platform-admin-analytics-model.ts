@@ -11,10 +11,13 @@ export type DeltaDirection = "UP" | "DOWN" | "FLAT" | "NONE";
 
 export type AdminAnalyticsKpiCard = {
   key: KpiKey;
+  label: string;
+  definition: string;
   unit: KpiUnit;
   availability: Availability;
   current: number | null;
   prior: number | null;
+  delta: number | null;
   deltaDirection: DeltaDirection;
 };
 
@@ -147,64 +150,11 @@ export function formatSeriesPointValue(point: AdminAnalyticsKpiSeriesPoint, unit
   }
 }
 
-export function analyticsCsvFilename(overview: AdminAnalyticsOverview): string {
-  const date = overview.generatedAt.slice(0, 10);
-  return `readmates-admin-analytics-${overview.window}-${date}.csv`;
-}
-
-export function analyticsCsvHref(overview: AdminAnalyticsOverview): string {
-  return `data:text/csv;charset=utf-8,${encodeURIComponent(buildAnalyticsCsv(overview))}`;
-}
-
-export function buildAnalyticsCsv(overview: AdminAnalyticsOverview): string {
-  const rows = [
-    ["section", "window", "kpi", "bucketStart", "value", "availability", "clubSlug", "clubName"],
-  ];
-
-  for (const series of overview.series) {
-    for (const point of series.points) {
-      rows.push([
-        "series",
-        overview.window,
-        labelKpi(series.key),
-        point.bucketStart,
-        formatSeriesPointValue(point, series.unit),
-        point.availability,
-        "",
-        "",
-      ]);
-    }
-  }
-
-  for (const row of overview.clubBenchmark.rows) {
-    rows.push([
-      "benchmark",
-      overview.window,
-      "",
-      "",
-      "",
-      overview.clubBenchmark.availability,
-      row.slug,
-      row.name,
-    ]);
-  }
-
-  return rows.map((row) => row.map(csvCell).join(",")).join("\n");
-}
-
-function csvCell(value: string): string {
-  if (/[",\n]/.test(value)) {
-    return `"${value.replaceAll("\"", "\"\"")}"`;
-  }
-  return value;
-}
-
 export function deltaLabel(card: AdminAnalyticsKpiCard): string {
-  if (card.deltaDirection === "NONE" || card.current === null || card.prior === null) {
+  if (card.deltaDirection === "NONE" || card.delta === null) {
     return "이전 구간 대비 비교 불가";
   }
-  const diff = Math.round((card.current - card.prior) * 10000) / 10000;
   const arrow = card.deltaDirection === "UP" ? "▲" : card.deltaDirection === "DOWN" ? "▼" : "→";
-  const sign = diff > 0 ? "+" : "";
-  return `${arrow} ${sign}${diff} (이전 구간 대비)`;
+  const sign = card.delta > 0 ? "+" : "";
+  return `${arrow} ${sign}${card.delta} (이전 구간 대비)`;
 }
