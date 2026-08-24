@@ -53,13 +53,26 @@ export READMATES_AUTH_SESSION_COOKIE_SECURE="${READMATES_AUTH_SESSION_COOKIE_SEC
 export READMATES_IP_HASH_BASE_SECRET="${READMATES_IP_HASH_BASE_SECRET:-local-oauth-ip-hash-placeholder}"
 export READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY:-local-only-admin-command-digest-material}"
 export READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:-1}"
+export READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY:-}"
 export READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:-0}"
+export READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS="${READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS:-false}"
 
 if [[ -z "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY" ]]; then
   fail "local admin command digest key must not be empty"
 fi
+if [[ ! "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION" =~ ^[0-9]+$ ||
+  ! "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION" =~ ^[0-9]+$ ]]; then
+  fail "admin command digest key versions must be non-negative integers"
+fi
 if [[ "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION" == "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION" ]]; then
   fail "admin command digest key versions must differ"
+fi
+case "$READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS" in
+  true|false) ;;
+  *) fail "admin command digest previous-alias write flag must be true or false" ;;
+esac
+if [[ "$READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS" == "true" && -z "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY" ]]; then
+  fail "admin command digest previous-alias write requires a previous key"
 fi
 
 unset google_client_id google_client_secret

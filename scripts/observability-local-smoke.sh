@@ -11,7 +11,9 @@ server_pid=""
 spring_profiles_active="${SPRING_PROFILES_ACTIVE:-dev}"
 admin_digest_current_key="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY:-local-only-admin-command-digest-material}"
 admin_digest_current_version="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:-1}"
+admin_digest_previous_key="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY:-}"
 admin_digest_previous_version="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:-0}"
+admin_digest_write_previous_alias="${READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS:-false}"
 
 cd "$repo_root"
 
@@ -19,8 +21,24 @@ if [[ -z "$admin_digest_current_key" ]]; then
   printf 'observability-local-smoke: local admin command digest key must not be empty\n' >&2
   exit 2
 fi
+if [[ ! "$admin_digest_current_version" =~ ^[0-9]+$ ||
+  ! "$admin_digest_previous_version" =~ ^[0-9]+$ ]]; then
+  printf 'observability-local-smoke: admin command digest key versions must be non-negative integers\n' >&2
+  exit 2
+fi
 if [[ "$admin_digest_current_version" == "$admin_digest_previous_version" ]]; then
   printf 'observability-local-smoke: admin command digest key versions must differ\n' >&2
+  exit 2
+fi
+case "$admin_digest_write_previous_alias" in
+  true|false) ;;
+  *)
+    printf 'observability-local-smoke: admin command digest previous-alias write flag must be true or false\n' >&2
+    exit 2
+    ;;
+esac
+if [[ "$admin_digest_write_previous_alias" == "true" && -z "$admin_digest_previous_key" ]]; then
+  printf 'observability-local-smoke: admin command digest previous-alias write requires a previous key\n' >&2
   exit 2
 fi
 
@@ -156,7 +174,9 @@ env \
   READMATES_AUTH_RETURN_STATE_SECRET=local-observability-smoke \
   READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="$admin_digest_current_key" \
   READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION="$admin_digest_current_version" \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY="$admin_digest_previous_key" \
   READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION="$admin_digest_previous_version" \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS="$admin_digest_write_previous_alias" \
   READMATES_AIGEN_ENABLED=false \
   READMATES_OTLP_TRACES_ENDPOINT="$otlp_url" \
   ./server/gradlew -p server bootRun >"$tmpdir/server.log" 2>&1 &

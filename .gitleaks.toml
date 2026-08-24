@@ -30,17 +30,18 @@ keywords = ["sk-", "AIza", "OPENAI_API_KEY", "API_KEY", "GOOGLE_API_KEY"]
 [[rules]]
 id = "readmates-real-secret-assignment"
 description = "Real-looking deployment secret assignments must not be committed"
-regex = '''(?i)(?:^|[^A-Za-z0-9_$/{.-])(?:READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|client[_-]?secret|oauth[_-]?client[_-]?secret)[[:space:]]*[:=][[:space:]]*["']?[^[:space:]"'<>`]{16,}'''
-keywords = ["READMATES_BFF_SECRET", "readmates.bff-secret", "BFF_SECRET", "SPRING_DATASOURCE_PASSWORD", "spring.datasource.password", "MYSQL_ADMIN_PASS", "APP_DB_PASS", "GOOGLE_CLIENT_SECRET", "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET", "client_secret", "client-secret", "oauth_client_secret", "oauth-client-secret"]
+regex = '''(?i)(?:^|[^A-Za-z0-9_$/{.-])(?:READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|READMATES_ADMIN_COMMAND_DIGEST_(?:CURRENT|PREVIOUS)_KEY|client[_-]?secret|oauth[_-]?client[_-]?secret)[ \t]*[:=][ \t]*["']?[^[:space:]\r\n"'<>`]{16,}'''
+keywords = ["READMATES_BFF_SECRET", "readmates.bff-secret", "BFF_SECRET", "SPRING_DATASOURCE_PASSWORD", "spring.datasource.password", "MYSQL_ADMIN_PASS", "APP_DB_PASS", "GOOGLE_CLIENT_SECRET", "SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET", "READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY", "READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY", "client_secret", "client-secret", "oauth_client_secret", "oauth-client-secret"]
 
 [[allowlists]]
 description = "Documented placeholders and local/test-only secrets"
 regexTarget = "match"
 regexes = [
-  '''(?i)<(?:db-password|secret|shared-secret|shared-bff-secret|same-secret-as-cloudflare|same-shared-secret|google-oauth-client-secret|pages-function-secret)>''',
+  '''(?i)<(?:db-password|secret|shared-secret|shared-bff-secret|same-secret-as-cloudflare|same-shared-secret|google-oauth-client-secret|pages-function-secret|admin-command-digest-current-key|admin-command-digest-previous-key)>''',
   '''(?i)<(?:same-pages-function-secret)>''',
-  '''(?i)\$\{(?:READMATES_BFF_SECRET|BFF_SECRET|APP_DB_PASS|MYSQL_ADMIN_PASS|GOOGLE_CLIENT_SECRET|SPRING_DATASOURCE_PASSWORD|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET)(?::[^}]*)?\}''',
-  '''(?i)\b(?:local-dev-secret|e2e-secret|test-secret|test-bff-secret|wrong-secret)\b''',
+  '''(?i)\$\{(?:READMATES_BFF_SECRET|BFF_SECRET|APP_DB_PASS|MYSQL_ADMIN_PASS|GOOGLE_CLIENT_SECRET|SPRING_DATASOURCE_PASSWORD|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|READMATES_ADMIN_COMMAND_DIGEST_(?:CURRENT|PREVIOUS)_KEY)(?::[^}]*)?\}''',
+  '''(?i)READMATES_ADMIN_COMMAND_DIGEST_(?:CURRENT|PREVIOUS)_KEY[[:space:]]*[:=][[:space:]]*["']?\$[A-Za-z_][A-Za-z0-9_]*''',
+  '''(?i)\b(?:local-dev-secret|e2e-secret|test-secret|test-bff-secret|wrong-secret|local-only-admin-command-digest-material|test-admin-command-digest-key|fixture-admin-current-material|fixture-admin-previous-material)\b''',
   '''(?i)\b(?:host|member[0-9]+|new[.]member)@example[.]com\b'''
 ]
 

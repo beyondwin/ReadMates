@@ -77,28 +77,36 @@ record_scan_error() {
 content_match_is_allowed() {
   local description="$1"
   local match="$2"
-  local assignment_regex value
+  local assignment_regex assignment_key value
 
-  [[ "$description" == "real-looking DB/BFF/OAuth secret assignment" ]] || return 1
+  [[ "$description" == "real-looking deployment secret assignment" ]] || return 1
 
-  assignment_regex="(READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|client[_-]?secret|oauth[_-]?client[_-]?secret)[[:space:]]*[:=][[:space:]]*['\"]?([^[:space:]'\"<>\`]+)"
+  assignment_regex="(READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|READMATES_ADMIN_COMMAND_DIGEST_(CURRENT|PREVIOUS)_KEY|client[_-]?secret|oauth[_-]?client[_-]?secret)[[:space:]]*[:=][[:space:]]*['\"]?([^[:space:]'\"<>\`]+)"
 
   if [[ "$match" =~ $assignment_regex ]]; then
-    value="${BASH_REMATCH[2]}"
+    assignment_key="${BASH_REMATCH[1]}"
+    value="${BASH_REMATCH[3]}"
   else
     return 1
   fi
 
   case "$value" in
-    "<db-password>"|"<secret>"|"<shared-secret>"|"<shared-bff-secret>"|"<same-secret-as-cloudflare>"|"<same-shared-secret>"|"<same-pages-function-secret>"|"<google-oauth-client-secret>"|"<pages-function-secret>")
+    "<db-password>"|"<secret>"|"<shared-secret>"|"<shared-bff-secret>"|"<same-secret-as-cloudflare>"|"<same-shared-secret>"|"<same-pages-function-secret>"|"<google-oauth-client-secret>"|"<pages-function-secret>"|"<admin-command-digest-current-key>"|"<admin-command-digest-previous-key>")
       return 0
       ;;
-    "local-dev-secret"|"e2e-secret"|"test-secret"|"test-bff-secret"|"wrong-secret")
+    "local-dev-secret"|"e2e-secret"|"test-secret"|"test-bff-secret"|"wrong-secret"|\
+    "local-only-admin-command-digest-material"|"test-admin-command-digest-key"|\
+    "fixture-admin-current-material"|"fixture-admin-previous-material")
       return 0
       ;;
   esac
 
-  if [[ "$value" =~ ^\$\{(READMATES_BFF_SECRET|BFF_SECRET|APP_DB_PASS|MYSQL_ADMIN_PASS|GOOGLE_CLIENT_SECRET|SPRING_DATASOURCE_PASSWORD|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET)(:[^}]*)?\}$ ]]; then
+  if [[ "$value" =~ ^\$\{(READMATES_BFF_SECRET|BFF_SECRET|APP_DB_PASS|MYSQL_ADMIN_PASS|GOOGLE_CLIENT_SECRET|SPRING_DATASOURCE_PASSWORD|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|READMATES_ADMIN_COMMAND_DIGEST_(CURRENT|PREVIOUS)_KEY)(:[^}]*)?\}$ ]]; then
+    return 0
+  fi
+
+  if [[ "$assignment_key" =~ ^READMATES_ADMIN_COMMAND_DIGEST_(CURRENT|PREVIOUS)_KEY$ &&
+    "$value" =~ ^\$[A-Za-z_][A-Za-z0-9_]*$ ]]; then
     return 0
   fi
 
@@ -460,7 +468,7 @@ run_targeted_content_checks() {
   run_content_check "OCI OCID" 'ocid1[.][a-z0-9][a-z0-9._-]{16,}'
   run_content_check "GitHub token" '(gh[pousr]_[A-Za-z0-9_]{20,}|github_pat_[A-Za-z0-9_]{20,})'
   run_content_check "OpenAI/API key style token" '(^|[^A-Za-z0-9_-])(sk-[A-Za-z0-9][A-Za-z0-9_-]{20,}|AIza[0-9A-Za-z_-]{20,}|(OPENAI_API_KEY|API_KEY|GOOGLE_API_KEY)[[:space:]]*[:=][[:space:]]*['"'"'"]?[A-Za-z0-9_-]{24,})'
-  run_content_check "real-looking DB/BFF/OAuth secret assignment" '(^|[^A-Za-z0-9_$/{.-])(READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|client[_-]?secret|oauth[_-]?client[_-]?secret)[[:space:]]*[:=][[:space:]]*['"'"'"]?[^[:space:]'"'"'"<>`]{16,}'
+  run_content_check "real-looking deployment secret assignment" '(^|[^A-Za-z0-9_$/{.-])(READMATES_BFF_SECRET|readmates[.]bff-secret|BFF_SECRET|SPRING_DATASOURCE_PASSWORD|spring[.]datasource[.]password|MYSQL_ADMIN_PASS|APP_DB_PASS|GOOGLE_CLIENT_SECRET|SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET|READMATES_ADMIN_COMMAND_DIGEST_(CURRENT|PREVIOUS)_KEY|client[_-]?secret|oauth[_-]?client[_-]?secret)[[:space:]]*[:=][[:space:]]*['"'"'"]?[^[:space:]'"'"'"<>`]{16,}'
   run_content_check "Gmail address" '[A-Za-z0-9._%+-]+@gmail[.]com'
   run_content_check "private club domain" 'readmates[.]kr'
   run_content_check "local workstation path" '/''Users/[^[:space:]]+'

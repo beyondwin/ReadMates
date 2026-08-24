@@ -38,11 +38,19 @@ run_fixture() {
     READMATES_LOCAL_GOOGLE_OAUTH_DRY_RUN=true \
     READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY:-}" \
     READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:-}" \
+    READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY:-}" \
     READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:-}" \
+    READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS="${READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS:-}" \
     MOCK_GOOGLE_CLIENT_ID="${MOCK_GOOGLE_CLIENT_ID:-}" \
     MOCK_GOOGLE_CLIENT_SECRET="${MOCK_GOOGLE_CLIENT_SECRET:-}" \
     "$runner" 2>&1
 }
+
+READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY=
+READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=
+READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY=
+READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=
+READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=
 
 MOCK_GOOGLE_CLIENT_ID=local-google-client-id
 MOCK_GOOGLE_CLIENT_SECRET=local-google-client-secret
@@ -94,6 +102,35 @@ if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=1 \
 fi
 if [[ "$invalid_admin_output" != *"admin command digest key versions must differ"* ]]; then
   printf 'expected a safe admin digest version error, got: %s\n' "$invalid_admin_output" >&2
+  exit 1
+fi
+
+if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=-1 \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=0 \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=false \
+  invalid_version_output="$(run_fixture)"; then
+  printf 'expected negative local admin digest version to be rejected\n' >&2
+  exit 1
+fi
+if [[ "$invalid_version_output" != *"admin command digest key versions must be non-negative integers"* ]]; then
+  printf 'expected a safe admin digest version-range error, got: %s\n' "$invalid_version_output" >&2
+  exit 1
+fi
+
+if READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY= \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=1 \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=0 \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=true \
+  invalid_alias_output="$(run_fixture)"; then
+  printf 'expected previous-alias write without a previous key to be rejected\n' >&2
+  exit 1
+fi
+if [[ "$invalid_alias_output" != *"previous-alias write requires a previous key"* ]]; then
+  printf 'expected a safe previous-alias validation error, got: %s\n' "$invalid_alias_output" >&2
+  exit 1
+fi
+if [[ "$invalid_alias_output" == *"$admin_digest_sentinel"* ]]; then
+  printf 'previous-alias validation exposed admin digest material\n' >&2
   exit 1
 fi
 

@@ -110,7 +110,11 @@ if [[ -L "$fixture_root" ]]; then
 fi
 
 safe_remove_fixture_root
-mkdir -p "$fixture_root/secret-dollar" "$fixture_root/secret-comment" "$fixture_root/placeholders"
+mkdir -p \
+  "$fixture_root/secret-dollar" \
+  "$fixture_root/secret-comment" \
+  "$fixture_root/secret-admin-command-digest" \
+  "$fixture_root/placeholders"
 
 if [[ -L "$source_tmp_parent" ]]; then
   fail "front/.tmp is a symlink; refusing to use it for the builder fixture"
@@ -152,7 +156,7 @@ if ./scripts/public-release-check.sh "$fixture_root/secret-dollar" > "$fixture_r
   fail "dollar-containing secret fixture unexpectedly passed"
 fi
 
-if ! grep -q "real-looking DB/BFF/OAuth secret assignment" "$fixture_root/secret-dollar.err"; then
+if ! grep -q "real-looking deployment secret assignment" "$fixture_root/secret-dollar.err"; then
   sed 's/^/  /' "$fixture_root/secret-dollar.err" >&2
   fail "dollar-containing secret fixture failed for the wrong reason"
 fi
@@ -165,9 +169,26 @@ if ./scripts/public-release-check.sh "$fixture_root/secret-comment" > "$fixture_
   fail "comment-placeholder secret fixture unexpectedly passed"
 fi
 
-if ! grep -q "real-looking DB/BFF/OAuth secret assignment" "$fixture_root/secret-comment.err"; then
+if ! grep -q "real-looking deployment secret assignment" "$fixture_root/secret-comment.err"; then
   sed 's/^/  /' "$fixture_root/secret-comment.err" >&2
   fail "comment-placeholder secret fixture failed for the wrong reason"
+fi
+
+admin_digest_key='READMATES_ADMIN_COMMAND_DIGEST_''CURRENT_KEY'
+admin_digest_value='AdminDigestFixture''Literal1234567890'
+printf '%s=%s\n' "$admin_digest_key" "$admin_digest_value" \
+  > "$fixture_root/secret-admin-command-digest/.env.example"
+
+if ./scripts/public-release-check.sh "$fixture_root/secret-admin-command-digest" \
+  > "$fixture_root/secret-admin-command-digest.out" \
+  2> "$fixture_root/secret-admin-command-digest.err"; then
+  fail "admin command digest literal fixture unexpectedly passed"
+fi
+
+if ! grep -q "real-looking deployment secret assignment" \
+  "$fixture_root/secret-admin-command-digest.err"; then
+  sed 's/^/  /' "$fixture_root/secret-admin-command-digest.err" >&2
+  fail "admin command digest literal fixture failed for the wrong reason"
 fi
 
 # The positive placeholder case carries the minimum complete release contract:
