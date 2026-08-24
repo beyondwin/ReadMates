@@ -4,6 +4,7 @@
 - 결정일: 2026-08-22
 - 작성자: 플랫폼 운영·보안·서버
 - 관련: ADR-0001, ADR-0009, ADR-0012, ADR-0028, ADR-0029, ADR-0030, ADR-0033, ADR-0037, ADR-0039,
+  ADR-0041, ADR-0042, ADR-0043,
   `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`,
   `server/src/main/kotlin/com/readmates/notification/application/service/AdminNotificationReplayService.kt:35-151`,
   `server/src/main/kotlin/com/readmates/admin/operations/application/service/AdminOperationCaseService.kt:88-239`,
@@ -151,6 +152,61 @@ Notification replay confirm은 eligible event를 origin outbox mutation으로 �
 이 성공은 실제 delivery 완료를 뜻하지 않는다. 이후 delivery attempt와 outcome은 같은 workflow identity의
 L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로 resume한다.
 
+### Proposed 범위 정교화: V59 service receipt와 convergence
+
+ADR-0040은 아직 `Proposed`이고 V59가 미구현이므로, 이 절은 기존 결정을 대체하거나 이미 배포된 schema를
+rewrite하는 것이 아니라 Service Operations executor가 따라야 할 구체 계약을 추가한다. Club V58의 검증된
+immutable receipt/current convergence/append-only attempt 구조를 기준으로 notification과 AI의 typed parent를
+혼합하지 않는다.
+
+V59 notification confirmation과 AI admin receipt는 각각 자기 도메인의 typed receipt다. 공통 convergence row는
+`notification_receipt_id_snapshot`과 `ai_receipt_id_snapshot` 중 정확히 하나만 허용하는 XOR CHECK와 실제
+`ON DELETE RESTRICT` FK를 가진다. `NOTIFICATION_REPLAY`는 notification parent만,
+`AI_JOB_CANCEL|AI_COMMIT_RETRY`는 AI parent만 허용한다. Polymorphic string ID만 저장하거나 FK 없는
+`domain_receipt_id`로 parent 존재를 application 주장에 맡기지 않는다.
+
+각 receipt는 다음 deletion-safe immutable evidence를 공통으로 갖는다.
+
+- actor user UUID snapshot, 당시 platform role과 bounded actor capabilities JSON;
+- command/receipt kind, target kind, opaque target UUID snapshot, 필요한 club UUID snapshot;
+- before/after state·revision, origin outcome과 safe result;
+- canonical identity evidence와 origin timestamp;
+- transaction 안에서 함께 쓴 `platform_audit_event_id_snapshot`의 unique logical link.
+
+이 snapshot에는 deletable notification preview/delivery/event, AI job, user 또는 club FK를 두지 않는다. Notification
+confirmation의 기존 destructive preview/actor/club/audit FK는 V59에서 snapshot semantics로 전환하되 immutable receipt
+보존이 source hard delete를 막지 않게 한다. JSON은 type, item count와 encoded byte size를 모두 제한하고 raw
+email/body/provider payload/prompt/completion/error/token/URL을 허용하지 않는다.
+
+V48 legacy notification confirmation의 lowercase 64-hex `selection_hash`는 당시의 unkeyed SHA evidence로만
+분류한다. 이를 HMAC이라고 rename하거나 key version을 지어내지 않는다. V59는 receipt identity mode와 DB CHECK로
+다음 XOR을 강제한다.
+
+- `LEGACY_SELECTION_SHA`: legacy SHA가 있고 canonical schema, digest key version, request HMAC은 모두 없다.
+- `HMAC`: legacy SHA가 없고 canonical schema, non-negative digest key version, 32-byte request HMAC이 모두 있다.
+
+AI receipt와 V59 이후 notification receipt는 `HMAC`만 쓴다. Legacy backfill은 deterministic receipt identity와
+mode만 보강하고 원래 confirmation 의미·count를 바꾸지 않는다.
+
+Service convergence current row는 immutable receipt parent, effect type과 opaque
+`effect_target_id_snapshot`을 하나의 composite identity로 고정한다. Notification은 origin에서 고정한 replay
+confirmation/target-set identity를, AI는 job UUID snapshot을 target으로 쓴다. Receipt당 허용 effect/target은
+unique이고, current row는 receipt와 함께 유지한다. Mutable state는 `PENDING|SUCCEEDED|FAILED`, attempt count,
+next attempt, bounded lease owner/expiry, next availability와 strict safe error code만 가진다.
+
+각 attempt는 start event(seq 0)를 먼저 append하고, 같은 attempt의 outcome event(seq 1)가 generated composite
+self-FK로 start를 참조한다. Event는 convergence ID, typed receipt parent, effect와 target snapshot까지 composite
+RESTRICT FK로 묶어 orphan/mismatched history를 허용하지 않는다. Terminal current state는 attempt count가 1
+이상이어야 하고, retryable/ambiguous outcome은 append-only event 뒤 같은 `PENDING` row의 safe error continuity와
+다음 availability를 갱신한다. Provider raw error나 free text는 current/event 어느 쪽에도 기록하지 않는다.
+
+Origin transaction과 convergence lease transaction은 분리한다. Receipt/audit/effect target/current convergence
+insert는 origin business transaction에서 원자적이고, external I/O는 그 transaction 밖에서 수행한다. Worker는
+짧은 lease+start-event transaction, 외부 effect 또는 authoritative observer 호출, 짧은 outcome CAS+event
+transaction을 사용한다. Stale lease owner/attempt는 outcome을 적용하지 못한다. Notification convergence는
+existing delivery engine을 관측할 뿐 다시 전송하지 않고, AI commit reconciliation은 existing
+`AiGenerationCommitRecoveryService`에 위임할 뿐 별도 commit engine을 만들지 않는다.
+
 ## 근거
 
 - 영향이 작은 lifecycle action을 과도하게 방해하지 않으면서 공개·권한·provider mutation을 강하게 잠근다.
@@ -159,6 +215,8 @@ L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로
 - DB mutation과 audit가 갈라지거나 provider effect가 중복되는 실패 모드를 줄인다.
 - UI, BFF, Spring security 중 하나만 믿지 않는 defense-in-depth를 유지한다.
 - Notification replay의 검증된 atomic preview/receipt 계약을 다른 위험 command의 기준으로 확장한다.
+- V59 typed receipt FK와 append-only attempt evidence가 polymorphic orphan, source delete block, provider 성공 과장을
+  schema와 transaction boundary에서 막는다.
 
 ## 대안
 
@@ -216,6 +274,10 @@ L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로
 - Concurrent support grant create가 DB constraint와 idempotency로 하나의 origin mutation만 만드는지 확인한다.
 - Flyway clean/upgrade, ADR-0009 Zod DTO fixture, compatibility endpoint의 duplicate-effect 방지를 검증한다.
 - Global audit의 role/capability별 redaction과 admin frontend의 host mutation client 비의존을 확인한다.
+- V59 fresh/legacy migration에서 typed receipt parent XOR/FK, receipt/effect/target composite identity, actor
+  role/capability snapshot, unique audit snapshot, legacy SHA/HMAC XOR와 deletion-safe hard delete를 확인한다.
+- Convergence event가 같은 attempt의 start event와 typed parent/effect/target을 모두 참조하고 terminal attempt
+  count, pending retry continuity, stale lease CAS와 safe error regex를 강제하는지 negative MySQL test한다.
 
 ## 후속 작업
 
