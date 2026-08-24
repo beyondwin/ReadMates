@@ -8,10 +8,16 @@ import {
 } from "@/features/host/api/host-api";
 import type { HostMemberListItem, HostMemberListPage } from "@/features/host/api/host-contracts";
 import type { HostMembersActions } from "@/features/host/model/host-member-actions";
+import type {
+  HostMemberProfileErrorCode,
+  HostMemberProfileResponse,
+  MemberLifecycleResponse,
+} from "@/features/host/model/host-view-types";
 import { hostMemberListQuery, invalidateHostMembers } from "@/features/host/queries/host-members-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import { hostApiErrorFromResponse, readHostResponseJson } from "@/shared/api/host-authority-event";
 
 const HOST_MEMBERS_PAGE_LIMIT = 50;
 
@@ -56,17 +62,32 @@ export function createHostMembersActions(
     refreshMembers,
     submitLifecycle: async (membershipId, path, body) => {
       const response = await submitHostMemberLifecycle(membershipId, path, body, context);
-      if (response.ok) {
-        await markMembersStale();
+      if (!response.ok) {
+        throw await hostApiErrorFromResponse(response, {
+          clubSlug: context.clubSlug,
+          requestKind: "MEMBER_LIFECYCLE",
+        });
       }
-      return response;
+      const result = await readHostResponseJson<MemberLifecycleResponse>(response);
+      await markMembersStale();
+      return result;
     },
     submitProfile: async (membershipId, displayName) => {
       const response = await submitHostMemberProfile(membershipId, displayName, context);
-      if (response.ok) {
-        await markMembersStale();
+      if (!response.ok) {
+        const error = await hostApiErrorFromResponse(response, {
+          clubSlug: context.clubSlug,
+          requestKind: "MEMBER_PROFILE",
+        });
+        return {
+          ok: false,
+          status: response.status,
+          code: error.code as HostMemberProfileErrorCode,
+        };
       }
-      return response;
+      const member = await readHostResponseJson<HostMemberProfileResponse>(response);
+      await markMembersStale();
+      return { ok: true, member };
     },
     submitViewerAction: (membershipId, action) => submitHostViewerAction(membershipId, action, context),
   };

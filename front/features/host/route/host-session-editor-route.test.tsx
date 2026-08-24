@@ -279,7 +279,7 @@ import {
   EditHostSessionRoute,
   NewHostSessionRoute,
 } from "./host-session-editor-route";
-import { hostSessionEditorLoaderFactory } from "./host-session-editor-data";
+import { hostSessionEditorLoaderFactory as createHostSessionEditorLoader } from "./host-session-editor-data";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
 import { hostSessionRecordKeys } from "@/features/host/queries/host-session-record-queries";
 import { hostSessionKeys } from "@/features/host/queries/host-session-queries";
@@ -301,6 +301,17 @@ const snapshot = {
   oneLineReviews: [],
   feedbackDocument: { fileName: "", title: "", markdown: "" },
 };
+
+function hostSessionEditorLoaderFactory(client: QueryClient) {
+  return createHostSessionEditorLoader(client, (pathname) => {
+    const clubSlug = /^\/clubs\/([^/]+)\/app\/host(?:\/|$)/.exec(pathname)?.[1] ?? "";
+    const fallback = `/clubs/${clubSlug}/app/host`;
+    const lastSafeTarget = window.sessionStorage.getItem("readmates:last-safe-workspace-target:host");
+    return lastSafeTarget?.startsWith(`${fallback}/`) && lastSafeTarget !== pathname
+      ? lastSafeTarget
+      : fallback;
+  });
+}
 
 const recordEditor: HostSessionRecordEditor = {
   sessionId: "session-1",
@@ -344,13 +355,6 @@ function sessionDetail(overrides: Record<string, unknown> = {}) {
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
     ...overrides,
   };
-}
-
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
 }
 
 function renderWorkflow(
@@ -1278,8 +1282,10 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("captures a pending undo from a basic save receipt and restores with the preview hash", async () => {
-    const saveSession = vi.fn(async () => jsonResponse({
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
+    const saveSession = vi.fn(async () => ({
+      ok: true as const,
+      createdSessionId: null,
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
     }));
     routeMocks.previewRestore.mockResolvedValue({
       sessionId: "session-1",
@@ -1344,8 +1350,10 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("clears mounted draft, receipt, and reconciliation state for the revoked club only", async () => {
-    const saveSession = vi.fn(async () => jsonResponse({
-      changeReceipt: { changeId: "change-basic-sensitive", kind: "BASIC_INFO", undoAvailable: true },
+    const saveSession = vi.fn(async () => ({
+      ok: true as const,
+      createdSessionId: null,
+      changeReceipt: { changeId: "change-basic-sensitive", kind: "BASIC_INFO" as const, undoAvailable: true },
     }));
     routeMocks.preview.mockResolvedValue({
       eventType: "SESSION_RECORD_UPDATED",
@@ -1379,8 +1387,10 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("clears the undo bar when restore completes without a new undoable receipt", async () => {
-    const saveSession = vi.fn(async () => jsonResponse({
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
+    const saveSession = vi.fn(async () => ({
+      ok: true as const,
+      createdSessionId: null,
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
     }));
     routeMocks.previewRestore.mockResolvedValue({
       sessionId: "session-1",
@@ -1582,8 +1592,10 @@ describe("EditHostSessionRecordWorkflow", () => {
         attendanceStatus: "ATTENDED",
       }],
     });
-    const saveSession = vi.fn(async () => jsonResponse({
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
+    const saveSession = vi.fn(async () => ({
+      ok: true as const,
+      createdSessionId: null,
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
     }));
     const updateAttendance = vi.fn(async () => ({
       sessionId: "session-1",
@@ -1637,7 +1649,7 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("does not create a receipt when a mutation fails", async () => {
-    const saveSession = vi.fn(async () => jsonResponse({ message: "failed" }, 500));
+    const saveSession = vi.fn(async () => ({ ok: false as const }));
     const updateAttendance = vi.fn(async () => {
       throw new Error("offline");
     });
@@ -1658,9 +1670,11 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("dismisses the undo bar without restoring", async () => {
-    const saveSession = vi.fn(async () => jsonResponse(sessionDetail({
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
-    })));
+    const saveSession = vi.fn(async () => ({
+      ok: true as const,
+      createdSessionId: null,
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
+    }));
     renderWorkflow(recordEditor, vi.fn(), undefined, {
       session: sessionDetail(),
       actions: { saveSession },

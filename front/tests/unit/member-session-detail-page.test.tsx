@@ -13,8 +13,10 @@ import {
 } from "@/features/archive/model/session-detail-read-view";
 import {
   enrichSessionDetailHighlightAuthors,
-  memberSessionDetailLoaderFactory,
+  memberSessionDetailLoaderFactory as createMemberSessionDetailLoader,
 } from "@/features/archive/route/member-session-detail-data";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
+import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
 import { archiveKeys } from "@/features/archive/queries/archive-queries";
 import MemberSessionDetailPage from "@/features/archive/ui/member-session-detail-page";
 import MemberSessionDetailRoutePage, { GuestSessionDetailContent } from "@/src/pages/member-session";
@@ -79,6 +81,14 @@ function createTestQueryClient() {
       },
     },
   });
+}
+
+function memberSessionDetailLoaderFactory(queryClient: QueryClient) {
+  return createMemberSessionDetailLoader(queryClient, (pathname) =>
+    resolveUnavailableDetailTarget({
+      pathname,
+      lastSafeTarget: readLastSafeWorkspaceTarget("member"),
+    }));
 }
 
 function renderRouterWithQueryClient(router: ReturnType<typeof createMemoryRouter>, queryClient: QueryClient) {

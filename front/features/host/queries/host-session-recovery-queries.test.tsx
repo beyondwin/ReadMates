@@ -97,8 +97,8 @@ describe("host session recovery queries", () => {
   it("scopes restore preview keys by club slug", () => {
     expect(hostSessionRestorePreviewQuery("session-7", "change-1", context).queryKey).toEqual([
       "host",
-      "session-recovery",
       "reading-sai",
+      "session-recovery",
       "restore-preview",
       "session-7",
       "change-1",

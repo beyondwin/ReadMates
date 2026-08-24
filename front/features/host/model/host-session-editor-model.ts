@@ -1,4 +1,5 @@
 import { compatibilityExposureLabel, type SessionAccessScope } from "./session-exposure-model";
+import type { HostSessionChangeReceipt } from "./host-view-types";
 
 export type HostSessionAttendanceStatus = "UNKNOWN" | "ATTENDED" | "ABSENT";
 export type HostSessionState = "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
@@ -34,6 +35,14 @@ export type HostSessionRequest = {
   questionDeadlineAt?: string | null;
   accessScope?: SessionAccessScope;
 };
+
+export type HostSessionSaveResult =
+  | { ok: false }
+  | {
+      ok: true;
+      createdSessionId: string | null;
+      changeReceipt: HostSessionChangeReceipt | null;
+    };
 
 export type HostSessionEditorSession = {
   sessionId?: string;

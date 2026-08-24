@@ -8,20 +8,20 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
 } from "@/features/host/api/host-contracts";
-import {
-  parseOptionalHostSessionChangeReceipt,
-  type HostSessionChangeReceipt,
-} from "@/features/host/api/host-session-recovery-contracts";
+import type { HostSessionChangeReceipt } from "@/features/host/api/host-session-recovery-contracts";
 import type { HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import { hostSessionChangeUndoDescription } from "@/features/host/model/host-session-editor-view-model";
-import type { HostSessionRequest, HostSessionState } from "@/features/host/model/host-session-editor-model";
+import type {
+  HostSessionRequest,
+  HostSessionSaveResult,
+  HostSessionState,
+} from "@/features/host/model/host-session-editor-model";
 import {
   lifecycleConfirmCopy,
   type HostSessionLifecycleResult,
   type SessionLifecycleConfirmKind,
 } from "@/features/host/model/host-session-lifecycle-model";
 import type { SessionAccessScope } from "@/features/host/model/session-exposure-model";
-import { readHostResponseJson } from "@/shared/api/host-authority-event";
 
 export type HostSessionEditorActions = {
   loadDeletionPreview: (sessionId: string) => Promise<HostSessionDeletionPreviewResponse>;
@@ -33,7 +33,7 @@ export type HostSessionEditorActions = {
   reopenSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   unpublishSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   returnSessionToDraft: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
-  saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
+  saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<HostSessionSaveResult>;
   updateAttendance: (
     sessionId: string,
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
@@ -103,16 +103,15 @@ export function wrapHostSessionEditorActionsForUndo(
         onReceipt,
       ),
     saveSession: async (sessionId, request) => {
-      const response = await actions.saveSession(sessionId, request);
-      if (response.ok && sessionId) {
-        const body = await readResponseJson(response);
+      const result = await actions.saveSession(sessionId, request);
+      if (result.ok && sessionId) {
         captureReceipt(
-          parseOptionalHostSessionChangeReceipt(body),
+          result.changeReceipt,
           hostSessionChangeUndoDescription("BASIC_INFO"),
           onReceipt,
         );
       }
-      return response;
+      return result;
     },
     updateAttendance: async (sessionId, attendance) => {
       const result = await actions.updateAttendance(sessionId, attendance);
@@ -124,12 +123,4 @@ export function wrapHostSessionEditorActionsForUndo(
       return result;
     },
   };
-}
-
-async function readResponseJson(response: Response): Promise<unknown> {
-  try {
-    return await readHostResponseJson(response.clone());
-  } catch {
-    return null;
-  }
 }

@@ -4,10 +4,12 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import {
+  hostSessionKeys,
   useCloseHostSessionMutation,
   useDeleteHostSessionMutation,
   useOpenHostSessionMutation,
 } from "@/features/host/queries/host-session-queries";
+import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 import {
   AuthActionsContext,
   AuthContext,
@@ -17,6 +19,7 @@ import {
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { GuestNavigationProvider } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { Link } from "@/src/app/router-link";
+import { hostSessionDetailContractFixture } from "@/tests/unit/api-contract-fixtures";
 import { AppRouteLayout } from "./app-route-layout";
 
 const hostAuth: AuthMeResponse = {
@@ -63,11 +66,12 @@ function jsonResponse(body: unknown, status = 200) {
 }
 
 type SessionMutationOperation = "open" | "close" | "delete";
+const hostContext = { clubSlug: "reading-sai" } as const;
 
 function SessionMutationHarness({ operation }: { operation: SessionMutationOperation }) {
-  const openMutation = useOpenHostSessionMutation();
-  const closeMutation = useCloseHostSessionMutation();
-  const deleteMutation = useDeleteHostSessionMutation();
+  const openMutation = useOpenHostSessionMutation(hostContext);
+  const closeMutation = useCloseHostSessionMutation(hostContext);
+  const deleteMutation = useDeleteHostSessionMutation(hostContext);
 
   const mutate = {
     open: openMutation.mutateAsync,
@@ -206,6 +210,7 @@ function renderScopedExpiryLayout({
 
 afterEach(() => {
   cleanup();
+  __resetHostClientContractCapabilityForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -214,18 +219,25 @@ describe("AppRouteLayout host session navigation", () => {
   it.each([
     {
       operation: "open" as const,
-      mutationPath: "/api/bff/api/host/sessions/session-7/open",
+      mutationPath: "/api/bff/api/host/sessions/session-7/open?clubSlug=reading-sai",
       mutationMethod: "POST",
+      expected: { sessionRevision: 3 },
     },
     {
       operation: "close" as const,
-      mutationPath: "/api/bff/api/host/sessions/session-7/close",
+      mutationPath: "/api/bff/api/host/sessions/session-7/close?clubSlug=reading-sai",
       mutationMethod: "POST",
+      expected: {
+        sessionRevision: 3,
+        participantSetRevision: 4,
+        attendanceSnapshotId: "attendance-snapshot-4",
+      },
     },
     {
       operation: "delete" as const,
-      mutationPath: "/api/bff/api/host/sessions/session-7",
+      mutationPath: "/api/bff/api/host/sessions/session-7?clubSlug=reading-sai",
       mutationMethod: "DELETE",
+      expected: { sessionRevision: 3 },
     },
   ])(
     "keeps the meeting-list destination stable after a successful $operation mutation",
@@ -233,11 +245,55 @@ describe("AppRouteLayout host session navigation", () => {
       operation,
       mutationPath,
       mutationMethod,
+      expected,
     }) => {
       const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const path = input.toString();
+        if (path === "/api/bff/__internal/client-contract-status") {
+          return Promise.resolve(new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v3"],
+          }), {
+            status: 200,
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          }));
+        }
         if (path === "/api/bff/api/sessions/current") {
           return Promise.resolve(jsonResponse({ currentSession: null }));
+        }
+        if (
+          path === "/api/bff/api/host/sessions/session-7?clubSlug=reading-sai"
+          && (init?.method === undefined || init.method === "GET")
+        ) {
+          return Promise.resolve(jsonResponse({
+            ...hostSessionDetailContractFixture,
+            sessionId: "session-7",
+            versions: {
+              sessionRevision: 3,
+              exposureRevision: 2,
+              participantSetRevision: 4,
+              recordDraftRevision: 5,
+              liveRecordRevision: 2,
+              publicationRevision: 1,
+            },
+            attendanceSnapshotId: "attendance-snapshot-4",
+            attendees: hostSessionDetailContractFixture.attendees.map((attendee, index) => ({
+              ...attendee,
+              attendanceRevision: index + 1,
+            })),
+          }));
+        }
+        if (
+          path === "/api/bff/api/host/sessions/session-7/closing-status?clubSlug=reading-sai"
+          && (init?.method === undefined || init.method === "GET")
+        ) {
+          return Promise.resolve(jsonResponse({
+            session: {
+              sessionRevision: 3,
+              participantSetRevision: 4,
+              attendanceSnapshotId: "attendance-snapshot-4",
+            },
+          }));
         }
         if (path === mutationPath && init?.method === mutationMethod) {
           if (mutationMethod === "DELETE") {
@@ -248,6 +304,7 @@ describe("AppRouteLayout host session navigation", () => {
               state: "DRAFT",
               deletedAt: "2026-08-01T00:00:00Z",
               purgeAfter: "2026-08-08T00:00:00Z",
+              sessionRevision: 4,
               trashed: true,
               counts: {
                 participants: 0,
@@ -270,8 +327,18 @@ describe("AppRouteLayout host session navigation", () => {
       vi.stubGlobal("fetch", fetchMock);
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { retry: false, staleTime: 0, gcTime: 0 },
+          queries: { retry: false, staleTime: Number.POSITIVE_INFINITY, gcTime: 0 },
           mutations: { retry: false },
+        },
+      });
+      queryClient.setQueryData(hostSessionKeys.detail("session-7", hostContext), {
+        versions: { sessionRevision: 3 },
+      });
+      queryClient.setQueryData(hostSessionKeys.closingStatus("session-7", hostContext), {
+        session: {
+          sessionRevision: 3,
+          participantSetRevision: 4,
+          attendanceSnapshotId: "attendance-snapshot-4",
         },
       });
       const user = userEvent.setup();
@@ -287,6 +354,17 @@ describe("AppRouteLayout host session navigation", () => {
         mutationPath,
         expect.objectContaining({ method: mutationMethod }),
       ));
+      const mutationCall = fetchMock.mock.calls.find(([input, init]) =>
+        input.toString() === mutationPath && init?.method === mutationMethod
+      );
+      const mutationInit = mutationCall?.[1];
+      expect(JSON.parse(String(mutationInit?.body))).toEqual({
+        idempotencyKey: expect.stringMatching(/^host-/),
+        expected,
+        command: {},
+      });
+      expect(mutationInit?.headers).toBeInstanceOf(Headers);
+      expect((mutationInit?.headers as Headers).get("X-Readmates-Client-Contract")).toBe("v3");
       expectSessionLinks("/app/host/sessions");
 
     },

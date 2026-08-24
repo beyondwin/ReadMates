@@ -21,9 +21,10 @@ import {
   wrapHostSessionEditorActionsForUndo,
   type HostSessionEditorActions,
 } from "@/features/host/route/host-session-editor-actions";
-import type {
-  HostSessionChangeReceipt,
-  HostSessionRestorePreview,
+import {
+  parseOptionalHostSessionChangeReceipt,
+  type HostSessionChangeReceipt,
+  type HostSessionRestorePreview,
 } from "@/features/host/api/host-session-recovery-contracts";
 import type {
   HostSessionHistoryItem,
@@ -45,6 +46,10 @@ import {
 } from "@/features/host/model/host-session-ledger-model";
 import { openAlreadyExistsMessage } from "@/features/host/model/host-session-lifecycle-model";
 import { isReadmatesApiError } from "@/shared/api/errors";
+import {
+  completeHostResponseBody,
+  readHostResponseJson,
+} from "@/shared/api/host-authority-event";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import {
   WorkspaceTrashTombstone,
@@ -166,6 +171,20 @@ export type HostSessionRecordsChangedEvent = {
 
 function contextFromClubSlug(clubSlug?: string): ExplicitReadmatesApiContext {
   return requireHostClubContext(clubSlug);
+}
+
+async function hostSessionSaveResult(response: Response) {
+  if (!response.ok) {
+    await completeHostResponseBody(response);
+    return { ok: false as const };
+  }
+
+  const body = await readHostResponseJson<Record<string, unknown>>(response);
+  return {
+    ok: true as const,
+    createdSessionId: typeof body.sessionId === "string" ? body.sessionId : null,
+    changeReceipt: parseOptionalHostSessionChangeReceipt(body),
+  };
 }
 
 function isOverlayPanel(
@@ -500,10 +519,12 @@ function useHostSessionEditorActions(
       runLifecycle(() => unpublishSession({ sessionId, request }), sessionId),
     returnSessionToDraft: (sessionId, request) =>
       runLifecycle(() => returnSessionToDraft({ sessionId, request }), sessionId),
-    saveSession: (sessionId, request) =>
-      sessionId === null
-        ? createSession(request)
-        : updateSession({ sessionId, request }),
+    saveSession: async (sessionId, request) =>
+      hostSessionSaveResult(
+        sessionId === null
+          ? await createSession(request)
+          : await updateSession({ sessionId, request }),
+      ),
     updateAttendance: (sessionId, attendance) =>
       updateAttendance({ sessionId, attendance }),
     previewSessionImport: hostSessionEditorPreviewActions(context).previewSessionImport,

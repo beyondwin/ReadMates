@@ -864,7 +864,7 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request: importRequest });
     });
 
-    expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest);
+    expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest, context);
     expectInvalidated(client, [
       entries.detail,
       entries.list,

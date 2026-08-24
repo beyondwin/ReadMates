@@ -1,8 +1,7 @@
-import type { HostSecurityPurgeCode } from "@/shared/api/host-authority-event";
-import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import type { HostSecurityPurgeCode } from "@/shared/model/host-authority";
 
-export type { HostSecurityPurgeCode } from "@/shared/api/host-authority-event";
-export { isHostSecurityPurgeCode } from "@/shared/api/host-authority-event";
+export type { HostSecurityPurgeCode } from "@/shared/model/host-authority";
+export { isHostSecurityPurgeCode } from "@/shared/model/host-authority";
 
 const messages: Record<HostSecurityPurgeCode, string> = {
   HOST_AUTHORITY_REVOKED: "이 모임의 호스트 권한이 해제되어 안전한 멤버 공간으로 이동했습니다.",
@@ -18,7 +17,7 @@ export function hostAuthoritySafeDestination(clubSlug: string): string {
   return `/clubs/${encodeURIComponent(clubSlug)}/app`;
 }
 
-export function requireHostClubContext(clubSlug: string | undefined): ExplicitReadmatesApiContext {
+export function requireHostClubContext(clubSlug: string | undefined): { clubSlug: string } {
   if (!clubSlug) throw new Error("HOST_API_CONTEXT_REQUIRED");
   return { clubSlug };
 }

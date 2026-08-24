@@ -8,7 +8,11 @@ import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireHost } from "@/src/app/route-guards";
-import { canonicalizeCompatibilityEntry } from "@/src/app/workspace-route-model";
+import {
+  canonicalizeCompatibilityEntry,
+  resolveUnavailableDetailTarget,
+} from "@/src/app/workspace-route-model";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import { HOST_ROUTE_PATHS } from "@/shared/routing/host-route-destinations";
 
@@ -16,6 +20,13 @@ type ScopedHostRouteModule = {
   Component: ComponentType;
   loader?: LoaderFunction;
 };
+
+function unavailableHostDetailTarget(pathname: string) {
+  return resolveUnavailableDetailTarget({
+    pathname,
+    lastSafeTarget: readLastSafeWorkspaceTarget("host"),
+  });
+}
 
 async function canonicalHostCompatibilityLoader(args: LoaderFunctionArgs) {
   const auth = await requireHostLoaderAuth(args);
@@ -191,7 +202,7 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
           import("@/src/app/host-routes/meeting-route-element"),
           import("@/features/host/route/host-session-editor-data"),
         ]);
-        return { Component, loader: hostSessionEditorLoaderFactory(queryClient) };
+        return { Component, loader: hostSessionEditorLoaderFactory(queryClient, unavailableHostDetailTarget) };
       },
     }),
     scopedHostRoute({
@@ -358,7 +369,7 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
           import("@/src/app/host-routes/meeting-route-element"),
           import("@/features/host/route/host-session-editor-data"),
         ]);
-        return { Component: MeetingRouteElement, loader: hostSessionEditorLoaderFactory(queryClient) };
+        return { Component: MeetingRouteElement, loader: hostSessionEditorLoaderFactory(queryClient, unavailableHostDetailTarget) };
       },
     },
     {

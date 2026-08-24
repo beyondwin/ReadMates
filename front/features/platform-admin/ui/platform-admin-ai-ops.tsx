@@ -3,7 +3,7 @@ import type {
   PlatformAdminAiOpsAction,
   PlatformAdminAiOpsCommandPreviewResponse,
   PlatformAdminAiOpsCommandReceiptResponse,
-} from "@/features/platform-admin/api/platform-admin-contracts";
+} from "@/features/platform-admin/model/platform-admin-domain-types";
 import { AdminModalDialog } from "@/features/platform-admin/ui/admin-modal-dialog";
 
 export type PlatformAdminAiOpsRole = "OWNER" | "OPERATOR" | "SUPPORT";

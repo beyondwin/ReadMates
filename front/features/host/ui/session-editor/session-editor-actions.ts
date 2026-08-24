@@ -8,7 +8,10 @@ import type {
   SessionImportPreviewResponse,
   SessionImportRequest,
 } from "@/features/host/model/host-view-types";
-import type { HostSessionRequest } from "@/features/host/model/host-session-editor-model";
+import type {
+  HostSessionRequest,
+  HostSessionSaveResult,
+} from "@/features/host/model/host-session-editor-model";
 import type {
   HostSessionLifecycleResult,
   HostSessionReverseRequest,
@@ -33,7 +36,7 @@ export type HostSessionEditorActions = {
   reopenSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   unpublishSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   returnSessionToDraft: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
-  saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
+  saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<HostSessionSaveResult>;
   updateAttendance: (
     sessionId: string,
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,

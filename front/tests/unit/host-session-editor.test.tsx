@@ -105,8 +105,8 @@ const hostSessionEditorTestActions = {
   reopenSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   unpublishSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   returnSessionToDraft: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
-  saveSession: (sessionId, request) =>
-    fetch(
+  saveSession: async (sessionId, request) => {
+    const response = await fetch(
       sessionId === null
         ? "/api/bff/api/host/sessions"
         : `/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`,
@@ -116,7 +116,17 @@ const hostSessionEditorTestActions = {
         body: JSON.stringify(request),
         cache: "no-store",
       },
-    ),
+    );
+    if (!response.ok) {
+      return { ok: false };
+    }
+    const body = await response.json() as { sessionId?: unknown };
+    return {
+      ok: true,
+      createdSessionId: typeof body.sessionId === "string" ? body.sessionId : null,
+      changeReceipt: null,
+    };
+  },
   updateAttendance: async (sessionId, attendance) => {
     const response = await fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
       method: "POST",
@@ -656,7 +666,11 @@ describe("HostSessionEditor", () => {
 
   it("does not submit basic information when Enter is pressed in a record input", async () => {
     const user = userEvent.setup();
-    const saveSession = vi.fn(async () => ({ ok: true }) as Response);
+    const saveSession = vi.fn(async () => ({
+      ok: true as const,
+      createdSessionId: null,
+      changeReceipt: null,
+    }));
     const workflow = recordWorkflow("MEMBER");
     workflow.snapshot.oneLineReviews = [{
       membershipId: "membership-reviewer",
@@ -712,7 +726,11 @@ describe("HostSessionEditor", () => {
 
   it("keeps basic save feedback beside the section-local action", async () => {
     const user = userEvent.setup();
-    const saveSession = vi.fn(async () => ({ ok: true }) as Response);
+    const saveSession = vi.fn(async () => ({
+      ok: true as const,
+      createdSessionId: null,
+      changeReceipt: null,
+    }));
 
     render(
       <HostSessionEditorForTest
@@ -1940,7 +1958,7 @@ describe("HostSessionEditor", () => {
 
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
     expect(await screen.findByText("게스트·멤버 노트 게시 완료")).toBeVisible();
-    expect(await screen.findByRole("status")).toHaveTextContent("기록을 공개했습니다.");
+    expect(await screen.findByRole("status")).toHaveTextContent("게스트·멤버 노트에 기록을 게시했습니다.");
   });
 
   it("disables publication actions for unsaved new sessions and explains why", () => {

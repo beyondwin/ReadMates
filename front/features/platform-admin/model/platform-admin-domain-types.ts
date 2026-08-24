@@ -151,6 +151,32 @@ export type PlatformAdminOnboardingResultResponse = {
 
 export type PlatformAdminAiOpsAction = "FORCE_CANCEL" | "RETRY_COMMIT";
 
+export type PlatformAdminAiOpsCommandPreviewResponse = {
+  previewId: string;
+  jobId: string;
+  action: PlatformAdminAiOpsAction;
+  jobStatus: string;
+  jobRevision: number;
+  effectType: "AI_JOB_CANCEL" | "AI_COMMIT_RETRY";
+  impactCodes: string[];
+  expiresAt: string;
+  fingerprintPrefix: string;
+};
+
+export type PlatformAdminAiOpsCommandReceiptResponse = {
+  receiptId: string;
+  previewId: string;
+  jobId: string;
+  action: PlatformAdminAiOpsAction;
+  beforeJobStatus: string;
+  beforeJobRevision: number;
+  afterJobStatus: string;
+  afterJobRevision: number;
+  originStatus: string;
+  effectStatus: string;
+  safeErrorCode: string | null;
+};
+
 export type PlatformAdminAiGenerationCapabilitiesResponse = {
   enabled: boolean;
 };

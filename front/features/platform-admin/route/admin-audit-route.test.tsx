@@ -91,7 +91,15 @@ describe("AdminAuditRoute", () => {
     await screen.findByRole("button", { name: /다음 이벤트/ });
     expect(screen.getAllByRole("button", { name: /경계 이벤트/ })).toHaveLength(1);
     expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("경계 이벤트");
-    expect(fetchAdminAuditLedger).toHaveBeenLastCalledWith({ range: "7d", sourceSlice: "S6" }, "cursor-1");
+    expect(fetchAdminAuditLedger).toHaveBeenLastCalledWith(
+      {
+        range: "7d",
+        sourceSlice: "S6",
+        from: "2026-08-18T00:00:00Z",
+        to: "2026-08-25T00:00:00Z",
+      },
+      "cursor-1",
+    );
     expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 

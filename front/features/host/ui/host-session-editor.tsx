@@ -33,7 +33,6 @@ import type {
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
 } from "@/features/host/model/host-session-workspace-navigation";
-import { readHostResponseJson } from "@/shared/api/host-authority-event";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
@@ -778,13 +777,15 @@ export default function HostSessionEditor({
         questionDeadlineOffsetDays,
       }, session ?? undefined);
       try {
-        const response = await actions.saveSession(session?.sessionId ?? null, payload);
+        const result = await actions.saveSession(session?.sessionId ?? null, payload);
 
-        if (response.ok) {
+        if (result.ok) {
           setSaveState("saved");
           if (isNewSession) {
-            const created = await readHostResponseJson<{ sessionId: string }>(response);
-            globalThis.location.href = scopedHostSessionEditHref(created.sessionId, clubSlug);
+            if (!result.createdSessionId) {
+              throw new Error("HOST_SESSION_CREATE_RESULT_REQUIRED");
+            }
+            globalThis.location.href = scopedHostSessionEditHref(result.createdSessionId, clubSlug);
             return;
           }
 
