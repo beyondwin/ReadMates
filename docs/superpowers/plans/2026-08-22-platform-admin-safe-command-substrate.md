@@ -4,7 +4,7 @@
 
 **Goal:** 플랫폼 어드민의 위험 명령이 재시도·동시 실행·응답 유실 상황에서도 중복 효과를 만들지 않도록, 도메인별 preview/receipt가 공유할 최소 운영 idempotency와 HMAC 기반을 제공한다.
 
-**Architecture:** Flyway V57은 mutable claim `platform_admin_command_idempotency`, key-version alias `platform_admin_command_idempotency_keys`, retirement state `platform_admin_command_digest_key_state`를 분리한다. `shared/mutation`의 versioned canonical HMAC primitive를 재사용하되 platform-admin identity는 host membership identity와 분리한다. 각 club/notification/AI/support application service가 자기 transaction 안에서 모든 active-key alias를 같은 claim에 예약하고 자기 immutable receipt와 함께 완료하며, 범용 명령 controller·executor·receipt body는 만들지 않는다.
+**Architecture:** Flyway V57은 mutable claim `platform_admin_command_idempotency`, key-version alias `platform_admin_command_idempotency_keys`, retirement state `platform_admin_command_digest_key_state`를 분리한다. `shared/mutation`의 versioned canonical HMAC primitive를 재사용하되 platform-admin identity는 host membership identity와 분리한다. 각 club/notification/AI/support application service가 rotation phase의 alias write candidates를 자기 transaction 안에서 같은 claim에 예약하고 자기 immutable receipt와 함께 완료하며, 범용 명령 controller·executor·receipt body는 만들지 않는다.
 
 **Tech Stack:** Kotlin, Spring Boot, JDBC, MySQL 8, Flyway, JUnit 5, Testcontainers, Micrometer.
 
@@ -18,8 +18,9 @@ ADR impact: implements proposed ADR-0040; constraining reference — ADR-0028, A
 - V57 stores no raw reason, email, name, URL, request JSON, canonical input, idempotency key, or plaintext digest.
 - Logical identity is `(platformAdminUserId, commandType, targetType, targetId, idempotencyKey)`. Plaintext key는 저장하지 않고 key version별 HMAC alias만 같은 claim에 연결한다. It never uses club membership IDs.
 - Same key + same canonical request converges to the same domain receipt. Same key + different request is `409 IDEMPOTENCY_CONFLICT`. A live claim is `409 COMMAND_IN_PROGRESS` with bounded retry guidance.
-- Digest and idempotency-key fingerprints use purpose-separated, versioned HMAC and constant-time comparison. Rotation overlap에서는 current·previous alias를 모두 예약하며 unknown or retired versions fail closed.
+- Digest and idempotency-key fingerprints use purpose-separated, versioned HMAC and constant-time comparison. Rotation은 `writePreviousAlias=true` overlap에서 current·previous alias를 dual-write하고, old writer drain 확인 뒤 `false`로 바꿔 current alias만 새로 쓰되 previous는 lookup에 유지한다. Expired completed claim purge로 previous alias를 제거하고, zero-reference 이후 최소 24시간 buffer를 거친 뒤에만 previous key를 제거한다. Unknown or retired versions fail closed.
 - Origin claim states are only `IN_PROGRESS|COMPLETED`. Persisted lease takeover와 bare `FAILED`는 없고 committed `IN_PROGRESS`는 fail closed한다. L3 lease는 origin commit 이후 convergence work에만 존재한다.
+- Claim creation expiry는 retention anchor가 아니다. Completion CAS가 `expiresAt = completedAt + retention`으로 다시 설정하고 retention은 최소 24시간이어야 한다. Initial expiry 뒤까지 실행된 long-running claim도 valid claim token이면 완료할 수 있다.
 - The operational row is not business audit. Domain-owned immutable receipts and audit events remain the only user-visible proof.
 - Application services own transaction boundaries. Controller and adapter must not orchestrate multi-port business transactions.
 - Purge removes only expired `COMPLETED` claims after at least 24 hours and cascades only to their operational aliases, never to immutable receipts. Key retirement also requires no remaining alias plus a 24-hour unreferenced buffer.
@@ -129,6 +130,12 @@ data class AdminCommandDigest(
     val requestHmac: ByteArray,
 )
 
+data class AdminCommandDigestSet(
+    val lookupCandidates: List<AdminCommandDigest>,
+    val aliasCandidates: List<AdminCommandDigest>,
+    val writePreviousAlias: Boolean,
+)
+
 interface CanonicalAdminCommandRequest {
     val schemaVersion: String
     fun canonicalFields(): List<Pair<String, String>>
@@ -137,7 +144,7 @@ interface CanonicalAdminCommandRequest {
 
 Canonicalization applies NFC, explicit UTF-8 byte framing, field-name sorting, length prefixes, and command-specific schema version. `targetId` is a stable UUID or documented synthetic slot such as `new-club`; free text is included in the request HMAC but never persisted.
 
-`AdminCommandDigest`는 한 key version의 alias material이다. Task 3 claim reservation은 configured current·previous version 각각의 digest를 version 오름차순으로 계산해야 하며, 하나의 current digest만 stable claim identity로 취급하지 않는다.
+`AdminCommandDigest`는 한 key version의 alias material이고 `AdminCommandDigestSet`은 raw key를 persistence 밖에 둔 rotation envelope다. `lookupCandidates`는 current와 lookup-capable previous version을 version 오름차순으로 담는다. `aliasCandidates`는 current를 항상 포함하고 `writePreviousAlias=true`인 overlap 동안에만 previous도 포함한다. Old-version writer drain이 확인되면 flag를 `false`로 바꾸지만 previous digest는 response-loss lookup을 위해 `lookupCandidates`에 유지한다. `aliasCandidates`는 `lookupCandidates`의 ordered subset이어야 하며 둘 다 version duplicate를 거절한다.
 
 - [ ] **Step 1: Write RED canonicalization tests.** Cover Unicode NFC equivalence, field-order invariance, absent vs empty distinction, delimiter collision, target/actor/command separation, same/different key behavior, key rotation, unknown/retired key, constant-time verification path, and log capture proving no raw inputs.
 - [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server unitTest --tests com.readmates.shared.adminmutation.application.service.AdminCommandIdentityServiceTest`; expected FAIL.
@@ -155,13 +162,34 @@ Canonicalization applies NFC, explicit UTF-8 byte framing, field-name sorting, l
 - Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/adapter/out/persistence/AdminCommandIdempotencyRows.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/application/service/AdminCommandIdempotencyServiceTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/adapter/out/persistence/AdminCommandIdempotencyConcurrencyTest.kt`
+- Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/config/AdminCommandIdempotencyProperties.kt`
+- Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/config/AdminCommandIdempotencyPropertiesTest.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/model/AdminCommandIdentity.kt`
 - Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/service/AdminCommandIdentityService.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/config/AdminCommandIdentityProperties.kt`
 - Modify: `server/src/test/kotlin/com/readmates/shared/adminmutation/application/service/AdminCommandIdentityServiceTest.kt`
+- Modify: `server/src/main/resources/application.yml`
+- Modify: `.env.example`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt`
 
 **Interfaces:**
 
 ```kotlin
+data class AdminCommandScope(
+    val platformAdminUserId: UUID,
+    val commandType: String,
+    val targetType: String,
+    val targetId: String,
+)
+
+data class AdminCommandClaimAttempt(
+    val claimId: UUID,
+    val claimToken: UUID,
+    val canonicalSchemaVersion: String,
+    val claimedAt: Instant,
+    val initialExpiresAt: Instant,
+)
+
 sealed interface AdminCommandClaimResult {
     data class Claimed(val claimId: UUID, val claimToken: UUID) : AdminCommandClaimResult
     data class Completed(val receiptType: String, val receiptId: String) : AdminCommandClaimResult
@@ -170,44 +198,66 @@ sealed interface AdminCommandClaimResult {
 }
 
 interface AdminCommandIdempotencyPort {
-    fun claim(identity: PlatformAdminCommandIdentity, aliases: List<AdminCommandDigest>, now: Instant): AdminCommandClaimResult
-    fun complete(claimId: UUID, claimToken: UUID, receiptType: String, receiptId: String, now: Instant): Boolean
+    fun claim(
+        scope: AdminCommandScope,
+        attempt: AdminCommandClaimAttempt,
+        digests: AdminCommandDigestSet,
+    ): AdminCommandClaimResult
+
+    fun complete(
+        claimId: UUID,
+        claimToken: UUID,
+        receiptType: String,
+        receiptId: String,
+        completedAt: Instant,
+        retention: Duration,
+    ): Boolean
 }
 ```
 
-The service exposes claim primitives to domain application services; it does not open a nested transaction. Domain code must claim, perform effect, insert immutable receipt/audit, and complete the pointer inside one outer transaction. A response-loss retry obtains `Completed` and reauthorizes before loading the domain receipt. A committed `IN_PROGRESS` returns `InProgress` and is never automatically taken over or failed.
+`PlatformAdminCommandIdentity`와 raw idempotency key는 `AdminCommandIdentityService`에서 canonicalize/HMAC한 뒤 persistence 경계를 넘지 않는다. `AdminCommandIdempotencyPort`는 stripped `AdminCommandScope`, generated `AdminCommandClaimAttempt`, HMAC-only `AdminCommandDigestSet`만 받는다. The service exposes claim primitives to domain application services; it does not open a nested transaction. Domain code must claim, perform effect, insert immutable receipt/audit, and complete the pointer inside one outer transaction. A response-loss retry obtains `Completed` and reauthorizes before loading the domain receipt. A committed `IN_PROGRESS` returns `InProgress` and is never automatically taken over or failed.
 
-- [ ] **Step 1: Write RED unit state-machine tests.** Cover first claim with sorted current·previous aliases, either-version replay, live/committed `IN_PROGRESS` fail-closed, identical completed replay, conflicting request HMAC, stale-token completion, and invalid receipt pointer. Assert no failed/takeover transition exists.
-- [ ] **Step 2: Write RED two-connection integration tests.** Synchronize concurrent overlapping-version claims with latches; assert exactly one claim, aliases from both versions point to it, savepoint rollback removes a partial candidate reservation before duplicate reconciliation, outer transaction rollback removes the incomplete claim, and completion plus a fixture domain receipt commit atomically.
-- [ ] **Step 3: Run RED.**
+- [ ] **Step 1: Write RED unit state-machine/config tests.** Cover digest-set invariants, overlap dual-write, drained current-only alias write with previous lookup, first claim, either-version replay, live/committed `IN_PROGRESS` fail-closed, identical completed replay, conflicting request HMAC, stale-token completion, invalid receipt pointer, and rejection of retention below 24 hours. Assert the port never accepts `PlatformAdminCommandIdentity` or a raw key and no failed/takeover transition exists.
+- [ ] **Step 2: Write RED two-connection integration tests.** Synchronize concurrent overlapping-version claims with latches; assert exactly one claim, aliases from both versions point to it, and savepoint rollback removes a partial candidate reservation before duplicate reconciliation. For every `aliasCandidate`, upsert then lock `platform_admin_command_digest_key_state` in globally sorted key-version order inside the same savepoint and outer transaction as claim/alias reservation, update `last_referenced_at`, and clear `unreferenced_since`; assert rollback also restores key-state values. Assert outer transaction rollback removes the incomplete claim, and completion plus a fixture domain receipt commit atomically.
+- [ ] **Step 3: Write RED completion-retention integration tests.** Create a claim with a short initial expiry, advance beyond that expiry while the domain transaction remains valid, and complete with the original claim token. Assert completion succeeds, stores the immutable receipt pointer, and sets `expires_at` exactly to `completedAt + retention` with retention at least 24 hours; the claim-created expiry must not shorten completed retention.
+- [ ] **Step 4: Run RED.**
 
   Run: `./server/gradlew -p server unitTest --tests com.readmates.shared.adminmutation.application.service.AdminCommandIdempotencyServiceTest`
 
   Run: `./server/gradlew -p server integrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandIdempotencyConcurrencyTest`
 
   Expected: FAIL.
-- [ ] **Step 4: Implement sorted alias reservation with a savepoint, conditional SQL, and typed service outcomes.** On any alias duplicate, rollback the whole candidate reservation to the savepoint before reconciling the existing claim. Use affected-row counts; never catch all exceptions as idempotent success and never add origin-claim lease takeover.
-- [ ] **Step 5: Run GREEN.** Run both Task 3 commands; expected PASS.
-- [ ] **Step 6: Commit.** Commit: `feat(server): implement atomic admin command claims`
+- [ ] **Step 5: Implement stripped persistence inputs, sorted key-state/alias reservation with a savepoint, conditional completion SQL, and typed service outcomes.** On any key-state or alias duplicate, rollback the whole candidate reservation to the savepoint before reconciling the existing claim. Completion CAS matches claim ID/token/state and resets expiry from completion time. Use affected-row counts; never catch all exceptions as idempotent success and never add origin-claim lease takeover.
+- [ ] **Step 6: Run GREEN.** Run both Task 3 commands plus `AdminCommandIdempotencyPropertiesTest`; expected PASS.
+- [ ] **Step 7: Commit.** Commit: `feat(server): implement atomic admin command claims`
 
 ### Task 4: Add retention, observability, and a full security-chain harness
 
 **Files:**
 - Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/adapter/in/scheduling/AdminCommandIdempotencyPurgeScheduler.kt`
 - Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/adapter/out/observability/AdminCommandMetrics.kt`
+- Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/model/AdminCommandDigestKeyRetirement.kt`
+- Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/service/AdminCommandDigestKeyRetirementService.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/adapter/in/scheduling/AdminCommandIdempotencyPurgeSchedulerTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/adapter/out/observability/AdminCommandMetricsTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/application/service/AdminCommandDigestKeyRetirementServiceTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/adapter/out/persistence/AdminCommandDigestKeyRetirementConcurrencyTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/auth/api/PlatformAdminBffSecurityTest.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/port/out/AdminCommandIdempotencyPort.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/adapter/out/persistence/JdbcAdminCommandIdempotencyAdapter.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt`
 
 The shared security test supplies real Spring Security, BFF secret header, canonical Origin/Referer, session principal, `CurrentPlatformAdmin` resolution, and method/path cases. Domain plans extend its parameter matrix; they do not replace it with standalone matcher tests.
 
-- [ ] **Step 1: Write RED purge/key-retirement/metric tests.** Keep every `IN_PROGRESS` row and non-expired `COMPLETED` row; purge a bounded batch of expired `COMPLETED` claims and their aliases; prove receipt fixture survives. Reject key retirement while an alias exists or until `unreferenced_since` has aged at least 24 hours. Assert only bounded tags.
-- [ ] **Step 2: Write the initial RED security harness.** Prove a representative admin POST rejects missing/wrong BFF secret, cross-site origin, inactive/non-admin actor, and insufficient capability; accepts the exact same-origin BFF request.
-- [ ] **Step 3: Run RED.** Run: `./server/gradlew -p server unitTest --tests com.readmates.shared.adminmutation.adapter.in.scheduling.AdminCommandIdempotencyPurgeSchedulerTest --tests com.readmates.shared.adminmutation.adapter.out.observability.AdminCommandMetricsTest --tests com.readmates.auth.api.PlatformAdminBffSecurityTest`; expected FAIL.
-- [ ] **Step 4: Implement completed-only bounded purge, fail-closed key retirement, metrics, and reusable test fixture.** Do not add a generic production controller or purge/take over committed `IN_PROGRESS` claims.
-- [ ] **Step 5: Run GREEN.** Run the Task 4 command; expected PASS.
-- [ ] **Step 6: Commit.** Commit: `feat(server): operate admin command claims safely`
+- [ ] **Step 1: Write RED purge/key-retirement/metric tests.** Keep every `IN_PROGRESS` row and non-expired `COMPLETED` row; purge a bounded batch of expired `COMPLETED` claims and their aliases; prove receipt fixture survives. Retirement locks digest-key-state rows in the same global version order as claim reservation, returns `REFERENCED` while any alias exists, starts/retains `unreferenced_since` only at zero aliases, returns `BUFFER_PENDING` before 24 hours, and returns `REMOVABLE` only after a fresh locked zero-alias check at or beyond 24 hours. Assert only bounded metric tags.
+- [ ] **Step 2: Write RED two-connection claim-vs-retirement tests.** Cover both lock orders. If claim reservation wins, retirement waits and then observes the alias as `REFERENCED`. If retirement starts the unreferenced buffer first, a concurrent still-authorized overlap claim waits, then inserts its alias and clears `unreferenced_since`, invalidating removal eligibility. After old writers drain and `writePreviousAlias=false`, previous remains lookup-capable but no claim path may create a new previous alias; only then may a fresh 24-hour zero-reference result authorize config key removal.
+- [ ] **Step 3: Write the initial RED security harness.** Prove a representative admin POST rejects missing/wrong BFF secret, cross-site origin, inactive/non-admin actor, and insufficient capability; accepts the exact same-origin BFF request.
+- [ ] **Step 4: Run RED.** Run: `./server/gradlew -p server unitTest --tests com.readmates.shared.adminmutation.adapter.in.scheduling.AdminCommandIdempotencyPurgeSchedulerTest --tests com.readmates.shared.adminmutation.adapter.out.observability.AdminCommandMetricsTest --tests com.readmates.shared.adminmutation.application.service.AdminCommandDigestKeyRetirementServiceTest --tests com.readmates.auth.api.PlatformAdminBffSecurityTest`.
+
+  Run: `./server/gradlew -p server integrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandDigestKeyRetirementConcurrencyTest`; expected FAIL.
+- [ ] **Step 5: Implement completed-only bounded purge, serialized fail-closed key retirement, metrics, and reusable test fixture.** Retirement reports eligibility; key removal is a later configuration rollout step after writer drain and the locked 24-hour gate. Do not add a generic production controller or purge/take over committed `IN_PROGRESS` claims.
+- [ ] **Step 6: Run GREEN.** Run both Task 4 commands; expected PASS.
+- [ ] **Step 7: Commit.** Commit: `feat(server): operate admin command claims safely`
 
 ### Task 5: Verify substrate acceptance before domain adoption
 
@@ -217,7 +267,7 @@ The shared security test supplies real Spring Security, BFF secret header, canon
 - [ ] **Step 1: Run focused tests repeatedly.** Run the Task 2–4 unit and integration commands three times; expected deterministic PASS with no flaky concurrency result.
 - [ ] **Step 2: Run MySQL and server gates.**
 
-  Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandIdempotencyConcurrencyTest`
+  Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandIdempotencyConcurrencyTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandDigestKeyRetirementConcurrencyTest`
 
   Run: `./scripts/server-ci-check.sh`
 

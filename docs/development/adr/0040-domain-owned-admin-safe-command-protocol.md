@@ -73,9 +73,12 @@ request는 저장된 receipt를 반환하고 같은 key의 다른 request는 con
 Operational claim identity와 HMAC key version alias는 분리한다. Claim은 actor·command·target scope,
 canonical schema version, `IN_PROGRESS|COMPLETED`, CAS claim token과 domain receipt pointer만 가진다. Alias는
 같은 scope, digest key version, idempotency-key HMAC, request HMAC과 claim ID를 가진다. Rotation overlap 동안
-current·previous version alias를 모두 계산해 같은 claim에 연결하며, `(scope, key version,
-idempotency-key HMAC)` unique와 `(claim, key version)` unique를 함께 강제한다. 따라서 rotation 전·후 key로
-동시에 들어온 요청도 별도 claim을 만들 수 없다.
+lookup과 새 alias write 모두 current·previous version을 사용해 같은 claim에 연결하며, `(scope, key version,
+idempotency-key HMAC)` unique와 `(claim, key version)` unique를 함께 강제한다. Old-version writer drain을
+확인한 뒤에는 새 alias는 current로만 쓰되 previous는 response-loss lookup에 유지한다. 이후 expired
+completed claim purge가 previous alias를 제거하고, zero-reference 24시간 buffer가 끝난 뒤 previous key를
+설정에서 제거한다. 따라서 rotation 전·후 key로 동시에 들어온 요청도 별도 claim을 만들 수 없고 lookup
+호환성을 alias write 기간보다 먼저 끊지 않는다.
 
 Canonical request identity는 ADR-0028의 versioned canonical HMAC 정책을 재사용한다. DTO validation과
 default 적용 뒤 operation별 schema가 Unicode, field/collection order, null·omitted·default 의미를 고정한다.
@@ -90,6 +93,13 @@ alias는 deterministic version 순서로 예약하며 duplicate reconciliation�
 두지 않는다. Transaction rollback이면 incomplete claim도 함께 사라져야 한다. Commit된 `IN_PROGRESS`가
 관측되면 자동 takeover·재실행하지 않고 fail closed한다. L3의 lease는 origin receipt commit 이후 별도
 convergence work에만 둔다.
+
+Alias reservation은 쓰려는 모든 digest key state row를 global version 순서로 upsert·lock하고
+`last_referenced_at`을 갱신하며 `unreferenced_since`를 지운다. 이 key-state 변경, claim, 모든 alias는 같은
+savepoint와 outer transaction에 들어가 duplicate reconciliation rollback 때 함께 되돌아간다. Retirement도
+같은 row와 순서를 lock한 뒤 alias 존재 여부를 다시 확인한다. Alias가 0일 때만 `unreferenced_since`를
+시작·유지하고, fresh locked zero-reference가 24시간 이상 지속된 뒤에만 key 제거 가능 상태를 반환한다.
+따라서 claim과 retirement가 교차해 reference를 잃거나 premature key removal을 허용하지 않는다.
 
 Response-loss 재호출에서는 같은 actor·command·target·key·request의 completed receipt lookup을
 preview expired/consumed rejection보다 먼저 수행한다. Receipt lookup도 현재 active platform admin과
@@ -107,10 +117,14 @@ version, reason category와 redacted reason, result와 safe error code, preview/
 error, secret은 기록하지 않는다. Global audit ledger는 모든 L1 lifecycle event와 L2/L3 receipt를 조회할
 수 있어야 하며 domain-local history만 존재하는 상태를 통합 감사로 표현하지 않는다.
 
-Preview와 operational idempotency ownership row는 bounded retention과 안전한 cleanup을 가진다. Purge는
-retention이 지난 `COMPLETED` claim과 그 operational alias만 제거하며 committed `IN_PROGRESS`를 자동 삭제해
-새 실행을 열지 않는다. Immutable receipt는 삭제 가능한 target resource에 destructive FK를 두지 않고
-redacted immutable target ID snapshot을 보존한다. Receipt 보존 기간과 접근 권한은 audit 정책과 일치시킨다.
+Preview와 operational idempotency ownership row는 bounded retention과 안전한 cleanup을 가진다. Claim 생성
+시점 expiry는 completion retention의 기준이 아니다. Completion CAS가 `expires_at`을
+`completedAt + retention`으로 다시 설정하고 retention은 최소 24시간이다. 따라서 initial expiry 뒤까지
+실행된 long-running command도 valid claim token으로 완료할 수 있고 완료 직후 purge되지 않는다. Purge는
+이 completion-anchored retention이 지난 `COMPLETED` claim과 그 operational alias만 제거하며 committed
+`IN_PROGRESS`를 자동 삭제해 새 실행을 열지 않는다. Immutable receipt는 삭제 가능한 target resource에
+destructive FK를 두지 않고 redacted immutable target ID snapshot을 보존한다. Receipt 보존 기간과 접근
+권한은 audit 정책과 일치시킨다.
 
 Browser mutation은 same-origin BFF만 사용한다. BFF는 path를 정규화하고 browser가 보낸 내부 인증
 header를 폐기한 뒤 server-only secret과 canonical Origin/Referer를 붙인다. Spring은 secret,
@@ -175,6 +189,9 @@ L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로
 - Partial failure가 대상별 outcome·skipped count·retry eligibility를 보존하는지 확인한다.
 - MySQL write와 receipt/audit/outbox 중 하나가 실패하면 전체 origin transaction이 rollback되는지 확인한다.
 - Origin claim의 rollback, committed `IN_PROGRESS` fail-closed, sorted dual-alias reservation과 savepoint rollback을 확인한다.
+- Rotation overlap dual-write, writer drain 뒤 current-only alias write/previous lookup, alias purge, locked zero-reference 24시간 buffer, key removal 순서를 확인한다.
+- Claim과 key retirement 두 connection이 같은 key-state row lock으로 serialize되고 새 alias가 `unreferenced_since`를 지우는지 확인한다.
+- Initial expiry를 넘긴 long-running claim completion이 성공하고 completion 시점부터 최소 24시간 retention을 다시 확보하는지 확인한다.
 - External provider failure/resume가 origin claim takeover 없이 같은 convergence ID와 append-only attempt lease를 사용하는지 확인한다.
 - Trusted BFF without Spring CSRF token 성공, missing/invalid secret·origin·active actor·capability 거절,
   exact path만 CSRF 예외이고 near-miss path는 보호되는지 full security chain으로 확인한다.
