@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  useBlocker,
   useLoaderData,
   useLocation,
   useNavigate,
@@ -16,6 +15,7 @@ import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routi
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
+import { useDraftRouteNavigationGuard } from "@/features/host/route/host-draft-route-navigation-guard";
 import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
 import {
   wrapHostSessionEditorActionsForUndo,
@@ -292,24 +292,6 @@ function isFreshApplyRequired(code: string) {
     "SESSION_RECORD_APPLY_REQUEST_ALREADY_USED",
     "SESSION_RECORD_INVALID_APPLY_CONTRACT",
   ].includes(code);
-}
-
-function useDraftRouteNavigationGuard(shouldBlock: boolean) {
-  const blocker = useBlocker(useCallback(
-    ({ currentLocation, nextLocation }) =>
-      shouldBlock && currentLocation.pathname !== nextLocation.pathname,
-    [shouldBlock],
-  ));
-  useEffect(() => {
-    if (blocker.state !== "blocked") {
-      return;
-    }
-    if (window.confirm("저장되지 않은 작업 초안이 있습니다. 이 화면을 떠날까요?")) {
-      blocker.proceed();
-    } else {
-      blocker.reset();
-    }
-  }, [blocker]);
 }
 
 function HostSessionEditorQueryState({
