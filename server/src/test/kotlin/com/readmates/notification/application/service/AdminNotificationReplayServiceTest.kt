@@ -4,8 +4,10 @@ import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.config.AdminNotificationReplayProperties
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import com.readmates.notification.application.model.AdminNotificationFilter
 import com.readmates.notification.application.model.AdminNotificationReplayConfirmCommand
+import com.readmates.notification.application.model.AdminNotificationReplayExecution
 import com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest
 import com.readmates.notification.application.model.AdminNotificationReplaySnapshot
 import com.readmates.notification.application.model.AdminNotificationReplayTarget
@@ -17,6 +19,11 @@ import com.readmates.notification.application.port.out.AdminNotificationReplayCo
 import com.readmates.notification.application.port.out.AdminNotificationReplayPort
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewInsert
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewRecord
+import com.readmates.shared.adminmutation.application.model.AdminCommandClaimResult
+import com.readmates.shared.adminmutation.application.model.AdminCommandDigest
+import com.readmates.shared.adminmutation.application.model.CanonicalAdminCommandRequest
+import com.readmates.shared.adminmutation.application.model.PlatformAdminCommandIdentity
+import com.readmates.shared.adminmutation.application.service.AdminCommandIdempotencyService
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
@@ -24,6 +31,9 @@ import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
+import org.mockito.ArgumentMatchers
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.`when`
 import java.time.Clock
 import java.time.Instant
 import java.time.OffsetDateTime
@@ -32,6 +42,41 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 class AdminNotificationReplayServiceTest {
+    @Test
+    fun `completed response loss replay returns immutable receipt without loading preview`() {
+        val replayPort = ReplayPortFake(preview = null, confirmation = confirmation())
+
+        val result =
+            service(
+                replayPort,
+                claimResult =
+                    AdminCommandClaimResult.Completed(
+                        "admin_notification_replay_confirmation",
+                        CONFIRMATION_ID.toString(),
+                    ),
+            ).confirm(admin(PlatformAdminRole.OPERATOR), confirmCommand())
+
+        assertThat(result.receiptId).isEqualTo(CONFIRMATION_ID)
+        assertThat(result.effectStatus).isEqualTo("PENDING")
+        assertThat(replayPort.calls).containsExactly("receiptById")
+    }
+
+    @Test
+    fun `claimed replay stores HMAC receipt fixed targets and pending convergence before completing claim`() {
+        val replayPort = ReplayPortFake(preview = openV2Preview(), replayedCount = 1)
+
+        val result = service(replayPort).confirm(admin(), confirmCommand())
+
+        assertThat(result.receiptId).isEqualTo(replayPort.confirmationInsert?.confirmationId)
+        assertThat(result.skippedReasonCounts).containsEntry("TARGET_STATE_CHANGED", 1)
+        assertThat(result.originStatus).isEqualTo("SUCCEEDED")
+        assertThat(result.effectStatus).isEqualTo("PENDING")
+        assertThat(result.convergenceId).isEqualTo(replayPort.confirmationInsert?.convergenceId)
+        assertThat(replayPort.confirmationInsert?.selectionHash).isNull()
+        assertThat(replayPort.confirmationInsert?.requestHmac).hasSize(32)
+        assertThat(replayPort.confirmationInsert?.replayedTargetIds).containsExactly(REPLAYED_DELIVERY_ID)
+    }
+
     @ParameterizedTest
     @EnumSource(value = PlatformAdminRole::class, names = ["OWNER", "OPERATOR"])
     fun `owner and operator can preview replay`(role: PlatformAdminRole) {
@@ -122,7 +167,7 @@ class AdminNotificationReplayServiceTest {
         assertThat(clock.readCount).isEqualTo(1)
         assertThat(result.replayedCount).isEqualTo(1)
         assertThat(result.skippedCount).isEqualTo(1)
-        assertThat(replayPort.calls).containsExactly("lock", "receipt", "replay", "confirmation", "consume")
+        assertThat(replayPort.calls).containsExactly("lock", "replay", "confirmation", "consume")
         assertThat(replayPort.replayedAt).isEqualTo(CONFIRMED_AT)
         assertThat(auditPort.createdAt).isEqualTo(CONFIRMED_AT)
         assertThat(replayPort.confirmationInsert?.platformAuditEventId).isEqualTo(AUDIT_ID)
@@ -177,7 +222,7 @@ class AdminNotificationReplayServiceTest {
 
             service(replayPort).confirm(admin(), confirmCommand(reason = reason))
 
-            assertThat(replayPort.calls).containsExactly("lock", "receipt", "replay", "confirmation", "consume")
+            assertThat(replayPort.calls).containsExactly("lock", "replay", "confirmation", "consume")
         }
     }
 
@@ -192,7 +237,7 @@ class AdminNotificationReplayServiceTest {
                     .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_CONFIRMATION_CONFLICT)
             }
 
-        assertThat(replayPort.calls).containsExactly("lock", "receipt", "replay", "confirmation", "consume")
+        assertThat(replayPort.calls).containsExactly("lock", "replay", "confirmation", "consume")
         assertThat(auditPort.calls).isEqualTo(1)
     }
 
@@ -213,7 +258,7 @@ class AdminNotificationReplayServiceTest {
 
         assertThat(result.replayedCount).isEqualTo(1)
         assertThat(result.skippedCount).isEqualTo(1)
-        assertThat(replayPort.calls).containsExactly("lock", "receipt")
+        assertThat(replayPort.calls).containsExactly("receiptById")
         assertThat(auditPort.calls).isZero()
     }
 
@@ -231,7 +276,7 @@ class AdminNotificationReplayServiceTest {
                     .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED)
             }
 
-        assertThat(replayPort.calls).containsExactly("lock", "receipt")
+        assertThat(replayPort.calls).containsExactly("lock")
         assertThat(replayPort.replayedAt).isNull()
         assertThat(auditPort.calls).isZero()
     }
@@ -252,19 +297,24 @@ class AdminNotificationReplayServiceTest {
     }
 
     @Test
-    fun `actor hash and role are validated before a stored receipt can be disclosed`() {
-        val mismatches =
-            listOf(
-                admin(userId = OTHER_USER_ID) to confirmCommand(),
-                admin() to confirmCommand(selectionHash = "b".repeat(64)),
-                admin(PlatformAdminRole.OPERATOR) to confirmCommand(),
-            )
-        mismatches.forEach { (admin, command) ->
-            val replayPort = ReplayPortFake(preview = openV2Preview(), confirmation = confirmation())
-            assertThatThrownBy { service(replayPort).confirm(admin, command) }
-                .isInstanceOfAny(AccessDeniedException::class.java, NotificationApplicationException::class.java)
-            assertThat(replayPort.calls).containsExactly("lock")
+    fun `current actor identity is validated before a stored receipt can be disclosed`() {
+        val replayPort = ReplayPortFake(confirmation = confirmation())
+
+        assertThatThrownBy { service(replayPort).confirm(admin(userId = OTHER_USER_ID), confirmCommand()) }
+            .isInstanceOf(NotificationApplicationException::class.java)
+        assertThat(replayPort.calls).containsExactly("receiptById")
+    }
+
+    @Test
+    fun `different request under the same idempotency key fails before preview access`() {
+        val replayPort = ReplayPortFake(preview = openV2Preview())
+
+        assertThatThrownBy {
+            service(replayPort, claimResult = AdminCommandClaimResult.Conflict).confirm(admin(), confirmCommand())
+        }.isInstanceOfSatisfying(NotificationApplicationException::class.java) {
+            assertThat(it.error).isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IDEMPOTENCY_CONFLICT)
         }
+        assertThat(replayPort.calls).isEmpty()
     }
 
     @ParameterizedTest
@@ -279,9 +329,9 @@ class AdminNotificationReplayServiceTest {
 
         assertThatThrownBy {
             service(replayPort, auditPort = auditPort).confirm(admin(), confirmCommand())
-        }.isInstanceOf(AccessDeniedException::class.java)
+        }.isInstanceOf(NotificationApplicationException::class.java)
 
-        assertThat(replayPort.calls).containsExactly("lock", "receipt")
+        assertThat(replayPort.calls).containsExactly("receiptById")
         assertThat(replayPort.replayedAt).isNull()
         assertThat(replayPort.confirmationInsert).isNull()
         assertThat(replayPort.consumedAt).isNull()
@@ -293,13 +343,46 @@ class AdminNotificationReplayServiceTest {
         properties: AdminNotificationReplayProperties = AdminNotificationReplayProperties(),
         clock: Clock = Clock.fixed(CONFIRMED_AT.toInstant(), ZoneOffset.UTC),
         auditPort: AdminNotificationAuditPort = ReplayAuditFake(),
-    ) = AdminNotificationReplayService(
-        replayPort = replayPort,
-        auditPort = auditPort,
-        jsonCodec = ReplayJson,
-        replayProperties = properties,
-        clock = clock,
-    )
+        claimResult: AdminCommandClaimResult? = null,
+    ): AdminNotificationReplayService {
+        val idempotencyService = mock(AdminCommandIdempotencyService::class.java)
+        val resolvedClaim =
+            claimResult ?: replayPort.confirmation?.let {
+                AdminCommandClaimResult.Completed("admin_notification_replay_confirmation", it.confirmationId.toString())
+            } ?: claimed()
+        `when`(
+            idempotencyService.claim(
+                ArgumentMatchers.any(PlatformAdminCommandIdentity::class.java)
+                    ?: PlatformAdminCommandIdentity(ADMIN_USER_ID, "test.command", "test-target", "test", "test-key"),
+                ArgumentMatchers.any(CanonicalAdminCommandRequest::class.java)
+                    ?: TestCanonicalRequest,
+            ),
+        ).thenReturn(resolvedClaim)
+        `when`(
+            idempotencyService.complete(
+                ArgumentMatchers.any(UUID::class.java) ?: CLAIM_ID,
+                ArgumentMatchers.any(UUID::class.java) ?: CLAIM_TOKEN,
+                ArgumentMatchers.anyString(),
+                ArgumentMatchers.anyString(),
+            ),
+        ).thenReturn(true)
+        return AdminNotificationReplayService(
+            replayPort = replayPort,
+            auditPort = auditPort,
+            jsonCodec = ReplayJson,
+            replayProperties = properties,
+            notificationProperties =
+                NotificationRuntimeProperties(true, "sender@example.invalid", "ReadMates"),
+            idempotencyService = idempotencyService,
+            clock = clock,
+        )
+    }
+}
+
+private object TestCanonicalRequest : CanonicalAdminCommandRequest {
+    override val schemaVersion: String = "test:v1"
+
+    override fun canonicalFields(): List<Pair<String, String>> = emptyList()
 }
 
 private object ReplayJson : AdminNotificationJsonCodec {
@@ -313,13 +396,17 @@ private object ReplayJson : AdminNotificationJsonCodec {
         replayedCount: Int,
         skippedCount: Int,
     ): String = "{\"previewId\":\"$previewId\",\"reason\":\"$reason\"}"
+
+    override fun stringListJson(values: List<String>): String = values.joinToString(prefix = "[\"", postfix = "\"]", separator = "\",\"")
+
+    override fun countMapJson(values: Map<String, Int>): String = "{}"
 }
 
 private class ReplayPortFake(
     private val snapshot: AdminNotificationReplaySnapshot =
         AdminNotificationReplaySnapshot(listOf(replayTarget()), 0, emptyList()),
     private val preview: AdminNotificationReplayPreviewRecord? = null,
-    private val confirmation: AdminNotificationReplayConfirmation? = null,
+    val confirmation: AdminNotificationReplayConfirmation? = null,
     private val replayedCount: Int = 0,
     private val consumeResult: Boolean = true,
 ) : AdminNotificationReplayPort {
@@ -355,19 +442,32 @@ private class ReplayPortFake(
         return confirmation
     }
 
+    override fun findConfirmationById(confirmationId: UUID): AdminNotificationReplayConfirmation? {
+        calls += "receiptById"
+        return confirmation
+    }
+
     override fun replayPreviewTargets(
         previewId: UUID,
         replayedAt: OffsetDateTime,
-    ): Int {
+    ): AdminNotificationReplayExecution {
         calls += "replay"
         this.replayedAt = replayedAt
-        return replayedCount
+        return AdminNotificationReplayExecution(
+            replayedTargetIds = List(replayedCount) { REPLAYED_DELIVERY_ID },
+            skippedReasonCounts =
+                if (replayedCount < (preview?.matchedCount ?: 0)) {
+                    mapOf("TARGET_STATE_CHANGED" to ((preview?.matchedCount ?: 0) - replayedCount))
+                } else {
+                    emptyMap()
+                },
+        )
     }
 
     override fun createConfirmation(input: AdminNotificationReplayConfirmationInsert): UUID {
         calls += "confirmation"
         confirmationInsert = input
-        return CONFIRMATION_ID
+        return input.confirmationId
     }
 
     override fun consumePreview(
@@ -423,10 +523,18 @@ private fun confirmation() =
         actorUserId = ADMIN_USER_ID,
         actorPlatformRole = "OWNER",
         clubId = CLUB_ID,
-        selectionHash = SELECTION_HASH,
+        selectionHash = null,
         replayedCount = 1,
         skippedCount = 1,
         confirmedAt = CONFIRMED_AT.minusMinutes(2),
+        actorCapabilities = listOf("REPLAY_NOTIFICATIONS"),
+        identityMode = "HMAC",
+        canonicalSchemaVersion = "notification-replay:v1",
+        digestKeyVersion = 1,
+        requestHmac = ByteArray(32) { 2 },
+        skippedReasonCounts = mapOf("TARGET_STATE_CHANGED" to 1),
+        convergenceId = CONVERGENCE_ID,
+        effectStatus = "PENDING",
     )
 
 private fun replayTarget(index: Int = 0) =
@@ -449,13 +557,13 @@ private fun previewRequest() = AdminNotificationReplayPreviewRequest(AdminNotifi
 private fun confirmCommand(
     selectionHash: String = SELECTION_HASH,
     reason: String = "Retry failed deliveries",
-) = AdminNotificationReplayConfirmCommand(PREVIEW_ID, selectionHash, reason)
+) = AdminNotificationReplayConfirmCommand(PREVIEW_ID, selectionHash, reason, "notification-replay-key")
 
 enum class ReplayReceiptIdentityMutation {
     ACTOR,
-    ROLE,
-    CLUB,
-    SELECTION_HASH,
+    COMMAND,
+    TARGET,
+    IDENTITY_MODE,
 }
 
 private fun mutateReceipt(
@@ -464,9 +572,9 @@ private fun mutateReceipt(
 ): AdminNotificationReplayConfirmation =
     when (mutation) {
         ReplayReceiptIdentityMutation.ACTOR -> receipt.copy(actorUserId = OTHER_USER_ID)
-        ReplayReceiptIdentityMutation.ROLE -> receipt.copy(actorPlatformRole = "OPERATOR")
-        ReplayReceiptIdentityMutation.CLUB -> receipt.copy(clubId = OTHER_CLUB_ID)
-        ReplayReceiptIdentityMutation.SELECTION_HASH -> receipt.copy(selectionHash = "b".repeat(64))
+        ReplayReceiptIdentityMutation.COMMAND -> receipt.copy(commandType = "notification.other")
+        ReplayReceiptIdentityMutation.TARGET -> receipt.copy(targetIdSnapshot = OTHER_USER_ID)
+        ReplayReceiptIdentityMutation.IDENTITY_MODE -> receipt.copy(identityMode = "LEGACY_SELECTION_SHA")
     }
 
 private class ReplayCountingClock(
@@ -487,9 +595,26 @@ private class ReplayCountingClock(
 private val PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000031")
 private val CONFIRMATION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000032")
 private val AUDIT_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000033")
+private val CONVERGENCE_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000034")
+private val REPLAYED_DELIVERY_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000011")
 private val ADMIN_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000101")
 private val OTHER_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000102")
 private val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
 private val OTHER_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
 private val CONFIRMED_AT: OffsetDateTime = OffsetDateTime.parse("2026-05-27T01:02:03.123456Z")
 private const val SELECTION_HASH = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
+private val CLAIM_ID: UUID = UUID.fromString("00000000-0000-4000-8000-000000000035")
+private val CLAIM_TOKEN: UUID = UUID.fromString("00000000-0000-4000-8000-000000000036")
+
+private fun claimed() =
+    AdminCommandClaimResult.Claimed(
+        CLAIM_ID,
+        CLAIM_TOKEN,
+        AdminCommandDigest(
+            schemaVersion = "notification-replay:v1",
+            digestKeyVersion = 1,
+            idempotencyKeyHmac = ByteArray(32) { 1 },
+            requestHmac = ByteArray(32) { 2 },
+        ),
+    )

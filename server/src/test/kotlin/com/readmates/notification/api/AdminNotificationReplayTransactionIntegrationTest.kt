@@ -6,6 +6,7 @@ import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.model.AdminNotificationFilter
 import com.readmates.notification.application.model.AdminNotificationReplayConfirmCommand
+import com.readmates.notification.application.model.AdminNotificationReplayExecution
 import com.readmates.notification.application.model.AdminNotificationReplayPreviewRequest
 import com.readmates.notification.application.model.AdminNotificationReplaySnapshot
 import com.readmates.notification.application.port.`in`.ManageAdminNotificationOperationsUseCase
@@ -73,6 +74,26 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
         auditPort.failAfterInsert = false
         auditPort.failCheckedAfterInsert = false
         (previewIds + replayPort.createdPreviewIds).forEach { previewId ->
+            val receiptIds =
+                jdbcTemplate.queryForList(
+                    "select id from admin_notification_replay_confirmations where preview_id = ?",
+                    String::class.java,
+                    previewId.toString(),
+                )
+            receiptIds.forEach { receiptId ->
+                jdbcTemplate.update(
+                    "delete from admin_service_command_convergence_events where notification_receipt_id_snapshot = ?",
+                    receiptId,
+                )
+                jdbcTemplate.update(
+                    "delete from admin_service_command_convergence where notification_receipt_id_snapshot = ?",
+                    receiptId,
+                )
+                jdbcTemplate.update(
+                    "delete from admin_notification_replay_confirmation_targets where confirmation_id = ?",
+                    receiptId,
+                )
+            }
             jdbcTemplate.update(
                 """
                 update admin_notification_replay_previews
@@ -322,7 +343,12 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
         selectionHash: String,
     ) = useCase.confirmReplay(
         ADMIN,
-        AdminNotificationReplayConfirmCommand(previewId, selectionHash, "Retry after provider recovery"),
+        AdminNotificationReplayConfirmCommand(
+            previewId,
+            selectionHash,
+            "Retry after provider recovery",
+            "notification-replay-$previewId",
+        ),
     )
 
     private fun seedFailedDelivery() {
@@ -527,10 +553,12 @@ internal class SwitchableReplayPort(
 
     override fun findConfirmation(previewId: UUID): ReplayConfirmation? = delegate.findConfirmation(previewId)
 
+    override fun findConfirmationById(confirmationId: UUID): ReplayConfirmation? = delegate.findConfirmationById(confirmationId)
+
     override fun replayPreviewTargets(
         previewId: UUID,
         replayedAt: OffsetDateTime,
-    ): Int =
+    ): AdminNotificationReplayExecution =
         delegate.replayPreviewTargets(previewId, replayedAt).also {
             if (failureStage ==
                 FailureStage.TARGET_UPDATE

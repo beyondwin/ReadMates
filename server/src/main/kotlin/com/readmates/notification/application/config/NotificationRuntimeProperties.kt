@@ -80,6 +80,9 @@ data class NotificationRuntimeProperties(
         require(worker.retryDelays.size >= kafka.maxPublishAttempts - 1) {
             "readmates.notifications.worker.retry-delays must cover every nonterminal publish attempt"
         }
+        require(worker.retryDelays.size >= kafka.maxDeliveryAttempts - 1) {
+            "readmates.notifications.worker.retry-delays must cover every nonterminal delivery observation"
+        }
     }
 
     data class Worker(

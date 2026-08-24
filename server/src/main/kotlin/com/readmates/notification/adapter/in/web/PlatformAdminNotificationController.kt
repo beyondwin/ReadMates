@@ -90,6 +90,7 @@ class PlatformAdminNotificationController(
                     previewId = UUID.fromString(request.previewId),
                     selectionHash = request.selectionHash,
                     reason = request.reason,
+                    idempotencyKey = request.idempotencyKey,
                 ),
             ).toResponse()
 }

@@ -30,4 +30,8 @@ class JacksonAdminNotificationJsonCodec(
                 "skippedCount" to skippedCount,
             ),
         )
+
+    override fun stringListJson(values: List<String>): String = objectMapper.writeValueAsString(values)
+
+    override fun countMapJson(values: Map<String, Int>): String = objectMapper.writeValueAsString(values)
 }

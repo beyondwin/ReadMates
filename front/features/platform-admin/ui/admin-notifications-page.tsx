@@ -4,22 +4,31 @@ import type {
   AdminNotificationOperationsSnapshot,
   AdminNotificationOutboxEvent,
   AdminNotificationReplayPreview,
+  AdminNotificationReplayConfirmResult,
 } from "@/features/platform-admin/model/platform-admin-notifications-model";
 
 export type AdminNotificationsPageProps = {
-  snapshot: AdminNotificationOperationsSnapshot;
+  snapshot: AdminNotificationOperationsSnapshot | null;
   events: AdminNotificationOutboxEvent[];
   deliveries: AdminNotificationDelivery[];
   focus: string | null;
   replayPreview: AdminNotificationReplayPreview | null;
   replayReason: string;
+  replayResult?: AdminNotificationReplayConfirmResult | null;
   canReplay: boolean;
   busy: boolean;
+  reasonLocked?: boolean;
   error: string | null;
-  success: string | null;
+  success?: string | null;
   onPreviewReplay: () => Promise<void>;
   onConfirmReplay: () => Promise<void>;
   onReplayReasonChange: (value: string) => void;
+  hasMoreEvents?: boolean;
+  hasMoreDeliveries?: boolean;
+  loadingMoreEvents?: boolean;
+  loadingMoreDeliveries?: boolean;
+  onLoadMoreEvents?: () => Promise<void>;
+  onLoadMoreDeliveries?: () => Promise<void>;
 };
 
 export function AdminNotificationsPage({
@@ -29,13 +38,21 @@ export function AdminNotificationsPage({
   focus,
   replayPreview,
   replayReason,
+  replayResult = null,
   canReplay,
   busy,
+  reasonLocked = false,
   error,
   success,
   onPreviewReplay,
   onConfirmReplay,
   onReplayReasonChange,
+  hasMoreEvents = false,
+  hasMoreDeliveries = false,
+  loadingMoreEvents = false,
+  loadingMoreDeliveries = false,
+  onLoadMoreEvents,
+  onLoadMoreDeliveries,
 }: AdminNotificationsPageProps) {
   const confirmDisabled = !replayPreview || !replayReason.trim() || !canReplay || busy;
 
@@ -48,25 +65,29 @@ export function AdminNotificationsPage({
             알림 / Outbox 운영
           </h1>
         </div>
-        <p className="admin-notifications__timestamp">생성 {formatTimestamp(snapshot.generatedAt)}</p>
+        <p className="admin-notifications__timestamp">
+          {snapshot ? `생성 ${formatTimestamp(snapshot.generatedAt)}` : "요약을 불러오지 못함"}
+        </p>
       </header>
 
       {focus ? <FocusBanner focus={focus} /> : null}
       {error ? <p className="admin-notifications__error" role="alert">{error}</p> : null}
       {success ? <p className="admin-notifications__success" role="status">{success}</p> : null}
 
-      <div className="admin-notifications__summary" aria-label="알림 운영 요약">
-        <Metric label="Outbox pending" value={snapshot.outboxSummary.pending} />
-        <Metric label="Outbox failed" value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
-        <Metric label="Delivery pending" value={snapshot.deliverySummary.pending} />
-        <Metric label="Delivery failed" value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
-        <Metric label="Relay stale" value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
-      </div>
+      {snapshot ? (
+        <div className="admin-notifications__summary" aria-label="알림 운영 요약">
+          <Metric label="Outbox pending" value={snapshot.outboxSummary.pending} />
+          <Metric label="Outbox failed" value={snapshot.outboxSummary.failed + snapshot.outboxSummary.dead} />
+          <Metric label="Delivery pending" value={snapshot.deliverySummary.pending} />
+          <Metric label="Delivery failed" value={snapshot.deliverySummary.failed + snapshot.deliverySummary.dead} />
+          <Metric label="Relay stale" value={snapshot.relaySummary.stalePublishing + snapshot.relaySummary.staleSending} />
+        </div>
+      ) : null}
 
       <div className="admin-notifications__grid">
         <section className="admin-notifications__panel" aria-labelledby="admin-notifications-failures-title">
           <h2 id="admin-notifications-failures-title" className="h3 editorial">Failure clusters</h2>
-          {snapshot.failureClusters.length > 0 ? (
+          {snapshot?.failureClusters.length ? (
             <ul className="admin-notifications__cluster-list">
               {snapshot.failureClusters.map((cluster) => (
                 <li key={`${cluster.status}-${cluster.safeErrorCode}`}>
@@ -93,6 +114,12 @@ export function AdminNotificationsPage({
                 대상 <strong>{replayPreview.matchedCount}</strong>건 · 제외 {replayPreview.excludedCount}건
               </p>
               <p className="small muted">만료 {formatTimestamp(replayPreview.expiresAt)}</p>
+              {Object.entries(replayPreview.estimatedByStatus).map(([status, count]) => (
+                <span key={status} className="platform-admin-domain-status">{status} {count}</span>
+              ))}
+              {replayPreview.warnings.map((warning) => (
+                <span key={warning} className="admin-notifications__safe-code">{warning}</span>
+              ))}
             </div>
           ) : (
             <p className="muted">실패/Dead delivery를 확인한 뒤 사유를 남기고 재처리합니다.</p>
@@ -101,6 +128,7 @@ export function AdminNotificationsPage({
             <span>처리 사유</span>
             <textarea
               value={replayReason}
+              disabled={busy || reasonLocked}
               onChange={(event) => onReplayReasonChange(event.currentTarget.value)}
               rows={3}
               placeholder="예: 공급자 복구 후 실패 delivery 재처리"
@@ -111,9 +139,10 @@ export function AdminNotificationsPage({
               대상 확인
             </button>
             <button type="button" className="btn btn-primary btn-sm" disabled={confirmDisabled} onClick={() => void onConfirmReplay()}>
-              재처리 확정
+              {replayResult?.effectStatus === "PENDING" ? "효과 상태 새로고침" : "재처리 확정"}
             </button>
           </div>
+          {replayResult ? <ReplayReceipt result={replayResult} /> : null}
         </section>
       </div>
 
@@ -129,6 +158,11 @@ export function AdminNotificationsPage({
           </article>
         ))}
       </LedgerSection>
+      {hasMoreEvents ? (
+        <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreEvents} onClick={() => void onLoadMoreEvents?.()}>
+          {loadingMoreEvents ? "불러오는 중" : "Outbox 더 보기"}
+        </button>
+      ) : null}
 
       <LedgerSection title="Delivery ledger" empty="표시할 delivery가 없습니다.">
         {deliveries.map((delivery) => (
@@ -144,8 +178,33 @@ export function AdminNotificationsPage({
           </article>
         ))}
       </LedgerSection>
+      {hasMoreDeliveries ? (
+        <button type="button" className="btn btn-quiet btn-sm" disabled={loadingMoreDeliveries} onClick={() => void onLoadMoreDeliveries?.()}>
+          {loadingMoreDeliveries ? "불러오는 중" : "Delivery 더 보기"}
+        </button>
+      ) : null}
     </section>
   );
+}
+
+function ReplayReceipt({ result }: { result: AdminNotificationReplayConfirmResult }) {
+  const availability = result.effectAvailability === "DISABLED" ? " · 현재 비활성" : "";
+  return (
+    <div className="admin-notifications__preview" role="status">
+      <p>영수증 {result.receiptId}</p>
+      <p>재처리 {result.replayedCount}건 · 건너뜀 {result.skippedCount}건</p>
+      {Object.entries(result.skippedReasonCounts).map(([reason, count]) => (
+        <p key={reason} className="small muted">{reason} {count}</p>
+      ))}
+      <p>효과 {effectLabel(result.effectStatus)}{availability}</p>
+    </div>
+  );
+}
+
+function effectLabel(status: AdminNotificationReplayConfirmResult["effectStatus"]) {
+  if (status === "PENDING") return "대기";
+  if (status === "SUCCEEDED") return "완료";
+  return "실패";
 }
 
 function Metric({ label, value }: { label: string; value: number }) {

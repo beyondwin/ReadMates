@@ -128,12 +128,23 @@ data class AdminNotificationReplayConfirmCommand(
     val previewId: UUID,
     val selectionHash: String,
     val reason: String,
+    val idempotencyKey: String,
 )
 
 data class AdminNotificationReplayConfirmResult(
+    val receiptId: UUID,
     val replayedCount: Int,
     val skippedCount: Int,
-    val selectionHash: String,
+    val skippedReasonCounts: Map<String, Int>,
+    val originStatus: String,
+    val effectStatus: String,
+    val effectAvailability: String,
+    val convergenceId: UUID,
+)
+
+data class AdminNotificationReplayExecution(
+    val replayedTargetIds: List<UUID>,
+    val skippedReasonCounts: Map<String, Int>,
 )
 
 data class AdminNotificationReplayTarget(

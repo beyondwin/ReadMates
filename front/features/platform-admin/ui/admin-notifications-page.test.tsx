@@ -8,6 +8,7 @@ import type {
   AdminNotificationOperationsSnapshot,
   AdminNotificationOutboxEvent,
   AdminNotificationReplayPreview,
+  AdminNotificationReplayConfirmResult,
 } from "@/features/platform-admin/model/platform-admin-notifications-model";
 
 const snapshot: AdminNotificationOperationsSnapshot = {
@@ -53,8 +54,19 @@ const replayPreview: AdminNotificationReplayPreview = {
   matchedCount: 2,
   excludedCount: 0,
   estimatedByStatus: { DEAD: 2 },
-  warnings: [],
+  warnings: ["MAIL_AMBIGUOUS"],
   expiresAt: "2026-05-27T00:10:00Z",
+};
+
+const replayResult: AdminNotificationReplayConfirmResult = {
+  receiptId: "00000000-0000-4000-8000-000000005901",
+  replayedCount: 1,
+  skippedCount: 1,
+  skippedReasonCounts: { TARGET_STATE_CHANGED: 1 },
+  originStatus: "SUCCEEDED",
+  effectStatus: "PENDING",
+  effectAvailability: "DISABLED",
+  convergenceId: "00000000-0000-4000-8000-000000005902",
 };
 
 function renderPage(overrides: Partial<ComponentProps<typeof AdminNotificationsPage>> = {}) {
@@ -70,6 +82,7 @@ function renderPage(overrides: Partial<ComponentProps<typeof AdminNotificationsP
       busy={false}
       error={null}
       success={null}
+      replayResult={null}
       onPreviewReplay={vi.fn()}
       onConfirmReplay={vi.fn()}
       onReplayReasonChange={vi.fn()}
@@ -93,6 +106,17 @@ describe("AdminNotificationsPage", () => {
     expect(screen.getByText(/^만료 /)).toHaveClass("small");
     expect(screen.getByText(/^AUTOMATIC · attempts 2 ·/)).toHaveClass("small");
     expect(screen.getByText(/^attempts 2 ·/)).toHaveClass("small");
+    expect(screen.getByText("MAIL_AMBIGUOUS")).toBeInTheDocument();
+    expect(screen.getByText(/DEAD 2/)).toBeInTheDocument();
+  });
+
+  it("shows immutable receipt counts and disabled pending convergence separately", () => {
+    renderPage({ replayResult });
+
+    expect(screen.getByText(/영수증 00000000-0000-4000-8000-000000005901/)).toBeInTheDocument();
+    expect(screen.getByText(/재처리 1건 · 건너뜀 1건/)).toBeInTheDocument();
+    expect(screen.getByText(/TARGET_STATE_CHANGED 1/)).toBeInTheDocument();
+    expect(screen.getByText(/효과 대기 · 현재 비활성/)).toBeInTheDocument();
   });
 
   it("renders masked recipients without raw email fixture", () => {

@@ -9,8 +9,8 @@ export function adminNotificationsLoaderFactory(queryClient: QueryClient) {
   return async function loadAdminNotifications() {
     await Promise.all([
       queryClient.fetchQuery(platformAdminNotificationSnapshotQuery()),
-      queryClient.fetchQuery(platformAdminNotificationEventsQuery()),
-      queryClient.fetchQuery(platformAdminNotificationDeliveriesQuery()),
+      queryClient.fetchInfiniteQuery(platformAdminNotificationEventsQuery()),
+      queryClient.fetchInfiniteQuery(platformAdminNotificationDeliveriesQuery()),
     ]);
     return null;
   };

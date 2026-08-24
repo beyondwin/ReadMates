@@ -108,10 +108,16 @@ export type AdminNotificationReplayConfirmRequest = {
   previewId: string;
   selectionHash: string;
   reason: string;
+  idempotencyKey: string;
 };
 
 export type AdminNotificationReplayConfirmResult = {
+  receiptId: string;
   replayedCount: number;
   skippedCount: number;
-  selectionHash: string;
+  skippedReasonCounts: Record<string, number>;
+  originStatus: "SUCCEEDED";
+  effectStatus: "PENDING" | "SUCCEEDED" | "FAILED";
+  effectAvailability: "AVAILABLE" | "DISABLED";
+  convergenceId: string;
 };

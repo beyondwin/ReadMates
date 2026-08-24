@@ -14,4 +14,8 @@ interface AdminNotificationJsonCodec {
         replayedCount: Int,
         skippedCount: Int,
     ): String
+
+    fun stringListJson(values: List<String>): String
+
+    fun countMapJson(values: Map<String, Int>): String
 }

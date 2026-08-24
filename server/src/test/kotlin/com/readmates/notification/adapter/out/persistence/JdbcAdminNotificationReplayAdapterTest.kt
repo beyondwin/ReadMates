@@ -205,7 +205,7 @@ internal class JdbcAdminNotificationReplayAdapterTest(
 
         val currentDeliveryId = applyCasMutation(mutation, at)
 
-        assertThat(adapter.replayPreviewTargets(previewId, at.plusMinutes(1))).isZero()
+        assertThat(adapter.replayPreviewTargets(previewId, at.plusMinutes(1)).replayedTargetIds).isEmpty()
         assertThat(deliveryState(currentDeliveryId).first()).isNotEqualTo("PENDING")
     }
 
@@ -230,7 +230,7 @@ internal class JdbcAdminNotificationReplayAdapterTest(
                     .toLocalDateTime(),
             )
 
-            assertThat(adapter.replayPreviewTargets(previewId, at.plusMinutes(1))).isZero()
+            assertThat(adapter.replayPreviewTargets(previewId, at.plusMinutes(1)).replayedTargetIds).isEmpty()
             assertThat(deliveryState(TARGET_ID).first()).isNotEqualTo("PENDING")
         }
     }
@@ -301,15 +301,23 @@ internal class JdbcAdminNotificationReplayAdapterTest(
         val confirmationId =
             adapter.createConfirmation(
                 AdminNotificationReplayConfirmationInsert(
-                    previewId,
-                    ADMIN_USER_ID,
-                    "OWNER",
-                    CLUB_ID,
-                    selectionHash,
-                    1,
-                    0,
-                    AUDIT_ID,
-                    at,
+                    confirmationId = UUID.randomUUID(),
+                    previewId = previewId,
+                    actorUserId = ADMIN_USER_ID,
+                    actorPlatformRole = "OWNER",
+                    clubId = CLUB_ID,
+                    selectionHash = null,
+                    replayedCount = 1,
+                    skippedCount = 0,
+                    platformAuditEventId = AUDIT_ID,
+                    confirmedAt = at,
+                    actorCapabilitiesJson = "[\"REPLAY_NOTIFICATIONS\"]",
+                    canonicalSchemaVersion = "notification-replay:v1",
+                    digestKeyVersion = 1,
+                    requestHmac = ByteArray(32) { 1 },
+                    skippedReasonCountsJson = "{}",
+                    replayedTargetIds = listOf(TARGET_ID),
+                    convergenceId = UUID.randomUUID(),
                 ),
             )
 

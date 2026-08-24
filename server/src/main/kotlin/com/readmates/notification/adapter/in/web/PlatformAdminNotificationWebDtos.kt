@@ -115,6 +115,7 @@ data class AdminNotificationReplayConfirmRequestBody(
     val previewId: String,
     val selectionHash: String,
     val reason: String,
+    val idempotencyKey: String,
 )
 
 data class AdminNotificationReplayPreviewResponse(
@@ -128,9 +129,14 @@ data class AdminNotificationReplayPreviewResponse(
 )
 
 data class AdminNotificationReplayConfirmResponse(
+    val receiptId: String,
     val replayedCount: Int,
     val skippedCount: Int,
-    val selectionHash: String,
+    val skippedReasonCounts: Map<String, Int>,
+    val originStatus: String,
+    val effectStatus: String,
+    val effectAvailability: String,
+    val convergenceId: String,
 )
 
 fun AdminNotificationOperationsSnapshot.toResponse(): AdminNotificationOperationsSnapshotResponse =
@@ -192,7 +198,16 @@ fun AdminNotificationReplayPreview.toResponse(): AdminNotificationReplayPreviewR
     )
 
 fun AdminNotificationReplayConfirmResult.toResponse(): AdminNotificationReplayConfirmResponse =
-    AdminNotificationReplayConfirmResponse(replayedCount, skippedCount, selectionHash)
+    AdminNotificationReplayConfirmResponse(
+        receiptId.toString(),
+        replayedCount,
+        skippedCount,
+        skippedReasonCounts,
+        originStatus,
+        effectStatus,
+        effectAvailability,
+        convergenceId.toString(),
+    )
 
 private fun AdminNotificationFailureCluster.toResponse(): AdminNotificationFailureClusterResponse =
     AdminNotificationFailureClusterResponse(safeErrorCode, status, count, latestAt?.toString())

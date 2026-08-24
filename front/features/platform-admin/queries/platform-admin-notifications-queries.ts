@@ -1,4 +1,4 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   confirmAdminNotificationReplay,
   fetchAdminNotificationDeliveries,
@@ -18,7 +18,6 @@ function normalizeFilters(filters: AdminNotificationFilters = {}) {
     eventStatus: filters.eventStatus ?? null,
     deliveryStatus: filters.deliveryStatus ?? null,
     channel: filters.channel ?? null,
-    cursor: filters.cursor ?? null,
   };
 }
 
@@ -39,17 +38,32 @@ export function platformAdminNotificationSnapshotQuery() {
 }
 
 export function platformAdminNotificationEventsQuery(filters?: AdminNotificationFilters) {
-  return queryOptions({
+  const normalized = normalizeFilters(filters);
+  return infiniteQueryOptions({
     queryKey: platformAdminNotificationsKeys.events(filters),
-    queryFn: () => fetchAdminNotificationEvents(filters),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => fetchAdminNotificationEvents({ ...normalizedFilters(normalized), cursor: pageParam ?? undefined }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 }
 
 export function platformAdminNotificationDeliveriesQuery(filters?: AdminNotificationFilters) {
-  return queryOptions({
+  const normalized = normalizeFilters(filters);
+  return infiniteQueryOptions({
     queryKey: platformAdminNotificationsKeys.deliveries(filters),
-    queryFn: () => fetchAdminNotificationDeliveries(filters),
+    initialPageParam: null as string | null,
+    queryFn: ({ pageParam }) => fetchAdminNotificationDeliveries({ ...normalizedFilters(normalized), cursor: pageParam ?? undefined }),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
+}
+
+function normalizedFilters(filters: ReturnType<typeof normalizeFilters>): AdminNotificationFilters {
+  return {
+    clubId: filters.clubId ?? undefined,
+    eventStatus: filters.eventStatus ?? undefined,
+    deliveryStatus: filters.deliveryStatus ?? undefined,
+    channel: filters.channel ?? undefined,
+  };
 }
 
 export function usePreviewAdminNotificationReplayMutation() {

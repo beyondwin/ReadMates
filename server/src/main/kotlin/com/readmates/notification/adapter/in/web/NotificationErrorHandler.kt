@@ -63,6 +63,10 @@ class NotificationErrorHandler {
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_SELECTION_MISMATCH -> HttpStatus.CONFLICT
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REPREVIEW_REQUIRED -> HttpStatus.CONFLICT
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_CONFIRMATION_CONFLICT -> HttpStatus.CONFLICT
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_INVALID_IDEMPOTENCY_KEY -> HttpStatus.BAD_REQUEST
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IDEMPOTENCY_CONFLICT -> HttpStatus.CONFLICT
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IN_PROGRESS -> HttpStatus.CONFLICT
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_RECEIPT_INVALID -> HttpStatus.CONFLICT
         }
 
     @Suppress("CyclomaticComplexMethod")
@@ -110,5 +114,13 @@ class NotificationErrorHandler {
                 "기존 재처리 미리보기입니다. 새 미리보기를 생성해 주세요."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_CONFIRMATION_CONFLICT ->
                 "재처리 확정 상태를 확인할 수 없습니다. 새 미리보기를 생성해 주세요."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_INVALID_IDEMPOTENCY_KEY ->
+                "재처리 요청 식별자가 올바르지 않습니다."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IDEMPOTENCY_CONFLICT ->
+                "같은 요청 식별자로 다른 재처리를 진행할 수 없습니다."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IN_PROGRESS ->
+                "동일한 재처리가 진행 중입니다. 잠시 후 다시 확인해 주세요."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_RECEIPT_INVALID ->
+                "재처리 결과를 안전하게 확인할 수 없습니다."
         }
 }
