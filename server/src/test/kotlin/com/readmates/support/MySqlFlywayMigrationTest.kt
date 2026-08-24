@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(15)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(16)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("57")
+            assertThat(latestVersion).isEqualTo("58")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -102,6 +102,7 @@ class MySqlFlywayMigrationTest(
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
+            assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -378,7 +379,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(13)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(14)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -390,7 +391,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("57")
+            assertThat(latestVersion).isEqualTo("58")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -398,6 +399,7 @@ class MySqlFlywayMigrationTest(
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
+            assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1659,13 +1661,14 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("57")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("58")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54PublicProjectionConvergenceSchema(jdbc)
             assertV55PlatformAdminPublicTakedownSchema(jdbc)
             assertV56PublicConvergenceWorkRetentionIndex(jdbc)
             assertV57PlatformAdminCommandIdempotencySchema(jdbc)
+            assertV58PlatformAdminClubCommandEvidenceSchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1764,14 +1767,15 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(6)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("57")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(7)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("58")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
+            assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertThat(
                 upgradeJdbc.queryForMap(
                     """
@@ -1860,9 +1864,10 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("57")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("58")
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
+            assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
 
             val actorId = "aaaaaaaa-0000-4000-8000-000000057002"
             val claimId = "aaaaaaaa-0000-4000-8000-000000057003"
@@ -2073,12 +2078,311 @@ class MySqlFlywayMigrationTest(
 
     @Test
     @Suppress("LongMethod")
+    fun `mysql upgrades v57 with club command evidence that survives hard club deletion`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v57Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("57")
+                    .load()
+            assertThat(v57Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("57")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            val clubId = "aaaaaaaa-0000-4000-8000-000000058001"
+            val actorId = "aaaaaaaa-0000-4000-8000-000000058002"
+            val auditId = "aaaaaaaa-0000-4000-8000-000000058003"
+            val previewId = "aaaaaaaa-0000-4000-8000-000000058004"
+            val receiptId = "aaaaaaaa-0000-4000-8000-000000058005"
+            val convergenceId = "aaaaaaaa-0000-4000-8000-000000058006"
+            upgradeJdbc.update(
+                """
+                insert into clubs (id, slug, name, tagline, about)
+                values (?, 'v58-hard-delete-target', 'V58 target', 'V58 target', 'V58 target')
+                """.trimIndent(),
+                clubId,
+            )
+            insertProfileUser(
+                upgradeJdbc,
+                actorId,
+                "v58-actor" + "@" + "example" + "." + "test",
+                "V58 Actor",
+                "V58Actor",
+            )
+            upgradeJdbc.update(
+                """
+                insert into platform_audit_events (
+                  id, actor_user_id, actor_platform_role, event_type, metadata_json, created_at
+                ) values (?, ?, 'OWNER', 'CLUB_DOMAIN_PROVISIONING_STARTED', json_object(),
+                          '2026-08-24 01:00:00.000000')
+                """.trimIndent(),
+                auditId,
+                actorId,
+            )
+
+            val upgradeResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("58")
+            assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
+            assertEquals(
+                0L,
+                upgradeJdbc.queryForObject(
+                    "select admin_revision from clubs where id = ?",
+                    Long::class.java,
+                    clubId,
+                ),
+            )
+
+            insertV58ClubCommandPreview(upgradeJdbc, previewId, actorId, clubId)
+            insertV58ClubCommandReceipt(upgradeJdbc, receiptId, previewId, actorId, clubId, auditId)
+            assertUniqueConstraintRejected("platform_admin_club_receipts_preview_uk") {
+                insertV58ClubCommandReceipt(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    previewId,
+                    actorId,
+                    clubId,
+                    UUID.randomUUID().toString(),
+                )
+            }
+            insertV58ClubCommandConvergence(upgradeJdbc, convergenceId, receiptId)
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_club_command_convergence
+                    set lease_owner = ?, lease_expires_at = '2026-08-24 01:03:00.000000'
+                    where id = ?
+                    """.trimIndent(),
+                    "HTTPS:" + "/" + "/WORKER_INVALID",
+                    convergenceId,
+                )
+            }
+            assertConstraintRejected {
+                insertV58ClubCommandConvergenceEvent(
+                    upgradeJdbc,
+                    convergenceId,
+                    UUID.randomUUID().toString(),
+                    attemptNo = 99,
+                    eventSeq = 0,
+                    state = "PENDING",
+                    safeErrorCode = null,
+                )
+            }
+            assertConstraintRejected {
+                insertV58ClubCommandConvergenceEvent(
+                    upgradeJdbc,
+                    convergenceId,
+                    receiptId,
+                    attemptNo = 99,
+                    eventSeq = 0,
+                    state = "PENDING",
+                    safeErrorCode = null,
+                    effectType = "HOST_INVITATION",
+                )
+            }
+            listOf("RAW\tERROR", "RAW\nERROR", "HTTPS:" + "/" + "/EXAMPLE_INVALID").forEach { unsafeCode ->
+                assertConstraintRejected {
+                    upgradeJdbc.update(
+                        """
+                        update platform_admin_club_command_convergence
+                        set last_safe_error_code = ?
+                        where id = ?
+                        """.trimIndent(),
+                        unsafeCode,
+                        convergenceId,
+                    )
+                }
+            }
+            insertV58ClubCommandConvergenceEvent(
+                upgradeJdbc,
+                convergenceId,
+                receiptId,
+                attemptNo = 1,
+                eventSeq = 0,
+                state = "PENDING",
+                safeErrorCode = null,
+            )
+            insertV58ClubCommandConvergenceEvent(
+                upgradeJdbc,
+                convergenceId,
+                receiptId,
+                attemptNo = 1,
+                eventSeq = 1,
+                state = "FAILED",
+                safeErrorCode = "DNS_PROVIDER_UNAVAILABLE",
+            )
+            upgradeJdbc.update(
+                """
+                update platform_admin_club_command_convergence
+                set state = 'FAILED', attempt_count = 1, next_attempt_no = 2,
+                    last_safe_error_code = 'DNS_PROVIDER_UNAVAILABLE',
+                    available_at = null,
+                    updated_at = '2026-08-24 01:05:00.000000'
+                where id = ?
+                """.trimIndent(),
+                convergenceId,
+            )
+
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_club_command_previews
+                    set consumed_at = '2026-08-24 01:02:00.000000'
+                    where id = ?
+                    """.trimIndent(),
+                    previewId,
+                )
+            }
+            assertThat(
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_club_command_previews
+                    set consumed_at = '2026-08-24 01:02:00.000000',
+                        consumed_receipt_id_snapshot = ?
+                    where id = ?
+                    """.trimIndent(),
+                    receiptId,
+                    previewId,
+                ),
+            ).isEqualTo(1)
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    insert into platform_admin_club_command_previews (
+                      id, command_type, actor_user_id_snapshot, actor_platform_role_snapshot,
+                      actor_capabilities_json, target_kind, club_id_snapshot, new_club_slot_id_snapshot,
+                      canonical_schema_version, digest_key_version, request_hmac,
+                      sanitized_impact_json, expires_at, consumed_at, consumed_receipt_id_snapshot, created_at
+                    ) values (?, 'club.onboarding', ?, 'OWNER', json_array('CREATE_CLUB'),
+                              'NEW_CLUB', ?, ?, 'club-onboarding:v1', 1, ?, json_object('codes', json_array('CREATE')),
+                              '2026-08-24 01:10:00.000000', null, null, '2026-08-24 01:00:00.000000')
+                    """.trimIndent(),
+                    UUID.randomUUID().toString(),
+                    actorId,
+                    clubId,
+                    UUID.randomUUID().toString(),
+                    ByteArray(32) { 0x41 },
+                )
+            }
+            assertConstraintRejected {
+                insertV58ClubCommandPreview(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    actorId,
+                    clubId,
+                    commandType = "CLUB_DOMAIN_PROVISION",
+                )
+            }
+            assertConstraintRejected {
+                insertV58ClubCommandPreview(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    actorId,
+                    clubId,
+                    commandType = "club/domain.provision",
+                )
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_club_command_previews
+                    set canonical_schema_version = ?
+                    where id = ?
+                    """.trimIndent(),
+                    "https:" + "/" + "/schema.invalid",
+                    previewId,
+                )
+            }
+            assertConstraintRejected {
+                insertV58ClubCommandConvergenceEvent(
+                    upgradeJdbc,
+                    convergenceId,
+                    receiptId,
+                    attemptNo = 2,
+                    eventSeq = 1,
+                    state = "FAILED",
+                    safeErrorCode = null,
+                )
+            }
+            assertConstraintRejected {
+                insertV58ClubCommandConvergenceEvent(
+                    upgradeJdbc,
+                    convergenceId,
+                    receiptId,
+                    attemptNo = 2,
+                    eventSeq = 1,
+                    state = "FAILED",
+                    safeErrorCode = "lowercase_error",
+                )
+            }
+            listOf("RAW\tERROR", "RAW\nERROR", "HTTPS:" + "/" + "/EXAMPLE_INVALID")
+                .forEachIndexed { index, unsafeCode ->
+                    assertConstraintRejected {
+                        insertV58ClubCommandConvergenceEvent(
+                            upgradeJdbc,
+                            convergenceId,
+                            receiptId,
+                            attemptNo = index + 10,
+                            eventSeq = 1,
+                            state = "FAILED",
+                            safeErrorCode = unsafeCode,
+                        )
+                    }
+                }
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from platform_admin_club_command_receipts receipt
+                    join platform_audit_events audit
+                      on audit.id = receipt.platform_audit_event_id_snapshot
+                    where receipt.id = ? and audit.id = ?
+                    """.trimIndent(),
+                    Int::class.java,
+                    receiptId,
+                    auditId,
+                ),
+            )
+            assertThat(upgradeJdbc.update("delete from clubs where id = ?", clubId)).isEqualTo(1)
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from platform_admin_club_command_receipts where id = ? and club_id_snapshot = ?",
+                    Int::class.java,
+                    receiptId,
+                    clubId,
+                ),
+            )
+            assertEquals(
+                2,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from platform_admin_club_command_convergence_events where convergence_id = ?",
+                    Int::class.java,
+                    convergenceId,
+                ),
+            )
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
     fun `mysql adds revision domains participant audit and application snapshot identity`() {
         assertV52RevisionSchema(jdbcTemplate)
         assertV53IdempotencySchema(jdbcTemplate)
         assertV54PublicProjectionConvergenceSchema(jdbcTemplate)
         assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate)
         assertV57PlatformAdminCommandIdempotencySchema(jdbcTemplate)
+        assertV58PlatformAdminClubCommandEvidenceSchema(jdbcTemplate)
         val fixture = V52LiveRevisionFixture()
         try {
             insertV52RevisionClubGraph(
@@ -4068,6 +4372,354 @@ class MySqlFlywayMigrationTest(
             digestKeyVersion,
             idempotencyKeyHmac,
             requestHmac,
+        )
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV58PlatformAdminClubCommandEvidenceSchema(jdbcTemplate: JdbcTemplate) {
+        val previewTable = "platform_admin_club_command_previews"
+        val receiptTable = "platform_admin_club_command_receipts"
+        val convergenceTable = "platform_admin_club_command_convergence"
+        val eventTable = "platform_admin_club_command_convergence_events"
+
+        val adminRevision = columnMetadata(jdbcTemplate, "clubs", "admin_revision")
+        assertThat(adminRevision["DATA_TYPE"]).isEqualTo("bigint")
+        assertThat(adminRevision["IS_NULLABLE"]).isEqualTo("NO")
+        assertThat(adminRevision["COLUMN_DEFAULT"].toString()).isEqualTo("0")
+        assertThat(checkConstraintClause(jdbcTemplate, "clubs_admin_revision_check")).contains(">= 0")
+
+        assertThat(columns(jdbcTemplate, previewTable)).containsExactlyInAnyOrder(
+            "id",
+            "command_type",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "actor_capabilities_json",
+            "target_kind",
+            "club_id_snapshot",
+            "new_club_slot_id_snapshot",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "sanitized_impact_json",
+            "expires_at",
+            "consumed_at",
+            "consumed_receipt_id_snapshot",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, receiptTable)).containsExactlyInAnyOrder(
+            "id",
+            "command_type",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "actor_capabilities_json",
+            "club_id_snapshot",
+            "preview_id_snapshot",
+            "before_admin_revision",
+            "after_admin_revision",
+            "outcome",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "platform_audit_event_id_snapshot",
+            "origin_at",
+            "safe_result_json",
+        )
+        assertThat(columns(jdbcTemplate, convergenceTable)).containsExactlyInAnyOrder(
+            "id",
+            "receipt_id_snapshot",
+            "effect_type",
+            "state",
+            "attempt_count",
+            "next_attempt_no",
+            "lease_owner",
+            "lease_expires_at",
+            "last_safe_error_code",
+            "available_at",
+            "created_at",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, eventTable)).containsExactlyInAnyOrder(
+            "convergence_id",
+            "receipt_id_snapshot",
+            "effect_type",
+            "attempt_no",
+            "event_seq",
+            "state",
+            "safe_error_code",
+            "observed_at",
+        )
+
+        listOf(
+            previewTable to "id",
+            previewTable to "actor_user_id_snapshot",
+            previewTable to "club_id_snapshot",
+            previewTable to "new_club_slot_id_snapshot",
+            previewTable to "consumed_receipt_id_snapshot",
+            receiptTable to "id",
+            receiptTable to "actor_user_id_snapshot",
+            receiptTable to "club_id_snapshot",
+            receiptTable to "preview_id_snapshot",
+            receiptTable to "platform_audit_event_id_snapshot",
+            convergenceTable to "id",
+            convergenceTable to "receipt_id_snapshot",
+            eventTable to "convergence_id",
+            eventTable to "receipt_id_snapshot",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("char")
+            assertThat(metadata["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("36")
+            assertThat(metadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
+            assertThat(metadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
+        }
+        listOf(previewTable, receiptTable).forEach { table ->
+            val hmac = columnMetadata(jdbcTemplate, table, "request_hmac")
+            assertThat(hmac["DATA_TYPE"]).isEqualTo("varbinary")
+            assertThat(hmac["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+            assertThat(hmac["IS_NULLABLE"]).isEqualTo("NO")
+        }
+
+        assertEquals("id", indexColumns(jdbcTemplate, previewTable, "PRIMARY"))
+        assertEquals(
+            "expires_at,id",
+            indexColumns(jdbcTemplate, previewTable, "platform_admin_club_previews_expiry_idx"),
+        )
+        assertEquals(
+            "club_id_snapshot,created_at,id",
+            indexColumns(jdbcTemplate, previewTable, "platform_admin_club_previews_target_idx"),
+        )
+        assertEquals("id", indexColumns(jdbcTemplate, receiptTable, "PRIMARY"))
+        assertEquals(
+            "platform_audit_event_id_snapshot",
+            indexColumns(jdbcTemplate, receiptTable, "platform_admin_club_receipts_audit_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, receiptTable, "platform_admin_club_receipts_audit_uk")).isZero()
+        assertEquals(
+            "preview_id_snapshot",
+            indexColumns(jdbcTemplate, receiptTable, "platform_admin_club_receipts_preview_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, receiptTable, "platform_admin_club_receipts_preview_uk")).isZero()
+        assertEquals(
+            "club_id_snapshot,origin_at,id",
+            indexColumns(jdbcTemplate, receiptTable, "platform_admin_club_receipts_target_idx"),
+        )
+        assertEquals("id", indexColumns(jdbcTemplate, convergenceTable, "PRIMARY"))
+        assertEquals(
+            "id,receipt_id_snapshot,effect_type",
+            indexColumns(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_identity_uk"),
+        )
+        assertThat(
+            indexNonUnique(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_identity_uk"),
+        ).isZero()
+        assertEquals(
+            "receipt_id_snapshot,effect_type",
+            indexColumns(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_receipt_effect_uk"),
+        )
+        assertThat(
+            indexNonUnique(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_receipt_effect_uk"),
+        ).isZero()
+        assertEquals(
+            "state,available_at,lease_expires_at,id",
+            indexColumns(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_available_idx"),
+        )
+        assertEquals(
+            "convergence_id,attempt_no,event_seq",
+            indexColumns(jdbcTemplate, eventTable, "PRIMARY"),
+        )
+        assertEquals(
+            "receipt_id_snapshot,observed_at,convergence_id,attempt_no,event_seq",
+            indexColumns(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_receipt_idx"),
+        )
+
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_previews_role_check"))
+            .contains("OWNER", "OPERATOR", "SUPPORT")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_previews_command_check"))
+            .contains("regexp_like", "^[a-z0-9._:-]{1,96}$")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_previews_target_check"))
+            .contains("EXISTING_CLUB", "NEW_CLUB", "club_id_snapshot", "new_club_slot_id_snapshot")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_previews_hmac_check"))
+            .contains("digest_key_version", "request_hmac", "32")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_previews_schema_check"))
+            .contains("regexp_like", "^[A-Za-z0-9._:-]{1,64}$")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_previews_json_check"))
+            .contains("actor_capabilities_json", "sanitized_impact_json", "8192")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_previews_consumption_check"))
+            .contains("consumed_at", "consumed_receipt_id_snapshot")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_role_check"))
+            .contains("OWNER", "OPERATOR", "SUPPORT")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_command_check"))
+            .contains("regexp_like", "^[a-z0-9._:-]{1,96}$")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_revision_check"))
+            .contains("before_admin_revision", "after_admin_revision", ">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_outcome_check"))
+            .contains("SUCCEEDED", "PARTIAL", "FAILED")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_hmac_check"))
+            .contains("digest_key_version", "request_hmac", "32")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_schema_check"))
+            .contains("regexp_like", "^[A-Za-z0-9._:-]{1,64}$")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_json_check"))
+            .contains("actor_capabilities_json", "safe_result_json", "8192")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_effect_check"))
+            .contains("HOST_INVITATION", "DOMAIN_PROVISIONING")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_state_check"))
+            .contains("PENDING", "SUCCEEDED", "FAILED", "last_safe_error_code")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_attempt_check"))
+            .contains("attempt_count", "next_attempt_no")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_lease_check"))
+            .contains("lease_owner", "lease_expires_at", "regexp_like", "^[A-Za-z0-9._:-]{1,128}$")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_events_contract_check"))
+            .contains("PENDING", "SUCCEEDED", "FAILED", "event_seq", "safe_error_code")
+
+        assertThat(importedKeys(jdbcTemplate, previewTable)).containsExactly(receiptTable)
+        assertThat(importedKeys(jdbcTemplate, receiptTable)).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, convergenceTable)).containsExactly(receiptTable)
+        assertThat(importedKeys(jdbcTemplate, eventTable)).containsExactly(convergenceTable)
+        assertEquals(
+            "consumed_receipt_id_snapshot,id",
+            foreignKeyColumns(jdbcTemplate, previewTable, "platform_admin_club_previews_consumed_receipt_fk"),
+        )
+        assertEquals(
+            "RESTRICT",
+            foreignKeyDeleteRule(jdbcTemplate, previewTable, "platform_admin_club_previews_consumed_receipt_fk"),
+        )
+        assertEquals(
+            "receipt_id_snapshot",
+            foreignKeyColumns(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_receipt_fk"),
+        )
+        assertEquals(
+            "RESTRICT",
+            foreignKeyDeleteRule(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_receipt_fk"),
+        )
+        assertEquals(
+            "convergence_id,receipt_id_snapshot,effect_type",
+            foreignKeyColumns(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_identity_fk"),
+        )
+        assertEquals(
+            "RESTRICT",
+            foreignKeyDeleteRule(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_identity_fk"),
+        )
+
+        listOf(previewTable, receiptTable, convergenceTable, eventTable).forEach { table ->
+            assertThat(columns(jdbcTemplate, table)).doesNotContain(
+                "accept_url",
+                "invitation_token",
+                "dns_secret",
+                "hostname",
+                "email",
+                "reason",
+                "note",
+                "message",
+                "provider_error",
+                "provider_response",
+                "raw_error",
+                "request_json",
+                "canonical_payload",
+                "request_sha256",
+            )
+        }
+        assertThat(columns(jdbcTemplate, receiptTable)).doesNotContain("updated_at", "deleted_at")
+    }
+
+    private fun insertV58ClubCommandPreview(
+        jdbcTemplate: JdbcTemplate,
+        previewId: String,
+        actorId: String,
+        clubId: String,
+        commandType: String = "club.domain.provision",
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_club_command_previews (
+              id, command_type, actor_user_id_snapshot, actor_platform_role_snapshot,
+              actor_capabilities_json, target_kind, club_id_snapshot, new_club_slot_id_snapshot,
+              canonical_schema_version, digest_key_version, request_hmac, sanitized_impact_json,
+              expires_at, consumed_at, consumed_receipt_id_snapshot, created_at
+            ) values (?, ?, ?, 'OWNER', json_array('MANAGE_CLUB_DOMAINS'),
+                      'EXISTING_CLUB', ?, null, 'club-domain-provision:v1', 1, ?,
+                      json_object('codes', json_array('DOMAIN_PROVISIONING')),
+                      '2026-08-24 01:10:00.000000', null, null, '2026-08-24 01:00:00.000000')
+            """.trimIndent(),
+            previewId,
+            commandType,
+            actorId,
+            clubId,
+            ByteArray(32) { 0x31 },
+        )
+    }
+
+    private fun insertV58ClubCommandReceipt(
+        jdbcTemplate: JdbcTemplate,
+        receiptId: String,
+        previewId: String,
+        actorId: String,
+        clubId: String,
+        auditId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_club_command_receipts (
+              id, command_type, actor_user_id_snapshot, actor_platform_role_snapshot,
+              actor_capabilities_json, club_id_snapshot, preview_id_snapshot,
+              before_admin_revision, after_admin_revision,
+              outcome, canonical_schema_version, digest_key_version, request_hmac,
+              platform_audit_event_id_snapshot, origin_at, safe_result_json
+            ) values (?, 'club.domain.provision', ?, 'OWNER', json_array('MANAGE_CLUB_DOMAINS'), ?, ?, 0, 1,
+                      'SUCCEEDED', 'club-domain-provision:v1', 1, ?, ?, '2026-08-24 01:01:00.000000',
+                      json_object('resultCode', 'DOMAIN_ORIGIN_COMMITTED'))
+            """.trimIndent(),
+            receiptId,
+            actorId,
+            clubId,
+            previewId,
+            ByteArray(32) { 0x32 },
+            auditId,
+        )
+    }
+
+    private fun insertV58ClubCommandConvergence(
+        jdbcTemplate: JdbcTemplate,
+        convergenceId: String,
+        receiptId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_club_command_convergence (
+              id, receipt_id_snapshot, effect_type, state, attempt_count, next_attempt_no,
+              lease_owner, lease_expires_at, last_safe_error_code, available_at, created_at, updated_at
+            ) values (?, ?, 'DOMAIN_PROVISIONING', 'PENDING', 0, 1, null, null, null,
+                      '2026-08-24 01:01:00.000000', '2026-08-24 01:01:00.000000',
+                      '2026-08-24 01:01:00.000000')
+            """.trimIndent(),
+            convergenceId,
+            receiptId,
+        )
+    }
+
+    private fun insertV58ClubCommandConvergenceEvent(
+        jdbcTemplate: JdbcTemplate,
+        convergenceId: String,
+        receiptId: String,
+        attemptNo: Int,
+        eventSeq: Int,
+        state: String,
+        safeErrorCode: String?,
+        effectType: String = "DOMAIN_PROVISIONING",
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_club_command_convergence_events (
+              convergence_id, receipt_id_snapshot, effect_type, attempt_no, event_seq,
+              state, safe_error_code, observed_at
+            ) values (?, ?, ?, ?, ?, ?, ?,
+                      timestampadd(second, ?, timestamp('2026-08-24 01:01:00.000000')))
+            """.trimIndent(),
+            convergenceId,
+            receiptId,
+            effectType,
+            attemptNo,
+            eventSeq,
+            state,
+            safeErrorCode,
+            attemptNo + eventSeq,
         )
     }
 
