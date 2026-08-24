@@ -2155,6 +2155,23 @@ class MySqlFlywayMigrationTest(
                 )
             }
             insertV58ClubCommandConvergence(upgradeJdbc, convergenceId, receiptId)
+            listOf(
+                "SUCCEEDED" to null,
+                "FAILED" to "DNS_PROVIDER_UNAVAILABLE",
+            ).forEach { (terminalState, safeErrorCode) ->
+                assertConstraintRejected {
+                    upgradeJdbc.update(
+                        """
+                        update platform_admin_club_command_convergence
+                        set state = ?, last_safe_error_code = ?, available_at = null
+                        where id = ?
+                        """.trimIndent(),
+                        terminalState,
+                        safeErrorCode,
+                        convergenceId,
+                    )
+                }
+            }
             assertConstraintRejected {
                 upgradeJdbc.update(
                     """
@@ -2187,6 +2204,17 @@ class MySqlFlywayMigrationTest(
                     state = "PENDING",
                     safeErrorCode = null,
                     effectType = "HOST_INVITATION",
+                )
+            }
+            assertConstraintRejected {
+                insertV58ClubCommandConvergenceEvent(
+                    upgradeJdbc,
+                    convergenceId,
+                    receiptId,
+                    attemptNo = 98,
+                    eventSeq = 1,
+                    state = "SUCCEEDED",
+                    safeErrorCode = null,
                 )
             }
             listOf("RAW\tERROR", "RAW\nERROR", "HTTPS:" + "/" + "/EXAMPLE_INVALID").forEach { unsafeCode ->
@@ -4444,6 +4472,7 @@ class MySqlFlywayMigrationTest(
             "effect_type",
             "attempt_no",
             "event_seq",
+            "start_event_seq",
             "state",
             "safe_error_code",
             "observed_at",
@@ -4563,7 +4592,7 @@ class MySqlFlywayMigrationTest(
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_state_check"))
             .contains("PENDING", "SUCCEEDED", "FAILED", "last_safe_error_code")
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_attempt_check"))
-            .contains("attempt_count", "next_attempt_no")
+            .contains("PENDING", "attempt_count", "next_attempt_no", "> 0")
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_lease_check"))
             .contains("lease_owner", "lease_expires_at", "regexp_like", "^[A-Za-z0-9._:-]{1,128}$")
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_events_contract_check"))
@@ -4572,7 +4601,7 @@ class MySqlFlywayMigrationTest(
         assertThat(importedKeys(jdbcTemplate, previewTable)).containsExactly(receiptTable)
         assertThat(importedKeys(jdbcTemplate, receiptTable)).isEmpty()
         assertThat(importedKeys(jdbcTemplate, convergenceTable)).containsExactly(receiptTable)
-        assertThat(importedKeys(jdbcTemplate, eventTable)).containsExactly(convergenceTable)
+        assertThat(importedKeys(jdbcTemplate, eventTable)).containsExactlyInAnyOrder(convergenceTable, eventTable)
         assertEquals(
             "consumed_receipt_id_snapshot,id",
             foreignKeyColumns(jdbcTemplate, previewTable, "platform_admin_club_previews_consumed_receipt_fk"),
@@ -4596,6 +4625,18 @@ class MySqlFlywayMigrationTest(
         assertEquals(
             "RESTRICT",
             foreignKeyDeleteRule(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_identity_fk"),
+        )
+        assertEquals(
+            "convergence_id,attempt_no,start_event_seq",
+            foreignKeyColumns(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_start_fk"),
+        )
+        assertEquals(
+            "$eventTable:convergence_id,attempt_no,event_seq",
+            foreignKeyReference(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_start_fk"),
+        )
+        assertEquals(
+            "RESTRICT",
+            foreignKeyDeleteRule(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_start_fk"),
         )
 
         listOf(previewTable, receiptTable, convergenceTable, eventTable).forEach { table ->

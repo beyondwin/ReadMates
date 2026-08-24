@@ -171,7 +171,9 @@ create table platform_admin_club_command_convergence (
     or regexp_like(last_safe_error_code, '^[A-Z][A-Z0-9_]{0,63}$', 'c')
   ),
   constraint platform_admin_club_convergence_attempt_check check (
-    attempt_count >= 0 and next_attempt_no = attempt_count + 1
+    attempt_count >= 0
+    and next_attempt_no = attempt_count + 1
+    and (binary state = binary 'PENDING' or attempt_count > 0)
   ),
   constraint platform_admin_club_convergence_lease_check check (
     (
@@ -192,6 +194,9 @@ create table platform_admin_club_command_convergence_events (
   effect_type varchar(32) character set ascii collate ascii_bin not null,
   attempt_no int not null,
   event_seq tinyint not null,
+  start_event_seq tinyint generated always as (
+    case when event_seq = 1 then 0 else null end
+  ) stored,
   state varchar(16) character set ascii collate ascii_bin not null,
   safe_error_code varchar(64) character set ascii collate ascii_bin,
   observed_at datetime(6) not null,
@@ -206,6 +211,10 @@ create table platform_admin_club_command_convergence_events (
   constraint platform_admin_club_convergence_events_identity_fk
     foreign key (convergence_id, receipt_id_snapshot, effect_type)
     references platform_admin_club_command_convergence(id, receipt_id_snapshot, effect_type)
+    on delete restrict,
+  constraint platform_admin_club_convergence_events_start_fk
+    foreign key (convergence_id, attempt_no, start_event_seq)
+    references platform_admin_club_command_convergence_events(convergence_id, attempt_no, event_seq)
     on delete restrict,
   constraint platform_admin_club_convergence_events_effect_check check (
     binary effect_type in (binary 'HOST_INVITATION', binary 'DOMAIN_PROVISIONING')
