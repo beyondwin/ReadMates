@@ -1,5 +1,11 @@
 package com.readmates.auth.api
 
+import com.readmates.admin.audit.adapter.`in`.web.AdminAuditErrorHandler
+import com.readmates.admin.audit.adapter.`in`.web.PlatformAdminAuditController
+import com.readmates.admin.audit.application.model.AdminAuditLedgerPage
+import com.readmates.admin.audit.application.model.AdminAuditListQuery
+import com.readmates.admin.audit.application.model.AdminAuditSummary
+import com.readmates.admin.audit.application.port.`in`.ListAdminAuditLedgerUseCase
 import com.readmates.admin.takedown.adapter.`in`.web.PlatformAdminPublicTakedownController
 import com.readmates.admin.takedown.adapter.`in`.web.PlatformAdminPublicTakedownErrorHandler
 import com.readmates.admin.takedown.application.model.PreviewPublicTakedownCommand
@@ -102,6 +108,7 @@ import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.CurrentUser
 import com.readmates.shared.security.PlatformActor
 import com.readmates.shared.security.PlatformCapability
+import com.readmates.shared.security.toPlatformActor
 import com.readmatesharness.PlatformAdminBffSecurityHarnessApplication
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
@@ -147,12 +154,14 @@ class PlatformAdminBffSecurityTest(
     @param:Autowired private val identities: PlatformAdminSecurityIdentities,
     @param:Autowired private val aiCommandInvocations: PlatformAdminAiCommandInvocations,
     @param:Autowired private val supportCommandInvocations: PlatformAdminSupportCommandInvocations,
+    @param:Autowired private val auditSearchInvocations: PlatformAdminAuditSearchInvocations,
 ) {
     @BeforeEach
     fun resetIdentities() {
         identities.reset()
         aiCommandInvocations.reset()
         supportCommandInvocations.reset()
+        auditSearchInvocations.reset()
     }
 
     @Test
@@ -399,6 +408,41 @@ class PlatformAdminBffSecurityTest(
         assertThat(supportCommandInvocations.legacyCalls).isZero()
     }
 
+    @Test
+    fun `exact sensitive audit search requires trusted bff same origin active capable admin`() {
+        identities.admin(PlatformAdminRole.OWNER)
+        auditSearchRequest().andExpect(status().isOk)
+        identities.admin(PlatformAdminRole.OPERATOR)
+        auditSearchRequest(origin = null, referer = "http://localhost:3000/admin/audit")
+            .andExpect(status().isOk)
+
+        listOf<String?>(null, "wrong-secret").forEach { secret ->
+            auditSearchRequest(secret = secret).andExpect(status().isUnauthorized)
+        }
+        auditSearchRequest(origin = "https://attacker.example").andExpect(status().isForbidden)
+        auditSearchRequest(origin = null, referer = "https://attacker.example/path")
+            .andExpect(status().isForbidden)
+
+        identities.inactiveSession()
+        auditSearchRequest().andExpect(status().isUnauthorized)
+        identities.nonAdmin()
+        auditSearchRequest().andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.SUPPORT)
+        auditSearchRequest().andExpect(status().isForbidden)
+
+        assertThat(auditSearchInvocations.calls).isEqualTo(2)
+    }
+
+    @Test
+    fun `audit search wrong method suffix and encoded slash near misses stay protected`() {
+        identities.admin(PlatformAdminRole.OWNER)
+
+        auditSearchRequest(method = HttpMethod.PUT).andExpect(status().isForbidden)
+        auditSearchRequest(path = "$AUDIT_SEARCH_PATH/near-miss").andExpect(status().isForbidden)
+        auditSearchRequest(path = "$AUDIT_SEARCH_PATH%2Fnear-miss").andExpect(status().isBadRequest)
+        assertThat(auditSearchInvocations.calls).isZero()
+    }
+
     private fun commandRequest(
         route: ClubCommandRoute,
         method: HttpMethod = route.method,
@@ -410,6 +454,22 @@ class PlatformAdminBffSecurityTest(
         request(method, path)
             .contentType(MediaType.APPLICATION_JSON)
             .content(route.body)
+            .cookie(Cookie(SESSION_COOKIE, SESSION_TOKEN))
+            .apply { secret?.let { header(BffSecretFilter.BFF_SECRET_HEADER, it) } }
+            .apply { origin?.let { header("Origin", it) } }
+            .apply { referer?.let { header("Referer", it) } },
+    )
+
+    private fun auditSearchRequest(
+        method: HttpMethod = HttpMethod.POST,
+        path: String = AUDIT_SEARCH_PATH,
+        secret: String? = "test-bff-secret",
+        origin: String? = "http://localhost:3000",
+        referer: String? = null,
+    ) = mockMvc.perform(
+        request(method, path)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(AUDIT_SEARCH_JSON)
             .cookie(Cookie(SESSION_COOKIE, SESSION_TOKEN))
             .apply { secret?.let { header(BffSecretFilter.BFF_SECRET_HEADER, it) } }
             .apply { origin?.let { header("Origin", it) } }
@@ -436,11 +496,13 @@ class PlatformAdminBffSecurityTest(
         const val SESSION_COOKIE = "READMATES_SECURITY_SESSION"
         const val SESSION_TOKEN = "task4-session-token"
         const val EXACT_PATH = "/api/admin/public-takedowns/preview"
+        const val AUDIT_SEARCH_PATH = "/api/admin/audit/events/search"
         val CLUB_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060002")
         val SESSION_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060003")
         val PUBLICATION_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060004")
         val REQUEST_JSON =
             """{"clubId":"$CLUB_ID","sessionId":"$SESSION_ID","publicationId":"$PUBLICATION_ID"}"""
+        const val AUDIT_SEARCH_JSON = """{"range":"24h","sensitiveTarget":"masked-subject"}"""
 
         @JvmStatic
         fun clubCommandRoutes(): List<Arguments> {
@@ -694,11 +756,21 @@ class PlatformAdminSupportCommandInvocations {
     }
 }
 
+class PlatformAdminAuditSearchInvocations {
+    var calls: Int = 0
+
+    fun reset() {
+        calls = 0
+    }
+}
+
 @TestConfiguration(proxyBeanMethods = false)
 @EnableAutoConfiguration(exclude = [DataSourceAutoConfiguration::class, FlywayAutoConfiguration::class])
 @Import(
     SecurityConfig::class,
     CurrentMemberWebConfig::class,
+    PlatformAdminAuditController::class,
+    AdminAuditErrorHandler::class,
     PlatformAdminPublicTakedownController::class,
     PlatformAdminPublicTakedownErrorHandler::class,
     PlatformAdminController::class,
@@ -718,7 +790,34 @@ class PlatformAdminBffSecurityHarnessConfiguration {
     fun supportCommandInvocations() = PlatformAdminSupportCommandInvocations()
 
     @Bean
+    fun auditSearchInvocations() = PlatformAdminAuditSearchInvocations()
+
+    @Bean
     fun identities() = PlatformAdminSecurityIdentities()
+
+    @Bean
+    fun auditLedger(invocations: PlatformAdminAuditSearchInvocations): ListAdminAuditLedgerUseCase =
+        object : ListAdminAuditLedgerUseCase {
+            override fun listLedger(
+                admin: CurrentPlatformAdmin,
+                query: AdminAuditListQuery,
+            ): AdminAuditLedgerPage {
+                if (
+                    query.sensitiveTarget != null &&
+                    !admin.toPlatformActor().can(PlatformCapability.VIEW_SENSITIVE_AUDIT)
+                ) {
+                    throw AccessDeniedException("Platform admin role cannot search sensitive audit targets")
+                }
+                invocations.calls += 1
+                return AdminAuditLedgerPage(
+                    generatedAt = query.filter.to,
+                    filters = query.filter,
+                    summary = AdminAuditSummary(0, 0, 0, emptyList()),
+                    items = emptyList(),
+                    nextCursor = null,
+                )
+            }
+        }
 
     @Bean
     fun manageSessions(identities: PlatformAdminSecurityIdentities): ManageAuthSessionUseCase =
