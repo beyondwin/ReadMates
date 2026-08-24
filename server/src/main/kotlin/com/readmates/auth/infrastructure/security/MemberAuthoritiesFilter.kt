@@ -1,15 +1,20 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.adapter.`in`.security.AuthClubContextSource
 import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
 import com.readmates.auth.application.model.AuthoritySynthesisRequest
 import com.readmates.auth.application.model.ClubContextInput
 import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
 import com.readmates.auth.application.port.`in`.SynthesizeAuthoritiesUseCase
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
+import com.readmates.shared.security.HostAuthorityLossCode
+import com.readmates.shared.security.HostAuthorityLossContract
 import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -56,6 +61,7 @@ class MemberAuthoritiesFilter(
         if (authentication != null && email != null) {
             val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
             val resolvedClubContext = requestedClubContext.context
+            val priorMember = authentication.principal as? CurrentMember
 
             val member =
                 if (requestedClubContext.supplied && resolvedClubContext == null) {
@@ -63,6 +69,15 @@ class MemberAuthoritiesFilter(
                 } else {
                     resolveAuthenticatedPrincipalUseCase.resolveByEmail(email, resolvedClubContext)
                 }
+
+            val authorityLoss =
+                request.hostAuthorityLossCode(
+                    requestedClubContext.source,
+                    resolvedClubContext,
+                    priorMember,
+                    member,
+                )
+            request.recordAuthorityLoss(authorityLoss)
 
             val userId =
                 when (val principal = authentication.principal) {
@@ -115,7 +130,8 @@ class MemberAuthoritiesFilter(
             }
 
             // Map authority strings → SimpleGrantedAuthority at this infrastructure boundary
-            val grantedAuthorities = result.authorities.map { SimpleGrantedAuthority(it) }
+            val grantedAuthorities =
+                result.authorities.toGrantedAuthorities(authorityLoss)
 
             val mappedAuthentication =
                 UsernamePasswordAuthenticationToken(
@@ -144,4 +160,48 @@ class MemberAuthoritiesFilter(
             clubName = clubName,
             avatarKey = avatarKey,
         )
+
+    private fun HttpServletRequest.hostAuthorityLossCode(
+        source: AuthClubContextSource,
+        requestedClub: com.readmates.club.application.model.ResolvedClubContext?,
+        priorMember: CurrentMember?,
+        currentMember: AuthenticatedMemberSnapshot?,
+    ): HostAuthorityLossCode? =
+        if (isHostApi() && source == AuthClubContextSource.SLUG && requestedClub != null && currentMember != null) {
+            classifyHostAuthorityLoss(requestedClub, priorMember, currentMember)
+        } else {
+            null
+        }
+
+    private fun HttpServletRequest.recordAuthorityLoss(code: HostAuthorityLossCode?) {
+        code?.let { setAttribute(HostAuthorityLossContract.REQUEST_ATTRIBUTE, it) }
+    }
+
+    private fun Set<String>.toGrantedAuthorities(authorityLoss: HostAuthorityLossCode?): List<SimpleGrantedAuthority> =
+        filterNot { authorityLoss != null && it == HOST_AUTHORITY }
+            .map(::SimpleGrantedAuthority)
+
+    private fun HttpServletRequest.isHostApi(): Boolean = requestURI == HOST_API_ROOT || requestURI.startsWith(HOST_API_PREFIX)
+
+    private companion object {
+        const val HOST_API_ROOT = "/api/host"
+        const val HOST_API_PREFIX = "/api/host/"
+        const val HOST_AUTHORITY = "ROLE_HOST"
+    }
+}
+
+private fun classifyHostAuthorityLoss(
+    requestedClub: com.readmates.club.application.model.ResolvedClubContext,
+    priorMember: CurrentMember?,
+    currentMember: AuthenticatedMemberSnapshot,
+): HostAuthorityLossCode? {
+    val priorHost = priorMember?.takeIf { it.userId == currentMember.actor.userId && it.isHost }
+    return when {
+        priorHost != null && priorHost.clubId != requestedClub.clubId -> HostAuthorityLossCode.CROSS_CLUB_SCOPE
+        priorHost != null &&
+            currentMember.membershipStatus == MembershipStatus.ACTIVE &&
+            currentMember.role != MembershipRole.HOST -> HostAuthorityLossCode.HOST_AUTHORITY_REVOKED
+        currentMember.membershipStatus == MembershipStatus.SUSPENDED -> HostAuthorityLossCode.MEMBERSHIP_SUSPENDED
+        else -> null
+    }
 }

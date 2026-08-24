@@ -33,6 +33,7 @@ class SecurityConfig(
     private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter,
     private val rateLimitFilter: RateLimitFilter,
     private val memberAuthoritiesFilter: MemberAuthoritiesFilter,
+    private val hostAuthorityLossAccessDeniedHandler: HostAuthorityLossAccessDeniedHandler,
     private val platformAdminAuthoritiesFilter: PlatformAdminAuthoritiesFilter,
     private val oAuthFlowContextRepository: OAuthFlowContextRepository,
     private val googleOidcUserService: GoogleOidcUserService,
@@ -206,6 +207,7 @@ class SecurityConfig(
                     .authenticated()
             }.exceptionHandling {
                 it.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                it.accessDeniedHandler(hostAuthorityLossAccessDeniedHandler)
             }.addFilterBefore(bffSecretFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterBefore(sessionCookieAuthenticationFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterAfter(platformAdminAuthoritiesFilter, SessionCookieAuthenticationFilter::class.java)
