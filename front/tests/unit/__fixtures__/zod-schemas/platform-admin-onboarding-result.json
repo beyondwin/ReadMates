@@ -1,0 +1,21 @@
+{
+  "receiptId": "00000000-0000-0000-0000-00000000a104",
+  "club": {
+    "clubId": "00000000-0000-0000-0000-00000000a101",
+    "slug": "public-contract-club",
+    "name": "Public Contract Club",
+    "tagline": "A public-safe contract fixture",
+    "about": "Synthetic public fixture data only.",
+    "status": "ACTIVE",
+    "publicVisibility": "PRIVATE",
+    "domainCount": 1,
+    "domainActionRequiredCount": 1,
+    "notificationFailureCount": 0,
+    "aiFailureCount": 0,
+    "firstHostOnboardingState": "ASSIGNED",
+    "adminRevision": 7
+  },
+  "originStatus": "SUCCEEDED",
+  "firstHostKind": "INVITATION_CREATED",
+  "invitationDelivery": "PENDING"
+}

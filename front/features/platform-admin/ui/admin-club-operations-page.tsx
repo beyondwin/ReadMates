@@ -20,15 +20,25 @@ import {
 
 type AdminClubOperationsPageProps = {
   snapshot: AdminClubOperationsSnapshot;
-  supportGrantCount: number;
+  supportGrantCount?: number;
+  supportGrantUnavailable?: boolean;
+  onRetrySupportGrants?: () => void;
 };
 
-export function AdminClubOperationsPage({ snapshot, supportGrantCount }: AdminClubOperationsPageProps) {
+export function AdminClubOperationsPage({
+  snapshot,
+  supportGrantCount,
+  supportGrantUnavailable = false,
+  onRetrySupportGrants,
+}: AdminClubOperationsPageProps) {
   const notifDelta = notificationFailureDelta(snapshot);
   const aiDelta = aiFailureDelta(snapshot);
 
   return (
-    <section className="admin-club-operations" aria-labelledby="admin-club-operations-title">
+    <section
+      className="admin-club-operations"
+      aria-labelledby="admin-club-operations-title"
+    >
       <header className="admin-club-operations__header">
         <div>
           <p className="eyebrow">Operations snapshot</p>
@@ -36,18 +46,45 @@ export function AdminClubOperationsPage({ snapshot, supportGrantCount }: AdminCl
             {snapshot.club.name} 운영 스냅샷
           </h2>
         </div>
-        <span className="platform-admin-domain-status">{snapshot.readiness.state}</span>
+        <span className="platform-admin-domain-status">
+          {snapshot.readiness.state}
+        </span>
       </header>
 
       <div className="admin-club-operations__summary">
         <Metric label="활성 멤버" value={snapshot.memberActivity.activeCount} />
         <Metric label="호스트" value={snapshot.memberActivity.hostCount} />
-        <Metric label="지원 grant" value={supportGrantCount} />
-        <Metric label="열린 세션" value={snapshot.sessionProgress.currentOpenCount} />
-        <Metric label="알림 실패 (7일)" value={snapshot.notificationHealth.recentFailed7d} delta={notifDelta} />
+        {supportGrantCount !== undefined ? (
+          <Metric label="지원 grant" value={supportGrantCount} />
+        ) : supportGrantUnavailable ? (
+          <article className="surface admin-club-operations__metric">
+            <p className="tiny muted">지원 grant 확인 불가</p>
+            {onRetrySupportGrants ? (
+              <button
+                type="button"
+                className="btn btn-ghost btn-sm"
+                onClick={onRetrySupportGrants}
+              >
+                지원 grant 다시 시도
+              </button>
+            ) : null}
+          </article>
+        ) : null}
+        <Metric
+          label="열린 세션"
+          value={snapshot.sessionProgress.currentOpenCount}
+        />
+        <Metric
+          label="알림 실패 (7일)"
+          value={snapshot.notificationHealth.recentFailed7d}
+          delta={notifDelta}
+        />
       </div>
 
-      <section className="admin-club-operations__group" aria-label="플랫폼 운영">
+      <section
+        className="admin-club-operations__group"
+        aria-label="플랫폼 운영"
+      >
         <h3 className="h4 editorial">플랫폼 운영</h3>
         {snapshot.readiness.blockingReasons.length > 0 ? (
           <ul className="admin-club-operations__blockers">
@@ -71,41 +108,71 @@ export function AdminClubOperationsPage({ snapshot, supportGrantCount }: AdminCl
 
         <div className="admin-club-operations__grid">
           <Panel title="Notification health">
-            <Stat label="최근 7일 실패" value={snapshot.notificationHealth.recentFailed7d} />
+            <Stat
+              label="최근 7일 실패"
+              value={snapshot.notificationHealth.recentFailed7d}
+            />
             <Stat label="지난 7일 대비" value={formatDelta(notifDelta)} />
             <Stat label="Pending" value={snapshot.notificationHealth.pending} />
-            <Stat label="Failed (전체)" value={snapshot.notificationHealth.failed} />
-            <Stat label="Dead (전체)" value={snapshot.notificationHealth.dead} />
-            <Link className="btn btn-ghost btn-sm" to={`/admin/notifications?clubId=${snapshot.club.clubId}`}>
+            <Stat
+              label="Failed (전체)"
+              value={snapshot.notificationHealth.failed}
+            />
+            <Stat
+              label="Dead (전체)"
+              value={snapshot.notificationHealth.dead}
+            />
+            <Link
+              className="btn btn-ghost btn-sm"
+              to={`/admin/notifications?clubId=${snapshot.club.clubId}`}
+            >
               알림 ledger
             </Link>
           </Panel>
 
           <Panel title="AI usage">
             <Stat label="Active jobs" value={snapshot.aiUsage.activeJobs} />
-            <Stat label="최근 7일 실패" value={snapshot.aiUsage.failedRecentJobs} />
+            <Stat
+              label="최근 7일 실패"
+              value={snapshot.aiUsage.failedRecentJobs}
+            />
             <Stat label="지난 7일 대비" value={formatDelta(aiDelta)} />
             <Stat label="Cost" value={`$${snapshot.aiUsage.costEstimateUsd}`} />
-            <Link className="btn btn-ghost btn-sm" to={`/admin/ai-ops?clubId=${snapshot.club.clubId}`}>
+            <Link
+              className="btn btn-ghost btn-sm"
+              to={`/admin/ai-ops?clubId=${snapshot.club.clubId}`}
+            >
               AI Ops
             </Link>
           </Panel>
         </div>
       </section>
 
-      <section className="admin-club-operations__group" aria-label="호스트 운영">
+      <section
+        className="admin-club-operations__group"
+        aria-label="호스트 운영"
+      >
         <h3 className="h4 editorial">호스트 운영</h3>
         <div className="admin-club-operations__grid">
           <Panel title="Session progress">
             <Stat label="예정" value={snapshot.sessionProgress.upcomingCount} />
             <Stat label="닫힘" value={snapshot.sessionProgress.closedCount} />
-            <Stat label="공개 기록" value={snapshot.sessionProgress.publishedRecordCount} />
-            <Stat label="미완료 기록" value={snapshot.sessionProgress.incompleteRecordCount} />
+            <Stat
+              label="공개 기록"
+              value={snapshot.sessionProgress.publishedRecordCount}
+            />
+            <Stat
+              label="미완료 기록"
+              value={snapshot.sessionProgress.incompleteRecordCount}
+            />
           </Panel>
           <Panel title="Member activity">
             <Stat label="활성" value={snapshot.memberActivity.activeCount} />
             <Stat label="휴면" value={snapshot.memberActivity.dormantCount} />
-            <Stat label="대기" value={snapshot.memberActivity.pendingViewerCount} />
+            <Stat
+              label="대기"
+              value={snapshot.memberActivity.pendingViewerCount}
+            />
           </Panel>
         </div>
         <ClosingRiskPanel snapshot={snapshot} />
@@ -113,7 +180,11 @@ export function AdminClubOperationsPage({ snapshot, supportGrantCount }: AdminCl
 
       <div className="admin-club-operations__links">
         {snapshot.safeLinks.map((link) => (
-          <Link key={`${link.kind}-${link.href}`} to={link.href} className="admin-club-operations__link">
+          <Link
+            key={`${link.kind}-${link.href}`}
+            to={link.href}
+            className="admin-club-operations__link"
+          >
             {link.label}
           </Link>
         ))}
@@ -128,20 +199,38 @@ function formatDelta(delta: number): string {
   return `→ 0 (지난 7일 대비)`;
 }
 
-function Metric({ label, value, delta }: { label: string; value: number; delta?: number }) {
+function Metric({
+  label,
+  value,
+  delta,
+}: {
+  label: string;
+  value: number;
+  delta?: number;
+}) {
   return (
     <article className="surface admin-club-operations__metric">
       <p className="tiny muted">{label}</p>
       <strong className="editorial">{value}</strong>
-      {delta !== undefined ? <p className="tiny muted">{formatDelta(delta)}</p> : null}
+      {delta !== undefined ? (
+        <p className="tiny muted">{formatDelta(delta)}</p>
+      ) : null}
     </article>
   );
 }
 
 function Panel({ title, children }: { title: string; children: ReactNode }) {
   return (
-    <section className="admin-club-operations__panel" aria-labelledby={`${title.replace(/\s+/g, "-").toLowerCase()}-title`}>
-      <h4 id={`${title.replace(/\s+/g, "-").toLowerCase()}-title`} className="h5 editorial">{title}</h4>
+    <section
+      className="admin-club-operations__panel"
+      aria-labelledby={`${title.replace(/\s+/g, "-").toLowerCase()}-title`}
+    >
+      <h4
+        id={`${title.replace(/\s+/g, "-").toLowerCase()}-title`}
+        className="h5 editorial"
+      >
+        {title}
+      </h4>
       <div className="admin-club-operations__stats">{children}</div>
     </section>
   );
@@ -156,21 +245,29 @@ function Stat({ label, value }: { label: string; value: number | string }) {
   );
 }
 
-function ClosingRiskPanel({ snapshot }: { snapshot: AdminClubOperationsSnapshot }) {
+function ClosingRiskPanel({
+  snapshot,
+}: {
+  snapshot: AdminClubOperationsSnapshot;
+}) {
   const closingRisks = snapshot.closingRisks;
   const visibleItems = closingRisks?.items.slice(0, 5) ?? [];
   const resolvedItems = closingRisks?.recentlyResolvedItems?.slice(0, 3) ?? [];
   const overflowCount = closingRiskOverflowCount(snapshot);
 
   return (
-    <section className="admin-club-operations__closing-risk" aria-labelledby="admin-club-closing-risk-title">
+    <section
+      className="admin-club-operations__closing-risk"
+      aria-labelledby="admin-club-closing-risk-title"
+    >
       <div className="admin-club-operations__closing-risk-header">
         <div>
           <h4 id="admin-club-closing-risk-title" className="h5 editorial">
             클로징 확인 필요
           </h4>
           <p className="tiny muted">
-            미완료 {closingRisks?.incompleteCount ?? 0} · 차단 {closingRisks?.blockedCount ?? 0} · 준비{" "}
+            미완료 {closingRisks?.incompleteCount ?? 0} · 차단{" "}
+            {closingRisks?.blockedCount ?? 0} · 준비{" "}
             {closingRisks?.readyCount ?? 0}
           </p>
           {closingRisks?.trackingUnavailable ? (
@@ -190,21 +287,35 @@ function ClosingRiskPanel({ snapshot }: { snapshot: AdminClubOperationsSnapshot 
           ))}
         </div>
       ) : (
-        <p className="admin-club-operations__closing-risk-empty muted">확인 필요한 회차 없음</p>
+        <p className="admin-club-operations__closing-risk-empty muted">
+          확인 필요한 회차 없음
+        </p>
       )}
 
       {overflowCount > 0 ? (
-        <p className="admin-club-operations__closing-risk-overflow tiny muted">외 {overflowCount}개 회차</p>
+        <p className="admin-club-operations__closing-risk-overflow tiny muted">
+          외 {overflowCount}개 회차
+        </p>
       ) : null}
 
       {resolvedItems.length > 0 ? (
-        <section className="admin-club-operations__closing-risk-resolved" aria-labelledby="admin-club-closing-risk-resolved-title">
-          <h5 id="admin-club-closing-risk-resolved-title" className="h6 editorial">
+        <section
+          className="admin-club-operations__closing-risk-resolved"
+          aria-labelledby="admin-club-closing-risk-resolved-title"
+        >
+          <h5
+            id="admin-club-closing-risk-resolved-title"
+            className="h6 editorial"
+          >
             최근 해소됨
           </h5>
           <div className="admin-club-operations__closing-risk-list">
             {resolvedItems.map((item) => (
-              <ClosingRiskRow key={item.sessionId} item={item} variant="resolved" />
+              <ClosingRiskRow
+                key={item.sessionId}
+                item={item}
+                variant="resolved"
+              />
             ))}
           </div>
         </section>
@@ -226,10 +337,14 @@ function ClosingRiskRow({
   const occurrenceLabel = closingRiskOccurrenceLabel(item);
   const trackingLabel = closingRiskTrackingLabel(item);
   const shouldShowTrackingLabel =
-    variant === "active" && (trackingLabel !== "추적 상태 확인 불가" || showUnavailableTracking);
-  const resolvedAtLabel = variant === "resolved" ? closingRiskResolvedAtLabel(item) : null;
-  const firstDetectedLabel = variant === "active" ? closingRiskFirstDetectedLabel(item) : null;
-  const lastSeenLabel = variant === "active" ? closingRiskLastSeenLabel(item) : null;
+    variant === "active" &&
+    (trackingLabel !== "추적 상태 확인 불가" || showUnavailableTracking);
+  const resolvedAtLabel =
+    variant === "resolved" ? closingRiskResolvedAtLabel(item) : null;
+  const firstDetectedLabel =
+    variant === "active" ? closingRiskFirstDetectedLabel(item) : null;
+  const lastSeenLabel =
+    variant === "active" ? closingRiskLastSeenLabel(item) : null;
 
   return (
     <article className="admin-club-operations__closing-risk-row">
@@ -239,22 +354,39 @@ function ClosingRiskRow({
         </strong>
         <span>{resolvedAtLabel ?? item.meetingDate}</span>
       </div>
-      <span className="admin-club-operations__closing-risk-badge" data-state={closingRiskSafeStateCode(item.overallState)}>
+      <span
+        className="admin-club-operations__closing-risk-badge"
+        data-state={closingRiskSafeStateCode(item.overallState)}
+      >
         {closingRiskStateLabel(item.overallState)}
       </span>
       <span className="admin-club-operations__closing-risk-blocker">
         {closingRiskBlockerLabel(item.primaryBlocker)}
       </span>
-      {ageLabel ? <span className="admin-club-operations__closing-risk-age">{ageLabel}</span> : null}
+      {ageLabel ? (
+        <span className="admin-club-operations__closing-risk-age">
+          {ageLabel}
+        </span>
+      ) : null}
       {firstDetectedLabel ? (
-        <span className="admin-club-operations__closing-risk-date">{firstDetectedLabel}</span>
+        <span className="admin-club-operations__closing-risk-date">
+          {firstDetectedLabel}
+        </span>
       ) : null}
       {lastSeenLabel ? (
-        <span className="admin-club-operations__closing-risk-date">{lastSeenLabel}</span>
+        <span className="admin-club-operations__closing-risk-date">
+          {lastSeenLabel}
+        </span>
       ) : null}
-      {occurrenceLabel ? <span className="admin-club-operations__closing-risk-repeat">{occurrenceLabel}</span> : null}
+      {occurrenceLabel ? (
+        <span className="admin-club-operations__closing-risk-repeat">
+          {occurrenceLabel}
+        </span>
+      ) : null}
       {shouldShowTrackingLabel ? (
-        <span className="admin-club-operations__closing-risk-tracking">{trackingLabel}</span>
+        <span className="admin-club-operations__closing-risk-tracking">
+          {trackingLabel}
+        </span>
       ) : null}
       <Link className="btn btn-ghost btn-sm" to={item.hostClosingHref}>
         호스트 클로징 보드

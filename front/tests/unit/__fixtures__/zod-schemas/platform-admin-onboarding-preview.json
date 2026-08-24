@@ -1,0 +1,13 @@
+{
+  "previewId": "00000000-0000-0000-0000-00000000a103",
+  "expiresAt": "2026-08-24T01:00:00Z",
+  "clubSlug": "public-contract-club",
+  "firstHostKind": "NEW_USER",
+  "requiredConfirmation": null,
+  "impactCodes": [
+    "CLUB_CREATED",
+    "HOST_INVITED"
+  ],
+  "prerequisiteCodes": [],
+  "requestFingerprintPrefix": "abcd1234"
+}

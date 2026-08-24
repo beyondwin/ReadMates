@@ -1,211 +1,392 @@
-import { useEffect, useState } from "react";
-import type { PlatformAdminClubRegistryItem } from "@/features/platform-admin/ui/platform-admin-club-registry";
+import { useEffect, useRef, useState } from "react";
+import {
+  adminCommandRecovery,
+  type AdminCommandRecovery,
+} from "@/features/platform-admin/model/platform-admin-command-recovery";
 
-export type PlatformAdminOnboardingRequest = {
-  club: {
-    name: string;
-    slug: string;
-    tagline: string;
-    about: string;
-  };
-  firstHost: {
-    email: string;
-    name: string;
-  };
-  domain?: {
-    hostname: string;
-    kind: "SUBDOMAIN" | "CUSTOM_DOMAIN";
-  };
-  existingUserConfirmation?: string;
+export type PlatformAdminOnboardingDraft = {
+  club: { name: string; slug: string; tagline: string; about: string };
+  firstHost: { email: string; name: string };
+  domain?: { hostname: string; kind: "SUBDOMAIN" | "CUSTOM_DOMAIN" };
 };
 
-export type PlatformAdminOnboardingPreviewResponse = {
-  club: {
-    slug: string;
-    available: boolean;
+export type PlatformAdminOnboardingConfirmIntent =
+  PlatformAdminOnboardingDraft & {
+    previewId: string;
+    idempotencyKey: string;
+    existingUserConfirmation?: string;
+    confirmed: boolean;
   };
-  firstHost: {
-    kind: "EXISTING_USER" | "NEW_USER";
-    email: string;
-    existingUserId: string | null;
-    existingUserName: string | null;
-    requiredConfirmation: string | null;
-  };
-  domain: null | {
-    hostname: string;
-    available: boolean;
-  };
+
+export type PlatformAdminOnboardingPreviewView = {
+  previewId: string;
+  expiresAt: string;
+  clubSlug: string;
+  firstHostKind: "EXISTING_USER" | "NEW_USER";
+  requiredConfirmation: string | null;
+  impactCodes: string[];
+  prerequisiteCodes: string[];
+  requestFingerprintPrefix: string;
 };
 
-export type PlatformAdminOnboardingResultResponse = {
-  club: PlatformAdminClubRegistryItem;
-  hostOnboarding: {
-    kind: "EXISTING_USER_ASSIGNED" | "INVITATION_CREATED";
-    email: string;
-    userId: string | null;
-    invitationId: string | null;
-    acceptUrl: string | null;
-    emailDelivery: {
-      status: "SENT" | "FAILED" | "SKIPPED";
-    };
-  };
-  domain: null | {
-    hostname: string;
-    status: string;
-  };
+export type PlatformAdminOnboardingResultView = {
+  receiptId: string;
+  club: { clubId: string; name: string };
+  originStatus: "SUCCEEDED";
+  firstHostKind: "EXISTING_USER_ASSIGNED" | "INVITATION_CREATED";
+  invitationDelivery: "NOT_REQUIRED" | "PENDING" | "SUCCEEDED" | "FAILED";
 };
 
 type Props = {
-  onPreview: (request: PlatformAdminOnboardingRequest) => Promise<PlatformAdminOnboardingPreviewResponse>;
-  onCommit: (request: PlatformAdminOnboardingRequest) => Promise<PlatformAdminOnboardingResultResponse>;
-  onCreated?: (result: PlatformAdminOnboardingResultResponse) => void;
+  onPreview: (
+    request: PlatformAdminOnboardingDraft,
+  ) => Promise<PlatformAdminOnboardingPreviewView>;
+  onCommit: (
+    request: PlatformAdminOnboardingConfirmIntent,
+  ) => Promise<PlatformAdminOnboardingResultView>;
+  onViewClub?: (clubId: string) => void;
   onDirtyChange?: (isDirty: boolean) => void;
+  onEffectPendingChange?: (isPending: boolean) => void;
 };
 
-export function PlatformAdminOnboardingWizard({ onPreview, onCommit, onCreated, onDirtyChange }: Props) {
-  const [request, setRequest] = useState<PlatformAdminOnboardingRequest>({
-    club: { name: "", slug: "", tagline: "", about: "" },
-    firstHost: { email: "", name: "" },
-  });
-  const [preview, setPreview] = useState<PlatformAdminOnboardingPreviewResponse | null>(null);
-  const [confirmedExistingUser, setConfirmedExistingUser] = useState(false);
-  const [result, setResult] = useState<PlatformAdminOnboardingResultResponse | null>(null);
-  const [busy, setBusy] = useState(false);
+const EMPTY_REQUEST: PlatformAdminOnboardingDraft = {
+  club: { name: "", slug: "", tagline: "", about: "" },
+  firstHost: { email: "", name: "" },
+};
+const BLOCKING_PREREQUISITES = new Set([
+  "CLUB_SLUG_CONFLICT",
+  "CLUB_DOMAIN_CONFLICT",
+]);
 
-  const isDirty =
-    request.club.name.length > 0 ||
-    request.club.slug.length > 0 ||
-    request.club.tagline.length > 0 ||
-    request.club.about.length > 0 ||
-    request.firstHost.email.length > 0 ||
-    request.firstHost.name.length > 0;
-  useEffect(() => {
-    onDirtyChange?.(isDirty && result === null);
-  }, [isDirty, result, onDirtyChange]);
+export function PlatformAdminOnboardingWizard({
+  onPreview,
+  onCommit,
+  onViewClub,
+  onDirtyChange,
+  onEffectPendingChange,
+}: Props) {
+  const [request, setRequest] =
+    useState<PlatformAdminOnboardingDraft>(EMPTY_REQUEST);
+  const [preview, setPreview] =
+    useState<PlatformAdminOnboardingPreviewView | null>(null);
+  const [confirmed, setConfirmed] = useState(false);
+  const [confirmationPhrase, setConfirmationPhrase] = useState("");
+  const [intentKey, setIntentKey] = useState<string | null>(null);
+  const [result, setResult] =
+    useState<PlatformAdminOnboardingResultView | null>(null);
+  const [recovery, setRecovery] = useState<AdminCommandRecovery | null>(null);
+  const [previewPending, setPreviewPending] = useState(false);
+  const [effectPending, setEffectPending] = useState(false);
+  const requestEpoch = useRef(0);
+  const isDirty = JSON.stringify(request) !== JSON.stringify(EMPTY_REQUEST);
+  const hasBlockingPrerequisite =
+    preview?.prerequisiteCodes.some((code) =>
+      BLOCKING_PREREQUISITES.has(code),
+    ) ?? false;
+  const confirmationPhraseMatches =
+    preview?.requiredConfirmation == null ||
+    confirmationPhrase.trim() === preview.requiredConfirmation;
+  const busy = previewPending || effectPending;
+  useEffect(
+    () => onDirtyChange?.(isDirty && result === null),
+    [isDirty, onDirtyChange, result],
+  );
 
-  const existingUserConfirmation =
-    confirmedExistingUser && preview?.firstHost.requiredConfirmation ? preview.firstHost.requiredConfirmation : undefined;
-  const canCommit =
-    preview != null &&
-    preview.club.available &&
-    (preview.firstHost.kind !== "EXISTING_USER" || confirmedExistingUser);
-
+  function update(next: PlatformAdminOnboardingDraft) {
+    requestEpoch.current += 1;
+    setRequest(next);
+    setPreview(null);
+    setConfirmed(false);
+    setConfirmationPhrase("");
+    setIntentKey(null);
+    setResult(null);
+    setRecovery(null);
+  }
   async function handlePreview() {
-    setBusy(true);
+    const epoch = requestEpoch.current;
+    const previewRequest = request;
+    setPreviewPending(true);
+    setRecovery(null);
     try {
-      setPreview(await onPreview(request));
-      setConfirmedExistingUser(false);
-      setResult(null);
+      const next = await onPreview(previewRequest);
+      if (requestEpoch.current !== epoch) return;
+      setPreview(next);
+      setConfirmed(false);
+      setConfirmationPhrase("");
+      setIntentKey(crypto.randomUUID());
+    } catch (error) {
+      if (requestEpoch.current !== epoch) return;
+      setRecovery(adminCommandRecovery(error));
     } finally {
-      setBusy(false);
+      setPreviewPending(false);
     }
   }
-
-  async function handleCommit() {
-    setBusy(true);
+  async function handleCommit(refreshDelivery = false) {
+    if (!preview || !intentKey || hasBlockingPrerequisite) return;
+    if (result && !refreshDelivery) return;
+    const command = {
+      previewId: preview.previewId,
+      idempotencyKey: intentKey,
+      ...request,
+      existingUserConfirmation: confirmationPhrase.trim() || undefined,
+      confirmed: true,
+    };
+    setEffectPending(true);
+    onEffectPendingChange?.(true);
+    setRecovery(null);
     try {
-      const created = await onCommit({ ...request, existingUserConfirmation });
+      const created = await onCommit(command);
       setResult(created);
-      onCreated?.(created);
+    } catch (error) {
+      const nextRecovery = adminCommandRecovery(error);
+      setRecovery(nextRecovery);
+      if (
+        nextRecovery.kind === "RESTART_PREVIEW" ||
+        nextRecovery.kind === "RESTART_INTENT" ||
+        nextRecovery.kind === "REFRESH_STATE" ||
+        nextRecovery.kind === "CORRECT_DRAFT"
+      ) {
+        setPreview(null);
+        setConfirmed(false);
+        setConfirmationPhrase("");
+        setIntentKey(null);
+      }
     } finally {
-      setBusy(false);
+      setEffectPending(false);
+      onEffectPendingChange?.(false);
     }
   }
 
   return (
     <section className="platform-admin-onboarding" aria-label="새 클럽 온보딩">
+      <div className="platform-admin-onboarding__intro">
+        <p className="eyebrow">Durable onboarding</p>
+        <p className="body">
+          먼저 정규화된 영향만 확인합니다. 생성 결과는 receipt와 전달 상태로
+          다시 확인할 수 있습니다.
+        </p>
+      </div>
       <div className="platform-admin-onboarding__grid">
-        <label className="field-group">
-          <span className="label">클럽 이름</span>
-          <input
-            className="input"
-            value={request.club.name}
-            onChange={(event) => setRequest({ ...request, club: { ...request.club, name: event.target.value } })}
-          />
-        </label>
-        <label className="field-group">
-          <span className="label">Slug</span>
-          <input
-            className="input"
-            value={request.club.slug}
-            onChange={(event) => setRequest({ ...request, club: { ...request.club, slug: event.target.value } })}
-          />
-        </label>
-        <label className="field-group">
-          <span className="label">Tagline</span>
-          <input
-            className="input"
-            value={request.club.tagline}
-            onChange={(event) => setRequest({ ...request, club: { ...request.club, tagline: event.target.value } })}
-          />
-        </label>
-        <label className="field-group">
-          <span className="label">첫 호스트 이메일</span>
-          <input
-            className="input"
-            value={request.firstHost.email}
-            onChange={(event) => setRequest({ ...request, firstHost: { ...request.firstHost, email: event.target.value } })}
-          />
-        </label>
-        <label className="field-group">
-          <span className="label">첫 호스트 이름</span>
-          <input
-            className="input"
-            value={request.firstHost.name}
-            onChange={(event) => setRequest({ ...request, firstHost: { ...request.firstHost, name: event.target.value } })}
-          />
-        </label>
+        <Field
+          label="클럽 이름"
+          value={request.club.name}
+          onChange={(value) =>
+            update({ ...request, club: { ...request.club, name: value } })
+          }
+          disabled={effectPending}
+        />
+        <Field
+          label="Slug"
+          value={request.club.slug}
+          onChange={(value) =>
+            update({ ...request, club: { ...request.club, slug: value } })
+          }
+          disabled={effectPending}
+        />
+        <Field
+          label="Tagline"
+          value={request.club.tagline}
+          onChange={(value) =>
+            update({ ...request, club: { ...request.club, tagline: value } })
+          }
+          disabled={effectPending}
+        />
+        <Field
+          label="첫 호스트 이메일"
+          value={request.firstHost.email}
+          onChange={(value) =>
+            update({
+              ...request,
+              firstHost: { ...request.firstHost, email: value },
+            })
+          }
+          disabled={effectPending}
+        />
+        <Field
+          label="첫 호스트 이름"
+          value={request.firstHost.name}
+          onChange={(value) =>
+            update({
+              ...request,
+              firstHost: { ...request.firstHost, name: value },
+            })
+          }
+          disabled={effectPending}
+        />
         <label className="field-group platform-admin-onboarding__about">
           <span className="label">About</span>
           <textarea
             className="input"
             value={request.club.about}
-            onChange={(event) => setRequest({ ...request, club: { ...request.club, about: event.target.value } })}
+            disabled={effectPending}
+            onChange={(event) =>
+              update({
+                ...request,
+                club: { ...request.club, about: event.target.value },
+              })
+            }
           />
         </label>
       </div>
-
       {preview ? (
-        <div className="platform-admin-onboarding__preview" aria-live="polite">
-          <span className="platform-admin-domain-status">{preview.club.available ? "slug available" : "slug unavailable"}</span>
-          <span className="tiny muted">{preview.firstHost.kind}</span>
-        </div>
-      ) : null}
-
-      {preview?.firstHost.kind === "EXISTING_USER" ? (
-        <div className="surface platform-admin-onboarding__confirmation">
-          <p className="eyebrow">기존 사용자 확인 필요</p>
-          <p className="body">{preview.firstHost.existingUserName} 계정에 이 클럽의 HOST 권한을 부여합니다.</p>
+        <div
+          className="surface platform-admin-onboarding__preview"
+          aria-live="polite"
+        >
+          <div>
+            <p className="eyebrow">미리보기</p>
+            <strong>{preview.clubSlug}</strong>
+            <p className="tiny muted">첫 호스트 {preview.firstHostKind}</p>
+          </div>
+          <ul>
+            {preview.impactCodes.map((code) => (
+              <li key={code}>{code}</li>
+            ))}
+          </ul>
+          {preview.prerequisiteCodes.length > 0 ? (
+            <p className="tiny muted">
+              {preview.prerequisiteCodes.join(" · ")}
+            </p>
+          ) : null}
+          {hasBlockingPrerequisite ? (
+            <p className="tiny danger" role="alert">
+              slug 또는 도메인 중복을 해결한 뒤 다시 미리 확인해 주세요.
+            </p>
+          ) : null}
+          {preview.requiredConfirmation ? (
+            <div className="platform-admin-onboarding__confirmation">
+              <p className="tiny muted">
+                기존 사용자에게 HOST 권한을 부여하려면 아래 문구를 직접 입력해
+                주세요.
+              </p>
+              <code>{preview.requiredConfirmation}</code>
+              <label className="field-group">
+                <span className="label">확인 문구</span>
+                <input
+                  className="input"
+                  value={confirmationPhrase}
+                  disabled={effectPending}
+                  autoComplete="off"
+                  spellCheck={false}
+                  onChange={(event) =>
+                    setConfirmationPhrase(event.target.value)
+                  }
+                />
+              </label>
+            </div>
+          ) : null}
+          <p className="tiny muted">
+            만료 {preview.expiresAt} · 확인 코드{" "}
+            {preview.requestFingerprintPrefix}
+          </p>
           <label className="checkbox-row">
             <input
               type="checkbox"
-              checked={confirmedExistingUser}
-              onChange={(event) => setConfirmedExistingUser(event.target.checked)}
+              checked={confirmed}
+              disabled={
+                hasBlockingPrerequisite || result !== null || effectPending
+              }
+              onChange={(event) => setConfirmed(event.target.checked)}
             />
-            <span>이 기존 사용자에게 HOST 권한을 부여합니다.</span>
+            <span>온보딩 영향을 확인했습니다</span>
           </label>
         </div>
       ) : null}
-
-      {result ? (
-        <div className="surface platform-admin-onboarding__result">
-          <p className="eyebrow">생성 결과</p>
-          <strong>{result.club.slug}</strong>
-          <span>{result.hostOnboarding.kind}</span>
-          <span>메일: {result.hostOnboarding.emailDelivery.status}</span>
-          {result.domain ? <span>도메인: {result.domain.hostname} · {result.domain.status}</span> : null}
-          {result.hostOnboarding.acceptUrl ? <code>{result.hostOnboarding.acceptUrl}</code> : null}
+      {recovery ? (
+        <div role="alert" className="surface platform-admin-onboarding__error">
+          <strong>명령을 이어서 확인해야 합니다.</strong>
+          <p className="tiny muted">{recovery.message}</p>
         </div>
       ) : null}
-
+      {result ? (
+        <div
+          className="surface platform-admin-onboarding__result"
+          aria-live="polite"
+        >
+          <p className="eyebrow">생성 결과</p>
+          <strong>{result.club.name}</strong>
+          <span>receipt {result.receiptId}</span>
+          <span>origin {result.originStatus}</span>
+          <span>첫 호스트 {result.firstHostKind}</span>
+          <span>초대 전달 {result.invitationDelivery}</span>
+          {onViewClub ? (
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => onViewClub(result.club.clubId)}
+            >
+              생성된 클럽 상세로 이동
+            </button>
+          ) : null}
+          {result.invitationDelivery === "PENDING" ? (
+            <button
+              type="button"
+              className="btn btn-ghost btn-sm"
+              disabled={busy}
+              onClick={() => void handleCommit(true)}
+            >
+              전달 상태 새로고침
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <div className="platform-admin-onboarding__actions">
-        <button type="button" className="btn btn-ghost btn-sm" onClick={handlePreview} disabled={busy}>
+        <button
+          type="button"
+          className="btn btn-ghost btn-sm"
+          onClick={() => void handlePreview()}
+          disabled={
+            busy ||
+            !request.club.name.trim() ||
+            !request.club.slug.trim() ||
+            !request.club.tagline.trim() ||
+            !request.club.about.trim() ||
+            !request.firstHost.email.trim() ||
+            !request.firstHost.name.trim()
+          }
+        >
           미리 확인
         </button>
-        <button type="button" className="btn btn-primary btn-sm" onClick={handleCommit} disabled={busy || !canCommit}>
-          {preview?.firstHost.kind === "EXISTING_USER" ? "기존 사용자에게 HOST 권한 부여" : "클럽 생성"}
+        <button
+          type="button"
+          className="btn btn-primary btn-sm"
+          onClick={() => void handleCommit()}
+          disabled={
+            busy ||
+            !preview ||
+            !confirmed ||
+            hasBlockingPrerequisite ||
+            !confirmationPhraseMatches ||
+            result !== null
+          }
+        >
+          클럽 생성 확정
         </button>
       </div>
     </section>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  disabled = false,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <label className="field-group">
+      <span className="label">{label}</span>
+      <input
+        className="input"
+        value={value}
+        disabled={disabled}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
   );
 }

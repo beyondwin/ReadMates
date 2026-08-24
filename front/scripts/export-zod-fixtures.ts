@@ -163,7 +163,9 @@ const adminAnalyticsOverview = {
     {
       key: "SESSION_COMPLETION",
       unit: "PERCENT",
-      points: [{ bucketStart: "2026-05-01", availability: "AVAILABLE", value: 80 }],
+      points: [
+        { bucketStart: "2026-05-01", availability: "AVAILABLE", value: 80 },
+      ],
     },
   ],
 };
@@ -360,10 +362,101 @@ const guestArchiveDetail = {
   total: 1,
   state: "PUBLISHED",
   summary: "공개 요약",
-  highlights: [{ text: "공개 하이라이트", sortOrder: 1, authorName: null, authorShortName: null, avatarKey: null }],
-  questions: [{ priority: 1, text: "공개 질문", draftThought: null, authorName: "가람", authorShortName: "가람", avatarKey: "open-book" }],
-  oneLiners: [{ text: "공개 한줄평", authorName: "가람", authorShortName: "가람", avatarKey: "open-book" }],
-  longReviews: [{ title: "가람의 서평", content: "공개 서평", authorName: "가람", authorShortName: "가람", avatarKey: "open-book" }],
+  highlights: [
+    {
+      text: "공개 하이라이트",
+      sortOrder: 1,
+      authorName: null,
+      authorShortName: null,
+      avatarKey: null,
+    },
+  ],
+  questions: [
+    {
+      priority: 1,
+      text: "공개 질문",
+      draftThought: null,
+      authorName: "가람",
+      authorShortName: "가람",
+      avatarKey: "open-book",
+    },
+  ],
+  oneLiners: [
+    {
+      text: "공개 한줄평",
+      authorName: "가람",
+      authorShortName: "가람",
+      avatarKey: "open-book",
+    },
+  ],
+  longReviews: [
+    {
+      title: "가람의 서평",
+      content: "공개 서평",
+      authorName: "가람",
+      authorShortName: "가람",
+      avatarKey: "open-book",
+    },
+  ],
+};
+
+const platformAdminClub = {
+  clubId: "00000000-0000-0000-0000-00000000a101",
+  slug: "public-contract-club",
+  name: "Public Contract Club",
+  tagline: "A public-safe contract fixture",
+  about: "Synthetic public fixture data only.",
+  status: "ACTIVE",
+  publicVisibility: "PRIVATE",
+  domainCount: 1,
+  domainActionRequiredCount: 1,
+  notificationFailureCount: 0,
+  aiFailureCount: 0,
+  firstHostOnboardingState: "ASSIGNED",
+  adminRevision: 7,
+};
+
+const platformAdminClubList = {
+  items: [platformAdminClub],
+  nextCursor: "opaque-contract-cursor",
+};
+
+const platformAdminClubDetail = {
+  ...platformAdminClub,
+  domains: [
+    {
+      id: "00000000-0000-0000-0000-00000000a102",
+      clubId: platformAdminClub.clubId,
+      hostname: "club.example.test",
+      kind: "CUSTOM_DOMAIN",
+      status: "ACTION_REQUIRED",
+      desiredState: "ENABLED",
+      manualAction: "CLOUDFLARE_PAGES_CUSTOM_DOMAIN",
+      errorCode: null,
+      isPrimary: true,
+      verifiedAt: null,
+      lastCheckedAt: null,
+    },
+  ],
+};
+
+const platformAdminOnboardingPreview = {
+  previewId: "00000000-0000-0000-0000-00000000a103",
+  expiresAt: "2026-08-24T01:00:00Z",
+  clubSlug: "public-contract-club",
+  firstHostKind: "NEW_USER",
+  requiredConfirmation: null,
+  impactCodes: ["CLUB_CREATED", "HOST_INVITED"],
+  prerequisiteCodes: [],
+  requestFingerprintPrefix: "abcd1234",
+};
+
+const platformAdminOnboardingResult = {
+  receiptId: "00000000-0000-0000-0000-00000000a104",
+  club: platformAdminClub,
+  originStatus: "SUCCEEDED",
+  firstHostKind: "INVITATION_CREATED",
+  invitationDelivery: "PENDING",
 };
 
 function write(filename: string, data: unknown): void {
@@ -391,3 +484,7 @@ write("aigen-start.json", aigenStart);
 write("aigen-recent-job.json", aigenRecentJob);
 write("aigen-club-default.json", aigenClubDefault);
 write("guest-archive-detail.json", guestArchiveDetail);
+write("platform-admin-club-list.json", platformAdminClubList);
+write("platform-admin-club-detail.json", platformAdminClubDetail);
+write("platform-admin-onboarding-preview.json", platformAdminOnboardingPreview);
+write("platform-admin-onboarding-result.json", platformAdminOnboardingResult);

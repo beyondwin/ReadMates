@@ -1,0 +1,56 @@
+import { QueryClient } from "@tanstack/react-query";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { adminClubDetailLoaderFactory } from "./admin-club-detail-data";
+
+const api = vi.hoisted(() => ({
+  fetchClub: vi.fn(),
+  listSupportGrants: vi.fn(),
+  fetchOperations: vi.fn(),
+}));
+
+vi.mock(
+  "@/features/platform-admin/api/platform-admin-api",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/features/platform-admin/api/platform-admin-api")
+    >()),
+    fetchPlatformAdminClub: api.fetchClub,
+    listSupportAccessGrantsByClub: api.listSupportGrants,
+  }),
+);
+
+vi.mock(
+  "@/features/platform-admin/api/platform-admin-club-operations-api",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/features/platform-admin/api/platform-admin-club-operations-api")
+    >()),
+    fetchPlatformAdminClubOperations: api.fetchOperations,
+  }),
+);
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  api.fetchClub.mockResolvedValue({ clubId: "c-1" });
+  api.listSupportGrants.mockRejectedValue(new Error("secondary unavailable"));
+  api.fetchOperations.mockRejectedValue(new Error("secondary unavailable"));
+});
+
+describe("adminClubDetailLoaderFactory", () => {
+  it("loads authoritative identity without coupling navigation to secondary panels", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    await expect(
+      adminClubDetailLoaderFactory(client)({
+        params: { clubId: "c-1" },
+        request: new Request("https://readmates.test/admin/clubs/c-1"),
+      } as never),
+    ).resolves.toEqual({ clubId: "c-1" });
+
+    expect(api.fetchClub).toHaveBeenCalledWith("c-1");
+    expect(api.listSupportGrants).not.toHaveBeenCalled();
+    expect(api.fetchOperations).not.toHaveBeenCalled();
+  });
+});

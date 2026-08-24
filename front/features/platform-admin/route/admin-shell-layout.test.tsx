@@ -1,6 +1,13 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  act,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Routes, Route } from "react-router";
+import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type {
   PlatformAdminClubListResponse,
@@ -25,19 +32,40 @@ vi.mock("@/shared/auth/session-api", () => ({
   logoutCurrentSession: vi.fn(),
 }));
 
-vi.mock("@/features/platform-admin/api/platform-admin-operations-api", async (importOriginal) => ({
-  ...(await importOriginal<
-    typeof import("@/features/platform-admin/api/platform-admin-operations-api")
-  >()),
-  fetchAdminOperationCases: vi.fn(),
-}));
+vi.mock(
+  "@/features/platform-admin/api/platform-admin-operations-api",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/features/platform-admin/api/platform-admin-operations-api")
+    >()),
+    fetchAdminOperationCases: vi.fn(),
+  }),
+);
 
-vi.mock("@/features/platform-admin/api/platform-admin-capabilities-api", () => ({
-  fetchPlatformAdminCapabilities: vi.fn(),
-}));
+vi.mock(
+  "@/features/platform-admin/api/platform-admin-capabilities-api",
+  () => ({
+    fetchPlatformAdminCapabilities: vi.fn(),
+  }),
+);
+
+vi.mock(
+  "@/features/platform-admin/api/platform-admin-api",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/features/platform-admin/api/platform-admin-api")
+    >()),
+    previewPlatformAdminOnboarding: vi.fn(),
+    commitPlatformAdminOnboarding: vi.fn(),
+  }),
+);
 
 import { logoutCurrentSession } from "@/shared/auth/session-api";
 import { fetchAdminOperationCases } from "@/features/platform-admin/api/platform-admin-operations-api";
+import {
+  commitPlatformAdminOnboarding,
+  previewPlatformAdminOnboarding,
+} from "@/features/platform-admin/api/platform-admin-api";
 import { AdminShellLayout } from "./admin-shell-layout";
 
 const summary: PlatformAdminSummaryResponse = {
@@ -144,7 +172,11 @@ const auth = {
       primaryHost: null,
     },
   ],
-  platformAdmin: { userId: "platform-owner-user", email: "owner@example.com", role: "OWNER" },
+  platformAdmin: {
+    userId: "platform-owner-user",
+    email: "owner@example.com",
+    role: "OWNER",
+  },
   recommendedAppEntryUrl: "/admin",
 } satisfies AuthMeResponse;
 
@@ -155,39 +187,61 @@ function renderShell(
     operations?: AdminOperationCasesResponse;
     summary?: PlatformAdminSummaryResponse;
     capabilities?: PlatformAdminCapabilities;
+    initialEntries?: string[];
+    initialIndex?: number;
   } = {},
 ) {
   const queryClient = new QueryClient({
-    defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+    defaultOptions: {
+      queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
+    },
   });
   installPlatformAdminAuthorityLossHandler(queryClient);
-  queryClient.setQueryData(platformAdminSummaryQuery().queryKey, opts.summary ?? summary);
+  queryClient.setQueryData(
+    platformAdminSummaryQuery().queryKey,
+    opts.summary ?? summary,
+  );
   queryClient.setQueryData(platformAdminClubsQuery().queryKey, clubs);
-  queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, opts.capabilities ?? ownerCapabilities);
+  queryClient.setQueryData(
+    platformAdminCapabilitiesQuery().queryKey,
+    opts.capabilities ?? ownerCapabilities,
+  );
   queryClient.setQueryData(
     platformAdminOperationCasesQuery().queryKey,
     opts.operations ?? operations,
   );
   queryClient.setQueryData(memberQueryKey, memberSnapshot);
+  const router = createMemoryRouter(
+    [
+      {
+        path: "/admin",
+        element: <AdminShellLayout auth={opts.auth ?? auth} />,
+        children: [
+          { path: "today", element: <div>today content</div> },
+          { path: "clubs", element: <div>clubs content</div> },
+          { path: "clubs/:clubId", element: <div>club detail</div> },
+        ],
+      },
+    ],
+    {
+      initialEntries: opts.initialEntries ?? [initialEntry],
+      initialIndex: opts.initialIndex,
+    },
+  );
   const view = render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={[initialEntry]}>
-        <Routes>
-          <Route path="/admin/*" element={<AdminShellLayout auth={opts.auth ?? auth} />}>
-            <Route path="today" element={<div>today content</div>} />
-            <Route path="clubs" element={<div>clubs content</div>} />
-          </Route>
-        </Routes>
-      </MemoryRouter>
+      <RouterProvider router={router} />
     </QueryClientProvider>,
   );
-  return { ...view, queryClient };
+  return { ...view, queryClient, router };
 }
 
 describe("AdminShellLayout", () => {
   beforeEach(() => {
     vi.mocked(logoutCurrentSession).mockReset();
     vi.mocked(fetchAdminOperationCases).mockReset();
+    vi.mocked(previewPlatformAdminOnboarding).mockReset();
+    vi.mocked(commitPlatformAdminOnboarding).mockReset();
   });
 
   afterEach(() => {
@@ -212,24 +266,35 @@ describe("AdminShellLayout", () => {
   });
 
   it("preserves the shell and route content when an operations summary is unavailable", async () => {
-    vi.mocked(fetchAdminOperationCases).mockRejectedValue(new Error("operations unavailable"));
+    vi.mocked(fetchAdminOperationCases).mockRejectedValue(
+      new Error("operations unavailable"),
+    );
     const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
+      defaultOptions: {
+        queries: { retry: false, staleTime: Number.POSITIVE_INFINITY },
+      },
     });
     installPlatformAdminAuthorityLossHandler(queryClient);
     queryClient.setQueryData(platformAdminSummaryQuery().queryKey, summary);
     queryClient.setQueryData(platformAdminClubsQuery().queryKey, clubs);
-    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, ownerCapabilities);
+    queryClient.setQueryData(
+      platformAdminCapabilitiesQuery().queryKey,
+      ownerCapabilities,
+    );
 
+    const router = createMemoryRouter(
+      [
+        {
+          path: "/admin",
+          element: <AdminShellLayout auth={auth} />,
+          children: [{ path: "today", element: <div>today content</div> }],
+        },
+      ],
+      { initialEntries: ["/admin/today"] },
+    );
     render(
       <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={["/admin/today"]}>
-          <Routes>
-            <Route path="/admin/*" element={<AdminShellLayout auth={auth} />}>
-              <Route path="today" element={<div>today content</div>} />
-            </Route>
-          </Routes>
-        </MemoryRouter>
+        <RouterProvider router={router} />
       </QueryClientProvider>,
     );
 
@@ -244,13 +309,19 @@ describe("AdminShellLayout", () => {
 
   it("does not render a global header 새 클럽 CTA", () => {
     renderShell("/admin/today");
-    expect(within(screen.getByRole("banner")).queryByRole("link", { name: "새 클럽" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).queryByRole("link", {
+        name: "새 클럽",
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps the operating wordmark and role badge", () => {
     renderShell("/admin/today");
     expect(screen.getByText("ReadMates · 운영")).toBeInTheDocument();
-    expect(screen.getByText("OWNER", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
+    expect(
+      screen.getByText("OWNER", { selector: ".admin-shell__role-badge" }),
+    ).toBeInTheDocument();
   });
 
   it("shows the onboarding modal when ?onboarding=1 is present", () => {
@@ -263,13 +334,29 @@ describe("AdminShellLayout", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
+  it("closes onboarding without removing registry filters", async () => {
+    const { router } = renderShell(
+      "/admin/clubs?search=alpha&visibility=PRIVATE&onboarding=1",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "닫기" }));
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+    );
+    expect(router.state.location.search).toContain("search=alpha");
+    expect(router.state.location.search).toContain("visibility=PRIVATE");
+    expect(router.state.location.search).not.toContain("onboarding");
+  });
+
   it("exposes navigation and main landmarks with a skip link to main content", () => {
     const { container } = renderShell("/admin/today");
-    expect(screen.getByRole("navigation", { name: "Admin 콘솔" })).toBeInTheDocument();
-    expect(screen.getAllByRole("navigation").map((nav) => nav.getAttribute("aria-label"))).toEqual([
-      "현재 위치",
-      "Admin 콘솔",
-    ]);
+    expect(
+      screen.getByRole("navigation", { name: "Admin 콘솔" }),
+    ).toBeInTheDocument();
+    expect(
+      screen
+        .getAllByRole("navigation")
+        .map((nav) => nav.getAttribute("aria-label")),
+    ).toEqual(["현재 위치", "Admin 콘솔"]);
     const main = screen.getByRole("main");
     expect(main).toHaveAttribute("id", "admin-main");
     expect(main).toHaveAttribute("tabindex", "-1");
@@ -283,31 +370,37 @@ describe("AdminShellLayout", () => {
   it("replaces the member-space link with current-account workspace destinations", () => {
     renderShell("/admin/today");
 
-    expect(screen.queryByRole("link", { name: /멤버 공간/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /멤버 공간/ }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
 
-    expect(screen.getByRole("menuitem", { name: "읽는사이 호스트 공간" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app/host",
-    );
-    expect(screen.getByRole("menuitem", { name: "읽는사이 멤버 공간" })).toHaveAttribute(
-      "href",
-      "/clubs/reading-sai/app",
-    );
+    expect(
+      screen.getByRole("menuitem", { name: "읽는사이 호스트 공간" }),
+    ).toHaveAttribute("href", "/clubs/reading-sai/app/host");
+    expect(
+      screen.getByRole("menuitem", { name: "읽는사이 멤버 공간" }),
+    ).toHaveAttribute("href", "/clubs/reading-sai/app");
   });
 
   it("sends other-account login through logout and a safe admin return path", async () => {
-    vi.mocked(logoutCurrentSession).mockResolvedValue(new Response(null, { status: 204 }));
+    vi.mocked(logoutCurrentSession).mockResolvedValue(
+      new Response(null, { status: 204 }),
+    );
     const assign = vi.fn();
     vi.stubGlobal("location", { assign });
 
     renderShell("/admin/clubs?filter=ready#top");
     fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
-    fireEvent.click(screen.getByRole("menuitem", { name: "다른 계정으로 로그인" }));
+    fireEvent.click(
+      screen.getByRole("menuitem", { name: "다른 계정으로 로그인" }),
+    );
 
     await waitFor(() => {
       expect(logoutCurrentSession).toHaveBeenCalledTimes(1);
-      expect(assign).toHaveBeenCalledWith("/login?returnTo=%2Fadmin%2Fclubs%3Ffilter%3Dready%23top");
+      expect(assign).toHaveBeenCalledWith(
+        "/login?returnTo=%2Fadmin%2Fclubs%3Ffilter%3Dready%23top",
+      );
     });
   });
 
@@ -323,9 +416,15 @@ describe("AdminShellLayout", () => {
       },
     });
 
-    expect(within(screen.getByRole("banner")).queryByRole("link", { name: "새 클럽" })).not.toBeInTheDocument();
+    expect(
+      within(screen.getByRole("banner")).queryByRole("link", {
+        name: "새 클럽",
+      }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(screen.getByText("OWNER", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
+    expect(
+      screen.getByText("OWNER", { selector: ".admin-shell__role-badge" }),
+    ).toBeInTheDocument();
   });
 
   it("keeps onboarding reachable from the query param when CREATE_CLUB is present", () => {
@@ -340,9 +439,13 @@ describe("AdminShellLayout", () => {
       },
     });
 
-    expect(screen.queryByRole("link", { name: "새 클럽" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: "새 클럽" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText("SUPPORT", { selector: ".admin-shell__role-badge" })).toBeInTheDocument();
+    expect(
+      screen.getByText("SUPPORT", { selector: ".admin-shell__role-badge" }),
+    ).toBeInTheDocument();
   });
 
   it("renders empty navigation when the capability list is empty", () => {
@@ -366,7 +469,9 @@ describe("AdminShellLayout", () => {
     const { queryClient } = renderShell("/admin/today?onboarding=1");
     fireEvent.click(screen.getByRole("button", { name: "내 공간" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByRole("menu", { name: "내 ReadMates 공간" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("menu", { name: "내 ReadMates 공간" }),
+    ).toBeInTheDocument();
 
     await waitFor(async () => {
       await queryClient
@@ -381,13 +486,22 @@ describe("AdminShellLayout", () => {
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(screen.queryByRole("menu", { name: "내 ReadMates 공간" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("menu", { name: "내 ReadMates 공간" }),
+      ).not.toBeInTheDocument();
     });
-    expect(queryClient.getQueryData(platformAdminKeys.summary())).toBeUndefined();
-    expect(queryClient.getQueryData(platformAdminKeys.capabilities())).toBeUndefined();
+    expect(
+      queryClient.getQueryData(platformAdminKeys.summary()),
+    ).toBeUndefined();
+    expect(
+      queryClient.getQueryData(platformAdminKeys.capabilities()),
+    ).toBeUndefined();
     expect(queryClient.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
 
-    queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, ownerCapabilities);
+    queryClient.setQueryData(
+      platformAdminCapabilitiesQuery().queryKey,
+      ownerCapabilities,
+    );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
@@ -409,7 +523,9 @@ describe("AdminShellLayout", () => {
 
     await waitFor(() => {
       expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-      expect(screen.queryByRole("menu", { name: "내 ReadMates 공간" })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("menu", { name: "내 ReadMates 공간" }),
+      ).not.toBeInTheDocument();
     });
     const nav = screen.getByRole("navigation", { name: "Admin 콘솔" });
     expect(within(nav).queryAllByRole("link")).toEqual([]);
@@ -417,4 +533,233 @@ describe("AdminShellLayout", () => {
     expect(queryClient.getQueryData(platformAdminKeys.clubs())).toBeUndefined();
     expect(queryClient.getQueryData(memberQueryKey)).toEqual(memberSnapshot);
   });
+
+  it("blocks SPA back navigation while onboarding is dirty and preserves the draft on cancel", async () => {
+    const confirm = vi
+      .spyOn(window, "confirm")
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    const { router } = renderShell("/admin/clubs?onboarding=1", {
+      initialEntries: ["/admin/clubs", "/admin/clubs?onboarding=1"],
+      initialIndex: 1,
+    });
+    const name = screen.getByRole("textbox", { name: "클럽 이름" });
+    fireEvent.change(name, { target: { value: "Draft Club" } });
+    name.focus();
+
+    await act(() => router.navigate(-1));
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(1));
+    expect(router.state.location.search).toBe("?onboarding=1");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(name).toHaveValue("Draft Club");
+    expect(name).toHaveFocus();
+
+    await act(() => router.navigate(-1));
+    await waitFor(() => expect(confirm).toHaveBeenCalledTimes(2));
+    expect(router.state.location.search).toBe("");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("hard-blocks in-app close and SPA back while onboarding commit outcome is pending", async () => {
+    let resolveCommit:
+      | ((
+          value: Awaited<ReturnType<typeof commitPlatformAdminOnboarding>>,
+        ) => void)
+      | undefined;
+    vi.mocked(previewPlatformAdminOnboarding).mockResolvedValue({
+      previewId: "preview-1",
+      expiresAt: "2026-08-24T01:00:00Z",
+      clubSlug: "pending-club",
+      firstHostKind: "NEW_USER",
+      requiredConfirmation: null,
+      impactCodes: ["CLUB_CREATED"],
+      prerequisiteCodes: [],
+      requestFingerprintPrefix: "abcd1234",
+    });
+    vi.mocked(commitPlatformAdminOnboarding).mockReturnValue(
+      new Promise((resolve) => {
+        resolveCommit = resolve;
+      }),
+    );
+    const confirm = vi.spyOn(window, "confirm");
+    const { router } = renderShell("/admin/clubs?onboarding=1", {
+      initialEntries: ["/admin/clubs", "/admin/clubs?onboarding=1"],
+      initialIndex: 1,
+    });
+    for (const [name, value] of [
+      ["클럽 이름", "Pending Club"],
+      ["Slug", "pending-club"],
+      ["Tagline", "함께 읽는 모임"],
+      ["About", "공개 소개"],
+      ["첫 호스트 이메일", "fixture@example.test"],
+      ["첫 호스트 이름", "Fixture Host"],
+    ] as const) {
+      fireEvent.change(screen.getByRole("textbox", { name }), {
+        target: { value },
+      });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "미리 확인" }));
+    await screen.findByText("CLUB_CREATED");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "온보딩 영향을 확인했습니다" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "클럽 생성 확정" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /닫기/ })).toBeDisabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /닫기/ }));
+    expect(confirm).not.toHaveBeenCalled();
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
+    expect(confirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("admin-modal-dialog-backdrop"));
+    expect(confirm).not.toHaveBeenCalled();
+    await act(() => router.navigate(-1));
+    expect(router.state.location.search).toBe("?onboarding=1");
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(confirm).not.toHaveBeenCalled();
+
+    resolveCommit?.({
+      receiptId: "receipt-pending",
+      club: {
+        clubId: "club-pending",
+        slug: "pending-club",
+        name: "Pending Club",
+        tagline: "함께 읽는 모임",
+        about: "공개 소개",
+        status: "ACTIVE",
+        publicVisibility: "PRIVATE",
+        domainCount: 0,
+        domainActionRequiredCount: 0,
+        notificationFailureCount: 0,
+        aiFailureCount: 0,
+        firstHostOnboardingState: "INVITED",
+        adminRevision: 1,
+      },
+      originStatus: "SUCCEEDED",
+      firstHostKind: "INVITATION_CREATED",
+      invitationDelivery: "PENDING",
+    });
+    expect(await screen.findByText(/receipt-pending/)).toBeInTheDocument();
+    confirm.mockRestore();
+  });
+
+  it("runs onboarding through mutation hooks and invalidates active registry state", async () => {
+    vi.mocked(previewPlatformAdminOnboarding).mockResolvedValue({
+      previewId: "preview-1",
+      expiresAt: "2026-08-24T01:00:00Z",
+      clubSlug: "new-club",
+      firstHostKind: "NEW_USER",
+      requiredConfirmation: null,
+      impactCodes: ["CLUB_CREATED"],
+      prerequisiteCodes: [],
+      requestFingerprintPrefix: "abcd1234",
+    });
+    vi.mocked(commitPlatformAdminOnboarding).mockResolvedValue({
+      receiptId: "receipt-1",
+      club: {
+        clubId: "club-new",
+        slug: "new-club",
+        name: "New Club",
+        tagline: "",
+        about: "",
+        status: "ACTIVE",
+        publicVisibility: "PRIVATE",
+        domainCount: 0,
+        domainActionRequiredCount: 0,
+        notificationFailureCount: 0,
+        aiFailureCount: 0,
+        firstHostOnboardingState: "INVITED",
+        adminRevision: 1,
+      },
+      originStatus: "SUCCEEDED",
+      firstHostKind: "INVITATION_CREATED",
+      invitationDelivery: "PENDING",
+    });
+    const { queryClient } = renderShell("/admin/clubs?onboarding=1");
+    const filteredKey = platformAdminClubsQuery().queryKey;
+    const invalidate = vi.spyOn(queryClient, "invalidateQueries");
+    for (const [name, value] of [
+      ["클럽 이름", "New Club"],
+      ["Slug", "new-club"],
+      ["Tagline", "함께 읽는 모임"],
+      ["About", "공개 소개"],
+      ["첫 호스트 이메일", "fixture@example.test"],
+      ["첫 호스트 이름", "Fixture Host"],
+    ] as const) {
+      fireEvent.change(screen.getByRole("textbox", { name }), {
+        target: { value },
+      });
+    }
+    fireEvent.click(screen.getByRole("button", { name: "미리 확인" }));
+    await screen.findByText("CLUB_CREATED");
+    fireEvent.click(
+      screen.getByRole("checkbox", { name: "온보딩 영향을 확인했습니다" }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "클럽 생성 확정" }));
+    await screen.findByText(/receipt-1/);
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: platformAdminKeys.clubsRoot(),
+    });
+    expect(invalidate).toHaveBeenCalledWith({
+      queryKey: platformAdminKeys.summary(),
+    });
+    expect(queryClient.getQueryState(filteredKey)).toBeDefined();
+  });
+
+  it.each(["preview", "commit"] as const)(
+    "purges admin state when onboarding %s loses authority",
+    async (phase) => {
+      const forbidden = await forbiddenError();
+      vi.mocked(previewPlatformAdminOnboarding).mockImplementation(async () => {
+        if (phase === "preview") throw forbidden;
+        return {
+          previewId: "preview-1",
+          expiresAt: "2026-08-24T01:00:00Z",
+          clubSlug: "new-club",
+          firstHostKind: "NEW_USER",
+          requiredConfirmation: null,
+          impactCodes: ["CLUB_CREATED"],
+          prerequisiteCodes: [],
+          requestFingerprintPrefix: "abcd1234",
+        };
+      });
+      vi.mocked(commitPlatformAdminOnboarding).mockRejectedValue(forbidden);
+      const { queryClient } = renderShell("/admin/clubs?onboarding=1");
+      fireEvent.change(screen.getByRole("textbox", { name: "클럽 이름" }), {
+        target: { value: "Draft" },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "Slug" }), {
+        target: { value: "draft" },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "Tagline" }), {
+        target: { value: "함께 읽는 모임" },
+      });
+      fireEvent.change(screen.getByRole("textbox", { name: "About" }), {
+        target: { value: "공개 소개" },
+      });
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "첫 호스트 이메일" }),
+        { target: { value: "fixture@example.test" } },
+      );
+      fireEvent.change(
+        screen.getByRole("textbox", { name: "첫 호스트 이름" }),
+        { target: { value: "Host" } },
+      );
+      fireEvent.click(screen.getByRole("button", { name: "미리 확인" }));
+      if (phase === "commit") {
+        await screen.findByText("CLUB_CREATED");
+        fireEvent.click(
+          screen.getByRole("checkbox", { name: "온보딩 영향을 확인했습니다" }),
+        );
+        fireEvent.click(screen.getByRole("button", { name: "클럽 생성 확정" }));
+      }
+      await waitFor(() =>
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument(),
+      );
+      expect(
+        queryClient.getQueryData(platformAdminKeys.capabilities()),
+      ).toBeUndefined();
+    },
+  );
 });

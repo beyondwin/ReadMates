@@ -4,7 +4,7 @@ import type {
 } from "@/features/platform-admin/model/platform-admin-workbench-model";
 import type { PlatformAdminClubRegistryItem } from "@/features/platform-admin/ui/platform-admin-club-registry";
 import { ClubPublishChecklist } from "@/features/platform-admin/ui/club-publish-checklist";
-import { DomainProvisioningPanel } from "@/features/platform-admin/ui/domain-provisioning-panel";
+import { DomainProvisioningPanel } from "@/features/platform-admin/ui/legacy-domain-provisioning-panel";
 import { PlatformAdminClubDetail } from "@/features/platform-admin/ui/platform-admin-club-detail";
 import {
   SupportAccessGrantsPanel,
@@ -54,7 +54,9 @@ export function ClubOperationsBrief({
   if (!club) {
     return (
       <section className="platform-admin-detail" aria-label="선택 클럽 상세">
-        <p className="muted platform-admin-domain-empty">선택할 클럽이 없습니다.</p>
+        <p className="muted platform-admin-domain-empty">
+          선택할 클럽이 없습니다.
+        </p>
       </section>
     );
   }

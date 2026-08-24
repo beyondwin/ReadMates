@@ -17,7 +17,12 @@ export function adminRoutes(queryClient: QueryClient): RouteObject[] {
       id: "app-admin",
       path: "/admin",
       errorElement: <RouteErrorBoundary variant="auth" />,
-      hydrateFallbackElement: <ReadmatesRouteLoading label="플랫폼 관리를 불러오는 중" variant="auth" />,
+      hydrateFallbackElement: (
+        <ReadmatesRouteLoading
+          label="플랫폼 관리를 불러오는 중"
+          variant="auth"
+        />
+      ),
       loader: adminShellLoaderFactory(queryClient),
       lazy: async () => {
         const { AdminShellLayout } = await import(
@@ -54,20 +59,29 @@ function buildChildren(queryClient: QueryClient): RouteObject[] {
   return children;
 }
 
-const adminChildHydrateFallback = <ReadmatesRouteLoading label="플랫폼 관리 화면 불러오는 중" variant="auth" />;
+const adminChildHydrateFallback = (
+  <ReadmatesRouteLoading label="플랫폼 관리 화면 불러오는 중" variant="auth" />
+);
 
-function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): RouteObject {
+function readyChild(
+  route: AdminRouteDescriptor,
+  queryClient: QueryClient,
+): RouteObject {
   switch (route.path) {
     case "today":
       return {
         path: "today",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminTodayRoute }, { adminTodayLoaderFactory }] = await Promise.all([
-            import("@/features/platform-admin/route/admin-today-route"),
-            import("@/features/platform-admin/route/admin-today-data"),
-          ]);
-          return { Component: AdminTodayRoute, loader: adminTodayLoaderFactory(queryClient) };
+          const [{ AdminTodayRoute }, { adminTodayLoaderFactory }] =
+            await Promise.all([
+              import("@/features/platform-admin/route/admin-today-route"),
+              import("@/features/platform-admin/route/admin-today-data"),
+            ]);
+          return {
+            Component: AdminTodayRoute,
+            loader: adminTodayLoaderFactory(queryClient),
+          };
         },
       };
     case "clubs":
@@ -75,11 +89,20 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "clubs",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminClubsRoute }, { adminClubsLoaderFactory }] = await Promise.all([
+          const [
+            { AdminClubsRoute },
+            { adminClubsLoaderFactory },
+            { AdminClubsRouteError },
+          ] = await Promise.all([
             import("@/features/platform-admin/route/admin-clubs-route"),
             import("@/features/platform-admin/route/admin-clubs-data"),
+            import("@/features/platform-admin/route/admin-club-route-error"),
           ]);
-          return { Component: AdminClubsRoute, loader: adminClubsLoaderFactory(queryClient) };
+          return {
+            Component: AdminClubsRoute,
+            loader: adminClubsLoaderFactory(queryClient),
+            ErrorBoundary: AdminClubsRouteError,
+          };
         },
       };
     case "ai-ops":
@@ -87,11 +110,15 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "ai-ops",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminAiOpsRoute }, { adminAiOpsLoaderFactory }] = await Promise.all([
-            import("@/features/platform-admin/route/admin-ai-ops-route"),
-            import("@/features/platform-admin/route/admin-ai-ops-data"),
-          ]);
-          return { Component: AdminAiOpsRoute, loader: adminAiOpsLoaderFactory(queryClient) };
+          const [{ AdminAiOpsRoute }, { adminAiOpsLoaderFactory }] =
+            await Promise.all([
+              import("@/features/platform-admin/route/admin-ai-ops-route"),
+              import("@/features/platform-admin/route/admin-ai-ops-data"),
+            ]);
+          return {
+            Component: AdminAiOpsRoute,
+            loader: adminAiOpsLoaderFactory(queryClient),
+          };
         },
       };
     case "support":
@@ -99,11 +126,15 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "support",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminSupportRoute }, { adminSupportLoaderFactory }] = await Promise.all([
-            import("@/features/platform-admin/route/admin-support-route"),
-            import("@/features/platform-admin/route/admin-support-data"),
-          ]);
-          return { Component: AdminSupportRoute, loader: adminSupportLoaderFactory(queryClient) };
+          const [{ AdminSupportRoute }, { adminSupportLoaderFactory }] =
+            await Promise.all([
+              import("@/features/platform-admin/route/admin-support-route"),
+              import("@/features/platform-admin/route/admin-support-data"),
+            ]);
+          return {
+            Component: AdminSupportRoute,
+            loader: adminSupportLoaderFactory(queryClient),
+          };
         },
       };
     case "health":
@@ -111,11 +142,15 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "health",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminHealthRoute }, { adminHealthLoaderFactory }] = await Promise.all([
-            import("@/features/platform-admin/route/admin-health-route"),
-            import("@/features/platform-admin/route/admin-health-data"),
-          ]);
-          return { Component: AdminHealthRoute, loader: adminHealthLoaderFactory(queryClient) };
+          const [{ AdminHealthRoute }, { adminHealthLoaderFactory }] =
+            await Promise.all([
+              import("@/features/platform-admin/route/admin-health-route"),
+              import("@/features/platform-admin/route/admin-health-data"),
+            ]);
+          return {
+            Component: AdminHealthRoute,
+            loader: adminHealthLoaderFactory(queryClient),
+          };
         },
       };
     case "notifications":
@@ -123,7 +158,10 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "notifications",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminNotificationsRoute }, { adminNotificationsLoaderFactory }] = await Promise.all([
+          const [
+            { AdminNotificationsRoute },
+            { adminNotificationsLoaderFactory },
+          ] = await Promise.all([
             import("@/features/platform-admin/route/admin-notifications-route"),
             import("@/features/platform-admin/route/admin-notifications-data"),
           ]);
@@ -138,11 +176,15 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "audit",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminAuditRoute }, { adminAuditLoaderFactory }] = await Promise.all([
-            import("@/features/platform-admin/route/admin-audit-route"),
-            import("@/features/platform-admin/route/admin-audit-data"),
-          ]);
-          return { Component: AdminAuditRoute, loader: adminAuditLoaderFactory(queryClient) };
+          const [{ AdminAuditRoute }, { adminAuditLoaderFactory }] =
+            await Promise.all([
+              import("@/features/platform-admin/route/admin-audit-route"),
+              import("@/features/platform-admin/route/admin-audit-data"),
+            ]);
+          return {
+            Component: AdminAuditRoute,
+            loader: adminAuditLoaderFactory(queryClient),
+          };
         },
       };
     case "analytics":
@@ -150,11 +192,15 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
         path: "analytics",
         hydrateFallbackElement: adminChildHydrateFallback,
         lazy: async () => {
-          const [{ AdminAnalyticsRoute }, { adminAnalyticsLoaderFactory }] = await Promise.all([
-            import("@/features/platform-admin/route/admin-analytics-route"),
-            import("@/features/platform-admin/route/admin-analytics-data"),
-          ]);
-          return { Component: AdminAnalyticsRoute, loader: adminAnalyticsLoaderFactory(queryClient) };
+          const [{ AdminAnalyticsRoute }, { adminAnalyticsLoaderFactory }] =
+            await Promise.all([
+              import("@/features/platform-admin/route/admin-analytics-route"),
+              import("@/features/platform-admin/route/admin-analytics-data"),
+            ]);
+          return {
+            Component: AdminAnalyticsRoute,
+            loader: adminAnalyticsLoaderFactory(queryClient),
+          };
         },
       };
     default:
@@ -167,10 +213,11 @@ function comingSoonChild(descriptor: AdminRouteDescriptor): RouteObject {
     path: descriptor.path,
     hydrateFallbackElement: adminChildHydrateFallback,
     lazy: async () => {
-      const [{ AdminComingSoonRoute }, { adminComingSoonLoader }] = await Promise.all([
-        import("@/features/platform-admin/route/admin-coming-soon-route"),
-        import("@/features/platform-admin/route/admin-coming-soon-data"),
-      ]);
+      const [{ AdminComingSoonRoute }, { adminComingSoonLoader }] =
+        await Promise.all([
+          import("@/features/platform-admin/route/admin-coming-soon-route"),
+          import("@/features/platform-admin/route/admin-coming-soon-data"),
+        ]);
       return {
         Component: AdminComingSoonRoute,
         loader: adminComingSoonLoader(descriptor),
@@ -184,13 +231,19 @@ function clubDetailChild(queryClient: QueryClient): RouteObject {
     path: ADMIN_CLUB_DETAIL_ROUTE.path,
     hydrateFallbackElement: adminChildHydrateFallback,
     lazy: async () => {
-      const [{ AdminClubDetailRoute }, { adminClubDetailLoaderFactory }] = await Promise.all([
+      const [
+        { AdminClubDetailRoute },
+        { adminClubDetailLoaderFactory },
+        { AdminClubDetailRouteError },
+      ] = await Promise.all([
         import("@/features/platform-admin/route/admin-club-detail-route"),
         import("@/features/platform-admin/route/admin-club-detail-data"),
+        import("@/features/platform-admin/route/admin-club-route-error"),
       ]);
       return {
         Component: AdminClubDetailRoute,
         loader: adminClubDetailLoaderFactory(queryClient),
+        ErrorBoundary: AdminClubDetailRouteError,
       };
     },
   };

@@ -1,25 +1,120 @@
-import { render, screen, fireEvent, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, Routes, Route } from "react-router";
-import { describe, expect, it } from "vitest";
-import { platformAdminClubsQuery } from "@/features/platform-admin/queries/platform-admin-queries";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+} from "react-router";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PlatformAdminClub } from "@/features/platform-admin/api/platform-admin-contracts";
+import { platformAdminClubListFiltersFromSearch } from "@/features/platform-admin/model/platform-admin-club-list-filters";
+import {
+  platformAdminCapabilitiesQuery,
+  platformAdminClubsInfiniteQuery,
+} from "@/features/platform-admin/queries/platform-admin-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminClubsRoute } from "./admin-clubs-route";
 
-function renderRoute(items: Array<{
-  clubId: string; slug: string; name: string;
-  status: "ACTIVE" | "SETUP_REQUIRED" | "SUSPENDED" | "ARCHIVED";
-  publicVisibility: "PRIVATE" | "PUBLIC";
-  domainCount: number; domainActionRequiredCount: number;
-  notificationFailureCount: number; aiFailureCount: number;
-  firstHostOnboardingState: "MISSING" | "INVITED" | "ASSIGNED";
-  tagline: string; about: string;
-}>) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  queryClient.setQueryData(platformAdminClubsQuery().queryKey, { items });
+vi.mock(
+  "@/features/platform-admin/api/platform-admin-api",
+  async (importOriginal) => ({
+    ...(await importOriginal<
+      typeof import("@/features/platform-admin/api/platform-admin-api")
+    >()),
+    fetchPlatformAdminClubs: vi.fn(),
+  }),
+);
+
+import { fetchPlatformAdminClubs } from "@/features/platform-admin/api/platform-admin-api";
+
+const club: PlatformAdminClub = {
+  clubId: "c-1",
+  slug: "alpha",
+  name: "Alpha",
+  tagline: "",
+  about: "",
+  status: "ACTIVE",
+  publicVisibility: "PRIVATE",
+  domainCount: 1,
+  domainActionRequiredCount: 0,
+  notificationFailureCount: 0,
+  aiFailureCount: 0,
+  firstHostOnboardingState: "ASSIGNED",
+  adminRevision: 7,
+};
+
+function LocationProbe() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  return (
+    <>
+      <output data-testid="location-search">{location.search}</output>
+      <button
+        type="button"
+        onClick={() => navigate("/admin/clubs?search=restored")}
+      >
+        URL 검색 변경
+      </button>
+    </>
+  );
+}
+
+function renderRoute(
+  items: PlatformAdminClub[] = [club],
+  initialEntry = "/admin/clubs",
+  capabilities = ["VIEW_CLUBS", "CREATE_CLUB"],
+  additionalPage?: PlatformAdminClub[] | null,
+) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  const url = new URL(initialEntry, "https://example.test");
+  const filters = {
+    search: url.searchParams.get("search") || undefined,
+    lifecycle: (url.searchParams.get("lifecycle") || undefined) as
+      | "ACTIVE"
+      | undefined,
+    visibility: (url.searchParams.get("visibility") || undefined) as
+      | "PRIVATE"
+      | undefined,
+    limit: 25,
+  };
+  const pages =
+    additionalPage === null
+      ? [{ items, nextCursor: "cursor-2" }]
+      : additionalPage
+        ? [
+            { items, nextCursor: "cursor-2" },
+            { items: additionalPage, nextCursor: null },
+          ]
+        : [{ items, nextCursor: null }];
+  const pageParams = Array.isArray(additionalPage)
+    ? [undefined, "cursor-2"]
+    : [undefined];
+  queryClient.setQueryData(platformAdminClubsInfiniteQuery(filters).queryKey, {
+    pages,
+    pageParams,
+  });
+  queryClient.setQueryData(
+    platformAdminClubsInfiniteQuery({ limit: 25 }).queryKey,
+    {
+      pages,
+      pageParams,
+    },
+  );
+  queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+    schemaVersion: 1,
+    role: "OWNER",
+    status: "ACTIVE",
+    capabilities,
+    generatedAt: "2026-08-24T00:00:00Z",
+  });
   return render(
     <QueryClientProvider client={queryClient}>
-      <MemoryRouter initialEntries={["/admin/clubs"]}>
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <LocationProbe />
         <Routes>
           <Route path="/admin/clubs" element={<AdminClubsRoute />} />
           <Route path="/admin/clubs/:clubId" element={<div>club detail</div>} />
@@ -30,120 +125,145 @@ function renderRoute(items: Array<{
 }
 
 describe("AdminClubsRoute", () => {
-  it("renders a row per club with key columns", () => {
-    const { container } = renderRoute([
-      {
-        clubId: "c-1", slug: "alpha", name: "Alpha", status: "ACTIVE",
-        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-    ]);
-    expect(screen.getAllByRole("heading").length).toBeGreaterThan(0);
-    expect(findUnnamedInteractiveElements(container)).toEqual([]);
+  beforeEach(() => vi.clearAllMocks());
+  it("renders server-ordered registry rows with accessible controls", () => {
+    const { container } = renderRoute();
+    expect(screen.getByRole("heading", { name: "클럽" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("searchbox", { name: "클럽 검색" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("alpha")).toBeInTheDocument();
-    expect(screen.getByText("Alpha")).toBeInTheDocument();
-    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
-    expect(screen.getByText("PRIVATE")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Alpha" })).toHaveAttribute(
+      "href",
+      "/admin/clubs/c-1",
+    );
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
-  it("navigates to club detail on row click", () => {
-    renderRoute([
-      {
-        clubId: "c-1", slug: "alpha", name: "Alpha", status: "ACTIVE",
-        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-    ]);
-    fireEvent.click(screen.getByRole("link", { name: /Alpha/ }));
-    expect(screen.getByText("club detail")).toBeInTheDocument();
+  it("hydrates URL-safe filters and writes filter changes back to the URL", async () => {
+    renderRoute(
+      [club],
+      "/admin/clubs?search=alpha&lifecycle=ACTIVE&visibility=PRIVATE",
+    );
+    expect(screen.getByRole("searchbox", { name: "클럽 검색" })).toHaveValue(
+      "alpha",
+    );
+    expect(screen.getByRole("combobox", { name: "수명주기" })).toHaveValue(
+      "ACTIVE",
+    );
+    expect(screen.getByRole("combobox", { name: "공개 상태" })).toHaveValue(
+      "PRIVATE",
+    );
+
+    fireEvent.change(screen.getByRole("combobox", { name: "호스트 온보딩" }), {
+      target: { value: "MISSING" },
+    });
+    await waitFor(() =>
+      expect(screen.getByTestId("location-search")).toHaveTextContent(
+        "onboardingState=MISSING",
+      ),
+    );
+    expect(screen.getByTestId("location-search")).not.toHaveTextContent(
+      "cursor=",
+    );
   });
 
-  it("orders critical clubs before healthy clubs", () => {
-    renderRoute([
-      {
-        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
-        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-      {
-        clubId: "crit-1", slug: "broken", name: "Broken", status: "ACTIVE",
-        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 2,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-    ]);
-    const rows = screen.getAllByRole("row").slice(1); // drop header row
-    expect(within(rows[0]).getByText("Broken")).toBeInTheDocument();
-    expect(within(rows[1]).getByText("Healthy")).toBeInTheDocument();
+  it("does not expose cursor state and shows a bounded empty state", () => {
+    renderRoute([], "/admin/clubs?cursor=private-cursor&search=missing");
+    expect(
+      screen.getByText("조건에 맞는 클럽이 없습니다."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("private-cursor")).not.toBeInTheDocument();
   });
 
-  it("shows a severity badge and reason for an at-risk club", () => {
-    renderRoute([
-      {
-        clubId: "crit-1", slug: "broken", name: "Broken", status: "ACTIVE",
-        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 2,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-    ]);
-    const rows = screen.getAllByRole("row").slice(1); // drop header row
-    expect(within(rows[0]).getByText("긴급")).toBeInTheDocument();
-    expect(screen.getByText("도메인 조치 필요")).toBeInTheDocument();
+  it("keeps the new-club entry point URL-scoped", () => {
+    renderRoute();
+    expect(screen.getByRole("link", { name: "새 클럽" })).toHaveAttribute(
+      "href",
+      "/admin/clubs?onboarding=1",
+    );
   });
 
-  it("filters the list to only critical clubs when the 긴급 filter is selected", () => {
-    renderRoute([
-      {
-        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
-        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-      {
-        clubId: "crit-1", slug: "broken", name: "Broken", status: "SUSPENDED",
-        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-    ]);
-    fireEvent.click(screen.getByRole("button", { name: "긴급" }));
-    expect(screen.getByText("Broken")).toBeInTheDocument();
-    expect(screen.queryByText("Healthy")).not.toBeInTheDocument();
+  it("preserves registry filters when opening onboarding", () => {
+    renderRoute([club], "/admin/clubs?search=alpha&visibility=PRIVATE");
+    const href = screen
+      .getByRole("link", { name: "새 클럽" })
+      .getAttribute("href");
+    expect(href).toContain("search=alpha");
+    expect(href).toContain("visibility=PRIVATE");
+    expect(href).toContain("onboarding=1");
   });
 
-  it("shows an empty hint when a filter matches no clubs", () => {
-    renderRoute([
-      {
-        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
-        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-    ]);
-    fireEvent.click(screen.getByRole("button", { name: "긴급" }));
-    expect(screen.getByText("선택한 필터에 해당하는 클럽이 없습니다.")).toBeInTheDocument();
+  it("syncs the debounced draft when browser navigation changes the search URL", async () => {
+    renderRoute([club], "/admin/clubs?search=alpha");
+    expect(screen.getByRole("searchbox", { name: "클럽 검색" })).toHaveValue(
+      "alpha",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "URL 검색 변경" }));
+    await waitFor(() =>
+      expect(screen.getByRole("searchbox", { name: "클럽 검색" })).toHaveValue(
+        "restored",
+      ),
+    );
   });
 
-  it("shows a notification-failure reason and ranks the club critical", () => {
-    renderRoute([
-      {
-        clubId: "ok-1", slug: "healthy", name: "Healthy", status: "ACTIVE",
-        publicVisibility: "PUBLIC", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 0, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-      {
-        clubId: "fail-1", slug: "failing", name: "Failing", status: "ACTIVE",
-        publicVisibility: "PRIVATE", domainCount: 1, domainActionRequiredCount: 0,
-        notificationFailureCount: 4, aiFailureCount: 0,
-        firstHostOnboardingState: "ASSIGNED", tagline: "", about: "",
-      },
-    ]);
-    const rows = screen.getAllByRole("row").slice(1);
-    expect(within(rows[0]).getByText("Failing")).toBeInTheDocument();
-    expect(screen.getByText("알림 실패 4건")).toBeInTheDocument();
+  it("hides the new-club entry point without CREATE_CLUB", () => {
+    renderRoute([club], "/admin/clubs", ["VIEW_CLUBS"]);
+    expect(
+      screen.queryByRole("link", { name: "새 클럽" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("ignores URL filter values outside the bounded server allowlists", () => {
+    expect(
+      platformAdminClubListFiltersFromSearch(
+        new URLSearchParams(
+          "lifecycle=DROP&visibility=SECRET&domainStatus=RAW&onboardingState=OWNER",
+        ),
+      ),
+    ).toEqual({ limit: 25 });
+    renderRoute(
+      [club],
+      "/admin/clubs?lifecycle=DROP&visibility=SECRET&domainStatus=RAW&onboardingState=OWNER",
+    );
+    expect(screen.getByRole("combobox", { name: "수명주기" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "공개 상태" })).toHaveValue("");
+    expect(screen.getByRole("combobox", { name: "도메인 상태" })).toHaveValue(
+      "",
+    );
+    expect(screen.getByRole("combobox", { name: "호스트 온보딩" })).toHaveValue(
+      "",
+    );
+  });
+
+  it("deduplicates a club repeated at an infinite-page boundary", () => {
+    const later = { ...club, name: "Alpha stale duplicate" };
+    renderRoute([club], "/admin/clubs", ["VIEW_CLUBS"], [later]);
+    expect(screen.getAllByRole("link", { name: /Alpha/ })).toHaveLength(1);
+    expect(screen.queryByText("Alpha stale duplicate")).not.toBeInTheDocument();
+  });
+
+  it("keeps page-one rows and retries the same cursor after page-two failure", async () => {
+    vi.mocked(fetchPlatformAdminClubs)
+      .mockRejectedValueOnce(new Error("page two unavailable"))
+      .mockResolvedValueOnce({
+        items: [{ ...club, clubId: "c-2", name: "Beta" }],
+        nextCursor: null,
+      });
+    renderRoute([club], "/admin/clubs", ["VIEW_CLUBS"], null);
+
+    fireEvent.click(screen.getByRole("button", { name: "더 보기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "다음 클럽을 불러오지 못했습니다",
+    );
+    expect(screen.getByRole("link", { name: "Alpha" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+    expect(
+      await screen.findByRole("link", { name: "Beta" }),
+    ).toBeInTheDocument();
+    expect(fetchPlatformAdminClubs).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ cursor: "cursor-2" }),
+    );
   });
 });

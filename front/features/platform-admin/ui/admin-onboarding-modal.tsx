@@ -3,6 +3,7 @@ import { AdminModalDialog } from "./admin-modal-dialog";
 
 export type AdminOnboardingModalProps = {
   isDirty: boolean;
+  effectPending?: boolean;
   onRequestClose: () => void;
   children: ReactNode;
   triggerRef?: RefObject<HTMLElement | null>;
@@ -10,13 +11,17 @@ export type AdminOnboardingModalProps = {
 
 export function AdminOnboardingModal({
   isDirty,
+  effectPending = false,
   onRequestClose,
   children,
   triggerRef,
 }: AdminOnboardingModalProps) {
-  const fallbackTriggerRef = useRef<HTMLElement | null>(null);
+  const fallbackTriggerRef = useRef<HTMLElement | null>(activeTrigger());
+  const effectPendingRef = useRef(effectPending);
+  effectPendingRef.current = effectPending;
 
   function requestClose() {
+    if (effectPendingRef.current) return;
     if (isDirty) {
       const ok = window.confirm("작성 중인 내용이 사라집니다. 닫을까요?");
       if (!ok) return;
@@ -25,14 +30,14 @@ export function AdminOnboardingModal({
   }
 
   useEffect(() => {
-    if (!isDirty) return;
+    if (!isDirty && !effectPending) return;
     function onBeforeUnload(event: BeforeUnloadEvent) {
       event.preventDefault();
       event.returnValue = "";
     }
     window.addEventListener("beforeunload", onBeforeUnload);
     return () => window.removeEventListener("beforeunload", onBeforeUnload);
-  }, [isDirty]);
+  }, [effectPending, isDirty]);
 
   return (
     <AdminModalDialog
@@ -49,6 +54,7 @@ export function AdminOnboardingModal({
           type="button"
           className="admin-onboarding-modal__close"
           onClick={requestClose}
+          disabled={effectPending}
           aria-label="닫기"
         >
           닫기
@@ -57,4 +63,12 @@ export function AdminOnboardingModal({
       <div className="admin-onboarding-modal__body">{children}</div>
     </AdminModalDialog>
   );
+}
+
+function activeTrigger(): HTMLElement | null {
+  if (typeof document === "undefined") return null;
+  const active = document.activeElement;
+  return active instanceof HTMLElement && active !== document.body
+    ? active
+    : null;
 }
