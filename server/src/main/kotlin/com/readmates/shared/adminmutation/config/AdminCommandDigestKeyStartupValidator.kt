@@ -53,7 +53,7 @@ class AdminCommandDigestKeyStartupValidator(
     ) {
         val lastReferencedAt = state.lastReferencedAt
         when {
-            state.aliasCount > 0 ->
+            state.referenceCount > 0 ->
                 if (state.digestKeyVersion !in configuredVersions || lastReferencedAt == null) failClosed()
             state.digestKeyVersion in configuredVersions ->
                 if (lastReferencedAt == null) failClosed()
@@ -88,6 +88,6 @@ class AdminCommandDigestKeyStartupValidator(
 
     private fun failClosed(): Nothing =
         throw IllegalStateException(
-            "Admin command digest keys cannot safely replay or retire persisted aliases",
+            "Admin command digest keys cannot safely replay or retire persisted command references",
         )
 }

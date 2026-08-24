@@ -1,335 +1,190 @@
 package com.readmates.club.application.service
 
-import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
-import com.readmates.club.application.model.FirstHostOnboardingState
-import com.readmates.club.application.model.HostOnboardingResultKind
-import com.readmates.club.application.model.PlatformAdminClubDetail
-import com.readmates.club.application.model.PlatformAdminClubDomain
-import com.readmates.club.application.model.PlatformAdminClubListItem
-import com.readmates.club.application.model.PlatformAdminEmailDeliveryStatus
+import com.readmates.club.application.model.FirstHostPreviewKind
 import com.readmates.club.application.model.PlatformAdminOnboardingClubInput
 import com.readmates.club.application.model.PlatformAdminOnboardingCommand
 import com.readmates.club.application.model.PlatformAdminOnboardingDomainInput
 import com.readmates.club.application.model.PlatformAdminOnboardingHostInput
-import com.readmates.club.application.port.out.CreateClubDomainPort
-import com.readmates.club.application.port.out.CreateClubDomainResult
-import com.readmates.club.application.port.out.CreatePlatformAdminClubCommand
-import com.readmates.club.application.port.out.CreatePlatformAdminHostInvitationCommand
-import com.readmates.club.application.port.out.GeneratePlatformAdminInvitationTokenPort
-import com.readmates.club.application.port.out.GeneratedPlatformAdminInvitationToken
-import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
-import com.readmates.club.application.port.out.PlatformAdminClubRegistryQuery
-import com.readmates.club.application.port.out.PlatformAdminClubRegistryRow
-import com.readmates.club.application.port.out.PlatformAdminExistingUser
-import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
+import com.readmates.club.application.port.out.DerivePlatformAdminHostInvitationTokenPort
+import com.readmates.club.application.port.out.PlatformAdminOnboardingCommandPort
 import com.readmates.club.application.port.out.SendPlatformAdminHostInvitationEmailPort
+import com.readmates.club.application.port.out.TransientPlatformAdminHostInvitationMail
 import com.readmates.club.domain.ClubDomainKind
-import com.readmates.club.domain.ClubDomainStatus
-import com.readmates.club.domain.ClubPublicVisibility
-import com.readmates.club.domain.ClubStatus
-import com.readmates.shared.security.AccessDeniedException
-import com.readmates.shared.security.PlatformActor
-import com.readmates.shared.security.PlatformCapability
+import com.readmates.notification.application.config.NotificationRuntimeProperties
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatCode
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
-import org.springframework.transaction.TransactionDefinition
-import org.springframework.transaction.support.AbstractPlatformTransactionManager
-import org.springframework.transaction.support.DefaultTransactionStatus
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verifyNoInteractions
 import org.springframework.transaction.support.TransactionTemplate
-import java.time.OffsetDateTime
+import java.time.Clock
+import java.time.Duration
 import java.util.UUID
 
 @Tag("unit")
 class PlatformAdminOnboardingServiceTest {
     @Test
-    fun `commit does not send invitation email when domain creation fails`() {
-        val ports = FakePlatformAdminOnboardingPorts()
-        ports.createDomainResult = CreateClubDomainResult.DuplicateHostname
-        val mail = FakePlatformAdminInvitationMail()
-        val service = service(ports, mail)
-
-        assertThatThrownBy {
-            service.commit(operatorActor(), commandWithNewHostAndDomain())
-        }.isInstanceOfSatisfying(PlatformAdminException::class.java) {
-            assertThat(it.error).isEqualTo(PlatformAdminError.CLUB_DOMAIN_CONFLICT)
-        }
-
-        assertThat(mail.sent).isEmpty()
-    }
-
-    @Test
-    fun `commit sends one invitation email after successful persistence`() {
-        val ports = FakePlatformAdminOnboardingPorts()
-        val mail = FakePlatformAdminInvitationMail()
-        val transactionManager = RecordingTransactionManager()
-        mail.transactionState = { transactionManager.transactionActive }
-        val service = service(ports, mail, transactionManager = transactionManager)
-
-        val result = service.commit(operatorActor(), commandWithNewHostAndDomain())
-
-        assertThat(result.hostOnboarding.kind).isEqualTo(HostOnboardingResultKind.INVITATION_CREATED)
-        assertThat(result.hostOnboarding.emailDelivery.status).isEqualTo(PlatformAdminEmailDeliveryStatus.SENT)
-        assertThat(mail.sent).hasSize(1)
-        assertThat(mail.sent.single().email).isEqualTo("host@example.com")
-        assertThat(mail.sent.single().acceptUrl)
-            .isEqualTo("https://app.example.com/clubs/new-club/invite/platform-admin-raw-token")
-        assertThat(ports.createdInvitations.single().tokenHash)
-            .isEqualTo("platform-admin-token-hash")
-        assertThat(mail.transactionStates).containsExactly(false)
-    }
-
-    @Test
-    fun `support actor is denied before onboarding ports are touched`() {
-        val ports = FakePlatformAdminOnboardingPorts()
-        val service = service(ports, FakePlatformAdminInvitationMail())
-
-        assertThatThrownBy {
-            service.preview(supportActor(), commandWithNewHostAndDomain())
-        }.isInstanceOf(AccessDeniedException::class.java)
-
-        assertThat(ports.onboardingReads).isZero()
-    }
-}
-
-private class NoOpTransactionManager : AbstractPlatformTransactionManager() {
-    override fun doGetTransaction(): Any = Any()
-
-    override fun doBegin(
-        transaction: Any,
-        definition: TransactionDefinition,
-    ) = Unit
-
-    override fun doCommit(status: DefaultTransactionStatus) = Unit
-
-    override fun doRollback(status: DefaultTransactionStatus) = Unit
-}
-
-private class RecordingTransactionManager : AbstractPlatformTransactionManager() {
-    var transactionActive = false
-        private set
-
-    override fun doGetTransaction(): Any = Any()
-
-    override fun doBegin(
-        transaction: Any,
-        definition: TransactionDefinition,
-    ) {
-        transactionActive = true
-    }
-
-    override fun doCommit(status: DefaultTransactionStatus) {
-        transactionActive = false
-    }
-
-    override fun doRollback(status: DefaultTransactionStatus) {
-        transactionActive = false
-    }
-}
-
-private fun service(
-    ports: FakePlatformAdminOnboardingPorts,
-    mail: FakePlatformAdminInvitationMail,
-    tokenGenerator: GeneratePlatformAdminInvitationTokenPort = fixedTokenGenerator(),
-    transactionManager: AbstractPlatformTransactionManager = NoOpTransactionManager(),
-): PlatformAdminOnboardingService =
-    PlatformAdminOnboardingService(
-        onboardingPort = ports,
-        loadClubsPort = ports,
-        createClubDomainPort = ports,
-        sendHostInvitationEmailPort = mail,
-        generateInvitationTokenPort = tokenGenerator,
-        transactionTemplate = TransactionTemplate(transactionManager),
-        appBaseUrl = "https://app.example.com",
-    )
-
-private fun fixedTokenGenerator(): GeneratePlatformAdminInvitationTokenPort =
-    GeneratePlatformAdminInvitationTokenPort {
-        GeneratedPlatformAdminInvitationToken(
-            rawToken = "platform-admin-raw-token",
-            tokenHash = "platform-admin-token-hash",
-        )
-    }
-
-private fun operatorActor(): PlatformActor =
-    actorWith(
-        PlatformCapability.VIEW_CLUBS,
-        PlatformCapability.VIEW_CLUB_OPERATIONS,
-        PlatformCapability.CREATE_CLUB,
-        PlatformCapability.MANAGE_CLUBS,
-        PlatformCapability.MANAGE_CLUB_DOMAINS,
-    )
-
-private fun actorWith(vararg capabilities: PlatformCapability): PlatformActor =
-    PlatformActor(
-        adminId = UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
-        role = com.readmates.club.domain.PlatformAdminRole.OPERATOR,
-        capabilities = capabilities.toSet(),
-    )
-
-private fun supportActor(): PlatformActor =
-    actorWith(
-        PlatformCapability.VIEW_CLUBS,
-        PlatformCapability.VIEW_CLUB_OPERATIONS,
-    )
-
-private fun commandWithNewHostAndDomain(): PlatformAdminOnboardingCommand =
-    PlatformAdminOnboardingCommand(
-        club =
-            PlatformAdminOnboardingClubInput(
-                name = "New Club",
-                slug = "new-club",
-                tagline = "A club tagline",
-                about = "About this club",
-            ),
-        firstHost =
-            PlatformAdminOnboardingHostInput(
-                email = "host@example.com",
-                name = "Host User",
-            ),
-        domain =
-            PlatformAdminOnboardingDomainInput(
-                hostname = "club.example.com",
-                kind = ClubDomainKind.CUSTOM_DOMAIN,
-            ),
-        existingUserConfirmation = null,
-    )
-
-private class FakePlatformAdminInvitationMail : SendPlatformAdminHostInvitationEmailPort {
-    data class Sent(
-        val email: String,
-        val clubName: String,
-        val acceptUrl: String,
-    )
-
-    val sent = mutableListOf<Sent>()
-    val transactionStates = mutableListOf<Boolean>()
-    var transactionState: () -> Boolean = { false }
-
-    override fun send(
-        to: String,
-        clubName: String,
-        acceptUrl: String,
-    ) {
-        transactionStates += transactionState()
-        sent += Sent(to, clubName, acceptUrl)
-    }
-}
-
-private class FakePlatformAdminOnboardingPorts :
-    PlatformAdminOnboardingPort,
-    LoadPlatformAdminClubsPort,
-    CreateClubDomainPort {
-    var existingUserByEmail: PlatformAdminExistingUser? = null
-    var existingSlugs: MutableSet<String> = mutableSetOf()
-    var existingDomainHostnames: MutableSet<String> = mutableSetOf()
-    var createDomainResult: CreateClubDomainResult? = null
-    var onboardingReads: Int = 0
-
-    val createdClubs = mutableListOf<CreatePlatformAdminClubCommand>()
-    val createdInvitations = mutableListOf<CreatePlatformAdminHostInvitationCommand>()
-    val upsertedMemberships = mutableListOf<Triple<UUID, UUID, String>>()
-
-    override fun slugExists(slug: String): Boolean {
-        onboardingReads += 1
-        return slug in existingSlugs
-    }
-
-    override fun domainHostnameExists(hostname: String): Boolean = hostname in existingDomainHostnames
-
-    override fun findUserByEmail(email: String): PlatformAdminExistingUser? {
-        onboardingReads += 1
-        return existingUserByEmail
-    }
-
-    override fun createClub(command: CreatePlatformAdminClubCommand): UUID {
-        createdClubs += command
-        return command.clubId
-    }
-
-    override fun upsertHostMembership(
-        clubId: UUID,
-        userId: UUID,
-        displayName: String,
-    ): UUID {
-        upsertedMemberships += Triple(clubId, userId, displayName)
-        return UUID.randomUUID()
-    }
-
-    override fun createHostInvitation(command: CreatePlatformAdminHostInvitationCommand) {
-        createdInvitations += command
-    }
-
-    override fun listClubs(query: PlatformAdminClubRegistryQuery): List<PlatformAdminClubRegistryRow> =
-        createdClubs.map { command ->
-            val item = toListItem(command)
-            PlatformAdminClubRegistryRow(item, item.name.lowercase())
-        }
-
-    override fun loadClub(clubId: UUID): PlatformAdminClubListItem? =
-        createdClubs
-            .firstOrNull { it.clubId == clubId }
-            ?.let(::toListItem)
-
-    override fun loadClubDetail(clubId: UUID): PlatformAdminClubDetail? =
-        loadClub(clubId)?.let { item ->
-            PlatformAdminClubDetail(
-                clubId = item.clubId,
-                slug = item.slug,
-                name = item.name,
-                tagline = item.tagline,
-                about = item.about,
-                adminRevision = 0,
-                status = item.status,
-                publicVisibility = item.publicVisibility,
-                domains = emptyList(),
-                firstHostOnboardingState = item.firstHostOnboardingState,
-                domainCount = item.domainCount,
-                domainActionRequiredCount = item.domainActionRequiredCount,
-                notificationFailureCount = item.notificationFailureCount,
-                aiFailureCount = item.aiFailureCount,
+    fun `canonical onboarding normalizes all identity fields and binds the confirmation`() {
+        val normalized = PlatformAdminOnboardingPolicy.normalize(command())
+        val request =
+            PlatformAdminOnboardingPolicy.request(
+                PREVIEW_ID,
+                normalized,
+                FirstHostPreviewKind.EXISTING_USER,
             )
+
+        assertThat(normalized.club.slug).isEqualTo("new-club")
+        assertThat(normalized.firstHost.email).isEqualTo("host@example.test")
+        assertThat(normalized.domain?.hostname).isEqualTo("club.example.test")
+        assertThat(request.canonicalFields())
+            .contains(
+                "previewId" to PREVIEW_ID.toString(),
+                "existingUserConfirmation" to "ASSIGN_EXISTING_USER_AS_HOST",
+                "firstHostEmail" to "host@example.test",
+            )
+    }
+
+    @Test
+    fun `canonical onboarding rejects unsafe hostnames before persistence`() {
+        val unsafe =
+            command().copy(
+                domain = PlatformAdminOnboardingDomainInput("https://internal.test", ClubDomainKind.CUSTOM_DOMAIN),
+            )
+
+        assertThatThrownBy { PlatformAdminOnboardingPolicy.normalize(unsafe) }
+            .isInstanceOf(PlatformAdminException::class.java)
+    }
+
+    @Test
+    fun `canonical onboarding accepts exact persistence boundaries`() {
+        val commands =
+            listOf(
+                command().copy(club = command().club.copy(name = "n".repeat(120))),
+                command().copy(club = command().club.copy(tagline = "t".repeat(255))),
+                command().copy(firstHost = command().firstHost.copy(name = "h".repeat(120))),
+                command().copy(firstHost = command().firstHost.copy(email = "e".repeat(307) + "@example.test")),
+                command().copy(club = command().club.copy(about = "a".repeat(65_535))),
+            )
+
+        commands.forEach { candidate ->
+            assertThatCode { PlatformAdminOnboardingPolicy.normalize(candidate) }.doesNotThrowAnyException()
         }
+    }
 
-    override fun activeHostCount(clubId: UUID): Int = 0
+    @Test
+    fun `canonical onboarding rejects values beyond persistence boundaries`() {
+        val commands =
+            listOf(
+                command().copy(club = command().club.copy(name = "n".repeat(121))),
+                command().copy(club = command().club.copy(tagline = "t".repeat(256))),
+                command().copy(firstHost = command().firstHost.copy(name = "h".repeat(121))),
+                command().copy(firstHost = command().firstHost.copy(email = "e".repeat(308) + "@example.test")),
+                command().copy(club = command().club.copy(about = "a".repeat(65_536))),
+            )
 
-    override fun createClubDomain(
-        clubId: UUID,
-        hostname: String,
-        kind: ClubDomainKind,
-        isPrimary: Boolean,
-    ): CreateClubDomainResult =
-        createDomainResult ?: CreateClubDomainResult.Created(
-            domain =
-                PlatformAdminClubDomain(
-                    id = UUID.randomUUID(),
-                    clubId = clubId,
-                    hostname = hostname,
-                    kind = kind,
-                    status = ClubDomainStatus.REQUESTED,
-                    isPrimary = isPrimary,
-                    verifiedAt = null,
-                    lastCheckedAt = OffsetDateTime.now(),
-                    errorCode = null,
-                ),
+        commands.forEach { candidate ->
+            assertThatThrownBy { PlatformAdminOnboardingPolicy.normalize(candidate) }
+                .isInstanceOf(PlatformAdminException::class.java)
+        }
+    }
+
+    @Test
+    fun `canonical onboarding rejects line and control characters from single line fields`() {
+        val commands =
+            listOf(
+                command().copy(club = command().club.copy(name = "New\rClub")),
+                command().copy(club = command().club.copy(name = "New\nClub")),
+                command().copy(club = command().club.copy(name = "New\u2028Club")),
+                command().copy(club = command().club.copy(tagline = "Tag\u0000line")),
+                command().copy(firstHost = command().firstHost.copy(name = "First\u007fHost")),
+                command().copy(firstHost = command().firstHost.copy(email = "host\u0000@example.test")),
+            )
+
+        commands.forEach { candidate ->
+            assertThatThrownBy { PlatformAdminOnboardingPolicy.normalize(candidate) }
+                .isInstanceOf(PlatformAdminException::class.java)
+        }
+    }
+
+    @Test
+    fun `canonical onboarding bounds about by utf8 bytes while allowing line feeds`() {
+        val exact = command().copy(club = command().club.copy(about = "가".repeat(21_845)))
+        val oversized = command().copy(club = command().club.copy(about = "가".repeat(21_846)))
+        val multiline = command().copy(club = command().club.copy(about = "First line\nSecond line"))
+
+        assertThatCode { PlatformAdminOnboardingPolicy.normalize(exact) }.doesNotThrowAnyException()
+        assertThatCode { PlatformAdminOnboardingPolicy.normalize(multiline) }.doesNotThrowAnyException()
+        assertThatThrownBy { PlatformAdminOnboardingPolicy.normalize(oversized) }
+            .isInstanceOf(PlatformAdminException::class.java)
+    }
+
+    @Test
+    fun `transient invitation mail never renders recipient or capability`() {
+        val mail =
+            TransientPlatformAdminHostInvitationMail(
+                to = "recipient@example.test",
+                clubName = "Synthetic Club",
+                acceptUrl = "https://example.test/invite/not-a-real-capability",
+            )
+
+        assertThat(mail.toString()).isEqualTo("[REDACTED]")
+    }
+
+    @Test
+    fun `disabled notification worker never claims invitation convergence`() {
+        val commandPort = mock(PlatformAdminOnboardingCommandPort::class.java)
+        val service = worker(commandPort, NotificationRuntimeProperties(enabled = false))
+
+        assertThat(service.processOne()).isFalse()
+        verifyNoInteractions(commandPort)
+    }
+
+    @Test
+    fun `host invitation retry delays must cover every nonterminal attempt`() {
+        val properties =
+            NotificationRuntimeProperties(
+                enabled = false,
+                worker =
+                    NotificationRuntimeProperties.Worker(
+                        retryDelays = listOf(Duration.ofMinutes(1), Duration.ofMinutes(2)),
+                    ),
+                kafka =
+                    NotificationRuntimeProperties.Kafka(
+                        maxPublishAttempts = 3,
+                        maxDeliveryAttempts = 5,
+                    ),
+            )
+
+        assertThatThrownBy { worker(mock(PlatformAdminOnboardingCommandPort::class.java), properties) }
+            .isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("host invitation attempt")
+    }
+
+    private fun worker(
+        commandPort: PlatformAdminOnboardingCommandPort,
+        properties: NotificationRuntimeProperties,
+    ) = PlatformAdminHostInvitationConvergenceService(
+        commandPort = commandPort,
+        tokenDeriver = mock(DerivePlatformAdminHostInvitationTokenPort::class.java),
+        mailPort = mock(SendPlatformAdminHostInvitationEmailPort::class.java),
+        transactions = mock(TransactionTemplate::class.java),
+        clock = Clock.systemUTC(),
+        notificationProperties = properties,
+        appBaseUrl = "https://example.test",
+    )
+
+    private fun command() =
+        PlatformAdminOnboardingCommand(
+            club = PlatformAdminOnboardingClubInput(" New Club ", " New-Club ", " Tagline ", " About "),
+            firstHost = PlatformAdminOnboardingHostInput(" HOST@EXAMPLE.TEST ", " Host "),
+            domain = PlatformAdminOnboardingDomainInput(" CLUB.EXAMPLE.TEST. ", ClubDomainKind.CUSTOM_DOMAIN),
+            existingUserConfirmation = null,
         )
 
-    private fun toListItem(command: CreatePlatformAdminClubCommand): PlatformAdminClubListItem =
-        PlatformAdminClubListItem(
-            clubId = command.clubId,
-            slug = command.slug,
-            name = command.name,
-            tagline = command.tagline,
-            about = command.about,
-            status = ClubStatus.SETUP_REQUIRED,
-            publicVisibility = ClubPublicVisibility.PRIVATE,
-            domainCount = 0,
-            domainActionRequiredCount = 0,
-            notificationFailureCount = 0,
-            aiFailureCount = 0,
-            firstHostOnboardingState = FirstHostOnboardingState.MISSING,
-            adminRevision = 0,
-        )
+    private companion object {
+        val PREVIEW_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000301")
+    }
 }

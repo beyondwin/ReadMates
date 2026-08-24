@@ -43,8 +43,17 @@ class PlatformAdminBffSecurityTest(
     @AfterEach
     fun cleanupCreatedRows() {
         try {
+            jdbcTemplate.update("delete from platform_admin_club_command_convergence_events where event_seq = 1")
+            jdbcTemplate.update("delete from platform_admin_club_command_convergence_events where event_seq = 0")
+            jdbcTemplate.update("delete from platform_admin_club_command_convergence")
+            jdbcTemplate.update("delete from platform_admin_command_idempotency_keys")
+            jdbcTemplate.update("delete from platform_admin_command_idempotency")
+            jdbcTemplate.update("delete from platform_admin_club_command_previews")
+            jdbcTemplate.update("delete from platform_admin_club_command_receipts")
+            jdbcTemplate.update("delete from platform_audit_events where event_type like 'ADMIN_CLUB_%'")
             deleteWhereIn("invitations", "id", createdInvitationIds)
             deleteWhereIn("club_domains", "id", createdClubDomainIds)
+            deleteWhereIn("club_audit_events", "club_id", createdClubIds)
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
             deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
@@ -101,21 +110,42 @@ class PlatformAdminBffSecurityTest(
     fun `admin domain bff request reaches controller without spring csrf token`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
         val hostname = "bff-${UUID.randomUUID()}.example.test"
+        val preview =
+            mockMvc
+                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """{"expectedAdminRevision":0,"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+                    cookie(sessionCookieForUser(operator))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                }.andExpect { status { isOk() } }
+                .andReturn()
+        val previewId = JsonPath.read<String>(preview.response.contentAsString, "$.previewId")
 
         val result =
             mockMvc
                 .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+                    content =
+                        """
+                        {
+                          "previewId":"$previewId",
+                          "idempotencyKey":"bff-domain-${UUID.randomUUID()}",
+                          "expectedAdminRevision":0,
+                          "hostname":"$hostname",
+                          "kind":"SUBDOMAIN",
+                          "confirmed":true
+                        }
+                        """.trimIndent()
                     cookie(sessionCookieForUser(operator))
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
                     header("Origin", "http://localhost:3000")
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.hostname") { value(hostname) }
-                    jsonPath("$.status") { value("ACTION_REQUIRED") }
+                    jsonPath("$.commandType") { value("club.domain.create") }
                 }.andReturn()
-        createdClubDomainIds += JsonPath.read<String>(result.response.contentAsString, "$.id")
+        createdClubDomainIds += JsonPath.read<String>(result.response.contentAsString, "$.targetId")
 
         assertEquals(1, countDomainRows(hostname))
     }
@@ -133,28 +163,47 @@ class PlatformAdminBffSecurityTest(
                 header("Origin", "http://localhost:3000")
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.firstHost.kind") { value("NEW_USER") }
+                jsonPath("$.firstHostKind") { value("NEW_USER") }
             }
     }
 
     @Test
     fun `admin onboarding commit bff request reaches controller without spring csrf token`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val command = onboardingRequestJson("bff.commit.${UUID.randomUUID()}@example.com")
+        val preview =
+            mockMvc
+                .post("/api/admin/clubs/onboarding/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = command
+                    cookie(sessionCookieForUser(operator))
+                    header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    header("Origin", "http://localhost:3000")
+                }.andExpect { status { isOk() } }
+                .andReturn()
+        val previewId = JsonPath.read<String>(preview.response.contentAsString, "$.previewId")
 
         val result =
             mockMvc
                 .post("/api/admin/clubs/onboarding") {
                     contentType = MediaType.APPLICATION_JSON
-                    content = onboardingRequestJson("bff.commit.${UUID.randomUUID()}@example.com")
+                    content = confirmationBody(command, previewId, "bff-onboarding-${UUID.randomUUID()}")
                     cookie(sessionCookieForUser(operator))
                     header("X-Readmates-Bff-Secret", "test-bff-secret")
                     header("Origin", "http://localhost:3000")
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.hostOnboarding.kind") { value("INVITATION_CREATED") }
+                    jsonPath("$.firstHostKind") { value("INVITATION_CREATED") }
+                    jsonPath("$.invitationDelivery") { value("PENDING") }
+                    jsonPath("$.token") { doesNotExist() }
+                    jsonPath("$.email") { doesNotExist() }
                 }.andReturn()
-        createdInvitationIds += JsonPath.read<String>(result.response.contentAsString, "$.hostOnboarding.invitationId")
-        createdClubIds += JsonPath.read<String>(result.response.contentAsString, "$.club.clubId")
+        val clubId = JsonPath.read<String>(result.response.contentAsString, "$.club.clubId")
+        createdClubIds += clubId
+        createdInvitationIds +=
+            jdbcTemplate
+                .queryForList("select id from invitations where club_id = ?", String::class.java, clubId)
+                .filterNotNull()
     }
 
     private fun createPlatformAdminUser(
@@ -220,6 +269,16 @@ class PlatformAdminBffSecurityTest(
             }
             """.trimIndent()
     }
+
+    private fun confirmationBody(
+        command: String,
+        previewId: String,
+        idempotencyKey: String,
+    ): String =
+        command.replaceFirst(
+            "{",
+            "{\"previewId\":\"$previewId\",\"idempotencyKey\":\"$idempotencyKey\",\"confirmed\":true,",
+        )
 
     private fun deleteWhereIn(
         tableName: String,

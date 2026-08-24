@@ -4456,6 +4456,7 @@ class MySqlFlywayMigrationTest(
             "id",
             "receipt_id_snapshot",
             "effect_type",
+            "effect_target_id_snapshot",
             "state",
             "attempt_count",
             "next_attempt_no",
@@ -4470,6 +4471,7 @@ class MySqlFlywayMigrationTest(
             "convergence_id",
             "receipt_id_snapshot",
             "effect_type",
+            "effect_target_id_snapshot",
             "attempt_no",
             "event_seq",
             "start_event_seq",
@@ -4491,8 +4493,10 @@ class MySqlFlywayMigrationTest(
             receiptTable to "platform_audit_event_id_snapshot",
             convergenceTable to "id",
             convergenceTable to "receipt_id_snapshot",
+            convergenceTable to "effect_target_id_snapshot",
             eventTable to "convergence_id",
             eventTable to "receipt_id_snapshot",
+            eventTable to "effect_target_id_snapshot",
         ).forEach { (table, column) ->
             val metadata = columnMetadata(jdbcTemplate, table, column)
             assertThat(metadata["DATA_TYPE"]).isEqualTo("char")
@@ -4533,7 +4537,7 @@ class MySqlFlywayMigrationTest(
         )
         assertEquals("id", indexColumns(jdbcTemplate, convergenceTable, "PRIMARY"))
         assertEquals(
-            "id,receipt_id_snapshot,effect_type",
+            "id,receipt_id_snapshot,effect_type,effect_target_id_snapshot",
             indexColumns(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_identity_uk"),
         )
         assertThat(
@@ -4586,7 +4590,7 @@ class MySqlFlywayMigrationTest(
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_schema_check"))
             .contains("regexp_like", "^[A-Za-z0-9._:-]{1,64}$")
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_receipts_json_check"))
-            .contains("actor_capabilities_json", "safe_result_json", "8192")
+            .contains("actor_capabilities_json", "safe_result_json", "139264")
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_effect_check"))
             .contains("HOST_INVITATION", "DOMAIN_PROVISIONING")
         assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_club_convergence_state_check"))
@@ -4619,7 +4623,7 @@ class MySqlFlywayMigrationTest(
             foreignKeyDeleteRule(jdbcTemplate, convergenceTable, "platform_admin_club_convergence_receipt_fk"),
         )
         assertEquals(
-            "convergence_id,receipt_id_snapshot,effect_type",
+            "convergence_id,receipt_id_snapshot,effect_type,effect_target_id_snapshot",
             foreignKeyColumns(jdbcTemplate, eventTable, "platform_admin_club_convergence_events_identity_fk"),
         )
         assertEquals(
@@ -4720,18 +4724,20 @@ class MySqlFlywayMigrationTest(
         jdbcTemplate: JdbcTemplate,
         convergenceId: String,
         receiptId: String,
+        effectTargetId: String = convergenceId,
     ) {
         jdbcTemplate.update(
             """
             insert into platform_admin_club_command_convergence (
-              id, receipt_id_snapshot, effect_type, state, attempt_count, next_attempt_no,
+              id, receipt_id_snapshot, effect_type, effect_target_id_snapshot, state, attempt_count, next_attempt_no,
               lease_owner, lease_expires_at, last_safe_error_code, available_at, created_at, updated_at
-            ) values (?, ?, 'DOMAIN_PROVISIONING', 'PENDING', 0, 1, null, null, null,
+            ) values (?, ?, 'DOMAIN_PROVISIONING', ?, 'PENDING', 0, 1, null, null, null,
                       '2026-08-24 01:01:00.000000', '2026-08-24 01:01:00.000000',
                       '2026-08-24 01:01:00.000000')
             """.trimIndent(),
             convergenceId,
             receiptId,
+            effectTargetId,
         )
     }
 
@@ -4744,18 +4750,20 @@ class MySqlFlywayMigrationTest(
         state: String,
         safeErrorCode: String?,
         effectType: String = "DOMAIN_PROVISIONING",
+        effectTargetId: String = convergenceId,
     ) {
         jdbcTemplate.update(
             """
             insert into platform_admin_club_command_convergence_events (
-              convergence_id, receipt_id_snapshot, effect_type, attempt_no, event_seq,
+              convergence_id, receipt_id_snapshot, effect_type, effect_target_id_snapshot, attempt_no, event_seq,
               state, safe_error_code, observed_at
-            ) values (?, ?, ?, ?, ?, ?, ?,
+            ) values (?, ?, ?, ?, ?, ?, ?, ?,
                       timestampadd(second, ?, timestamp('2026-08-24 01:01:00.000000')))
             """.trimIndent(),
             convergenceId,
             receiptId,
             effectType,
+            effectTargetId,
             attemptNo,
             eventSeq,
             state,

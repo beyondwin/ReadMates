@@ -29,6 +29,22 @@ class AdminCommandDigestKeyRetirementServiceTest {
     }
 
     @Test
+    fun `pending host invitation is a durable key reference after aliases drain`() {
+        val port =
+            RetirementPort(
+                state(
+                    aliasCount = 0,
+                    unreferencedSince = NOW.minus(Duration.ofDays(2)),
+                    pendingHostInvitationCount = 1,
+                ),
+            )
+
+        val result = service(port).assess(1)
+
+        assertThat(result.outcome).isEqualTo(AdminCommandDigestKeyRetirementOutcome.REFERENCED)
+    }
+
+    @Test
     fun `zero aliases start and retain a twenty four hour buffer`() {
         val port = RetirementPort(state(aliasCount = 0, unreferencedSince = NOW.minus(Duration.ofHours(23))))
 
@@ -59,11 +75,13 @@ class AdminCommandDigestKeyRetirementServiceTest {
     private fun state(
         aliasCount: Long,
         unreferencedSince: Instant?,
+        pendingHostInvitationCount: Long = 0,
     ) = AdminCommandDigestKeyReferenceState(
         digestKeyVersion = 1,
         aliasCount = aliasCount,
         lastReferencedAt = NOW.minus(Duration.ofDays(2)),
         unreferencedSince = unreferencedSince,
+        pendingHostInvitationCount = pendingHostInvitationCount,
     )
 
     private companion object {

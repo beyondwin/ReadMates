@@ -32,12 +32,11 @@ class PlatformAdminDomainConvergenceService(
         receipt: PlatformAdminClubCommandReceipt,
         admin: PlatformActor,
     ): PlatformAdminClubCommandReceipt {
-        processConvergence(receipt)
+        receipt.convergenceId?.let(::process)
         return refresh(receipt, admin)
     }
 
-    private fun processConvergence(receipt: PlatformAdminClubCommandReceipt) {
-        val convergenceId = receipt.convergenceId ?: return
+    fun process(convergenceId: UUID) {
         val leaseOwner = UUID.randomUUID().toString()
         val startedAt = clock.instant()
         val acquisition =

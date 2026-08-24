@@ -119,7 +119,8 @@ private class JdbcDomainConvergenceAcquisition(
         jdbcTemplate
             .query(
                 """
-                select c.id, c.receipt_id_snapshot, c.state, c.next_attempt_no, c.lease_owner,
+                select c.id, c.receipt_id_snapshot, c.effect_target_id_snapshot, c.state,
+                       c.next_attempt_no, c.lease_owner,
                        c.lease_expires_at, c.last_safe_error_code, c.available_at,
                        previous_finish.observed_at previous_finished_at,
                        cast(r.safe_result_json as char) safe_result_json
@@ -194,6 +195,7 @@ private class JdbcDomainConvergenceAcquisition(
             jdbcTemplate,
             candidate.convergenceId,
             candidate.receiptId,
+            candidate.domainId,
             candidate.attemptNo,
             safeErrorCode,
             now,
@@ -391,7 +393,7 @@ private fun ResultSet.toCandidate(objectMapper: ObjectMapper): DomainConvergence
     return DomainConvergenceCandidate(
         convergenceId = uuid("id"),
         receiptId = uuid("receipt_id_snapshot"),
-        domainId = UUID.fromString(safeResult.path("targetId").asString()),
+        domainId = uuid("effect_target_id_snapshot"),
         state = getString("state"),
         attemptNo = getInt("next_attempt_no"),
         leaseOwner = getString("lease_owner"),
@@ -419,13 +421,14 @@ private fun insertStartedEvent(
     jdbcTemplate.update(
         """
         insert into platform_admin_club_command_convergence_events (
-          convergence_id, receipt_id_snapshot, effect_type, attempt_no, event_seq,
+          convergence_id, receipt_id_snapshot, effect_type, effect_target_id_snapshot, attempt_no, event_seq,
           state, safe_error_code, observed_at
-        ) values (?, ?, 'DOMAIN_PROVISIONING', ?, 0, 'PENDING', null, ?)
+        ) values (?, ?, 'DOMAIN_PROVISIONING', ?, ?, 0, 'PENDING', null, ?)
         on duplicate key update convergence_id = values(convergence_id)
         """.trimIndent(),
         candidate.convergenceId.dbString(),
         candidate.receiptId.dbString(),
+        candidate.domainId.dbString(),
         candidate.attemptNo,
         now.dbTime(),
     )
@@ -440,6 +443,7 @@ private fun insertFinishedEvent(
     jdbcTemplate,
     lease.convergenceId,
     lease.receiptId,
+    lease.domainId,
     lease.attemptNo,
     safeErrorCode,
     completedAt,
@@ -449,6 +453,7 @@ private fun insertFinishedEvent(
     jdbcTemplate: JdbcTemplate,
     convergenceId: UUID,
     receiptId: UUID,
+    effectTargetId: UUID,
     attemptNo: Int,
     safeErrorCode: String?,
     completedAt: Instant,
@@ -456,12 +461,13 @@ private fun insertFinishedEvent(
     jdbcTemplate.update(
         """
         insert into platform_admin_club_command_convergence_events (
-          convergence_id, receipt_id_snapshot, effect_type, attempt_no, event_seq,
+          convergence_id, receipt_id_snapshot, effect_type, effect_target_id_snapshot, attempt_no, event_seq,
           state, safe_error_code, observed_at
-        ) values (?, ?, 'DOMAIN_PROVISIONING', ?, 1, ?, ?, ?)
+        ) values (?, ?, 'DOMAIN_PROVISIONING', ?, ?, 1, ?, ?, ?)
         """.trimIndent(),
         convergenceId.dbString(),
         receiptId.dbString(),
+        effectTargetId.dbString(),
         attemptNo,
         if (safeErrorCode == null) "SUCCEEDED" else "FAILED",
         safeErrorCode,

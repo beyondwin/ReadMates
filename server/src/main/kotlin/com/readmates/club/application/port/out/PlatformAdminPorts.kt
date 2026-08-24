@@ -382,10 +382,14 @@ interface PlatformAdminOnboardingPort {
     fun createHostInvitation(command: CreatePlatformAdminHostInvitationCommand)
 }
 
+class TransientPlatformAdminHostInvitationMail internal constructor(
+    internal val to: String,
+    internal val clubName: String,
+    internal val acceptUrl: String,
+) {
+    override fun toString(): String = "[REDACTED]"
+}
+
 interface SendPlatformAdminHostInvitationEmailPort {
-    fun send(
-        to: String,
-        clubName: String,
-        acceptUrl: String,
-    )
+    fun send(command: TransientPlatformAdminHostInvitationMail)
 }

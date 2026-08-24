@@ -4,13 +4,13 @@
 - 결정일: 2026-08-24
 - 작성자: 플랫폼 운영·보안·서버
 - 관련: ADR-0028, ADR-0033, ADR-0040,
-  `server/src/main/kotlin/com/readmates/auth/application/service/InvitationTokenService.kt:15-33`,
-  `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingService.kt:98-112`,
-  `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingService.kt:171-195`,
-  `server/src/main/kotlin/com/readmates/shared/security/RequestIdentityHmac.kt:10-28`,
-  `server/src/main/resources/db/mysql/migration/V57__platform_admin_command_idempotency.sql:46-91`,
-  `server/src/main/resources/db/mysql/migration/V58__platform_admin_club_command_receipts.sql:5-21`,
-  `server/src/main/resources/db/mysql/migration/V58__platform_admin_club_command_receipts.sql:69-189`
+  `server/src/main/kotlin/com/readmates/auth/application/service/InvitationTokenService.kt`,
+  `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingService.kt`,
+  `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminHostInvitationConvergenceService.kt`,
+  `server/src/main/kotlin/com/readmates/club/adapter/out/security/PlatformAdminInvitationTokenDeriver.kt`,
+  `server/src/main/kotlin/com/readmates/shared/security/RequestIdentityHmac.kt`,
+  `server/src/main/resources/db/mysql/migration/V57__platform_admin_command_idempotency.sql`,
+  `server/src/main/resources/db/mysql/migration/V58__platform_admin_club_command_receipts.sql`
 
 ## 컨텍스트
 
@@ -39,6 +39,9 @@ Onboarding preview는 DTO validation과 default 적용 뒤 versioned canonical s
 snapshot, synthetic new-club slot, canonical schema version, **현재** digest key version의 request HMAC, 짧은
 expiry와 allowlist된 safe impact만 저장한다. Preview response도 normalized public-safe label, 영향·차단 code,
 matched identity category, opaque preview ID, expiry와 짧은 fingerprint만 반환한다.
+Club name, tagline, first-host name/email은 DB 문자 경계 안에서 single-line 값만 허용하고 line/control 문자를
+거절한다. Club about은 MySQL `TEXT` 경계에 맞춰 UTF-8 65,535 bytes 이하로 제한하되 line feed는 보존하고 CRLF는
+canonical line feed로 정규화한다. Preview와 confirm은 이 같은 validation과 normalization 함수를 공유한다.
 
 Confirm은 preview ID만 신뢰하지 않고 preview 때와 같은 전체 command, idempotency key와 명시적 확인 code를
 다시 받는다. Application service는 현재 active actor와 command capability를 먼저 확인하고 command를 같은
@@ -90,6 +93,11 @@ application origin으로 transient mail command와 accept URL을 만든다. Toke
 memory를 벗어나 receipt,
 convergence event, audit, log, metric label, exception message 또는 response DTO에 들어가지 않는다.
 
+Worker 활성화는 `readmates.notifications.enabled`와 `readmates.notifications.worker.enabled`가 모두 true인
+경우에만 허용한다. Claim lease, fixed delay, batch size, retry delay와 max delivery attempts는 기존 notification
+runtime properties를 그대로 사용하며, retry delay 목록이 모든 nonterminal attempt를 덮지 못하면 startup에서
+fail closed한다.
+
 Retry는 같은 receipt, convergence, invitation UUID, club UUID와 digest key version을 사용하므로 항상 같은
 raw token과 같은 링크를 만든다. SMTP에 stable provider/message identity를 전달할 수 있으면 convergence
 identity를 사용하지만, SMTP 자체에는 exactly-once가 없다. Send 성공 뒤 outcome CAS 전에 process가 죽거나
@@ -118,23 +126,26 @@ configured key가 없거나 불일치하면 startup과 retirement를 fail closed
 Unexpired preview는 별도 durable key reference로 집계하지 않는다. 대신 다음 불변식을 모두 강제한다.
 
 1. Preview는 current key로만 만들며 previous key로 새 preview를 만들지 않는다.
-2. Onboarding preview TTL은 고정 10분이고, startup validation은 이 TTL이 configured
-   `previous-key-rollout-buffer`보다 **엄격히 짧은지** 확인한다. Existing buffer validator의 최소값은 24시간이다.
+2. Onboarding preview TTL은 shared command-idempotency `preview-ttl`을 사용하고 현재 기본값은 10분이다. Startup
+   validation은 configured TTL이 양수이고 `previous-key-rollout-buffer`보다 **엄격히 짧은지** 확인한다. Existing
+   buffer validator의 최소값은 24시간이다.
 3. Rotation overlap 진입은 old-current/new-previous key-state row를 lock하고 기존 `unreferenced_since`를
    무효화한다. Writer drain과 current-only 전환이 끝난 뒤 reference 0을 같은 lock 아래 다시 확인한 시점부터
    fresh post-drain buffer를 새로 시작한다.
 4. Previous key는 그 fresh zero-reference buffer 전체가 지난 뒤에만 제거한다.
 
 따라서 rotation 직전 old current key로 만든 preview도 key 제거 전에 만료되고, overlap 중 preview는 새 current
-key만 사용한다. TTL이 configurable해지거나 buffer 이상으로 늘어나거나 overlap이 old-key buffer를
-무효화하지 않는 설계로 바뀌면 이 증명은 성립하지 않으므로, 그 변경 전에 unexpired preview를 key reference
-query와 lock protocol에 포함해야 한다.
+key만 사용한다. Configured TTL이 buffer 이상으로 허용되거나 overlap이 old-key buffer를 무효화하지 않는 설계로
+바뀌면 이 증명은 성립하지 않으므로, 그 변경 전에 unexpired preview를 key reference query와 lock protocol에
+포함해야 한다.
 
 ### Transaction, startup, rollback
 
 Claim, club/host/invitation origin write, domain audit, platform audit snapshot, immutable receipt,
-`HOST_INVITATION` convergence insert, preview consume와 claim completion은 ADR-0033의 business orchestration
-owner가 소유하는 한 transaction이다. Mail I/O는 이 transaction 안에서 실행하지 않는다.
+`HOST_INVITATION|DOMAIN_PROVISIONING` convergence insert, preview consume와 claim completion은 ADR-0033의
+business orchestration owner가 소유하는 한 transaction이다. Mail I/O와 domain provider I/O는 이 transaction
+안에서 실행하지 않는다. Optional domain은 origin commit 뒤 기존 Task 3 domain convergence lease/관측/CAS
+경로로 첫 시도를 수행하며, host invitation effect와 같은 receipt 아래에서 독립적으로 수렴한다.
 
 Worker는 짧은 lease/start-event transaction, 외부 send, 짧은 outcome CAS/event transaction으로 나눈다.
 Lease owner, attempt number와 state가 달라지면 stale worker의 outcome은 적용하지 않는다. Rollback은 origin
@@ -192,7 +203,9 @@ reference, fail-closed startup/retirement와 evidence 비저장으로 제한한�
 - 생성 token의 hash로 기존 invitation acceptance가 성공하고 raw token/URL이 DB schema/row, receipt, audit,
   DTO, `toString`, log와 metric에 없는지 test한다.
 - Origin transaction 각 write failure가 claim부터 convergence까지 전부 rollback하고 mail 호출은 0건인지
-  MySQL integration test한다.
+  MySQL integration test한다. Optional domain은 기존 domain convergence reader가 onboarding receipt의 safe origin
+  status/updated-at snapshot을 읽어 transaction 밖에서 target CAS하고, 같은 receipt의 host effect를 변경하지 않는지
+  검증한다.
 - Crash-after-send, `AMBIGUOUS`, `RETRYABLE`, `PERMANENT`, attempt exhaustion과 concurrent worker lease/CAS를
   test하고 retry마다 같은 link인지 확인한다.
 - Notifications disabled에서 claim/send/success가 0건이고 work가 `PENDING`인지 확인한다.

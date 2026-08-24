@@ -37,6 +37,15 @@ class AdminCommandDigestKeyStartupIntegrationTest(
     @AfterEach
     fun cleanup() {
         jdbcTemplate.update(
+            "delete from platform_admin_club_command_convergence where receipt_id_snapshot = ?",
+            PENDING_RECEIPT_ID.toString(),
+        )
+        jdbcTemplate.update(
+            "delete from platform_admin_club_command_receipts where id = ?",
+            PENDING_RECEIPT_ID.toString(),
+        )
+        jdbcTemplate.update("delete from platform_audit_events where id = ?", PENDING_AUDIT_ID.toString())
+        jdbcTemplate.update(
             "delete from platform_admin_command_idempotency_keys where digest_key_version between ? and ?",
             VERSION_MIN,
             VERSION_MAX,
@@ -62,7 +71,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
     }
 
     @Test
-    fun `empty first deployment starts after Flyway has created V57`() {
+    fun `empty first deployment starts after Flyway has created V58`() {
         withFreshDatabase { database ->
             runContext(
                 previousKey = "",
@@ -74,7 +83,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                 val migratedJdbc = JdbcTemplate(context.getBean(DataSource::class.java))
                 assertThat(context.getBean(AdminCommandDigestKeyStartupValidator::class.java)).isNotNull
                 assertThat(tableExists(migratedJdbc, "platform_admin_command_idempotency_keys")).isTrue()
-                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("57")
+                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("58")
             }
         }
     }
@@ -84,6 +93,17 @@ class AdminCommandDigestKeyStartupIntegrationTest(
         insertReferencedVersion(PREVIOUS_VERSION, withState = true)
 
         assertStartupRejected(previousKey = "", previousVersion = PREVIOUS_VERSION)
+    }
+
+    @Test
+    fun `pending host invitation requires its receipt digest key at startup`() {
+        insertPendingHostInvitationReference(PREVIOUS_VERSION)
+
+        assertStartupRejected(previousKey = "", previousVersion = PREVIOUS_VERSION)
+
+        assertThatCode {
+            runContext(previousKey = key(PREVIOUS_VERSION), previousVersion = PREVIOUS_VERSION).close()
+        }.doesNotThrowAnyException()
     }
 
     @Test
@@ -170,10 +190,10 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                     """.trimIndent(),
                     String::class.java,
                 ),
-            ).isEqualTo("57")
+            ).isEqualTo("58")
         } else {
             assertThat(generateSequence(failure) { it.cause }.mapNotNull { it.message }.toList())
-                .contains("Admin command digest keys cannot safely replay or retire persisted aliases")
+                .contains("Admin command digest keys cannot safely replay or retire persisted command references")
         }
     }
 
@@ -263,6 +283,55 @@ class AdminCommandDigestKeyStartupIntegrationTest(
         )
     }
 
+    private fun insertPendingHostInvitationReference(version: Int) {
+        insertState(version, NOW.minusSeconds(1), null)
+        jdbcTemplate.update(
+            """
+            insert into platform_audit_events
+              (id, actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at)
+            values (?, null, 'OWNER', null, 'ADMIN_CLUB_ONBOARDED',
+                    cast('{"receipt":"pending"}' as json), ?)
+            """.trimIndent(),
+            PENDING_AUDIT_ID.toString(),
+            NOW.toDbTimeStartup(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_club_command_receipts (
+              id, command_type, actor_user_id_snapshot, actor_platform_role_snapshot,
+              actor_capabilities_json, club_id_snapshot, preview_id_snapshot,
+              before_admin_revision, after_admin_revision, outcome,
+              canonical_schema_version, digest_key_version, request_hmac,
+              platform_audit_event_id_snapshot, origin_at, safe_result_json
+            ) values (?, 'club.onboarding.create', ?, 'OWNER', cast('["CREATE_CLUB"]' as json), ?, null,
+                      null, 0, 'SUCCEEDED', 'admin.club.onboarding.create.v1', ?, ?, ?, ?,
+                      cast('{"resultCode":"CLUB_ONBOARDED"}' as json))
+            """.trimIndent(),
+            PENDING_RECEIPT_ID.toString(),
+            ADMIN_ID.toString(),
+            TARGET_ID.toString(),
+            version,
+            ByteArray(32) { 7 },
+            PENDING_AUDIT_ID.toString(),
+            NOW.toDbTimeStartup(),
+        )
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_club_command_convergence (
+              id, receipt_id_snapshot, effect_type, effect_target_id_snapshot,
+              state, attempt_count, next_attempt_no, lease_owner, lease_expires_at,
+              last_safe_error_code, available_at, created_at, updated_at
+            ) values (?, ?, 'HOST_INVITATION', ?, 'PENDING', 0, 1, null, null, null, ?, ?, ?)
+            """.trimIndent(),
+            PENDING_CONVERGENCE_ID.toString(),
+            PENDING_RECEIPT_ID.toString(),
+            PENDING_INVITATION_ID.toString(),
+            NOW.toDbTimeStartup(),
+            NOW.toDbTimeStartup(),
+            NOW.toDbTimeStartup(),
+        )
+    }
+
     private fun tableExists(
         jdbc: JdbcTemplate,
         table: String,
@@ -300,6 +369,10 @@ class AdminCommandDigestKeyStartupIntegrationTest(
         val NOW: Instant = Instant.now().minusSeconds(1)
         val ADMIN_ID: UUID = UUID.fromString("cccccccc-0000-4000-8000-000000059001")
         val TARGET_ID: UUID = UUID.fromString("cccccccc-0000-4000-8000-000000059002")
+        val PENDING_AUDIT_ID: UUID = UUID.fromString("cccccccc-0000-4000-8000-000000059003")
+        val PENDING_RECEIPT_ID: UUID = UUID.fromString("cccccccc-0000-4000-8000-000000059004")
+        val PENDING_CONVERGENCE_ID: UUID = UUID.fromString("cccccccc-0000-4000-8000-000000059005")
+        val PENDING_INVITATION_ID: UUID = UUID.fromString("cccccccc-0000-4000-8000-000000059006")
         const val CURRENT_VERSION = 5902
         const val PREVIOUS_VERSION = 5901
         const val UNKNOWN_VERSION = 5909

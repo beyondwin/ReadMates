@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`
 
-ADR impact: implements proposed ADR-0039 and ADR-0040; constraining reference — ADR-0019, ADR-0022, ADR-0029, ADR-0033
+ADR impact: update — implements proposed ADR-0039, ADR-0040, and ADR-0041; constraining references ADR-0019, ADR-0022, ADR-0029, ADR-0033
 
 ## Global Constraints
 
@@ -161,21 +161,36 @@ Ordering is `(normalized_name ASC, club_id ASC)`. The opaque cursor binds schema
 **Files:**
 - Modify: `server/src/main/kotlin/com/readmates/club/application/model/PlatformAdminModels.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/application/port/in/PlatformAdminUseCases.kt`
-- Modify: `server/src/main/kotlin/com/readmates/club/application/port/out/PlatformAdminPorts.kt`
-- Modify: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminClubRegistryService.kt`
-- Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminClubAdapter.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/port/out/PlatformAdminOnboardingCommandPort.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/port/out/PlatformAdminInvitationTokenPort.kt`
+- Modify: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingService.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingInputPolicy.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminHostInvitationConvergenceService.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminOnboardingCommandAdapter.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminOnboardingPreviewStore.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminOnboardingOriginStore.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminHostInvitationConvergenceStore.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/mail/PlatformAdminHostInvitationMailAdapter.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/in/web/PlatformAdminClubController.kt`
+- Modify: `server/src/main/resources/db/mysql/migration/V58__platform_admin_club_command_receipts.sql`
 - Create: `server/src/test/kotlin/com/readmates/club/api/PlatformAdminOnboardingCommandDbTest.kt`
-- Modify: `server/src/test/kotlin/com/readmates/club/application/service/PlatformAdminClubRegistryServiceTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/club/adapter/out/security/PlatformAdminInvitationTokenDeriverTest.kt`
+- Modify: `server/src/test/kotlin/com/readmates/club/application/service/PlatformAdminOnboardingServiceTest.kt`
 
-Preview returns only normalized public-safe labels, impact/prerequisite codes, matched identity category, `previewId`, HMAC fingerprint prefix, and TTL. Confirm accepts `previewId`, idempotency key, and explicit phrase/code; response is `{receiptId, club, originStatus, invitationDelivery}` and excludes `acceptUrl` or token. The same identity can resume delivery convergence without creating a second club/membership/invitation.
+Preview returns only normalized public-safe labels, impact/prerequisite codes, matched identity category, `previewId`, HMAC
+fingerprint prefix, and TTL. Confirm accepts `previewId`, idempotency key, the full normalized command, `confirmed=true`,
+and the existing-user confirmation phrase when applicable. Response is
+`{receiptId, club, originStatus, firstHostKind, invitationDelivery}` and excludes `acceptUrl` or token. The same identity can
+resume delivery convergence without creating a second club/membership/invitation.
 
-- [ ] **Step 1: Write RED onboarding tests.** Cover valid, duplicate slug/domain/email, preview expiry/consume/mismatch, actor switch, same/different idempotency key, concurrent confirm, transaction rollback, response loss, mail unavailable, worker retry success/failure, receipt lookup reauthorization, and no secret in DTO/log/audit.
-- [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server integrationTest --tests com.readmates.club.api.PlatformAdminOnboardingCommandDbTest` and `./server/gradlew -p server unitTest --tests com.readmates.club.application.service.PlatformAdminClubRegistryServiceTest`; expected FAIL.
-- [ ] **Step 3: Implement durable preview, atomic origin, immutable receipt, and convergence worker.** Invitation delivery happens after the origin transaction through the convergence row; never hold a DB transaction open around mail I/O.
-- [ ] **Step 4: Run GREEN.** Run the Task 4 commands; expected PASS.
-- [ ] **Step 5: Commit.** Commit: `feat(admin): make club onboarding recoverable`
+- [x] **Step 1: Write RED onboarding tests.** Cover valid, exact/oversized text boundaries, line/control rejection, duplicate slug/domain/email, preview expiry/consume/mismatch, actor switch, same/different idempotency key, concurrent confirm, transaction rollback, response loss, mail unavailable, worker retry success/failure, receipt lookup reauthorization, and no secret in DTO/log/audit.
+- [x] **Step 2: Run RED.** The onboarding command/convergence DB tests and token/service unit tests failed first on the missing durable receipt, target snapshot, retry, and deterministic-token contracts.
+- [x] **Step 3: Implement durable preview, atomic origin, immutable receipt, and convergence worker.** Invitation delivery happens after the origin transaction through the convergence row; never hold a DB transaction open around mail I/O. Optional domain reuses the Task 3 post-commit convergence path and remains independent of the host effect.
+- [x] **Step 4: Run GREEN.** Run `PlatformAdminOnboardingCommandDbTest`,
+  `PlatformAdminOnboardingConvergenceDbTest`, `PlatformAdminOnboardingServiceTest`, and
+  `PlatformAdminInvitationTokenDeriverTest`; expected PASS. Run context-heavy startup and Flyway tests as separate
+  `--max-workers=1` invocations to stay inside the test worker heap.
+- [x] **Step 5: Commit.** Commit: `feat(admin): make club onboarding recoverable`
 
 ### Task 5: Build the registry, detail, and onboarding workflows
 

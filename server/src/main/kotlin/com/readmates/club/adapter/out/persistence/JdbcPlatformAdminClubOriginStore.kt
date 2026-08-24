@@ -340,12 +340,13 @@ internal class JdbcPlatformAdminClubEvidenceStore(
         jdbcTemplate.update(
             """
             insert into platform_admin_club_command_convergence (
-              id, receipt_id_snapshot, effect_type, state, attempt_count, next_attempt_no,
+              id, receipt_id_snapshot, effect_type, effect_target_id_snapshot, state, attempt_count, next_attempt_no,
               lease_owner, lease_expires_at, last_safe_error_code, available_at, created_at, updated_at
-            ) values (?, ?, 'DOMAIN_PROVISIONING', 'PENDING', 0, 1, null, null, null, ?, ?, ?)
+            ) values (?, ?, 'DOMAIN_PROVISIONING', ?, 'PENDING', 0, 1, null, null, null, ?, ?, ?)
             """.trimIndent(),
             domain.convergenceId.dbString(),
             domain.receiptId.dbString(),
+            domain.domainId.dbString(),
             timestamp,
             timestamp,
             timestamp,

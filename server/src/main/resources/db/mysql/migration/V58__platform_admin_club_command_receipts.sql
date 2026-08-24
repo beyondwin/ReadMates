@@ -117,7 +117,9 @@ create table platform_admin_club_command_receipts (
     and octet_length(cast(actor_capabilities_json as char)) <= 4096
     and json_type(safe_result_json) = 'OBJECT'
     and json_length(safe_result_json) between 1 and 24
-    and octet_length(cast(safe_result_json as char)) <= 8192
+    -- Onboarding replay retains a TEXT-sized public club about snapshot. JSON escaping can
+    -- double its 65,535-byte input, so keep a bounded 136 KiB evidence envelope.
+    and octet_length(cast(safe_result_json as char)) <= 139264
   )
 ) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 
@@ -131,6 +133,7 @@ create table platform_admin_club_command_convergence (
   id char(36) character set ascii collate ascii_bin not null,
   receipt_id_snapshot char(36) character set ascii collate ascii_bin not null,
   effect_type varchar(32) character set ascii collate ascii_bin not null,
+  effect_target_id_snapshot char(36) character set ascii collate ascii_bin not null,
   state varchar(16) character set ascii collate ascii_bin not null,
   attempt_count int not null,
   next_attempt_no int not null,
@@ -142,7 +145,12 @@ create table platform_admin_club_command_convergence (
   updated_at datetime(6) not null,
   primary key (id),
   -- Current rows are retained with their receipt so append-only events cannot become orphans.
-  unique key platform_admin_club_convergence_identity_uk (id, receipt_id_snapshot, effect_type),
+  unique key platform_admin_club_convergence_identity_uk (
+    id,
+    receipt_id_snapshot,
+    effect_type,
+    effect_target_id_snapshot
+  ),
   unique key platform_admin_club_convergence_receipt_effect_uk (receipt_id_snapshot, effect_type),
   key platform_admin_club_convergence_available_idx (state, available_at, lease_expires_at, id),
   constraint platform_admin_club_convergence_receipt_fk
@@ -192,6 +200,7 @@ create table platform_admin_club_command_convergence_events (
   convergence_id char(36) character set ascii collate ascii_bin not null,
   receipt_id_snapshot char(36) character set ascii collate ascii_bin not null,
   effect_type varchar(32) character set ascii collate ascii_bin not null,
+  effect_target_id_snapshot char(36) character set ascii collate ascii_bin not null,
   attempt_no int not null,
   event_seq tinyint not null,
   start_event_seq tinyint generated always as (
@@ -209,8 +218,13 @@ create table platform_admin_club_command_convergence_events (
     event_seq
   ),
   constraint platform_admin_club_convergence_events_identity_fk
-    foreign key (convergence_id, receipt_id_snapshot, effect_type)
-    references platform_admin_club_command_convergence(id, receipt_id_snapshot, effect_type)
+    foreign key (convergence_id, receipt_id_snapshot, effect_type, effect_target_id_snapshot)
+    references platform_admin_club_command_convergence(
+      id,
+      receipt_id_snapshot,
+      effect_type,
+      effect_target_id_snapshot
+    )
     on delete restrict,
   constraint platform_admin_club_convergence_events_start_fk
     foreign key (convergence_id, attempt_no, start_event_seq)

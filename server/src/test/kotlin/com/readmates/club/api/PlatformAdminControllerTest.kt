@@ -335,9 +335,10 @@ class PlatformAdminControllerTest(
                 cookie(sessionCookieForUser(operator))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.firstHost.kind") { value("EXISTING_USER") }
-                jsonPath("$.firstHost.existingUserId") { value(hostUserId) }
-                jsonPath("$.firstHost.requiredConfirmation") { value("ASSIGN_EXISTING_USER_AS_HOST") }
+                jsonPath("$.firstHostKind") { value("EXISTING_USER") }
+                jsonPath("$.requiredConfirmation") { value("ASSIGN_EXISTING_USER_AS_HOST") }
+                jsonPath("$.firstHost.email") { doesNotExist() }
+                jsonPath("$.existingUserId") { doesNotExist() }
             }
     }
 
@@ -346,6 +347,16 @@ class PlatformAdminControllerTest(
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
         val hostUserId = createGoogleUser("assign.host.${UUID.randomUUID()}@example.com", "Assign Host")
         val hostEmail = emailForUser(hostUserId)
+        val slug = "club-${UUID.randomUUID().toString().take(8)}"
+        val preview =
+            mockMvc
+                .post("/api/admin/clubs/onboarding/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = onboardingRequestJson(hostEmail = hostEmail, slug = slug)
+                    cookie(sessionCookieForUser(operator))
+                }.andExpect { status { isOk() } }
+                .andReturn()
+        val previewId = checkNotNull(preview.response.jsonPathValue<String>("$.previewId"))
 
         val result =
             mockMvc
@@ -354,15 +365,19 @@ class PlatformAdminControllerTest(
                     content =
                         onboardingRequestJson(
                             hostEmail = hostEmail,
+                            slug = slug,
                             existingUserConfirmation = "ASSIGN_EXISTING_USER_AS_HOST",
+                            previewId = previewId,
+                            idempotencyKey = "onboarding-${UUID.randomUUID()}",
                         )
                     cookie(sessionCookieForUser(operator))
                 }.andExpect {
                     status { isOk() }
                     jsonPath("$.club.publicVisibility") { value("PRIVATE") }
                     jsonPath("$.club.status") { value("SETUP_REQUIRED") }
-                    jsonPath("$.hostOnboarding.kind") { value("EXISTING_USER_ASSIGNED") }
-                    jsonPath("$.hostOnboarding.emailDelivery.status") { value("SKIPPED") }
+                    jsonPath("$.originStatus") { value("SUCCEEDED") }
+                    jsonPath("$.firstHostKind") { value("EXISTING_USER_ASSIGNED") }
+                    jsonPath("$.invitationDelivery") { value("NOT_REQUIRED") }
                 }.andReturn()
         val clubId = checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
         createdClubIds += clubId
@@ -371,24 +386,46 @@ class PlatformAdminControllerTest(
     }
 
     @Test
-    fun `operator creates host invitation and returns accept url for new host email`() {
+    fun `operator creates durable host invitation without returning a capability`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
         val hostEmail = "new.host.${UUID.randomUUID()}@example.com"
+        val slug = "club-${UUID.randomUUID().toString().take(8)}"
+        val preview =
+            mockMvc
+                .post("/api/admin/clubs/onboarding/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = onboardingRequestJson(hostEmail = hostEmail, slug = slug)
+                    cookie(sessionCookieForUser(operator))
+                }.andExpect { status { isOk() } }
+                .andReturn()
+        val previewId = checkNotNull(preview.response.jsonPathValue<String>("$.previewId"))
 
         val result =
             mockMvc
                 .post("/api/admin/clubs/onboarding") {
                     contentType = MediaType.APPLICATION_JSON
-                    content = onboardingRequestJson(hostEmail = hostEmail)
+                    content =
+                        onboardingRequestJson(
+                            hostEmail = hostEmail,
+                            slug = slug,
+                            previewId = previewId,
+                            idempotencyKey = "onboarding-${UUID.randomUUID()}",
+                        )
                     cookie(sessionCookieForUser(operator))
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.hostOnboarding.kind") { value("INVITATION_CREATED") }
-                    jsonPath("$.hostOnboarding.acceptUrl") { exists() }
-                    jsonPath("$.hostOnboarding.emailDelivery.status") { exists() }
+                    jsonPath("$.firstHostKind") { value("INVITATION_CREATED") }
+                    jsonPath("$.invitationDelivery") { value("PENDING") }
+                    jsonPath("$.acceptUrl") { doesNotExist() }
+                    jsonPath("$.email") { doesNotExist() }
+                    jsonPath("$.token") { doesNotExist() }
                 }.andReturn()
-        createdInvitationIds += checkNotNull(result.response.jsonPathValue<String>("$.hostOnboarding.invitationId"))
-        createdClubIds += checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
+        val clubId = checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
+        createdClubIds += clubId
+        createdInvitationIds +=
+            jdbcTemplate
+                .queryForList("select id from invitations where club_id = ?", String::class.java, clubId)
+                .filterNotNull()
     }
 }
 
@@ -509,6 +546,7 @@ abstract class PlatformAdminControllerDbSupport(
             deleteWhereIn("invitations", "id", createdInvitationIds)
             deleteWhereIn("club_domains", "id", createdClubDomainIds)
             deleteWhereIn("memberships", "id", createdMembershipIds)
+            deleteWhereIn("club_audit_events", "club_id", createdClubIds)
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
             deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
@@ -670,13 +708,22 @@ abstract class PlatformAdminControllerDbSupport(
 
     protected fun onboardingRequestJson(
         hostEmail: String,
+        slug: String = "club-${UUID.randomUUID().toString().take(8)}",
         existingUserConfirmation: String? = null,
+        previewId: String? = null,
+        idempotencyKey: String? = null,
     ): String {
-        val slug = "club-${UUID.randomUUID().toString().take(8)}"
         val confirmationJson =
             existingUserConfirmation?.let { ""","existingUserConfirmation":"$it"""" } ?: ""
+        val confirmJson =
+            if (previewId == null || idempotencyKey == null) {
+                ""
+            } else {
+                """"previewId":"$previewId","idempotencyKey":"$idempotencyKey","confirmed":true,"""
+            }
         return """
             {
+              $confirmJson
               "club": {
                 "name": "New Platform Club",
                 "slug": "$slug",

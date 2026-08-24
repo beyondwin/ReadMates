@@ -7,7 +7,11 @@ data class AdminCommandDigestKeyReferenceState(
     val aliasCount: Long,
     val lastReferencedAt: Instant?,
     val unreferencedSince: Instant?,
-)
+    val pendingHostInvitationCount: Long = 0,
+) {
+    val referenceCount: Long
+        get() = aliasCount + pendingHostInvitationCount
+}
 
 enum class AdminCommandDigestKeyRetirementOutcome {
     REFERENCED,

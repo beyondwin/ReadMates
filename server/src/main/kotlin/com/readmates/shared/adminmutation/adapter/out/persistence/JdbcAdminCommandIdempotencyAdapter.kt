@@ -517,8 +517,10 @@ private class AdminCommandDigestKeyStateJdbcStore(
             lockStates(listOf(digestKeyVersion)).singleOrNull()
                 ?: throw CorruptAdminCommandClaimException()
         val aliasCount = countAliases(digestKeyVersion)
+        val pendingHostInvitationCount = countPendingHostInvitations(digestKeyVersion)
+        val referenceCount = aliasCount + pendingHostInvitationCount
         val unreferencedSince =
-            if (aliasCount > 0) {
+            if (referenceCount > 0) {
                 jdbcTemplate.update(
                     """
                     update platform_admin_command_digest_key_state
@@ -541,7 +543,11 @@ private class AdminCommandDigestKeyStateJdbcStore(
                 )
                 locked.unreferencedSince ?: startedAt
             }
-        return locked.copy(aliasCount = aliasCount, unreferencedSince = unreferencedSince)
+        return locked.copy(
+            aliasCount = aliasCount,
+            pendingHostInvitationCount = pendingHostInvitationCount,
+            unreferencedSince = unreferencedSince,
+        )
     }
 
     fun lockSnapshot(): List<AdminCommandDigestKeyReferenceState> {
@@ -557,11 +563,31 @@ private class AdminCommandDigestKeyStateJdbcStore(
                     """.trimIndent(),
                     { resultSet, _ -> resultSet.getInt("digest_key_version") to resultSet.getLong("alias_count") },
                 ).toMap()
-        return (states.keys + aliasCounts.keys).sorted().map { version ->
-            states[version]?.copy(aliasCount = aliasCounts[version] ?: 0L)
+        val pendingHostInvitationCounts =
+            jdbcTemplate
+                .query(
+                    """
+                    select r.digest_key_version, count(*) as pending_host_invitation_count
+                    from platform_admin_club_command_convergence c
+                    join platform_admin_club_command_receipts r on r.id = c.receipt_id_snapshot
+                    where c.effect_type = 'HOST_INVITATION' and c.state = 'PENDING'
+                    group by r.digest_key_version
+                    order by r.digest_key_version
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        resultSet.getInt("digest_key_version") to
+                            resultSet.getLong("pending_host_invitation_count")
+                    },
+                ).toMap()
+        return (states.keys + aliasCounts.keys + pendingHostInvitationCounts.keys).sorted().map { version ->
+            states[version]?.copy(
+                aliasCount = aliasCounts[version] ?: 0L,
+                pendingHostInvitationCount = pendingHostInvitationCounts[version] ?: 0L,
+            )
                 ?: AdminCommandDigestKeyReferenceState(
                     digestKeyVersion = version,
-                    aliasCount = aliasCounts.getValue(version),
+                    aliasCount = aliasCounts[version] ?: 0L,
+                    pendingHostInvitationCount = pendingHostInvitationCounts[version] ?: 0L,
                     lastReferencedAt = null,
                     unreferencedSince = null,
                 )
@@ -677,6 +703,20 @@ private class AdminCommandDigestKeyStateJdbcStore(
             select count(*)
             from platform_admin_command_idempotency_keys
             where digest_key_version = ?
+            """.trimIndent(),
+            Long::class.java,
+            digestKeyVersion,
+        ) ?: 0L
+
+    private fun countPendingHostInvitations(digestKeyVersion: Int): Long =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from platform_admin_club_command_convergence c
+            join platform_admin_club_command_receipts r on r.id = c.receipt_id_snapshot
+            where r.digest_key_version = ?
+              and c.effect_type = 'HOST_INVITATION'
+              and c.state = 'PENDING'
             """.trimIndent(),
             Long::class.java,
             digestKeyVersion,

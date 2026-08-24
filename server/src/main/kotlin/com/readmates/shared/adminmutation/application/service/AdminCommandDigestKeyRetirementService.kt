@@ -35,7 +35,7 @@ class AdminCommandDigestKeyRetirementService(
         }
         val outcome =
             when {
-                state.aliasCount > 0 -> AdminCommandDigestKeyRetirementOutcome.REFERENCED
+                state.referenceCount > 0 -> AdminCommandDigestKeyRetirementOutcome.REFERENCED
                 state.unreferencedSince == null -> throw CorruptAdminCommandClaimException()
                 now.isBefore(state.unreferencedSince.plus(properties.previousKeyRolloutBuffer)) ->
                     AdminCommandDigestKeyRetirementOutcome.BUFFER_PENDING

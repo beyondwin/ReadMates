@@ -4,6 +4,7 @@ import com.readmates.club.application.model.AdminClubOperationsSnapshot
 import com.readmates.club.application.model.AdminTodayClosingRiskSnapshot
 import com.readmates.club.application.model.ConfirmCreateClubDomainCommand
 import com.readmates.club.application.model.ConfirmPlatformAdminClubVisibilityCommand
+import com.readmates.club.application.model.ConfirmPlatformAdminOnboardingCommand
 import com.readmates.club.application.model.PlatformAdminClubCommandPreview
 import com.readmates.club.application.model.PlatformAdminClubCommandReceipt
 import com.readmates.club.application.model.PlatformAdminClubDetail
@@ -100,7 +101,7 @@ interface PreviewPlatformAdminClubOnboardingUseCase {
 interface CommitPlatformAdminClubOnboardingUseCase {
     fun commit(
         admin: PlatformActor,
-        command: PlatformAdminOnboardingCommand,
+        command: ConfirmPlatformAdminOnboardingCommand,
     ): PlatformAdminOnboardingResult
 }
 

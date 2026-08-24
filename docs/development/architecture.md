@@ -120,7 +120,26 @@ Platform admin club operations는 `/api/admin/clubs/{clubId}/operations`에서 �
 
 Platform admin club control mutation은 DB의 `BIGINT clubs.admin_revision`을 Kotlin `Long`으로 그대로 노출하고 CAS token으로 사용합니다. `PATCH /api/admin/clubs/{clubId}/metadata`는 revision CAS로 metadata만 갱신합니다. 공개 범위 변경은 `/visibility/preview|confirm`, domain 생성은 `/domains/preview`와 `/domains` confirm으로 분리되며 둘 다 actor·revision·full effect·versioned request HMAC에 묶인 V58 preview를 한 번만 소비합니다. Visibility confirm은 target visibility를 반복해 preview와 canonical request digest에 결속하며, immutable receipt와 audit 모두 before/after visibility 및 lifecycle status를 보존합니다. PUBLIC confirm은 기존 member lifecycle과 같은 `club -> ordered active HOST rows` 순서로 current locks를 잡고, revision·현재 lifecycle·현재 visibility를 모두 origin CAS에 포함하므로 concurrent lifecycle winner를 덮거나 host prerequisite가 commit 전에 사라지지 않습니다. PUBLIC publish prerequisite는 공개 전환에만 적용하고 PRIVATE 축소를 막지 않습니다. Domain 상태 재확인은 `POST /api/admin/domains/{domainId}/check`의 L1 command입니다. Confirm/recheck는 현재 활성 platform admin과 exact capability를 먼저 확인한 뒤 V57 shared claim을 예약하고, origin 변경·V58 immutable receipt·platform audit·convergence row·claim completion을 하나의 application-owned transaction으로 commit합니다. 완료 replay는 현재 권한을 다시 확인하지만 만료·소비된 preview 또는 삭제·변경된 target보다 immutable receipt를 먼저 사용합니다. Domain provider I/O는 DB transaction 밖에서 실행되며, convergence는 lease로 직렬화하고 설정된 bounded retry budget 뒤 `FAILED`와 명시적 allowlist safe error code로 종료합니다. Lease는 hostname 대신 origin의 status/updated-at observation만 운반하고, retry takeover는 마지막 immutable finish event의 `observed_at`을 target token으로 사용합니다. Provider 전 operational hostname을 별도로 조회하며, acquisition과 completion의 conditional target CAS가 삭제·후속 mutation을 `DOMAIN_TARGET_NOT_FOUND|STALE` terminal evidence로 닫아 이전 command가 최신 상태를 덮어쓰지 못하게 합니다. Preview TTL은 digest previous-key rollout buffer보다 항상 짧아야 하므로 overlap에서 만든 preview가 drain 뒤 시작되는 24시간 이상 retirement buffer를 넘지 않습니다. Safe-command conflict와 malformed user idempotency key는 공통 `ApiErrorResponse`의 controlled enum code로 복구 방향을 보존합니다. Receipt, audit, convergence와 로그에는 raw idempotency key, hostname, URL, provider response를 저장하지 않습니다.
 
-이 경계의 active component inventory는 registry/metadata의 `PlatformAdminClubRegistryService`와 `JdbcPlatformAdminClubAdapter`, visibility의 `PlatformAdminClubVisibilityService`와 `JdbcPlatformAdminClubVisibilityLockAdapter`, domain origin의 `PlatformAdminDomainCommandService`, provider 이후 수렴의 `PlatformAdminDomainConvergenceService`, command persistence facade인 `JdbcPlatformAdminClubCommandAdapter`와 preview/origin/convergence focused store입니다. Registry adapter는 onboarding/read model을 유지하고 command adapter만 V58 evidence protocol을 구현하므로 application transaction과 JDBC lock 순서를 한 giant adapter에 섞지 않습니다.
+Platform admin club onboarding도 같은 V57/V58 safe-command substrate를 사용합니다. Preview에는 full command 대신
+current-key request HMAC과 public-safe impact만 저장하고, confirm은 full normalized command와 confirmation을
+반복합니다. Shared claim은 preview/source read보다 먼저 실행되며 completed replay는 현재 read capability를
+재검증한 뒤 consumed/expired preview보다 immutable receipt를 먼저 반환합니다. 새 club, 기존-user HOST 또는
+invitation, optional domain, audit, receipt, convergence, preview consume와 claim completion은 한 transaction에서
+commit됩니다. Invitation raw token은 receipt digest key version으로 purpose-separated HMAC 재생성하고 기존
+invitation SHA-256 `token_hash`만 저장합니다. Mail은 notification worker 설정을 재사용한 lease/CAS worker가
+transaction 밖에서 at-least-once로 전송하며, optional domain은 기존 domain convergence path가 독립 effect
+target을 처리합니다. `PENDING HOST_INVITATION`은 key retirement/startup의 durable reference이고 terminal 전이는
+같은 digest-key-state lock을 먼저 잡습니다. DTO, receipt, audit, convergence event와 로그에는 email, raw token,
+invitation URL 또는 hostname을 저장하지 않습니다.
+
+이 경계의 active component inventory는 registry/metadata의 `PlatformAdminClubRegistryService`와
+`JdbcPlatformAdminClubAdapter`, visibility의 `PlatformAdminClubVisibilityService`와
+`JdbcPlatformAdminClubVisibilityLockAdapter`, domain origin/convergence의 `PlatformAdminDomainCommandService`와
+`PlatformAdminDomainConvergenceService`, onboarding origin/delivery의 `PlatformAdminOnboardingService`와
+`PlatformAdminHostInvitationConvergenceService`, command persistence facades인
+`JdbcPlatformAdminClubCommandAdapter`와 `JdbcPlatformAdminOnboardingCommandAdapter`, 그리고
+preview/origin/convergence focused store입니다. Registry adapter는 read model을 유지하고 command adapters만 V58
+evidence protocol을 구현하므로 application transaction과 JDBC lock 순서를 한 giant adapter에 섞지 않습니다.
 
 Platform admin AI Ops는 `readmates.aigen.enabled=true`일 때 `/api/admin/ai-generation/summary`, `/api/admin/ai-generation/jobs`, `/api/admin/ai-generation/jobs/{jobId}`, `/api/admin/ai-generation/jobs/{jobId}/force-cancel`을 사용합니다. 요약과 job ledger는 provider/model/status/error/cost 중심의 안전한 projection만 반환하고, force-cancel은 platform admin actor, 이전/다음 상태, 결과, 안전한 error code를 Flyway V34 `ai_generation_admin_action_audit`에 기록합니다.
 

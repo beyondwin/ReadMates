@@ -1,7 +1,6 @@
 package com.readmates.auth.application
 
 import com.readmates.auth.application.service.InvitationTokenService
-import com.readmates.club.application.port.out.GeneratePlatformAdminInvitationTokenPort
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
@@ -30,15 +29,5 @@ class InvitationTokenServiceTest {
         assertNotEquals(first, third)
         assertNotEquals("raw-token", first)
         assertTrue(first.matches(Regex("^[0-9a-f]{64}$")))
-    }
-
-    @Test
-    fun `generates a platform admin invitation token paired with its exact hash`() {
-        val tokenGenerator: GeneratePlatformAdminInvitationTokenPort = service
-
-        val generated = tokenGenerator.generate()
-
-        assertTrue(generated.rawToken.length >= 43)
-        assertEquals(service.hashToken(generated.rawToken), generated.tokenHash)
     }
 }

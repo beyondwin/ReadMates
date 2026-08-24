@@ -256,23 +256,22 @@ data class PlatformAdminOnboardingCommand(
     val existingUserConfirmation: String?,
 )
 
+data class ConfirmPlatformAdminOnboardingCommand(
+    val previewId: UUID,
+    val idempotencyKey: String,
+    val onboarding: PlatformAdminOnboardingCommand,
+    val confirmed: Boolean,
+)
+
 data class PlatformAdminOnboardingPreview(
-    val club: PlatformAdminOnboardingClubPreview,
-    val firstHost: PlatformAdminFirstHostPreview,
-    val domain: PlatformAdminDomainPreview?,
-)
-
-data class PlatformAdminOnboardingClubPreview(
-    val slug: String,
-    val available: Boolean,
-)
-
-data class PlatformAdminFirstHostPreview(
-    val kind: FirstHostPreviewKind,
-    val email: String,
-    val existingUserId: UUID?,
-    val existingUserName: String?,
+    val previewId: UUID,
+    val expiresAt: Instant,
+    val clubSlug: String,
+    val firstHostKind: FirstHostPreviewKind,
     val requiredConfirmation: String?,
+    val impactCodes: List<String>,
+    val prerequisiteCodes: List<String>,
+    val requestFingerprintPrefix: String,
 )
 
 enum class FirstHostPreviewKind {
@@ -280,25 +279,17 @@ enum class FirstHostPreviewKind {
     NEW_USER,
 }
 
-data class PlatformAdminDomainPreview(
-    val hostname: String,
-    val available: Boolean,
-)
-
 data class PlatformAdminOnboardingResult(
+    val receiptId: UUID,
     val club: PlatformAdminClubListItem,
-    val hostOnboarding: PlatformAdminHostOnboardingResult,
-    val domain: PlatformAdminClubDomain?,
+    val originStatus: PlatformAdminOnboardingOriginStatus,
+    val firstHostKind: HostOnboardingResultKind,
+    val invitationDelivery: PlatformAdminEmailDeliveryStatus,
 )
 
-data class PlatformAdminHostOnboardingResult(
-    val kind: HostOnboardingResultKind,
-    val email: String,
-    val userId: UUID?,
-    val invitationId: UUID?,
-    val acceptUrl: String?,
-    val emailDelivery: PlatformAdminEmailDeliveryResult,
-)
+enum class PlatformAdminOnboardingOriginStatus {
+    SUCCEEDED,
+}
 
 enum class HostOnboardingResultKind {
     EXISTING_USER_ASSIGNED,
@@ -310,7 +301,11 @@ data class PlatformAdminEmailDeliveryResult(
 )
 
 enum class PlatformAdminEmailDeliveryStatus {
-    SENT,
+    NOT_REQUIRED,
+    PENDING,
+    SUCCEEDED,
     FAILED,
-    SKIPPED,
 }
+
+const val CLUB_ONBOARDING_COMMAND_TYPE = "club.onboarding.create"
+const val CLUB_ONBOARDING_SCHEMA_VERSION = "admin.club.onboarding.create.v1"
