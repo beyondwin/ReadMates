@@ -1,6 +1,6 @@
 # ADR-0042: 플랫폼 어드민 audit cursor를 V57 digest key로 서명
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-24
 - 작성자: 플랫폼 운영·보안·서버
 - 관련: ADR-0028, ADR-0033, ADR-0040,
@@ -123,8 +123,7 @@ durable reference로 계수하거나 cursor 전용 key lifecycle을 별도 ADR�
 - Sensitive target/name/email/member UUID/note가 cursor payload, DTO, log, metric, URL/history/storage에 없는지
   security/privacy test한다.
 
-## 후속 작업
+## 구현 결과
 
-- Review Workbenches Task 4가 signer, property/startup validation, source-aware pagination과 security/privacy tests를
-  함께 구현한다.
-- Code, tests, active architecture와 rotation runbook이 이 계약과 일치한 뒤에만 `Accepted`로 승격한다.
+- Signer, property/startup validation, source-aware pagination과 security/privacy tests가 함께 구현되었다.
+- Code, tests, active architecture와 rotation runbook이 이 계약과 일치한다.

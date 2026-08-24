@@ -1,6 +1,6 @@
 # ADR-0039: 플랫폼 어드민을 task-centered Service Spine으로 구성
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 제품·디자인·플랫폼 운영
 - 관련: ADR-0003, ADR-0020, ADR-0030,
@@ -99,10 +99,9 @@ ADR-0030을, mutation 확인과 receipt는 ADR-0040을 따른다.
 - SUPPORT가 허용되지 않은 action을 실행할 수 없고 direct URL/API도 server에서 거절되는지 검증한다.
 - Platform admin route가 host mutation API를 호출하거나 host-sensitive state를 재사용하지 않는지 review한다.
 
-## 후속 작업
+## 구현 결과
 
-- 승인 설계를 수직 slice implementation plan으로 분해한다.
-- 구현, route/browser evidence, active architecture가 일치하면 ADR-0039의 `Accepted` 승격을 검토한다.
+- Service Spine 수직 slice와 route/browser evidence가 구현 및 active architecture와 일치한다.
 - Admin 구현은 public·guest·member·host까지 포괄하는 ADR-0020의
   `Accepted` 승격을 단독으로 충족하지 않는다. 각 ADR은 독립적으로 승격한다.
 - Admin command의 위험 등급과 preview/receipt는 ADR-0040을 따른다.

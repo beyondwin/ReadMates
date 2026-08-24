@@ -63,11 +63,11 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0036](0036-public-projection-cache-convergence.md) | Public projection 원자성과 cache convergence를 분리 | Proposed | 2026-08-22 | server, BFF, ops, product |
 | [0037](0037-platform-admin-emergency-public-takedown.md) | 긴급 public takedown을 platform-admin 전용 command로 실행 | Proposed | 2026-08-22 | platform ops, security, server |
 | [0038](0038-server-owned-host-list-cursor-epochs.md) | Host 모임·기록 목록을 server-owned cursor epoch로 제공 | Proposed | 2026-08-22 | server, front, product |
-| [0039](0039-platform-admin-task-centered-service-spine.md) | 플랫폼 어드민을 task-centered Service Spine으로 구성 | Proposed | 2026-08-22 | product, design, platform ops |
-| [0040](0040-domain-owned-admin-safe-command-protocol.md) | 플랫폼 어드민 mutation을 도메인 소유 safe-command protocol로 실행 | Proposed | 2026-08-22 | platform ops, security, server |
-| [0041](0041-domain-separated-platform-admin-invitation-delivery-token.md) | 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성 | Proposed | 2026-08-24 | platform ops, security, server |
-| [0042](0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Proposed | 2026-08-24 | platform ops, security, server |
-| [0043](0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Proposed | 2026-08-24 | platform ops, security, server, front |
+| [0039](0039-platform-admin-task-centered-service-spine.md) | 플랫폼 어드민을 task-centered Service Spine으로 구성 | Accepted | 2026-08-22 | product, design, platform ops |
+| [0040](0040-domain-owned-admin-safe-command-protocol.md) | 플랫폼 어드민 mutation을 도메인 소유 safe-command protocol로 실행 | Accepted | 2026-08-22 | platform ops, security, server |
+| [0041](0041-domain-separated-platform-admin-invitation-delivery-token.md) | 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성 | Accepted | 2026-08-24 | platform ops, security, server |
+| [0042](0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Accepted | 2026-08-24 | platform ops, security, server |
+| [0043](0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Accepted | 2026-08-24 | platform ops, security, server, front |
 
 ## 상태 범례
 

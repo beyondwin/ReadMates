@@ -1,6 +1,6 @@
 # ADR-0040: 플랫폼 어드민 mutation을 도메인 소유 safe-command protocol로 실행
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 플랫폼 운영·보안·서버
 - 관련: ADR-0001, ADR-0009, ADR-0012, ADR-0028, ADR-0029, ADR-0030, ADR-0033, ADR-0037, ADR-0039,
@@ -152,10 +152,10 @@ Notification replay confirm은 eligible event를 origin outbox mutation으로 �
 이 성공은 실제 delivery 완료를 뜻하지 않는다. 이후 delivery attempt와 outcome은 같은 workflow identity의
 L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로 resume한다.
 
-### Proposed 범위 정교화: V59 service receipt와 convergence
+### V59 service receipt와 convergence
 
-ADR-0040은 아직 `Proposed`이고 V59가 미구현이므로, 이 절은 기존 결정을 대체하거나 이미 배포된 schema를
-rewrite하는 것이 아니라 Service Operations executor가 따라야 할 구체 계약을 추가한다. Club V58의 검증된
+이 절은 기존 결정을 대체하거나 이미 배포된 schema를 rewrite하는 것이 아니라 V59에 구현된 구체 계약을
+기록한다. Club V58의 검증된
 immutable receipt/current convergence/append-only attempt 구조를 기준으로 notification과 AI의 typed parent를
 혼합하지 않는다.
 
@@ -279,12 +279,8 @@ existing delivery engine을 관측할 뿐 다시 전송하지 않고, AI commit 
 - Convergence event가 같은 attempt의 start event와 typed parent/effect/target을 모두 참조하고 terminal attempt
   count, pending retry continuity, stale lease CAS와 safe error regex를 강제하는지 negative MySQL test한다.
 
-## 후속 작업
+## 구현 결과
 
-- 현재 mutation을 L1/L2/L3로 inventory하고 필요한 migration과 compatibility route를 implementation plan에
-  분리한다.
-- AI POST CSRF/BFF 통합 경로를 characterization RED test로 먼저 확정한다.
-- Support active duplicate constraint와 grant/audit atomicity를 migration으로 보강한다.
-- Club public visibility를 generic metadata PATCH에서 typed command로 분리한다.
-- Code, migration, integration/security tests, global audit와 active architecture가 일치한 뒤 `Accepted`로
-  승격한다.
+- Mutation inventory, typed migration/compatibility route, AI POST CSRF/BFF 경로, support duplicate 및
+  grant/audit atomicity, club public visibility typed command가 구현되었다.
+- Code, V59/V60 migration, integration/security tests, global audit와 active architecture가 이 계약과 일치한다.

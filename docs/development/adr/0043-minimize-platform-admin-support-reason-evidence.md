@@ -1,6 +1,6 @@
 # ADR-0043: 플랫폼 어드민 support access 사유 evidence를 최소화
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-24
 - 작성자: 플랫폼 운영·보안·서버·프런트엔드
 - 관련: ADR-0030, ADR-0033, ADR-0039, ADR-0040,
@@ -132,9 +132,8 @@ Redacted plaintext를 되살리는 rollback은 없으며 V60 schema 위에서 ap
 - Active `HOST_SUPPORT_READ` grant는 request-local `ROLE_HOST`를 합성하지만 membership row/normal membership
   DTO를 만들지 않고, wrong club/scope, expiry, revoke 뒤에는 합성하지 않는지 auth regression test한다.
 
-## 후속 작업
+## 구현 결과
 
-- Review Workbenches Tasks 1–3가 V60 migration, support command contract, legacy redaction, transient authority
-  regression과 browser privacy tests를 함께 구현한다.
-- Code, migration, tests, active architecture와 retention/runbook이 이 계약과 일치한 뒤에만 `Accepted`로
-  승격한다.
+- V60 migration, support command contract, legacy redaction, transient authority regression과 browser privacy
+  경계가 구현되었다.
+- Code, migration, tests, active architecture와 retention/runbook이 이 계약과 일치한다.

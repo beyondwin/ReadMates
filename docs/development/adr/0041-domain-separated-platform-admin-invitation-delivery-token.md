@@ -1,6 +1,6 @@
 # ADR-0041: 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-24
 - 작성자: 플랫폼 운영·보안·서버
 - 관련: ADR-0028, ADR-0033, ADR-0040,
@@ -81,8 +81,8 @@ SHA-256 결과만 저장하며 raw token은 저장하지 않는다. HMAC 결과�
 V58 convergence에는 `effect_target_id_snapshot CHAR(36) CHARACTER SET ascii COLLATE ascii_bin NOT NULL`을
 추가한다. `HOST_INVITATION`은 invitation UUID, `DOMAIN_PROVISIONING`은 domain UUID를 저장하고 기존의 receipt당
 effect type 하나라는 unique 경계와 함께 `(receipt, effect type, effect target)` identity를 고정한다. Snapshot에는
-deletable invitation, club, user FK를 두지 않는다. 이 변경은 아직 feature-local이고 미출시인 V58을 Task 4
-stack에서 보강한다. Service operations에 예약된 V59를 사용하지 않는다.
+deletable invitation, club, user FK를 두지 않는다. 이 변경은 V58을 Task 4 stack에서 보강했으며 Service
+operations에 예약된 V59를 사용하지 않는다.
 
 Delivery worker는 짧은 claim/lease transaction에서 `PENDING HOST_INVITATION` work를 잡고, transaction 밖에서
 receipt의 digest key version과 convergence target invitation UUID, invitation의 club UUID를 읽어 raw token을
@@ -218,11 +218,10 @@ reference, fail-closed startup/retirement와 evidence 비저장으로 제한한�
 - Public-release safety scan은 token-shaped fixture, raw email, URL, secret과 private path가 새 docs/source/fixture에
   들어오지 않았는지 확인한다.
 
-## 후속 작업
+## 구현 결과
 
-- Task 4는 V58에 convergence effect target snapshot을 추가하고 receipt/worker/key retirement/startup protocol을
-  구현한다. 새 V59 migration이나 새 secret은 만들지 않는다.
-- Implementation plan은 이 ADR을 ADR impact `new`, 상태 `Proposed`로 참조한다. Code, migration, tests,
-  active architecture와 operator rotation evidence가 모두 일치한 뒤에만 `Accepted`로 승격한다.
+- V58 convergence effect target snapshot과 receipt/worker/key retirement/startup protocol이 구현되었고,
+  별도 invitation secret이나 추가 migration 없이 domain-separated token 계약을 지킨다.
+- Code, migration, tests, active architecture와 operator rotation runbook이 일치한다.
 - Terminal failure 뒤 새 invitation을 발급하는 별도 operator workflow가 필요해지면 기존 receipt/link를
   암묵적으로 바꾸지 말고 별도 command decision으로 검토한다.
