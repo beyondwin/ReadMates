@@ -1,5 +1,6 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolveE2eDatabaseName } from "./tests/e2e/readmates-e2e-config";
+import { protectedSecurityReporterEnabled } from "./tests/e2e/support/host-authority-cache-security-reporter";
 
 delete process.env.NO_COLOR;
 
@@ -37,7 +38,9 @@ export default defineConfig({
   workers,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  reporter: "list",
+  reporter: protectedSecurityReporterEnabled()
+    ? [["list"], ["./tests/e2e/support/host-authority-cache-security-reporter.ts"]]
+    : "list",
   use: {
     baseURL,
     trace: "on-first-retry",

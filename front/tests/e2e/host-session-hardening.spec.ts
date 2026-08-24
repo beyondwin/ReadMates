@@ -1024,3 +1024,65 @@ where session_id = ${sqlString(sessionId)}
   expect(audit).not.toContain("member1@example.com");
   expect(readMembershipId("host@example.com")).toBe(HOST_MEMBERSHIP_ID);
 });
+
+test("recoverable conflict and committed response loss preserve form drafts and reconcile before retry", async ({ page }) => {
+  const conflictSessionId = insertSession({ bookTitle: "복구 가능한 리비전 충돌", state: "DRAFT" });
+  const responseLossSessionId = insertSession({ bookTitle: "복구 가능한 응답 유실", state: "DRAFT" });
+  const conflictDraft = "충돌 뒤에도 남아야 하는 모임 제목";
+  const responseLossDraft = "응답 유실 뒤 조정으로 확정할 모임 제목";
+  await loginWithGoogleFixture(page, "host@example.com");
+
+  await openHostSession(page, conflictSessionId);
+  await openWorkspacePanel(page, "기본 정보");
+  const conflictTitle = page.getByLabel("모임 제목");
+  await conflictTitle.fill(conflictDraft);
+  let conflictAttempts = 0;
+  const conflictPattern = `**/api/bff/api/host/sessions/${conflictSessionId}?clubSlug=${CLUB_SLUG}`;
+  await page.route(conflictPattern, async (route) => {
+    if (route.request().method() !== "PATCH") return route.continue();
+    conflictAttempts += 1;
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "REVISION_CONFLICT",
+        message: "최신 모임 정보를 확인해 주세요.",
+        status: 409,
+      }),
+    });
+  });
+  await page.getByRole("button", { name: "기본 정보 저장" }).click();
+  await expect(page.locator("#host-session-basic-save-state")).toHaveAttribute("role", "alert");
+  await expect(conflictTitle).toHaveValue(conflictDraft);
+  expect(conflictAttempts).toBe(1);
+  await page.unroute(conflictPattern);
+
+  await openHostSession(page, responseLossSessionId);
+  await openWorkspacePanel(page, "기본 정보");
+  const responseLossTitle = page.getByLabel("모임 제목");
+  await responseLossTitle.fill(responseLossDraft);
+  const order: string[] = [];
+  let mutationAttempts = 0;
+  const responseLossPattern = `**/api/bff/api/host/sessions/${responseLossSessionId}?clubSlug=${CLUB_SLUG}`;
+  await page.route(responseLossPattern, async (route) => {
+    if (route.request().method() !== "PATCH") return route.continue();
+    mutationAttempts += 1;
+    order.push(`mutation-${mutationAttempts}`);
+    const committed = await route.fetch();
+    expect(committed.status(), await committed.text()).toBe(200);
+    await route.abort("failed");
+  });
+  await page.route("**/api/bff/api/host/mutations/SESSION_BASIC_SAVE/**", async (route) => {
+    order.push("reconcile");
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "기본 정보 저장" }).click();
+  await expect(page.locator("#host-session-basic-save-state")).toHaveText("저장되었습니다.");
+  await expect(responseLossTitle).toHaveValue(responseLossDraft);
+  expect(order).toEqual(["mutation-1", "reconcile"]);
+  expect(mutationAttempts).toBe(1);
+  const storedTitle = runMysql(`
+select title from sessions where id = ${sqlString(responseLossSessionId)};
+`).trim().split("\n").at(-1);
+  expect(storedTitle).toBe(responseLossDraft);
+});

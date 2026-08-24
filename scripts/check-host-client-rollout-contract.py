@@ -38,6 +38,8 @@ REQUIRED_SOURCES = (
     ".github/workflows/deploy-server.yml",
     ".github/workflows/deploy-front.yml",
     "server/src/main/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilter.kt",
+    "front/playwright.config.ts",
+    "front/tests/e2e/support/host-authority-cache-security-reporter.ts",
     "scripts/check-host-client-rollout-contract.py",
     "scripts/host-rollout-cache-evidence.py",
     "scripts/host-rollout-evidence-reporter.py",
@@ -165,6 +167,13 @@ EXPECTED_REPORTER_ARGV = {
     "playwright-contract-rollout": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "--config", "playwright-rollout.config.ts", "tests/e2e/host-client-contract-rollout.spec.ts"],
     "playwright-non-session-regressions": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/host-feedback-notification-composer.spec.ts", "tests/e2e/host-next-book-notification-composer.spec.ts", "tests/e2e/manual-notifications.spec.ts"],
     "playwright-authority-cache-regressions": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/host-authority-loss.spec.ts", "tests/e2e/public-projection-cache-safety.spec.ts"],
+}
+
+SECURITY_REPORTER_REQUIRED_PATHS = {
+    "front/playwright.config.ts",
+    "front/tests/e2e/host-authority-loss.spec.ts",
+    "front/tests/e2e/public-projection-cache-safety.spec.ts",
+    "front/tests/e2e/support/host-authority-cache-security-reporter.ts",
 }
 
 
@@ -700,6 +709,8 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
                 paths = command.get("requiredPaths")
                 if not isinstance(paths, list) or not paths or any(not isinstance(path, str) or not path for path in paths):
                     errors.append("structured reporter substantive spec/config path set is empty or invalid")
+                elif command_id == "playwright-authority-cache-regressions" and set(paths) != SECURITY_REPORTER_REQUIRED_PATHS:
+                    errors.append("security reporter causal source set is incomplete or unknown")
                 cases = command.get("cases")
                 if not isinstance(cases, list) or not cases or any(not isinstance(case, str) for case in cases):
                     errors.append("structured reporter case set is empty or invalid")
@@ -733,6 +744,25 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         _require(reporter_source, needle, message, errors)
     if "hashlib" in reporter_source or "cryptography" in reporter_source:
         errors.append("structured reporter must not implement cryptography in Python")
+
+    playwright_config = sources["front/playwright.config.ts"]
+    for needle, message in (
+        ("reporter: protectedSecurityReporterEnabled()", "Playwright config does not scope the causal reporter to the protected security command"),
+        ("host-authority-cache-security-reporter", "Playwright config does not select the causal security reporter"),
+    ):
+        _require(playwright_config, needle, message, errors)
+    security_reporter = sources["front/tests/e2e/support/host-authority-cache-security-reporter.ts"]
+    for needle, message in (
+        ("onTestEnd", "security reporter does not aggregate actual Playwright callbacks"),
+        ("unexpected source file", "security reporter does not fail closed on unexpected spec files"),
+        ("unknown test", "security reporter does not fail closed on unknown tests"),
+        ("duplicate callback", "security reporter does not fail closed on duplicate callbacks"),
+        ("callback set is missing", "security reporter does not fail closed on missing callbacks"),
+        ("did not pass", "security reporter does not fail closed on failed or skipped callbacks"),
+        ("unknown case", "security reporter does not fail closed on unknown cases"),
+        ("duplicate case", "security reporter does not fail closed on duplicate cases"),
+    ):
+        _require(security_reporter, needle, message, errors)
 
     pages_job = _mapping(jobs.get("pages-candidate"))
     if _needs(pages_job) != {"source"}:
@@ -1831,6 +1861,30 @@ class RolloutContractTests(unittest.TestCase):
             sources = _read_sources(REPO_ROOT)
             sources[path] = sources[path].replace(old, new, 1)
             with self.subTest(mutation=new):
+                self.assertTrue(validate_structural_sources(sources))
+
+    def test_security_reporter_contract_rejects_unbound_or_noncausal_aggregation(self) -> None:
+        cases = (
+            (
+                "scripts/host-rollout-test-contract.json",
+                '"front/tests/e2e/support/host-authority-cache-security-reporter.ts"',
+                '"front/tests/e2e/support/unbound-reporter.ts"',
+            ),
+            (
+                "front/playwright.config.ts",
+                "reporter: protectedSecurityReporterEnabled()",
+                "reporter: reporterAlwaysEnabled()",
+            ),
+            (
+                "front/tests/e2e/support/host-authority-cache-security-reporter.ts",
+                "onTestEnd",
+                "omittedTestCallback",
+            ),
+        )
+        for path, old, new in cases:
+            sources = _read_sources(REPO_ROOT)
+            sources[path] = sources[path].replace(old, new, 1)
+            with self.subTest(path=path):
                 self.assertTrue(validate_structural_sources(sources))
 
     def test_live_browser_jobs_require_fresh_setup_and_manual_protected_authority(self) -> None:
