@@ -4,7 +4,10 @@ package com.readmates.admin.takedown.adapter.`in`.web
 
 import com.readmates.admin.takedown.application.model.ConfirmPublicTakedownCommand
 import com.readmates.admin.takedown.application.model.PreviewPublicTakedownCommand
+import com.readmates.admin.takedown.application.model.PublicTakedownError
+import com.readmates.admin.takedown.application.model.PublicTakedownException
 import com.readmates.admin.takedown.application.model.PublicTakedownPreview
+import com.readmates.admin.takedown.application.model.PublicTakedownReasonCategory
 import com.readmates.admin.takedown.application.model.PublicTakedownReceipt
 import java.time.Instant
 import java.util.UUID
@@ -31,7 +34,10 @@ data class PublicTakedownConfirmRequest(
     fun toCommand(): ConfirmPublicTakedownCommand =
         ConfirmPublicTakedownCommand(
             previewId = previewId ?: throw InvalidPublicTakedownRequestException(),
-            reasonCategory = reasonCategory ?: throw InvalidPublicTakedownRequestException(),
+            reasonCategory =
+                reasonCategory
+                    ?.let(PublicTakedownReasonCategory::fromWire)
+                    ?: throw PublicTakedownException(PublicTakedownError.INVALID_REASON_CATEGORY),
             reason = reason ?: throw InvalidPublicTakedownRequestException(),
             idempotencyKey = idempotencyKey ?: throw InvalidPublicTakedownRequestException(),
         )
@@ -94,7 +100,7 @@ data class PublicTakedownReceiptResponse(
                 publicationId = receipt.publicationId,
                 committedGeneration = receipt.committedGeneration,
                 originResult = receipt.originResult,
-                reasonCategory = receipt.reasonCategory,
+                reasonCategory = receipt.reasonCategory.name,
                 reasonRedacted = receipt.reasonRedacted,
                 createdAt = receipt.createdAt,
                 bffEvictionOutcome = receipt.bffEvictionOutcome,

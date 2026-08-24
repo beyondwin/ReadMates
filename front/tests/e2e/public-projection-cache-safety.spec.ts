@@ -91,7 +91,7 @@ class ActualBffHarness {
         request: new Request(bffUrl(path)),
         env: {
           READMATES_API_BASE_URL: "https://api.example.test",
-          READMATES_BFF_SECRET: "public-safe-placeholder",
+          READMATES_BFF_SECRET: "test-bff-secret",
         },
         params: { path: path.replace(/^\//, "").split("/") },
         waitUntil: (promise) => pending.push(promise),
@@ -172,27 +172,28 @@ async function visit(page: Page, path: string, visitId: string) {
 
 test.describe.configure({ mode: "serial" });
 
-test("actual BFF keeps a general public club projection for 120 seconds", async ({ page }) => {
+test("actual BFF stops serving a revoked public club list after 60 seconds", async ({ page }) => {
   const harness = new ActualBffHarness();
   const path = "/api/public/clubs/reading-sai";
-  harness.setOrigin(path, "generation-1-club", "public, max-age=120, must-revalidate");
+  harness.setOrigin(path, "generation-1-club", "public, max-age=60, must-revalidate");
   await installActualBff(page, harness);
 
   await visit(page, path, "initial");
   await expect(page.locator("main")).toHaveText("generation-1-club");
   await expect(page.locator("main")).toHaveAttribute(
     "data-cache-control",
-    "public, max-age=120, must-revalidate",
+    "public, max-age=60, must-revalidate",
   );
-  harness.setOrigin(path, "generation-2-club", "public, max-age=120, must-revalidate");
+  harness.revoke(path);
 
-  harness.cache.nowSeconds = 119;
+  harness.cache.nowSeconds = 59;
   await visit(page, path, "before-boundary");
   await expect(page.locator("main")).toHaveText("generation-1-club");
 
-  harness.cache.nowSeconds = 121;
+  harness.cache.nowSeconds = 61;
   await visit(page, path, "after-boundary");
-  await expect(page.locator("main")).toHaveText("generation-2-club");
+  await expect(page.locator("main")).toHaveText("origin-denied");
+  await expect(page.locator("main")).toHaveAttribute("data-cache-control", "no-store");
 });
 
 test("actual BFF detail policy denies after 60 seconds on navigation reload and Back", async ({ page }) => {

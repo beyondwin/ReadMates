@@ -38,7 +38,7 @@ class PublicControllerDbTest(
             .get("/api/public/club")
             .andExpect {
                 status { isOk() }
-                header { string("Cache-Control", "public, max-age=120, must-revalidate") }
+                header { string("Cache-Control", "public, max-age=60, must-revalidate") }
                 jsonPath("$.clubName") { value("읽는사이") }
                 jsonPath("$.stats.sessions") { value(6) }
                 jsonPath("$.recentSessions[0].sessionNumber") { value(6) }
@@ -618,6 +618,15 @@ class PublicControllerDbTest(
         """
 
         private const val CLEANUP_PUBLIC_PUBLICATION_MATRIX_SQL = """
+            delete from public_projection_generations
+            where session_id in (
+              '00000000-0000-0000-0000-000000000990',
+              '00000000-0000-0000-0000-000000000991',
+              '00000000-0000-0000-0000-000000000992',
+              '00000000-0000-0000-0000-000000000993',
+              '00000000-0000-0000-0000-000000000994',
+              '00000000-0000-0000-0000-000000000995'
+            );
             delete from public_session_publications
             where session_id in (
               '00000000-0000-0000-0000-000000000990',
@@ -752,6 +761,16 @@ class PublicControllerDbTest(
               'PUBLIC',
               'HIDDEN',
               null
+            );
+            insert into public_projection_generations (
+              publication_id, club_id, session_id, generation, live_record_revision, origin_readable
+            ) values (
+              '00000000-0000-0000-0000-000000001991',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000991',
+              1,
+              null,
+              true
             );
         """
 

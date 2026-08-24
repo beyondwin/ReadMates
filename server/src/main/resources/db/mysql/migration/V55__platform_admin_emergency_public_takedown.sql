@@ -42,7 +42,12 @@ create table admin_public_takedown_receipts (
   constraint admin_public_takedown_receipts_generation_check check (committed_generation > 1),
   constraint admin_public_takedown_receipts_origin_check check (binary origin_result = binary 'DENIED'),
   constraint admin_public_takedown_receipts_reason_check check (
-    length(trim(reason_category)) > 0 and reason_redacted = true
+    binary reason_category in (
+      binary 'PRIVATE_DATA',
+      binary 'LEGAL_REQUEST',
+      binary 'SECURITY_INCIDENT',
+      binary 'PUBLIC_SAFETY'
+    ) and reason_redacted = true
   )
 ) default character set utf8mb4 collate utf8mb4_0900_ai_ci;
 

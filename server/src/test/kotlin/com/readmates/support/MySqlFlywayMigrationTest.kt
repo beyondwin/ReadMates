@@ -3628,6 +3628,33 @@ class MySqlFlywayMigrationTest(
         assertThat(
             columnMetadata(jdbcTemplate, "admin_public_takedown_previews", "expires_at")["DATETIME_PRECISION"],
         ).isEqualTo(6L)
+        assertV55ReasonCategoryConstraint(jdbcTemplate)
+    }
+
+    private fun assertV55ReasonCategoryConstraint(jdbcTemplate: JdbcTemplate) {
+        fun insertReceipt(category: String) {
+            jdbcTemplate.update(
+                """
+                insert into admin_public_takedown_receipts (
+                  id, convergence_id, actor_user_id_snapshot, actor_platform_role_snapshot,
+                  reason_category, reason_redacted, club_id_snapshot, session_id_snapshot,
+                  publication_id_snapshot, committed_generation, origin_result,
+                  current_surfaces_json, remote_copy_limitation_code, created_at
+                ) values (?, ?, ?, 'OWNER', ?, true, ?, ?, ?, 2, 'DENIED', json_array('ORIGIN'),
+                          'REMOTE_STORED_OR_OFFLINE_COPY_NOT_ERASABLE', utc_timestamp(6))
+                """.trimIndent(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                category,
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+            )
+        }
+        insertReceipt("PRIVATE_DATA")
+        assertConstraintRejected { insertReceipt("MEMBER_EMAIL_EXPOSURE") }
+        jdbcTemplate.update("delete from admin_public_takedown_receipts")
     }
 
     private fun assertV55IdempotencyAndPrivacySchema(jdbcTemplate: JdbcTemplate) {

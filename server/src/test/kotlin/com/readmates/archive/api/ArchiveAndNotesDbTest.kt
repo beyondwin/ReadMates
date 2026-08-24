@@ -1465,6 +1465,13 @@ class ArchiveAndNotesDbTest(
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
 
         private const val CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL = """
+            delete from public_projection_generations
+            where session_id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3',
+              '00000000-0000-0000-0000-0000000092bb'
+            );
             delete from public_session_publications
             where session_id in (
               '00000000-0000-0000-0000-0000000092b1',
@@ -1559,6 +1566,16 @@ class ArchiveAndNotesDbTest(
                 '00000000-0000-0000-0000-0000000092b3',
                 '호스트 actor matrix 요약입니다.', false, 'HOST_ONLY', 'HIDDEN', null
               );
+            insert into public_projection_generations (
+              publication_id, club_id, session_id, generation, live_record_revision, origin_readable
+            ) values (
+              '00000000-0000-0000-0000-0000000092b4',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-0000000092b1',
+              1,
+              null,
+              true
+            );
             insert into session_participants (
               id, club_id, session_id, membership_id,
               rsvp_status, attendance_status, participation_status

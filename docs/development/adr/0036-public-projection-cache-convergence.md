@@ -7,11 +7,11 @@
 
 ## 컨텍스트
 
-현재 public response는 `max-age=120, stale-while-revalidate=600`이다(`PublicController.kt:22`). Database transaction과 origin projection은 원자적으로 바꿀 수 있지만, 이미 fresh cache를 가진 browser와 CDN은 같은 순간에 바뀌지 않는다. CDN purge도 이미 렌더링되거나 offline으로 저장된 내용을 원격 삭제하지 못한다.
+V55 substrate 이전 public response는 `max-age=120, stale-while-revalidate=600`이었다. 현재 public club/list/detail response는 긴급 차단 경계를 공통 적용하기 위해 `max-age=60, must-revalidate`다. Database transaction과 origin projection은 원자적으로 바꿀 수 있지만, 이미 이전 header로 fresh cache를 가진 browser와 CDN은 같은 순간에 바뀌지 않는다. CDN purge도 이미 렌더링되거나 offline으로 저장된 내용을 원격 삭제하지 못한다.
 
 ## 결정
 
-Publication/revoke transaction은 DB와 origin projection, cache generation을 원자적으로 바꾸고 immutable mutation receipt에 origin result, generation, actor, request identity, `convergenceId`를 남긴다. CDN purge attempt는 별도 append-only convergence ledger에 `PENDING|SUCCEEDED|FAILED`, provider attempt, observed time을 추가하고 current projection은 ledger에서 계산한다. Mutation receipt를 상태 갱신 용도로 수정하지 않는다. 일반 수정·visibility revoke는 새 navigation/read가 120초 안에 수렴해야 한다. 민감 정보 긴급 takedown은 origin을 즉시 deny하고 관련 public response의 browser freshness를 60초 이하로 낮춰 새 navigation/read가 60초 안에 deny를 관찰하게 한다. 이 정책을 활성화하기 전에는 기존 `max-age=120 + stale-while-revalidate=600` browser lifetime 전체인 720초를 기다린다. CDN/BFF purge는 이미 이전 header로 저장된 browser cache를 지우지 못하므로 이 대기 증거를 대체하지 않는다. R2a는 이 시간 순서와 origin/BFF/CDN/old-browser 결과를 별도 attested cache-safety manifest로 고정하고, R2b는 동일 C1 source set을 새 Pages candidate에서 결정론적으로 재실행한다. 이미 렌더링·저장·offline인 copy는 SLA 밖임을 confirmation과 runbook에 명시한다. 긴급 takedown command authorization과 idempotency는 ADR-0037을 따른다.
+Publication/revoke transaction은 DB와 origin projection, cache generation을 원자적으로 바꾸고 immutable mutation receipt에 origin result, generation, actor, request identity, `convergenceId`를 남긴다. 모든 public projection reader는 publication과 exact current generation row를 결합하고 `origin_readable=true`인 경우에만 summary, book metadata, record와 club count를 반환한다. CDN purge attempt는 별도 append-only convergence ledger에 `PENDING|SUCCEEDED|FAILED`, provider attempt, observed time을 추가하고 current projection은 ledger에서 계산한다. Mutation receipt를 상태 갱신 용도로 수정하지 않는다. 일반 수정·visibility revoke와 민감 정보 긴급 takedown은 origin을 즉시 deny하며 새 navigation/read가 60초 안에 deny를 관찰하게 한다. 이 정책을 활성화하기 전에는 기존 `max-age=120 + stale-while-revalidate=600` browser lifetime 전체인 720초를 기다린다. CDN/BFF purge는 이미 이전 header로 저장된 browser cache를 지우지 못하므로 이 대기 증거를 대체하지 않는다. R2a는 이 시간 순서와 origin/BFF/CDN/old-browser 결과를 별도 attested cache-safety manifest로 고정하고, R2b는 동일 C1 source set을 새 Pages candidate에서 결정론적으로 재실행한다. 이미 렌더링·저장·offline인 copy는 SLA 밖임을 confirmation과 runbook에 명시한다. 긴급 takedown command authorization과 idempotency는 ADR-0037을 따른다.
 
 Operational lease/work row는 retention에 따라 제거할 수 있다. Immutable receipt/convergence event는 삭제 가능한 session/publication content에 destructive FK를 두지 않고 redacted resource UUID snapshot을 보존한다. 기존 7일 hard delete는 계속 성공해야 하며, immutable bytes는 authorized audit 경로에서만 조회한다.
 
@@ -37,10 +37,10 @@ Operational lease/work row는 retention에 따라 제거할 수 있다. Immutabl
 
 ## 검증
 
-- Origin/CDN/browser fresh·stale boundary에서 일반 120초, 긴급 60초 목표, 기존 720초 policy 소진 gate와 purge failure receipt를 integration/browser test한다.
+- Origin/CDN/browser fresh boundary에서 60초 목표, 기존 720초 policy 소진 gate와 purge failure receipt를 integration/browser test한다.
 - 만료된 synthetic session/publication hard delete가 성공하고 operational row는 retention대로 정리되며 redacted immutable convergence bytes는 남는지 검증한다.
 - 2026-08-24 server service/API subset은 claim lease와 `PENDING` commit, transaction 밖 provider 호출, 별도 terminal commit, deterministic attempt token, bounded retry/backoff, host-authorized bounded status query를 구현했다. HTTP adapter는 provider 준비 플래그로 bean graph를 완결하지만 feature가 꺼져 있으면 work를 실행하지 않고, scheduler는 feature·scheduler·HTTP provider 삼중 opt-in에서만 동작한다. HTTP lease는 connect/read budget과 terminal-write safety margin의 합보다 엄격히 커야 하며 provider-neutral 응답은 2xx만 성공으로 인정한다. Cache header/browser/CDN evidence와 emergency control plane은 아직 후속 작업이므로 이 ADR은 `Proposed`를 유지한다.
-- 같은 날 V55 emergency server substrate가 origin deny와 generation 회전, immutable redacted admin receipt, 기존 V54 convergence link/work를 한 transaction에 연결했다. Production confirm은 protected Step 8 evidence verifier가 없어서 계속 fail closed이며, operator UI·active runbook·browser/CDN runtime evidence도 후속 작업이므로 상태는 `Proposed`다.
+- 같은 날 V55 emergency server substrate가 origin deny와 generation 회전, immutable redacted admin receipt, 기존 V54 convergence link/work를 한 transaction에 연결했다. Club list/stats/detail과 guest record reader는 exact generation의 readable marker를 공통으로 요구하고, deterministic actual-BFF harness가 60초 뒤 revoked club list를 재조회하는 경계를 검증한다. Production confirm은 protected Step 8 evidence verifier가 없어서 계속 fail closed이며, operator UI·active runbook·실제 CDN runtime evidence도 후속 작업이므로 상태는 `Proposed`다.
 
 ## 후속 작업
 

@@ -17,10 +17,22 @@ data class PreviewPublicTakedownCommand(
 
 data class ConfirmPublicTakedownCommand(
     val previewId: UUID,
-    val reasonCategory: String,
+    val reasonCategory: PublicTakedownReasonCategory,
     val reason: String,
     val idempotencyKey: String,
 )
+
+enum class PublicTakedownReasonCategory {
+    PRIVATE_DATA,
+    LEGAL_REQUEST,
+    SECURITY_INCIDENT,
+    PUBLIC_SAFETY,
+    ;
+
+    companion object {
+        fun fromWire(value: String): PublicTakedownReasonCategory? = entries.firstOrNull { it.name == value.trim() }
+    }
+}
 
 data class PublicTakedownTarget(
     val clubId: UUID,
@@ -54,7 +66,7 @@ data class PublicTakedownReceipt(
     val publicationId: UUID,
     val committedGeneration: Long,
     val originResult: String,
-    val reasonCategory: String,
+    val reasonCategory: PublicTakedownReasonCategory,
     val reasonRedacted: Boolean,
     val createdAt: Instant,
     val bffEvictionOutcome: String = "NOT_STARTED",

@@ -7,6 +7,7 @@ import com.readmates.admin.takedown.application.model.PublicTakedownError
 import com.readmates.admin.takedown.application.model.PublicTakedownException
 import com.readmates.admin.takedown.application.model.PublicTakedownIdempotencyScope
 import com.readmates.admin.takedown.application.model.PublicTakedownPreview
+import com.readmates.admin.takedown.application.model.PublicTakedownReasonCategory
 import com.readmates.admin.takedown.application.model.PublicTakedownReceipt
 import com.readmates.admin.takedown.application.model.PublicTakedownRequestIdentity
 import com.readmates.admin.takedown.application.port.`in`.ConfirmPublicTakedownUseCase
@@ -71,7 +72,7 @@ class PublicTakedownService(
         command: ConfirmPublicTakedownCommand,
     ): PublicTakedownReceipt {
         authorize(actor)
-        val category = validateCategory(command.reasonCategory)
+        val category = command.reasonCategory
         val reason = validateReason(command.reason)
         validateKey(command.idempotencyKey)
         val preview = port.loadPreview(command.previewId) ?: fail(PublicTakedownError.PREVIEW_NOT_FOUND)
@@ -120,7 +121,7 @@ class PublicTakedownService(
 
     private fun requestIdentity(
         preview: PublicTakedownPreview,
-        category: String,
+        category: PublicTakedownReasonCategory,
         reason: String,
     ): PublicTakedownRequestIdentity {
         val normalizedReason = Normalizer.normalize(reason, Normalizer.Form.NFC)
@@ -149,7 +150,7 @@ class PublicTakedownService(
 
     private fun canonicalRequestHmac(
         preview: PublicTakedownPreview,
-        category: String,
+        category: PublicTakedownReasonCategory,
         normalizedReason: String,
         key: ByteArray,
     ): ByteArray {
@@ -169,15 +170,12 @@ class PublicTakedownService(
             output.writeUTF(preview.publicationId.toString())
             output.writeLong(preview.targetGeneration)
             preview.currentSurfaces.sorted().forEach(output::writeUTF)
-            output.writeUTF(category)
+            output.writeUTF(category.name)
             output.writeInt(reasonHmac.size)
             output.write(reasonHmac)
         }
         return RequestIdentityHmac.hmac(key, bytes.toByteArray())
     }
-
-    private fun validateCategory(value: String): String =
-        value.trim().takeIf { CATEGORY.matches(it) } ?: fail(PublicTakedownError.INVALID_REASON_CATEGORY)
 
     private fun validateReason(value: String): String =
         value.trim().takeIf { it.isNotEmpty() && it.length <= MAX_REASON_LENGTH }
@@ -192,7 +190,6 @@ class PublicTakedownService(
     private companion object {
         val PREVIEW_TTL: Duration = Duration.ofMinutes(10)
         const val MAX_REASON_LENGTH = 500
-        val CATEGORY = Regex("^[A-Z][A-Z0-9_]{0,63}$")
         val IDEMPOTENCY_KEY = Regex("^[A-Za-z0-9._-]{8,128}$")
     }
 }

@@ -239,6 +239,16 @@ class GuestBrowseControllerDbTest(
             PUBLIC_SUMMARY,
         )
         jdbcTemplate.update(
+            """
+            insert into public_projection_generations (
+              publication_id, club_id, session_id, generation, live_record_revision, origin_readable
+            ) values (?, ?, ?, 1, null, true)
+            """.trimIndent(),
+            PUBLICATION_ID,
+            CLUB_ID,
+            PUBLISHED_ID,
+        )
+        jdbcTemplate.update(
             "update questions set created_at = ? where id = ?",
             FIXED_FEED_CREATED_AT,
             ARCHIVE_QUESTION_ID,
@@ -262,6 +272,7 @@ class GuestBrowseControllerDbTest(
 
     @AfterEach
     fun cleanupGuestBrowseMatrix() {
+        jdbcTemplate.update("delete from public_projection_generations where publication_id = ?", PUBLICATION_ID)
         jdbcTemplate.update("delete from public_session_publications where id = ?", PUBLICATION_ID)
         jdbcTemplate.update("delete from highlights where id in (?, ?)", HIGHLIGHT_ID, OUTSIDE_HIGHLIGHT_ID)
         jdbcTemplate.update(

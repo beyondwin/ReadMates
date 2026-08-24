@@ -77,7 +77,9 @@ class JdbcPublicQueryAdapter(
                 join clubs on clubs.id = sessions.club_id
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
-                left join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
+                join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
+                  and public_projection_generations.club_id = sessions.club_id
+                  and public_projection_generations.session_id = sessions.id
                 where clubs.slug = ?
                   and clubs.status = 'ACTIVE'
                   and clubs.public_visibility = 'PUBLIC'
@@ -85,6 +87,7 @@ class JdbcPublicQueryAdapter(
                   and sessions.state = 'PUBLISHED'
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
+                  and public_projection_generations.origin_readable = true
                 """.trimIndent(),
                 { rs, _ ->
                     PublicSessionDetailResult(
@@ -147,20 +150,28 @@ class JdbcPublicQueryAdapter(
                 from active_sessions sessions
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
+                join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
+                  and public_projection_generations.club_id = sessions.club_id
+                  and public_projection_generations.session_id = sessions.id
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
+                  and public_projection_generations.origin_readable = true
               ) as session_count,
               (
                 select count(distinct sessions.book_title)
                 from active_sessions sessions
                 join public_session_publications on public_session_publications.session_id = sessions.id
                   and public_session_publications.club_id = sessions.club_id
+                join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
+                  and public_projection_generations.club_id = sessions.club_id
+                  and public_projection_generations.session_id = sessions.id
                 where sessions.club_id = ?
                   and sessions.state = 'PUBLISHED'
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
+                  and public_projection_generations.origin_readable = true
               ) as book_count,
               (
                 select count(*)
@@ -206,6 +217,9 @@ class JdbcPublicQueryAdapter(
             from active_sessions sessions
             join public_session_publications on public_session_publications.session_id = sessions.id
               and public_session_publications.club_id = sessions.club_id
+            join public_projection_generations on public_projection_generations.publication_id = public_session_publications.id
+              and public_projection_generations.club_id = sessions.club_id
+              and public_projection_generations.session_id = sessions.id
             left join (
               select highlights.session_id, count(*) as cnt
               from highlights
@@ -230,6 +244,7 @@ class JdbcPublicQueryAdapter(
               and sessions.state = 'PUBLISHED'
               and sessions.access_scope = 'GUEST_READABLE'
               and public_session_publications.site_visibility = 'PUBLIC_RECORD'
+              and public_projection_generations.origin_readable = true
             order by sessions.number desc
             limit 6
             """.trimIndent(),

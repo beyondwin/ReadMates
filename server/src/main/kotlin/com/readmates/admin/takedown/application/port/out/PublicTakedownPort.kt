@@ -2,6 +2,7 @@ package com.readmates.admin.takedown.application.port.out
 
 import com.readmates.admin.takedown.application.model.PublicTakedownIdempotencyScope
 import com.readmates.admin.takedown.application.model.PublicTakedownPreview
+import com.readmates.admin.takedown.application.model.PublicTakedownReasonCategory
 import com.readmates.admin.takedown.application.model.PublicTakedownReceipt
 import com.readmates.admin.takedown.application.model.PublicTakedownRequestIdentity
 import com.readmates.admin.takedown.application.model.PublicTakedownTarget
@@ -41,7 +42,7 @@ data class StorePublicTakedownCommand(
     val preview: PublicTakedownPreview,
     val scope: PublicTakedownIdempotencyScope,
     val identity: PublicTakedownRequestIdentity,
-    val reasonCategory: String,
+    val reasonCategory: PublicTakedownReasonCategory,
     val now: Instant,
     val idempotencyExpiresAt: Instant,
 )

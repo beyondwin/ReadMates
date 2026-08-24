@@ -112,6 +112,7 @@ class JdbcMutationIdempotencyAdapter(
         limit: Int,
     ): Int {
         if (limit <= 0) return 0
+        val budgets = fairMutationNamespaceBudgets(limit, now)
         val adminPurged =
             purgeOperationalRows(
                 """
@@ -121,7 +122,7 @@ class JdbcMutationIdempotencyAdapter(
                 limit ?
                 """.trimIndent(),
                 now,
-                limit,
+                budgets[ADMIN_NAMESPACE],
             )
         val previewsPurged =
             purgeOperationalRows(
@@ -132,7 +133,7 @@ class JdbcMutationIdempotencyAdapter(
                 limit ?
                 """.trimIndent(),
                 now,
-                limit - adminPurged,
+                budgets[PREVIEW_NAMESPACE],
             )
         val hostPurged =
             purgeOperationalRows(
@@ -143,7 +144,7 @@ class JdbcMutationIdempotencyAdapter(
                 limit ?
                 """.trimIndent(),
                 now,
-                limit - adminPurged - previewsPurged,
+                budgets[HOST_NAMESPACE],
             )
         return adminPurged + previewsPurged + hostPurged
     }
@@ -271,6 +272,26 @@ class JdbcMutationIdempotencyAdapter(
             expiresAt = utcOffsetDateTime("expires_at").toInstant(),
         )
     }
+
+    private companion object {
+        const val ADMIN_NAMESPACE = 0
+        const val PREVIEW_NAMESPACE = 1
+        const val HOST_NAMESPACE = 2
+    }
+}
+
+private fun fairMutationNamespaceBudgets(
+    limit: Int,
+    now: Instant,
+): IntArray {
+    val budgets = IntArray(MUTATION_NAMESPACE_COUNT) { limit / MUTATION_NAMESPACE_COUNT }
+    val remainderStart = Math.floorMod(now.epochSecond, MUTATION_NAMESPACE_COUNT.toLong()).toInt()
+    repeat(limit % MUTATION_NAMESPACE_COUNT) { offset ->
+        budgets[(remainderStart + offset) % MUTATION_NAMESPACE_COUNT] += 1
+    }
+    return budgets
 }
 
 private fun Instant.toDbTimestamp() = atOffset(ZoneOffset.UTC).toUtcLocalDateTime()
+
+private const val MUTATION_NAMESPACE_COUNT = 3

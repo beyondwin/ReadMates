@@ -285,6 +285,82 @@ class JdbcMutationIdempotencyAdapterDbTest(
     }
 
     @Test
+    fun `bounded purge gives admin preview and host namespaces a fair share under backlog`() {
+        repeat(6) { index ->
+            insertFairAdminIdempotency(index)
+            insertFairPreview(index)
+            service().claim(identity("fair-host-$index"), payload(meetingPasscode = "fair-$index"))
+        }
+        clock.instant = clock.instant.plus(Duration.ofHours(24)).plusSeconds(1)
+
+        assertThat(service().purgeExpired(6)).isEqualTo(6)
+
+        assertThat(fairRowCount("admin_public_takedown_idempotency", "idempotency_key", "fair-admin-%"))
+            .isEqualTo(4)
+        assertThat(fairRowCount("admin_public_takedown_previews", "actor_user_id_snapshot", ACTOR_ID.toString()))
+            .isEqualTo(4)
+        assertThat(fairRowCount("mutation_idempotency_keys", "idempotency_key", "fair-host-%"))
+            .isEqualTo(4)
+    }
+
+    private fun insertFairAdminIdempotency(index: Int) {
+        jdbcTemplate.update(
+            """
+            insert into admin_public_takedown_idempotency (
+              actor_user_id, operation, club_id, publication_id, idempotency_key,
+              request_hmac, canonical_schema_version, digest_key_version,
+              created_at, expires_at
+            ) values (?, 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, ?,
+                      unhex(sha2(?, 256)), 1, ?, ?, ?)
+            """.trimIndent(),
+            ACTOR_ID.toString(),
+            CLUB_ID.toString(),
+            RESOURCE_ID.toString(),
+            "fair-admin-$index",
+            "fair-admin-request-$index",
+            KEY_V1_VERSION,
+            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+            clock.instant
+                .plus(Duration.ofHours(24))
+                .atOffset(ZoneOffset.UTC)
+                .toLocalDateTime(),
+        )
+    }
+
+    private fun insertFairPreview(index: Int) {
+        jdbcTemplate.update(
+            """
+            insert into admin_public_takedown_previews (
+              id, actor_user_id_snapshot, actor_platform_role_snapshot,
+              club_id_snapshot, session_id_snapshot, publication_id_snapshot,
+              target_generation, current_surfaces_json, expires_at, created_at
+            ) values (?, ?, 'OWNER', ?, ?, ?, 1, json_array('ORIGIN'), ?, ?)
+            """.trimIndent(),
+            UUID.nameUUIDFromBytes("fair-preview-$index".toByteArray()).toString(),
+            ACTOR_ID.toString(),
+            CLUB_ID.toString(),
+            RESOURCE_ID.toString(),
+            RESOURCE_ID.toString(),
+            clock.instant
+                .plus(Duration.ofHours(24))
+                .atOffset(ZoneOffset.UTC)
+                .toLocalDateTime(),
+            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
+        )
+    }
+
+    private fun fairRowCount(
+        table: String,
+        column: String,
+        value: String,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from $table where $column like ?",
+            Int::class.java,
+            value,
+        ) ?: 0
+
+    @Test
     fun `tables logs and receipt dto never persist raw canonical url passcode sha or hmac secret`() {
         val identity = identity("secret-key")
         val claimed =
@@ -481,9 +557,9 @@ class JdbcMutationIdempotencyAdapterDbTest(
 
 private const val CLEANUP_MUTATION_IDEMPOTENCY_SQL = """
 delete from admin_public_takedown_previews
-where id = 'aaaaaaaa-0000-4000-8000-000000053011';
+where actor_user_id_snapshot = 'aaaaaaaa-0000-4000-8000-000000053002';
 delete from admin_public_takedown_idempotency
-where idempotency_key = 'admin-retire-key';
+where actor_user_id = 'aaaaaaaa-0000-4000-8000-000000053002';
 delete from mutation_idempotency_keys
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from host_session_mutation_receipts

@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
 import java.util.UUID
 
-private const val PUBLIC_CLUB_CACHE_CONTROL = "public, max-age=120, must-revalidate"
+private const val PUBLIC_CLUB_CACHE_CONTROL = "public, max-age=60, must-revalidate"
 private const val PUBLIC_DETAIL_CACHE_CONTROL = "public, max-age=60, must-revalidate"
 
 @RestController

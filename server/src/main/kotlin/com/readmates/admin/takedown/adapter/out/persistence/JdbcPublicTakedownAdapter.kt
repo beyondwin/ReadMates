@@ -6,6 +6,7 @@ import com.readmates.admin.takedown.application.model.PublicTakedownError
 import com.readmates.admin.takedown.application.model.PublicTakedownException
 import com.readmates.admin.takedown.application.model.PublicTakedownIdempotencyScope
 import com.readmates.admin.takedown.application.model.PublicTakedownPreview
+import com.readmates.admin.takedown.application.model.PublicTakedownReasonCategory
 import com.readmates.admin.takedown.application.model.PublicTakedownReceipt
 import com.readmates.admin.takedown.application.model.PublicTakedownRequestIdentity
 import com.readmates.admin.takedown.application.model.PublicTakedownTarget
@@ -76,7 +77,7 @@ class JdbcPublicTakedownAdapter(
         scope: PublicTakedownIdempotencyScope,
         identity: PublicTakedownRequestIdentity,
     ): PublicTakedownPort.ReplayResult {
-        val row = loadIdempotency(scope)
+        val row = loadIdempotency(scope, lock = false)
         val expectedHmac = row?.let { identity.replayHmacs[it.keyVersion] }
         return when {
             row == null -> PublicTakedownPort.ReplayResult.Missing
@@ -102,11 +103,23 @@ class JdbcPublicTakedownAdapter(
         return loadReceipt(receiptId)
     }
 
-    private fun replayExisting(command: StorePublicTakedownCommand): PublicTakedownReceipt =
-        when (val replay = loadReplay(command.scope, command.identity)) {
-            is PublicTakedownPort.ReplayResult.Replayed -> replay.receipt
-            else -> fail(PublicTakedownError.IDEMPOTENCY_KEY_REUSED)
+    private fun replayExisting(command: StorePublicTakedownCommand): PublicTakedownReceipt {
+        val row = loadIdempotency(command.scope, lock = true)
+        val expectedHmac = row?.let { command.identity.replayHmacs[it.keyVersion] }
+        val receiptId = row?.receiptId
+        val digestMatches =
+            row != null && expectedHmac != null && RequestIdentityHmac.equal(row.requestHmac, expectedHmac)
+        val completedRequestMatches =
+            row != null &&
+                row.schemaVersion == command.identity.canonicalSchemaVersion &&
+                receiptId != null
+        if (
+            !digestMatches || !completedRequestMatches
+        ) {
+            fail(PublicTakedownError.IDEMPOTENCY_KEY_REUSED)
         }
+        return loadReceipt(receiptId, lock = true)
+    }
 
     private fun lockAndValidateTarget(command: StorePublicTakedownCommand): PublicTakedownTarget {
         val target =
@@ -164,14 +177,18 @@ class JdbcPublicTakedownAdapter(
             ).firstOrNull()
     }
 
-    private fun loadIdempotency(scope: PublicTakedownIdempotencyScope): IdempotencyRow? =
-        jdbcTemplate
+    private fun loadIdempotency(
+        scope: PublicTakedownIdempotencyScope,
+        lock: Boolean,
+    ): IdempotencyRow? {
+        val suffix = if (lock) " for update" else ""
+        return jdbcTemplate
             .query(
                 """
                 select request_hmac, canonical_schema_version, digest_key_version, receipt_id
                 from admin_public_takedown_idempotency
                 where actor_user_id = ? and operation = ? and club_id = ?
-                  and publication_id = ? and idempotency_key = ?
+                  and publication_id = ? and idempotency_key = ?$suffix
                 """.trimIndent(),
                 { resultSet, _ ->
                     IdempotencyRow(
@@ -187,14 +204,19 @@ class JdbcPublicTakedownAdapter(
                 scope.publicationId.dbString(),
                 scope.idempotencyKey,
             ).firstOrNull()
+    }
 
-    private fun loadReceipt(receiptId: UUID): PublicTakedownReceipt =
-        jdbcTemplate
+    private fun loadReceipt(
+        receiptId: UUID,
+        lock: Boolean = false,
+    ): PublicTakedownReceipt {
+        val suffix = if (lock) " for update" else ""
+        return jdbcTemplate
             .query(
                 """
                 select id, convergence_id, club_id_snapshot, session_id_snapshot, publication_id_snapshot,
                        committed_generation, origin_result, reason_category, reason_redacted, created_at
-                from admin_public_takedown_receipts where id = ?
+                from admin_public_takedown_receipts where id = ?$suffix
                 """.trimIndent(),
                 { resultSet, _ ->
                     PublicTakedownReceipt(
@@ -205,13 +227,14 @@ class JdbcPublicTakedownAdapter(
                         publicationId = resultSet.uuid("publication_id_snapshot"),
                         committedGeneration = resultSet.getLong("committed_generation"),
                         originResult = resultSet.getString("origin_result"),
-                        reasonCategory = resultSet.getString("reason_category"),
+                        reasonCategory = PublicTakedownReasonCategory.valueOf(resultSet.getString("reason_category")),
                         reasonRedacted = resultSet.getBoolean("reason_redacted"),
                         createdAt = resultSet.utcOffsetDateTime("created_at").toInstant(),
                     )
                 },
                 receiptId.dbString(),
             ).single()
+    }
 
     private fun ResultSet.toPreview(): PublicTakedownPreview =
         PublicTakedownPreview(

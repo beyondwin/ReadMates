@@ -6,6 +6,7 @@ import com.readmates.admin.takedown.application.model.PublicTakedownError
 import com.readmates.admin.takedown.application.model.PublicTakedownException
 import com.readmates.admin.takedown.application.model.PublicTakedownIdempotencyScope
 import com.readmates.admin.takedown.application.model.PublicTakedownPreview
+import com.readmates.admin.takedown.application.model.PublicTakedownReasonCategory
 import com.readmates.admin.takedown.application.model.PublicTakedownReceipt
 import com.readmates.admin.takedown.application.model.PublicTakedownRequestIdentity
 import com.readmates.admin.takedown.application.model.PublicTakedownTarget
@@ -69,7 +70,12 @@ class PublicTakedownServiceTest {
     private fun previewCommand() = PreviewPublicTakedownCommand(CLUB_ID, SESSION_ID, PUBLICATION_ID)
 
     private fun confirmCommand(previewId: UUID) =
-        ConfirmPublicTakedownCommand(previewId, "PRIVATE_DATA", "Synthetic reason", "safe-test-key-0001")
+        ConfirmPublicTakedownCommand(
+            previewId,
+            PublicTakedownReasonCategory.PRIVATE_DATA,
+            "Synthetic reason",
+            "safe-test-key-0001",
+        )
 
     private fun owner() = actor(OWNER_ID)
 

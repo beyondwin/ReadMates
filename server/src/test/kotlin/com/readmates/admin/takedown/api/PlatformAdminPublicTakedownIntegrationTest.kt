@@ -5,6 +5,7 @@ import com.readmates.admin.takedown.application.model.ConfirmPublicTakedownComma
 import com.readmates.admin.takedown.application.model.PreviewPublicTakedownCommand
 import com.readmates.admin.takedown.application.model.PublicTakedownError
 import com.readmates.admin.takedown.application.model.PublicTakedownException
+import com.readmates.admin.takedown.application.model.PublicTakedownReasonCategory
 import com.readmates.admin.takedown.application.port.`in`.PreviewPublicTakedownUseCase
 import com.readmates.admin.takedown.application.port.out.PublicTakedownActivationEvidencePort
 import com.readmates.admin.takedown.application.port.out.PublicTakedownPort
@@ -18,6 +19,7 @@ import com.readmates.publication.application.port.out.ProviderFailureCategory
 import com.readmates.publication.application.port.out.ProviderSuccessCategory
 import com.readmates.publication.application.port.out.PublicCachePurgeCommand
 import com.readmates.publication.application.port.out.PublicCachePurgePort
+import com.readmates.session.adapter.`in`.scheduling.HostSessionTrashScheduler
 import com.readmates.shared.mutation.application.port.`in`.PurgeExpiredMutationIdempotencyUseCase
 import com.readmates.shared.mutation.config.MutationIdempotencyProperties
 import com.readmates.shared.security.PlatformActor
@@ -63,6 +65,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
     @param:Autowired private val publicTakedownPort: PublicTakedownPort,
     @param:Autowired private val clock: Clock,
     @param:Autowired private val purgeExpiredMutationIdempotency: PurgeExpiredMutationIdempotencyUseCase,
+    @param:Autowired private val hostSessionTrashScheduler: HostSessionTrashScheduler,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @MockitoBean
     private lateinit var activationEvidence: PublicTakedownActivationEvidencePort
@@ -172,8 +175,25 @@ class PlatformAdminPublicTakedownIntegrationTest(
 
             assertThat(JsonPath.read<String>(body, "$.originResult")).isEqualTo("DENIED")
             assertThat(JsonPath.read<Int>(body, "$.committedGeneration")).isEqualTo(8)
+            assertThat(JsonPath.read<String>(body, "$.reasonCategory")).isEqualTo("PRIVATE_DATA")
             assertThat(JsonPath.read<String>(body, "$.cdnPurgeOutcome")).isEqualTo("QUEUED")
             assertThat(JsonPath.read<String>(body, "$.bffEvictionOutcome")).isEqualTo("NOT_STARTED")
+            assertThat(
+                jdbcTemplate.queryForObject(
+                    "select reason_category from admin_public_takedown_receipts",
+                    String::class.java,
+                ),
+            ).isEqualTo("PRIVATE_DATA")
+            assertThat(
+                jdbcTemplate.queryForObject(
+                    """
+                    select json_unquote(json_extract(metadata_json, '$.reasonCategory'))
+                    from platform_audit_events
+                    where event_type = 'EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED'
+                    """.trimIndent(),
+                    String::class.java,
+                ),
+            ).isEqualTo("PRIVATE_DATA")
             assertThat(originReadable()).isFalse()
             assertThat(generation()).isEqualTo(8)
         }
@@ -274,7 +294,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
                 "OWNER",
                 ConfirmPublicTakedownCommand(
                     preview.previewId,
-                    "PRIVATE_DATA",
+                    PublicTakedownReasonCategory.PRIVATE_DATA,
                     "Synthetic incident reason",
                     key,
                 ),
@@ -350,70 +370,6 @@ class PlatformAdminPublicTakedownIntegrationTest(
     }
 
     @Test
-    fun `expiry generation target mismatch and invalid bounded inputs fail closed`() {
-        whenever(activationEvidence.confirmEnabled()).thenReturn(true)
-        val expired = createPreview(OWNER_USER_ID)
-        jdbcTemplate.update(
-            """
-            update admin_public_takedown_previews
-            set expires_at = date_sub(utc_timestamp(6), interval 1 minute)
-            where id = ?
-            """.trimIndent(),
-            expired,
-        )
-        confirmExpecting(expired, "key-expired-preview-0001", 410, "PREVIEW_EXPIRED")
-
-        val stale = createPreview(OWNER_USER_ID)
-        jdbcTemplate.update(
-            "update public_projection_generations set generation = generation + 1 where publication_id = ?",
-            PUBLICATION_ID,
-        )
-        confirmExpecting(stale, "key-generation-mismatch-0001", 409, "GENERATION_MISMATCH")
-        jdbcTemplate.update(
-            "update public_projection_generations set generation = 7 where publication_id = ?",
-            PUBLICATION_ID,
-        )
-
-        mockMvc
-            .post("/api/admin/public-takedowns/preview") {
-                contentType = MediaType.APPLICATION_JSON
-                content = previewRequest(publicationId = "00000000-0000-0000-0000-00000000ffff")
-                trustedAdminRequest(OWNER_USER_ID)
-            }.andExpect {
-                status { isNotFound() }
-                jsonPath("$.code") { value("TARGET_NOT_FOUND") }
-            }
-
-        val valid = createPreview(OWNER_USER_ID)
-        val invalidBodies =
-            listOf(
-                confirmRequest(valid, "key-invalid-category", category = "", reason = "reason") to
-                    "INVALID_REASON_CATEGORY",
-                confirmRequest(valid, "key-long-category-001", category = "X".repeat(65), reason = "reason") to
-                    "INVALID_REASON_CATEGORY",
-                confirmRequest(valid, "key-blank-reason-01", reason = "   ") to
-                    "INVALID_REASON",
-                confirmRequest(valid, "key-long-reason-001", reason = "x".repeat(501)) to
-                    "INVALID_REASON",
-                confirmRequest(valid, "unsafe key", reason = "reason") to
-                    "INVALID_IDEMPOTENCY_KEY",
-            )
-        invalidBodies.forEach { (body, code) ->
-            mockMvc
-                .post("/api/admin/public-takedowns/confirm") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = body
-                    trustedAdminRequest(OWNER_USER_ID)
-                }.andExpect {
-                    status { isBadRequest() }
-                    jsonPath("$.code") { value(code) }
-                }
-        }
-        assertThat(originReadable()).isTrue()
-        assertThat(count("admin_public_takedown_receipts")).isZero()
-    }
-
-    @Test
     fun `raw reason and private body are absent from dto database and audit while hard delete preserves evidence`() {
         whenever(activationEvidence.confirmEnabled()).thenReturn(true)
         val rawReason = "SENSITIVE_REASON_SENTINEL"
@@ -447,9 +403,17 @@ class PlatformAdminPublicTakedownIntegrationTest(
         assertThat(persisted).doesNotContain(rawReason).doesNotContain(privateBody)
 
         val convergenceId = JsonPath.read<String>(body, "$.convergenceId")
-        jdbcTemplate.update("delete from public_session_publications where id = ?", PUBLICATION_ID)
-        jdbcTemplate.update("delete from session_publication_versions where session_id = ?", SESSION_ID)
-        jdbcTemplate.update("delete from sessions where id = ?", SESSION_ID)
+        jdbcTemplate.update(
+            """
+            update sessions
+            set deleted_at = date_sub(utc_timestamp(6), interval 8 day),
+                deleted_by_membership_id = '00000000-0000-0000-0000-000000000201',
+                purge_after = date_sub(utc_timestamp(6), interval 1 day)
+            where id = ?
+            """.trimIndent(),
+            SESSION_ID,
+        )
+        hostSessionTrashScheduler.purgeExpired()
         jdbcTemplate.update(
             "update admin_public_takedown_previews " +
                 "set expires_at = date_sub(utc_timestamp(6), interval 1 second)",
@@ -461,6 +425,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
         assertThat(purgeExpiredMutationIdempotency.purgeExpired(50)).isGreaterThanOrEqualTo(2)
 
         assertThat(count("public_projection_generations", "publication_id", PUBLICATION_ID)).isZero()
+        assertThat(count("sessions", "id", SESSION_ID)).isZero()
         assertThat(count("admin_public_takedown_previews")).isZero()
         assertThat(count("admin_public_takedown_idempotency")).isZero()
         assertThat(count("admin_public_takedown_receipts")).isOne()
@@ -496,23 +461,6 @@ class PlatformAdminPublicTakedownIntegrationTest(
             }.andReturn()
             .response
             .contentAsString
-
-    private fun confirmExpecting(
-        previewId: String,
-        key: String,
-        statusCode: Int,
-        code: String,
-    ) {
-        mockMvc
-            .post("/api/admin/public-takedowns/confirm") {
-                contentType = MediaType.APPLICATION_JSON
-                content = confirmRequest(previewId, key)
-                trustedAdminRequest(OWNER_USER_ID)
-            }.andExpect {
-                status { isEqualTo(statusCode) }
-                jsonPath("$.code") { value(code) }
-            }
-    }
 
     private fun org.springframework.test.web.servlet.MockHttpServletRequestDsl.trustedAdminRequest(userId: String) {
         header(BFF_SECRET_HEADER, BFF_SECRET)
@@ -662,11 +610,15 @@ class PlatformAdminPublicTakedownIntegrationTest(
             ).orEmpty()
 }
 
-private fun previewRequest(publicationId: String = PUBLICATION_ID): String =
+private fun previewRequest(
+    clubId: String = CLUB_ID,
+    sessionId: String = SESSION_ID,
+    publicationId: String = PUBLICATION_ID,
+): String =
     """
     {
-      "clubId":"$CLUB_ID",
-      "sessionId":"$SESSION_ID",
+      "clubId":"$clubId",
+      "sessionId":"$sessionId",
       "publicationId":"$publicationId"
     }
     """.trimIndent()

@@ -1711,6 +1711,30 @@ on duplicate key update
   site_visibility = values(site_visibility),
   published_at = values(published_at);
 
+insert ignore into public_projection_generations (
+  publication_id,
+  club_id,
+  session_id,
+  generation,
+  live_record_revision,
+  origin_readable,
+  updated_at
+)
+select
+  publication.id,
+  publication.club_id,
+  publication.session_id,
+  1,
+  null,
+  true,
+  utc_timestamp(6)
+from public_session_publications publication
+join sessions on sessions.id = publication.session_id
+  and sessions.club_id = publication.club_id
+where sessions.state = 'PUBLISHED'
+  and sessions.access_scope = 'GUEST_READABLE'
+  and publication.site_visibility = 'PUBLIC_RECORD';
+
 insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
 with seed as (
   select 5101 as id_suffix, 1 as session_number, 'host@example.com' as email, '소득 4단계 프레임은 세계를 단순화하지만, 대화를 시작하게 만드는 기준이 되었다.' as text, 0 as sort_order

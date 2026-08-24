@@ -45,13 +45,13 @@ class SessionRecordPublicProjectionDbTest(
         val sessionId = publishedSessionWithInitialRecord()
         saveRecordDraft(sessionId, "direct apply", "PUBLIC")
         val applyRequestId = "00000000-0000-4000-8000-000000000711"
-        val key = "key-direct-apply-green-01"
+        val requestDeduplicationValue = "direct-apply-replay"
         val hash = recordDraftHash(sessionId)
         val generationBefore = publicGeneration(sessionId)
         val convergenceBefore = sessionRecordConvergenceReceiptCount(sessionId)
         val workBefore = convergenceWorkCount(sessionId)
 
-        applyRecordCommand(sessionId, applyRequestId, key, expectedLiveRevision = 1, hash = hash)
+        applyRecordCommand(sessionId, applyRequestId, requestDeduplicationValue, expectedLiveRevision = 1, hash = hash)
             .andExpect { status { isOk() } }
 
         assertThat(publicGeneration(sessionId)).isEqualTo(generationBefore + 1)
@@ -59,7 +59,7 @@ class SessionRecordPublicProjectionDbTest(
         assertThat(convergenceWorkCount(sessionId)).isEqualTo(workBefore + 1)
         assertThat(originTexts(sessionId)).containsExactly("direct apply highlight", "direct apply one line")
 
-        applyRecordCommand(sessionId, applyRequestId, key, expectedLiveRevision = 1, hash = hash)
+        applyRecordCommand(sessionId, applyRequestId, requestDeduplicationValue, expectedLiveRevision = 1, hash = hash)
             .andExpect { status { isOk() } }
         assertThat(publicGeneration(sessionId)).isEqualTo(generationBefore + 1)
         assertThat(sessionRecordConvergenceReceiptCount(sessionId)).isEqualTo(convergenceBefore + 1)

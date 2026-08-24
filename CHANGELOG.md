@@ -8,14 +8,24 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- **플랫폼 관리자 긴급 공개 회수 기반:** active OWNER/OPERATOR의 전용 capability로 공개 projection을 preview하고 confirm하는 V55 API substrate를 추가했습니다. Confirm은 origin을 즉시 차단하고 generation을 한 번 회전하며 redacted immutable receipt/audit와 기존 convergence work를 같은 transaction에 연결합니다. 이미 저장·표시·offline인 사본은 원격 삭제할 수 없습니다.
 - **모임 집중 작업 화면:** 특정 모임 화면은 지금 할 일과 주 행동 하나를 먼저 보여 줍니다. 기존 단계 rail과 편집 탭 대신 같은 화면에서 기본 정보·출석·기록·변경 내역을 엽니다. 기본 정보와 출석은 바로 되돌릴 수 있고, 지운 모임은 7일 동안 휴지통에서 복구할 수 있습니다.
 - **모임 운영 장부:** 호스트 홈이 지금 다루는 모임의 모임 전·진행 중·모임 후 장부입니다. 다음 책은 여러 권 미리 넣고 멤버에게 보일 수 있으며, 기록은 정리본 파일로 올립니다. 모임 주소는 `/app/host/sessions/:sessionId`이고 `/edit`와 `/closing`은 그 화면으로 이동합니다. 새 모임은 `GET /api/host/sessions/schedule-defaults`로 최근 일정을 채우고, 내구 이력이 없는 `DRAFT`는 목록에서 휴지통으로 옮길 수 있습니다.
 - **호스트 세션 되돌리기:** 호스트가 확인 후 공개 취소, 마감 취소, 예정 환원을 한 단계씩 할 수 있습니다. 기록과 알림은 남고, 다른 진행 중 세션이 있으면 다시 열 수 없습니다.
 
 ### Fixed
 
+- **긴급 회수 공개 reader·중복 실행 안전성:** 공개 club 목록·통계·상세와 guest record reader가 current generation의 `origin_readable=true`를 공통으로 요구하고 공개 freshness를 60초로 맞춥니다. 동일 idempotency key 동시 confirm은 locking current read로 같은 receipt에 수렴하며 다른 payload는 conflict입니다. Reason category는 고정 allowlist만 허용하고 admin/preview/host retention cleanup은 namespace 간 공정한 batch budget을 사용합니다.
 - **호스트 운영 무결성:** 모임 삭제의 기록·알림 blocker와 동시성 검사를 fail-closed로 통합하고, 수명주기 사유 감사, revision 0 호환, 명시적 온라인 정보 채택, 전체 주의 목록과 독립 실패 운영 허브를 추가했습니다. Flyway lifecycle audit은 additive이며 기존 적용 기록 backfill은 수행하지 않습니다. 혼합 배포 구간에서는 reverse 사유를 optional로 받고(`readmates.session.lifecycle.require-reverse-reason=false`) top-level 일정 필드와 `GET /api/host/dashboard`를 유지합니다. 지원 클라이언트의 `session.lifecycle.legacy.reason`이 0이 된 뒤에 enforcement를 켜고 호환 경로를 제거합니다.
 - **세션 되돌리기 후 화면 정합성:** 공개 취소·마감 취소·예정 환원 직후 멤버 current/archive와 공개 클럽 캐시를 바로 무효화합니다. 잘못된 세션 id로 `/reopen`하면 다른 진행 중 세션이 있어도 `404`를 유지합니다.
+
+### Database
+
+- **Flyway V55:** 긴급 공개 회수 preview, admin-scoped idempotency, immutable redacted receipt를 additive table로 저장하고 reason category를 `PRIVATE_DATA|LEGAL_REQUEST|SECURITY_INCIDENT|PUBLIC_SAFETY`로 제한합니다. Rollback은 V55를 삭제하거나 수정하지 않고 schema를 보존하는 compatible image 또는 새 forward-fix migration을 사용합니다.
+
+### Deployment Notes
+
+- V55 backend를 먼저 적용해도 preview/confirm route는 production confirm을 열지 않습니다. 현재 repository에는 confirm을 활성화하는 property, environment variable, tracked evidence가 없으며 protected Step 8 cache-safety evidence와 active runbook이 연결될 때까지 confirm은 fail closed입니다. 회귀 시 V55 schema와 immutable evidence를 보존한 compatible image 또는 새 migration으로 forward-fix합니다.
 
 ## v2.4.1 - 2026-08-17
 

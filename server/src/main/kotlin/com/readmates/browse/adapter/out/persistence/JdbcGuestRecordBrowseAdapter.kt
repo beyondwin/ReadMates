@@ -93,6 +93,13 @@ class JdbcGuestRecordBrowseAdapter(
               ) as highlight_count
             from active_sessions sessions
             join clubs on clubs.id = sessions.club_id
+            join public_session_publications publication on publication.session_id = sessions.id
+              and publication.club_id = sessions.club_id
+              and publication.site_visibility = 'PUBLIC_RECORD'
+            join public_projection_generations generation on generation.publication_id = publication.id
+              and generation.club_id = sessions.club_id
+              and generation.session_id = sessions.id
+              and generation.origin_readable = true
             where clubs.slug = ?
               and clubs.status = 'ACTIVE'
               and clubs.public_visibility = 'PUBLIC'
@@ -160,6 +167,13 @@ class JdbcGuestRecordBrowseAdapter(
               select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.session_date
               from active_sessions sessions
               join clubs on clubs.id = sessions.club_id
+              join public_session_publications publication on publication.session_id = sessions.id
+                and publication.club_id = sessions.club_id
+                and publication.site_visibility = 'PUBLIC_RECORD'
+              join public_projection_generations generation on generation.publication_id = publication.id
+                and generation.club_id = sessions.club_id
+                and generation.session_id = sessions.id
+                and generation.origin_readable = true
               where clubs.slug = ?
                 and clubs.status = 'ACTIVE'
                 and clubs.public_visibility = 'PUBLIC'
@@ -279,11 +293,18 @@ class JdbcGuestRecordBrowseAdapter(
                  and session_participants.participation_status = 'ACTIVE') as total
             from active_sessions sessions
             join clubs on clubs.id = sessions.club_id
+            left join public_session_publications publication on publication.session_id = sessions.id
+              and publication.club_id = sessions.club_id
+              and publication.site_visibility = 'PUBLIC_RECORD'
+            left join public_projection_generations generation on generation.publication_id = publication.id
+              and generation.club_id = sessions.club_id
+              and generation.session_id = sessions.id
             where clubs.slug = ?
               and clubs.status = 'ACTIVE'
               and clubs.public_visibility = 'PUBLIC'
               and sessions.access_scope = 'GUEST_READABLE'
               and sessions.state in ('CLOSED', 'PUBLISHED')
+              and (sessions.state = 'CLOSED' or generation.origin_readable = true)
               $cursorClause
             order by sessions.number desc, sessions.id desc
             limit ?
@@ -318,12 +339,18 @@ class JdbcGuestRecordBrowseAdapter(
                     join clubs on clubs.id = sessions.club_id
                     left join public_session_publications on public_session_publications.session_id = sessions.id
                       and public_session_publications.club_id = sessions.club_id
+                      and public_session_publications.site_visibility = 'PUBLIC_RECORD'
+                    left join public_projection_generations generation
+                      on generation.publication_id = public_session_publications.id
+                     and generation.club_id = sessions.club_id
+                     and generation.session_id = sessions.id
                     where clubs.slug = ?
                       and clubs.status = 'ACTIVE'
                       and clubs.public_visibility = 'PUBLIC'
                       and sessions.id = ?
                       and sessions.access_scope = 'GUEST_READABLE'
                       and sessions.state in ('CLOSED', 'PUBLISHED')
+                      and (sessions.state = 'CLOSED' or generation.origin_readable = true)
                     """.trimIndent(),
                     { resultSet, _ -> resultSet.toArchiveDetailHeader() },
                     clubSlug,
