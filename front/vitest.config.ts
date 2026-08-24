@@ -50,6 +50,7 @@ export default defineConfig({
           include: [
             "tests/lighthouse/**/*.test.ts",
             "tests/performance/**/*.test.ts",
+            "tests/e2e/support/**/*.test.ts",
             "tests/unit/**/*.test.ts",
             "src/**/*.test.ts",
             "features/**/*.test.ts",

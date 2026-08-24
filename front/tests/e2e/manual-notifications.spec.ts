@@ -86,7 +86,7 @@ async function postJson(
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Readmates-Client-Contract": "v2",
+        "X-Readmates-Client-Contract": "v3",
       },
       body: JSON.stringify(requestBody),
     });
@@ -409,7 +409,7 @@ test("selected-member confirm retry returns the same event without duplicate dis
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Readmates-Client-Contract": "v2",
+        "X-Readmates-Client-Contract": "v3",
       },
       body: JSON.stringify(request),
     });
@@ -425,7 +425,7 @@ test("selected-member confirm retry returns the same event without duplicate dis
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Readmates-Client-Contract": "v2",
+        "X-Readmates-Client-Contract": "v3",
       },
       body: JSON.stringify(request),
     });
@@ -436,7 +436,7 @@ test("selected-member confirm retry returns the same event without duplicate dis
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "X-Readmates-Client-Contract": "v2",
+        "X-Readmates-Client-Contract": "v3",
       },
       body: JSON.stringify(request),
     });

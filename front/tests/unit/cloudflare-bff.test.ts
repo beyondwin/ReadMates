@@ -1433,13 +1433,42 @@ describe("Cloudflare BFF host client contract capability", () => {
   } as const;
 
   const hostMutations = [
-    sessionCreate,
+    { ...sessionCreate, body: "{}" },
     {
       name: "member approve",
       method: "POST",
       url: "https://readmates.pages.dev/api/bff/api/host/members/m-1/approve",
       path: ["api", "host", "members", "m-1", "approve"],
       upstream: "https://api.example.com/api/host/members/m-1/approve",
+      body: "{}",
+    },
+    {
+      name: "member invite",
+      method: "POST",
+      url: "https://readmates.pages.dev/api/bff/api/host/invitations",
+      path: ["api", "host", "invitations"],
+      upstream: "https://api.example.com/api/host/invitations",
+      body: JSON.stringify({
+        email: "rollout.invite@example.com",
+        name: "호환성 초대",
+        applyToCurrentSession: false,
+      }),
+    },
+    {
+      name: "notification policy",
+      method: "PUT",
+      url: "https://readmates.pages.dev/api/bff/api/host/notifications/policy",
+      path: ["api", "host", "notifications", "policy"],
+      upstream: "https://api.example.com/api/host/notifications/policy",
+      body: JSON.stringify({ sessionReminderEnabled: true }),
+    },
+    {
+      name: "manual notification preview",
+      method: "POST",
+      url: "https://readmates.pages.dev/api/bff/api/host/notifications/manual/preview",
+      path: ["api", "host", "notifications", "manual", "preview"],
+      upstream: "https://api.example.com/api/host/notifications/manual/preview",
+      body: JSON.stringify({ audience: "ALL_ACTIVE_MEMBERS", requestedChannels: "BOTH" }),
     },
     {
       name: "manual notification",
@@ -1447,6 +1476,23 @@ describe("Cloudflare BFF host client contract capability", () => {
       url: "https://readmates.pages.dev/api/bff/api/host/notifications/manual",
       path: ["api", "host", "notifications", "manual"],
       upstream: "https://api.example.com/api/host/notifications/manual",
+      body: JSON.stringify({ previewId: "preview-fixture", resendConfirmed: false }),
+    },
+    {
+      name: "notification dispatch",
+      method: "POST",
+      url: "https://readmates.pages.dev/api/bff/api/host/notifications/process",
+      path: ["api", "host", "notifications", "process"],
+      upstream: "https://api.example.com/api/host/notifications/process",
+      body: "{}",
+    },
+    {
+      name: "test mail",
+      method: "POST",
+      url: "https://readmates.pages.dev/api/bff/api/host/notifications/test-mail",
+      path: ["api", "host", "notifications", "test-mail"],
+      upstream: "https://api.example.com/api/host/notifications/test-mail",
+      body: JSON.stringify({ recipientEmail: "rollout.mail@example.com" }),
     },
     {
       name: "ai defaults",
@@ -1454,6 +1500,7 @@ describe("Cloudflare BFF host client contract capability", () => {
       url: "https://readmates.pages.dev/api/bff/api/host/clubs/my-club/ai-defaults",
       path: ["api", "host", "clubs", "my-club", "ai-defaults"],
       upstream: "https://api.example.com/api/host/clubs/my-club/ai-defaults",
+      body: "{}",
     },
     {
       name: "session patch",
@@ -1461,6 +1508,7 @@ describe("Cloudflare BFF host client contract capability", () => {
       url: "https://readmates.pages.dev/api/bff/api/host/sessions/s-1",
       path: ["api", "host", "sessions", "s-1"],
       upstream: "https://api.example.com/api/host/sessions/s-1",
+      body: "{}",
     },
     {
       name: "session delete",
@@ -1468,6 +1516,7 @@ describe("Cloudflare BFF host client contract capability", () => {
       url: "https://readmates.pages.dev/api/bff/api/host/sessions/s-1",
       path: ["api", "host", "sessions", "s-1"],
       upstream: "https://api.example.com/api/host/sessions/s-1",
+      body: "",
     },
   ] as const;
 
@@ -1582,6 +1631,7 @@ describe("Cloudflare BFF host client contract capability", () => {
         url: caseItem.url,
         path: caseItem.path,
         contract: "v3",
+        body: caseItem.body,
       });
 
       expect(result.response.status).toBe(200);
@@ -1591,6 +1641,10 @@ describe("Cloudflare BFF host client contract capability", () => {
       );
       expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).toBe("v3");
       expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).not.toBe("v2");
+      if (caseItem.method !== "DELETE") {
+        const [, forwarded] = result.fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+        expect(new TextDecoder().decode(forwarded.body as ArrayBuffer)).toBe(caseItem.body);
+      }
     },
   );
 

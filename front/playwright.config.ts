@@ -53,11 +53,13 @@ export default defineConfig({
         `${envAssignment("READMATES_APP_BASE_URL", baseURL)} ${envAssignment("READMATES_ALLOWED_ORIGINS", allowedOrigins)} ` +
         `${envAssignment("READMATES_BFF_SECRET", "e2e-secret")} ` +
         `${envAssignment("READMATES_IP_HASH_BASE_SECRET", "test-secret")} ` +
+        `${envAssignment("READMATES_HOST_LIST_CURSOR_CURRENT_KEY", "e2e-host-list-cursor-key")} ` +
+        `${envAssignment("READMATES_MUTATION_IDENTITY_CURRENT_KEY", "e2e-mutation-identity-key")} ` +
         `${envAssignment("READMATES_MANAGEMENT_PORT", "0")} ` +
         `${envAssignment("READMATES_FLYWAY_LOCATIONS", "classpath:db/mysql/migration,classpath:db/mysql/dev")} ` +
         `${envAssignment("READMATES_AUTH_SESSION_COOKIE_SECURE", "false")} ` +
         `${envAssignment("READMATES_HOST_ACTION_CONFIRMATION_REQUIRED", "true")} ` +
-        `${envAssignment("READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED", "true")} ` +
+        `${envAssignment("READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE", "SUPPORT_V2_V3")} ` +
         "../server/gradlew -p ../server bootRun",
       url: `${apiBaseURL}/internal/health`,
       reuseExistingServer: false,

@@ -104,6 +104,20 @@ export function writeHostClientUpgradeRequired(res: HostClientUpgradeRequiredRes
   );
 }
 
+function writeHostClientContractStatus(
+  res: HostClientUpgradeRequiredResponse,
+  capability: HostClientContractCapability,
+) {
+  if (res.headersSent || res.writableEnded) {
+    return;
+  }
+  res.writeHead(200, {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store",
+  });
+  res.end(JSON.stringify(hostClientContractStatusBody(capability)));
+}
+
 export function applyHostClientContractProxyHeader(
   proxyReq: HostClientContractProxyRequest,
   capability: HostClientContractCapability = PRODUCTION_HOST_CLIENT_CONTRACT_CAPABILITY,
@@ -132,6 +146,11 @@ export function hostClientContractViteBypass(
 ): string | undefined {
   if (!res) {
     return undefined;
+  }
+  const pathname = req.url?.split("?", 1)[0];
+  if (req.method === "GET" && pathname === "/api/bff/__internal/client-contract-status") {
+    writeHostClientContractStatus(res, capability);
+    return req.url;
   }
   if (!isHostApiMutation(req.method, req.url)) {
     return undefined;
