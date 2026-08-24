@@ -8,9 +8,10 @@ import {
 } from "@/src/app/app-route-security-transition";
 import { hostAuthorityLossMessage, type HostSecurityPurgeCode } from "@/features/host/model/host-authority-loss";
 import {
-  HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY,
-  HostAuthorityLossController,
-} from "./host-authority-loss-controller";
+  consumeHostAuthorityNavigation,
+  stageHostAuthorityNavigation,
+} from "@/features/host/model/host-authority-navigation";
+import { HostAuthorityLossController } from "./host-authority-loss-controller";
 
 const workspaceLabels: Record<ClubWorkspace, string> = {
   member: "멤버 공간",
@@ -33,40 +34,6 @@ const defaultTransitionStore: WorkspaceRouteTransitionStore = {
   consume: consumePreparedWorkspaceTransition,
 };
 
-let pendingAuthorityAnnouncement: {
-  handoffId: string;
-  message: string;
-  targetPathname: string;
-} | null = null;
-
-function stageAuthorityAnnouncement(
-  message: string,
-  targetPathname: string,
-  handoffId: string,
-) {
-  pendingAuthorityAnnouncement = { handoffId, message, targetPathname };
-}
-
-function authorityLossHandoffId(state: unknown): string | null {
-  if (!state || typeof state !== "object") return null;
-  const value = (state as Record<string, unknown>)[HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY];
-  return typeof value === "string" ? value : null;
-}
-
-function consumeAuthorityAnnouncement(
-  pathname: string,
-  handoffId: string | null,
-): string | null {
-  if (
-    !handoffId
-    || pendingAuthorityAnnouncement?.targetPathname !== pathname
-    || pendingAuthorityAnnouncement.handoffId !== handoffId
-  ) return null;
-  const { message } = pendingAuthorityAnnouncement;
-  pendingAuthorityAnnouncement = null;
-  return message;
-}
-
 export function AppRouteSecurityController({
   workspace,
   transitionStore = defaultTransitionStore,
@@ -81,11 +48,7 @@ export function AppRouteSecurityController({
     targetPathname: string,
     handoffId: string,
   ) => {
-    stageAuthorityAnnouncement(
-      hostAuthorityLossMessage(code),
-      targetPathname,
-      handoffId,
-    );
+    stageHostAuthorityNavigation({ code, targetPathname, handoffId });
   }, []);
 
   useEffect(() => {
@@ -103,11 +66,10 @@ export function AppRouteSecurityController({
     const finishRouteTransition = () => {
       const shouldAnnounce = changedWorkspace
         && transitionStore.consume(currentRoute);
-      const authorityAnnouncement = consumeAuthorityAnnouncement(
-        location.pathname,
-        authorityLossHandoffId(location.state),
-      );
-      setAnnouncement(authorityAnnouncement ?? (shouldAnnounce ? `${label}으로 전환했습니다` : ""));
+      const authorityCode = consumeHostAuthorityNavigation(location.pathname, location.state);
+      setAnnouncement(authorityCode
+        ? hostAuthorityLossMessage(authorityCode)
+        : (shouldAnnounce ? `${label}으로 전환했습니다` : ""));
       const heading = document.querySelector<HTMLElement>("main h1, h1");
       if (!heading) {
         return;

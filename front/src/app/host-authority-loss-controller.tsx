@@ -5,6 +5,7 @@ import {
   hostAuthoritySafeDestination,
   type HostSecurityPurgeCode,
 } from "@/features/host/model/host-authority-loss";
+import { HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY } from "@/features/host/model/host-authority-navigation";
 import { purgeClubHostState } from "@/features/host/queries/host-state-purge";
 import {
   hostSensitiveStorage,
@@ -12,7 +13,6 @@ import {
 } from "@/features/host/storage/host-sensitive-storage";
 import { subscribeHostAuthorityLoss } from "@/shared/api/host-authority-event";
 
-export const HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY = "readmatesHostAuthorityLossHandoffId";
 let authorityLossHandoffSequence = 0;
 
 function nextAuthorityLossHandoffId(): string {
