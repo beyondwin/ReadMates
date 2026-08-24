@@ -143,24 +143,24 @@ class PlatformAdminOnboardingServiceTest {
     }
 
     @Test
-    fun `host invitation retry delays must cover every nonterminal attempt`() {
-        val properties =
-            NotificationRuntimeProperties(
-                enabled = false,
-                worker =
-                    NotificationRuntimeProperties.Worker(
-                        retryDelays = listOf(Duration.ofMinutes(1), Duration.ofMinutes(2)),
-                    ),
-                kafka =
-                    NotificationRuntimeProperties.Kafka(
-                        maxPublishAttempts = 3,
-                        maxDeliveryAttempts = 5,
-                    ),
-            )
-
-        assertThatThrownBy { worker(mock(PlatformAdminOnboardingCommandPort::class.java), properties) }
-            .isInstanceOf(IllegalArgumentException::class.java)
-            .hasMessageContaining("host invitation attempt")
+    fun `notification retry delays are validated before the onboarding worker is constructed`() {
+        assertThatThrownBy {
+            val properties =
+                NotificationRuntimeProperties(
+                    enabled = false,
+                    worker =
+                        NotificationRuntimeProperties.Worker(
+                            retryDelays = listOf(Duration.ofMinutes(1), Duration.ofMinutes(2)),
+                        ),
+                    kafka =
+                        NotificationRuntimeProperties.Kafka(
+                            maxPublishAttempts = 3,
+                            maxDeliveryAttempts = 5,
+                        ),
+                )
+            worker(mock(PlatformAdminOnboardingCommandPort::class.java), properties)
+        }.isInstanceOf(IllegalArgumentException::class.java)
+            .hasMessageContaining("delivery observation")
     }
 
     private fun worker(
@@ -172,7 +172,7 @@ class PlatformAdminOnboardingServiceTest {
         mailPort = mock(SendPlatformAdminHostInvitationEmailPort::class.java),
         transactions = mock(TransactionTemplate::class.java),
         clock = Clock.systemUTC(),
-        notificationProperties = properties,
+        deliveryPolicy = properties,
         appBaseUrl = "https://example.test",
     )
 

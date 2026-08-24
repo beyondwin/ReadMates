@@ -297,7 +297,7 @@ class PlatformAdminBffSecurityTest(
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("legacyAiOneClickRoutes")
-    fun `legacy ai one click commands return safe confirm required only after the full trust chain`(route: ClubCommandRoute) {
+    fun `legacy ai one click commands require the full trust chain`(route: ClubCommandRoute) {
         identities.admin(PlatformAdminRole.OWNER)
 
         commandRequest(route)
@@ -339,7 +339,7 @@ class PlatformAdminBffSecurityTest(
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("supportCommandRoutes")
-    fun `exact support command routes require trusted bff same origin active owner capability`(route: ClubCommandRoute) {
+    fun `support commands require trusted active owner capability`(route: ClubCommandRoute) {
         identities.admin(PlatformAdminRole.OWNER)
         commandRequest(route).andExpect(status().isOk)
 
@@ -372,7 +372,7 @@ class PlatformAdminBffSecurityTest(
 
     @ParameterizedTest(name = "{0}")
     @MethodSource("legacySupportOneClickRoutes")
-    fun `legacy support one click commands return safe confirm required only after the full trust chain`(route: ClubCommandRoute) {
+    fun `legacy support one click commands require the full trust chain`(route: ClubCommandRoute) {
         identities.admin(PlatformAdminRole.OWNER)
         commandRequest(route)
             .andExpect(status().isGone)
@@ -650,7 +650,8 @@ class PlatformAdminBffSecurityTest(
                     "legacy support-access create",
                     HttpMethod.POST,
                     "/api/admin/support-access-grants",
-                    """{"clubId":"$CLUB_ID","granteeUserId":"$USER_ID","scope":"HOST_SUPPORT_READ","reason":"legacy","expiresAt":"$expiry"}""",
+                    """{"clubId":"$CLUB_ID","granteeUserId":"$USER_ID",""" +
+                        """"scope":"HOST_SUPPORT_READ","reason":"legacy","expiresAt":"$expiry"}""",
                 ),
                 ClubCommandRoute(
                     "legacy support-access revoke",
@@ -662,7 +663,8 @@ class PlatformAdminBffSecurityTest(
                     "legacy support workbench create",
                     HttpMethod.POST,
                     "/api/admin/support/grants",
-                    """{"clubId":"$CLUB_ID","granteeSubjectId":"$USER_ID","scope":"HOST_SUPPORT_READ","reason":"legacy","expiresAt":"$expiry"}""",
+                    """{"clubId":"$CLUB_ID","granteeSubjectId":"$USER_ID",""" +
+                        """"scope":"HOST_SUPPORT_READ","reason":"legacy","expiresAt":"$expiry"}""",
                 ),
                 ClubCommandRoute(
                     "legacy support workbench revoke",
@@ -974,7 +976,13 @@ class PlatformAdminBffSecurityHarnessConfiguration {
                 command: ConfirmSupportGrantCreateCommand,
             ) = admin.withCapability(PlatformCapability.MANAGE_SUPPORT_ACCESS) {
                 invocations.calls += 1
-                supportReceipt(SupportGrantCommandType.CREATE, command.previewId, SUPPORT_GRANT_ID, command.clubId, command.expiresAt)
+                supportReceipt(
+                    SupportGrantCommandType.CREATE,
+                    command.previewId,
+                    SUPPORT_GRANT_ID,
+                    command.clubId,
+                    command.expiresAt,
+                )
             }
 
             override fun confirmRevoke(
@@ -983,7 +991,13 @@ class PlatformAdminBffSecurityHarnessConfiguration {
                 command: ConfirmSupportGrantRevokeCommand,
             ) = admin.withCapability(PlatformCapability.MANAGE_SUPPORT_ACCESS) {
                 invocations.calls += 1
-                supportReceipt(SupportGrantCommandType.REVOKE, command.previewId, grantId, command.clubId, command.expiresAt)
+                supportReceipt(
+                    SupportGrantCommandType.REVOKE,
+                    command.previewId,
+                    grantId,
+                    command.clubId,
+                    command.expiresAt,
+                )
             }
         }
 

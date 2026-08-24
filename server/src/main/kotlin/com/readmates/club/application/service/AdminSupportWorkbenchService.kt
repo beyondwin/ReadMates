@@ -27,14 +27,8 @@ class AdminSupportWorkbenchService(
         query: String,
         clubId: UUID?,
     ): List<AdminSupportSearchResult> {
-        val trimmed = query.trim()
-        if (trimmed.isBlank()) {
-            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Search query is required")
-        }
-        if (trimmed.length > MAX_SUPPORT_QUERY_LENGTH || trimmed.any { it in SUPPORT_WILDCARDS }) {
-            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Search query is invalid")
-        }
-        if (admin.role != PlatformAdminRole.OWNER) throw AccessDeniedException("Platform admin cannot search support subjects")
+        val trimmed = normalizeSearchQuery(query)
+        requireOwner(admin, "Platform admin cannot search support subjects")
         return searchPort.search(trimmed, clubId, SUPPORT_SEARCH_LIMIT)
     }
 
@@ -44,7 +38,7 @@ class AdminSupportWorkbenchService(
         status: String?,
         cursor: String?,
     ): AdminSupportGrantLedgerPage {
-        if (admin.role != PlatformAdminRole.OWNER) throw AccessDeniedException("Platform admin cannot read support grants")
+        requireOwner(admin, "Platform admin cannot read support grants")
         val normalizedStatus =
             status?.uppercase()?.also {
                 if (it !in SUPPORT_GRANT_STATUSES) {
@@ -81,18 +75,39 @@ class AdminSupportWorkbenchService(
             try {
                 CursorCodec.decodeStrict(raw)
             } catch (_: InvalidCursorEncodingException) {
-                throw PlatformAdminException(PlatformAdminError.INVALID_CURSOR, "Invalid support grant cursor")
+                invalidGrantCursor()
             } ?: return null
         if (decoded.keys != setOf("createdAt", "grantId")) {
-            throw PlatformAdminException(PlatformAdminError.INVALID_CURSOR, "Invalid support grant cursor")
+            invalidGrantCursor()
         }
         return runCatching {
             AdminSupportGrantLedgerCursor(
                 createdAt = OffsetDateTime.parse(decoded.getValue("createdAt")),
                 grantId = UUID.fromString(decoded.getValue("grantId")),
             )
-        }.getOrElse { throw PlatformAdminException(PlatformAdminError.INVALID_CURSOR, "Invalid support grant cursor") }
+        }.getOrElse { invalidGrantCursor() }
     }
+
+    private fun normalizeSearchQuery(query: String): String {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) {
+            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Search query is required")
+        }
+        if (trimmed.length > MAX_SUPPORT_QUERY_LENGTH || trimmed.any { it in SUPPORT_WILDCARDS }) {
+            throw PlatformAdminException(PlatformAdminError.SUPPORT_TARGET_NOT_FOUND, "Search query is invalid")
+        }
+        return trimmed
+    }
+
+    private fun requireOwner(
+        admin: CurrentPlatformAdmin,
+        message: String,
+    ) {
+        if (admin.role != PlatformAdminRole.OWNER) throw AccessDeniedException(message)
+    }
+
+    private fun invalidGrantCursor(): Nothing =
+        throw PlatformAdminException(PlatformAdminError.INVALID_CURSOR, "Invalid support grant cursor")
 }
 
 private const val SUPPORT_SEARCH_LIMIT = 10

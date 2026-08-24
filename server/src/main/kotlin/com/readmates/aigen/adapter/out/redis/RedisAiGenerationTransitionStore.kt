@@ -8,6 +8,7 @@ import com.readmates.aigen.application.model.ModelId
 import com.readmates.aigen.application.model.SessionImportV1Snapshot
 import com.readmates.aigen.application.model.TokenUsage
 import com.readmates.aigen.application.port.out.AiGenerationAdminCancelResult
+import com.readmates.aigen.application.port.out.AiGenerationAdminJobCommandPort
 import com.readmates.aigen.application.port.out.AiGenerationJobTransitionPort
 import com.readmates.aigen.application.port.out.GroundedResultPayload
 import com.readmates.aigen.application.port.out.SaveGroundedResultCommand
@@ -16,7 +17,8 @@ import java.util.UUID
 
 internal class RedisAiGenerationTransitionStore(
     private val context: AiGenerationRedisContext,
-) : AiGenerationJobTransitionPort {
+) : AiGenerationJobTransitionPort,
+    AiGenerationAdminJobCommandPort {
     private val redisTemplate = context.redisTemplate
     private val properties = context.properties
     private val clock = context.clock

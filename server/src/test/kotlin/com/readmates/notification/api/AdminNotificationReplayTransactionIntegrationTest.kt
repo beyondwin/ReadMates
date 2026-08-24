@@ -68,6 +68,7 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val previewIds = linkedSetOf<UUID>()
 
+    @Suppress("LongMethod")
     @AfterEach
     fun cleanup() {
         replayPort.failureStage = null
@@ -579,7 +580,7 @@ internal class SwitchableReplayPort(
 
     override fun findConfirmation(previewId: UUID): ReplayConfirmation? = delegate.findConfirmation(previewId)
 
-    override fun findConfirmationById(confirmationId: UUID): ReplayConfirmation? = delegate.findConfirmationById(confirmationId)
+    override fun findConfirmationById(confirmationId: UUID) = delegate.findConfirmationById(confirmationId)
 
     override fun replayPreviewTargets(
         previewId: UUID,

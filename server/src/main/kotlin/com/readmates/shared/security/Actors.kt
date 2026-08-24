@@ -1,7 +1,12 @@
 package com.readmates.shared.security
 
-import com.readmates.club.domain.PlatformAdminRole
 import java.util.UUID
+
+enum class PlatformAdminRole {
+    OWNER,
+    OPERATOR,
+    SUPPORT,
+}
 
 enum class ClubCapability {
     BROWSE_MEMBER_CONTENT,

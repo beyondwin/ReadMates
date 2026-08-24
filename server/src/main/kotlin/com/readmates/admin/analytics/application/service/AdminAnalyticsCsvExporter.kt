@@ -2,6 +2,8 @@ package com.readmates.admin.analytics.application.service
 
 import com.readmates.admin.analytics.application.model.AdminAnalyticsKpiCard
 import com.readmates.admin.analytics.application.model.AdminAnalyticsOverview
+import com.readmates.admin.analytics.application.port.`in`.AdminAnalyticsCsvExport
+import com.readmates.admin.analytics.application.port.`in`.ExportAdminAnalyticsCsvUseCase
 import org.springframework.stereotype.Component
 
 private val CSV_COLUMNS =
@@ -32,14 +34,9 @@ private val CSV_COLUMNS =
         "notification_delivery_rate",
     )
 
-data class AdminAnalyticsCsvExport(
-    val filename: String,
-    val content: String,
-)
-
 @Component
-class AdminAnalyticsCsvExporter {
-    fun export(overview: AdminAnalyticsOverview): AdminAnalyticsCsvExport {
+class AdminAnalyticsCsvExporter : ExportAdminAnalyticsCsvUseCase {
+    override fun export(overview: AdminAnalyticsOverview): AdminAnalyticsCsvExport {
         val cards = overview.kpis.associateBy { it.key }
         val rows =
             buildList {

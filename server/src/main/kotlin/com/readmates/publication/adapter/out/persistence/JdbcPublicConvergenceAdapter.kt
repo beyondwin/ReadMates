@@ -25,6 +25,7 @@ class JdbcPublicConvergenceAdapter(
 ) : PublicConvergencePort {
     private val events = PublicConvergenceEventRepository(jdbcTemplate)
     private val work = PublicConvergenceWorkRepository(jdbcTemplate, events)
+    private val receipts = PublicConvergenceReceiptRepository(jdbcTemplate)
     private val hostQuery = PublicConvergenceHostQueryRepository(jdbcTemplate)
 
     override fun loadGenerationBySession(sessionId: UUID): PublicProjectionGeneration? =
@@ -46,52 +47,7 @@ class JdbcPublicConvergenceAdapter(
                 sessionId.dbString(),
             ).firstOrNull()
 
-    override fun loadReceipt(mutationReceiptId: String): PublicMutationConvergenceReceipt? =
-        loadLegacyReceipt(mutationReceiptId) ?: loadProjectionLinkReceipt(mutationReceiptId)
-
-    private fun loadLegacyReceipt(mutationReceiptId: String): PublicMutationConvergenceReceipt? =
-        jdbcTemplate
-            .query(
-                """
-                select mutation_receipt_id, convergence_id, publication_id_snapshot,
-                       session_id_snapshot, committed_generation, origin_readable
-                from public_mutation_convergence_receipts
-                where mutation_receipt_id = ?
-                """.trimIndent(),
-                { resultSet, _ ->
-                    PublicMutationConvergenceReceipt(
-                        mutationReceiptId = resultSet.getString("mutation_receipt_id"),
-                        convergenceId = resultSet.uuid("convergence_id"),
-                        publicationIdSnapshot = resultSet.uuid("publication_id_snapshot"),
-                        sessionIdSnapshot = resultSet.uuid("session_id_snapshot"),
-                        committedGeneration = resultSet.getLong("committed_generation"),
-                        originReadable = resultSet.getBoolean("origin_readable"),
-                    )
-                },
-                mutationReceiptId,
-            ).firstOrNull()
-
-    private fun loadProjectionLinkReceipt(mutationReceiptId: String): PublicMutationConvergenceReceipt? =
-        jdbcTemplate
-            .query(
-                """
-                select mutation_receipt_id, convergence_id, publication_id_snapshot,
-                       session_id_snapshot, committed_generation, origin_readable
-                from public_mutation_convergence_links
-                where mutation_receipt_id = ?
-                """.trimIndent(),
-                { resultSet, _ ->
-                    PublicMutationConvergenceReceipt(
-                        mutationReceiptId = resultSet.getString("mutation_receipt_id"),
-                        convergenceId = resultSet.uuid("convergence_id"),
-                        publicationIdSnapshot = resultSet.getString("publication_id_snapshot")?.let(UUID::fromString),
-                        sessionIdSnapshot = resultSet.getString("session_id_snapshot")?.let(UUID::fromString),
-                        committedGeneration = resultSet.getLong("committed_generation"),
-                        originReadable = resultSet.getBoolean("origin_readable"),
-                    )
-                },
-                mutationReceiptId,
-            ).firstOrNull()
+    override fun loadReceipt(mutationReceiptId: String) = receipts.load(mutationReceiptId)
 
     override fun loadWork(convergenceId: UUID): PublicConvergenceWork? =
         jdbcTemplate

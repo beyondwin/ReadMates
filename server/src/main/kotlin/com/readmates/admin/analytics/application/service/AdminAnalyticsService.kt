@@ -37,11 +37,11 @@ private val KPI_DEFINITIONS =
         KpiKey.ACTIVE_MEMBERS to
             KpiDefinition("활성 멤버", "선택 기간의 모임에 참여한 고유 멤버 수"),
         KpiKey.SESSION_COMPLETION to
-            KpiDefinition("세션 완료율", "선택 기간의 전체 세션 중 완료 또는 공개된 세션 비율"),
+            KpiDefinition("모임 완료율", "선택 기간의 전체 모임 중 완료 또는 공개된 모임 비율"),
         KpiKey.RSVP_RATE to
-            KpiDefinition("RSVP 응답률", "선택 기간의 전체 참여자 중 참석 또는 미정으로 응답한 비율"),
+            KpiDefinition("참석 응답률", "선택 기간의 전체 참여자 중 참석 또는 미정으로 응답한 비율"),
         KpiKey.AI_COST_PER_SESSION to
-            KpiDefinition("AI 비용/세션", "선택 기간의 AI 추정 비용을 전체 세션 수로 나눈 USD 비용"),
+            KpiDefinition("AI 비용/모임", "선택 기간의 AI 추정 비용을 전체 모임 수로 나눈 USD 비용"),
         KpiKey.NOTIFICATION_DELIVERY to
             KpiDefinition("알림 도달률", "선택 기간에 종료 상태가 된 알림 중 발송 성공 비율"),
     )

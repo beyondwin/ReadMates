@@ -30,6 +30,7 @@ class PlatformAdminSupportWorkbenchControllerTest(
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Suppress("LongMethod")
     @Test
     fun `owner uses no-store body search and canonical create revoke`() {
         mockMvc

@@ -7,6 +7,7 @@ import com.readmates.admin.audit.application.AdminAuditException
 import com.readmates.admin.audit.application.model.AdminAuditActionCategory
 import com.readmates.admin.audit.application.model.AdminAuditActor
 import com.readmates.admin.audit.application.model.AdminAuditActorRole
+import com.readmates.admin.audit.application.model.AdminAuditCursor
 import com.readmates.admin.audit.application.model.AdminAuditCursorDraft
 import com.readmates.admin.audit.application.model.AdminAuditFilter
 import com.readmates.admin.audit.application.model.AdminAuditLedgerItem
@@ -51,26 +52,11 @@ class AdminAuditLedgerService(
         query: AdminAuditListQuery,
     ): AdminAuditLedgerPage {
         validateFilter(query.filter)
-        val actor = admin.toPlatformActor()
-        if (!actor.can(PlatformCapability.VIEW_AUDIT)) {
-            throw AdminAuditException(AdminAuditError.INVALID_FILTER, "Audit access is not allowed")
-        }
-        if (query.sensitiveTarget != null && !actor.can(PlatformCapability.VIEW_SENSITIVE_AUDIT)) {
-            throw AdminAuditException(AdminAuditError.INVALID_FILTER, "Sensitive audit search is not allowed")
-        }
+        requireAuditAccess(admin, query.sensitiveTarget)
 
         val requestedLimit = query.pageRequest.limit.coerceIn(1, MAX_LIMIT)
         val fingerprint = cursorSigner.fingerprint(query.filter, query.sensitiveTarget)
-        val cursor =
-            query.rawCursor
-                ?.takeIf(String::isNotBlank)
-                ?.let { cursorSigner.verify(it, query.filter, query.sensitiveTarget) }
-        if (
-            cursor != null &&
-            (cursor.from != query.filter.from.utc() || cursor.snapshotTo.isAfter(query.filter.to.utc()))
-        ) {
-            throw AdminAuditException(AdminAuditError.INVALID_CURSOR, "Invalid audit cursor")
-        }
+        val cursor = resolveCursor(query)
         val now = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
         val snapshotTo = cursor?.snapshotTo ?: minOf(query.filter.to.utc(), now)
         val after = cursor?.let { AdminAuditTuple(it.occurredAt, it.sourceRank, it.immutableSourceId) }
@@ -83,18 +69,8 @@ class AdminAuditLedgerService(
                 limit = requestedLimit + 1,
                 sensitiveTarget = query.sensitiveTarget,
             )
-        val sourceRows =
-            AdminAuditSourceType.entries
-                .asSequence()
-                .filterNot(unavailable::contains)
-                .flatMap { source ->
-                    readSource(source, sourceQuery, continuation = cursor != null, unavailable).asSequence()
-                }.toList()
-
         val projected =
-            sourceRows
-                .map { project(admin, it) }
-                .sortedWith(::compareItems)
+            projectedRows(admin, sourceQuery, cursor != null, unavailable)
 
         val visible = projected.take(requestedLimit)
         val nextCursor =
@@ -129,6 +105,48 @@ class AdminAuditLedgerService(
             items = visible,
             nextCursor = nextCursor,
         )
+    }
+
+    private fun projectedRows(
+        admin: CurrentPlatformAdmin,
+        sourceQuery: AdminAuditSourceQuery,
+        continuation: Boolean,
+        unavailable: MutableSet<AdminAuditSourceType>,
+    ): List<AdminAuditLedgerItem> =
+        AdminAuditSourceType.entries
+            .asSequence()
+            .filterNot(unavailable::contains)
+            .flatMap { source ->
+                readSource(source, sourceQuery, continuation, unavailable).asSequence()
+            }.map { project(admin, it) }
+            .sortedWith(::compareItems)
+            .toList()
+
+    private fun requireAuditAccess(
+        admin: CurrentPlatformAdmin,
+        sensitiveTarget: String?,
+    ) {
+        val actor = admin.toPlatformActor()
+        if (!actor.can(PlatformCapability.VIEW_AUDIT)) {
+            throw AdminAuditException(AdminAuditError.INVALID_FILTER, "Audit access is not allowed")
+        }
+        if (sensitiveTarget != null && !actor.can(PlatformCapability.VIEW_SENSITIVE_AUDIT)) {
+            throw AdminAuditException(AdminAuditError.INVALID_FILTER, "Sensitive audit search is not allowed")
+        }
+    }
+
+    private fun resolveCursor(query: AdminAuditListQuery): AdminAuditCursor? {
+        val cursor =
+            query.rawCursor
+                ?.takeIf(String::isNotBlank)
+                ?.let { cursorSigner.verify(it, query.filter, query.sensitiveTarget) }
+        if (
+            cursor != null &&
+            (cursor.from != query.filter.from.utc() || cursor.snapshotTo.isAfter(query.filter.to.utc()))
+        ) {
+            throw AdminAuditException(AdminAuditError.INVALID_CURSOR, "Invalid audit cursor")
+        }
+        return cursor
     }
 
     private fun validateFilter(filter: AdminAuditFilter) {
@@ -428,16 +446,19 @@ class AdminAuditLedgerService(
         right: AdminAuditLedgerItem,
     ): Int {
         val occurred = right.occurredAt.compareTo(left.occurredAt)
-        if (occurred != 0) return occurred
         val leftSource = sourceType(left)
         val rightSource = sourceType(right)
         val rank = leftSource.rank.compareTo(rightSource.rank)
-        if (rank != 0) return rank
-        return compareNativeIdDescending(
-            left.nativeSourceId(),
-            right.nativeSourceId(),
-            leftSource,
-        )
+        return when {
+            occurred != 0 -> occurred
+            rank != 0 -> rank
+            else ->
+                compareNativeIdDescending(
+                    left.nativeSourceId(),
+                    right.nativeSourceId(),
+                    leftSource,
+                )
+        }
     }
 
     private fun sourceType(item: AdminAuditLedgerItem): AdminAuditSourceType =

@@ -379,7 +379,10 @@ class AdminNotificationReplayServiceTest {
         val idempotencyService = mock(AdminCommandIdempotencyService::class.java)
         val resolvedClaim =
             claimResult ?: replayPort.confirmation?.let {
-                AdminCommandClaimResult.Completed("admin_notification_replay_confirmation", it.confirmationId.toString())
+                AdminCommandClaimResult.Completed(
+                    "admin_notification_replay_confirmation",
+                    it.confirmationId.toString(),
+                )
             } ?: claimed()
         `when`(
             idempotencyService.claim(
@@ -428,7 +431,12 @@ private object ReplayJson : AdminNotificationJsonCodec {
         skippedCount: Int,
     ): String = "{\"previewId\":\"$previewId\",\"reason\":\"$reason\"}"
 
-    override fun stringListJson(values: List<String>): String = values.joinToString(prefix = "[\"", postfix = "\"]", separator = "\",\"")
+    override fun stringListJson(values: List<String>): String =
+        values.joinToString(
+            prefix = "[\"",
+            postfix = "\"]",
+            separator = "\",\"",
+        )
 
     override fun countMapJson(values: Map<String, Int>): String = "{}"
 }

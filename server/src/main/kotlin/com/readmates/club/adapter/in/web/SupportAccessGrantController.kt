@@ -30,14 +30,14 @@ class SupportAccessGrantController(
     @PostMapping
     fun create(
         admin: CurrentPlatformAdmin,
-        @RequestBody request: CreateSupportAccessGrantRequest,
+        @RequestBody ignored: CreateSupportAccessGrantRequest,
     ): Nothing = requireSafeConfirmation(admin)
 
     @DeleteMapping("/{grantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun revoke(
         admin: CurrentPlatformAdmin,
-        @PathVariable grantId: UUID,
+        @PathVariable("grantId") ignored: UUID,
     ): Nothing = requireSafeConfirmation(admin)
 
     @GetMapping

@@ -1,12 +1,12 @@
 package com.readmates.club.adapter.out.security
 
-import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.club.application.port.out.DerivePlatformAdminHostInvitationTokenPort
 import com.readmates.club.application.port.out.DerivedPlatformAdminHostInvitationToken
 import com.readmates.club.application.port.out.TransientPlatformAdminInvitationToken
 import com.readmates.shared.adminmutation.application.model.DigestKeyUnavailableException
 import com.readmates.shared.adminmutation.config.AdminCommandIdentityProperties
 import com.readmates.shared.security.RequestIdentityHmac
+import com.readmates.shared.security.TokenHashing
 import org.springframework.stereotype.Component
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
@@ -18,7 +18,6 @@ import java.util.UUID
 @Component
 class PlatformAdminInvitationTokenDeriver(
     private val identityProperties: AdminCommandIdentityProperties,
-    private val invitationTokenService: InvitationTokenService,
 ) : DerivePlatformAdminHostInvitationTokenPort {
     override fun derive(
         invitationId: UUID,
@@ -35,7 +34,7 @@ class PlatformAdminInvitationTokenDeriver(
         val rawToken = Base64.getUrlEncoder().withoutPadding().encodeToString(tokenBytes)
         return DerivedPlatformAdminHostInvitationToken(
             rawToken = TransientPlatformAdminInvitationToken(rawToken),
-            tokenHash = invitationTokenService.hashToken(rawToken),
+            tokenHash = TokenHashing.sha256(rawToken),
         )
     }
 

@@ -43,7 +43,7 @@ class AdminAnalyticsServiceTest {
                 .first { it.key == KpiKey.SESSION_COMPLETION }
 
         assertThat(card.availability).isEqualTo(Availability.AVAILABLE)
-        assertThat(card.label).isEqualTo("세션 완료율")
+        assertThat(card.label).isEqualTo("모임 완료율")
         assertThat(card.definition).contains("완료")
         assertThat(card.current).isEqualTo(80.0)
         assertThat(card.prior).isEqualTo(50.0)

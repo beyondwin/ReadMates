@@ -80,26 +80,36 @@ class PlatformAdminSupportWorkbenchController(
         admin: CurrentPlatformAdmin,
         @PathVariable grantId: UUID,
         @RequestBody request: AdminSupportGrantRevokePreviewRequest,
-    ): SupportGrantCommandPreview = previewCommandUseCase.previewRevoke(admin.toPlatformActor(), grantId, request.toCommand())
+    ): SupportGrantCommandPreview =
+        previewCommandUseCase.previewRevoke(
+            admin.toPlatformActor(),
+            grantId,
+            request.toCommand(),
+        )
 
     @PostMapping("/grants/{grantId}/revoke/confirm")
     fun confirmRevoke(
         admin: CurrentPlatformAdmin,
         @PathVariable grantId: UUID,
         @RequestBody request: AdminSupportGrantRevokeConfirmRequest,
-    ): SupportGrantCommandReceipt = confirmCommandUseCase.confirmRevoke(admin.toPlatformActor(), grantId, request.toCommand())
+    ): SupportGrantCommandReceipt =
+        confirmCommandUseCase.confirmRevoke(
+            admin.toPlatformActor(),
+            grantId,
+            request.toCommand(),
+        )
 
     @PostMapping("/grants")
     fun create(
         admin: CurrentPlatformAdmin,
-        @RequestBody request: AdminSupportGrantRequest,
+        @RequestBody ignored: AdminSupportGrantRequest,
     ): Nothing = requireSafeConfirmation(admin)
 
     @DeleteMapping("/grants/{grantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun revoke(
         admin: CurrentPlatformAdmin,
-        @PathVariable grantId: UUID,
+        @PathVariable("grantId") ignored: UUID,
     ): Nothing = requireSafeConfirmation(admin)
 }
 
@@ -250,6 +260,9 @@ data class AdminSupportGrantLedgerPageResponse(
 ) {
     companion object {
         fun from(page: AdminSupportGrantLedgerPage) =
-            AdminSupportGrantLedgerPageResponse(page.items.map(AdminSupportGrantLedgerItemResponse::from), page.nextCursor)
+            AdminSupportGrantLedgerPageResponse(
+                page.items.map(AdminSupportGrantLedgerItemResponse::from),
+                page.nextCursor,
+            )
     }
 }

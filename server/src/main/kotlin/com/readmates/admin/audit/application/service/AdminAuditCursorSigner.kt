@@ -287,7 +287,10 @@ private fun hmac(
     purpose: String,
 ): ByteArray = RequestIdentityHmac.hmac(key, bytes, purpose)
 
-private fun String.normalizeSensitive(): String = Normalizer.normalize(trim(), Normalizer.Form.NFC).lowercase(Locale.ROOT)
+private fun String.normalizeSensitive(): String =
+    Normalizer
+        .normalize(trim(), Normalizer.Form.NFC)
+        .lowercase(Locale.ROOT)
 
 private fun OffsetDateTime.normalized(): String = utc().toString()
 

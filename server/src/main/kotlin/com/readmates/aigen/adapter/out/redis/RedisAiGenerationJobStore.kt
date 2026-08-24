@@ -1,6 +1,7 @@
 package com.readmates.aigen.adapter.out.redis
 
 import com.readmates.aigen.application.port.out.ActiveAiGenerationJobProbe
+import com.readmates.aigen.application.port.out.AiGenerationAdminJobCommandPort
 import com.readmates.aigen.application.port.out.AiGenerationCommitStatePort
 import com.readmates.aigen.application.port.out.AiGenerationFailureRecoveryPort
 import com.readmates.aigen.application.port.out.AiGenerationJobReadWritePort
@@ -52,7 +53,9 @@ private class RedisAiGenerationCompositeStore(
     readWrite: AiGenerationJobReadWritePort,
     transition: AiGenerationJobTransitionPort,
     commit: AiGenerationCommitStatePort,
+    adminCommand: AiGenerationAdminJobCommandPort = transition as AiGenerationAdminJobCommandPort,
 ) : AiGenerationJobStore,
     AiGenerationJobReadWritePort by readWrite,
     AiGenerationJobTransitionPort by transition,
+    AiGenerationAdminJobCommandPort by adminCommand,
     AiGenerationCommitStatePort by commit

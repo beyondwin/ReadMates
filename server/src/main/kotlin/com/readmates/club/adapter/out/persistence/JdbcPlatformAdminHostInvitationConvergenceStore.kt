@@ -223,7 +223,6 @@ internal class JdbcPlatformAdminHostInvitationConvergenceStore(
             )
         if (locked != digestKeyVersion) throw CorruptAdminCommandClaimException()
     }
-
 }
 
 private class JdbcExpiredHostInvitationLeaseRecovery(

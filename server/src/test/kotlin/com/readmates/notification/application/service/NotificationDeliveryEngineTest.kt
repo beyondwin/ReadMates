@@ -26,7 +26,7 @@ import java.util.UUID
 @ResourceLock("NotificationDeliveryEngineLogger")
 class NotificationDeliveryEngineTest {
     @Test
-    fun `constructor rejects retry schedules that cannot cover every nonterminal delivery attempt`() {
+    fun `runtime properties reject retry schedules that cannot cover every nonterminal delivery observation`() {
         assertThatThrownBy {
             notificationDeliveryEngine(
                 deliveryStatusPort = EngineRecordingDeliveryPort(),
@@ -36,7 +36,7 @@ class NotificationDeliveryEngineTest {
             )
         }.isInstanceOf(IllegalArgumentException::class.java)
             .hasMessageContaining("retry-delays")
-            .hasMessageContaining("delivery attempt")
+            .hasMessageContaining("delivery observation")
     }
 
     @Test

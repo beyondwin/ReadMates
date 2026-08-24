@@ -1,5 +1,6 @@
 package com.readmates.notification.application.config
 
+import com.readmates.shared.delivery.DeliveryRuntimePolicy
 import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.boot.convert.DurationUnit
 import java.time.Duration
@@ -48,7 +49,20 @@ data class NotificationRuntimeProperties(
     val worker: Worker = Worker(),
     val kafka: Kafka = Kafka(),
     val smtp: Smtp = Smtp(),
-) {
+) : DeliveryRuntimePolicy {
+    override val deliveryEnabled: Boolean
+        get() = enabled
+    override val deliveryWorkerEnabled: Boolean
+        get() = worker.enabled
+    override val deliveryBatchSize: Int
+        get() = worker.relayBatchSize
+    override val deliveryClaimLease: Duration
+        get() = worker.claimLease
+    override val deliveryMaxAttempts: Int
+        get() = kafka.maxDeliveryAttempts
+    override val deliveryRetryDelays: List<Duration>
+        get() = worker.retryDelays
+
     init {
         if (enabled) {
             requireNotBlank("sender-email", senderEmail)

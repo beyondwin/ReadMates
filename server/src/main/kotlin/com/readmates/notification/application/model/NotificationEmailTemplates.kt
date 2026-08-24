@@ -375,10 +375,6 @@ object NotificationEmailTemplates {
 
     private fun String.ensureLeadingSlash(): String = if (startsWith("/")) this else "/$this"
 
-    private fun meetingFolio(sessionNumber: Int): String = "No.$sessionNumber"
-
-    private fun meetingSentence(sessionNumber: Int): String = "${sessionNumber}번째 모임"
-
     private fun labelForText(label: String): String = if (label == "확인") "확인할 일" else label
 
     private fun String.requiredClubName(): String =
@@ -412,3 +408,7 @@ object NotificationEmailTemplates {
         val inAppBody: String,
     )
 }
+
+private fun meetingFolio(sessionNumber: Int): String = "No.$sessionNumber"
+
+private fun meetingSentence(sessionNumber: Int): String = "${sessionNumber}번째 모임"

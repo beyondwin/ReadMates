@@ -1,6 +1,7 @@
 package com.readmates.notification.application.service
 
 import com.readmates.notification.application.config.NotificationRuntimeProperties
+import com.readmates.notification.application.port.`in`.ProcessAdminNotificationReplayConvergenceUseCase
 import com.readmates.notification.application.port.out.AdminNotificationReplayConvergenceAcquisition
 import com.readmates.notification.application.port.out.AdminNotificationReplayConvergenceLease
 import com.readmates.notification.application.port.out.AdminNotificationReplayConvergenceObservation
@@ -18,8 +19,8 @@ class AdminNotificationReplayConvergenceService(
     private val properties: NotificationRuntimeProperties,
     private val transactions: TransactionOperations,
     private val clock: Clock,
-) {
-    fun processBatch(): Int {
+) : ProcessAdminNotificationReplayConvergenceUseCase {
+    override fun processBatch(): Int {
         if (!enabled()) return 0
         var processed = 0
         while (processed < properties.worker.relayBatchSize && processOne()) {
@@ -86,23 +87,19 @@ class AdminNotificationReplayConvergenceService(
         }
 
     private fun evaluate(observation: AdminNotificationReplayConvergenceObservation): Evaluation {
-        if (observation.expectedTargetCount <= 0) {
-            return Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, TARGET_SET_EMPTY)
-        }
-        if (observation.expectedTargetCount != observation.statuses.size) {
-            return Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, TARGET_MISSING)
-        }
         val statuses = observation.statuses.toSet()
-        if (statuses.any { it !in KNOWN_DELIVERY_STATES }) {
-            return Evaluation(AdminNotificationReplayConvergenceOutcome.PENDING, DELIVERY_STATE_UNKNOWN)
-        }
-        if (statuses.any { it in ACTIVE_DELIVERY_STATES }) {
-            return Evaluation(AdminNotificationReplayConvergenceOutcome.PENDING, DELIVERIES_STILL_PENDING)
-        }
-        return if ("DEAD" in statuses) {
-            Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, DELIVERY_DEAD)
-        } else {
-            Evaluation(AdminNotificationReplayConvergenceOutcome.SUCCEEDED, null)
+        return when {
+            observation.expectedTargetCount <= 0 ->
+                Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, TARGET_SET_EMPTY)
+            observation.expectedTargetCount != observation.statuses.size ->
+                Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, TARGET_MISSING)
+            statuses.any { it !in KNOWN_DELIVERY_STATES } ->
+                Evaluation(AdminNotificationReplayConvergenceOutcome.PENDING, DELIVERY_STATE_UNKNOWN)
+            statuses.any { it in ACTIVE_DELIVERY_STATES } ->
+                Evaluation(AdminNotificationReplayConvergenceOutcome.PENDING, DELIVERIES_STILL_PENDING)
+            "DEAD" in statuses ->
+                Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, DELIVERY_DEAD)
+            else -> Evaluation(AdminNotificationReplayConvergenceOutcome.SUCCEEDED, null)
         }
     }
 

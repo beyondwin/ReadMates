@@ -426,7 +426,11 @@ internal class JdbcAdminNotificationReplayAdapterTest(
         insertDelivery(TARGET_ID, "FAILED", "MAIL_RETRYABLE")
         val snapshot = adapter.loadSnapshot(AdminNotificationFilter(clubId = CLUB_ID), 2)
         val at = OffsetDateTime.parse("2026-05-27T01:02:03.123456Z")
-        val selectionHash = adminNotificationReplaySelectionHash(AdminNotificationFilter(clubId = CLUB_ID), snapshot.targets)
+        val selectionHash =
+            adminNotificationReplaySelectionHash(
+                AdminNotificationFilter(clubId = CLUB_ID),
+                snapshot.targets,
+            )
         val previewId = adapter.createPreview(previewInsert(snapshot.targets, selectionHash, at))
         createdPreviewIds += previewId
         insertAudit(at)

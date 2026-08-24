@@ -20,7 +20,6 @@ browse|shared
 club|shared
 feedback|shared
 note|shared
-notification|club
 notification|shared
 publication|club
 publication|shared

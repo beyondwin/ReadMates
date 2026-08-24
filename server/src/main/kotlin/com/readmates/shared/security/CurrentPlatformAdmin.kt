@@ -1,6 +1,5 @@
 package com.readmates.shared.security
 
-import com.readmates.club.domain.PlatformAdminRole
 import java.util.UUID
 
 data class CurrentPlatformAdmin(

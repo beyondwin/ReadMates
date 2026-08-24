@@ -70,7 +70,11 @@ class AdminNotificationReplayConvergenceServiceTest {
     fun `missing immutable target fails closed instead of shrinking denominator`() {
         val port =
             RecordingConvergencePort(
-                observation = AdminNotificationReplayConvergenceObservation(expectedTargetCount = 2, statuses = listOf("SENT")),
+                observation =
+                    AdminNotificationReplayConvergenceObservation(
+                        expectedTargetCount = 2,
+                        statuses = listOf("SENT"),
+                    ),
             )
 
         service(port).processOne()
@@ -83,7 +87,11 @@ class AdminNotificationReplayConvergenceServiceTest {
     fun `empty immutable target set fails closed instead of vacuous success`() {
         val port =
             RecordingConvergencePort(
-                observation = AdminNotificationReplayConvergenceObservation(expectedTargetCount = 0, statuses = emptyList()),
+                observation =
+                    AdminNotificationReplayConvergenceObservation(
+                        expectedTargetCount = 0,
+                        statuses = emptyList(),
+                    ),
             )
 
         service(port).processOne()

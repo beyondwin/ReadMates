@@ -432,7 +432,10 @@ private fun cleanupReviewTarget(jdbcTemplate: JdbcTemplate) {
         """.trimIndent(),
         REVIEW_PUBLICATION_ID,
     )
-    jdbcTemplate.update("delete from public_projection_current where publication_id_snapshot = ?", REVIEW_PUBLICATION_ID)
+    jdbcTemplate.update(
+        "delete from public_projection_current where publication_id_snapshot = ?",
+        REVIEW_PUBLICATION_ID,
+    )
     jdbcTemplate.update("delete from public_projection_generations where publication_id = ?", REVIEW_PUBLICATION_ID)
     jdbcTemplate.update("delete from public_session_publications where id = ?", REVIEW_PUBLICATION_ID)
     jdbcTemplate.update("delete from session_publication_versions where session_id = ?", REVIEW_SESSION_ID)

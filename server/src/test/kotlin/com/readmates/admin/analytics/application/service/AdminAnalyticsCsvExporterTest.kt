@@ -19,6 +19,7 @@ import java.util.UUID
 class AdminAnalyticsCsvExporterTest {
     private val exporter = AdminAnalyticsCsvExporter()
 
+    @Suppress("LongMethod")
     @Test
     fun `exports every projection value with deterministic columns and filename`() {
         val overview = projection()

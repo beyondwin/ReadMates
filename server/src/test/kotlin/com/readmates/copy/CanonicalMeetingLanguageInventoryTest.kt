@@ -67,6 +67,11 @@ import java.time.OffsetDateTime
 import java.util.UUID
 import kotlin.io.path.relativeTo
 
+private typealias ConfirmTransactionInput = ManualNotificationConfirmTransactionInput
+private typealias ConfirmAttempt = ManualNotificationConfirmAttempt
+private typealias RecordReplacement = SessionImportRecordReplacement
+private typealias StoredFeedbackDocument = SessionImportStoredFeedbackDocument
+
 class CanonicalMeetingLanguageInventoryTest {
     @Test
     fun `session error copy uses meeting language and keeps codes stable`() {
@@ -238,8 +243,12 @@ class CanonicalMeetingLanguageInventoryTest {
 
         val templates =
             HostManualNotificationService(CopyInventoryManualPort())
-                .options(hostMember(), SESSION_ID, null, PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100))
-                .templates
+                .options(
+                    hostMember(),
+                    SESSION_ID,
+                    null,
+                    PageRequest.cursor(null, null, defaultLimit = 50, maxLimit = 100),
+                ).templates
         assertThat(templates.associate { it.eventType to it.label }).containsExactlyInAnyOrderEntriesOf(
             mapOf(
                 NotificationEventType.NEXT_BOOK_PUBLISHED to "다음 책 확정",
@@ -298,9 +307,24 @@ class CanonicalMeetingLanguageInventoryTest {
     @Test
     fun `lifecycle and publication wording stay on independent axes`() {
         val handler = SessionApplicationErrorHandler()
-        val unpublish = handler.handleUnpublishNotAllowed().body?.message.orEmpty()
-        val exposure = handler.handleInvalidExposure().body?.message.orEmpty()
-        val reopen = handler.handleReopenNotAllowed().body?.message.orEmpty()
+        val unpublish =
+            handler
+                .handleUnpublishNotAllowed()
+                .body
+                ?.message
+                .orEmpty()
+        val exposure =
+            handler
+                .handleInvalidExposure()
+                .body
+                ?.message
+                .orEmpty()
+        val reopen =
+            handler
+                .handleReopenNotAllowed()
+                .body
+                ?.message
+                .orEmpty()
         val record = eventCopy(NotificationEventType.SESSION_RECORD_UPDATED)
         val nextBook = eventCopy(NotificationEventType.NEXT_BOOK_PUBLISHED)
         val forbidden = listOf("세션", "회차", "기록 공개", "공개 완료", "공개를 취소", "공개 기록", "공개 범위")
@@ -342,7 +366,10 @@ class CanonicalMeetingLanguageInventoryTest {
     @Test
     fun `allowlisted production hits are only technical parser or historical exceptions`() {
         val sourceRoot = projectRoot().resolve("server/src/main/kotlin")
-        val allowlist = readAllowlist(projectRoot().resolve("server/config/copy/canonical-meeting-language-allowlist.txt"))
+        val allowlist =
+            readAllowlist(
+                projectRoot().resolve("server/config/copy/canonical-meeting-language-allowlist.txt"),
+            )
         val hits = scanLegacyCopy(sourceRoot)
         val unmatched =
             hits.filter { hit ->
@@ -409,7 +436,8 @@ class CanonicalMeetingLanguageInventoryTest {
         val source =
             Files.readString(
                 projectRoot().resolve(
-                    "server/src/main/kotlin/com/readmates/notification/application/service/HostManualNotificationService.kt",
+                    "server/src/main/kotlin/com/readmates/notification/" +
+                        "application/service/HostManualNotificationService.kt",
                 ),
             )
         return NotificationEventType.entries.associateWith { eventType ->
@@ -554,8 +582,7 @@ class CanonicalMeetingLanguageInventoryTest {
             hostMembershipId: UUID,
         ): ManualNotificationPreviewRecord? = error("unused")
 
-        override fun confirmManualDispatch(input: ManualNotificationConfirmTransactionInput): ManualNotificationConfirmAttempt =
-            error("unused")
+        override fun confirmManualDispatch(input: ConfirmTransactionInput): ConfirmAttempt = error("unused")
 
         override fun insertManualDispatch(
             clubId: UUID,
@@ -575,7 +602,6 @@ class CanonicalMeetingLanguageInventoryTest {
             sessionId: UUID,
         ): SessionImportTarget = target
 
-        override fun replaceRecords(command: SessionImportRecordReplacement): SessionImportStoredFeedbackDocument =
-            error("unused")
+        override fun replaceRecords(command: RecordReplacement): StoredFeedbackDocument = error("unused")
     }
 }

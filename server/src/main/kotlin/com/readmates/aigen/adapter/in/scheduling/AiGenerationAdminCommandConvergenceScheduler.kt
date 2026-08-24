@@ -2,7 +2,7 @@
 
 package com.readmates.aigen.adapter.`in`.scheduling
 
-import com.readmates.aigen.application.service.AiGenerationAdminCommandConvergenceService
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationAdminCommandConvergenceUseCase
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Component
@@ -10,10 +10,10 @@ import org.springframework.stereotype.Component
 @Component
 @ConditionalOnProperty(prefix = "readmates.aigen", name = ["enabled"], havingValue = "true")
 class AiGenerationAdminCommandConvergenceScheduler(
-    private val service: AiGenerationAdminCommandConvergenceService,
+    private val useCase: ProcessAiGenerationAdminCommandConvergenceUseCase,
 ) {
     @Scheduled(fixedDelayString = "\${readmates.aigen.admin-command-convergence-fixed-delay:30s}")
     fun converge() {
-        service.processBatch()
+        useCase.processBatch()
     }
 }

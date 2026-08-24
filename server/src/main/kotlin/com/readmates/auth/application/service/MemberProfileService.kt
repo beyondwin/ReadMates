@@ -191,21 +191,13 @@ class MemberProfileService(
         membershipId: UUID,
         displayName: String,
     ): MemberProfileRow {
-        if (!memberProfileStore.lockClubProfileNames(clubId)) {
-            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        }
-        val target =
-            memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
-                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        if (target.status !in PROFILE_EDIT_TARGET_STATUSES) {
-            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        }
-        if (memberProfileStore.displayNameExistsInClub(clubId, displayName, membershipId)) {
-            throw MemberProfileException(MemberProfileError.DISPLAY_NAME_DUPLICATE)
-        }
-        if (!memberProfileStore.updateDisplayName(clubId, membershipId, displayName)) {
-            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        }
+        requireProfileNameLock(clubId)
+        val target = requireProfileMember(clubId, membershipId)
+        requireHostProfileTarget(target)
+        requireAvailableDisplayName(clubId, membershipId, displayName)
+        requireDisplayNameUpdated(
+            memberProfileStore.updateDisplayName(clubId, membershipId, displayName),
+        )
         return target
     }
 
@@ -228,29 +220,63 @@ class MemberProfileService(
         membershipId: UUID,
         displayName: String,
     ): MemberProfileRow {
-        if (!memberProfileStore.lockClubProfileNames(clubId)) {
-            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        }
-        val currentMember =
-            memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
-                ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-        if (!currentMember.toCurrentMember().canEditOwnProfile) {
-            throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
-        }
-        if (memberProfileStore.displayNameExistsInClub(clubId, displayName, membershipId)) {
-            throw MemberProfileException(MemberProfileError.DISPLAY_NAME_DUPLICATE)
-        }
+        requireProfileNameLock(clubId)
+        val currentMember = requireProfileMember(clubId, membershipId)
+        requireOwnProfileEditable(currentMember)
+        requireAvailableDisplayName(clubId, membershipId, displayName)
         if (!memberProfileStore.updateOwnDisplayName(clubId, membershipId, displayName)) {
-            val updatedMember =
-                memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
-                    ?: throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
-            if (!updatedMember.toCurrentMember().canEditOwnProfile) {
-                throw MemberProfileException(MemberProfileError.MEMBERSHIP_NOT_ALLOWED)
-            }
-            throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+            rejectOwnDisplayNameUpdate(clubId, membershipId)
         }
         return currentMember
     }
+
+    private fun requireProfileNameLock(clubId: UUID) {
+        if (!memberProfileStore.lockClubProfileNames(clubId)) memberNotFound()
+    }
+
+    private fun requireProfileMember(
+        clubId: UUID,
+        membershipId: UUID,
+    ): MemberProfileRow =
+        memberProfileStore.findProfileMemberInClubForUpdate(clubId, membershipId)
+            ?: memberNotFound()
+
+    private fun requireHostProfileTarget(target: MemberProfileRow) {
+        if (target.status !in PROFILE_EDIT_TARGET_STATUSES) memberNotFound()
+    }
+
+    private fun requireOwnProfileEditable(member: MemberProfileRow) {
+        if (!member.toCurrentMember().canEditOwnProfile) membershipNotAllowed()
+    }
+
+    private fun requireAvailableDisplayName(
+        clubId: UUID,
+        membershipId: UUID,
+        displayName: String,
+    ) {
+        if (memberProfileStore.displayNameExistsInClub(clubId, displayName, membershipId)) {
+            throw MemberProfileException(MemberProfileError.DISPLAY_NAME_DUPLICATE)
+        }
+    }
+
+    private fun requireDisplayNameUpdated(updated: Boolean) {
+        if (!updated) memberNotFound()
+    }
+
+    private fun rejectOwnDisplayNameUpdate(
+        clubId: UUID,
+        membershipId: UUID,
+    ): Nothing {
+        requireOwnProfileEditable(requireProfileMember(clubId, membershipId))
+        memberNotFound()
+    }
+
+    private fun memberNotFound(): Nothing = throw MemberProfileException(MemberProfileError.MEMBER_NOT_FOUND)
+
+    private fun membershipNotAllowed(): Nothing =
+        throw MemberProfileException(
+            MemberProfileError.MEMBERSHIP_NOT_ALLOWED,
+        )
 
     private fun validateDisplayName(rawDisplayName: String?): String {
         val displayName =

@@ -123,13 +123,18 @@ private val serverSlices =
                     "com.readmates.notification.adapter.in.web..",
                     "com.readmates.notification.adapter.in.kafka..",
                     "com.readmates.notification.adapter.in.scheduler..",
+                    "com.readmates.notification.adapter.in.scheduling..",
                 ),
             applicationPackages = listOf("com.readmates.notification.application.."),
         ),
         ServerSlice(
             name = "club",
             type = ServerSliceType.WRITE,
-            inboundAdapterPackages = listOf("com.readmates.club.adapter.in.web.."),
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.club.adapter.in.web..",
+                    "com.readmates.club.adapter.in.scheduler..",
+                ),
             applicationPackages = listOf("com.readmates.club.application.."),
         ),
         ServerSlice(
@@ -1103,6 +1108,7 @@ private val aiGenerationCapabilityMethods =
                 "markCleanupComplete",
                 "deleteTransientPayload",
             ),
+        "AiGenerationAdminJobCommandPort" to setOf("cancelForAdmin"),
     )
 
 private fun aiGenerationRedisRoot(): Path =

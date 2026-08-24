@@ -99,7 +99,9 @@ interface AiGenerationJobTransitionPort {
     ): Boolean
 
     fun saveGroundedResult(command: SaveGroundedResultCommand): Boolean
+}
 
+interface AiGenerationAdminJobCommandPort {
     /** Atomically revision-CAS the job to CANCELLED and delete all transient payloads. */
     fun cancelForAdmin(
         jobId: UUID,
@@ -162,6 +164,7 @@ interface AiGenerationCommitStatePort {
 interface AiGenerationJobStore :
     AiGenerationJobReadWritePort,
     AiGenerationJobTransitionPort,
+    AiGenerationAdminJobCommandPort,
     AiGenerationCommitStatePort
 
 data class SaveGroundedResultCommand(

@@ -24,22 +24,21 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
         leaseExpiresAt: Instant,
         maxAttempts: Int,
     ): AdminNotificationReplayConvergenceAcquisition {
-        val candidate =
-            lockCandidate(startedAt, maxAttempts)
-                ?: return AdminNotificationReplayConvergenceAcquisition.Unavailable
-        if (!claim(candidate, leaseOwner, startedAt, leaseExpiresAt)) {
-            return AdminNotificationReplayConvergenceAcquisition.Unavailable
+        val candidate = lockCandidate(startedAt, maxAttempts)
+        return if (candidate == null || !claim(candidate, leaseOwner, startedAt, leaseExpiresAt)) {
+            AdminNotificationReplayConvergenceAcquisition.Unavailable
+        } else {
+            ensureStartedEvent(candidate, startedAt)
+            AdminNotificationReplayConvergenceAcquisition.Acquired(
+                AdminNotificationReplayConvergenceLease(
+                    convergenceId = candidate.convergenceId,
+                    receiptId = candidate.receiptId,
+                    effectTargetId = candidate.receiptId,
+                    attemptNo = candidate.attemptNo,
+                    lastSafeErrorCode = candidate.lastSafeErrorCode,
+                ),
+            )
         }
-        ensureStartedEvent(candidate, startedAt)
-        return AdminNotificationReplayConvergenceAcquisition.Acquired(
-            AdminNotificationReplayConvergenceLease(
-                convergenceId = candidate.convergenceId,
-                receiptId = candidate.receiptId,
-                effectTargetId = candidate.receiptId,
-                attemptNo = candidate.attemptNo,
-                lastSafeErrorCode = candidate.lastSafeErrorCode,
-            ),
-        )
     }
 
     override fun observeTargets(receiptId: UUID): AdminNotificationReplayConvergenceObservation {
@@ -78,13 +77,15 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
         safeErrorCode: String?,
         completedAt: Instant,
         retryAt: Instant?,
-    ): Boolean {
-        if (!lockOwnedLease(lease, leaseOwner, completedAt)) return false
-        val updated = updateOutcome(lease, leaseOwner, outcome, safeErrorCode, completedAt, retryAt)
-        if (!updated) return false
-        insertOutcomeEvent(lease, outcome, safeErrorCode, completedAt)
-        return true
-    }
+    ): Boolean =
+        if (!lockOwnedLease(lease, leaseOwner, completedAt)) {
+            false
+        } else if (!updateOutcome(lease, leaseOwner, outcome, safeErrorCode, completedAt, retryAt)) {
+            false
+        } else {
+            insertOutcomeEvent(lease, outcome, safeErrorCode, completedAt)
+            true
+        }
 
     private fun lockCandidate(
         startedAt: Instant,

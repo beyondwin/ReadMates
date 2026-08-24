@@ -1020,6 +1020,7 @@ class MySqlFlywayMigrationTest(
         assertAtomicAdminReplayForeignKeys(jdbcTemplate)
     }
 
+    @Suppress("LongMethod")
     private fun assertAtomicAdminReplayColumns(jdbcTemplate: JdbcTemplate) {
         assertThat(columns(jdbcTemplate, "admin_notification_replay_previews"))
             .contains("contract_version", "actor_platform_role", "club_id", "consumed_confirmation_id")
@@ -2592,8 +2593,17 @@ class MySqlFlywayMigrationTest(
             )
 
             insertV59NotificationPreview(upgradeJdbc, fixture.notificationPreviewId, fixture)
-            insertV59NotificationReceipt(upgradeJdbc, fixture.notificationReceiptId, fixture.notificationPreviewId, fixture)
-            insertV59NotificationReceiptTarget(upgradeJdbc, fixture.notificationReceiptId, fixture.notificationDeliveryId)
+            insertV59NotificationReceipt(
+                upgradeJdbc,
+                fixture.notificationReceiptId,
+                fixture.notificationPreviewId,
+                fixture,
+            )
+            insertV59NotificationReceiptTarget(
+                upgradeJdbc,
+                fixture.notificationReceiptId,
+                fixture.notificationDeliveryId,
+            )
             assertUniqueConstraintRejected("PRIMARY") {
                 insertV59NotificationReceiptTarget(
                     upgradeJdbc,
@@ -2843,7 +2853,9 @@ class MySqlFlywayMigrationTest(
             assertThat(
                 upgradeJdbc.update("delete from memberships where id = ?", fixture.membershipId),
             ).isEqualTo(1)
-            assertThat(upgradeJdbc.update("delete from platform_audit_events where id = ?", fixture.auditId)).isEqualTo(1)
+            assertThat(
+                upgradeJdbc.update("delete from platform_audit_events where id = ?", fixture.auditId),
+            ).isEqualTo(1)
             assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.actorId)).isEqualTo(1)
             assertThat(upgradeJdbc.update("delete from clubs where id = ?", fixture.clubId)).isEqualTo(1)
             assertEquals(
@@ -3185,7 +3197,9 @@ class MySqlFlywayMigrationTest(
             ).isEqualTo(1)
 
             assertThat(upgradeJdbc.update("delete from platform_admin_support_command_previews")).isEqualTo(2)
-            assertThat(upgradeJdbc.update("delete from support_access_grants where club_id = ?", fixture.clubId)).isEqualTo(6)
+            assertThat(
+                upgradeJdbc.update("delete from support_access_grants where club_id = ?", fixture.clubId),
+            ).isEqualTo(6)
             assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.granteeId)).isEqualTo(1)
             assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.otherGranteeId)).isEqualTo(1)
             assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.grantorId)).isEqualTo(1)
@@ -6017,6 +6031,7 @@ class MySqlFlywayMigrationTest(
         val revokeAuditId: String = "bbbbbbbb-0000-4000-8000-000000060026",
     )
 
+    @Suppress("LongMethod")
     private fun insertV60LegacySupportFixtures(
         jdbcTemplate: JdbcTemplate,
         fixture: V60SupportCommandFixture,
@@ -6261,6 +6276,7 @@ class MySqlFlywayMigrationTest(
         val aiConvergenceId: String = "aaaaaaaa-0000-4000-8000-000000059015",
     )
 
+    @Suppress("LongMethod")
     private fun insertV59LegacyNotificationSources(
         jdbcTemplate: JdbcTemplate,
         fixture: V59ServiceCommandFixture,

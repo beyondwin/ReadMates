@@ -60,7 +60,18 @@ class ServerArchitectureInventoryTest {
             ),
         ).contains("PublicConvergencePort")
         assertThat(PublicConvergencePort::class.java.declaredMethods.map { it.name })
-            .containsExactlyInAnyOrder("loadReceipt", "loadWork", "loadCurrentEvent", "appendEvent")
+            .containsExactlyInAnyOrder(
+                "loadGenerationBySession",
+                "loadReceipt",
+                "loadWork",
+                "appendEvent",
+                "currentEvent",
+                "claimNext",
+                "completeAttempt",
+                "purgeExpiredWork",
+                "countWorkBacklog",
+                "loadHostSnapshot",
+            )
         assertThat(
             PublicConvergencePort::class.java.methods
                 .single { it.name == "appendEvent" }
@@ -125,6 +136,7 @@ class ServerArchitectureInventoryTest {
         assertThat(adapter).doesNotContain("import com.readmates.session.")
     }
 
+    @Suppress("LongMethod")
     @Test
     fun `mutation idempotency substrate stays shared and session receipts stay session owned`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
@@ -184,7 +196,8 @@ class ServerArchitectureInventoryTest {
         val confirmTest =
             Files.readString(
                 projectRoot().resolve(
-                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcManualNotificationDispatchAdapterTest.kt",
+                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/" +
+                        "JdbcManualNotificationDispatchAdapterTest.kt",
                 ),
             )
         assertThat(confirmTest).doesNotContain("HostMutationReceipt")
@@ -328,12 +341,13 @@ class ServerArchitectureInventoryTest {
         val expectedComponents = emptySet<Set<String>>()
 
         assertThat(actual).isEqualTo(baseline)
-        assertThat(baseline).hasSize(37)
+        assertThat(baseline).hasSize(36)
         assertThat(retired).containsExactlyInAnyOrder(
             "club|auth",
             "sessionrecord|sessionimport",
             "sessionrecord|session",
             "aigen|session",
+            "notification|club",
         )
         assertThat(baseline).contains("session|sessionrecord", "sessionimport|sessionrecord")
         requireApprovedIdentityPartition(

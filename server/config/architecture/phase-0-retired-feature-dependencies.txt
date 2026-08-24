@@ -3,3 +3,4 @@ club|auth
 sessionrecord|sessionimport
 sessionrecord|session
 aigen|session
+notification|club

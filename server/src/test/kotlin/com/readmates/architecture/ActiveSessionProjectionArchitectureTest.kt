@@ -37,7 +37,7 @@ class ActiveSessionProjectionArchitectureTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Normal session SQL must read active_sessions; only HostSessionDeletionQueries " +
+            "Normal session SQL must read active_sessions; only deletion/reconciliation projection owners " +
                 "and the HostSessionWriteQueries max-number allocation query may use sessions:\n" +
                 violations.joinToString("\n"),
         )
@@ -77,8 +77,10 @@ class ActiveSessionProjectionArchitectureTest {
         val inMaxNumberWindow =
             MAX_NUMBER_ALLOCATION_COLLAPSED in window
         val inProjectionLockWindow = PUBLIC_PROJECTION_LOCK_COLLAPSED in window
+        val isRawSessionRead = SESSION_TABLE_SCAN.matches(match.value)
         return when {
             sourceFile.name == "HostSessionDeletionQueries.kt" -> true
+            sourceFile.name in DELETION_RECONCILIATION_QUERY_FILES -> isRawSessionRead
             sourceFile.name in PUBLIC_PROJECTION_LOCK_FILES -> inProjectionLockWindow
             sourceFile.name != "HostSessionWriteQueries.kt" -> false
             else -> inMaxNumberWindow
@@ -140,6 +142,12 @@ class ActiveSessionProjectionArchitectureTest {
             setOf(
                 "JdbcAuthPublicProjectionMutationAdapter.kt",
                 "JdbcClubPublicProjectionMutationAdapter.kt",
+            )
+        val DELETION_RECONCILIATION_QUERY_FILES =
+            setOf(
+                "JdbcPublicQueryAdapter.kt",
+                "HostPublicProjectionWriteOperations.kt",
+                "HostSessionWriteQueryHelpers.kt",
             )
 
         fun collapseWhitespace(value: String): String = value.replace(Regex("""\s+"""), " ")

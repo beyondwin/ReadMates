@@ -387,8 +387,6 @@
     <ID>ThrowsCount:MemberLifecycleService.kt:MemberLifecycleService$private fun ensureMutableMembership: LifecycleMembershipRow</ID>
     <ID>ThrowsCount:MemberProfileService.kt:MemberProfileService$@Transactional override fun updateMemberProfile: HostMemberListItem</ID>
     <ID>ThrowsCount:MemberProfileService.kt:MemberProfileService$@Transactional override fun updateOwnProfile: MemberProfile</ID>
-    <ID>ThrowsCount:MemberProfileService.kt:MemberProfileService$private fun updateHostDisplayName</ID>
-    <ID>ThrowsCount:MemberProfileService.kt:MemberProfileService$private fun updateOwnDisplayName</ID>
     <ID>ThrowsCount:MemberProfileService.kt:MemberProfileService$private fun validateDisplayName: String</ID>
     <ID>ThrowsCount:PlatformAdminClubRegistryService.kt:PlatformAdminClubRegistryService$@Transactional override fun updateClub: PlatformAdminClubListItem</ID>
     <ID>ThrowsCount:PlatformAdminService.kt:PlatformAdminService$override fun checkClubDomainProvisioning: PlatformAdminClubDomain</ID>

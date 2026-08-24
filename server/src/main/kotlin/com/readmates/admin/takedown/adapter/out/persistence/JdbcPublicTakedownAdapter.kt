@@ -147,7 +147,7 @@ class JdbcPublicTakedownAdapter(
     ): PublicTakedownTarget? {
         if (lock) {
             jdbcTemplate.queryForObject(
-                "select id from sessions where club_id = ? and id = ? for update",
+                "select id from active_sessions where club_id = ? and id = ? for update",
                 String::class.java,
                 clubId.dbString(),
                 sessionId.dbString(),

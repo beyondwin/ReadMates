@@ -98,40 +98,64 @@ class SessionRecordApplyService(
     ): SessionRecordApplyResult {
         requireHost(host)
         val identity = applyIdentity(host, command)
-        if (identity != null && idempotency != null) {
-            when (
-                val claim =
-                    idempotency.claim(
-                        identity,
-                        CanonicalMutationPayload.RecordApply(
-                            applyRequestId = command.applyRequestId,
-                            entryKeys = listOf(command.expectedDraftHash),
-                        ),
-                    )
-            ) {
-                is MutationClaimResult.Replayed -> {
-                    requireMutationReceipt(host, command, claim.receiptId)
-                    val completed =
-                        store.findApplyReceipt(host, command.sessionId, claim.receiptId)
-                            ?: throw notFound()
-                    return replay(host, command, completed)
+        val result =
+            replayClaim(host, command, identity)
+                ?: replayStoredReceipt(host, command, identity)
+                ?: applyLocked(host, command, requireEditor(host, command), identity)
+        return result
+    }
+
+    private fun replayClaim(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+        identity: MutationIdentity?,
+    ): SessionRecordApplyResult? =
+        identity?.let { mutationIdentity ->
+            idempotency?.let { service ->
+                when (
+                    val claim =
+                        service.claim(
+                            mutationIdentity,
+                            CanonicalMutationPayload.RecordApply(
+                                applyRequestId = command.applyRequestId,
+                                entryKeys = listOf(command.expectedDraftHash),
+                            ),
+                        )
+                ) {
+                    is MutationClaimResult.Replayed -> replayClaimedReceipt(host, command, claim.receiptId)
+                    is MutationClaimResult.InProgress -> pendingMutation()
+                    is MutationClaimResult.Claimed -> null
                 }
-                is MutationClaimResult.InProgress -> throw MutationPendingException()
-                is MutationClaimResult.Claimed -> Unit
             }
         }
+
+    private fun replayStoredReceipt(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+        identity: MutationIdentity?,
+    ): SessionRecordApplyResult? =
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId)?.let { completed ->
             if (identity != null) {
                 requireMutationReceipt(host, command, command.applyRequestId)
                 idempotency?.complete(identity, command.applyRequestId)
             }
-            return replay(host, command, completed)
+            replay(host, command, completed)
         }
-        val editor =
-            store.lockEditor(host, command.sessionId)
-                ?: throw notFound()
-        return applyLocked(host, command, editor, identity)
+
+    private fun replayClaimedReceipt(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+        receiptId: UUID,
+    ): SessionRecordApplyResult {
+        requireMutationReceipt(host, command, receiptId)
+        val completed = store.findApplyReceipt(host, command.sessionId, receiptId) ?: throw notFound()
+        return replay(host, command, completed)
     }
+
+    private fun requireEditor(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+    ): SessionRecordEditor = store.lockEditor(host, command.sessionId) ?: throw notFound()
 
     override fun publishCorrection(
         host: CurrentMember,
@@ -376,6 +400,8 @@ private fun draftStale() = SessionRecordException(SessionRecordError.DRAFT_STALE
 private fun liveStale() = SessionRecordException(SessionRecordError.LIVE_STALE, "Session record live revision is stale")
 
 private fun notFound() = SessionRecordException(SessionRecordError.SESSION_NOT_FOUND, "Session record not found")
+
+private fun pendingMutation(): Nothing = throw MutationPendingException()
 
 private fun SessionRecordDraft.historicalAuthorBindings(
     live: LiveSessionRecord,

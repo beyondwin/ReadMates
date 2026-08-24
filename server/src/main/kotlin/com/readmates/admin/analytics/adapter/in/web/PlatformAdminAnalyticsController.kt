@@ -7,8 +7,8 @@ import com.readmates.admin.analytics.application.model.AdminAnalyticsKpiCard
 import com.readmates.admin.analytics.application.model.AdminAnalyticsKpiSeries
 import com.readmates.admin.analytics.application.model.AdminAnalyticsOverview
 import com.readmates.admin.analytics.application.model.AnalyticsWindow
+import com.readmates.admin.analytics.application.port.`in`.ExportAdminAnalyticsCsvUseCase
 import com.readmates.admin.analytics.application.port.`in`.GetAdminAnalyticsOverviewUseCase
-import com.readmates.admin.analytics.application.service.AdminAnalyticsCsvExporter
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.PlatformCapability
@@ -27,7 +27,7 @@ import java.nio.charset.StandardCharsets
 @RequestMapping("/api/admin/analytics")
 class PlatformAdminAnalyticsController(
     private val useCase: GetAdminAnalyticsOverviewUseCase,
-    private val csvExporter: AdminAnalyticsCsvExporter,
+    private val csvExporter: ExportAdminAnalyticsCsvUseCase,
 ) {
     @GetMapping("/overview")
     @Suppress("MaxLineLength")

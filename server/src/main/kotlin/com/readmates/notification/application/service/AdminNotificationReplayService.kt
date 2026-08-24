@@ -105,8 +105,10 @@ class AdminNotificationReplayService(
         return when (claim) {
             is AdminCommandClaimResult.Claimed -> confirmClaimed(admin, command, reason, claim)
             is AdminCommandClaimResult.Completed -> replayCompleted(admin, claim)
-            AdminCommandClaimResult.InProgress -> fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IN_PROGRESS)
-            AdminCommandClaimResult.Conflict -> fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IDEMPOTENCY_CONFLICT)
+            AdminCommandClaimResult.InProgress ->
+                fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IN_PROGRESS)
+            AdminCommandClaimResult.Conflict ->
+                fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_IDEMPOTENCY_CONFLICT)
         }
     }
 
@@ -178,7 +180,9 @@ class AdminNotificationReplayService(
         admin: CurrentPlatformAdmin,
         claim: AdminCommandClaimResult.Completed,
     ): AdminNotificationReplayConfirmResult {
-        if (claim.receiptType != RECEIPT_TYPE) fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_RECEIPT_INVALID)
+        if (claim.receiptType != RECEIPT_TYPE) {
+            fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_RECEIPT_INVALID)
+        }
         val receiptId =
             runCatching { UUID.fromString(claim.receiptId) }.getOrNull()
                 ?: fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_RECEIPT_INVALID)
@@ -250,7 +254,7 @@ class AdminNotificationReplayService(
         skippedReasonCounts = skippedReasonCounts,
         originStatus = ORIGIN_SUCCEEDED,
         effectStatus = effectStatus,
-        effectAvailability = if (effectAvailable()) "AVAILABLE" else "DISABLED",
+        effectAvailability = if (effectAvailable) "AVAILABLE" else "DISABLED",
         convergenceId = convergenceId,
     )
 
@@ -264,11 +268,20 @@ class AdminNotificationReplayService(
         }
     }
 
-    private fun effectAvailable(): Boolean = notificationProperties.enabled && notificationProperties.worker.enabled
+    private val effectAvailable: Boolean
+        get() = notificationProperties.enabled && notificationProperties.worker.enabled
 
-    private fun normalizedNow(): OffsetDateTime = clock.instant().truncatedTo(ChronoUnit.MICROS).atOffset(ZoneOffset.UTC)
+    private fun normalizedNow(): OffsetDateTime =
+        clock
+            .instant()
+            .truncatedTo(ChronoUnit.MICROS)
+            .atOffset(ZoneOffset.UTC)
 
-    private fun fail(error: NotificationApplicationError): Nothing = throw NotificationApplicationException(error, error.name)
+    private fun fail(error: NotificationApplicationError): Nothing =
+        throw NotificationApplicationException(
+            error,
+            error.name,
+        )
 
     private data class ReplayCanonicalRequest(
         val previewId: UUID,

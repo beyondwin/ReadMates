@@ -25,6 +25,8 @@ import org.springframework.transaction.annotation.Isolation
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
+private typealias NotExecuted = HostMutationReconciliationResult.NotExecuted
+
 @Service
 class HostMutationReconciliationService(
     private val idempotency: MutationIdempotencyService,
@@ -71,7 +73,7 @@ class HostMutationReconciliationService(
         }
     }
 
-    private fun currentNotExecuted(command: ReconcileHostMutationCommand): HostMutationReconciliationResult.NotExecuted {
+    private fun currentNotExecuted(command: ReconcileHostMutationCommand): NotExecuted {
         val sessionId =
             runCatching { UUID.fromString(command.resourceSlot) }.getOrNull()
                 ?: return HostMutationReconciliationResult.NotExecuted()

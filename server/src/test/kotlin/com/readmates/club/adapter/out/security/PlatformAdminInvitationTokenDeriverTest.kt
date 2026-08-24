@@ -21,7 +21,6 @@ class PlatformAdminInvitationTokenDeriverTest {
                     currentKeyVersion = 7,
                     previousKeyVersion = 6,
                 ),
-                InvitationTokenService(),
             )
 
         val derived = deriver.derive(INVITATION_ID, CLUB_ID, 7)
@@ -78,7 +77,6 @@ class PlatformAdminInvitationTokenDeriverTest {
                     previousKey = "unit-test-previous-key",
                     previousKeyVersion = 6,
                 ),
-                InvitationTokenService(),
             )
 
         val current = deriver.derive(INVITATION_ID, CLUB_ID, 7)

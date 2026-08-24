@@ -35,7 +35,14 @@ class JdbcAdminAuditLedgerAdapter(
         query: AdminAuditSourceQuery,
     ): List<AdminAuditSourceRow> {
         if (!sourceSupportsFilter(source, query)) return emptyList()
-        return when (source) {
+        return dispatchSource(source, query)
+    }
+
+    private fun dispatchSource(
+        source: AdminAuditSourceType,
+        query: AdminAuditSourceQuery,
+    ): List<AdminAuditSourceRow> =
+        when (source) {
             AdminAuditSourceType.PLATFORM -> platformEvents(query)
             AdminAuditSourceType.CLUB -> clubEvents(query)
             AdminAuditSourceType.OPERATION_CASE_EVENT -> operationCaseEvents(query)
@@ -51,7 +58,6 @@ class JdbcAdminAuditLedgerAdapter(
             AdminAuditSourceType.AI_GENERATION -> aiGenerationEvents(query)
             AdminAuditSourceType.NOTIFICATION_REPLAY_PREVIEW -> notificationReplayPreviews(query)
         }
-    }
 
     private fun platformEvents(query: AdminAuditSourceQuery) =
         standardQuery(
@@ -201,7 +207,8 @@ class JdbcAdminAuditLedgerAdapter(
             } else {
                 AdminAuditSourceType.AI_CONVERGENCE_ATTEMPT
             }
-        val parentColumn = if (notification) "event.notification_receipt_id_snapshot" else "event.ai_receipt_id_snapshot"
+        val parentColumn =
+            if (notification) "event.notification_receipt_id_snapshot" else "event.ai_receipt_id_snapshot"
         val join =
             if (notification) {
                 "join admin_notification_replay_confirmations receipt on receipt.id = event.notification_receipt_id_snapshot"
@@ -439,7 +446,10 @@ class JdbcAdminAuditLedgerAdapter(
             source.rank < after.sourceRank -> where.append("and $timeExpr < :afterOccurredAt\n")
             source.rank > after.sourceRank -> where.append("and $timeExpr <= :afterOccurredAt\n")
             else -> {
-                where.append("and ($timeExpr < :afterOccurredAt or ($timeExpr = :afterOccurredAt and $idExpr < :afterId))\n")
+                where.append(
+                    "and ($timeExpr < :afterOccurredAt or " +
+                        "($timeExpr = :afterOccurredAt and $idExpr < :afterId))\n",
+                )
                 params.addValue("afterId", after.nativeId(source))
             }
         }
@@ -523,7 +533,8 @@ private fun outcomeFromReceipt(column: String) =
     "case when $column in ('SUCCEEDED','ACCEPTED') then 'SUCCESS' when $column in ('FAILED','PARTIAL') then 'FAILED' else 'UNKNOWN' end"
 
 private fun outcomeFromState(column: String) =
-    "case when $column in ('SUCCEEDED','COMMITTED') then 'SUCCESS' when $column in ('FAILED','DEAD','CANCELLED') then 'FAILED' " +
+    "case when $column in ('SUCCEEDED','COMMITTED') then 'SUCCESS' " +
+        "when $column in ('FAILED','DEAD','CANCELLED') then 'FAILED' " +
         "when $column in ('PENDING','RUNNING','OPEN','ACKNOWLEDGED','SNOOZED') then 'PREPARED' else 'UNKNOWN' end"
 
 private fun compositeId(alias: String) =

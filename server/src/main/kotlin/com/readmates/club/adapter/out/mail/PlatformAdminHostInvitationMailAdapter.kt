@@ -2,8 +2,8 @@ package com.readmates.club.adapter.out.mail
 
 import com.readmates.club.application.port.out.SendPlatformAdminHostInvitationEmailPort
 import com.readmates.club.application.port.out.TransientPlatformAdminHostInvitationMail
-import com.readmates.notification.application.port.out.MailDeliveryCommand
-import com.readmates.notification.application.port.out.MailDeliveryPort
+import com.readmates.shared.delivery.MailDeliveryCommand
+import com.readmates.shared.delivery.MailDeliveryPort
 import org.springframework.stereotype.Component
 
 @Component

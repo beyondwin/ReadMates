@@ -32,6 +32,7 @@ class PlatformAdminSupportCommandDbTest(
     @param:Autowired private val service: SupportAccessGrantService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @Suppress("LongMethod")
     @Test
     fun `create stores one redacted origin and response loss replays the same receipt`() {
         val actor = CurrentPlatformAdmin(OWNER_ID, "owner@example.com", PlatformAdminRole.OWNER).toPlatformActor()
@@ -64,7 +65,11 @@ class PlatformAdminSupportCommandDbTest(
 
         assertThat(replay.receiptId).isEqualTo(first.receiptId)
         assertThat(first.notePresent).isTrue()
-        val grant = jdbcTemplate.queryForMap("select * from support_access_grants where id = ?", first.grantId.toString())
+        val grant =
+            jdbcTemplate.queryForMap(
+                "select * from support_access_grants where id = ?",
+                first.grantId.toString(),
+            )
         assertThat(grant["reason"]).isEqualTo("[REDACTED]")
         assertThat(grant["reason_category"]).isEqualTo("MEMBER_ASSISTANCE")
         assertThat((grant["active_slot"] as Number).toInt()).isOne()

@@ -2,6 +2,7 @@ package com.readmates.aigen.application.service
 
 import com.readmates.aigen.application.model.AiOpsAction
 import com.readmates.aigen.application.model.JobStatus
+import com.readmates.aigen.application.port.`in`.ProcessAiGenerationAdminCommandConvergenceUseCase
 import com.readmates.aigen.application.port.out.AiGenerationAdminCancelResult
 import com.readmates.aigen.application.port.out.AiGenerationAdminCommandConvergenceAcquisition
 import com.readmates.aigen.application.port.out.AiGenerationAdminCommandConvergenceLease
@@ -24,8 +25,8 @@ class AiGenerationAdminCommandConvergenceService(
     private val commitRecoveryService: AiGenerationCommitRecoveryService,
     private val clock: Clock,
     private val transactions: TransactionTemplate? = null,
-) {
-    fun processBatch() {
+) : ProcessAiGenerationAdminCommandConvergenceUseCase {
+    override fun processBatch() {
         commandPort.loadAvailableConvergenceIds(clock.instant(), BATCH_SIZE).forEach(::process)
     }
 

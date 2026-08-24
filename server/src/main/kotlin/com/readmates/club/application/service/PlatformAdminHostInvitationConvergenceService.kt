@@ -1,5 +1,6 @@
 package com.readmates.club.application.service
 
+import com.readmates.club.application.port.`in`.ProcessPlatformAdminHostInvitationConvergenceUseCase
 import com.readmates.club.application.port.out.DerivePlatformAdminHostInvitationTokenPort
 import com.readmates.club.application.port.out.PlatformAdminHostInvitationConvergenceAcquisition
 import com.readmates.club.application.port.out.PlatformAdminHostInvitationConvergenceLease
@@ -7,10 +8,10 @@ import com.readmates.club.application.port.out.PlatformAdminHostInvitationDelive
 import com.readmates.club.application.port.out.PlatformAdminOnboardingCommandPort
 import com.readmates.club.application.port.out.SendPlatformAdminHostInvitationEmailPort
 import com.readmates.club.application.port.out.TransientPlatformAdminHostInvitationMail
-import com.readmates.notification.application.config.NotificationRuntimeProperties
-import com.readmates.notification.application.port.out.MailDeliveryFailure
-import com.readmates.notification.application.port.out.MailDeliveryFailureKind
 import com.readmates.shared.adminmutation.application.model.DigestKeyUnavailableException
+import com.readmates.shared.delivery.DeliveryRuntimePolicy
+import com.readmates.shared.delivery.MailDeliveryFailure
+import com.readmates.shared.delivery.MailDeliveryFailureKind
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionTemplate
@@ -26,23 +27,22 @@ class PlatformAdminHostInvitationConvergenceService(
     private val mailPort: SendPlatformAdminHostInvitationEmailPort,
     private val transactions: TransactionTemplate,
     private val clock: Clock,
-    private val notificationProperties: NotificationRuntimeProperties,
+    private val deliveryPolicy: DeliveryRuntimePolicy,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
-) {
+) : ProcessPlatformAdminHostInvitationConvergenceUseCase {
     init {
         require(
-            notificationProperties.worker.retryDelays.size >=
-                notificationProperties.kafka.maxDeliveryAttempts - 1,
+            deliveryPolicy.deliveryRetryDelays.size >= deliveryPolicy.deliveryMaxAttempts - 1,
         ) {
             "readmates.notifications.worker.retry-delays must cover every nonterminal host invitation attempt"
         }
     }
 
-    fun processBatch(): Int {
+    override fun processBatch(): Int {
         if (!enabled()) return 0
         var processed = 0
-        while (processed < notificationProperties.worker.relayBatchSize && processOne()) {
+        while (processed < deliveryPolicy.deliveryBatchSize && processOne()) {
             processed += 1
         }
         return processed
@@ -57,8 +57,8 @@ class PlatformAdminHostInvitationConvergenceService(
                 commandPort.tryAcquireHostInvitationConvergence(
                     leaseOwner,
                     startedAt,
-                    startedAt.plus(notificationProperties.worker.claimLease),
-                    notificationProperties.kafka.maxDeliveryAttempts,
+                    startedAt.plus(deliveryPolicy.deliveryClaimLease),
+                    deliveryPolicy.deliveryMaxAttempts,
                 )
             }
         return when (acquisition) {
@@ -77,7 +77,7 @@ class PlatformAdminHostInvitationConvergenceService(
         val completedAt = clock.instant()
         val terminal =
             outcome.succeeded || outcome.permanent ||
-                lease.attemptNo >= notificationProperties.kafka.maxDeliveryAttempts
+                lease.attemptNo >= deliveryPolicy.deliveryMaxAttempts
         val retryAt = retryAt(lease, completedAt, terminal)
         return transactions.execute {
             commandPort.finishHostInvitationConvergence(
@@ -98,10 +98,10 @@ class PlatformAdminHostInvitationConvergenceService(
         terminal: Boolean,
     ): java.time.Instant? {
         if (terminal) return null
-        return completedAt.plus(notificationProperties.worker.retryDelays[lease.attemptNo - 1])
+        return completedAt.plus(deliveryPolicy.deliveryRetryDelays[lease.attemptNo - 1])
     }
 
-    private fun enabled(): Boolean = notificationProperties.enabled && notificationProperties.worker.enabled
+    private fun enabled(): Boolean = deliveryPolicy.deliveryEnabled && deliveryPolicy.deliveryWorkerEnabled
 
     private fun deliver(lease: PlatformAdminHostInvitationConvergenceLease): DeliveryOutcome {
         val target =
