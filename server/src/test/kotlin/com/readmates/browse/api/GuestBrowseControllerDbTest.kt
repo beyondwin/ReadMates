@@ -90,6 +90,24 @@ class GuestBrowseControllerDbTest(
         insertSession(CLOSED_ID, CLUB_ID, 40, "CLOSED", "GUEST_READABLE", "MEMBER", "종료 공개 세션")
         insertSession(PUBLISHED_ID, CLUB_ID, 39, "PUBLISHED", "GUEST_READABLE", "PUBLIC", "발행 공개 세션")
         insertSession(HOST_ONLY_CLOSED_ID, CLUB_ID, 38, "CLOSED", "HOST_ONLY", "HOST_ONLY", "숨은 종료 세션")
+        insertSession(
+            PUBLICATION_ONLY_CLOSED_ID,
+            CLUB_ID,
+            37,
+            "CLOSED",
+            "GUEST_READABLE",
+            "MEMBER",
+            "generation 없는 종료 세션",
+        )
+        insertSession(
+            DENIED_CLOSED_ID,
+            CLUB_ID,
+            36,
+            "CLOSED",
+            "GUEST_READABLE",
+            "MEMBER",
+            "긴급 차단된 종료 세션",
+        )
         insertSession(HOST_ONLY_OPEN_ID, CLUB_ID, 43, "OPEN", "HOST_ONLY", "HOST_ONLY", "숨은 현재 세션")
         insertSession(HOST_ONLY_DRAFT_ID, CLUB_ID, 44, "DRAFT", "HOST_ONLY", "HOST_ONLY", "숨은 예정 세션")
         insertSession(OUTSIDE_DRAFT_ID, OUTSIDE_CLUB_ID, 41, "DRAFT", "GUEST_READABLE", "MEMBER", "다른 클럽 예정 세션")
@@ -252,21 +270,27 @@ class GuestBrowseControllerDbTest(
             """
             insert into public_session_publications (
               id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
-            ) values (?, ?, ?, '종료 세션 공개 marker', true, 'PUBLIC', 'PUBLIC_RECORD', utc_timestamp(6))
+            ) values
+              (?, ?, ?, 'generation 없는 종료 marker', true, 'PUBLIC', 'PUBLIC_RECORD', utc_timestamp(6)),
+              (?, ?, ?, '긴급 차단된 종료 marker', true, 'PUBLIC', 'PUBLIC_RECORD', utc_timestamp(6))
             """.trimIndent(),
-            CLOSED_PUBLICATION_ID,
+            PUBLICATION_ONLY_CLOSED_PUBLICATION_ID,
             CLUB_ID,
-            CLOSED_ID,
+            PUBLICATION_ONLY_CLOSED_ID,
+            DENIED_CLOSED_PUBLICATION_ID,
+            CLUB_ID,
+            DENIED_CLOSED_ID,
         )
         jdbcTemplate.update(
             """
             insert into public_projection_generations (
-              publication_id, club_id, session_id, generation, live_record_revision, origin_readable
-            ) values (?, ?, ?, 1, null, false)
+              publication_id, club_id, session_id, generation, live_record_revision,
+              origin_readable, emergency_denied
+            ) values (?, ?, ?, 1, null, false, true)
             """.trimIndent(),
-            CLOSED_PUBLICATION_ID,
+            DENIED_CLOSED_PUBLICATION_ID,
             CLUB_ID,
-            CLOSED_ID,
+            DENIED_CLOSED_ID,
         )
         jdbcTemplate.update(
             "update questions set created_at = ? where id = ?",
@@ -324,20 +348,22 @@ class GuestBrowseControllerDbTest(
 
     private fun cleanupGuestPublicationMarkers() {
         jdbcTemplate.update(
-            "delete from public_projection_generations where publication_id in (?, ?)",
+            "delete from public_projection_generations where publication_id in (?, ?, ?)",
             PUBLICATION_ID,
-            CLOSED_PUBLICATION_ID,
+            PUBLICATION_ONLY_CLOSED_PUBLICATION_ID,
+            DENIED_CLOSED_PUBLICATION_ID,
         )
         jdbcTemplate.update(
-            "delete from public_session_publications where id in (?, ?)",
+            "delete from public_session_publications where id in (?, ?, ?)",
             PUBLICATION_ID,
-            CLOSED_PUBLICATION_ID,
+            PUBLICATION_ONLY_CLOSED_PUBLICATION_ID,
+            DENIED_CLOSED_PUBLICATION_ID,
         )
     }
 
     private fun cleanupGuestSessionGraph() {
         jdbcTemplate.update(
-            "delete from sessions where id in (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "delete from sessions where id in (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             OPEN_ID,
             DRAFT_ID,
             CLOSED_ID,
@@ -347,6 +373,8 @@ class GuestBrowseControllerDbTest(
             HOST_ONLY_DRAFT_ID,
             OUTSIDE_DRAFT_ID,
             OUTSIDE_PUBLISHED_ID,
+            PUBLICATION_ONLY_CLOSED_ID,
+            DENIED_CLOSED_ID,
         )
         jdbcTemplate.update(
             "delete from memberships where id in (?, ?)",
@@ -648,6 +676,52 @@ class GuestBrowseControllerDbTest(
     }
 
     @Test
+    fun `markerless closed guest archive remains visible in list and detail`() {
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/archive?limit=20")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") { value(hasItem(CLOSED_ID)) }
+            }
+
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/archive/$CLOSED_ID")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(CLOSED_ID) }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+    }
+
+    @Test
+    fun `closed publication without an exact generation fails closed`() {
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/archive?limit=20")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") { value(not(hasItem(PUBLICATION_ONLY_CLOSED_ID))) }
+            }
+
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/archive/$PUBLICATION_ONLY_CLOSED_ID")
+            .andExpect { status { isNotFound() } }
+    }
+
+    @Test
+    fun `emergency denied closed guest archive remains hidden`() {
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/archive?limit=20")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") { value(not(hasItem(DENIED_CLOSED_ID))) }
+            }
+
+        mockMvc
+            .get("/api/public/clubs/guest-test/browse/archive/$DENIED_CLOSED_ID")
+            .andExpect { status { isNotFound() } }
+    }
+
+    @Test
     fun `guest archive cursor continues without duplicating the previous item`() {
         val firstPage =
             mockMvc
@@ -801,6 +875,8 @@ class GuestBrowseControllerDbTest(
         const val HOST_ONLY_DRAFT_ID = "00000000-0000-0000-0000-000000007433"
         const val OUTSIDE_DRAFT_ID = "00000000-0000-0000-0000-000000007434"
         const val OUTSIDE_PUBLISHED_ID = "00000000-0000-0000-0000-000000007438"
+        const val PUBLICATION_ONLY_CLOSED_ID = "00000000-0000-0000-0000-000000007439"
+        const val DENIED_CLOSED_ID = "00000000-0000-0000-0000-00000000743a"
         const val PARTICIPANT_ONE_ID = "00000000-0000-0000-0000-000000007440"
         const val PARTICIPANT_TWO_ID = "00000000-0000-0000-0000-000000007441"
         const val PUBLISHED_PARTICIPANT_ONE_ID = "00000000-0000-0000-0000-000000007442"
@@ -817,7 +893,8 @@ class GuestBrowseControllerDbTest(
         const val HIGHLIGHT_ID = "00000000-0000-0000-0000-000000007470"
         const val OUTSIDE_HIGHLIGHT_ID = "00000000-0000-0000-0000-000000007471"
         const val PUBLICATION_ID = "00000000-0000-0000-0000-000000007480"
-        const val CLOSED_PUBLICATION_ID = "00000000-0000-0000-0000-000000007481"
+        const val PUBLICATION_ONLY_CLOSED_PUBLICATION_ID = "00000000-0000-0000-0000-000000007481"
+        const val DENIED_CLOSED_PUBLICATION_ID = "00000000-0000-0000-0000-000000007482"
         const val ARCHIVE_QUESTION = "기록에서 보이는 질문"
         const val REMOVED_QUESTION = "제외된 참가자의 숨겨야 하는 질문"
         const val DRAFT_THOUGHT = "기록에서 보이는 생각 초안"
