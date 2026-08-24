@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(17)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(18)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("59")
+            assertThat(latestVersion).isEqualTo("60")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -104,6 +104,7 @@ class MySqlFlywayMigrationTest(
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -380,7 +381,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(15)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(16)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -392,7 +393,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("59")
+            assertThat(latestVersion).isEqualTo("60")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -402,6 +403,7 @@ class MySqlFlywayMigrationTest(
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1653,7 +1655,7 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("59")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("60")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54PublicProjectionConvergenceSchema(jdbc)
@@ -1662,6 +1664,7 @@ class MySqlFlywayMigrationTest(
             assertV57PlatformAdminCommandIdempotencySchema(jdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(jdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(jdbc)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1760,8 +1763,8 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(8)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
@@ -1770,6 +1773,7 @@ class MySqlFlywayMigrationTest(
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
             assertThat(
                 upgradeJdbc.queryForMap(
                     """
@@ -1858,11 +1862,12 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
             assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
 
             val actorId = "aaaaaaaa-0000-4000-8000-000000057002"
             val claimId = "aaaaaaaa-0000-4000-8000-000000057003"
@@ -2125,10 +2130,11 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
             assertV58PlatformAdminClubCommandEvidenceSchema(upgradeJdbc)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
             assertEquals(
                 0L,
                 upgradeJdbc.queryForObject(
@@ -2429,8 +2435,8 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("59")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
             assertThat(
                 upgradeJdbc.queryForObject(
                     "select checksum from flyway_schema_history where version = '58' and success = true",
@@ -2438,6 +2444,7 @@ class MySqlFlywayMigrationTest(
                 ),
             ).isEqualTo(v58Checksum)
             assertV59PlatformAdminServiceCommandEvidenceSchema(upgradeJdbc)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
 
             val legacyReceipt =
                 upgradeJdbc.queryForMap(
@@ -2746,6 +2753,341 @@ class MySqlFlywayMigrationTest(
                     "select count(*) from ai_generation_admin_command_receipts where club_id_snapshot = ?",
                     Int::class.java,
                     fixture.clubId,
+                ),
+            )
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `mysql upgrades v59 with deterministic support cleanup and privacy safe command evidence`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v59Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("59")
+                    .load()
+            assertThat(v59Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("59")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            val fixture = V60SupportCommandFixture()
+            insertV60LegacySupportFixtures(upgradeJdbc, fixture)
+            val v59Checksum =
+                upgradeJdbc.queryForObject(
+                    "select checksum from flyway_schema_history where version = '59' and success = true",
+                    Int::class.java,
+                )
+
+            val upgradeResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("60")
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    "select checksum from flyway_schema_history where version = '59' and success = true",
+                    Int::class.java,
+                ),
+            ).isEqualTo(v59Checksum)
+            assertV60PlatformAdminSupportCommandEvidenceSchema(upgradeJdbc)
+
+            assertEquals(
+                5,
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from support_access_grants
+                    where binary reason = binary '[REDACTED]'
+                      and binary reason_category = binary 'LEGACY_UNCLASSIFIED'
+                      and note_present = 1
+                      and reason_evidence_version = 0
+                    """.trimIndent(),
+                    Int::class.java,
+                ),
+            )
+            val evidence =
+                upgradeJdbc.queryForMap(
+                    """
+                    select migration_version, duplicate_active_grants_revoked_count,
+                           legacy_reasons_redacted_count, recorded_at
+                    from platform_admin_support_migration_evidence
+                    """.trimIndent(),
+                )
+            assertThat(evidence["MIGRATION_VERSION"]).isEqualTo(60)
+            assertThat(evidence["DUPLICATE_ACTIVE_GRANTS_REVOKED_COUNT"]).isEqualTo(1L)
+            assertThat(evidence["LEGACY_REASONS_REDACTED_COUNT"]).isEqualTo(5L)
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from support_access_grants grant_row
+                    join platform_admin_support_migration_evidence evidence
+                      on evidence.migration_version = 60
+                     and evidence.recorded_at = grant_row.revoked_at
+                    where grant_row.id = ? and grant_row.active_slot is null
+                    """.trimIndent(),
+                    Int::class.java,
+                    fixture.duplicateLowId,
+                ),
+            )
+            val keptDuplicate =
+                upgradeJdbc.queryForMap(
+                    """
+                    select active_slot, revoked_at
+                    from support_access_grants
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.duplicateHighId,
+                )
+            assertThat(keptDuplicate["ACTIVE_SLOT"]).isEqualTo(1)
+            assertThat(keptDuplicate["REVOKED_AT"]).isNull()
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    "select active_slot from support_access_grants where id = ?",
+                    Int::class.java,
+                    fixture.otherScopeId,
+                ),
+            )
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update support_access_grants
+                    set revoked_at = '2026-08-24 02:00:00.000000'
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.duplicateHighId,
+                )
+            }
+            listOf(fixture.expiredId, fixture.revokedId).forEach { grantId ->
+                assertThat(
+                    upgradeJdbc.queryForObject(
+                        "select active_slot from support_access_grants where id = ?",
+                        Int::class.java,
+                        grantId,
+                    ),
+                ).isNull()
+            }
+
+            assertUniqueConstraintRejected("support_access_grants_active_slot_uk") {
+                insertV60OperationalGrant(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    fixture.clubId,
+                    fixture.grantorId,
+                    fixture.granteeId,
+                    scope = "HOST_SUPPORT_READ",
+                )
+            }
+            assertConstraintRejected {
+                insertV60OperationalGrant(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    fixture.clubId,
+                    fixture.grantorId,
+                    fixture.otherGranteeId,
+                    reason = "raw-value",
+                    activeSlot = null,
+                )
+            }
+            assertConstraintRejected {
+                insertV60OperationalGrant(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    fixture.clubId,
+                    fixture.grantorId,
+                    fixture.otherGranteeId,
+                    reasonCategory = "LEGACY_UNCLASSIFIED",
+                    activeSlot = null,
+                )
+            }
+            listOf("incident_investigation", "OTHER", "SECURITY-REVIEW").forEach { invalidCategory ->
+                assertConstraintRejected {
+                    insertV60OperationalGrant(
+                        upgradeJdbc,
+                        UUID.randomUUID().toString(),
+                        fixture.clubId,
+                        fixture.grantorId,
+                        fixture.otherGranteeId,
+                        reasonCategory = invalidCategory,
+                        activeSlot = null,
+                    )
+                }
+            }
+            insertV60OperationalGrant(
+                upgradeJdbc,
+                fixture.newGrantId,
+                fixture.clubId,
+                fixture.grantorId,
+                fixture.otherGranteeId,
+            )
+
+            insertV60SupportPreview(
+                upgradeJdbc,
+                fixture.createPreviewId,
+                fixture,
+                commandType = "CREATE",
+                grantId = null,
+                createSlotId = fixture.createSlotId,
+            )
+            insertV60SupportPreview(
+                upgradeJdbc,
+                fixture.revokePreviewId,
+                fixture,
+                commandType = "REVOKE",
+                grantId = fixture.duplicateHighId,
+                createSlotId = null,
+            )
+            assertThat(
+                upgradeJdbc.queryForObject(
+                    """
+                    select json_unquote(json_extract(actor_capabilities_json, '$[0]'))
+                    from platform_admin_support_command_previews
+                    where id = ?
+                    """.trimIndent(),
+                    String::class.java,
+                    fixture.createPreviewId,
+                ),
+            ).isEqualTo("MANAGE_SUPPORT_ACCESS")
+            assertConstraintRejected {
+                insertV60SupportPreview(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    commandType = "CREATE",
+                    grantId = fixture.duplicateHighId,
+                    createSlotId = fixture.createSlotId,
+                )
+            }
+            assertConstraintRejected {
+                insertV60SupportPreview(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    commandType = "CREATE",
+                    grantId = null,
+                    createSlotId = UUID.randomUUID().toString(),
+                    previewExpiresAt = "2026-08-24 02:00:00.000000",
+                )
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_support_command_previews
+                    set consumed_at = '2026-08-24 02:02:00.000000'
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.createPreviewId,
+                )
+            }
+
+            insertV60SupportReceipt(
+                upgradeJdbc,
+                fixture.createReceiptId,
+                fixture.createPreviewId,
+                fixture.newGrantId,
+                fixture,
+                commandType = "CREATE",
+                beforeStatus = "ABSENT",
+                afterStatus = "ACTIVE",
+                auditId = fixture.createAuditId,
+            )
+            insertV60SupportReceipt(
+                upgradeJdbc,
+                fixture.revokeReceiptId,
+                fixture.revokePreviewId,
+                fixture.duplicateHighId,
+                fixture,
+                commandType = "REVOKE",
+                beforeStatus = "ACTIVE",
+                afterStatus = "REVOKED",
+                auditId = fixture.revokeAuditId,
+            )
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_support_command_receipts
+                    set outcome = 'FAILED'
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.createReceiptId,
+                )
+            }
+            assertUniqueConstraintRejected("platform_admin_support_receipts_audit_uk") {
+                insertV60SupportReceipt(
+                    upgradeJdbc,
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    UUID.randomUUID().toString(),
+                    fixture,
+                    commandType = "CREATE",
+                    beforeStatus = "ABSENT",
+                    afterStatus = "ACTIVE",
+                    auditId = fixture.createAuditId,
+                )
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_support_command_previews
+                    set consumed_at = '2026-08-24 02:02:00.000000', consumed_receipt_id_snapshot = ?
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.revokeReceiptId,
+                    fixture.createPreviewId,
+                )
+            }
+            assertThat(
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_support_command_previews
+                    set consumed_at = '2026-08-24 02:02:00.000000', consumed_receipt_id_snapshot = ?
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.createReceiptId,
+                    fixture.createPreviewId,
+                ),
+            ).isEqualTo(1)
+            assertThat(
+                upgradeJdbc.update(
+                    """
+                    update platform_admin_support_command_previews
+                    set consumed_at = '2026-08-24 02:02:00.000000', consumed_receipt_id_snapshot = ?
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.revokeReceiptId,
+                    fixture.revokePreviewId,
+                ),
+            ).isEqualTo(1)
+
+            assertThat(upgradeJdbc.update("delete from platform_admin_support_command_previews")).isEqualTo(2)
+            assertThat(upgradeJdbc.update("delete from support_access_grants where club_id = ?", fixture.clubId)).isEqualTo(6)
+            assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.granteeId)).isEqualTo(1)
+            assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.otherGranteeId)).isEqualTo(1)
+            assertThat(upgradeJdbc.update("delete from users where id = ?", fixture.grantorId)).isEqualTo(1)
+            assertThat(upgradeJdbc.update("delete from clubs where id = ?", fixture.clubId)).isEqualTo(1)
+            assertEquals(
+                2,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from platform_admin_support_command_receipts where club_id_snapshot = ?",
+                    Int::class.java,
+                    fixture.clubId,
+                ),
+            )
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from platform_admin_support_migration_evidence where migration_version = 60",
+                    Int::class.java,
                 ),
             )
         }
@@ -4753,6 +5095,163 @@ class MySqlFlywayMigrationTest(
     }
 
     @Suppress("LongMethod")
+    private fun assertV60PlatformAdminSupportCommandEvidenceSchema(jdbcTemplate: JdbcTemplate) {
+        val migrationEvidenceTable = "platform_admin_support_migration_evidence"
+        val previewTable = "platform_admin_support_command_previews"
+        val receiptTable = "platform_admin_support_command_receipts"
+
+        assertThat(columns(jdbcTemplate, "support_access_grants"))
+            .contains("active_slot", "reason_category", "note_present", "reason_evidence_version")
+        assertThat(columns(jdbcTemplate, migrationEvidenceTable)).containsExactlyInAnyOrder(
+            "migration_version",
+            "duplicate_active_grants_revoked_count",
+            "legacy_reasons_redacted_count",
+            "recorded_at",
+        )
+        assertThat(columns(jdbcTemplate, previewTable)).containsExactlyInAnyOrder(
+            "id",
+            "command_type",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "actor_capabilities_json",
+            "grant_id_snapshot",
+            "club_id_snapshot",
+            "create_slot_id_snapshot",
+            "scope_snapshot",
+            "grant_expires_at_snapshot",
+            "reason_category",
+            "note_present",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "safe_impact_json",
+            "expires_at",
+            "consumed_at",
+            "consumed_receipt_id_snapshot",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, receiptTable)).containsExactlyInAnyOrder(
+            "id",
+            "preview_id_snapshot",
+            "command_type",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "actor_capabilities_json",
+            "grant_id_snapshot",
+            "club_id_snapshot",
+            "scope_snapshot",
+            "grant_expires_at_snapshot",
+            "reason_category",
+            "note_present",
+            "before_status",
+            "after_status",
+            "outcome",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "platform_audit_event_id_snapshot",
+            "created_at",
+        )
+
+        assertEquals(
+            "club_id,grantee_user_id,scope,active_slot",
+            indexColumns(jdbcTemplate, "support_access_grants", "support_access_grants_active_slot_uk"),
+        )
+        assertThat(
+            indexNonUnique(jdbcTemplate, "support_access_grants", "support_access_grants_active_slot_uk"),
+        ).isZero()
+        assertEquals(
+            "platform_audit_event_id_snapshot",
+            indexColumns(jdbcTemplate, receiptTable, "platform_admin_support_receipts_audit_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, receiptTable, "platform_admin_support_receipts_audit_uk")).isZero()
+        assertEquals(
+            "preview_id_snapshot",
+            indexColumns(jdbcTemplate, receiptTable, "platform_admin_support_receipts_preview_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, receiptTable, "platform_admin_support_receipts_preview_uk")).isZero()
+
+        assertThat(checkConstraintClause(jdbcTemplate, "support_access_grants_active_slot_check"))
+            .contains("active_slot", "= 1")
+        assertThat(checkConstraintClause(jdbcTemplate, "support_access_grants_reason_sentinel_check"))
+            .contains("[REDACTED]")
+        assertThat(checkConstraintClause(jdbcTemplate, "support_access_grants_reason_evidence_check"))
+            .contains("LEGACY_UNCLASSIFIED", "INCIDENT_INVESTIGATION", "MEMBER_ASSISTANCE")
+            .contains("DATA_CORRECTION", "SECURITY_REVIEW", "reason_evidence_version")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_support_previews_target_check"))
+            .contains("CREATE", "REVOKE", "grant_id_snapshot", "create_slot_id_snapshot")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_support_previews_hmac_check"))
+            .contains("digest_key_version", "request_hmac", "32")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_support_previews_json_check"))
+            .contains("actor_capabilities_json", "safe_impact_json", "4096", "8192")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_support_receipts_transition_check"))
+            .contains("CREATE", "REVOKE", "ABSENT", "ACTIVE", "REVOKED")
+
+        listOf(
+            previewTable to "id",
+            previewTable to "actor_user_id_snapshot",
+            previewTable to "grant_id_snapshot",
+            previewTable to "club_id_snapshot",
+            previewTable to "create_slot_id_snapshot",
+            previewTable to "consumed_receipt_id_snapshot",
+            receiptTable to "id",
+            receiptTable to "preview_id_snapshot",
+            receiptTable to "actor_user_id_snapshot",
+            receiptTable to "grant_id_snapshot",
+            receiptTable to "club_id_snapshot",
+            receiptTable to "platform_audit_event_id_snapshot",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("char")
+            assertThat(metadata["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("36")
+            assertThat(metadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
+            assertThat(metadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
+        }
+        listOf(previewTable, receiptTable).forEach { table ->
+            val hmac = columnMetadata(jdbcTemplate, table, "request_hmac")
+            assertThat(hmac["DATA_TYPE"]).isEqualTo("varbinary")
+            assertThat(hmac["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+            assertThat(hmac["IS_NULLABLE"]).isEqualTo("NO")
+        }
+
+        assertThat(importedKeys(jdbcTemplate, migrationEvidenceTable)).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, receiptTable)).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, previewTable)).containsExactly(receiptTable)
+        assertEquals(
+            "consumed_receipt_id_snapshot,id",
+            foreignKeyColumns(jdbcTemplate, previewTable, "platform_admin_support_previews_consumed_receipt_fk"),
+        )
+        assertEquals(
+            "RESTRICT",
+            foreignKeyDeleteRule(jdbcTemplate, previewTable, "platform_admin_support_previews_consumed_receipt_fk"),
+        )
+
+        val forbiddenColumns =
+            arrayOf(
+                "grantee_user_id",
+                "grantee_member_id",
+                "member_id",
+                "email",
+                "name",
+                "note",
+                "note_hmac",
+                "encrypted_note",
+                "reason",
+                "reason_text",
+                "idempotency_key",
+                "idempotency_key_hmac",
+                "request_json",
+                "payload",
+            )
+        listOf(migrationEvidenceTable, previewTable, receiptTable).forEach { table ->
+            assertThat(columns(jdbcTemplate, table)).doesNotContain(*forbiddenColumns)
+        }
+        assertThat(columns(jdbcTemplate, migrationEvidenceTable))
+            .doesNotContain("grant_id", "club_id", "user_id", "source_value")
+        assertThat(columns(jdbcTemplate, receiptTable)).doesNotContain("updated_at", "deleted_at")
+    }
+
+    @Suppress("LongMethod")
     private fun assertV59PlatformAdminServiceCommandEvidenceSchema(jdbcTemplate: JdbcTemplate) {
         val notificationReceiptTable = "admin_notification_replay_confirmations"
         val notificationTargetTable = "admin_notification_replay_confirmation_targets"
@@ -5259,6 +5758,249 @@ class MySqlFlywayMigrationTest(
             )
         }
         assertThat(columns(jdbcTemplate, receiptTable)).doesNotContain("updated_at", "deleted_at")
+    }
+
+    private data class V60SupportCommandFixture(
+        val clubId: String = "bbbbbbbb-0000-4000-8000-000000060001",
+        val grantorId: String = "bbbbbbbb-0000-4000-8000-000000060002",
+        val granteeId: String = "bbbbbbbb-0000-4000-8000-000000060003",
+        val otherGranteeId: String = "bbbbbbbb-0000-4000-8000-000000060004",
+        val duplicateLowId: String = "bbbbbbbb-0000-4000-8000-000000060010",
+        val duplicateHighId: String = "bbbbbbbb-0000-4000-8000-000000060011",
+        val otherScopeId: String = "bbbbbbbb-0000-4000-8000-000000060012",
+        val expiredId: String = "bbbbbbbb-0000-4000-8000-000000060013",
+        val revokedId: String = "bbbbbbbb-0000-4000-8000-000000060014",
+        val newGrantId: String = "bbbbbbbb-0000-4000-8000-000000060015",
+        val createPreviewId: String = "bbbbbbbb-0000-4000-8000-000000060020",
+        val revokePreviewId: String = "bbbbbbbb-0000-4000-8000-000000060021",
+        val createSlotId: String = "bbbbbbbb-0000-4000-8000-000000060022",
+        val createReceiptId: String = "bbbbbbbb-0000-4000-8000-000000060023",
+        val revokeReceiptId: String = "bbbbbbbb-0000-4000-8000-000000060024",
+        val createAuditId: String = "bbbbbbbb-0000-4000-8000-000000060025",
+        val revokeAuditId: String = "bbbbbbbb-0000-4000-8000-000000060026",
+    )
+
+    private fun insertV60LegacySupportFixtures(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V60SupportCommandFixture,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about)
+            values (?, 'v60-support-target', 'V60 target', 'V60 target', 'V60 target')
+            """.trimIndent(),
+            fixture.clubId,
+        )
+        insertProfileUser(
+            jdbcTemplate,
+            fixture.grantorId,
+            "v60-grantor" + "@" + "example" + "." + "test",
+            "V60 Grantor",
+            "V60Grantor",
+        )
+        insertProfileUser(
+            jdbcTemplate,
+            fixture.granteeId,
+            "v60-grantee" + "@" + "example" + "." + "test",
+            "V60 Grantee",
+            "V60Grantee",
+        )
+        insertProfileUser(
+            jdbcTemplate,
+            fixture.otherGranteeId,
+            "v60-other" + "@" + "example" + "." + "test",
+            "V60 Other",
+            "V60Other",
+        )
+        insertV60LegacyGrant(
+            jdbcTemplate,
+            fixture.duplicateLowId,
+            fixture,
+            fixture.granteeId,
+            "HOST_SUPPORT_READ",
+            "legacy detail alpha",
+            "2099-08-24 03:00:00.000000",
+            null,
+            "2026-08-24 01:00:00.000000",
+        )
+        insertV60LegacyGrant(
+            jdbcTemplate,
+            fixture.duplicateHighId,
+            fixture,
+            fixture.granteeId,
+            "HOST_SUPPORT_READ",
+            "legacy detail beta",
+            "2099-08-24 03:00:00.000000",
+            null,
+            "2026-08-24 01:00:00.000000",
+        )
+        insertV60LegacyGrant(
+            jdbcTemplate,
+            fixture.otherScopeId,
+            fixture,
+            fixture.granteeId,
+            "METADATA_READ",
+            "legacy metadata review",
+            "2099-08-24 03:00:00.000000",
+            null,
+            "2026-08-24 00:59:00.000000",
+        )
+        insertV60LegacyGrant(
+            jdbcTemplate,
+            fixture.expiredId,
+            fixture,
+            fixture.granteeId,
+            "HOST_SUPPORT_READ",
+            "legacy expired detail",
+            "2020-08-24 03:00:00.000000",
+            null,
+            "2020-08-24 01:00:00.000000",
+        )
+        insertV60LegacyGrant(
+            jdbcTemplate,
+            fixture.revokedId,
+            fixture,
+            fixture.otherGranteeId,
+            "HOST_SUPPORT_READ",
+            "legacy revoked detail",
+            "2099-08-24 03:00:00.000000",
+            "2026-08-23 01:00:00.000000",
+            "2026-08-22 01:00:00.000000",
+        )
+    }
+
+    private fun insertV60LegacyGrant(
+        jdbcTemplate: JdbcTemplate,
+        grantId: String,
+        fixture: V60SupportCommandFixture,
+        granteeId: String,
+        scope: String,
+        reason: String,
+        expiresAt: String,
+        revokedAt: String?,
+        createdAt: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into support_access_grants (
+              id, club_id, granted_by_user_id, grantee_user_id, scope, reason,
+              expires_at, revoked_at, created_at
+            ) values (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """.trimIndent(),
+            grantId,
+            fixture.clubId,
+            fixture.grantorId,
+            granteeId,
+            scope,
+            reason,
+            expiresAt,
+            revokedAt,
+            createdAt,
+        )
+    }
+
+    private fun insertV60OperationalGrant(
+        jdbcTemplate: JdbcTemplate,
+        grantId: String,
+        clubId: String,
+        grantorId: String,
+        granteeId: String,
+        scope: String = "HOST_SUPPORT_READ",
+        reason: String = "[REDACTED]",
+        reasonCategory: String = "INCIDENT_INVESTIGATION",
+        activeSlot: Int? = 1,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into support_access_grants (
+              id, club_id, granted_by_user_id, grantee_user_id, scope, reason,
+              expires_at, revoked_at, created_at, active_slot,
+              reason_category, note_present
+            ) values (?, ?, ?, ?, ?, ?, '2099-08-24 03:00:00.000000', null,
+                      '2026-08-24 02:01:00.000000', ?, ?, 1)
+            """.trimIndent(),
+            grantId,
+            clubId,
+            grantorId,
+            granteeId,
+            scope,
+            reason,
+            activeSlot,
+            reasonCategory,
+        )
+    }
+
+    private fun insertV60SupportPreview(
+        jdbcTemplate: JdbcTemplate,
+        previewId: String,
+        fixture: V60SupportCommandFixture,
+        commandType: String,
+        grantId: String?,
+        createSlotId: String?,
+        previewExpiresAt: String = "2026-08-24 02:10:00.000000",
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_support_command_previews (
+              id, command_type, actor_user_id_snapshot, actor_platform_role_snapshot,
+              actor_capabilities_json, grant_id_snapshot, club_id_snapshot,
+              create_slot_id_snapshot, scope_snapshot, grant_expires_at_snapshot,
+              reason_category, note_present, canonical_schema_version,
+              digest_key_version, request_hmac, safe_impact_json,
+              expires_at, consumed_at, consumed_receipt_id_snapshot, created_at
+            ) values (?, ?, ?, 'OWNER', json_array('MANAGE_SUPPORT_ACCESS'), ?, ?, ?,
+                      'HOST_SUPPORT_READ', '2099-08-24 03:00:00.000000',
+                      'INCIDENT_INVESTIGATION', 1, 'support-command:v1', 1, ?,
+                      json_object('impactCodes', json_array('SUPPORT_ACCESS_CHANGE')),
+                      ?, null, null, '2026-08-24 02:00:00.000000')
+            """.trimIndent(),
+            previewId,
+            commandType,
+            fixture.grantorId,
+            grantId,
+            fixture.clubId,
+            createSlotId,
+            ByteArray(32) { if (commandType == "CREATE") 0x71 else 0x72 },
+            previewExpiresAt,
+        )
+    }
+
+    private fun insertV60SupportReceipt(
+        jdbcTemplate: JdbcTemplate,
+        receiptId: String,
+        previewId: String,
+        grantId: String,
+        fixture: V60SupportCommandFixture,
+        commandType: String,
+        beforeStatus: String,
+        afterStatus: String,
+        auditId: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_support_command_receipts (
+              id, preview_id_snapshot, command_type, actor_user_id_snapshot,
+              actor_platform_role_snapshot, actor_capabilities_json,
+              grant_id_snapshot, club_id_snapshot, scope_snapshot,
+              grant_expires_at_snapshot, reason_category, note_present,
+              before_status, after_status, outcome, canonical_schema_version,
+              digest_key_version, request_hmac, platform_audit_event_id_snapshot, created_at
+            ) values (?, ?, ?, ?, 'OWNER', json_array('MANAGE_SUPPORT_ACCESS'), ?, ?,
+                      'HOST_SUPPORT_READ', '2099-08-24 03:00:00.000000',
+                      'INCIDENT_INVESTIGATION', 1, ?, ?, 'SUCCEEDED', 'support-command:v1',
+                      1, ?, ?, '2026-08-24 02:01:00.000000')
+            """.trimIndent(),
+            receiptId,
+            previewId,
+            commandType,
+            fixture.grantorId,
+            grantId,
+            fixture.clubId,
+            beforeStatus,
+            afterStatus,
+            ByteArray(32) { if (commandType == "CREATE") 0x71 else 0x72 },
+            auditId,
+        )
     }
 
     private data class V59ServiceCommandFixture(
