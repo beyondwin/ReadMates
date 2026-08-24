@@ -80,6 +80,15 @@ V60 active-slot uniqueness와 create/revoke transaction은 이 transient adapter
 하나로 수렴시킨다. 최신 valid row 하나만 active slot을 보유하고, expiry/revoke는 slot을 비운 뒤 합성 권한을
 즉시 잃게 한다.
 
+### 배포 경계
+
+V60 migration, canonical preview/confirm writer, frontend cutover와 exact legacy `410`은 하나의 release unit이다.
+V60은 legacy free-text create writer를 의도적으로 fail closed하고 legacy revoke는 `active_slot`을 비우지 못하므로
+중간 커밋을 배포하거나 whole-gate 대상으로 취급하지 않는다. Legacy request에는 allowlist category가 없으므로
+임의 category를 추정하거나 controller가 auto-preview/auto-confirm하지 않는다. Support write traffic을 drain한 뒤
+V60과 canonical writer 및 frontend/legacy cutover를 함께 적용하고 startup을 검증한 다음 write traffic을 복구한다.
+Redacted plaintext를 되살리는 rollback은 없으며 V60 schema 위에서 application을 roll forward한다.
+
 ## 근거
 
 - Category는 운영 분석과 review에 필요한 최소 의미를 남기고 free text의 private-data 확산을 막는다.

@@ -62,9 +62,11 @@ feature-local model/route/UI files only.
 - Add append-only `platform_admin_support_command_receipts`: receipt UUID, command, actor role/capability and grant/club target snapshots, scope/expiry, reason category, `note_present`, before/after status, outcome, request HMAC/key version, unique global audit snapshot and created time. Receipt/audit evidence does not duplicate email/name/grantee member identity.
 - Immutable preview/receipt evidence has no destructive FK to club/user/grant rows. Operational `support_access_grants` keeps the grantee/club FK needed for live authorization; cleanup/revoke precedes source hard delete while immutable redacted evidence remains.
 
-Task 1 and Task 2 may be reviewed as separate commits but are one deployment unit. Do not release V60 while an old binary
-can still write free-text `reason`; drain/stop old support writers, run Flyway, start the Task 2 binary, verify startup and only
-then restore write traffic. The sentinel-only CHECK makes an accidentally surviving old writer fail closed. Rollback never
+Tasks 1, 2, and 3 may be reviewed as separate commits but are one release unit. No intermediate commit is deployable:
+V60 intentionally rejects the legacy free-text create writer and its revoke path does not clear `active_slot`, while the
+legacy request has no allowlisted category that can be synthesized honestly. Drain/stop support writers, run Flyway, start
+the Task 2 canonical writer together with the Task 3 frontend and exact legacy `410` cutover, verify startup, and only then
+restore write traffic. The sentinel-only CHECK makes an accidentally surviving old writer fail closed. Rollback never
 restores redacted plaintext; it rolls application behavior forward on the V60 schema.
 
 - [ ] **Step 1: Write RED migration tests.** Cover fresh and legacy upgrades, valid/expired/revoked rows, same-timestamp duplicate tie-break, deterministic revoke/slot cleanup, count-only evidence, unique race guard, new-category allowlist, migration-only legacy category, immediate raw-value redaction and fixed-sentinel compatibility, preview TTL/paired consumption, actor role/capability and unique audit snapshots, receipt immutability, source cleanup/user deletion with redacted evidence retained, and absence of note/note-HMAC/encrypted payload/email/name/member-identity reason columns. Assert exact Flyway counts and no V59/baseline/seed rewrite.
@@ -114,6 +116,10 @@ atomically. A DB unique violation maps to the typed active-grant conflict, never
 Task 2 adds canonical endpoints and leaves legacy one-click responses unchanged while the current frontend still calls that
 path. Task 3 alone owns the atomic frontend/server `410` cutover. Read compatibility may delegate to the canonical ledger
 but no controller may auto-preview/auto-confirm or create a second business path.
+
+This compatibility is source-level only. The V60 + Task 2 intermediate state is not deployable or a whole-gate target;
+Task 3 must land in the same release unit. Do not invent a reason category for a legacy request or adapt it through an
+automatic preview/confirm flow.
 
 - [ ] **Step 1: Write RED search/privacy tests.** Reject GET query search, oversize/blank input, wildcard abuse, and unauthorized sensitive projection. Prove response masks email and hides user UUID/note according to capability; assert `no-store`. Scan request/receipt/audit/DTO/log/query cache evidence for raw note/email/name and reason metadata member identity.
 - [ ] **Step 2: Write RED command/concurrency tests.** Cover category allowlist/case, note normalization/length, note-present HMAC difference, create/revoke preview, eligibility recheck, actor/capability loss, expiry, Completed replay-before-preview rejection, same-key/different-request conflict, committed in-progress, two-admin duplicate race, expired-slot cleanup, DB uniqueness translation, response loss, atomic grant/receipt/audit/claim rollback, and receipt replay reauthorization. Auth regressions must prove active exact-club `HOST_SUPPORT_READ` still creates request-local `ROLE_HOST` without a membership row/DTO, while wrong scope/club, expiry and revoke do not synthesize or grant writes.
