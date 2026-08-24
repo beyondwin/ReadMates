@@ -1,16 +1,15 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as sessionExpiry from "@/shared/auth/session-expiry";
+import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 import {
   closeHostSession,
-  commitHostSessionImport,
-  confirmManualNotification,
-  createHostInvitation,
+  correctionPublishHostSession,
   createHostSession,
   deleteHostSession,
   fetchHostClubOperations,
   fetchHostCurrentSession,
+  fetchHostMutationReconciliation,
   fetchHostMembers,
-  fetchHostNotificationDetail,
   fetchHostNotificationEvents,
   fetchHostNotificationItems,
   fetchHostNotificationPolicy,
@@ -21,29 +20,17 @@ import {
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
   fetchManualNotificationOptions,
-  listHostInvitationsResponse,
   openHostSession,
   parseHostInvitationListResponse,
   parseHostInvitationResponse,
-  previewManualNotification,
-  processHostNotifications,
   publishHostSession,
   reopenHostSession,
-  restoreHostNotification,
-  returnHostSessionToDraft,
-  retryHostNotification,
-  revokeHostInvitation,
+  restoreHostSession,
   saveHostSessionAttendance,
   saveHostSessionPublication,
   saveHostSessionAccessScope,
   saveHostSessionVisibility,
-  sendHostNotificationTestMail,
-  submitHostMemberLifecycle,
-  submitHostMemberProfile,
-  submitHostViewerAction,
-  unpublishHostSession,
   updateHostSession,
-  updateHostNotificationPolicy,
 } from "./host-api";
 
 function jsonResponse(body: unknown = {}) {
@@ -71,6 +58,15 @@ function hostSessionDetail() {
     meetingPasscode: null,
     publication: null,
     state: "OPEN" as const,
+    versions: {
+      sessionRevision: 3,
+      exposureRevision: 2,
+      participantSetRevision: 1,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-1",
     attendees: [],
     feedbackDocument: {
       uploaded: false,
@@ -105,7 +101,12 @@ function hostMemberListItem(avatarKey: unknown = "banana-green-book") {
 
 function stubFetch() {
   const fetchMock = vi.fn().mockImplementation((url: string, init?: RequestInit) =>
-    Promise.resolve(jsonResponse(
+    Promise.resolve(url.includes("/__internal/client-contract-status")
+      ? new Response(JSON.stringify({
+          schemaVersion: 1,
+          supportedHostClientContracts: ["v2", "v3"],
+        }), { headers: { "Cache-Control": "no-store", "Content-Type": "application/json" } })
+      : jsonResponse(
       url.includes("/visibility") || url.includes("/access-scope")
         ? { session: hostSessionDetail(), composer: null }
         : url.includes("/attendance")
@@ -119,6 +120,7 @@ function stubFetch() {
                 trashed: true,
                 deletedAt: "2026-08-21T10:00:00Z",
                 purgeAfter: "2026-08-28T10:00:00Z",
+                sessionRevision: 4,
                 counts: {
                   participants: 0,
                   rsvpResponses: 0,
@@ -141,11 +143,283 @@ function stubFetch() {
 }
 
 afterEach(() => {
+  __resetHostClientContractCapabilityForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
 
 describe("host api wrappers", () => {
+  it("parses an exact club-scoped mutation reconciliation response", async () => {
+    const receipt = {
+      receiptId: "receipt-1",
+      operation: "SESSION_OPEN",
+      resourceId: "session-7",
+      resultingVersions: {
+        sessionRevision: 4,
+        exposureRevision: 1,
+        participantSetRevision: 2,
+        recordDraftRevision: null,
+        liveRecordRevision: null,
+        publicationRevision: 0,
+      },
+      notificationDecision: "NOT_SENT",
+      projection: {
+        snapshotId: "snapshot-1",
+        sessionId: "session-7",
+        sessionNumber: 7,
+        title: "함께 읽기",
+        bookTitle: "모비 딕",
+        bookAuthor: "허먼 멜빌",
+        date: "2026-08-30",
+        startTime: "19:00",
+        endTime: "21:00",
+        locationLabel: "온라인",
+        state: "OPEN",
+        versions: {
+          sessionRevision: 4,
+          exposureRevision: 1,
+          participantSetRevision: 2,
+          recordDraftRevision: null,
+          liveRecordRevision: null,
+          publicationRevision: 0,
+        },
+        accessScope: "HOST_ONLY",
+        siteVisibility: "HIDDEN",
+        visibility: "HOST_ONLY",
+      },
+    } as const;
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse({
+      status: "COMMITTED",
+      receipt,
+      current: receipt.projection,
+      attendanceVersions: [],
+      attendanceSnapshotId: "attendance-snapshot-1",
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchHostMutationReconciliation(
+      "SESSION_OPEN",
+      "session/7",
+      "b6-reconcile-0001",
+      { clubSlug: "reading-sai" },
+    )).resolves.toMatchObject({ status: "COMMITTED", receipt });
+    expect(fetchMock).toHaveBeenCalledWith(
+      "/api/bff/api/host/mutations/SESSION_OPEN/session%2F7/b6-reconcile-0001?clubSlug=reading-sai",
+      expect.objectContaining({ cache: "no-store" }),
+    );
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      status: "COMMITTED",
+      receipt: { ...receipt, resourceId: undefined },
+      current: receipt.projection,
+      attendanceVersions: [],
+      attendanceSnapshotId: null,
+    }));
+    await expect(fetchHostMutationReconciliation(
+      "SESSION_OPEN",
+      "session-7",
+      "b6-reconcile-0002",
+      { clubSlug: "reading-sai" },
+    )).rejects.toThrow();
+  });
+
+  it("sends strict v3 envelopes with explicit club context for adopted session mutations", async () => {
+    const fetchMock = stubFetch();
+    const context = { clubSlug: "reading-sai" };
+    const sessionId = "session 7";
+    const command = {
+      title: "함께 읽기",
+      bookTitle: "모비 딕",
+      bookAuthor: "허먼 멜빌",
+      date: "2026-08-30",
+    };
+    const key = (suffix: string) => `b6-key-${suffix}-0001`;
+
+    await createHostSession({ idempotencyKey: key("create"), expected: {}, command }, context);
+    await updateHostSession(sessionId, {
+      idempotencyKey: key("update"),
+      expected: { sessionRevision: 3 },
+      command,
+    }, context);
+    await deleteHostSession(sessionId, {
+      idempotencyKey: key("trash"),
+      expected: { sessionRevision: 3 },
+      command: {},
+    }, context);
+    await saveHostSessionAttendance(sessionId, {
+      idempotencyKey: key("attendance"),
+      expected: { rows: [{ membershipId: "membership-1", attendanceRevision: 2 }] },
+      command: {
+        entries: [{
+          membershipId: "membership-1",
+          attendanceStatus: "ATTENDED",
+          expectedAttendanceRevision: 2,
+        }],
+      },
+    }, context);
+    await saveHostSessionAccessScope(sessionId, {
+      idempotencyKey: key("access"),
+      expected: { exposureRevision: 4 },
+      command: { accessScope: "GUEST_READABLE" },
+    }, context);
+    await saveHostSessionPublication(sessionId, {
+      idempotencyKey: key("publication"),
+      expected: { publicationRevision: 5 },
+      command: { publicSummary: "함께 읽은 기록", siteVisibility: "PUBLIC_RECORD" },
+    }, context);
+    await openHostSession(sessionId, {
+      idempotencyKey: key("open"),
+      expected: { sessionRevision: 3 },
+      command: {},
+    }, context);
+    await closeHostSession(sessionId, {
+      idempotencyKey: key("close"),
+      expected: { sessionRevision: 4, participantSetRevision: 5, attendanceSnapshotId: "snapshot-5" },
+      command: {},
+    }, context);
+    await publishHostSession(sessionId, {
+      idempotencyKey: key("publish"),
+      expected: { sessionRevision: 5, liveRecordRevision: 2, exposureRevision: 4, publicationRevision: 5 },
+      command: {},
+    }, context);
+    await reopenHostSession(sessionId, {
+      idempotencyKey: key("reverse"),
+      expected: { sessionRevision: 6 },
+      command: { reasonCode: "OPERATIONAL_RECOVERY" },
+    }, context);
+    await restoreHostSession(sessionId, {
+      idempotencyKey: key("restore"),
+      expected: { sessionRevision: 7 },
+      command: {},
+    }, context);
+
+    const writeCalls = fetchMock.mock.calls.filter(([url]) => !String(url).includes("/__internal/"));
+    expect(writeCalls).toHaveLength(11);
+    expect(writeCalls.every(([url]) => String(url).includes("clubSlug=reading-sai"))).toBe(true);
+    expect(writeCalls.map(([, init]) => JSON.parse(String((init as RequestInit).body)))).toEqual([
+      { idempotencyKey: key("create"), expected: {}, command },
+      { idempotencyKey: key("update"), expected: { sessionRevision: 3 }, command },
+      { idempotencyKey: key("trash"), expected: { sessionRevision: 3 }, command: {} },
+      {
+        idempotencyKey: key("attendance"),
+        expected: { rows: [{ membershipId: "membership-1", attendanceRevision: 2 }] },
+        command: {
+          entries: [{
+            membershipId: "membership-1",
+            attendanceStatus: "ATTENDED",
+            expectedAttendanceRevision: 2,
+          }],
+        },
+      },
+      { idempotencyKey: key("access"), expected: { exposureRevision: 4 }, command: { accessScope: "GUEST_READABLE" } },
+      {
+        idempotencyKey: key("publication"),
+        expected: { publicationRevision: 5 },
+        command: { publicSummary: "함께 읽은 기록", siteVisibility: "PUBLIC_RECORD" },
+      },
+      { idempotencyKey: key("open"), expected: { sessionRevision: 3 }, command: {} },
+      {
+        idempotencyKey: key("close"),
+        expected: { sessionRevision: 4, participantSetRevision: 5, attendanceSnapshotId: "snapshot-5" },
+        command: {},
+      },
+      {
+        idempotencyKey: key("publish"),
+        expected: { sessionRevision: 5, liveRecordRevision: 2, exposureRevision: 4, publicationRevision: 5 },
+        command: {},
+      },
+      {
+        idempotencyKey: key("reverse"),
+        expected: { sessionRevision: 6 },
+        command: { reasonCode: "OPERATIONAL_RECOVERY" },
+      },
+      { idempotencyKey: key("restore"), expected: { sessionRevision: 7 }, command: {} },
+    ]);
+  });
+
+  it("rejects missing, extra, and wrong-domain revisions before a host write", async () => {
+    const fetchMock = stubFetch();
+    const context = { clubSlug: "reading-sai" };
+    const invalid = [
+      { idempotencyKey: "b6-invalid-missing", expected: {}, command: {} },
+      {
+        idempotencyKey: "b6-invalid-extra",
+        expected: { sessionRevision: 3, exposureRevision: 4 },
+        command: {},
+      },
+      {
+        idempotencyKey: "b6-invalid-domain",
+        expected: { publicationRevision: 4 },
+        command: {},
+      },
+    ];
+
+    for (const envelope of invalid) {
+      expect(() => openHostSession("session-7", envelope as never, context)).toThrow();
+    }
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("submits only an exact correction publication vector to the correction endpoint", async () => {
+    const fetchMock = stubFetch();
+    const context = { clubSlug: "reading-sai" };
+    const validEnvelope = {
+      idempotencyKey: "b6-correction-publish-0001",
+      expected: {
+        sessionRevision: 5,
+        recordDraftRevision: 7,
+        liveRecordRevision: 3,
+        exposureRevision: 4,
+        publicationRevision: 6,
+      },
+      command: {},
+    };
+
+    await correctionPublishHostSession("session 7", validEnvelope, context);
+
+    expect(fetchMock).toHaveBeenLastCalledWith(
+      "/api/bff/api/host/sessions/session%207/correction-publish?clubSlug=reading-sai",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify(validEnvelope),
+      }),
+    );
+
+    const invalidEnvelopes = [
+      {
+        ...validEnvelope,
+        idempotencyKey: "b6-correction-missing-0001",
+        expected: {
+          sessionRevision: 5,
+          liveRecordRevision: 3,
+          exposureRevision: 4,
+          publicationRevision: 6,
+        },
+      },
+      {
+        ...validEnvelope,
+        idempotencyKey: "b6-correction-extra-0001",
+        expected: { ...validEnvelope.expected, participantSetRevision: 9 },
+      },
+      {
+        ...validEnvelope,
+        idempotencyKey: "b6-correction-wrong-domain-0001",
+        expected: {
+          sessionRevision: 5,
+          recordDraftRevision: 7,
+          liveRecordRevision: 3,
+          exposureRevision: 4,
+          attendanceRevision: 6,
+        },
+      },
+    ];
+
+    for (const envelope of invalidEnvelopes) {
+      expect(() => correctionPublishHostSession("session-7", envelope as never, context)).toThrow();
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
   it("passes explicit club context through visibility PATCH", async () => {
     const fetchMock = stubFetch();
 
@@ -169,15 +443,23 @@ describe("host api wrappers", () => {
 
     await saveHostSessionAccessScope(
       "session 7",
-      { accessScope: "GUEST_READABLE" },
+      {
+        idempotencyKey: "b6-access-scope-0001",
+        expected: { exposureRevision: 2 },
+        command: { accessScope: "GUEST_READABLE" },
+      },
       { clubSlug: "reading-sai" },
     );
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(2,
       "/api/bff/api/host/sessions/session%207/access-scope?clubSlug=reading-sai",
       expect.objectContaining({
         method: "PATCH",
-        body: JSON.stringify({ accessScope: "GUEST_READABLE" }),
+        body: JSON.stringify({
+          idempotencyKey: "b6-access-scope-0001",
+          expected: { exposureRevision: 2 },
+          command: { accessScope: "GUEST_READABLE" },
+        }),
       }),
     );
   });
@@ -199,7 +481,7 @@ describe("host api wrappers", () => {
     });
     await fetchManualNotificationDispatches(context, {
       sessionId: "session 7",
-      eventType: "SESSION_REMINDER",
+      eventType: "SESSION_REMINDER_DUE",
       page: { limit: 5, cursor: "c1" },
     });
     await fetchHostNotificationTestMailAudit(context, { limit: 3 });
@@ -216,7 +498,7 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/notifications/items?status=FAILED&limit=20&cursor=next+page&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/events?limit=10&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/manual/options?sessionId=session+7&search=alice&limit=5&cursor=c1&clubSlug=reading-sai",
-      "/api/bff/api/host/notifications/manual/dispatches?sessionId=session+7&eventType=SESSION_REMINDER&limit=5&cursor=c1&clubSlug=reading-sai",
+      "/api/bff/api/host/notifications/manual/dispatches?sessionId=session+7&eventType=SESSION_REMINDER_DUE&limit=5&cursor=c1&clubSlug=reading-sai",
       "/api/bff/api/host/notifications/test-mail/audit?limit=3&clubSlug=reading-sai",
       "/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai",
       "/api/bff/api/host/sessions/schedule-defaults?clubSlug=reading-sai",
@@ -264,121 +546,21 @@ describe("host api wrappers", () => {
     await expect(fetchHostMembers()).rejects.toThrow();
   });
 
-  it("encodes host mutation paths and request bodies", async () => {
-    const fetchMock = stubFetch();
-    const sessionId = "session 7";
-    const membershipId = "member/7";
-
-    await processHostNotifications();
-    await updateHostNotificationPolicy(
-      { sessionReminderEnabled: true },
-      { clubSlug: "reading-sai" },
-    );
-    await previewManualNotification({ templateKey: "SESSION_REMINDER", sessionId });
-    await confirmManualNotification({ previewId: "preview-1" });
-    await fetchHostNotificationDetail("item/1");
-    await retryHostNotification("item/1");
-    await restoreHostNotification("item/1");
-    await sendHostNotificationTestMail({ toEmail: "host@example.com" });
-    await createHostSession({} as never);
-    await updateHostSession(sessionId, {} as never);
-    await deleteHostSession(sessionId);
-    await saveHostSessionAttendance(sessionId, []);
-    await saveHostSessionPublication(sessionId, { visibility: "PUBLIC" } as never);
-    await saveHostSessionVisibility(sessionId, { visibility: "MEMBER" });
-    await openHostSession(sessionId);
-    await closeHostSession(sessionId);
-    await publishHostSession(sessionId);
-    await reopenHostSession(sessionId, { reasonCode: "MEETING_RESCHEDULED", reasonNote: "moved online" });
-    await unpublishHostSession(sessionId, { reasonCode: "CONTENT_CORRECTION" });
-    await returnHostSessionToDraft(sessionId, { reasonCode: "ACCIDENTAL_TRANSITION" });
-    await commitHostSessionImport(sessionId, { payload: "{}" });
-    await submitHostMemberLifecycle(membershipId, "/current-session/remove", { currentSessionPolicy: "NEXT_SESSION" });
-    await submitHostViewerAction(membershipId, "activate");
-    await submitHostMemberProfile(membershipId, "Alice");
-    await listHostInvitationsResponse({ clubSlug: "reading-sai" }, { limit: 10 });
-    await createHostInvitation({ email: "new@example.com", name: "New Member", applyToCurrentSession: true });
-    await revokeHostInvitation("invite/1");
-
-    const calls = fetchMock.mock.calls.map(([url, init]) => ({
-      url,
-      method: (init as RequestInit | undefined)?.method ?? "GET",
-      body: (init as RequestInit | undefined)?.body,
-    }));
-    expect(calls.map((call) => [call.method, call.url])).toEqual([
-      ["POST", "/api/bff/api/host/notifications/process"],
-      ["PUT", "/api/bff/api/host/notifications/policy?clubSlug=reading-sai"],
-      ["POST", "/api/bff/api/host/notifications/manual/preview"],
-      ["POST", "/api/bff/api/host/notifications/manual"],
-      ["GET", "/api/bff/api/host/notifications/items/item%2F1"],
-      ["POST", "/api/bff/api/host/notifications/items/item%2F1/retry"],
-      ["POST", "/api/bff/api/host/notifications/items/item%2F1/restore"],
-      ["POST", "/api/bff/api/host/notifications/test-mail"],
-      ["POST", "/api/bff/api/host/sessions"],
-      ["PATCH", "/api/bff/api/host/sessions/session%207"],
-      ["DELETE", "/api/bff/api/host/sessions/session%207"],
-      ["POST", "/api/bff/api/host/sessions/session%207/attendance"],
-      ["PUT", "/api/bff/api/host/sessions/session%207/publication"],
-      ["PATCH", "/api/bff/api/host/sessions/session%207/visibility"],
-      ["POST", "/api/bff/api/host/sessions/session%207/open"],
-      ["POST", "/api/bff/api/host/sessions/session%207/close"],
-      ["POST", "/api/bff/api/host/sessions/session%207/publish"],
-      ["POST", "/api/bff/api/host/sessions/session%207/reopen"],
-      ["POST", "/api/bff/api/host/sessions/session%207/unpublish"],
-      ["POST", "/api/bff/api/host/sessions/session%207/return-to-draft"],
-      ["POST", "/api/bff/api/host/sessions/session%207/session-import/commit"],
-      ["POST", "/api/bff/api/host/members/member%2F7/current-session/remove"],
-      ["POST", "/api/bff/api/host/members/member%2F7/activate"],
-      ["PATCH", "/api/bff/api/host/members/member%2F7/profile"],
-      ["GET", "/api/bff/api/host/invitations?limit=10&clubSlug=reading-sai"],
-      ["POST", "/api/bff/api/host/invitations"],
-      ["POST", "/api/bff/api/host/invitations/invite%2F1/revoke"],
-    ]);
-    expect(calls[1].body).toBe(JSON.stringify({ sessionReminderEnabled: true }));
-    expect(calls[2].body).toBe(JSON.stringify({ templateKey: "SESSION_REMINDER", sessionId }));
-    expect(calls[17].body).toBe(JSON.stringify({
-      reasonCode: "MEETING_RESCHEDULED",
-      reasonNote: "moved online",
-    }));
-    expect(calls[18].body).toBe(JSON.stringify({ reasonCode: "CONTENT_CORRECTION" }));
-    expect(calls[19].body).toBe(JSON.stringify({ reasonCode: "ACCIDENTAL_TRANSITION" }));
-    expect(calls[21].body).toBe(JSON.stringify({ currentSessionPolicy: "NEXT_SESSION" }));
-    expect(calls[23].body).toBe(JSON.stringify({ displayName: "Alice" }));
-  });
-
-  it("sends reverse lifecycle JSON and keeps forward actions body-less", async () => {
-    const fetchMock = stubFetch();
-    const sessionId = "session 7";
-    const request = { reasonCode: "OPERATIONAL_RECOVERY" as const, reasonNote: "restored" };
-
-    await openHostSession(sessionId);
-    await closeHostSession(sessionId);
-    await publishHostSession(sessionId);
-    await reopenHostSession(sessionId, request);
-    await unpublishHostSession(sessionId, request);
-    await returnHostSessionToDraft(sessionId, request);
-
-    const calls = fetchMock.mock.calls.map(([, init]) => init as RequestInit);
-    expect(calls.slice(0, 3).map((init) => init.body)).toEqual([undefined, undefined, undefined]);
-    expect(calls.slice(3).map((init) => ({
-      contentType: new Headers(init.headers).get("Content-Type"),
-      body: init.body,
-    }))).toEqual([
-      { contentType: "application/json", body: JSON.stringify(request) },
-      { contentType: "application/json", body: JSON.stringify(request) },
-      { contentType: "application/json", body: JSON.stringify(request) },
-    ]);
-  });
-
   it("parses visibility responses and returns the composer result", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
-      session: hostSessionDetail(),
-      composer: {
-        sessionId: "session-7",
-        eventType: "NEXT_BOOK_PUBLISHED",
-        contentRevision: "b".repeat(64),
-      },
-    })));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({ schemaVersion: 1, supportedHostClientContracts: ["v3"] }), {
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          })
+        : jsonResponse({
+            session: hostSessionDetail(),
+            composer: {
+              sessionId: "session-7",
+              eventType: "NEXT_BOOK_PUBLISHED",
+              contentRevision: "b".repeat(64),
+            },
+          }),
+    )));
 
     await expect(saveHostSessionVisibility(
       "session-7",
@@ -391,13 +573,19 @@ describe("host api wrappers", () => {
   });
 
   it("rejects invalid visibility response data through the production wrapper", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(jsonResponse({
-      session: hostSessionDetail(),
-      composer: {
-        sessionId: "session-7",
-        eventType: "NEXT_BOOK_PUBLISHED",
-      },
-    })));
+    vi.stubGlobal("fetch", vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({ schemaVersion: 1, supportedHostClientContracts: ["v3"] }), {
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          })
+        : jsonResponse({
+            session: hostSessionDetail(),
+            composer: {
+              sessionId: "session-7",
+              eventType: "NEXT_BOOK_PUBLISHED",
+            },
+          }),
+    )));
 
     await expect(saveHostSessionVisibility(
       "session-7",

@@ -1,11 +1,17 @@
-import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import {
+  readmatesFetch,
+  readmatesFetchResponse,
+  type ExplicitReadmatesApiContext,
+  type ReadmatesApiContext,
+} from "@/shared/api/client";
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import {
   parseHostSessionChangeReceipt,
   parseHostSessionRestorePreview,
   type HostSessionChangeReceipt,
   type HostSessionRestorePreview,
-  type HostSessionRestoreRequest,
+  HostSessionRestoreMutationEnvelopeSchema,
+  type HostSessionRestoreMutationEnvelope,
 } from "./host-session-recovery-contracts";
 
 function changePath(sessionId: string, changeId: string, suffix: string) {
@@ -27,15 +33,15 @@ export function fetchHostSessionRestorePreview(
 export async function restoreHostSessionChange(
   sessionId: string,
   changeId: string,
-  request: HostSessionRestoreRequest,
-  context?: ReadmatesApiContext,
+  request: HostSessionRestoreMutationEnvelope,
+  context: ExplicitReadmatesApiContext,
 ): Promise<HostSessionChangeReceipt> {
   const response = await readmatesFetchResponse(
     changePath(sessionId, changeId, "restore"),
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(request),
+      body: JSON.stringify(HostSessionRestoreMutationEnvelopeSchema.parse(request)),
     },
     context,
   );

@@ -25,6 +25,322 @@ export type SessionParticipationStatus = "ACTIVE" | "REMOVED";
 export type CurrentSessionPolicy = "APPLY_NOW" | "NEXT_SESSION";
 export type CurrentSessionPolicyResult = "APPLIED" | "NOT_APPLICABLE" | "DEFERRED";
 
+export type HostVersionVector = {
+  sessionRevision: number;
+  exposureRevision: number;
+  participantSetRevision: number;
+  recordDraftRevision: number | null;
+  liveRecordRevision: number | null;
+  publicationRevision: number;
+};
+
+export type HostMutationEnvelope<TCommand, TExpected> = {
+  idempotencyKey: string;
+  expected: TExpected;
+  command: TCommand;
+};
+
+export type ExpectedSessionRevision = { sessionRevision: number };
+export type AttendanceVersion = { membershipId: string; attendanceRevision: number };
+export type ExpectedAttendanceVersions = {
+  rows: AttendanceVersion[];
+  participantSetRevision?: number;
+};
+export type ExpectedCloseRevisions = ExpectedSessionRevision & {
+  participantSetRevision: number;
+  attendanceSnapshotId: string;
+};
+export type ExpectedExposureRevision = { exposureRevision: number };
+export type ExpectedPublicationRevision = {
+  publicationRevision: number;
+  exposureRevision?: number;
+};
+export type PublicationVersionVector = ExpectedSessionRevision & {
+  liveRecordRevision: number;
+  exposureRevision: number;
+  publicationRevision: number;
+};
+export type CorrectionPublicationVersionVector = PublicationVersionVector & {
+  recordDraftRevision: number;
+};
+
+export type HostProjectionSnapshot = {
+  snapshotId: string;
+  sessionId: string;
+  sessionNumber: number;
+  title: string;
+  bookTitle: string;
+  bookAuthor: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  locationLabel: string;
+  state: SessionState;
+  versions: HostVersionVector;
+  accessScope: SessionAccessScope;
+  siteVisibility: PublicSiteVisibility;
+  visibility: SessionRecordVisibility;
+};
+
+export type HostMutationReceipt = {
+  receiptId: string;
+  operation: HostMutationOperation;
+  resourceId: string;
+  resultingVersions: HostVersionVector;
+  notificationDecision: "NOT_SENT" | "DISPATCH_REFERENCED";
+  projection: HostProjectionSnapshot;
+};
+
+export type HostMutationReconciliation = {
+  status: "COMMITTED" | "NOT_EXECUTED" | "PENDING";
+  receipt: HostMutationReceipt | null;
+  current: HostProjectionSnapshot | null;
+  attendanceVersions: AttendanceVersion[] | null;
+  attendanceSnapshotId: string | null;
+};
+
+export type HostMutationOperation =
+  | "SESSION_CREATE"
+  | "SESSION_BASIC_SAVE"
+  | "SESSION_ATTENDANCE_SINGLE"
+  | "SESSION_ATTENDANCE_BULK"
+  | "SESSION_EXPOSURE"
+  | "SESSION_PUBLICATION"
+  | "SESSION_OPEN"
+  | "SESSION_CLOSE"
+  | "SESSION_REVERSE"
+  | "SESSION_RECORD_APPLY"
+  | "SESSION_PUBLISH"
+  | "SESSION_CORRECTION_PUBLISH"
+  | "SESSION_TRASH"
+  | "SESSION_RESTORE";
+
+const nonNegativeRevision = z.number().int().nonnegative();
+const positiveRevision = z.number().int().positive();
+
+export const HostVersionVectorSchema = z.object({
+  sessionRevision: nonNegativeRevision,
+  exposureRevision: nonNegativeRevision,
+  participantSetRevision: nonNegativeRevision,
+  recordDraftRevision: positiveRevision.nullable(),
+  liveRecordRevision: positiveRevision.nullable(),
+  publicationRevision: nonNegativeRevision,
+}).strict();
+
+export const ExpectedCreateHostSessionSchema = z.object({}).strict();
+export const ExpectedSessionRevisionSchema = z.object({
+  sessionRevision: nonNegativeRevision,
+}).strict();
+export const AttendanceVersionSchema = z.object({
+  membershipId: z.string().min(1),
+  attendanceRevision: nonNegativeRevision,
+}).strict();
+export const ExpectedAttendanceVersionsSchema = z.object({
+  rows: z.array(AttendanceVersionSchema).min(1),
+  participantSetRevision: nonNegativeRevision.optional(),
+}).strict();
+export const ExpectedCloseRevisionsSchema = z.object({
+  sessionRevision: nonNegativeRevision,
+  participantSetRevision: nonNegativeRevision,
+  attendanceSnapshotId: z.string().min(1),
+}).strict();
+export const ExpectedExposureRevisionSchema = z.object({
+  exposureRevision: nonNegativeRevision,
+}).strict();
+export const ExpectedPublicationRevisionSchema = z.object({
+  publicationRevision: nonNegativeRevision,
+  exposureRevision: nonNegativeRevision.optional(),
+}).strict();
+export const PublicationVersionVectorSchema = z.object({
+  sessionRevision: nonNegativeRevision,
+  liveRecordRevision: nonNegativeRevision,
+  exposureRevision: nonNegativeRevision,
+  publicationRevision: nonNegativeRevision,
+}).strict();
+export const CorrectionPublicationVersionVectorSchema = z.object({
+  sessionRevision: nonNegativeRevision,
+  recordDraftRevision: positiveRevision,
+  liveRecordRevision: nonNegativeRevision,
+  exposureRevision: nonNegativeRevision,
+  publicationRevision: nonNegativeRevision,
+}).strict();
+
+export const HostProjectionSnapshotSchema = z.object({
+  snapshotId: z.string().min(1),
+  sessionId: z.string().min(1),
+  sessionNumber: z.number().int().positive(),
+  title: z.string(),
+  bookTitle: z.string(),
+  bookAuthor: z.string(),
+  date: z.string(),
+  startTime: z.string(),
+  endTime: z.string(),
+  locationLabel: z.string(),
+  state: z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]),
+  versions: HostVersionVectorSchema,
+  accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]),
+  siteVisibility: z.enum(["HIDDEN", "PUBLIC_RECORD"]),
+  visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]),
+}).strict();
+
+export const HostMutationReceiptSchema = z.object({
+  receiptId: z.string().min(1),
+  operation: z.enum([
+    "SESSION_CREATE",
+    "SESSION_BASIC_SAVE",
+    "SESSION_ATTENDANCE_SINGLE",
+    "SESSION_ATTENDANCE_BULK",
+    "SESSION_EXPOSURE",
+    "SESSION_PUBLICATION",
+    "SESSION_OPEN",
+    "SESSION_CLOSE",
+    "SESSION_REVERSE",
+    "SESSION_RECORD_APPLY",
+    "SESSION_PUBLISH",
+    "SESSION_CORRECTION_PUBLISH",
+    "SESSION_TRASH",
+    "SESSION_RESTORE",
+  ]),
+  resourceId: z.string().min(1),
+  resultingVersions: HostVersionVectorSchema,
+  notificationDecision: z.enum(["NOT_SENT", "DISPATCH_REFERENCED"]),
+  projection: HostProjectionSnapshotSchema,
+}).strict();
+
+export const HostMutationReconciliationSchema = z.object({
+  status: z.enum(["COMMITTED", "NOT_EXECUTED", "PENDING"]),
+  receipt: HostMutationReceiptSchema.nullable(),
+  current: HostProjectionSnapshotSchema.nullable(),
+  attendanceVersions: z.array(AttendanceVersionSchema).nullable(),
+  attendanceSnapshotId: z.string().min(1).nullable(),
+}).strict().superRefine((value, context) => {
+  if (value.status === "COMMITTED" && value.receipt === null) {
+    context.addIssue({ code: "custom", path: ["receipt"], message: "committed reconciliation requires receipt" });
+  }
+  if (value.status !== "COMMITTED" && value.receipt !== null) {
+    context.addIssue({ code: "custom", path: ["receipt"], message: "non-committed reconciliation cannot include receipt" });
+  }
+});
+
+export const HostMutationIdempotencyKeySchema = z.string().regex(/^[A-Za-z0-9._-]{8,128}$/);
+
+export function hostMutationEnvelopeSchema<TCommand, TExpected>(
+  command: z.ZodType<TCommand>,
+  expected: z.ZodType<TExpected>,
+) {
+  return z.object({
+    idempotencyKey: HostMutationIdempotencyKeySchema,
+    expected,
+    command,
+  }).strict();
+}
+
+export const HostSessionRequestSchema = z.object({
+  title: z.string(),
+  bookTitle: z.string(),
+  bookAuthor: z.string(),
+  bookLink: z.string().nullable().optional(),
+  bookImageUrl: z.string().nullable().optional(),
+  locationLabel: z.string().nullable().optional(),
+  meetingUrl: z.string().nullable().optional(),
+  meetingPasscode: z.string().nullable().optional(),
+  date: z.string(),
+  startTime: z.string().nullable().optional(),
+  endTime: z.string().nullable().optional(),
+  questionDeadlineAt: z.string().nullable().optional(),
+  accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]).optional(),
+}).strict();
+
+export const HostLifecycleCommandSchema = z.object({}).strict();
+export const HostSessionReverseCommandSchema = z.object({
+  reasonCode: z.string().optional(),
+  reasonNote: z.string().optional(),
+}).strict();
+export const HostAttendanceCommandEntrySchema = z.object({
+  membershipId: z.string().min(1),
+  attendanceStatus: z.enum(["ATTENDED", "ABSENT", "UNKNOWN"]),
+  expectedAttendanceRevision: nonNegativeRevision,
+}).strict();
+export const HostAttendanceCommandSchema = z.object({
+  entries: z.array(HostAttendanceCommandEntrySchema).min(1),
+}).strict();
+export const HostSessionAccessScopeCommandSchema = z.object({
+  accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]),
+}).strict();
+export const HostSessionPublicationCommandSchema = z.object({
+  publicSummary: z.string().min(1),
+  accessScope: z.enum(["HOST_ONLY", "GUEST_READABLE"]).optional(),
+  siteVisibility: z.enum(["HIDDEN", "PUBLIC_RECORD"]).optional(),
+  visibility: z.enum(["HOST_ONLY", "MEMBER", "PUBLIC"]).optional(),
+}).strict();
+
+export const CreateHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostSessionRequestSchema,
+  ExpectedCreateHostSessionSchema,
+);
+export const UpdateHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostSessionRequestSchema,
+  ExpectedSessionRevisionSchema,
+);
+export const SessionRevisionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostLifecycleCommandSchema,
+  ExpectedSessionRevisionSchema,
+);
+export const ReverseHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostSessionReverseCommandSchema,
+  ExpectedSessionRevisionSchema,
+);
+export const CloseHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostLifecycleCommandSchema,
+  ExpectedCloseRevisionsSchema,
+);
+export const PublishHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostLifecycleCommandSchema,
+  PublicationVersionVectorSchema,
+);
+export const CorrectionPublishHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostLifecycleCommandSchema,
+  CorrectionPublicationVersionVectorSchema,
+);
+export const AccessHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostSessionAccessScopeCommandSchema,
+  ExpectedExposureRevisionSchema,
+);
+export const PublicationHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostSessionPublicationCommandSchema,
+  ExpectedPublicationRevisionSchema,
+).superRefine((envelope, context) => {
+  const commandChangesExposure = envelope.command.accessScope !== undefined;
+  const expectedIncludesExposure = envelope.expected.exposureRevision !== undefined;
+  if (commandChangesExposure !== expectedIncludesExposure) {
+    context.addIssue({
+      code: "custom",
+      path: ["expected", "exposureRevision"],
+      message: "exposureRevision must exactly match an accessScope command",
+    });
+  }
+});
+export const AttendanceHostSessionMutationEnvelopeSchema = hostMutationEnvelopeSchema(
+  HostAttendanceCommandSchema,
+  ExpectedAttendanceVersionsSchema,
+).superRefine((envelope, context) => {
+  const expectedByMembership = new Map(
+    envelope.expected.rows.map((row) => [row.membershipId, row.attendanceRevision]),
+  );
+  const commandMembershipIds = envelope.command.entries.map((entry) => entry.membershipId);
+  const exactRows = commandMembershipIds.length === expectedByMembership.size
+    && new Set(commandMembershipIds).size === commandMembershipIds.length
+    && envelope.command.entries.every(
+      (entry) => expectedByMembership.get(entry.membershipId) === entry.expectedAttendanceRevision,
+    );
+  const participantRevisionShape = envelope.command.entries.length > 1
+    ? envelope.expected.participantSetRevision !== undefined
+    : envelope.expected.participantSetRevision === undefined;
+  if (!exactRows || !participantRevisionShape) {
+    context.addIssue({ code: "custom", message: "attendance command and expected versions differ" });
+  }
+});
+
 export type CreateInvitationRequest = {
   email: string;
   name: string;
@@ -275,6 +591,9 @@ export type HostSessionClosingStatusResponse = {
     meetingDate: string;
     state: SessionState;
     recordVisibility: "HOST_ONLY" | "MEMBER" | "PUBLIC";
+    sessionRevision: number;
+    participantSetRevision: number;
+    attendanceSnapshotId: string;
   };
   overall: {
     state: HostSessionClosingOverallState;
@@ -540,11 +859,13 @@ export type HostSessionPublication = {
 export type HostSessionPublicationRequest =
   | {
       publicSummary: string;
+      accessScope?: SessionAccessScope;
       siteVisibility: PublicSiteVisibility;
       visibility?: SessionRecordVisibility;
     }
   | {
       publicSummary: string;
+      accessScope?: SessionAccessScope;
       visibility: SessionRecordVisibility;
       siteVisibility?: PublicSiteVisibility;
     };
@@ -636,6 +957,8 @@ export type HostSessionDetailResponse = {
   siteVisibility?: PublicSiteVisibility;
   publication: HostSessionPublication | null;
   state: SessionState;
+  versions: HostVersionVector;
+  attendanceSnapshotId: string;
   attendees: Array<{
     membershipId: string;
     avatarKey: string;
@@ -644,6 +967,7 @@ export type HostSessionDetailResponse = {
     rsvpStatus: RsvpStatus;
     attendanceStatus: AttendanceStatus;
     participationStatus?: SessionParticipationStatus;
+    attendanceRevision: number;
   }>;
   feedbackDocument: FeedbackDocumentStatus;
   changeReceipt?: HostSessionChangeReceipt | null;
@@ -684,6 +1008,7 @@ export type HostSessionTrashItem = {
   state: SessionState;
   deletedAt: string;
   purgeAfter: string;
+  sessionRevision?: number;
 };
 
 export type HostSessionTrashPage = {
@@ -785,6 +1110,8 @@ export const HostSessionDetailResponseSchema = z.object({
         })
         .nullable(),
       state: z.enum(["DRAFT", "OPEN", "PUBLISHED", "CLOSED"]),
+      versions: HostVersionVectorSchema,
+      attendanceSnapshotId: z.string().min(1),
       attendees: z.array(
         z.object({
           membershipId: z.string(),
@@ -794,6 +1121,7 @@ export const HostSessionDetailResponseSchema = z.object({
           rsvpStatus: z.enum(["NO_RESPONSE", "GOING", "MAYBE", "DECLINED"]),
           attendanceStatus: z.enum(["UNKNOWN", "ATTENDED", "ABSENT"]),
           participationStatus: z.enum(["ACTIVE", "REMOVED"]).optional(),
+          attendanceRevision: nonNegativeRevision,
         }),
       ),
       feedbackDocument: z.object({
@@ -1029,7 +1357,8 @@ export const HostSessionTrashItemSchema = z.object({
   state: sessionStateSchema,
   deletedAt: z.string(),
   purgeAfter: z.string(),
-});
+  sessionRevision: nonNegativeRevision,
+}).strict();
 
 const HostSessionDeletionCountsSchema = z.object({
   participants: z.number(),

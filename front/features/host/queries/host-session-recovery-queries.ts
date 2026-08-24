@@ -12,6 +12,9 @@ import {
   invalidateHostSessionDashboard,
   invalidateHostSessionDetail,
   invalidateHostSessionLists,
+  executeHostMutationWithReconciliation,
+  HostMutationContextRequiredError,
+  hostSessionDetailQuery,
 } from "./host-session-queries";
 
 function scopeKey(context?: ReadmatesApiContext) {
@@ -50,7 +53,39 @@ export function useRestoreHostSessionChangeMutation(context?: ReadmatesApiContex
       sessionId: string;
       changeId: string;
       request: HostSessionRestoreRequest;
-    }) => restoreHostSessionChange(sessionId, changeId, request, context),
+    }) => {
+      if (!context?.clubSlug) {
+        throw new HostMutationContextRequiredError();
+      }
+      const explicitContext = { clubSlug: context.clubSlug };
+      return client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext)).then((detail) => {
+        const envelope = {
+          idempotencyKey: `host-${globalThis.crypto.randomUUID()}`,
+          expected: { sessionRevision: detail.versions.sessionRevision },
+          command: request,
+        };
+        return executeHostMutationWithReconciliation({
+          operation: "SESSION_RESTORE",
+          resourceSlot: changeId,
+          envelope,
+          context: explicitContext,
+          execute: (exactEnvelope) => restoreHostSessionChange(
+            sessionId,
+            changeId,
+            exactEnvelope,
+            explicitContext,
+          ),
+          acceptCommitted: async (reconciliation) => {
+            await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+            return {
+              changeId: reconciliation.receipt?.receiptId ?? changeId,
+              kind: "BASIC_INFO",
+              undoAvailable: true,
+            };
+          },
+        });
+      });
+    },
     onSuccess: async (_receipt, variables) => {
       await Promise.all([
         invalidateHostSessionDetail(client, variables.sessionId, context),

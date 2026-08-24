@@ -7,8 +7,14 @@ vi.mock("@/features/host/api/host-session-recovery-api", () => ({
   fetchHostSessionRestorePreview: vi.fn(),
   restoreHostSessionChange: vi.fn(),
 }));
+vi.mock("@/features/host/api/host-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/host/api/host-api")>()),
+  fetchHostSessionDetail: vi.fn(),
+  fetchHostMutationReconciliation: vi.fn(),
+}));
 
 import { restoreHostSessionChange } from "@/features/host/api/host-session-recovery-api";
+import { fetchHostSessionDetail } from "@/features/host/api/host-api";
 import { hostSessionRecordKeys } from "./host-session-record-queries";
 import { hostSessionKeys } from "./host-session-queries";
 import {
@@ -35,7 +41,10 @@ type CacheEntry = readonly [readonly unknown[], unknown];
 
 function seedSurfaces(client: QueryClient) {
   const entries = {
-    detail: [hostSessionKeys.detail("session-7", context), { surface: "detail" }],
+    detail: [hostSessionKeys.detail("session-7", context), {
+      surface: "detail",
+      versions: { sessionRevision: 3 },
+    }],
     history: [hostSessionRecordKeys.historyRoot("session-7", context), { surface: "history" }],
     editor: [hostSessionRecordKeys.editor("session-7", context), { surface: "editor" }],
     recordLedger: [hostSessionRecordKeys.ledger(undefined, context), { surface: "record-ledger" }],
@@ -78,6 +87,10 @@ function expectFresh(client: QueryClient, entries: readonly CacheEntry[]) {
 
 beforeEach(() => {
   vi.mocked(restoreHostSessionChange).mockReset();
+  vi.mocked(fetchHostSessionDetail).mockReset().mockResolvedValue({
+    surface: "detail",
+    versions: { sessionRevision: 3 },
+  } as never);
 });
 
 describe("host session recovery queries", () => {
@@ -116,7 +129,11 @@ describe("host session recovery queries", () => {
     expect(restoreHostSessionChange).toHaveBeenCalledWith(
       "session-7",
       "change-1",
-      { expectedCurrentHash: "f".repeat(64) },
+      expect.objectContaining({
+        idempotencyKey: expect.any(String),
+        expected: { sessionRevision: 3 },
+        command: { expectedCurrentHash: "f".repeat(64) },
+      }),
       context,
     );
     expectInvalidated(client, [

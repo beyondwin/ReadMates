@@ -241,8 +241,17 @@ describe("host session query keys", () => {
       { limit: 50 },
     );
     expect(fetchHostSessionTrash).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
-    await restoreHostSession("session-7", { clubSlug: "reading-sai" });
-    expect(restoreHostSession).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
+    const restoreEnvelope = {
+      idempotencyKey: "b6-trash-restore-0001",
+      expected: { sessionRevision: 4 },
+      command: {},
+    };
+    await restoreHostSession("session-7", restoreEnvelope, { clubSlug: "reading-sai" });
+    expect(restoreHostSession).toHaveBeenCalledWith(
+      "session-7",
+      restoreEnvelope,
+      { clubSlug: "reading-sai" },
+    );
   });
 
   it("parses DELETE trash payloads from trashed, not deleted", () => {
@@ -254,6 +263,7 @@ describe("host session query keys", () => {
       trashed: true,
       deletedAt: "2026-08-21T10:00:00Z",
       purgeAfter: "2026-08-28T10:00:00Z",
+      sessionRevision: 4,
       counts: emptyCounts(),
     })).toMatchObject({
       sessionId: "session-7",
@@ -434,6 +444,7 @@ function trashItem() {
     state: "DRAFT" as const,
     deletedAt: "2026-08-21T10:00:00Z",
     purgeAfter: "2026-08-28T10:00:00Z",
+    sessionRevision: 4,
   };
 }
 
@@ -456,6 +467,15 @@ function sessionDetail() {
     visibility: "HOST_ONLY" as const,
     publication: null,
     state: "DRAFT" as const,
+    versions: {
+      sessionRevision: 4,
+      exposureRevision: 0,
+      participantSetRevision: 0,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-0",
     attendees: [],
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
   };

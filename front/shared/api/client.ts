@@ -3,6 +3,7 @@ import { parseReadmatesResponse } from "@/shared/api/response";
 import { signalSessionExpired } from "@/shared/auth/session-expiry";
 import { currentRelativeReturnTo, loginPathForReturnTo } from "@/shared/auth/login-return";
 import { recordFrontendApiFailure } from "@/shared/observability/frontend-observability";
+import { requireHostClientContractV3 } from "@/shared/api/host-client-contract";
 
 export class ReadMatesSessionExpiredError extends Error {
   constructor() {
@@ -15,7 +16,7 @@ const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 let lastLoginRedirectAt = 0;
 const REDIRECT_COOL_OFF_MS = 1500;
 const HOST_WRITE_CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract";
-const HOST_WRITE_CLIENT_CONTRACT = "v2";
+const HOST_WRITE_CLIENT_CONTRACT = "v3";
 
 export function __resetRedirectGuardForTest() {
   lastLoginRedirectAt = 0;
@@ -23,6 +24,10 @@ export function __resetRedirectGuardForTest() {
 
 export type ReadmatesApiContext = {
   clubSlug?: string;
+};
+
+export type ExplicitReadmatesApiContext = {
+  clubSlug: string;
 };
 
 export type ReadmatesRequestPolicy = {
@@ -89,6 +94,7 @@ export async function readmatesFetchResponse(
   }
 
   if (MUTATING_METHODS.has(method) && path.startsWith("/api/host/")) {
+    await requireHostClientContractV3();
     headers.set(HOST_WRITE_CLIENT_CONTRACT_HEADER, HOST_WRITE_CLIENT_CONTRACT);
   } else {
     headers.delete(HOST_WRITE_CLIENT_CONTRACT_HEADER);

@@ -28,7 +28,11 @@ import { normalizeHostSessionLedgerRequest } from "@/features/host/api/host-sess
 import type { ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import { recordHostAttentionResult } from "@/shared/observability/frontend-observability";
-import { invalidateHostSessionDashboard } from "./host-session-queries";
+import {
+  executeHostMutationWithReconciliation,
+  HostMutationContextRequiredError,
+  invalidateHostSessionDashboard,
+} from "./host-session-queries";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
 
 export { hostSessionRecordKeys } from "./host-session-record-query-keys";
@@ -263,7 +267,50 @@ export function useApplyHostSessionRecordMutation(
     mutationFn: ({ sessionId, request }: {
       sessionId: string;
       request: HostSessionRecordApplyRequest;
-    }) => applyHostSessionRecord(sessionId, request, context),
+    }) => {
+      if (!context?.clubSlug) {
+        throw new HostMutationContextRequiredError();
+      }
+      const explicitContext = { clubSlug: context.clubSlug };
+      const envelope = {
+        idempotencyKey: `host-${globalThis.crypto.randomUUID()}`,
+        expected: {
+          draftRevision: request.expectedDraftRevision,
+          liveRevision: request.expectedLiveRevision,
+        },
+        command: {
+          applyRequestId: request.applyRequestId,
+          expectedDraftHash: request.expectedDraftHash,
+        },
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_RECORD_APPLY",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => applyHostSessionRecord(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: async (reconciliation) => {
+          if (!reconciliation.receipt) {
+            throw new Error("HOST_MUTATION_COMMITTED_RECEIPT_MISSING");
+          }
+          const history = await fetchHostSessionHistory(
+            sessionId,
+            { limit: 20 },
+            explicitContext,
+          );
+          const revisionId = history.items.find((item) => item.revisionId !== null)?.revisionId;
+          if (!revisionId) {
+            throw new Error("HOST_RECORD_APPLY_COMMITTED_STATE_MISSING");
+          }
+          return {
+            revisionId,
+            liveRevision: reconciliation.receipt.resultingVersions.liveRecordRevision
+              ?? request.expectedLiveRevision + 1,
+            composer: null,
+          };
+        },
+      });
+    },
     onSuccess: (_result, variables) =>
       invalidateAppliedRecordSurfaces(
         client,

@@ -1,4 +1,9 @@
-import { readmatesFetch, readmatesFetchResponse, type ReadmatesApiContext } from "@/shared/api/client";
+import {
+  readmatesFetch,
+  readmatesFetchResponse,
+  type ExplicitReadmatesApiContext,
+  type ReadmatesApiContext,
+} from "@/shared/api/client";
 import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { PageRequest } from "@/shared/model/paging";
 import type { HostSessionRecordLedgerPage } from "./host-contracts";
@@ -11,10 +16,11 @@ import {
   parseHostSessionRecordCapabilities,
   parseHostSessionRecordDraft,
   parseHostSessionRecordEditor,
+  HostSessionRecordApplyMutationEnvelopeSchema,
   type HostSessionHistoryPage,
   type HostSessionLedgerRequest,
   type HostSessionRecordApplyPreview,
-  type HostSessionRecordApplyRequest,
+  type HostSessionRecordApplyMutationEnvelope,
   type HostSessionRecordApplyResult,
   type HostSessionRecordCapabilities,
   type HostSessionRecordDraft,
@@ -152,14 +158,14 @@ export function previewHostSessionRecordApply(
 
 export function applyHostSessionRecord(
   sessionId: string,
-  request: HostSessionRecordApplyRequest,
-  context?: ReadmatesApiContext,
+  request: HostSessionRecordApplyMutationEnvelope,
+  context: ExplicitReadmatesApiContext,
 ): Promise<HostSessionRecordApplyResult> {
   return readmatesFetch<HostSessionRecordApplyResult>(
     sessionRecordPath(sessionId, "record-apply"),
     {
       method: "POST",
-      body: JSON.stringify(request),
+      body: JSON.stringify(HostSessionRecordApplyMutationEnvelopeSchema.parse(request)),
     },
     context,
   ).then(parseHostSessionRecordApplyResult);

@@ -7,6 +7,7 @@ import { hostNotificationKeys } from "./host-notification-queries";
 
 vi.mock("@/features/host/api/host-api", () => ({
   closeHostSession: vi.fn(),
+  correctionPublishHostSession: vi.fn(),
   commitHostSessionImport: vi.fn(),
   createHostSession: vi.fn(),
   deleteHostSession: vi.fn(),
@@ -21,16 +22,24 @@ vi.mock("@/features/host/api/host-api", () => ({
   unpublishHostSession: vi.fn(),
   updateHostSession: vi.fn(),
   fetchHostSessionScheduleDefaults: vi.fn(),
+  fetchHostSessionDetail: vi.fn(),
+  fetchHostSessionClosingStatus: vi.fn(),
   fetchHostSessionTrash: vi.fn(),
   fetchHostSessionTrashList: vi.fn(),
+  fetchHostMutationReconciliation: vi.fn(),
   restoreHostSession: vi.fn(),
 }));
 
 import {
   closeHostSession,
+  correctionPublishHostSession,
   commitHostSessionImport,
   createHostSession,
   deleteHostSession,
+  fetchHostMutationReconciliation,
+  fetchHostSessionDetail,
+  fetchHostSessionClosingStatus,
+  fetchHostSessionTrash,
   openHostSession,
   publishHostSession,
   reopenHostSession,
@@ -46,6 +55,7 @@ import {
 import {
   hostSessionKeys,
   useCloseHostSessionMutation,
+  useCorrectionPublishHostSessionMutation,
   useCommitHostSessionImportMutation,
   useCreateHostSessionMutation,
   useDeleteHostSessionMutation,
@@ -60,8 +70,10 @@ import {
   useUnpublishHostSessionMutation,
   useUpdateHostSessionAttendanceMutation,
   useUpdateHostSessionMutation,
+  executeHostMutationWithReconciliation,
 } from "./host-session-queries";
 import { hostSessionRecordKeys } from "./host-session-record-queries";
+import { ReadmatesTransportError } from "@/shared/api/errors";
 
 function createWrapper() {
   const client = new QueryClient({
@@ -78,6 +90,30 @@ function createWrapper() {
 
 const context = { clubSlug: "reading-sai" };
 type CacheEntry = readonly [readonly unknown[], unknown];
+
+function authoritativeDetail() {
+  return {
+    ...visibilityResult().session,
+    versions: {
+      sessionRevision: 3,
+      exposureRevision: 2,
+      participantSetRevision: 4,
+      recordDraftRevision: 5,
+      liveRecordRevision: 2,
+      publicationRevision: 1,
+    },
+    attendanceSnapshotId: "attendance-snapshot-4",
+    attendees: [{
+      membershipId: "member-1",
+      avatarKey: "banana-green-book",
+      displayName: "멤버",
+      accountName: "member",
+      rsvpStatus: "GOING" as const,
+      attendanceStatus: "UNKNOWN" as const,
+      attendanceRevision: 6,
+    }],
+  };
+}
 
 function surfaceKeys() {
   return {
@@ -102,8 +138,14 @@ function surfaceKeys() {
 function seedSurfaces(client: QueryClient) {
   const keys = surfaceKeys();
   const entries = {
-    detail: [keys.detail, { surface: "detail", sessionId: "session-7" }],
-    closingStatus: [keys.closingStatus, { surface: "closing-status", state: "OPEN" }],
+    detail: [keys.detail, authoritativeDetail()],
+    closingStatus: [keys.closingStatus, {
+      session: {
+        sessionRevision: 3,
+        participantSetRevision: 4,
+        attendanceSnapshotId: "attendance-snapshot-4",
+      },
+    }],
     list: [keys.list, { surface: "list", items: ["session-7"] }],
     dashboard: [keys.dashboard, { surface: "dashboard", sessions: ["session-7"] }],
     current: [keys.current, { surface: "current", sessionId: "session-7" }],
@@ -192,6 +234,15 @@ function visibilityResult() {
       meetingPasscode: null,
       publication: null,
       state: "OPEN" as const,
+      versions: {
+        sessionRevision: 3,
+        exposureRevision: 2,
+        participantSetRevision: 4,
+        recordDraftRevision: null,
+        liveRecordRevision: 2,
+        publicationRevision: 1,
+      },
+      attendanceSnapshotId: "attendance-snapshot-4",
       attendees: [],
       feedbackDocument: {
         uploaded: false,
@@ -214,6 +265,7 @@ beforeEach(() => {
   vi.mocked(deleteHostSession).mockReset();
   vi.mocked(openHostSession).mockReset();
   vi.mocked(closeHostSession).mockReset();
+  vi.mocked(correctionPublishHostSession).mockReset();
   vi.mocked(publishHostSession).mockReset();
   vi.mocked(reopenHostSession).mockReset();
   vi.mocked(unpublishHostSession).mockReset();
@@ -224,6 +276,24 @@ beforeEach(() => {
   vi.mocked(saveHostSessionPublication).mockReset();
   vi.mocked(saveHostSessionAttendance).mockReset();
   vi.mocked(commitHostSessionImport).mockReset();
+  vi.mocked(fetchHostSessionDetail).mockReset().mockResolvedValue(authoritativeDetail());
+  vi.mocked(fetchHostSessionClosingStatus).mockReset().mockResolvedValue({
+    session: {
+      sessionRevision: 3,
+      participantSetRevision: 4,
+      attendanceSnapshotId: "attendance-snapshot-4",
+    },
+  } as never);
+  vi.mocked(fetchHostSessionTrash).mockReset().mockResolvedValue({
+    sessionId: "session-7",
+    sessionNumber: 7,
+    title: "함께 읽기",
+    state: "DRAFT",
+    deletedAt: "2026-08-21T10:00:00Z",
+    purgeAfter: "2026-08-28T10:00:00Z",
+    sessionRevision: 4,
+  });
+  vi.mocked(fetchHostMutationReconciliation).mockReset();
 });
 
 afterEach(() => {
@@ -231,6 +301,179 @@ afterEach(() => {
 });
 
 describe("host session mutation hooks", () => {
+  it("reconciles correction publication with its exact operation, resource, key, and envelope", async () => {
+    vi.mocked(correctionPublishHostSession)
+      .mockRejectedValueOnce(new ReadmatesTransportError())
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }) as never);
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "NOT_EXECUTED",
+      receipt: null,
+      current: null,
+      attendanceVersions: [],
+      attendanceSnapshotId: null,
+    });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCorrectionPublishHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    const firstEnvelope = vi.mocked(correctionPublishHostSession).mock.calls[0]?.[1];
+    expect(firstEnvelope).toEqual({
+      idempotencyKey: expect.any(String),
+      expected: {
+        sessionRevision: 3,
+        recordDraftRevision: 5,
+        liveRecordRevision: 2,
+        exposureRevision: 2,
+        publicationRevision: 1,
+      },
+      command: {},
+    });
+    expect(vi.mocked(correctionPublishHostSession).mock.calls[1]?.[1]).toBe(firstEnvelope);
+    expect(fetchHostMutationReconciliation).toHaveBeenCalledWith(
+      "SESSION_CORRECTION_PUBLISH",
+      "session-7",
+      firstEnvelope?.idempotencyKey,
+      context,
+    );
+  });
+
+  it("refetches authoritative detail after a committed correction publication response loss", async () => {
+    vi.mocked(correctionPublishHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "COMMITTED",
+      receipt: {
+        resourceId: "session-7",
+        projection: { attendanceSnapshotId: "att:" },
+      } as never,
+      current: null,
+      attendanceVersions: null,
+      attendanceSnapshotId: "att:",
+    });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCorrectionPublishHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    expect(correctionPublishHostSession).toHaveBeenCalledTimes(1);
+    expect(fetchHostSessionDetail).toHaveBeenCalledTimes(2);
+    expect(fetchHostSessionDetail).toHaveBeenLastCalledWith("session-7", context);
+  });
+
+  it("refetches authoritative detail after COMMITTED response loss instead of trusting receipt projection", async () => {
+    vi.mocked(openHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "COMMITTED",
+      receipt: {
+        resourceId: "session-7",
+        projection: {
+          attendanceSnapshotId: "att:",
+          attendees: [{ membershipId: "stale-receipt-row" }],
+        },
+      } as never,
+      current: null,
+      attendanceVersions: null,
+      attendanceSnapshotId: "att:",
+    });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useOpenHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync("session-7");
+    });
+
+    expect(openHostSession).toHaveBeenCalledTimes(1);
+    expect(fetchHostMutationReconciliation).toHaveBeenCalledTimes(1);
+    expect(fetchHostSessionDetail).toHaveBeenCalledTimes(2);
+    expect(fetchHostSessionDetail).toHaveBeenLastCalledWith("session-7", context);
+  });
+
+  it("reuses the exact idempotency envelope only after authoritative NOT_EXECUTED", async () => {
+    const envelope = {
+      idempotencyKey: "b6-response-loss-0001",
+      expected: { sessionRevision: 3 },
+      command: {},
+    };
+    const execute = vi.fn()
+      .mockRejectedValueOnce(new ReadmatesTransportError())
+      .mockResolvedValueOnce("retried");
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValue({
+      status: "NOT_EXECUTED",
+      receipt: null,
+      current: null,
+      attendanceVersions: [],
+      attendanceSnapshotId: null,
+    });
+    const states: string[] = [];
+
+    await expect(executeHostMutationWithReconciliation({
+      operation: "SESSION_OPEN",
+      resourceSlot: "session-7",
+      envelope,
+      context,
+      execute,
+      acceptCommitted: () => "committed",
+      onStateChange: (state) => states.push(state),
+    })).resolves.toBe("retried");
+
+    expect(execute).toHaveBeenNthCalledWith(1, envelope);
+    expect(execute).toHaveBeenNthCalledWith(2, envelope);
+    expect(fetchHostMutationReconciliation).toHaveBeenCalledWith(
+      "SESSION_OPEN",
+      "session-7",
+      "b6-response-loss-0001",
+      context,
+    );
+    expect(states).toEqual(["checking", "idle"]);
+  });
+
+  it("never retries a committed or pending response-loss result", async () => {
+    const envelope = {
+      idempotencyKey: "b6-response-loss-0002",
+      expected: { sessionRevision: 3 },
+      command: {},
+    };
+    const execute = vi.fn().mockRejectedValue(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "COMMITTED",
+      receipt: {} as never,
+      current: null,
+      attendanceVersions: [],
+      attendanceSnapshotId: null,
+    });
+
+    await expect(executeHostMutationWithReconciliation({
+      operation: "SESSION_OPEN",
+      resourceSlot: "session-7",
+      envelope,
+      context,
+      execute,
+      acceptCommitted: () => "committed",
+    })).resolves.toBe("committed");
+    expect(execute).toHaveBeenCalledTimes(1);
+
+    vi.mocked(fetchHostMutationReconciliation).mockResolvedValueOnce({
+      status: "PENDING",
+      receipt: null,
+      current: null,
+      attendanceVersions: null,
+      attendanceSnapshotId: null,
+    });
+    await expect(executeHostMutationWithReconciliation({
+      operation: "SESSION_OPEN",
+      resourceSlot: "session-7",
+      envelope,
+      context,
+      execute,
+      acceptCommitted: () => "committed",
+    })).rejects.toMatchObject({ code: "HOST_MUTATION_PENDING" });
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
   it("invalidates lists and dashboard after a successful create response", async () => {
     vi.mocked(createHostSession).mockResolvedValue(new Response(JSON.stringify({ sessionId: "session-8" }), { status: 201 }) as never);
     const { client, Wrapper } = createWrapper();
@@ -242,7 +485,11 @@ describe("host session mutation hooks", () => {
     });
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
-    expect(createHostSession).toHaveBeenCalledWith(sessionRequest);
+    expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: {},
+      command: sessionRequest,
+    }), context);
     expectInvalidated(client, [entries.list, entries.dashboard]);
     expectFresh(client, [
       entries.detail,
@@ -283,7 +530,11 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request: sessionRequest });
     });
 
-    expect(updateHostSession).toHaveBeenCalledWith("session-7", sessionRequest);
+    expect(updateHostSession).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { sessionRevision: 3 },
+      command: sessionRequest,
+    }), context);
     expectInvalidated(client, [
       entries.detail,
       entries.closingStatus,
@@ -325,6 +576,7 @@ describe("host session mutation hooks", () => {
       trashed: true,
       deletedAt: "2026-08-21T10:00:00Z",
       purgeAfter: "2026-08-28T10:00:00Z",
+      sessionRevision: 4,
       counts: {
         participants: 0,
         rsvpResponses: 0,
@@ -346,7 +598,11 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync("session-7");
     });
 
-    expect(deleteHostSession).toHaveBeenCalledWith("session-7", context);
+    expect(deleteHostSession).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { sessionRevision: 3 },
+      command: {},
+    }), context);
     expect(client.getQueryData(keys.detail)).toBeUndefined();
     expect(client.getQueryState(keys.detail)).toBeUndefined();
     expectInvalidated(client, [
@@ -390,7 +646,15 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync("session-7");
     });
 
-    expect(apiFn).toHaveBeenCalledWith("session-7");
+    expect(apiFn).toHaveBeenCalledWith(
+      "session-7",
+      expect.objectContaining({
+        idempotencyKey: expect.any(String),
+        expected: expect.any(Object),
+        command: {},
+      }),
+      context,
+    );
     expectInvalidated(client, [
       entries.detail,
       entries.closingStatus,
@@ -428,7 +692,11 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request });
     });
 
-    expect(apiFn).toHaveBeenCalledWith("session-7", request);
+    expect(apiFn).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { sessionRevision: 3 },
+      command: request,
+    }), context);
     expectInvalidated(client, [
       entries.detail,
       entries.closingStatus,
@@ -553,9 +821,15 @@ describe("host session mutation hooks", () => {
       });
     });
 
-    expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", [
-      { membershipId: "member-1", attendanceStatus: "ATTENDED" },
-    ], context);
+    expect(saveHostSessionAttendance).toHaveBeenCalledWith("session-7", expect.objectContaining({
+      idempotencyKey: expect.any(String),
+      expected: { rows: [{ membershipId: "member-1", attendanceRevision: 6 }] },
+      command: { entries: [{
+        membershipId: "member-1",
+        attendanceStatus: "ATTENDED",
+        expectedAttendanceRevision: 6,
+      }] },
+    }), context);
     expectInvalidated(client, [
       entries.detail,
       entries.current,

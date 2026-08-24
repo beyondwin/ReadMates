@@ -1,11 +1,14 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import {
   closeHostSession,
+  correctionPublishHostSession,
   commitHostSessionImport,
   createHostSession,
   deleteHostSession,
   fetchHostCurrentSession,
+  fetchHostMutationReconciliation,
   fetchHostSessionClosingStatus,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
@@ -45,9 +48,12 @@ import type {
   ManualNotificationDispatchListResponse,
   HostNotificationEventType,
   SessionImportRequest,
+  HostMutationEnvelope,
+  HostMutationOperation,
+  HostMutationReconciliation,
 } from "@/features/host/api/host-contracts";
 import type { HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
-import type { ReadmatesApiContext } from "@/shared/api/client";
+import type { ExplicitReadmatesApiContext, ReadmatesApiContext } from "@/shared/api/client";
 import type { PageRequest } from "@/shared/model/paging";
 import {
   normalizePageRequest,
@@ -58,11 +64,63 @@ import {
   SCHEDULE_DEFAULTS_LOAD_WARNING,
   type HostScheduleDefaultsLoadState,
 } from "@/features/host/model/host-schedule-defaults-model";
-import { isReadmatesApiError } from "@/shared/api/errors";
+import { isReadmatesApiError, isReadmatesTransportError } from "@/shared/api/errors";
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
+
+export type HostMutationReconciliationState = "idle" | "checking";
+
+export class HostMutationPendingError extends Error {
+  readonly code = "HOST_MUTATION_PENDING";
+
+  constructor() {
+    super("요청 처리 결과를 아직 확인하고 있습니다.");
+    this.name = "HostMutationPendingError";
+  }
+}
+
+export type ExecuteHostMutationWithReconciliationOptions<TCommand, TExpected, TResult> = {
+  operation: HostMutationOperation;
+  resourceSlot: string;
+  envelope: HostMutationEnvelope<TCommand, TExpected>;
+  context: ExplicitReadmatesApiContext;
+  execute: (envelope: HostMutationEnvelope<TCommand, TExpected>) => Promise<TResult>;
+  acceptCommitted: (result: HostMutationReconciliation) => Promise<TResult> | TResult;
+  onStateChange?: (state: HostMutationReconciliationState) => void;
+};
+
+export async function executeHostMutationWithReconciliation<TCommand, TExpected, TResult>(
+  options: ExecuteHostMutationWithReconciliationOptions<TCommand, TExpected, TResult>,
+): Promise<TResult> {
+  try {
+    return await options.execute(options.envelope);
+  } catch (error) {
+    if (!isReadmatesTransportError(error)) {
+      throw error;
+    }
+  }
+
+  options.onStateChange?.("checking");
+  try {
+    const reconciliation = await fetchHostMutationReconciliation(
+      options.operation,
+      options.resourceSlot,
+      options.envelope.idempotencyKey,
+      options.context,
+    );
+    if (reconciliation.status === "COMMITTED") {
+      return await options.acceptCommitted(reconciliation);
+    }
+    if (reconciliation.status === "NOT_EXECUTED") {
+      return await options.execute(options.envelope);
+    }
+    throw new HostMutationPendingError();
+  } finally {
+    options.onStateChange?.("idle");
+  }
+}
 
 export type HostSessionManualDispatchesQueryRequest = {
   sessionId?: string | null;
@@ -72,6 +130,43 @@ export type HostSessionManualDispatchesQueryRequest = {
 
 function scopeKey(context?: ReadmatesApiContext): string | null {
   return context?.clubSlug ?? null;
+}
+
+export class HostMutationContextRequiredError extends Error {
+  readonly code = "HOST_API_CONTEXT_REQUIRED";
+
+  constructor() {
+    super("호스트 변경에는 명시적인 모임 컨텍스트가 필요합니다.");
+    this.name = "HostMutationContextRequiredError";
+  }
+}
+
+function requireHostMutationContext(context?: ReadmatesApiContext): ExplicitReadmatesApiContext {
+  if (!context?.clubSlug) {
+    throw new HostMutationContextRequiredError();
+  }
+  return { clubSlug: context.clubSlug };
+}
+
+function newHostMutationKey(): string {
+  return `host-${globalThis.crypto.randomUUID()}`;
+}
+
+async function committedDetailResponse(
+  sessionId: string,
+  context: ExplicitReadmatesApiContext,
+  status = 200,
+): Promise<Response> {
+  const detail = await fetchHostSessionDetail(sessionId, context);
+  return new Response(JSON.stringify(detail), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+function useReconciliationState() {
+  const [reconciliationState, setReconciliationState] = useState<HostMutationReconciliationState>("idle");
+  return { reconciliationState, setReconciliationState };
 }
 
 function optional(value: string | null | undefined): string | undefined {
@@ -307,6 +402,7 @@ function toTrashItem(result: HostSessionDeletionResponse | HostSessionTrashItem)
     state: result.state,
     deletedAt: result.deletedAt,
     purgeAfter: result.purgeAfter,
+    sessionRevision: result.sessionRevision,
   };
 }
 
@@ -364,8 +460,26 @@ export function invalidateHostSessionRecordSurfaces(
 
 export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: (request: HostSessionRequest) => createHostSession(request),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: (request: HostSessionRequest) => {
+      const explicitContext = requireHostMutationContext(context);
+      const envelope = { idempotencyKey: newHostMutationKey(), expected: {}, command: request };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_CREATE",
+        resourceSlot: "create",
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => createHostSession(exactEnvelope, explicitContext),
+        acceptCommitted: (result) => {
+          if (!result.receipt) {
+            throw new Error("HOST_MUTATION_COMMITTED_RECEIPT_MISSING");
+          }
+          return committedDetailResponse(result.receipt.resourceId, explicitContext, 201);
+        },
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response) =>
       invalidateOk(response, () =>
         Promise.all([
@@ -374,22 +488,59 @@ export function useCreateHostSessionMutation(context?: ReadmatesApiContext) {
         ]),
       ),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useUpdateHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionRequest }) =>
-      updateHostSession(sessionId, request),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionRequest }) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: { sessionRevision: detail.versions.sessionRevision },
+        command: request,
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_BASIC_SAVE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => updateHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, variables) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, variables.sessionId, context)),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: (sessionId: string) => deleteHostSession(sessionId, context),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: { sessionRevision: detail.versions.sessionRevision },
+        command: {},
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_TRASH",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => deleteHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => fetchHostSessionTrash(sessionId, explicitContext) as Promise<HostSessionDeletionResponse>,
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: async (result, sessionId) => {
       client.removeQueries({ queryKey: hostSessionKeys.detail(sessionId, context) });
       client.removeQueries({ queryKey: hostSessionRecordKeys.editor(sessionId, context) });
@@ -405,12 +556,34 @@ export function useDeleteHostSessionMutation(context?: ReadmatesApiContext) {
       ]);
     },
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useRestoreHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: (sessionId: string) => restoreHostSession(sessionId, context),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const explicitContext = requireHostMutationContext(context);
+      const trash = await client.fetchQuery(hostSessionTrashDetailQuery(sessionId, explicitContext));
+      if (trash.sessionRevision === undefined) {
+        throw new Error("HOST_SESSION_TRASH_REVISION_REQUIRED");
+      }
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: { sessionRevision: trash.sessionRevision },
+        command: {},
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_RESTORE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => restoreHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => fetchHostSessionDetail(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: async (detail, sessionId) => {
       client.setQueryData(hostSessionKeys.detail(sessionId, context), detail);
       client.removeQueries({ queryKey: hostSessionKeys.trashDetail(sessionId, context) });
@@ -424,63 +597,222 @@ export function useRestoreHostSessionMutation(context?: ReadmatesApiContext) {
       ]);
     },
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useOpenHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: (sessionId: string) => openHostSession(sessionId),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: { sessionRevision: detail.versions.sessionRevision },
+        command: {},
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_OPEN",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => openHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, sessionId) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context)),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useCloseHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: (sessionId: string) => closeHostSession(sessionId),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const explicitContext = requireHostMutationContext(context);
+      const closing = await client.fetchQuery(hostSessionClosingStatusQuery(sessionId, explicitContext));
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: {
+          sessionRevision: closing.session.sessionRevision,
+          participantSetRevision: closing.session.participantSetRevision,
+          attendanceSnapshotId: closing.session.attendanceSnapshotId,
+        },
+        command: {},
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_CLOSE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => closeHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, sessionId) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function usePublishHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: (sessionId: string) => publishHostSession(sessionId),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      if (detail.versions.liveRecordRevision === null) {
+        throw new Error("HOST_SESSION_LIVE_RECORD_REVISION_REQUIRED");
+      }
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: {
+          sessionRevision: detail.versions.sessionRevision,
+          liveRecordRevision: detail.versions.liveRecordRevision,
+          exposureRevision: detail.versions.exposureRevision,
+          publicationRevision: detail.versions.publicationRevision,
+        },
+        command: {},
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_PUBLISH",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => publishHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, sessionId) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
+}
+
+export function useCorrectionPublishHostSessionMutation(context?: ReadmatesApiContext) {
+  const client = useQueryClient();
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      if (detail.versions.recordDraftRevision === null) {
+        throw new Error("HOST_SESSION_RECORD_DRAFT_REVISION_REQUIRED");
+      }
+      if (detail.versions.liveRecordRevision === null) {
+        throw new Error("HOST_SESSION_LIVE_RECORD_REVISION_REQUIRED");
+      }
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: {
+          sessionRevision: detail.versions.sessionRevision,
+          recordDraftRevision: detail.versions.recordDraftRevision,
+          liveRecordRevision: detail.versions.liveRecordRevision,
+          exposureRevision: detail.versions.exposureRevision,
+          publicationRevision: detail.versions.publicationRevision,
+        },
+        command: {},
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_CORRECTION_PUBLISH",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => correctionPublishHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
+    onSuccess: (response, sessionId) =>
+      invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
+  });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useReopenHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) =>
-      reopenHostSession(sessionId, request),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const command = request;
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: { sessionRevision: detail.versions.sessionRevision },
+        command,
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_REVERSE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => reopenHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, { sessionId }) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useUnpublishHostSessionMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) =>
-      unpublishHostSession(sessionId, request),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const command = request;
+      const envelope = { idempotencyKey: newHostMutationKey(), expected: { sessionRevision: detail.versions.sessionRevision }, command };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_REVERSE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => unpublishHostSession(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, { sessionId }) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useReturnHostSessionToDraftMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) =>
-      returnHostSessionToDraft(sessionId, request),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionReverseRequest }) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const command = request;
+      const envelope = { idempotencyKey: newHostMutationKey(), expected: { sessionRevision: detail.versions.sessionRevision }, command };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_REVERSE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => returnHostSessionToDraft(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, { sessionId }) =>
       invalidateOk(response, () => invalidateSessionMutationSurfaces(client, sessionId, context, { manualDispatches: true })),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiContext) {
@@ -513,12 +845,33 @@ export function useSaveHostSessionVisibilityMutation(context?: ReadmatesApiConte
 
 export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation<
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation<
     HostSessionVisibilityUpdateResult,
     Error,
     { sessionId: string; request: HostSessionAccessScopeRequest }
   >({
-    mutationFn: ({ sessionId, request }) => saveHostSessionAccessScope(sessionId, request, context),
+    mutationFn: async ({ sessionId, request }) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: { exposureRevision: detail.versions.exposureRevision },
+        command: request,
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_EXPOSURE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => saveHostSessionAccessScope(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: async () => ({
+          session: await fetchHostSessionDetail(sessionId, explicitContext),
+          composer: null,
+        }),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (result, variables) => {
       client.setQueryData(hostSessionKeys.detail(variables.sessionId, context), result.session);
       if (result.composer) {
@@ -531,13 +884,36 @@ export function useSaveHostSessionAccessScopeMutation(context?: ReadmatesApiCont
       ]);
     },
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useSaveHostSessionPublicationMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ sessionId, request }: { sessionId: string; request: HostSessionPublicationRequest }) =>
-      saveHostSessionPublication(sessionId, request),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async ({ sessionId, request }: { sessionId: string; request: HostSessionPublicationRequest }) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: {
+          publicationRevision: detail.versions.publicationRevision,
+          ...(request.accessScope === undefined
+            ? {}
+            : { exposureRevision: detail.versions.exposureRevision }),
+        },
+        command: request,
+      };
+      return executeHostMutationWithReconciliation({
+        operation: "SESSION_PUBLICATION",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => saveHostSessionPublication(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: () => committedDetailResponse(sessionId, explicitContext),
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (response, variables) =>
       invalidateOk(response, () =>
         Promise.all([
@@ -549,13 +925,52 @@ export function useSaveHostSessionPublicationMutation(context?: ReadmatesApiCont
         ]),
       ),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiContext) {
   const client = useQueryClient();
-  return useMutation({
-    mutationFn: ({ sessionId, attendance }: { sessionId: string; attendance: HostAttendanceUpdate[] }) =>
-      saveHostSessionAttendance(sessionId, attendance, context),
+  const reconciliation = useReconciliationState();
+  const mutation = useMutation({
+    mutationFn: async ({ sessionId, attendance }: { sessionId: string; attendance: HostAttendanceUpdate[] }) => {
+      const explicitContext = requireHostMutationContext(context);
+      const detail = await client.fetchQuery(hostSessionDetailQuery(sessionId, explicitContext));
+      const revisionByMembership = new Map(
+        detail.attendees.map((attendee) => [attendee.membershipId, attendee.attendanceRevision]),
+      );
+      const entries = attendance.map((entry) => {
+        const expectedAttendanceRevision = revisionByMembership.get(entry.membershipId);
+        if (expectedAttendanceRevision === undefined) {
+          throw new Error("HOST_ATTENDANCE_REVISION_REQUIRED");
+        }
+        return { ...entry, expectedAttendanceRevision };
+      });
+      const envelope = {
+        idempotencyKey: newHostMutationKey(),
+        expected: {
+          rows: entries.map((entry) => ({
+            membershipId: entry.membershipId,
+            attendanceRevision: entry.expectedAttendanceRevision,
+          })),
+          ...(entries.length > 1
+            ? { participantSetRevision: detail.versions.participantSetRevision }
+            : {}),
+        },
+        command: { entries },
+      };
+      return executeHostMutationWithReconciliation({
+        operation: entries.length > 1 ? "SESSION_ATTENDANCE_BULK" : "SESSION_ATTENDANCE_SINGLE",
+        resourceSlot: sessionId,
+        envelope,
+        context: explicitContext,
+        execute: (exactEnvelope) => saveHostSessionAttendance(sessionId, exactEnvelope, explicitContext),
+        acceptCommitted: async () => {
+          await fetchHostSessionDetail(sessionId, explicitContext);
+          return { sessionId, count: entries.length };
+        },
+        onStateChange: reconciliation.setReconciliationState,
+      });
+    },
     onSuccess: (_result, variables) =>
       Promise.all([
         invalidateHostSessionDetail(client, variables.sessionId, context),
@@ -566,6 +981,7 @@ export function useUpdateHostSessionAttendanceMutation(context?: ReadmatesApiCon
         }),
       ]),
   });
+  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
 
 export function useCommitHostSessionImportMutation(context?: ReadmatesApiContext) {

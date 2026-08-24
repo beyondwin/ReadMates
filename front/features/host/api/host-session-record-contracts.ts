@@ -3,6 +3,10 @@ import type { SessionState } from "@/shared/model/readmates-types";
 import type { PageRequest, PagedResponse } from "@/shared/model/paging";
 import type { HostSessionHistoryRecovery } from "./host-session-recovery-contracts";
 import { HostSessionHistoryRecoverySchema } from "./host-session-recovery-contracts";
+import {
+  HostMutationIdempotencyKeySchema,
+  type HostMutationEnvelope,
+} from "./host-contracts";
 
 export type NotificationDecision = "SEND" | "SKIP";
 export type SessionRecordStatus = "NOT_STARTED" | "INCOMPLETE" | "COMPLETE";
@@ -107,6 +111,21 @@ export type HostSessionRecordApplyRequest = {
   expectedDraftHash: string;
 };
 
+export type HostSessionRecordApplyExpected = {
+  draftRevision: number;
+  liveRevision: number;
+};
+
+export type HostSessionRecordApplyCommand = {
+  applyRequestId: string;
+  expectedDraftHash: string;
+};
+
+export type HostSessionRecordApplyMutationEnvelope = HostMutationEnvelope<
+  HostSessionRecordApplyCommand,
+  HostSessionRecordApplyExpected
+>;
+
 export type HostNotificationComposerContext = {
   sessionId: string;
   eventType: "NEXT_BOOK_PUBLISHED" | "FEEDBACK_DOCUMENT_PUBLISHED" | "SESSION_RECORD_UPDATED";
@@ -121,7 +140,7 @@ export type HostSessionRecordApplyPreview = {
 export type HostSessionRecordApplyResult = {
   revisionId: string;
   liveRevision: number;
-  composer: HostNotificationComposerContext;
+  composer: HostNotificationComposerContext | null;
 };
 
 export type RestoreHostSessionRecordDraftRequest = {
@@ -240,6 +259,18 @@ export const HostSessionRecordEditorResponseSchema = z.object({
 export const HostSessionRecordApplyPreviewResponseSchema = z.object({
   eventType: z.enum(["FEEDBACK_DOCUMENT_PUBLISHED", "SESSION_RECORD_UPDATED"]),
   expectedDraftHash: z.string(),
+}).strict();
+
+export const HostSessionRecordApplyMutationEnvelopeSchema = z.object({
+  idempotencyKey: HostMutationIdempotencyKeySchema,
+  expected: z.object({
+    draftRevision: positiveInteger,
+    liveRevision: nonNegativeInteger,
+  }).strict(),
+  command: z.object({
+    applyRequestId: z.string().min(1),
+    expectedDraftHash: z.string().min(1),
+  }).strict(),
 }).strict();
 
 export const HostSessionRecordApplyResultResponseSchema = z.object({

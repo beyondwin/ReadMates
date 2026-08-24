@@ -570,7 +570,7 @@ describe("host session record queries", () => {
     expect(invalidateMemberAndPublicSurfaces).not.toHaveBeenCalled();
   });
 
-  it("requires and invokes cross-feature invalidation for unscoped apply", async () => {
+  it("fails closed before an unscoped record apply", async () => {
     vi.mocked(applyHostSessionRecord).mockResolvedValue({
       revisionId: "revision-3",
       liveRevision: 3,
@@ -587,7 +587,7 @@ describe("host session record queries", () => {
       { wrapper: Wrapper },
     );
 
-    await act(async () => {
+    await expect(act(async () => {
       await result.current.mutateAsync({
         sessionId: "session-28",
         request: {
@@ -597,11 +597,9 @@ describe("host session record queries", () => {
           expectedDraftHash: "a".repeat(64),
         },
       });
-    });
+    })).rejects.toMatchObject({ code: "HOST_API_CONTEXT_REQUIRED" });
 
-    expect(invalidateMemberAndPublicSurfaces).toHaveBeenCalledWith({
-      sessionId: "session-28",
-      clubSlug: undefined,
-    });
+    expect(applyHostSessionRecord).not.toHaveBeenCalled();
+    expect(invalidateMemberAndPublicSurfaces).not.toHaveBeenCalled();
   });
 });
