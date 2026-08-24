@@ -64,6 +64,7 @@ data class SessionRecordDraft(
     val baseSessionRevision: Long = 0,
     val baseExposureRevision: Long = 0,
     val basePublicationRevision: Long = 0,
+    val baseVectorKnown: Boolean,
     val draftRevision: Long,
     val source: SessionRecordDraftSource,
     val restoredFromRevisionId: UUID?,
@@ -74,7 +75,8 @@ data class SessionRecordDraft(
     val baseSessionUpdatedAt: OffsetDateTime = LEGACY_SESSION_RECORD_TIMESTAMP,
 ) {
     fun isStaleAgainst(live: LiveSessionRecord): Boolean =
-        baseSessionRevision != live.sessionRevision ||
+        !baseVectorKnown ||
+            baseSessionRevision != live.sessionRevision ||
             baseLiveRevision != live.revision ||
             baseExposureRevision != live.exposureRevision ||
             basePublicationRevision != live.publicationRevision
@@ -120,13 +122,26 @@ data class SaveSessionRecordDraftCommand(
     val restoredFromRevisionId: UUID? = null,
 )
 
+sealed interface RebaseSessionRecordBaseExpectation {
+    val expectedLiveRevision: Long
+
+    data class LegacyTimestamp(
+        override val expectedLiveRevision: Long,
+        val expectedSessionUpdatedAt: OffsetDateTime,
+    ) : RebaseSessionRecordBaseExpectation
+
+    data class ExactRevisions(
+        val expectedSessionRevision: Long,
+        override val expectedLiveRevision: Long,
+        val expectedExposureRevision: Long,
+        val expectedPublicationRevision: Long,
+    ) : RebaseSessionRecordBaseExpectation
+}
+
 data class RebaseSessionRecordDraftCommand(
     val sessionId: UUID,
     val expectedDraftRevision: Long,
-    val expectedSessionRevision: Long,
-    val expectedLiveRevision: Long,
-    val expectedExposureRevision: Long,
-    val expectedPublicationRevision: Long,
+    val expectedBase: RebaseSessionRecordBaseExpectation,
 )
 
 data class RestoreSessionRecordDraftCommand(
@@ -309,6 +324,7 @@ enum class SessionRecordError {
     PREVIEW_ALREADY_CONSUMED,
     APPLY_REQUEST_ALREADY_USED,
     INVALID_APPLY_CONTRACT,
+    INVALID_REBASE_CONTRACT,
 }
 
 class SessionRecordException(

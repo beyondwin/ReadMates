@@ -8,7 +8,9 @@ import com.readmates.shared.mutation.adapter.`in`.scheduling.MutationIdempotency
 import com.readmates.shared.mutation.application.model.CanonicalMutationPayload
 import com.readmates.shared.mutation.application.model.CanonicalRequestDigest
 import com.readmates.shared.mutation.application.model.HostMutationOperation
+import com.readmates.shared.mutation.application.model.IdempotencyKeyReusedException
 import com.readmates.shared.mutation.application.model.InvalidMutationIdempotencyKeyException
+import com.readmates.shared.mutation.application.model.MutationIdempotencyStatus
 import com.readmates.shared.mutation.application.model.MutationIdentity
 import com.readmates.shared.mutation.application.model.UnsupportedCanonicalSchemaException
 import com.readmates.shared.mutation.application.port.`in`.PurgeExpiredMutationIdempotencyUseCase
@@ -168,15 +170,75 @@ class MutationCanonicalizationTest {
                 siteVisibility = null,
                 accessScope = null,
                 visibility = "MEMBER",
+                expectedPublicationRevision = 3,
+                expectedExposureRevision = null,
             )
         val hidden = omitted.copy(siteVisibility = "HIDDEN")
         val publicLegacy = omitted.copy(visibility = "PUBLIC")
+        val differentPublicationRevision = omitted.copy(expectedPublicationRevision = 4)
+        val presentExposureRevision = omitted.copy(expectedExposureRevision = 0)
 
         assertSameDigest(service.digest(omitted), service.digest(omitted.copy()))
         assertDifferentDigest(service.digest(omitted), service.digest(hidden))
         assertDifferentDigest(service.digest(omitted), service.digest(publicLegacy))
+        assertDifferentDigest(service.digest(omitted), service.digest(differentPublicationRevision))
+        assertDifferentDigest(service.digest(omitted), service.digest(presentExposureRevision))
         assertThat(service.digest(omitted).canonicalSchemaVersion)
             .isEqualTo(CanonicalMutationPayload.PUBLICATION_SCHEMA_VERSION)
+        assertThat(CanonicalMutationPayload.PUBLICATION_SCHEMA_VERSION).isEqualTo(3)
+    }
+
+    @Test
+    fun `exposure identity binds the nullable expected revision`() {
+        val legacy =
+            CanonicalMutationPayload.Exposure(
+                accessScope = "GUEST_READABLE",
+                expectedExposureRevision = null,
+            )
+        val guarded = legacy.copy(expectedExposureRevision = 0)
+
+        assertSameDigest(service.digest(legacy), service.digest(legacy.copy()))
+        assertDifferentDigest(service.digest(legacy), service.digest(guarded))
+        assertThat(service.digest(guarded).canonicalSchemaVersion)
+            .isEqualTo(CanonicalMutationPayload.EXPOSURE_SCHEMA_VERSION)
+    }
+
+    @Test
+    fun `older stored canonical schema remains lookup only and cannot replay a current command`() {
+        val payload =
+            CanonicalMutationPayload.Publication(
+                publicSummary = "요약",
+                siteVisibility = null,
+                accessScope = null,
+                visibility = "MEMBER",
+                expectedPublicationRevision = 3,
+                expectedExposureRevision = null,
+            )
+        val identity =
+            MutationIdentity(
+                clubId = CLUB_ID,
+                actorMembershipId = ACTOR_ID,
+                operation = HostMutationOperation.SESSION_PUBLICATION.name,
+                resourceSlot = RESOURCE_SLOT,
+                idempotencyKey = "publication-old-schema-01",
+            )
+        val currentDigest = service.digest(payload)
+        val stored =
+            MutationIdempotencyPort.StoredRow(
+                identity = identity,
+                digest = currentDigest.copy(canonicalSchemaVersion = 2),
+                status = MutationIdempotencyStatus.COMPLETED,
+                receiptId = UUID.fromString("00000000-0000-4000-8000-0000000000bb"),
+                createdAt = java.time.Instant.EPOCH,
+                expiresAt =
+                    java.time.Instant.EPOCH
+                        .plusSeconds(86_400),
+            )
+        val lookupOnlyService = service(RecordingPort(stored))
+
+        assertThat(lookupOnlyService.lookup(identity)).isEqualTo(stored)
+        assertThatThrownBy { lookupOnlyService.claim(identity, payload) }
+            .isInstanceOf(IdempotencyKeyReusedException::class.java)
     }
 
     @Test
@@ -374,8 +436,20 @@ class MutationCanonicalizationTest {
             idempotencyKey = key,
         )
 
-    private class RecordingPort : MutationIdempotencyPort {
-        override fun claim(row: MutationIdempotencyPort.ClaimRow) = MutationIdempotencyPort.ClaimOutcome.Claimed
+    private fun service(port: MutationIdempotencyPort) =
+        MutationIdempotencyService(
+            port = port,
+            properties = TEST_PROPERTIES,
+            clock = Clock.systemUTC(),
+            metrics = MutationIdempotencyMetrics(SimpleMeterRegistry()),
+        )
+
+    private class RecordingPort(
+        private val existing: MutationIdempotencyPort.StoredRow? = null,
+    ) : MutationIdempotencyPort {
+        override fun claim(row: MutationIdempotencyPort.ClaimRow) =
+            existing?.let(MutationIdempotencyPort.ClaimOutcome::Existing)
+                ?: MutationIdempotencyPort.ClaimOutcome.Claimed
 
         override fun complete(
             identity: MutationIdentity,
@@ -383,7 +457,7 @@ class MutationCanonicalizationTest {
             at: java.time.Instant,
         ) = Unit
 
-        override fun find(identity: MutationIdentity) = null
+        override fun find(identity: MutationIdentity) = existing?.takeIf { it.identity == identity }
 
         override fun purgeExpired(
             now: java.time.Instant,

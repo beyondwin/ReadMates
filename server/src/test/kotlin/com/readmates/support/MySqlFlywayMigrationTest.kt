@@ -1707,6 +1707,97 @@ class MySqlFlywayMigrationTest(
 
     @Test
     @Suppress("LongMethod")
+    fun `v53 marks only timestamp matched legacy draft bases as known current`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v52Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("52")
+                    .load()
+            assertThat(v52Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("52")
+            val jdbc = JdbcTemplate(dataSource)
+            val clubId = "aaaaaaaa-0000-4000-8000-000000053001"
+            val freshSessionId = "aaaaaaaa-0000-4000-8000-000000053010"
+            val staleSessionId = "aaaaaaaa-0000-4000-8000-000000053011"
+            insertV52RevisionClubGraph(jdbc, clubId, "v53-draft-base")
+            listOf(freshSessionId, staleSessionId).forEachIndexed { index, sessionId ->
+                insertV52RevisionSession(jdbc, sessionId, clubId, number = index + 1, state = "PUBLISHED")
+                jdbc.update(
+                    """
+                    update sessions
+                    set session_revision = 4, exposure_revision = 5,
+                        updated_at = '2026-08-23 10:00:00.123456'
+                    where id = ?
+                    """.trimIndent(),
+                    sessionId,
+                )
+                jdbc.update(
+                    "insert into session_publication_versions (session_id, publication_revision) values (?, 6)",
+                    sessionId,
+                )
+            }
+            jdbc.update(
+                """
+                insert into session_record_drafts (
+                  session_id, club_id, base_live_revision, base_session_updated_at,
+                  draft_revision, source, snapshot_json, snapshot_sha256, updated_by_membership_id
+                ) values (?, ?, 2, '2026-08-23 10:00:00.123456', 1, 'MANUAL', '{}', ?, ?),
+                         (?, ?, 2, '2026-08-23 09:00:00.123456', 1, 'MANUAL', '{}', ?, ?)
+                """.trimIndent(),
+                freshSessionId,
+                clubId,
+                "a".repeat(64),
+                V52_EMPTY_HOST_MEMBERSHIP_ID,
+                staleSessionId,
+                clubId,
+                "b".repeat(64),
+                V52_EMPTY_HOST_MEMBERSHIP_ID,
+            )
+
+            val upgrade =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgrade.migrationsExecuted).isEqualTo(1)
+            assertThat(
+                jdbc.queryForMap(
+                    """
+                    select base_vector_known, base_session_revision,
+                           base_exposure_revision, base_publication_revision
+                    from session_record_drafts where session_id = ?
+                    """.trimIndent(),
+                    freshSessionId,
+                ),
+            ).containsEntry("base_vector_known", true)
+                .containsEntry("base_session_revision", 4L)
+                .containsEntry("base_exposure_revision", 5L)
+                .containsEntry("base_publication_revision", 6L)
+            assertThat(
+                jdbc.queryForMap(
+                    """
+                    select base_vector_known, base_session_revision,
+                           base_exposure_revision, base_publication_revision
+                    from session_record_drafts where session_id = ?
+                    """.trimIndent(),
+                    staleSessionId,
+                ),
+            ).containsEntry("base_vector_known", false)
+                .containsEntry("base_session_revision", 0L)
+                .containsEntry("base_exposure_revision", 0L)
+                .containsEntry("base_publication_revision", 0L)
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
     fun `mysql upgrades populated v51 rows with revision backfill without changing publication content`() {
         FlywayUpgradeMySqlContainer().use { database ->
             database.start()
@@ -3519,8 +3610,11 @@ class MySqlFlywayMigrationTest(
             "base_session_revision",
             "base_exposure_revision",
             "base_publication_revision",
+            "base_vector_known",
         )
         assertThat(columnMetadata(jdbcTemplate, "session_record_drafts", "base_session_revision")["IS_NULLABLE"])
+            .isEqualTo("NO")
+        assertThat(columnMetadata(jdbcTemplate, "session_record_drafts", "base_vector_known")["IS_NULLABLE"])
             .isEqualTo("NO")
         assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_session_revision_check"))
             .contains("base_session_revision", ">= 0")
@@ -3528,6 +3622,8 @@ class MySqlFlywayMigrationTest(
             .contains("base_exposure_revision", ">= 0")
         assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_publication_revision_check"))
             .contains("base_publication_revision", ">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_record_drafts_base_vector_known_check"))
+            .contains("base_vector_known")
         assertEquals(
             0,
             jdbcTemplate.queryForObject(
@@ -3536,9 +3632,10 @@ class MySqlFlywayMigrationTest(
                 from session_record_drafts d
                 join sessions s on s.id = d.session_id and s.club_id = d.club_id
                 join session_publication_versions p on p.session_id = d.session_id
-                where d.base_session_revision <> s.session_revision
-                   or d.base_exposure_revision <> s.exposure_revision
-                   or d.base_publication_revision <> p.publication_revision
+                where d.base_vector_known = true
+                  and (d.base_session_revision <> s.session_revision
+                    or d.base_exposure_revision <> s.exposure_revision
+                    or d.base_publication_revision <> p.publication_revision)
                 """.trimIndent(),
                 Int::class.java,
             ),

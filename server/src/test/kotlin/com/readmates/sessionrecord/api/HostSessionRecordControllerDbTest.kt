@@ -720,6 +720,70 @@ class HostSessionRecordDraftRebaseControllerDbTest(
         assertThat(loadEditor(expectedStale = true).get("draft").get("draftRevision").asLong()).isEqualTo(2)
     }
 
+    @Test
+    fun `host v2 rebase request remains accepted and records the locked exact base`() {
+        val initialEditor = loadEditor(expectedStale = false)
+        saveInitialDraft(initialEditor.get("liveSnapshot"))
+        touchSession("v2가 검토한 최신 책")
+        val reviewed = loadEditor(expectedStale = true)
+
+        mockMvc
+            .post("/api/host/sessions/$REBASE_SESSION_ID/record-draft/rebase") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "expectedDraftRevision": 1,
+                      "expectedLiveRevision": ${reviewed.get("liveRevision").asLong()},
+                      "expectedSessionUpdatedAt": "${reviewed.get("liveSessionUpdatedAt").asString()}"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.sessionId") { value(REBASE_SESSION_ID) }
+                jsonPath("$.baseLiveRevision") { value(reviewed.get("liveRevision").asLong()) }
+                jsonPath("$.baseSessionRevision") { value(reviewed.get("liveSessionRevision").asLong()) }
+                jsonPath("$.baseExposureRevision") { value(reviewed.get("liveExposureRevision").asLong()) }
+                jsonPath("$.basePublicationRevision") { value(reviewed.get("livePublicationRevision").asLong()) }
+                jsonPath("$.draftRevision") { value(2) }
+                jsonPath("$.source") { value("MANUAL") }
+                jsonPath("$.restoredFromRevisionId") { value(null) }
+                jsonPath("$.snapshot") { exists() }
+                jsonPath("$.updatedAt") { isString() }
+            }
+
+        loadEditor(expectedStale = false)
+    }
+
+    @Test
+    fun `rebase rejects mixed legacy timestamp and exact revision bases`() {
+        val initialEditor = loadEditor(expectedStale = false)
+        saveInitialDraft(initialEditor.get("liveSnapshot"))
+
+        mockMvc
+            .post("/api/host/sessions/$REBASE_SESSION_ID/record-draft/rebase") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "expectedDraftRevision": 1,
+                      "expectedSessionRevision": ${initialEditor.get("liveSessionRevision").asLong()},
+                      "expectedLiveRevision": ${initialEditor.get("liveRevision").asLong()},
+                      "expectedExposureRevision": ${initialEditor.get("liveExposureRevision").asLong()},
+                      "expectedPublicationRevision": ${initialEditor.get("livePublicationRevision").asLong()},
+                      "expectedSessionUpdatedAt": "${initialEditor.get("liveSessionUpdatedAt").asString()}"
+                    }
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("SESSION_RECORD_INVALID_REBASE_CONTRACT") }
+            }
+    }
+
     private fun loadEditor(expectedStale: Boolean): tools.jackson.databind.JsonNode =
         mockMvc
             .get("/api/host/sessions/$REBASE_SESSION_ID/record-editor") {
@@ -729,6 +793,7 @@ class HostSessionRecordDraftRebaseControllerDbTest(
                 jsonPath("$.liveSessionRevision") { isNumber() }
                 jsonPath("$.liveExposureRevision") { isNumber() }
                 jsonPath("$.livePublicationRevision") { isNumber() }
+                jsonPath("$.liveSessionUpdatedAt") { isString() }
                 jsonPath("$.draftLiveBaseStale") { value(expectedStale) }
             }.andReturn()
             .response.contentAsString

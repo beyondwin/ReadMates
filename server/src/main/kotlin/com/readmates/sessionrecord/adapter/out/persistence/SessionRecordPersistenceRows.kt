@@ -97,6 +97,7 @@ internal class SessionRecordPersistenceRows(
             baseSessionRevision = rs.getLong("base_session_revision"),
             baseExposureRevision = rs.getLong("base_exposure_revision"),
             basePublicationRevision = rs.getLong("base_publication_revision"),
+            baseVectorKnown = rs.getBoolean("base_vector_known"),
             baseSessionUpdatedAt = rs.utcOffsetDateTime("base_session_updated_at"),
             draftRevision = rs.getLong("draft_revision"),
             source = SessionRecordDraftSource.valueOf(rs.getString("source")),

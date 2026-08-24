@@ -86,6 +86,7 @@ internal class JdbcSessionRecordReadStore(
                 """
                 select session_id, club_id, base_live_revision,
                        base_session_revision, base_exposure_revision, base_publication_revision,
+                       base_vector_known,
                        base_session_updated_at,
                        draft_revision, source, restored_from_revision_id,
                        snapshot_json, updated_by_membership_id, created_at, updated_at

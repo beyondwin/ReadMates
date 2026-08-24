@@ -80,8 +80,19 @@ internal class HostSessionPublicationWriteOperations(
         command: UpsertPublicationCommand,
         publicationChanged: Boolean,
     ) {
-        command.expectedPublicationRevision?.takeIf { publicationChanged }?.let { expected ->
-            val bumped =
+        if (!publicationChanged) return
+        val expected = command.expectedPublicationRevision
+        val bumped =
+            if (expected == null) {
+                jdbcTemplate.update(
+                    """
+                    update session_publication_versions
+                    set publication_revision = publication_revision + 1
+                    where session_id = ?
+                    """.trimIndent(),
+                    command.sessionId.dbString(),
+                )
+            } else {
                 jdbcTemplate.update(
                     """
                     update session_publication_versions
@@ -92,8 +103,8 @@ internal class HostSessionPublicationWriteOperations(
                     command.sessionId.dbString(),
                     expected,
                 )
-            queries.throwIfStale(bumped, command.host, command.sessionId)
-        }
+            }
+        queries.throwIfStale(bumped, command.host, command.sessionId)
     }
 
     private fun updateSessionExposure(

@@ -341,6 +341,66 @@ class HostSessionServicesTest {
     }
 
     @Test
+    fun `semantic access no-op leaves cache and record epoch unchanged`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                currentAccessScope = SessionAccessScope.GUEST_READABLE
+                currentVisibility = SessionRecordVisibility.MEMBER
+                visibilityExposureChanged = false
+                visibilityCompatibilityChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                accessScope = SessionAccessScope.GUEST_READABLE,
+            ),
+        )
+
+        assertThat(invalidation.clubs).isEmpty()
+        assertThat(epochs.bumps).isEmpty()
+    }
+
+    @Test
+    fun `actual access change evicts cache and bumps record epoch exactly once`() {
+        val port = RecordingHostSessionPorts()
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                accessScope = SessionAccessScope.GUEST_READABLE,
+            ),
+        )
+
+        assertThat(invalidation.clubs).containsExactly(host.clubId)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
     fun `service delegates open transition`() {
         val port = RecordingHostSessionPorts()
         val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
@@ -1715,6 +1775,8 @@ class HostSessionServicesTest {
         var visibilityUpdatedAt = OffsetDateTime.parse("2026-07-23T10:00:00Z")
         var visibilityUpdateCount = 0
         var visibilityLockCount = 0
+        var visibilityExposureChanged = true
+        var visibilityCompatibilityChanged = false
         val basicSnapshots = ArrayDeque<HostSessionBasicAuditSnapshot>()
         var basicAuditBefore: HostSessionBasicAuditSnapshot? = null
         var basicAuditAfter: HostSessionBasicAuditSnapshot? = null
@@ -1863,6 +1925,8 @@ class HostSessionServicesTest {
                         accessScope = currentAccessScope,
                         bookTitle = visibilityBookTitle,
                     ),
+                exposureChanged = visibilityExposureChanged,
+                compatibilityChanged = visibilityCompatibilityChanged,
             )
         }
 

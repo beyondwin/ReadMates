@@ -458,6 +458,20 @@ class HostSessionIdempotencyDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     envelope(
+                        "key-exp-dup-01",
+                        """{"exposureRevision":1}""",
+                        """{"accessScope":"GUEST_READABLE"}""",
+                    )
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("IDEMPOTENCY_KEY_REUSED") }
+            }
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
                         "key-exp-stale-01",
                         """{"exposureRevision":0}""",
                         """{"accessScope":"HOST_ONLY"}""",
@@ -489,6 +503,20 @@ class HostSessionIdempotencyDbTest(
                     )
             }.andExpect { status { isOk() } }
         assertThat(publicationRevision(sessionId)).isEqualTo(1)
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-pub-dup-01",
+                        """{"publicationRevision":1}""",
+                        """{"publicSummary":"공개 요약","siteVisibility":"HIDDEN","visibility":"MEMBER"}""",
+                    )
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("IDEMPOTENCY_KEY_REUSED") }
+            }
         mockMvc
             .put("/api/host/sessions/$sessionId/publication") {
                 withHost()

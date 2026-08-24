@@ -28,10 +28,11 @@ internal class JdbcSessionRecordDraftStore(
             insert into session_record_drafts (
               session_id, club_id, base_live_revision,
               base_session_revision, base_exposure_revision, base_publication_revision,
+              base_vector_known,
               base_session_updated_at,
               draft_revision, source, restored_from_revision_id,
               snapshot_json, snapshot_sha256, updated_by_membership_id
-            ) values (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?, ?, ?)
+            ) values (?, ?, ?, ?, ?, ?, true, ?, 1, ?, ?, ?, ?, ?)
             """.trimIndent(),
             live.sessionId.dbString(),
             host.clubId.dbString(),
@@ -93,6 +94,7 @@ internal class JdbcSessionRecordDraftStore(
                     base_session_revision = ?,
                     base_exposure_revision = ?,
                     base_publication_revision = ?,
+                    base_vector_known = true,
                     base_session_updated_at = ?,
                     draft_revision = draft_revision + 1,
                     updated_by_membership_id = ?,
@@ -142,11 +144,12 @@ internal class JdbcSessionRecordDraftStore(
                     insert into session_record_drafts (
                       session_id, club_id, base_live_revision,
                       base_session_revision, base_exposure_revision, base_publication_revision,
+                      base_vector_known,
                       base_session_updated_at,
                       draft_revision, source, restored_from_revision_id,
                       snapshot_json, snapshot_sha256, updated_by_membership_id
                     )
-                    select ?, ?, ?, ?, ?, ?, ?, 1, 'RESTORED', ?, ?, ?, ?
+                    select ?, ?, ?, ?, ?, ?, true, ?, 1, 'RESTORED', ?, ?, ?, ?
                     where not exists (
                       select 1 from session_record_drafts where club_id = ? and session_id = ?
                     )
@@ -173,6 +176,7 @@ internal class JdbcSessionRecordDraftStore(
                         base_session_revision = ?,
                         base_exposure_revision = ?,
                         base_publication_revision = ?,
+                        base_vector_known = true,
                         base_session_updated_at = ?,
                         draft_revision = draft_revision + 1,
                         source = 'RESTORED',

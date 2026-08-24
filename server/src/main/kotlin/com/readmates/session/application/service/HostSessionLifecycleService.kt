@@ -111,7 +111,7 @@ class HostSessionLifecycleService(
                     current.detail.accessScope == SessionAccessScope.HOST_ONLY &&
                     command.accessScope == SessionAccessScope.GUEST_READABLE
             }
-        draftPort.updateVisibility(command)
+        val write = draftPort.updateVisibility(command)
         val applied = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
         if (command.accessScope == null && applied.detail.visibility != command.visibility) {
             throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
@@ -119,11 +119,14 @@ class HostSessionLifecycleService(
         if (command.accessScope != null && applied.detail.accessScope != command.accessScope) {
             throw HostActionNotificationException(HostActionNotificationError.PREVIEW_MISMATCH)
         }
-        cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+        if (write.changed) {
+            epochPort.bump(command.host.clubId, HostListEpochKind.RECORD)
+            cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
+        }
         return HostSessionVisibilityUpdateResult(
             session = applied.detail,
             composer =
-                if (firstPublication) {
+                if (firstPublication && write.changed) {
                     HostNotificationComposerContext(
                         sessionId = command.sessionId,
                         eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,

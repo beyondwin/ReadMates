@@ -53,68 +53,84 @@ internal class HostSessionDraftWriteOperations(
         }
         val exposure = policy.visibilityExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
-        val expectedExposure = command.expectedExposureRevision
-        val updated =
-            if (expectedExposure == null) {
-                jdbcTemplate.update(
-                    """
-                    update sessions
-                    set access_scope = ?,
-                        visibility = ?,
-                        updated_at = utc_timestamp(6)
-                    where id = ?
-                      and club_id = ?
-                      and deleted_at is null
-                    """.trimIndent(),
-                    exposure.accessScope.name,
-                    compatibility.sessionVisibility,
-                    command.sessionId.dbString(),
-                    command.host.clubId.dbString(),
+        val exposureChanged = exposure.accessScope != locked.exposure.accessScope
+        val sessionProjectionChanged = compatibility.sessionVisibility != locked.sessionVisibility
+        val publicationProjectionChanged =
+            locked.publicationExists &&
+                (
+                    exposure.siteVisibility != locked.exposure.siteVisibility ||
+                        compatibility.publicationVisibility != locked.publicationVisibility ||
+                        compatibility.isPublic != locked.publicationIsPublic
                 )
-            } else {
-                jdbcTemplate.update(
-                    """
-                    update sessions
-                    set access_scope = ?,
-                        visibility = ?,
-                        exposure_revision = exposure_revision + 1,
-                        updated_at = utc_timestamp(6)
-                    where id = ?
-                      and club_id = ?
-                      and deleted_at is null
-                      and exposure_revision = ?
-                    """.trimIndent(),
-                    exposure.accessScope.name,
-                    compatibility.sessionVisibility,
-                    command.sessionId.dbString(),
-                    command.host.clubId.dbString(),
-                    expectedExposure,
-                )
-            }
-        if (expectedExposure != null) {
+        if (exposureChanged || sessionProjectionChanged) {
+            val expectedExposure = command.expectedExposureRevision
+            val updated =
+                if (expectedExposure == null) {
+                    jdbcTemplate.update(
+                        """
+                        update sessions
+                        set access_scope = ?,
+                            visibility = ?,
+                            exposure_revision = exposure_revision + ?,
+                            updated_at = utc_timestamp(6)
+                        where id = ?
+                          and club_id = ?
+                          and deleted_at is null
+                        """.trimIndent(),
+                        exposure.accessScope.name,
+                        compatibility.sessionVisibility,
+                        if (exposureChanged) 1 else 0,
+                        command.sessionId.dbString(),
+                        command.host.clubId.dbString(),
+                    )
+                } else {
+                    jdbcTemplate.update(
+                        """
+                        update sessions
+                        set access_scope = ?,
+                            visibility = ?,
+                            exposure_revision = exposure_revision + ?,
+                            updated_at = utc_timestamp(6)
+                        where id = ?
+                          and club_id = ?
+                          and deleted_at is null
+                          and exposure_revision = ?
+                        """.trimIndent(),
+                        exposure.accessScope.name,
+                        compatibility.sessionVisibility,
+                        if (exposureChanged) 1 else 0,
+                        command.sessionId.dbString(),
+                        command.host.clubId.dbString(),
+                        expectedExposure,
+                    )
+                }
             queries.throwIfStale(updated, command.host, command.sessionId)
         }
-        jdbcTemplate.update(
-            """
-            update public_session_publications
-            set site_visibility = ?,
-                visibility = ?,
-                is_public = ?,
-                published_at = case when ? then coalesce(published_at, utc_timestamp(6)) else null end,
-                updated_at = utc_timestamp(6)
-            where session_id = ?
-              and club_id = ?
-            """.trimIndent(),
-            exposure.siteVisibility.name,
-            compatibility.publicationVisibility,
-            compatibility.isPublic,
-            compatibility.isPublic,
-            command.sessionId.dbString(),
-            command.host.clubId.dbString(),
-        )
+        if (publicationProjectionChanged) {
+            jdbcTemplate.update(
+                """
+                update public_session_publications
+                set site_visibility = ?,
+                    visibility = ?,
+                    is_public = ?,
+                    published_at = case when ? then coalesce(published_at, utc_timestamp(6)) else null end,
+                    updated_at = utc_timestamp(6)
+                where session_id = ?
+                  and club_id = ?
+                """.trimIndent(),
+                exposure.siteVisibility.name,
+                compatibility.publicationVisibility,
+                compatibility.isPublic,
+                compatibility.isPublic,
+                command.sessionId.dbString(),
+                command.host.clubId.dbString(),
+            )
+        }
         return HostSessionVisibilityUpdateResult(
             previousVisibility = SessionRecordVisibility.valueOf(locked.sessionVisibility),
             detail = queries.detail(command.host, command.sessionId),
+            exposureChanged = exposureChanged,
+            compatibilityChanged = sessionProjectionChanged || publicationProjectionChanged,
         )
     }
 

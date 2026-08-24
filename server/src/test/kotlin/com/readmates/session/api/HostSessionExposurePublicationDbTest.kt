@@ -207,6 +207,75 @@ class HostSessionExposurePublicationDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
+    fun `legacy flat access and publication detect semantic changes and true no-ops`() {
+        val sessionId = closedGuestReadableSession("legacy semantic detector")
+        val initial = versions(sessionId)
+        val initialUpdatedAt = sessionUpdatedAt(sessionId)
+        val initialEpoch = recordEpoch()
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"accessScope":"GUEST_READABLE"}"""
+            }.andExpect { status { isOk() } }
+        assertThat(versions(sessionId)).isEqualTo(initial)
+        assertThat(sessionUpdatedAt(sessionId)).isEqualTo(initialUpdatedAt)
+        assertThat(recordEpoch()).isEqualTo(initialEpoch)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"accessScope":"HOST_ONLY"}"""
+            }.andExpect { status { isOk() } }
+        val afterAccess = versions(sessionId)
+        val afterAccessUpdatedAt = sessionUpdatedAt(sessionId)
+        assertThat(afterAccess.exposure).isEqualTo(initial.exposure + 1)
+        assertThat(afterAccess.publication).isEqualTo(initial.publication)
+        assertThat(recordEpoch()).isEqualTo(initialEpoch + 1)
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/access-scope") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"accessScope":"HOST_ONLY"}"""
+            }.andExpect { status { isOk() } }
+        assertThat(versions(sessionId)).isEqualTo(afterAccess)
+        assertThat(sessionUpdatedAt(sessionId)).isEqualTo(afterAccessUpdatedAt)
+        assertThat(recordEpoch()).isEqualTo(initialEpoch + 1)
+
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {"publicSummary":"legacy detector summary","siteVisibility":"HIDDEN","visibility":"MEMBER"}
+                    """.trimIndent()
+            }.andExpect { status { isOk() } }
+        val afterPublication = versions(sessionId)
+        val afterPublicationUpdatedAt = sessionUpdatedAt(sessionId)
+        assertThat(afterPublication.exposure).isEqualTo(afterAccess.exposure)
+        assertThat(afterPublication.publication).isEqualTo(afterAccess.publication + 1)
+        assertThat(recordEpoch()).isEqualTo(initialEpoch + 2)
+
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {"publicSummary":"legacy detector summary","siteVisibility":"HIDDEN","visibility":"MEMBER"}
+                    """.trimIndent()
+            }.andExpect { status { isOk() } }
+        assertThat(versions(sessionId)).isEqualTo(afterPublication)
+        assertThat(sessionUpdatedAt(sessionId)).isEqualTo(afterPublicationUpdatedAt)
+        assertThat(recordEpoch()).isEqualTo(initialEpoch + 2)
+    }
+
+    @Test
     fun `compatibility-only publication repair signals once without bumping domain revisions`() {
         val sessionId = publishedSessionWithInitialRecord()
         saveRecordDraft(sessionId, "compatibility repair", "HOST_ONLY")
@@ -909,7 +978,8 @@ class HostSessionExposurePublicationDbTest(
                 jdbcTemplate.queryForList(
                     """
                     select base_live_revision, base_session_revision, base_exposure_revision,
-                           base_publication_revision, draft_revision, source, restored_from_revision_id,
+                           base_publication_revision, base_vector_known,
+                           draft_revision, source, restored_from_revision_id,
                            snapshot_json, snapshot_sha256, updated_by_membership_id, created_at, updated_at
                     from session_record_drafts where session_id = ?
                     """.trimIndent(),
@@ -1087,10 +1157,10 @@ class HostSessionExposurePublicationDbTest(
             """
             insert into session_record_drafts (
               session_id, club_id, base_live_revision, base_session_revision,
-              base_exposure_revision, base_publication_revision, base_session_updated_at,
+              base_exposure_revision, base_publication_revision, base_vector_known, base_session_updated_at,
               draft_revision, source, snapshot_json, snapshot_sha256, updated_by_membership_id
             )
-            select id, club_id, 1, session_revision, exposure_revision, 0, updated_at,
+            select id, club_id, 1, session_revision, exposure_revision, 0, true, updated_at,
                    1, 'MANUAL', ?, ?, ?
             from sessions where id = ? and club_id = ?
             """.trimIndent(),

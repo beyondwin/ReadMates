@@ -111,6 +111,30 @@ const hostSessionDetail = {
   changeReceipt: null,
 };
 
+const hostSessionRecordEditor = {
+  sessionId: "00000000-0000-0000-0000-000000000301",
+  liveRevision: 1,
+  liveSessionUpdatedAt: "2026-08-22T00:00:00Z",
+  liveSnapshot: {
+    schema: "readmates-session-record:v1",
+    visibility: "PUBLIC",
+    publicationSummary: "공개 기록 요약",
+    highlights: [],
+    oneLineReviews: [],
+    feedbackDocument: {
+      fileName: "session-feedback.md",
+      title: "모임 피드백",
+      markdown: "# 모임 피드백",
+    },
+  },
+  draft: null,
+  draftLiveBaseStale: false,
+  validationSummary: {
+    valid: true,
+    issues: [],
+  },
+};
+
 // ---------------------------------------------------------------------------
 // HostNotificationDeliveryListResponseSchema top-level keys
 // ---------------------------------------------------------------------------
@@ -372,6 +396,7 @@ function write(filename: string, data: unknown): void {
 }
 
 write("host-session-detail.json", hostSessionDetail);
+write("host-session-record-editor.json", hostSessionRecordEditor);
 write("host-session-change-receipt.json", hostSessionChangeReceipt);
 write("host-session-restore-preview.json", hostSessionRestorePreview);
 write("host-session-history-recovery.json", hostSessionHistoryRecovery);

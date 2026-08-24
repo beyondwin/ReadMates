@@ -341,6 +341,7 @@ class SessionImportDraftServiceTest {
                 sessionId = command.sessionId,
                 clubId = host.clubId,
                 baseLiveRevision = 0,
+                baseVectorKnown = true,
                 draftRevision = 1,
                 source = command.source,
                 restoredFromRevisionId = null,

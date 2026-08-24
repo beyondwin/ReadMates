@@ -60,6 +60,12 @@ class SessionRecordErrorHandler {
                     "SESSION_RECORD_INVALID_APPLY_CONTRACT",
                     "모임 기록 반영 요청을 확인해 주세요.",
                 )
+            SessionRecordError.INVALID_REBASE_CONTRACT ->
+                apiErrorResponse(
+                    HttpStatus.BAD_REQUEST,
+                    "SESSION_RECORD_INVALID_REBASE_CONTRACT",
+                    "모임 기록 초안 기준 요청을 확인해 주세요.",
+                )
             SessionRecordError.INVALID_RECORD ->
                 apiErrorResponse(
                     HttpStatus.UNPROCESSABLE_CONTENT,

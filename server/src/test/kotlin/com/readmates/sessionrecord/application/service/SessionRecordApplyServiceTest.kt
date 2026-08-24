@@ -207,6 +207,23 @@ class SessionRecordApplyServiceTest {
     }
 
     @Test
+    fun `unknown migrated base rejects preview and apply without side effects`() {
+        val fixture = Fixture(draftBaseVectorKnown = false)
+
+        assertThrows(SessionRecordException::class.java) {
+            fixture.preview()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+        assertThrows(SessionRecordException::class.java) {
+            fixture.apply()
+        }.also { assertEquals(SessionRecordError.LIVE_STALE, it.error) }
+
+        assertTrue(fixture.store.receipts.isEmpty())
+        assertTrue(fixture.store.revisions.isEmpty())
+        assertFalse(fixture.replacer.committed)
+        assertNotNull(fixture.store.draft)
+    }
+
+    @Test
     fun `restore apply records restored from revision`() {
         val restoredFrom = UUID.randomUUID()
         val fixture = Fixture(draftSource = SessionRecordDraftSource.RESTORED, restoredFromRevisionId = restoredFrom)
@@ -321,6 +338,7 @@ private class Fixture(
     draftBaseExposureRevision: Long = liveExposureRevision,
     livePublicationRevision: Long = 0,
     draftBasePublicationRevision: Long = livePublicationRevision,
+    draftBaseVectorKnown: Boolean = true,
     liveSessionUpdatedAt: OffsetDateTime = TEST_NOW,
     draftBaseSessionUpdatedAt: OffsetDateTime = liveSessionUpdatedAt,
 ) {
@@ -361,6 +379,7 @@ private class Fixture(
             baseSessionRevision = draftBaseSessionRevision,
             baseExposureRevision = draftBaseExposureRevision,
             basePublicationRevision = draftBasePublicationRevision,
+            baseVectorKnown = draftBaseVectorKnown,
             draftRevision = 2,
             source = draftSource,
             restoredFromRevisionId = restoredFromRevisionId,

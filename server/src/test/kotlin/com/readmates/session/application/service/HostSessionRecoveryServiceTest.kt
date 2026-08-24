@@ -456,7 +456,12 @@ class HostSessionRecoveryServiceTest {
             HostSessionVisibilitySnapshot(detail(), java.time.OffsetDateTime.parse("2026-05-20T00:00:00Z"))
 
         override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) =
-            HostSessionVisibilityUpdateResult(SessionRecordVisibility.HOST_ONLY, detail())
+            HostSessionVisibilityUpdateResult(
+                previousVisibility = SessionRecordVisibility.HOST_ONLY,
+                detail = detail(),
+                exposureChanged = true,
+                compatibilityChanged = false,
+            )
     }
 
     private class FakeAttendancePort : HostSessionAttendancePort {

@@ -496,3 +496,124 @@ Excluded:
 - Canonical publication v2 preserves semantic omission and legacy compatibility intent without persisting raw request material.
 - Controller work remains parsing/mapping only. Cross-club denial uses a fully valid foreign resource, so `404` is authorization-derived rather than fixture absence or validation failure.
 - C1 remains the non-release boundary. In particular, A7 does not consume C1's reserved V54, implement convergence attempts, or prove BFF/CDN/cache convergence SLA.
+
+## Fix round 3: v2 additive compatibility, fail-closed draft bases, and authoritative legacy revision signals
+
+This round closes the two Critical and three Important follow-up findings. It corrects two superseded round-2 statements: browser v2 continues to use `liveSessionUpdatedAt` for rebase review during `SUPPORT_V2_V3`, and V53 now adds three exact revision columns plus an explicit `base_vector_known` state. The migration suite remains 18/18; A7 still does not create or consume V54.
+
+### ADR impact
+
+- ADR-0022 (`update` impact, no status promotion): the shared V45 compatibility mapper remains authoritative for canonical and legacy writes. Actual legacy access/publication changes now advance the corresponding canonical revision signal; semantic repeats are write-free.
+- ADR-0023 (`update` impact, no status promotion): draft freshness is the exact session/live/exposure/publication base vector plus an explicit known/unknown state. The v2 timestamp is only a locked rebase-review input that records the current exact vector; it is not the stored freshness proxy. Participant-only `sessions.updated_at` movement does not stale a known exact base.
+- ADR-0028 (`update` impact, no status promotion): exposure identity is schema v2 and publication identity is schema v3. Both bind expected revisions with explicit null markers; publication additionally preserves omitted placement, nullable access, and legacy visibility. Older stored schema rows remain available to reconciliation lookup but cannot replay a current command.
+- ADR-0033 ownership is unchanged. Controllers validate/map mutually exclusive legacy/exact contracts; application services own the transaction and locked semantic decisions. No ADR is promoted.
+
+### Implementation and contract changes
+
+- The editor response restores the v2 `liveSessionUpdatedAt` field additively while retaining the exact live revisions. The rebase response remains parseable by the current strict frontend draft schema because Zod strips additive server fields.
+- Rebase accepts exactly one reviewed-base contract: v2 `expectedLiveRevision` plus `expectedSessionUpdatedAt`, or v3 session/live/exposure/publication revisions. Mixed, partial, or empty vectors fail as typed `SESSION_RECORD_INVALID_REBASE_CONTRACT`. The v2 path validates its timestamp under the live lock, then persists the locked exact vector; the v3 path validates those exact revisions directly.
+- V53 adds `base_vector_known boolean not null default false`. Only legacy drafts whose V41 `base_session_updated_at` equals the current locked-session evidence are backfilled with exact revisions and marked known. Mismatched/ambiguous drafts remain unknown and preview/confirm return typed `SESSION_RECORD_LIVE_STALE` with zero writes until an explicit rebase records a known vector. Save, restore, and rebase always persist a known exact base.
+- Legacy flat access and publication writes now use the same locked semantic detectors as canonical writes. Actual access changes advance `exposure_revision`; actual placement/summary changes advance `publication_revision`; any resulting readiness/projection change signals one record epoch and one cache invalidation. Repeated semantics leave `sessions.updated_at`, revisions, audits, epoch, and cache unchanged. Combined changes still emit only one record signal.
+- Exposure canonical identity includes nullable `expectedExposureRevision`; publication identity includes nullable `expectedPublicationRevision` and `expectedExposureRevision`. Same key plus a changed expected revision, including null-versus-present, conflicts instead of replaying. No raw payload, canonical bytes, request SHA, meeting URL, or passcode is stored.
+- Authorization fingerprints now include `base_vector_known` along with live/origin/public data, exact revisions, history, drafts, audits, both receipt families, operational keys, both club epochs, and outboxes.
+
+### Fix-round 3 TDD RED evidence
+
+Current frontend and v2 rebase contract RED:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*FrontendZodSchemaContractTest.host session record editor preserves*' --tests '*HostSessionRecordDraftRebaseControllerDbTest.host v2 rebase request remains*' --console=plain --no-parallel --max-workers=1
+```
+
+- RED, 0/2: the editor omitted `liveSessionUpdatedAt`, so the server response failed the current frontend fixture before the v2 rebase response could satisfy the contract.
+
+Exact-base, legacy signal, and HMAC contract RED:
+
+```bash
+./server/gradlew -p server compileTestKotlin --console=plain
+```
+
+- RED at test compilation: `baseVectorKnown`, access semantic-change flags, nullable expected-revision canonical fields, and the exposure/publication schema constants were absent. This established the missing production contracts before implementation.
+
+One first GREEN attempt correctly exposed invalid test setup rather than an implementation bypass: a PUBLISHED `HOST_ONLY` access request with the existing `PUBLIC_RECORD` placement failed `SESSION_EXPOSURE_INVALID`. The fixture was corrected to hide placement before saving the reviewed draft; production validation was retained.
+
+### Fix-round 3 GREEN evidence
+
+Frontend fixture/export and current browser parser:
+
+```bash
+npx --yes corepack@0.35.0 pnpm --dir front zod:export-fixtures
+npx --yes corepack@0.35.0 pnpm --dir front exec vitest run features/host/api/host-session-record-api.test.ts
+```
+
+- PASS: the fixture export completed and the current frontend API contract passed 8/8. Corepack was not on PATH, so the repository-documented `corepack@0.35.0` fallback was used. No frontend runtime/schema/bundle file changed.
+
+Exact rebase, V53 backfill, origin semantics, HMAC, and authorization bundle:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*FrontendZodSchemaContractTest*' --tests '*HostSessionRecordDraftRebaseControllerDbTest*' --tests '*HostSessionCorrectionSafetyDbTest*' --tests '*HostSessionExposurePublicationDbTest*' --tests '*HostSessionIdempotencyDbTest*' --tests '*MySqlFlywayMigrationTest*' --console=plain --no-parallel --max-workers=1
+```
+
+- PASS, 64/64: frontend contracts 14, rebase controller 3, correction safety 8, exposure/publication/auth 11, idempotency 10, migration 18.
+- The migration cases distinguish timestamp-equal known backfill from timestamp-mismatched unknown backfill and prove typed denial plus rebase recovery. No `V54__public_projection_convergence.sql` exists in A7.
+- A final isolated rerun of `HostSessionExposurePublicationDbTest` passed 11/11 after expanding the authorization fingerprint with `base_vector_known`.
+
+Focused application and canonical bundle:
+
+```bash
+./server/gradlew -p server unitTest --tests '*MutationCanonicalizationTest*' --tests '*HostSessionServicesTest*' --tests '*SessionRecordDraftServiceTest*' --tests '*SessionRecordApplyServiceTest*' --tests '*SessionRecordErrorHandlerTest*' --tests '*HostSessionRecoveryServiceTest*' --console=plain --no-parallel --max-workers=1
+```
+
+- PASS, 127/127: canonicalization 18, host services 64, draft 12, apply 17, record error handler 3, recovery 13. This includes current-versus-old schema lookup/conflict, null markers, semantic access no-op, and exactly-one epoch/cache signal.
+
+Notes/archive/import/A6/Redis regression bundle:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*ArchiveAndNotesDbTest*' --tests '*ArchiveControllerDbTest*' --tests '*HostSessionImportControllerDbTest*' --tests '*HostSessionRecordControllerDbTest*' --tests '*JdbcSessionRecordAdapterTest*' --tests '*JdbcMutationIdempotencyAdapterDbTest*' --tests '*RedisReadCacheInvalidationAdapterTest*' --tests '*RedisNotesReadCacheAdapterTest*' --tests '*RedisPublicReadCacheAdapterTest*' --console=plain --no-parallel --max-workers=1
+```
+
+- 102/103 passed. The only failure was the pre-existing order-sensitive digest-key retirement test after another method advanced its shared `MutableClock`; rerunning that exact test alone passed 1/1. All selected Notes/archive/import/session-record/Redis tests passed. Existing services and containers were preserved.
+
+Architecture:
+
+```bash
+./server/gradlew -p server architectureTest --tests '*ServerArchitectureBoundaryTest.session record boundaries use owned models and ports' --console=plain --no-parallel --max-workers=1
+./server/gradlew -p server architectureTest --console=plain --no-parallel --max-workers=1
+```
+
+- Focused apply-store abstract-method boundary PASS, 1/1.
+- Full architecture executed 97 tests: 96 passed, with the same inherited `HostSessionQueryPort.listMode` default-runtime-failure finding present at round-3 base `cf552539`.
+
+Full unit and quality gates:
+
+```bash
+./server/gradlew -p server unitTest --console=plain --no-parallel --max-workers=1
+./server/gradlew -p server ktlintCheck --console=plain --no-parallel --max-workers=1
+./server/gradlew -p server detekt --console=plain --no-parallel --max-workers=1
+./scripts/server-ci-check.sh
+git diff --check
+```
+
+- Full unit executed 1,636 tests: 1,633 passed, 1 skipped, and 2 failed. One is the inherited `ActiveSessionProjectionArchitectureTest`; the other is an unrelated global-log-appender race in `HostSessionServicesTest.changed reverse transition logs...`. The complete changed-unit bundle subsequently passed 127/127.
+- A7-local ktlint findings were reduced to zero. The gate still reports exactly the inherited 13 findings in `CanonicalMeetingLanguageInventoryTest.kt` (12 chain continuations, one function signature).
+- A7-local detekt additions were reduced from a temporary 124 to the unchanged baseline of exactly 122 issues across 38 files: MaxLineLength 57, ThrowsCount 15, MagicNumber 12, LongMethod 10, UnusedParameter 9, TooManyFunctions 7, LargeClass 5, CyclomaticComplexMethod 3, ReturnCount 3, ComplexCondition 1.
+- `server-ci-check.sh` reaches and fails at that same inherited detekt gate with 122 issues. It does not produce a false passing claim.
+- `git diff --check` passes.
+
+An accidentally broad frontend test invocation also exposed 5 existing branch failures among 2,671 tests in untouched SPA-router, host-editor copy, and frontend-boundary files. The correctly targeted current-browser contract passed 8/8; round 3 changes only the fixture exporter and generated fixture, not those failing runtime/test files.
+
+### Acceptance matrix selection and residual boundary
+
+Selected:
+
+- Compatibility: current frontend Zod fixture, v2 timestamp rebase, v3 exact rebase, mutually exclusive validation, and additive responses.
+- Persistence/migration: V53 known/unknown backfill, save/restore/rebase exact vectors, preview/confirm fail-closed behavior, and V54 reservation.
+- Exposure/publication: canonical and legacy access/site/summary changes, true no-op invariants, axis-specific revision movement, one record epoch/cache signal, and V45 compatibility repair.
+- Idempotency/privacy: expected-revision HMAC identity with null markers, older-schema lookup-only behavior, exact replay/conflict, and raw-request non-storage.
+- Authorization/club context and regressions: anonymous/non-host/cross-club zero-write fingerprints, Notes/Archive withdrawal, ordinary import/apply, A6 receipts/session record, and Redis invalidation.
+
+Excluded:
+
+- C1 convergence generation or attempts, BFF/CDN denial convergence, cache propagation SLA, deployment/runtime, OAuth/provider behavior, and browser UI redesign. A7 proves the origin transaction and signal only.
+
+Self-review confirms that participant-only timestamp movement cannot stale an unchanged five-component correction base; any correction-owned revision movement does stale it; v2 review cannot record a vector it did not validate under lock; legacy semantic no-ops cannot move timestamps/revisions/epochs; and schema-version changes cannot replay a weaker stored canonical identity. C1 remains the non-release boundary and retains exclusive ownership of V54.

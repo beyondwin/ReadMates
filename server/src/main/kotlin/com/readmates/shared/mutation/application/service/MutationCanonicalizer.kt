@@ -52,13 +52,8 @@ object MutationCanonicalizer {
                 writer.writeNullableString(payload.reasonCode)
                 writer.writeNullableString(payload.reasonNote)
             }
-            is CanonicalMutationPayload.Exposure -> writer.writeString(payload.accessScope)
-            is CanonicalMutationPayload.Publication -> {
-                writer.writeString(payload.publicSummary)
-                writer.writeNullableString(payload.siteVisibility)
-                writer.writeNullableString(payload.accessScope)
-                writer.writeString(payload.visibility)
-            }
+            is CanonicalMutationPayload.Exposure -> writer.writeExposure(payload)
+            is CanonicalMutationPayload.Publication -> writer.writePublication(payload)
             is CanonicalMutationPayload.RecordApply -> {
                 writer.writeString(payload.applyRequestId.toString())
                 writer.writeOrderedStrings(payload.entryKeys)
@@ -66,6 +61,20 @@ object MutationCanonicalizer {
         }
         return writer.toByteArray()
     }
+}
+
+private fun CanonicalWriter.writeExposure(payload: CanonicalMutationPayload.Exposure) {
+    writeString(payload.accessScope)
+    writeNullableLong(payload.expectedExposureRevision)
+}
+
+private fun CanonicalWriter.writePublication(payload: CanonicalMutationPayload.Publication) {
+    writeString(payload.publicSummary)
+    writeNullableString(payload.siteVisibility)
+    writeNullableString(payload.accessScope)
+    writeString(payload.visibility)
+    writeNullableLong(payload.expectedPublicationRevision)
+    writeNullableLong(payload.expectedExposureRevision)
 }
 
 internal class CanonicalWriter {

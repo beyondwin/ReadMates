@@ -27,4 +27,9 @@ data class HostSessionVisibilitySnapshot(
 data class HostSessionVisibilityUpdateResult(
     val previousVisibility: SessionRecordVisibility,
     val detail: HostSessionDetailResponse,
-)
+    val exposureChanged: Boolean,
+    val compatibilityChanged: Boolean,
+) {
+    val changed: Boolean
+        get() = exposureChanged || compatibilityChanged
+}

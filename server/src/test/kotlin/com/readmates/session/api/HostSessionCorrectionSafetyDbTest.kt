@@ -201,6 +201,89 @@ class HostSessionCorrectionSafetyDbTest(
     }
 
     @Test
+    fun `legacy flat access placement and summary changes each stale the exact correction draft base`() {
+        val accessSession = publishedSessionWithInitialRecord()
+        setPublicPlacement(accessSession, "HIDDEN", "key-legacy-access-base-hidden-01")
+        saveRecordDraft(accessSession, "legacy access stale", "PUBLIC")
+        mockMvc
+            .patch("/api/host/sessions/$accessSession/access-scope") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"accessScope":"HOST_ONLY"}"""
+            }.andExpect { status { isOk() } }
+        assertPreviewStaleWithoutWrites(accessSession)
+
+        val placementSession = publishedSessionWithInitialRecord()
+        saveRecordDraft(placementSession, "legacy placement stale", "PUBLIC")
+        mockMvc
+            .put("/api/host/sessions/$placementSession/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {"publicSummary":"initial summary","siteVisibility":"HIDDEN","visibility":"MEMBER"}
+                    """.trimIndent()
+            }.andExpect { status { isOk() } }
+        assertPreviewStaleWithoutWrites(placementSession)
+
+        val summarySession = publishedSessionWithInitialRecord()
+        saveRecordDraft(summarySession, "legacy summary stale", "PUBLIC")
+        mockMvc
+            .put("/api/host/sessions/$summarySession/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {"publicSummary":"legacy summary changed","siteVisibility":"PUBLIC_RECORD","visibility":"PUBLIC"}
+                    """.trimIndent()
+            }.andExpect { status { isOk() } }
+        assertPreviewStaleWithoutWrites(summarySession)
+    }
+
+    @Test
+    fun `unknown migrated draft base denies preview and confirm until exact rebase`() {
+        val sessionId = publishedSessionWithInitialRecord()
+        saveRecordDraft(sessionId, "unknown base", "PUBLIC")
+        jdbcTemplate.update(
+            "update session_record_drafts set base_vector_known = false where session_id = ?",
+            sessionId,
+        )
+        val current = versions(sessionId)
+        val before =
+            listOf(
+                liveRecordRevision(sessionId),
+                revisionCount(sessionId).toLong(),
+                applyReceiptCount(sessionId).toLong(),
+                recordEpoch(),
+            )
+
+        assertPreviewStaleWithoutWrites(sessionId)
+        mockMvc
+            .post("/api/host/sessions/$sessionId/correction-publish") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = envelope("key-unknown-base-denied-01", correctionVector(current), "{}")
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_LIVE_STALE") }
+            }
+        assertThat(
+            listOf(
+                liveRecordRevision(sessionId),
+                revisionCount(sessionId).toLong(),
+                applyReceiptCount(sessionId).toLong(),
+                recordEpoch(),
+            ),
+        ).isEqualTo(before)
+
+        val editor = loadRecordEditor(sessionId, stale = true)
+        rebaseDraft(sessionId, editor)
+        val rebased = versions(sessionId)
+        assertCorrectionPreview(sessionId, rebased, "GUEST_READABLE", "PUBLIC_RECORD", "PUBLIC")
+        publishCorrection(sessionId, "key-unknown-base-recovered-01", rebased)
+    }
+
+    @Test
     fun `participant-only timestamp change leaves exact correction preview and confirm eligible`() {
         val sessionId = publishedSessionWithInitialRecord()
         saveRecordDraft(sessionId, "participant safe", "PUBLIC")

@@ -108,6 +108,20 @@ class FrontendZodSchemaContractTest
         }
 
         @Test
+        fun `host session record editor preserves the current frontend zod contract`() {
+            val response =
+                mockMvc
+                    .get("/api/host/sessions/$seededHostSessionId/record-editor") {
+                        with(user("host@example.com"))
+                    }.andExpect {
+                        status { isOk() }
+                    }.andReturn()
+                    .response.contentAsString
+
+            assertJsonShapeAcceptsOptionalFields(response, "host-session-record-editor.json")
+        }
+
+        @Test
         @Sql(
             statements = [CLEANUP_CONTRACT_RECOVERY_SQL],
             executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
