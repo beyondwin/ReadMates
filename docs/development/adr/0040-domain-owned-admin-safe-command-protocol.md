@@ -70,11 +70,26 @@ Idempotency scope는 최소
 request는 저장된 receipt를 반환하고 같은 key의 다른 request는 conflict로 거절한다. Response loss 뒤
 재시도는 새 mutation, 새 audit receipt, 새 provider effect를 만들지 않는다.
 
+Operational claim identity와 HMAC key version alias는 분리한다. Claim은 actor·command·target scope,
+canonical schema version, `IN_PROGRESS|COMPLETED`, CAS claim token과 domain receipt pointer만 가진다. Alias는
+같은 scope, digest key version, idempotency-key HMAC, request HMAC과 claim ID를 가진다. Rotation overlap 동안
+current·previous version alias를 모두 계산해 같은 claim에 연결하며, `(scope, key version,
+idempotency-key HMAC)` unique와 `(claim, key version)` unique를 함께 강제한다. 따라서 rotation 전·후 key로
+동시에 들어온 요청도 별도 claim을 만들 수 없다.
+
 Canonical request identity는 ADR-0028의 versioned canonical HMAC 정책을 재사용한다. DTO validation과
 default 적용 뒤 operation별 schema가 Unicode, field/collection order, null·omitted·default 의미를 고정한다.
 Raw canonical payload나 평문 SHA digest를 저장하지 않고 server secret-keyed HMAC digest, canonical schema
-version, digest key version만 저장한다. 이전 key는 참조 receipt의 retention과 rollout buffer가 끝난 뒤에만
-폐기하며 reference 확인이 불가능하면 retirement를 fail closed한다.
+version, digest key version만 저장한다. 이전 key는 해당 version alias가 모두 제거되고
+`unreferenced_since` 이후 최소 24시간 rollout buffer가 끝난 뒤에만 폐기하며 reference 확인이 불가능하면
+retirement를 fail closed한다.
+
+Origin mutation claim은 domain application service의 transaction 안에서만 예약·완료한다. 여러 active key
+alias는 deterministic version 순서로 예약하며 duplicate reconciliation은 savepoint로 전체 후보 insert를
+되돌린 뒤 기존 claim을 조회한다. Origin claim에 persisted lease takeover나 bare `FAILED` terminal state를
+두지 않는다. Transaction rollback이면 incomplete claim도 함께 사라져야 한다. Commit된 `IN_PROGRESS`가
+관측되면 자동 takeover·재실행하지 않고 fail closed한다. L3의 lease는 origin receipt commit 이후 별도
+convergence work에만 둔다.
 
 Response-loss 재호출에서는 같은 actor·command·target·key·request의 completed receipt lookup을
 preview expired/consumed rejection보다 먼저 수행한다. Receipt lookup도 현재 active platform admin과
@@ -92,9 +107,10 @@ version, reason category와 redacted reason, result와 safe error code, preview/
 error, secret은 기록하지 않는다. Global audit ledger는 모든 L1 lifecycle event와 L2/L3 receipt를 조회할
 수 있어야 하며 domain-local history만 존재하는 상태를 통합 감사로 표현하지 않는다.
 
-Preview와 operational idempotency ownership row는 bounded retention과 안전한 cleanup을 가진다. Immutable
-receipt는 삭제 가능한 target resource에 destructive FK를 두지 않고 redacted immutable target ID snapshot을
-보존한다. Receipt 보존 기간과 접근 권한은 audit 정책과 일치시킨다.
+Preview와 operational idempotency ownership row는 bounded retention과 안전한 cleanup을 가진다. Purge는
+retention이 지난 `COMPLETED` claim과 그 operational alias만 제거하며 committed `IN_PROGRESS`를 자동 삭제해
+새 실행을 열지 않는다. Immutable receipt는 삭제 가능한 target resource에 destructive FK를 두지 않고
+redacted immutable target ID snapshot을 보존한다. Receipt 보존 기간과 접근 권한은 audit 정책과 일치시킨다.
 
 Browser mutation은 same-origin BFF만 사용한다. BFF는 path를 정규화하고 browser가 보낸 내부 인증
 header를 폐기한 뒤 server-only secret과 canonical Origin/Referer를 붙인다. Spring은 secret,
@@ -150,7 +166,7 @@ L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로
   state+history atomicity를 unit·integration test한다.
 - L2/L3는 preview expiry/consumption, actor·capability loss, target/revision drift, reason validation을
   test한다.
-- Same-key/same-request는 같은 receipt를 반환하고 same-key/different-request는 conflict인지 확인한다.
+- Same-key/same-request는 rotation 전·후 alias 모두 같은 receipt를 반환하고 same-key/different-request는 conflict인지 확인한다.
 - Canonicalization schema, null/default/Unicode/collection order, HMAC key rotation과 old-key retirement를
   test한다.
 - Response loss 재호출이 mutation, receipt, audit, provider effect를 중복하지 않는지 integration test한다.
@@ -158,7 +174,8 @@ L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로
   잃으면 sensitive metadata가 반환되지 않는지 확인한다.
 - Partial failure가 대상별 outcome·skipped count·retry eligibility를 보존하는지 확인한다.
 - MySQL write와 receipt/audit/outbox 중 하나가 실패하면 전체 origin transaction이 rollback되는지 확인한다.
-- External provider failure/resume가 같은 convergence ID와 append-only attempt를 사용하는지 확인한다.
+- Origin claim의 rollback, committed `IN_PROGRESS` fail-closed, sorted dual-alias reservation과 savepoint rollback을 확인한다.
+- External provider failure/resume가 origin claim takeover 없이 같은 convergence ID와 append-only attempt lease를 사용하는지 확인한다.
 - Trusted BFF without Spring CSRF token 성공, missing/invalid secret·origin·active actor·capability 거절,
   exact path만 CSRF 예외이고 near-miss path는 보호되는지 full security chain으로 확인한다.
 - DTO, receipt, audit, log, telemetry에 금지된 private content와 provider raw error가 없는지 검사한다.

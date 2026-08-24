@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(14)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(15)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,13 +94,14 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("56")
+            assertThat(latestVersion).isEqualTo("57")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
+            assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -377,7 +378,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(12)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(13)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -389,13 +390,14 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("56")
+            assertThat(latestVersion).isEqualTo("57")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
+            assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1657,12 +1659,13 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("56")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("57")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54PublicProjectionConvergenceSchema(jdbc)
             assertV55PlatformAdminPublicTakedownSchema(jdbc)
             assertV56PublicConvergenceWorkRetentionIndex(jdbc)
+            assertV57PlatformAdminCommandIdempotencySchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1761,13 +1764,14 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(5)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("56")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(6)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("57")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
             assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
+            assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
             assertThat(
                 upgradeJdbc.queryForMap(
                     """
@@ -1826,11 +1830,255 @@ class MySqlFlywayMigrationTest(
 
     @Test
     @Suppress("LongMethod")
+    fun `mysql upgrades v56 with rotation safe admin command aliases and permits hard target deletion`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v56Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("56")
+                    .load()
+            assertThat(v56Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("56")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            val targetClubId = "aaaaaaaa-0000-4000-8000-000000057001"
+            upgradeJdbc.update(
+                """
+                insert into clubs (id, slug, name, tagline, about)
+                values (?, 'v57-hard-delete-target', 'Migration target', 'Migration target', 'Migration target')
+                """.trimIndent(),
+                targetClubId,
+            )
+
+            val upgradeResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(1)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("57")
+            assertV57PlatformAdminCommandIdempotencySchema(upgradeJdbc)
+
+            val actorId = "aaaaaaaa-0000-4000-8000-000000057002"
+            val claimId = "aaaaaaaa-0000-4000-8000-000000057003"
+            val competingClaimId = "aaaaaaaa-0000-4000-8000-000000057004"
+            val claimToken = "aaaaaaaa-0000-4000-8000-000000057005"
+            val competingClaimToken = "aaaaaaaa-0000-4000-8000-000000057006"
+            val keyHmacV1 = ByteArray(32) { 0x11 }
+            val requestHmacV1 = ByteArray(32) { 0x21 }
+            insertV57CommandClaim(
+                upgradeJdbc,
+                id = claimId,
+                actorId = actorId,
+                targetId = targetClubId,
+                claimToken = claimToken,
+            )
+            insertV57CommandClaim(
+                upgradeJdbc,
+                id = competingClaimId,
+                actorId = actorId,
+                targetId = targetClubId,
+                claimToken = competingClaimToken,
+            )
+            upgradeJdbc.update(
+                """
+                insert into platform_admin_command_digest_key_state (
+                  digest_key_version, last_referenced_at, unreferenced_since
+                ) values (1, '2026-08-24 00:00:00.000000', null),
+                         (2, '2026-08-24 00:00:00.000000', null)
+                """.trimIndent(),
+            )
+            insertV57CommandAlias(
+                upgradeJdbc,
+                claimId = claimId,
+                actorId = actorId,
+                targetId = targetClubId,
+                digestKeyVersion = 1,
+                idempotencyKeyHmac = keyHmacV1,
+                requestHmac = requestHmacV1,
+            )
+            insertV57CommandAlias(
+                upgradeJdbc,
+                claimId = claimId,
+                actorId = actorId,
+                targetId = targetClubId,
+                digestKeyVersion = 2,
+                idempotencyKeyHmac = ByteArray(32) { 0x12 },
+                requestHmac = ByteArray(32) { 0x22 },
+            )
+            assertEquals(
+                2,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from platform_admin_command_idempotency_keys where claim_id = ?",
+                    Int::class.java,
+                    claimId,
+                ),
+            )
+
+            assertUniqueConstraintRejected("platform_admin_command_alias_identity_uk") {
+                insertV57CommandAlias(
+                    upgradeJdbc,
+                    claimId = competingClaimId,
+                    actorId = actorId,
+                    targetId = targetClubId,
+                    digestKeyVersion = 1,
+                    idempotencyKeyHmac = keyHmacV1,
+                    requestHmac = ByteArray(32) { 0x31 },
+                )
+            }
+            assertUniqueConstraintRejected("platform_admin_command_alias_claim_version_uk") {
+                insertV57CommandAlias(
+                    upgradeJdbc,
+                    claimId = claimId,
+                    actorId = actorId,
+                    targetId = targetClubId,
+                    digestKeyVersion = 1,
+                    idempotencyKeyHmac = ByteArray(32) { 0x13 },
+                    requestHmac = ByteArray(32) { 0x23 },
+                )
+            }
+            assertConstraintRejected {
+                insertV57CommandAlias(
+                    upgradeJdbc,
+                    claimId = claimId,
+                    actorId = actorId,
+                    targetId = "different-target",
+                    digestKeyVersion = 3,
+                    idempotencyKeyHmac = ByteArray(32) { 0x14 },
+                    requestHmac = ByteArray(32) { 0x24 },
+                )
+            }
+            assertConstraintRejected {
+                insertV57CommandAlias(
+                    upgradeJdbc,
+                    claimId = claimId,
+                    actorId = actorId,
+                    targetId = targetClubId,
+                    digestKeyVersion = 3,
+                    idempotencyKeyHmac = ByteArray(31) { 0x15 },
+                    requestHmac = ByteArray(32) { 0x25 },
+                )
+            }
+            assertConstraintRejected {
+                insertV57CommandAlias(
+                    upgradeJdbc,
+                    claimId = claimId,
+                    actorId = actorId,
+                    targetId = targetClubId,
+                    digestKeyVersion = 4,
+                    idempotencyKeyHmac = ByteArray(32) { 0x16 },
+                    requestHmac = ByteArray(31) { 0x26 },
+                )
+            }
+            assertConstraintRejected {
+                insertV57CommandAlias(
+                    upgradeJdbc,
+                    claimId = claimId,
+                    actorId = actorId,
+                    targetId = targetClubId,
+                    digestKeyVersion = -1,
+                    idempotencyKeyHmac = ByteArray(32) { 0x17 },
+                    requestHmac = ByteArray(32) { 0x27 },
+                )
+            }
+            assertConstraintRejected {
+                upgradeJdbc.update(
+                    """
+                    insert into platform_admin_command_digest_key_state (
+                      digest_key_version, last_referenced_at, unreferenced_since
+                    ) values (-1, '2026-08-24 00:00:00.000000', null)
+                    """.trimIndent(),
+                )
+            }
+
+            assertConstraintRejected {
+                insertV57CommandClaim(
+                    upgradeJdbc,
+                    id = UUID.randomUUID().toString(),
+                    actorId = actorId,
+                    targetId = "invalid-state",
+                    claimToken = UUID.randomUUID().toString(),
+                    state = "FAILED",
+                )
+            }
+            assertConstraintRejected {
+                insertV57CommandClaim(
+                    upgradeJdbc,
+                    id = UUID.randomUUID().toString(),
+                    actorId = actorId,
+                    targetId = "in-progress-with-receipt",
+                    claimToken = UUID.randomUUID().toString(),
+                    receiptType = "CLUB_COMMAND_RECEIPT",
+                    receiptId = UUID.randomUUID().toString(),
+                )
+            }
+            assertConstraintRejected {
+                insertV57CommandClaim(
+                    upgradeJdbc,
+                    id = UUID.randomUUID().toString(),
+                    actorId = actorId,
+                    targetId = "completed-without-receipt",
+                    claimToken = UUID.randomUUID().toString(),
+                    state = "COMPLETED",
+                )
+            }
+            assertThatThrownBy {
+                insertV57CommandClaim(
+                    upgradeJdbc,
+                    id = UUID.randomUUID().toString(),
+                    actorId = actorId,
+                    targetId = "missing-token",
+                    claimToken = null,
+                )
+            }.isInstanceOf(DataIntegrityViolationException::class.java)
+                .hasMessageContaining("claim_token")
+            insertV57CommandClaim(
+                upgradeJdbc,
+                id = UUID.randomUUID().toString(),
+                actorId = actorId,
+                targetId = "completed-with-cas-token",
+                claimToken = UUID.randomUUID().toString(),
+                state = "COMPLETED",
+                receiptType = "CLUB_COMMAND_RECEIPT",
+                receiptId = UUID.randomUUID().toString(),
+            )
+
+            assertThat(upgradeJdbc.update("delete from clubs where id = ?", targetClubId)).isEqualTo(1)
+            assertEquals(
+                2,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from platform_admin_command_idempotency where target_id = ?",
+                    Int::class.java,
+                    targetClubId,
+                ),
+            )
+            assertThat(
+                upgradeJdbc.update("delete from platform_admin_command_idempotency where id = ?", claimId),
+            ).isEqualTo(1)
+            assertEquals(
+                0,
+                upgradeJdbc.queryForObject(
+                    "select count(*) from platform_admin_command_idempotency_keys where claim_id = ?",
+                    Int::class.java,
+                    claimId,
+                ),
+            )
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
     fun `mysql adds revision domains participant audit and application snapshot identity`() {
         assertV52RevisionSchema(jdbcTemplate)
         assertV53IdempotencySchema(jdbcTemplate)
         assertV54PublicProjectionConvergenceSchema(jdbcTemplate)
         assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate)
+        assertV57PlatformAdminCommandIdempotencySchema(jdbcTemplate)
         val fixture = V52LiveRevisionFixture()
         try {
             insertV52RevisionClubGraph(
@@ -3600,6 +3848,226 @@ class MySqlFlywayMigrationTest(
         assertEquals(
             "created_at,convergence_id,lease_expires_at",
             indexColumns(jdbcTemplate, "public_convergence_work", "public_convergence_work_retention_idx"),
+        )
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV57PlatformAdminCommandIdempotencySchema(jdbcTemplate: JdbcTemplate) {
+        val claimTable = "platform_admin_command_idempotency"
+        val aliasTable = "platform_admin_command_idempotency_keys"
+        val keyStateTable = "platform_admin_command_digest_key_state"
+        assertThat(columns(jdbcTemplate, claimTable)).containsExactlyInAnyOrder(
+            "id",
+            "platform_admin_user_id",
+            "command_type",
+            "target_type",
+            "target_id",
+            "canonical_schema_version",
+            "state",
+            "claim_token",
+            "receipt_type",
+            "receipt_id",
+            "created_at",
+            "updated_at",
+            "expires_at",
+        )
+        assertThat(columns(jdbcTemplate, aliasTable)).containsExactlyInAnyOrder(
+            "claim_id",
+            "platform_admin_user_id",
+            "command_type",
+            "target_type",
+            "target_id",
+            "digest_key_version",
+            "idempotency_key_hmac",
+            "request_hmac",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, keyStateTable)).containsExactlyInAnyOrder(
+            "digest_key_version",
+            "last_referenced_at",
+            "unreferenced_since",
+        )
+
+        listOf(
+            claimTable to "id",
+            claimTable to "platform_admin_user_id",
+            claimTable to "claim_token",
+            aliasTable to "claim_id",
+            aliasTable to "platform_admin_user_id",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("char")
+            assertThat(metadata["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("36")
+            assertThat(metadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
+            assertThat(metadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
+        }
+        listOf(
+            claimTable to "command_type",
+            claimTable to "target_type",
+            claimTable to "target_id",
+            claimTable to "canonical_schema_version",
+            claimTable to "state",
+            claimTable to "receipt_type",
+            claimTable to "receipt_id",
+            aliasTable to "command_type",
+            aliasTable to "target_type",
+            aliasTable to "target_id",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["CHARACTER_SET_NAME"]).isEqualTo("ascii")
+            assertThat(metadata["COLLATION_NAME"]).isEqualTo("ascii_bin")
+        }
+        assertThat(columnMetadata(jdbcTemplate, claimTable, "receipt_type")["CHARACTER_MAXIMUM_LENGTH"].toString())
+            .isEqualTo("96")
+        assertThat(columnMetadata(jdbcTemplate, claimTable, "receipt_id")["CHARACTER_MAXIMUM_LENGTH"].toString())
+            .isEqualTo("128")
+        assertThat(
+            columnMetadata(jdbcTemplate, claimTable, "canonical_schema_version")["CHARACTER_MAXIMUM_LENGTH"].toString(),
+        ).isEqualTo("64")
+        listOf("idempotency_key_hmac", "request_hmac").forEach { column ->
+            val metadata = columnMetadata(jdbcTemplate, aliasTable, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("varbinary")
+            assertThat(metadata["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+            assertThat(metadata["IS_NULLABLE"]).isEqualTo("NO")
+        }
+        listOf(
+            claimTable to "created_at",
+            claimTable to "updated_at",
+            claimTable to "expires_at",
+            aliasTable to "created_at",
+            keyStateTable to "last_referenced_at",
+            keyStateTable to "unreferenced_since",
+        ).forEach { (table, column) ->
+            assertThat(columnMetadata(jdbcTemplate, table, column)["DATETIME_PRECISION"]).isEqualTo(6L)
+        }
+
+        assertEquals("id", indexColumns(jdbcTemplate, claimTable, "PRIMARY"))
+        assertEquals(
+            "id,platform_admin_user_id,command_type,target_type,target_id",
+            indexColumns(jdbcTemplate, claimTable, "platform_admin_command_scope_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, claimTable, "platform_admin_command_scope_uk")).isZero()
+        assertEquals(
+            "state,expires_at,id",
+            indexColumns(jdbcTemplate, claimTable, "platform_admin_command_expiry_idx"),
+        )
+        assertEquals(
+            "platform_admin_user_id,command_type,target_type,target_id,digest_key_version,idempotency_key_hmac",
+            indexColumns(jdbcTemplate, aliasTable, "platform_admin_command_alias_identity_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, aliasTable, "platform_admin_command_alias_identity_uk")).isZero()
+        assertEquals(
+            "claim_id,digest_key_version",
+            indexColumns(jdbcTemplate, aliasTable, "platform_admin_command_alias_claim_version_uk"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, aliasTable, "platform_admin_command_alias_claim_version_uk"))
+            .isZero()
+
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_command_schema_version_check"))
+            .contains("char_length", "canonical_schema_version", "1", "64")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_command_state_check"))
+            .contains("IN_PROGRESS", "COMPLETED")
+            .doesNotContain("FAILED")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_command_receipt_check"))
+            .contains("IN_PROGRESS", "COMPLETED", "receipt_type", "receipt_id")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_command_expiry_check"))
+            .contains("expires_at", "created_at")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_command_alias_version_check"))
+            .contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_command_alias_hmac_check"))
+            .contains("idempotency_key_hmac", "request_hmac", "32")
+        assertThat(checkConstraintClause(jdbcTemplate, "platform_admin_command_digest_key_version_check"))
+            .contains(">= 0")
+
+        assertThat(importedKeys(jdbcTemplate, claimTable)).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, keyStateTable)).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, aliasTable)).containsExactly(claimTable)
+        assertEquals(
+            "claim_id,platform_admin_user_id,command_type,target_type,target_id",
+            foreignKeyColumns(jdbcTemplate, aliasTable, "platform_admin_command_alias_claim_fk"),
+        )
+        assertEquals(
+            "$claimTable:id,platform_admin_user_id,command_type,target_type,target_id",
+            foreignKeyReference(jdbcTemplate, aliasTable, "platform_admin_command_alias_claim_fk"),
+        )
+        assertEquals(
+            "CASCADE",
+            foreignKeyDeleteRule(jdbcTemplate, aliasTable, "platform_admin_command_alias_claim_fk"),
+        )
+        assertThat(columns(jdbcTemplate, claimTable)).doesNotContain(
+            "reason",
+            "email",
+            "name",
+            "url",
+            "request_json",
+            "canonical_input",
+            "idempotency_key",
+            "terminal_error_code",
+            "lease_expires_at",
+        )
+        assertThat(columns(jdbcTemplate, aliasTable)).doesNotContain(
+            "reason",
+            "email",
+            "name",
+            "url",
+            "request_json",
+            "canonical_input",
+            "idempotency_key",
+        )
+    }
+
+    private fun insertV57CommandClaim(
+        jdbcTemplate: JdbcTemplate,
+        id: String,
+        actorId: String,
+        targetId: String,
+        claimToken: String?,
+        state: String = "IN_PROGRESS",
+        receiptType: String? = null,
+        receiptId: String? = null,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_command_idempotency (
+              id, platform_admin_user_id, command_type, target_type, target_id,
+              canonical_schema_version, state, claim_token, receipt_type, receipt_id,
+              created_at, updated_at, expires_at
+            ) values (?, ?, 'CLUB_ARCHIVE', 'CLUB', ?, 'club-archive:v1', ?, ?, ?, ?,
+                      '2026-08-24 00:00:00.000000', '2026-08-24 00:00:00.000000',
+                      '2026-08-26 00:00:00.000000')
+            """.trimIndent(),
+            id,
+            actorId,
+            targetId,
+            state,
+            claimToken,
+            receiptType,
+            receiptId,
+        )
+    }
+
+    private fun insertV57CommandAlias(
+        jdbcTemplate: JdbcTemplate,
+        claimId: String,
+        actorId: String,
+        targetId: String,
+        digestKeyVersion: Int,
+        idempotencyKeyHmac: ByteArray,
+        requestHmac: ByteArray,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_command_idempotency_keys (
+              claim_id, platform_admin_user_id, command_type, target_type, target_id,
+              digest_key_version, idempotency_key_hmac, request_hmac, created_at
+            ) values (?, ?, 'CLUB_ARCHIVE', 'CLUB', ?, ?, ?, ?, '2026-08-24 00:00:00.000000')
+            """.trimIndent(),
+            claimId,
+            actorId,
+            targetId,
+            digestKeyVersion,
+            idempotencyKeyHmac,
+            requestHmac,
         )
     }
 

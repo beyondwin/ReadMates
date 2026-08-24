@@ -13,6 +13,8 @@ Server commit 뒤 response가 끊기면 create, publish, restore, notification c
 
 Receipt-bearing host mutation은 `(club, actor membership, operation, resource/create slot, key)` 범위 idempotency key를 사용한다. Server는 DTO validation/default 이후 operation별 versioned canonical schema를 적용하고, Unicode NFC, field order, collection/set order, null/omitted/default 의미를 schema version에 고정한다. Raw canonical payload나 평문 SHA digest는 저장하지 않고 server secret-keyed HMAC digest, canonical schema version, digest key version만 저장한다. Meeting URL/passcode 같은 낮은 entropy 민감 입력도 log/receipt에 남기지 않는다. 이전 digest key는 해당 key version을 참조하는 idempotency row가 모두 purge되고 추가 24시간 rollout buffer가 지난 뒤에만 폐기한다. Reference count가 unavailable이거나 purge가 지연되면 retirement를 fail closed한다.
 
+기존 host `mutation_idempotency_keys`처럼 raw idempotency key를 stable unique identity로 저장하는 protocol은 key rotation에도 같은 ownership row를 찾는다. 반대로 privacy 때문에 raw key를 저장하지 않고 idempotency-key HMAC으로 index하는 protocol(예: platform-admin safe command)은 하나의 logical claim에 key version별 alias를 둬야 한다. Overlap window에서는 current와 previous key alias를 모두 계산해 정렬된 순서로 예약하므로 어느 version으로 재시도해도 같은 claim/receipt로 수렴한다. 단일 current-version fingerprint만 unique하게 두어 rotation 순간 두 claim을 허용하는 설계는 사용하지 않는다. 이전 digest key는 그 version의 alias가 모두 purge되고 `unreferenced_since` 이후 최소 24시간 rollout buffer가 지난 뒤에만 폐기한다. Reference 확인이 불가능하거나 purge가 지연되면 retirement를 fail closed한다.
+
 같은 key·같은 HMAC request identity는 같은 immutable receipt를, 같은 key·다른 request는 conflict를 반환한다. Response loss에서는 authoritative state와 receipt를 조회한 뒤 미실행이 확인될 때만 같은 key로 재시도한다. Receipt lookup은 현재 host authority를 다시 확인한다. Notification의 더 강한 preview/duplicate/resend 계약은 약화하지 않는다.
 
 Operational idempotency ownership row는 bounded retention으로 제거할 수 있다. Immutable feature receipt는 삭제 가능한 session/publication row에 destructive FK를 두지 않고 redacted resource UUID snapshot을 보존한다. 따라서 기존 7일 hard delete는 계속 성공하며 receipt bytes는 authorized reconciliation/audit 경로에서만 노출된다.
@@ -39,7 +41,7 @@ Operational idempotency ownership row는 bounded retention으로 제거할 수 �
 
 ## 검증
 
-- Canonicalization field/null/default/Unicode/collection matrix, HMAC key rotation replay, 참조 row가 남은 key retirement 거절을 test한다.
+- Canonicalization field/null/default/Unicode/collection matrix와 HMAC key rotation replay를 test한다. Raw key를 저장하지 않는 protocol은 overlapping key version별 alias가 같은 claim으로 수렴하고, 참조 alias가 남거나 24시간 retirement buffer가 지나지 않으면 key 폐기를 거절하는지도 test한다.
 - Duplicate, same-key/different-payload, response loss, authority revoked lookup과 raw sensitive payload 비저장을 integration test한다.
 - 만료된 synthetic resource hard delete 후 operational row retention과 redacted immutable receipt 보존을 integration test한다.
 
