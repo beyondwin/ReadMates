@@ -1,6 +1,7 @@
 package com.readmates.auth.api
 
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.infrastructure.security.HostAuthorityContextCookie
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Assertions.assertNotNull
@@ -60,6 +61,7 @@ class PasswordAuthControllerTest(
                 }.andExpect {
                     status { isNoContent() }
                     cookie { maxAge(AuthSessionService.COOKIE_NAME, 0) }
+                    cookie { maxAge(HostAuthorityContextCookie.COOKIE_NAME, 0) }
                 }.andReturn()
 
         val setCookieHeaders = result.response.getHeaders("Set-Cookie")
@@ -74,6 +76,12 @@ class PasswordAuthControllerTest(
                 it.startsWith("JSESSIONID=;") && it.contains("Max-Age=0")
             },
             "Expected JSESSIONID clearing cookie",
+        )
+        assertTrue(
+            setCookieHeaders.any {
+                it.startsWith("${HostAuthorityContextCookie.COOKIE_NAME}=;") && it.contains("Max-Age=0")
+            },
+            "Expected host authority context clearing cookie",
         )
 
         val revokedAt =

@@ -1,5 +1,6 @@
 package com.readmates.auth.adapter.`in`.web
 
+import com.readmates.auth.application.port.`in`.ClearHostAuthorityContextUseCase
 import com.readmates.auth.application.port.`in`.LogoutAuthSessionUseCase
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -14,6 +15,7 @@ import org.springframework.web.server.ResponseStatusException
 @RestController
 class PasswordAuthController(
     private val logoutAuthSessionUseCase: LogoutAuthSessionUseCase,
+    private val clearHostAuthorityContextUseCase: ClearHostAuthorityContextUseCase,
 ) {
     @PostMapping("/api/auth/login")
     fun login(): Nothing = throw ResponseStatusException(HttpStatus.GONE, "Password login has been removed")
@@ -33,5 +35,6 @@ class PasswordAuthController(
         SecurityContextHolder.clearContext()
         response.addHeader(HttpHeaders.SET_COOKIE, logoutAuthSessionUseCase.logout(rawToken))
         response.addHeader(HttpHeaders.SET_COOKIE, logoutAuthSessionUseCase.clearedServletSessionCookie())
+        response.addHeader(HttpHeaders.SET_COOKIE, clearHostAuthorityContextUseCase.clearedHostAuthorityContextCookie())
     }
 }

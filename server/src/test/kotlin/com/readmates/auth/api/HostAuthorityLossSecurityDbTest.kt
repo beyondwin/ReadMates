@@ -1,11 +1,11 @@
 package com.readmates.auth.api
 
 import com.readmates.auth.adapter.`in`.security.AuthClubContextHeader
-import com.readmates.auth.domain.MembershipRole
-import com.readmates.auth.domain.MembershipStatus
+import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.auth.infrastructure.security.HostAuthorityContextCookie
 import com.readmates.notification.application.service.NotificationDeliveryProcessingService
-import com.readmates.shared.security.CurrentMember
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import jakarta.servlet.http.Cookie
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.mockito.Mockito.verify
@@ -14,11 +14,9 @@ import org.mockito.Mockito.`when`
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.http.HttpHeaders
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
-import org.springframework.security.core.authority.SimpleGrantedAuthority
-import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.authentication
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
@@ -36,6 +34,7 @@ import java.util.UUID
 class HostAuthorityLossSecurityDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val authSessionService: AuthSessionService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @MockitoBean
     private lateinit var notificationProcessor: NotificationDeliveryProcessingService
@@ -43,65 +42,106 @@ class HostAuthorityLossSecurityDbTest(
     @Test
     fun `active host request remains authorized`() {
         `when`(notificationProcessor.processPendingForClub(READING_CLUB_ID, 20)).thenReturn(0)
+        val sessionCookie = issueSessionCookie(READING_HOST_USER_ID)
 
         mockMvc
             .post("/api/host/notifications/process") {
-                with(staleReadingHost())
+                cookie(sessionCookie)
                 header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.processed") { value(0) }
+                cookie { exists(HostAuthorityContextCookie.COOKIE_NAME) }
             }
 
         verify(notificationProcessor).processPendingForClub(READING_CLUB_ID, 20)
     }
 
     @Test
-    fun `downgraded prior host receives stable authority revoked problem without side effects`() {
+    fun `real auth session cookie preserves prior host proof after downgrade`() {
+        val sessionCookie = issueSessionCookie(READING_HOST_USER_ID)
+        val hostContextCookie = establishHostContext(sessionCookie, "reading-sai")
         jdbcTemplate.update(
             "update memberships set role = 'MEMBER' where id = ?",
             READING_HOST_MEMBERSHIP_ID.toString(),
         )
 
-        expectAuthorityProblem("reading-sai", "HOST_AUTHORITY_REVOKED")
+        mockMvc
+            .post("/api/host/notifications/process") {
+                cookie(sessionCookie, hostContextCookie)
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
+            }.andExpect {
+                status { isForbidden() }
+                content { contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON) }
+                jsonPath("$.code") { value("HOST_AUTHORITY_REVOKED") }
+            }
 
         verifyNoInteractions(notificationProcessor)
     }
 
     @Test
     fun `suspended membership receives stable suspension problem without side effects`() {
+        val sessionCookie = issueSessionCookie(READING_HOST_USER_ID)
+        val hostContextCookie = establishHostContext(sessionCookie, "reading-sai")
         jdbcTemplate.update(
             "update memberships set status = 'SUSPENDED' where id = ?",
             READING_HOST_MEMBERSHIP_ID.toString(),
         )
 
-        expectAuthorityProblem("reading-sai", "MEMBERSHIP_SUSPENDED")
+        expectAuthorityProblem(sessionCookie, hostContextCookie, "reading-sai", "MEMBERSHIP_SUSPENDED")
 
         verifyNoInteractions(notificationProcessor)
     }
 
     @Test
     fun `explicit different joined club receives cross club problem without side effects`() {
+        val sessionCookie = issueSessionCookie(READING_HOST_USER_ID)
+        val hostContextCookie = establishHostContext(sessionCookie, "reading-sai")
         insertSampleMembership()
 
-        expectAuthorityProblem("sample-book-club", "CROSS_CLUB_SCOPE")
+        expectAuthorityProblem(sessionCookie, hostContextCookie, "sample-book-club", "CROSS_CLUB_SCOPE")
 
         verifyNoInteractions(notificationProcessor)
     }
 
     @Test
-    fun `ordinary member and unknown club keep generic anti enumeration responses`() {
+    fun `safe navigation rotates authority context for a legitimate second host club`() {
+        `when`(notificationProcessor.processPendingForClub(SAMPLE_CLUB_ID, 20)).thenReturn(0)
+        val sessionCookie = issueSessionCookie(READING_HOST_USER_ID)
+        val readingContextCookie = establishHostContext(sessionCookie, "reading-sai")
+        insertSampleMembership(role = "HOST")
+
+        val sampleContextCookie = establishHostContext(sessionCookie, "sample-book-club", readingContextCookie)
+
         mockMvc
             .post("/api/host/notifications/process") {
-                with(authentication(activeReadingMember()))
+                cookie(sessionCookie, sampleContextCookie)
+                header(AuthClubContextHeader.CLUB_SLUG, "sample-book-club")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.processed") { value(0) }
+            }
+
+        verify(notificationProcessor).processPendingForClub(SAMPLE_CLUB_ID, 20)
+    }
+
+    @Test
+    fun `ordinary member and unknown club keep generic anti enumeration responses`() {
+        val memberSessionCookie = issueSessionCookie(READING_MEMBER_USER_ID)
+        mockMvc
+            .post("/api/host/notifications/process") {
+                cookie(memberSessionCookie, Cookie(HostAuthorityContextCookie.COOKIE_NAME, "v1.forged.signature"))
                 header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
             }.andExpect {
                 status { isForbidden() }
                 content { string("") }
+                cookie { maxAge(HostAuthorityContextCookie.COOKIE_NAME, 0) }
             }
+        val hostSessionCookie = issueSessionCookie(READING_HOST_USER_ID)
+        val hostContextCookie = establishHostContext(hostSessionCookie, "reading-sai")
         mockMvc
             .post("/api/host/notifications/process") {
-                with(staleReadingHost())
+                cookie(hostSessionCookie, hostContextCookie)
                 header(AuthClubContextHeader.CLUB_SLUG, "missing-club")
             }.andExpect {
                 status { isForbidden() }
@@ -117,12 +157,14 @@ class HostAuthorityLossSecurityDbTest(
     }
 
     private fun expectAuthorityProblem(
+        sessionCookie: Cookie,
+        hostContextCookie: Cookie,
         clubSlug: String,
         code: String,
     ) {
         mockMvc
             .post("/api/host/notifications/process") {
-                with(staleReadingHost())
+                cookie(sessionCookie, hostContextCookie)
                 header(AuthClubContextHeader.CLUB_SLUG, clubSlug)
             }.andExpect {
                 status { isForbidden() }
@@ -135,65 +177,42 @@ class HostAuthorityLossSecurityDbTest(
             }
     }
 
-    private fun staleReadingHost() = authentication(staleReadingHostAuthentication())
+    private fun issueSessionCookie(userId: UUID): Cookie {
+        val issued = authSessionService.issueSession(userId.toString(), "integration-test", "127.0.0.1")
+        return Cookie(AuthSessionService.COOKIE_NAME, issued.rawToken)
+    }
 
-    private fun staleReadingHostAuthentication() =
-        UsernamePasswordAuthenticationToken(
-            currentMember(
-                membershipId = READING_HOST_MEMBERSHIP_ID,
-                clubId = READING_CLUB_ID,
-                clubSlug = "reading-sai",
-                role = MembershipRole.HOST,
-                status = MembershipStatus.ACTIVE,
-            ),
-            null,
-            listOf(SimpleGrantedAuthority("ROLE_HOST")),
-        )
-
-    private fun activeReadingMember() =
-        UsernamePasswordAuthenticationToken(
-            currentMember(
-                membershipId = READING_MEMBER_MEMBERSHIP_ID,
-                clubId = READING_CLUB_ID,
-                clubSlug = "reading-sai",
-                role = MembershipRole.MEMBER,
-                status = MembershipStatus.ACTIVE,
-                email = "member1@example.com",
-                userId = UUID.fromString("00000000-0000-0000-0000-000000000102"),
-            ),
-            null,
-            listOf(SimpleGrantedAuthority("ROLE_MEMBER")),
-        )
-
-    private fun currentMember(
-        membershipId: UUID,
-        clubId: UUID,
+    private fun establishHostContext(
+        sessionCookie: Cookie,
         clubSlug: String,
-        role: MembershipRole,
-        status: MembershipStatus,
-        email: String = "host@example.com",
-        userId: UUID = READING_HOST_USER_ID,
-    ) = CurrentMember(
-        userId = userId,
-        membershipId = membershipId,
-        clubId = clubId,
-        clubSlug = clubSlug,
-        email = email,
-        displayName = "Fixture",
-        accountName = "fixture",
-        role = role,
-        membershipStatus = status,
-    )
+        priorContextCookie: Cookie? = null,
+    ): Cookie {
+        val response =
+            mockMvc
+                .get("/api/host/notifications/summary") {
+                    cookie(*listOfNotNull(sessionCookie, priorContextCookie).toTypedArray())
+                    header(AuthClubContextHeader.CLUB_SLUG, clubSlug)
+                }.andExpect {
+                    status { isOk() }
+                    cookie { exists(HostAuthorityContextCookie.COOKIE_NAME) }
+                }.andReturn()
+                .response
+        return requireNotNull(response.getHeader(HttpHeaders.SET_COOKIE))
+            .substringBefore(';')
+            .split('=', limit = 2)
+            .let { Cookie(it[0], it[1]) }
+    }
 
-    private fun insertSampleMembership() {
+    private fun insertSampleMembership(role: String = "MEMBER") {
         jdbcTemplate.update(
             """
             insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
-            values (?, ?, ?, 'MEMBER', 'ACTIVE', utc_timestamp(6), 'Cross Fixture', 'globe-notebook')
+            values (?, ?, ?, ?, 'ACTIVE', utc_timestamp(6), 'Cross Fixture', 'globe-notebook')
             """.trimIndent(),
             SAMPLE_MEMBERSHIP_ID.toString(),
             SAMPLE_CLUB_ID.toString(),
             READING_HOST_USER_ID.toString(),
+            role,
         )
     }
 
@@ -201,6 +220,7 @@ class HostAuthorityLossSecurityDbTest(
         val READING_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
         val SAMPLE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
         val READING_HOST_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000101")
+        val READING_MEMBER_USER_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000102")
         val READING_HOST_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000201")
         val READING_MEMBER_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000202")
         val SAMPLE_MEMBERSHIP_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000009201")

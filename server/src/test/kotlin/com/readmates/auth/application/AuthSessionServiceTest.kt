@@ -24,6 +24,7 @@ class AuthSessionServiceTest {
         assertTrue(issued.rawToken.length >= 43)
         assertFalse(issued.storedTokenHash.contains(issued.rawToken))
         assertEquals("00000000-0000-0000-0000-000000000101", issued.userId)
+        assertEquals(issued.sessionId, repository.findValidByTokenHash(issued.storedTokenHash)?.id)
     }
 
     @Test

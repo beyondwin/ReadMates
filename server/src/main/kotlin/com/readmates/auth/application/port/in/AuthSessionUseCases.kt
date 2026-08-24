@@ -26,3 +26,7 @@ interface LogoutAuthSessionUseCase {
 
     fun clearedServletSessionCookie(): String
 }
+
+interface ClearHostAuthorityContextUseCase {
+    fun clearedHostAuthorityContextCookie(): String
+}

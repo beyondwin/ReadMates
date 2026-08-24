@@ -1,16 +1,21 @@
 package com.readmates.auth.infrastructure.security
 
+import com.readmates.auth.adapter.`in`.security.AuthClubContextSource
 import com.readmates.auth.adapter.`in`.security.resolveAuthClubContext
 import com.readmates.auth.application.model.AuthenticatedMemberSnapshot
 import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
+import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
+import com.readmates.shared.security.HostAuthorityLossCode
+import com.readmates.shared.security.HostAuthorityLossContract
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
+import org.springframework.http.HttpHeaders
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken
 import org.springframework.security.core.authority.SimpleGrantedAuthority
 import org.springframework.security.core.context.SecurityContextHolder
@@ -23,6 +28,7 @@ class SessionCookieAuthenticationFilter(
     private val manageAuthSessionUseCase: ManageAuthSessionUseCase,
     private val resolveAuthenticatedPrincipalUseCase: ResolveAuthenticatedPrincipalUseCase,
     private val resolveClubContextUseCase: ResolveClubContextUseCase,
+    private val hostAuthorityContextCookie: HostAuthorityContextCookie,
 ) : OncePerRequestFilter() {
     override fun doFilterInternal(
         request: HttpServletRequest,
@@ -42,6 +48,14 @@ class SessionCookieAuthenticationFilter(
                     ?.takeUnless { it.revoked }
 
             if (session != null) {
+                val rawHostAuthorityContext =
+                    request.cookies
+                        ?.firstOrNull { it.name == HostAuthorityContextCookie.COOKIE_NAME }
+                        ?.value
+                val priorHostAuthority = hostAuthorityContextCookie.verify(rawHostAuthorityContext, session)
+                if (rawHostAuthorityContext != null && priorHostAuthority == null) {
+                    response.addHeader(HttpHeaders.SET_COOKIE, hostAuthorityContextCookie.clear())
+                }
                 val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
                 val member =
                     if (requestedClubContext.supplied && requestedClubContext.context == null) {
@@ -50,6 +64,23 @@ class SessionCookieAuthenticationFilter(
                         resolveAuthenticatedPrincipalUseCase.resolveByUserId(
                             session.userId,
                             requestedClubContext.context,
+                        )
+                    }
+                val authorityLoss =
+                    request.hostAuthorityLossCode(
+                        requestedClubContext.source,
+                        requestedClubContext.context,
+                        priorHostAuthority,
+                        member,
+                    )
+                authorityLoss?.let { request.setAttribute(HostAuthorityLossContract.REQUEST_ATTRIBUTE, it) }
+                member
+                    ?.takeIf {
+                        request.shouldIssueHostAuthorityContext(requestedClubContext.source, it, authorityLoss)
+                    }?.let { activeHost ->
+                        response.addHeader(
+                            HttpHeaders.SET_COOKIE,
+                            hostAuthorityContextCookie.issue(session.id, session.expiresAt, activeHost.actor.clubId),
                         )
                     }
                 val authentication =
@@ -146,4 +177,44 @@ class SessionCookieAuthenticationFilter(
     private fun HttpServletRequest.isAdminApi(): Boolean = requestURI == "/api/admin" || requestURI.startsWith("/api/admin/")
 
     private fun HttpServletRequest.isHostApi(): Boolean = requestURI == "/api/host" || requestURI.startsWith("/api/host/")
+
+    private fun HttpServletRequest.hostAuthorityLossCode(
+        source: AuthClubContextSource,
+        requestedClub: com.readmates.club.application.model.ResolvedClubContext?,
+        priorHostAuthority: VerifiedHostAuthorityContext?,
+        currentMember: AuthenticatedMemberSnapshot?,
+    ): HostAuthorityLossCode? {
+        if (!isHostApi() || source != AuthClubContextSource.SLUG || requestedClub == null) {
+            return null
+        }
+        return when {
+            currentMember?.membershipStatus == MembershipStatus.SUSPENDED -> HostAuthorityLossCode.MEMBERSHIP_SUSPENDED
+            priorHostAuthority?.clubId == requestedClub.clubId && !currentMember.isActiveHost() ->
+                HostAuthorityLossCode.HOST_AUTHORITY_REVOKED
+            !isSafeMethod() &&
+                priorHostAuthority != null &&
+                priorHostAuthority.clubId != requestedClub.clubId &&
+                currentMember != null -> HostAuthorityLossCode.CROSS_CLUB_SCOPE
+            else -> null
+        }
+    }
+
+    private fun HttpServletRequest.shouldIssueHostAuthorityContext(
+        source: AuthClubContextSource,
+        currentMember: AuthenticatedMemberSnapshot,
+        authorityLoss: HostAuthorityLossCode?,
+    ): Boolean =
+        isHostApi() &&
+            source == AuthClubContextSource.SLUG &&
+            currentMember.isActiveHost() &&
+            authorityLoss == null
+
+    private fun HttpServletRequest.isSafeMethod(): Boolean = method in SAFE_METHODS
+
+    private fun AuthenticatedMemberSnapshot?.isActiveHost(): Boolean =
+        this?.role == MembershipRole.HOST && membershipStatus == MembershipStatus.ACTIVE
+
+    private companion object {
+        val SAFE_METHODS = setOf("GET", "HEAD", "OPTIONS")
+    }
 }
