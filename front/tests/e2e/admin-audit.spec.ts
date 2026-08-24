@@ -87,6 +87,32 @@ async function routeAudit(page: Page): Promise<void> {
   });
 }
 
+async function routeSensitiveAudit(page: Page, onBody: (body: unknown) => void): Promise<void> {
+  await page.route("**/api/bff/api/admin/audit/events/search", async (route) => {
+    onBody(route.request().postDataJSON());
+    await json(route, 200, {
+      generatedAt: "2026-05-27T00:00:00Z",
+      filters: { from: "2026-05-20T00:00:00Z", to: "2026-05-27T00:00:00Z" },
+      summary: { visibleCount: 1, sourceUnavailableCount: 0, metadataUnavailableCount: 0, unavailableSources: [] },
+      nextCursor: null,
+      items: [{
+        id: "platform_audit_events:search-1",
+        occurredAt: "2026-05-27T00:01:00Z",
+        sourceSlice: "S4",
+        sourceTable: "platform_audit_events",
+        actionCategory: "SUPPORT",
+        actionType: "SUPPORT_ACCESS_GRANT_CREATED",
+        outcome: "SUCCESS",
+        actor: { userId: null, role: "OWNER", displayLabel: "OWNER" },
+        target: { clubId: "club-1", userId: null, jobId: null, eventId: null, label: "사용자 숨김" },
+        summary: "민감 대상과 연결된 안전한 감사 증거입니다.",
+        safeMetadata: [{ label: "reasonCategory", value: "MEMBER_ASSISTANCE", kind: "code" }],
+        metadataState: "AVAILABLE",
+      }],
+    });
+  });
+}
+
 test("owner reviews admin audit ledger without raw private fields", async ({ page }) => {
   await routePlatformAdminShell(page, "OWNER");
   await routeAudit(page);
@@ -99,6 +125,28 @@ test("owner reviews admin audit ledger without raw private fields", async ({ pag
   await expect(page.getByLabel("감사 이벤트 목록").getByText("support grant가 생성되었습니다.")).toBeVisible();
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
+});
+
+test("sensitive audit target stays in POST memory and out of browser persistence", async ({ page }) => {
+  const sentinel = "private.member@example.com";
+  let requestBody: unknown = null;
+  await routePlatformAdminShell(page, "OWNER");
+  await routeAudit(page);
+  await routeSensitiveAudit(page, (body) => { requestBody = body; });
+
+  await page.goto("/admin/audit?sourceSlice=S4");
+  await page.getByRole("searchbox", { name: "민감 대상 검색" }).fill(sentinel);
+  await page.getByRole("button", { name: "대상 검색" }).click();
+
+  await expect(page.getByRole("button", { name: /민감 대상과 연결된 안전한 감사 증거/ })).toBeVisible();
+  expect(requestBody).toMatchObject({ sensitiveTarget: sentinel, sourceSlice: "S4" });
+  await expect(page).toHaveURL(/\/admin\/audit\?sourceSlice=S4$/);
+  const persisted = await page.evaluate(() => JSON.stringify({
+    history: history.state,
+    local: { ...localStorage },
+    session: { ...sessionStorage },
+  }));
+  expect(persisted).not.toContain(sentinel);
 });
 
 async function expectNoAuditPrivateSentinels(page: Page): Promise<void> {

@@ -4,6 +4,7 @@ import {
   adminAuditSearchFromFilters,
   aiOpsDrilldownForAuditItem,
   buildAdminAuditOperationSummary,
+  mergeAdminAuditLedgerPages,
   labelAdminAuditOutcome,
   shouldShowAdminAuditDetailValue,
 } from "./platform-admin-audit-model";
@@ -24,6 +25,27 @@ describe("platform-admin-audit-model", () => {
     const search = adminAuditSearchFromFilters({ range: "30d", clubId: "club-1", actorRole: null, sourceSlice: "S4" });
 
     expect(search.toString()).toBe("range=30d&clubId=club-1&sourceSlice=S4");
+  });
+
+  it("keeps only normalized share-safe filters and never serializes cursor or target search", () => {
+    const filters = adminAuditFiltersFromSearchParams(
+      new URLSearchParams(
+        "range=30d&from=2026-08-01T00%3A00%3A00Z&to=invalid&clubId=club-1&actorRole=OWNER&sourceSlice=S6&actionCategory=AI_OPS&outcome=FAILED&cursor=signed-secret&email=private%40example.com",
+      ),
+    );
+
+    expect(filters).toEqual({
+      range: "30d",
+      from: "2026-08-01T00:00:00.000Z",
+      clubId: "club-1",
+      actorRole: "OWNER",
+      sourceSlice: "S6",
+      actionCategory: "AI_OPS",
+      outcome: "FAILED",
+    });
+    expect(adminAuditSearchFromFilters({ ...filters, cursor: "must-not-leak" } as never).toString()).toBe(
+      "range=30d&from=2026-08-01T00%3A00%3A00.000Z&clubId=club-1&actorRole=OWNER&sourceSlice=S6&actionCategory=AI_OPS&outcome=FAILED",
+    );
   });
 
   it("labels outcomes for ledger chips", () => {
@@ -56,8 +78,8 @@ function auditItem(overrides: Partial<AdminAuditLedgerItem> = {}): AdminAuditLed
 }
 
 describe("aiOpsDrilldownForAuditItem", () => {
-  it("returns an ai-ops clubId path for an AI_OPS item with a club target", () => {
-    expect(aiOpsDrilldownForAuditItem(auditItem())).toBe("/admin/ai-ops?clubId=club-1");
+  it("returns an ai-ops club and job path for an AI_OPS item", () => {
+    expect(aiOpsDrilldownForAuditItem(auditItem())).toBe("/admin/ai-ops?clubId=club-1&jobId=job-1");
   });
 
   it("returns null when the action category is not AI_OPS", () => {
@@ -78,7 +100,7 @@ describe("buildAdminAuditOperationSummary", () => {
     expect(buildAdminAuditOperationSummary(auditItem({ outcome: "FAILED" }))).toMatchObject({
       state: "NEEDS_REVIEW",
       label: "확인 필요",
-      nextHref: "/admin/ai-ops?clubId=club-1",
+      nextHref: "/admin/ai-ops?clubId=club-1&jobId=job-1",
     });
 
     expect(buildAdminAuditOperationSummary(auditItem({ outcome: "DENIED", actionCategory: "SUPPORT" }))).toMatchObject(
@@ -95,7 +117,7 @@ describe("buildAdminAuditOperationSummary", () => {
       state: "LIMITED_DETAIL",
       label: "세부 정보 제한",
       detail: "안전 정책 또는 source 상태 때문에 세부 정보를 표시하지 않습니다.",
-      nextHref: "/admin/ai-ops?clubId=club-1",
+      nextHref: "/admin/ai-ops?clubId=club-1&jobId=job-1",
       nextLabel: "AI Ops에서 보기",
     });
   });
@@ -105,7 +127,7 @@ describe("buildAdminAuditOperationSummary", () => {
       state: "FOLLOW_UP_AVAILABLE",
       label: "후속 화면 있음",
       detail: "AI 운영 화면에서 같은 클럽 범위로 이어서 확인할 수 있습니다.",
-      nextHref: "/admin/ai-ops?clubId=club-1",
+      nextHref: "/admin/ai-ops?clubId=club-1&jobId=job-1",
       nextLabel: "AI Ops에서 보기",
     });
   });
@@ -126,6 +148,39 @@ describe("buildAdminAuditOperationSummary", () => {
       detail: "지원 접근 이벤트가 감사 가능한 안전한 메타데이터와 함께 기록되었습니다.",
       nextHref: null,
       nextLabel: null,
+    });
+  });
+});
+
+describe("mergeAdminAuditLedgerPages", () => {
+  it("appends and deduplicates while preserving the first snapshot and unavailable sources", () => {
+    const first = {
+      generatedAt: "2026-08-25T00:00:00Z",
+      filters: { from: "2026-08-18T00:00:00Z", to: "2026-08-25T00:00:00Z" },
+      summary: { visibleCount: 2, sourceUnavailableCount: 1, metadataUnavailableCount: 0, unavailableSources: ["source-a"] },
+      items: [auditItem({ id: "a" }), auditItem({ id: "boundary" })],
+      nextCursor: "cursor-1",
+    };
+    const second = {
+      ...first,
+      generatedAt: "2026-08-25T00:01:00Z",
+      filters: { from: "wrong", to: "wrong" },
+      summary: { visibleCount: 2, sourceUnavailableCount: 2, metadataUnavailableCount: 1, unavailableSources: ["source-a", "source-b"] },
+      items: [auditItem({ id: "boundary" }), auditItem({ id: "b", metadataState: "UNAVAILABLE" })],
+      nextCursor: null,
+    };
+
+    expect(mergeAdminAuditLedgerPages([first, second])).toEqual({
+      generatedAt: first.generatedAt,
+      filters: first.filters,
+      summary: {
+        visibleCount: 3,
+        sourceUnavailableCount: 2,
+        metadataUnavailableCount: 1,
+        unavailableSources: ["source-a", "source-b"],
+      },
+      items: [first.items[0], first.items[1], second.items[1]],
+      nextCursor: null,
     });
   });
 });

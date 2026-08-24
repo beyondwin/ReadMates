@@ -93,7 +93,7 @@ function aiJob(clubId: string) {
   };
 }
 
-async function routeAiOps(page: Page, opts: { matchClubId: string }): Promise<void> {
+async function routeAiOps(page: Page, opts: { listMatchClubId: string }): Promise<void> {
   await page.route("**/api/bff/api/admin/ai-generation/summary**", async (route) => {
     await json(route, 200, {
       activeJobCount: 0,
@@ -116,15 +116,18 @@ async function routeAiOps(page: Page, opts: { matchClubId: string }): Promise<vo
   await page.route("**/api/bff/api/admin/ai-generation/jobs**", async (route) => {
     const url = new URL(route.request().url());
     const clubId = url.searchParams.get("clubId");
-    const items = clubId === opts.matchClubId ? [aiJob(opts.matchClubId)] : [];
+    const items = clubId === opts.listMatchClubId ? [aiJob(opts.listMatchClubId)] : [];
     await json(route, 200, { items, nextCursor: null });
+  });
+  await page.route("**/api/bff/api/admin/ai-generation/jobs/job-1", async (route) => {
+    await json(route, 200, aiJob("club-1"));
   });
 }
 
 test("owner drills from an AI_OPS audit row into the affected club's ai-ops jobs", async ({ page }) => {
   await routeShell(page, "OWNER");
   await routeAudit(page);
-  await routeAiOps(page, { matchClubId: "club-1" });
+  await routeAiOps(page, { listMatchClubId: "club-1" });
 
   await page.goto("/admin/audit");
 
@@ -133,7 +136,7 @@ test("owner drills from an AI_OPS audit row into the affected club's ai-ops jobs
   const detail = page.getByRole("region", { name: "감사 이벤트 상세" });
   await detail.getByRole("link", { name: /AI Ops에서 보기/ }).click();
 
-  await expect(page).toHaveURL(/\/admin\/ai-ops\?clubId=club-1/);
+  await expect(page).toHaveURL(/\/admin\/ai-ops\?clubId=club-1&jobId=job-1/);
   await expect(page.getByRole("heading", { name: "AI Ops", level: 1 })).toBeVisible();
   await expect(page.getByText("Club One")).toBeVisible();
   await expect(page.getByRole("button", { name: "전체 보기" })).toBeVisible();
@@ -145,16 +148,16 @@ test("owner drills from an AI_OPS audit row into the affected club's ai-ops jobs
   await expect(page.getByText("{\"")).toHaveCount(0);
 });
 
-test("ai-ops drilldown shows an honest empty state when the club has no jobs", async ({ page }) => {
+test("job-targeted drilldown remains exact when the club-filtered list is empty", async ({ page }) => {
   await routeShell(page, "OWNER");
   await routeAudit(page);
-  await routeAiOps(page, { matchClubId: "club-other" });
+  await routeAiOps(page, { listMatchClubId: "club-other" });
 
   await page.goto("/admin/audit");
   await page.getByRole("button", { name: /AI 커밋 재시도를 실행했습니다/ }).click();
   await page.getByRole("region", { name: "감사 이벤트 상세" }).getByRole("link", { name: /AI Ops에서 보기/ }).click();
 
-  await expect(page).toHaveURL(/\/admin\/ai-ops\?clubId=club-1/);
-  await expect(page.getByText("이 필터에 해당하는 AI job이 없습니다.")).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/ai-ops\?clubId=club-1&jobId=job-1/);
+  await expect(page.getByText("Club One")).toBeVisible();
   await expect(page.getByRole("button", { name: "전체 보기" })).toBeVisible();
 });

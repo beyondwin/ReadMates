@@ -5,6 +5,17 @@ import { MemoryRouter } from "react-router";
 import type { AdminAuditLedgerPage } from "@/features/platform-admin/model/platform-admin-audit-model";
 import { AdminAuditLedger } from "./admin-audit-ledger";
 
+const defaultSearch = {
+  value: "",
+  canSearch: true,
+  pending: false,
+  error: null,
+  active: false,
+  onChange: vi.fn(),
+  onSubmit: vi.fn(),
+  onClear: vi.fn(),
+};
+
 const page: AdminAuditLedgerPage = {
   generatedAt: "2026-05-27T00:00:00Z",
   filters: {},
@@ -51,8 +62,12 @@ describe("AdminAuditLedger", () => {
         filters={{ range: "7d" }}
         loading={false}
         error={null}
+        nextPageError={false}
+        loadingMore={false}
+        sensitiveSearch={defaultSearch}
         onFilterChange={vi.fn()}
         onLoadMore={vi.fn()}
+        onRetryLoadMore={vi.fn()}
       />,
     );
 
@@ -75,8 +90,12 @@ describe("AdminAuditLedger", () => {
         filters={{ range: "7d" }}
         loading={false}
         error={null}
+        nextPageError={false}
+        loadingMore={false}
+        sensitiveSearch={defaultSearch}
         onFilterChange={vi.fn()}
         onLoadMore={vi.fn()}
+        onRetryLoadMore={vi.fn()}
       />,
     );
 
@@ -112,8 +131,12 @@ describe("AdminAuditLedger", () => {
           filters={{ range: "7d" }}
           loading={false}
           error={null}
+          nextPageError={false}
+          loadingMore={false}
+          sensitiveSearch={defaultSearch}
           onFilterChange={vi.fn()}
           onLoadMore={vi.fn()}
+          onRetryLoadMore={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -124,7 +147,7 @@ describe("AdminAuditLedger", () => {
     expect(within(detail).getByText("후속 화면 있음")).toBeInTheDocument();
     expect(within(detail).getByRole("link", { name: /AI Ops에서 보기/ })).toHaveAttribute(
       "href",
-      "/admin/ai-ops?clubId=club-7",
+      "/admin/ai-ops?clubId=club-7&jobId=job-1",
     );
   });
 
@@ -144,8 +167,12 @@ describe("AdminAuditLedger", () => {
         filters={{ range: "7d" }}
         loading={false}
         error={null}
+        nextPageError={false}
+        loadingMore={false}
+        sensitiveSearch={defaultSearch}
         onFilterChange={vi.fn()}
         onLoadMore={vi.fn()}
+        onRetryLoadMore={vi.fn()}
       />,
     );
 
@@ -153,5 +180,73 @@ describe("AdminAuditLedger", () => {
     expect(within(detail).getByText("세부 정보 제한")).toBeInTheDocument();
     expect(detail.textContent).not.toContain("secret");
     expect(detail.textContent).not.toContain("{");
+  });
+
+  it("shows complete actor, target, transition, receipt, and correlation evidence", async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AdminAuditLedger
+          page={{
+            ...page,
+            items: [{
+              ...page.items[0],
+              actor: { userId: null, role: "SYSTEM", displayLabel: "notification-worker" },
+              target: { clubId: "club-1", userId: null, jobId: null, eventId: "event-1", label: "알림 재처리" },
+              safeMetadata: [
+                { label: "reasonCategory", value: "INCIDENT_INVESTIGATION", kind: "code" },
+                { label: "beforeStatus", value: "FAILED", kind: "code" },
+                { label: "afterStatus", value: "SUCCEEDED", kind: "code" },
+                { label: "receiptId", value: "receipt-1", kind: "reference" },
+                { label: "correlationId", value: "correlation-1", kind: "reference" },
+              ],
+            }],
+          }}
+          filters={{ range: "7d" }} loading={false} error={null} nextPageError={false} loadingMore={false}
+          sensitiveSearch={defaultSearch} onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await user.click(screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ }));
+    const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(detail).toHaveTextContent("notification-worker");
+    expect(detail).toHaveTextContent("알림 재처리");
+    expect(detail).toHaveTextContent("INCIDENT_INVESTIGATION");
+    expect(detail).toHaveTextContent("FAILED");
+    expect(detail).toHaveTextContent("SUCCEEDED");
+    expect(detail).toHaveTextContent("receipt-1");
+    expect(detail).toHaveTextContent("correlation-1");
+  });
+
+  it("supports arrow-key row navigation and a mobile return to the list", async () => {
+    const user = userEvent.setup();
+    render(
+      <AdminAuditLedger page={page} filters={{ range: "7d" }} loading={false} error={null}
+        nextPageError={false} loadingMore={false} sensitiveSearch={defaultSearch}
+        onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
+    );
+    const first = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
+    first.focus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("button", { name: /support grant가 생성되었습니다/ })).toHaveFocus();
+    expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("support grant가 생성되었습니다");
+    await user.click(screen.getByRole("button", { name: "목록으로" }));
+    expect(screen.getByLabelText("감사 이벤트 목록")).toHaveFocus();
+  });
+
+  it("exposes every share-safe filter without exposing cursor controls", () => {
+    render(
+      <AdminAuditLedger page={page} filters={{ range: "7d" }} loading={false} error={null}
+        nextPageError={false} loadingMore={false} sensitiveSearch={defaultSearch}
+        onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
+    );
+    expect(screen.getByLabelText("시작 시각")).toBeInTheDocument();
+    expect(screen.getByLabelText("종료 시각")).toBeInTheDocument();
+    expect(screen.getByLabelText("클럽 ID")).toBeInTheDocument();
+    expect(screen.getByLabelText("행위자 역할")).toBeInTheDocument();
+    expect(screen.getByLabelText("소스 영역")).toBeInTheDocument();
+    expect(screen.getByLabelText("행동 분류")).toBeInTheDocument();
+    expect(screen.getByLabelText("결과")).toBeInTheDocument();
+    expect(screen.queryByLabelText(/cursor/i)).not.toBeInTheDocument();
   });
 });

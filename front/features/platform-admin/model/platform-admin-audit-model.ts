@@ -25,7 +25,6 @@ export type AdminAuditFilters = {
   sourceSlice?: AdminAuditSourceSlice | null;
   actionCategory?: AdminAuditActionCategory | null;
   outcome?: AdminAuditOutcome | null;
-  cursor?: string | null;
 };
 
 export type AdminAuditLedgerPage = {
@@ -83,14 +82,13 @@ export function adminAuditFiltersFromSearchParams(params: URLSearchParams): Admi
   const filters: AdminAuditFilters = {
     range: enumParam(params.get("range"), RANGES) ?? "7d",
   };
-  setFilter(filters, "from", params.get("from"));
-  setFilter(filters, "to", params.get("to"));
-  setFilter(filters, "clubId", params.get("clubId"));
+  setFilter(filters, "from", normalizedInstant(params.get("from")));
+  setFilter(filters, "to", normalizedInstant(params.get("to")));
+  setFilter(filters, "clubId", normalizedIdentifier(params.get("clubId")));
   setFilter(filters, "actorRole", enumParam(params.get("actorRole"), ACTOR_ROLES));
   setFilter(filters, "sourceSlice", enumParam(params.get("sourceSlice"), SOURCE_SLICES));
   setFilter(filters, "actionCategory", enumParam(params.get("actionCategory"), ACTION_CATEGORIES));
   setFilter(filters, "outcome", enumParam(params.get("outcome"), OUTCOMES));
-  setFilter(filters, "cursor", params.get("cursor"));
   return filters;
 }
 
@@ -104,8 +102,34 @@ export function adminAuditSearchFromFilters(filters: AdminAuditFilters): URLSear
   setParam(params, "sourceSlice", filters.sourceSlice);
   setParam(params, "actionCategory", filters.actionCategory);
   setParam(params, "outcome", filters.outcome);
-  setParam(params, "cursor", filters.cursor);
   return params;
+}
+
+export function mergeAdminAuditLedgerPages(pages: AdminAuditLedgerPage[]): AdminAuditLedgerPage | null {
+  const first = pages[0];
+  const last = pages.at(-1);
+  if (!first || !last) return null;
+
+  const seen = new Set<string>();
+  const items = pages.flatMap((page) => page.items).filter((item) => {
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
+  });
+  const unavailableSources = [...new Set(pages.flatMap((page) => page.summary.unavailableSources))];
+
+  return {
+    generatedAt: first.generatedAt,
+    filters: first.filters,
+    summary: {
+      visibleCount: items.length,
+      sourceUnavailableCount: unavailableSources.length,
+      metadataUnavailableCount: items.filter((item) => item.metadataState === "UNAVAILABLE").length,
+      unavailableSources,
+    },
+    items,
+    nextCursor: last.nextCursor,
+  };
 }
 
 export function labelAdminAuditOutcome(outcome: AdminAuditOutcome): string {
@@ -155,7 +179,7 @@ export function aiOpsDrilldownForAuditItem(item: AdminAuditLedgerItem): string |
   if (item.actionCategory !== "AI_OPS") return null;
   const clubId = item.target.clubId;
   if (!clubId) return null;
-  return aiOpsPathFromFilter({ ...EMPTY_AI_OPS_FILTER, clubId });
+  return aiOpsPathFromFilter({ ...EMPTY_AI_OPS_FILTER, clubId, jobId: item.target.jobId });
 }
 
 export type AdminAuditOperationState = "NEEDS_REVIEW" | "RECORDED" | "FOLLOW_UP_AVAILABLE" | "LIMITED_DETAIL";
@@ -232,4 +256,15 @@ function setParam(params: URLSearchParams, key: string, value: string | null | u
   if (value) {
     params.set(key, value);
   }
+}
+
+function normalizedInstant(value: string | null): string | null {
+  if (!value) return null;
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+}
+
+function normalizedIdentifier(value: string | null): string | null {
+  const normalized = value?.trim() ?? "";
+  return normalized && normalized.length <= 128 ? normalized : null;
 }
