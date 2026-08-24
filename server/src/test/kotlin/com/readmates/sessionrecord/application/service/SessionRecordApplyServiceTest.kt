@@ -28,6 +28,7 @@ import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
+import com.readmates.sessionrecord.application.port.out.SessionRecordMutationReceiptPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.security.AuthenticatedClubActor
@@ -399,6 +400,7 @@ private class Fixture(
             store = store,
             codec = codec,
             replacer = replacer,
+            mutationReceipts = SessionRecordMutationReceiptPort.Noop,
         )
 
     init {
