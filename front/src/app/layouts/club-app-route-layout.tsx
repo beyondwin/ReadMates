@@ -4,6 +4,7 @@ import type { ClubAppAccess } from "@/features/guest-browse/route/club-app-audie
 import { ClubAppAudienceProvider } from "@/features/guest-browse/route/club-app-audience-context";
 import { GuestAppHead } from "@/features/guest-browse/ui/guest-app-head";
 import { GuestNavigationProvider } from "@/features/guest-browse/ui/guest-navigation-dialog";
+import { HostAuthorityLossGuestHandoff } from "@/src/app/host-authority-loss-guest-handoff";
 import { Link } from "@/src/app/router-link";
 import { AppRouteLayout } from "./app-route-layout";
 
@@ -13,6 +14,7 @@ export function ClubMemberAppRouteLayout() {
   const shell = (
     <ClubAppAudienceProvider value={access}>
       <GuestAppHead audience={access.audience} />
+      {access.audience === "GUEST" ? <HostAuthorityLossGuestHandoff /> : null}
       <AppRouteLayout scopedAuth={access.auth} audience={access.audience} />
     </ClubAppAudienceProvider>
   );
