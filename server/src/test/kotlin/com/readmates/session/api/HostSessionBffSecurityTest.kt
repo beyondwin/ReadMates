@@ -1,5 +1,9 @@
 package com.readmates.session.api
 
+import com.readmates.auth.application.port.out.AllowedOriginPort
+import com.readmates.auth.infrastructure.security.BffSecretFilter
+import com.readmates.auth.infrastructure.security.HostClientContractMode
+import com.readmates.auth.infrastructure.security.HostClientContractProperties
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Tag
@@ -9,8 +13,10 @@ import org.junit.jupiter.params.provider.MethodSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+import org.springframework.context.annotation.Profile
 import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
+import org.springframework.http.ResponseEntity
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
@@ -23,6 +29,14 @@ import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+import org.springframework.test.web.servlet.setup.MockMvcBuilders
+import org.springframework.test.web.servlet.setup.StandaloneMockMvcBuilder
+import org.springframework.web.bind.annotation.RequestBody
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestMethod
+import org.springframework.web.bind.annotation.RestController
+import java.util.concurrent.atomic.AtomicInteger
+import java.util.concurrent.atomic.AtomicReference
 import java.util.stream.Stream
 
 private const val CLEANUP_BFF_DELETE_SESSION_SQL = """
@@ -88,6 +102,70 @@ class HostSessionBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    @ParameterizedTest
+    @MethodSource("backendPolicyCases")
+    fun `spring dispatch applies every backend policy before controller side effects`(case: BackendPolicyCase) {
+        val probe = CompatibilityMutationProbeController()
+        val policyMockMvc = compatibilityPolicyMockMvc(case.mode, probe)
+        val request =
+            request(HttpMethod.POST, "/api/host/invitations")
+                .header("X-Readmates-Bff-Secret", "test-bff-secret")
+                .header("Origin", "http://localhost:3000")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(INVITATION_BODY)
+        case.generation?.let { request.header("X-Readmates-Client-Contract", it) }
+
+        val result = policyMockMvc.perform(request).andExpect(status().`is`(case.expectedStatus))
+        case.expectedCode?.let { result.andExpect(jsonPath("$.code").value(it)) }
+
+        if (case.expectedStatus == 204) {
+            assertEquals(1, probe.domainMutationCount.get())
+            assertEquals(INVITATION_BODY, probe.lastBody.get())
+        } else {
+            assertEquals(0, probe.domainMutationCount.get())
+            assertEquals(null, probe.lastBody.get())
+        }
+    }
+
+    @ParameterizedTest
+    @MethodSource("nonSessionV3Cases")
+    fun `support mode preserves v3 non session request bodies`(case: NonSessionV3Case) {
+        val probe = CompatibilityMutationProbeController()
+        val policyMockMvc = compatibilityPolicyMockMvc(HostClientContractMode.SUPPORT_V2_V3, probe)
+        val request =
+            request(case.method, case.path)
+                .header("X-Readmates-Bff-Secret", "test-bff-secret")
+                .header("X-Readmates-Client-Contract", "v3")
+                .header("Origin", "http://localhost:3000")
+        case.body?.let {
+            request.contentType(MediaType.APPLICATION_JSON).content(it)
+        }
+
+        policyMockMvc.perform(request).andExpect(status().isNoContent)
+
+        assertEquals(1, probe.domainMutationCount.get())
+        assertEquals(case.body, probe.lastBody.get())
+    }
+
+    private fun compatibilityPolicyMockMvc(
+        mode: HostClientContractMode,
+        probe: CompatibilityMutationProbeController,
+    ): MockMvc =
+        MockMvcBuilders
+            .standaloneSetup(probe)
+            .addFilters<StandaloneMockMvcBuilder>(
+                BffSecretFilter(
+                    configuredSecretsRaw = "",
+                    legacyExpectedSecret = "test-bff-secret",
+                    bffSecretRequired = true,
+                    allowedOriginPort =
+                        object : AllowedOriginPort {
+                            override fun isAllowed(origin: String) = origin == "http://localhost:3000"
+                        },
+                    hostClientContractProperties = HostClientContractProperties(mode = mode.name),
+                ),
+            ).build()
+
     @ParameterizedTest
     @MethodSource("recordMutationCases")
     fun `trusted host bff reaches every record mutation controller without csrf`(case: RecordMutationCase) {
@@ -706,6 +784,8 @@ class HostSessionBffSecurityTest(
     }
 
     private companion object {
+        private const val INVITATION_BODY =
+            "{\"email\":\"rollout.invite@example.com\",\"name\":\"호환성 초대\",\"applyToCurrentSession\":false}"
         private const val SESSION_ID = "00000000-0000-0000-0000-000000009888"
         private const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
         private const val VIEWER_USER_ID = "00000000-0000-0000-0000-000000009116"
@@ -801,6 +881,90 @@ class HostSessionBffSecurityTest(
                     """{"expectedSessionRevision":0}""",
                 ),
             )
+
+        @JvmStatic
+        fun backendPolicyCases(): Stream<BackendPolicyCase> {
+            val upgrade = "HOST_CLIENT_UPGRADE_REQUIRED"
+            val update = "CLIENT_UPDATE_REQUIRED"
+            return Stream.of(
+                BackendPolicyCase(HostClientContractMode.DISABLED, null, 204, null),
+                BackendPolicyCase(HostClientContractMode.DISABLED, "v2", 204, null),
+                BackendPolicyCase(HostClientContractMode.DISABLED, "v3", 204, null),
+                BackendPolicyCase(HostClientContractMode.DISABLED, "v9", 204, null),
+                BackendPolicyCase(HostClientContractMode.V2_ONLY, "v2", 204, null),
+                BackendPolicyCase(HostClientContractMode.V2_ONLY, "v3", 409, upgrade),
+                BackendPolicyCase(HostClientContractMode.V2_ONLY, null, 409, upgrade),
+                BackendPolicyCase(HostClientContractMode.V2_ONLY, "v9", 409, upgrade),
+                BackendPolicyCase(HostClientContractMode.SUPPORT_V2_V3, "v2", 204, null),
+                BackendPolicyCase(HostClientContractMode.SUPPORT_V2_V3, "v3", 204, null),
+                BackendPolicyCase(HostClientContractMode.SUPPORT_V2_V3, null, 409, upgrade),
+                BackendPolicyCase(HostClientContractMode.SUPPORT_V2_V3, "v9", 409, upgrade),
+                BackendPolicyCase(HostClientContractMode.ENFORCE_V3, "v3", 204, null),
+                BackendPolicyCase(HostClientContractMode.ENFORCE_V3, "v2", 428, update),
+                BackendPolicyCase(HostClientContractMode.ENFORCE_V3, null, 428, update),
+                BackendPolicyCase(HostClientContractMode.ENFORCE_V3, "v9", 428, update),
+            )
+        }
+
+        @JvmStatic
+        fun nonSessionV3Cases(): Stream<NonSessionV3Case> =
+            Stream.of(
+                NonSessionV3Case(HttpMethod.POST, "/api/host/members/m-1/approve", null),
+                NonSessionV3Case(HttpMethod.POST, "/api/host/invitations", INVITATION_BODY),
+                NonSessionV3Case(
+                    HttpMethod.PUT,
+                    "/api/host/notifications/policy",
+                    "{\"sessionReminderEnabled\":true}",
+                ),
+                NonSessionV3Case(
+                    HttpMethod.POST,
+                    "/api/host/notifications/manual/preview",
+                    "{\"audience\":\"ALL_ACTIVE_MEMBERS\",\"requestedChannels\":\"BOTH\"}",
+                ),
+                NonSessionV3Case(
+                    HttpMethod.POST,
+                    "/api/host/notifications/manual",
+                    "{\"previewId\":\"preview-fixture\",\"resendConfirmed\":false}",
+                ),
+                NonSessionV3Case(HttpMethod.POST, "/api/host/notifications/process", null),
+                NonSessionV3Case(
+                    HttpMethod.POST,
+                    "/api/host/notifications/test-mail",
+                    "{\"recipientEmail\":\"rollout.mail@example.com\"}",
+                ),
+            )
+    }
+}
+
+data class BackendPolicyCase(
+    val mode: HostClientContractMode,
+    val generation: String?,
+    val expectedStatus: Int,
+    val expectedCode: String?,
+)
+
+data class NonSessionV3Case(
+    val method: HttpMethod,
+    val path: String,
+    val body: String?,
+)
+
+@RestController
+@Profile("compatibility-matrix-probe")
+private class CompatibilityMutationProbeController {
+    val domainMutationCount = AtomicInteger()
+    val lastBody = AtomicReference<String?>()
+
+    @RequestMapping(
+        "/api/host/**",
+        method = [RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE],
+    )
+    fun mutate(
+        @RequestBody(required = false) body: String?,
+    ): ResponseEntity<Void> {
+        lastBody.set(body)
+        domainMutationCount.incrementAndGet()
+        return ResponseEntity.noContent().build()
     }
 }
 

@@ -11,6 +11,7 @@ test.describe.configure({ mode: "serial" });
 const invitedEmail = "e2e.invited@example.com";
 const appOrigin = `http://localhost:${process.env.PLAYWRIGHT_PORT ?? 3100}`;
 const hostMeetingPath = hostMeetingUrlPattern;
+const canonicalHostDashboardPath = "/clubs/reading-sai/app/host";
 
 function resetSessionFlowState() {
   resetE2eState({
@@ -35,6 +36,18 @@ async function loginAsDevAccount(page: Page, accountName: RegExp) {
 async function expectCanonicalMeetingUrl(page: Page) {
   await expect(page).toHaveURL(hostMeetingPath);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
+}
+
+async function expectCanonicalHostDashboard(page: Page) {
+  await expect(page).toHaveURL(new RegExp(`${canonicalHostDashboardPath}/?(?:\\?|$)`));
+  expect(new URL(page.url()).pathname).toBe(canonicalHostDashboardPath);
+  await expect(page.getByRole("heading", { level: 1, name: "오늘" })).toBeVisible();
+}
+
+async function openCurrentMeetingFromDashboard(page: Page) {
+  await expectCanonicalHostDashboard(page);
+  await page.getByRole("link", { name: "지금 다루는 모임 열기" }).click();
+  await expectCanonicalMeetingUrl(page);
 }
 
 async function fillNewMeetingBasics(
@@ -127,7 +140,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   createOpenSessionFixture();
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");
-  await expectCanonicalMeetingUrl(page);
+  await expectCanonicalHostDashboard(page);
 
   await page.goto("/app/host/sessions/new");
   await expect(page.getByLabel("모임 제목")).toBeVisible();
@@ -152,7 +165,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
       method: "PATCH",
       headers: {
         "content-type": "application/json",
-        "X-Readmates-Client-Contract": "v2",
+        "X-Readmates-Client-Contract": "v3",
       },
       body: JSON.stringify({ accessScope: "GUEST_READABLE" }),
     });
@@ -169,7 +182,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");
-  await expectCanonicalMeetingUrl(page);
+  await openCurrentMeetingFromDashboard(page);
   await confirmLifecycle(page, "모임 마치기", "/close");
   await page.goto(`/app/host/sessions/${createdSessionId}`);
   await expectCanonicalMeetingUrl(page);
@@ -191,7 +204,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
 
   await loginAsDevAccount(page, /호스트/);
   await page.goto("/app/host");
-  await expectCanonicalMeetingUrl(page);
+  await openCurrentMeetingFromDashboard(page);
   await confirmLifecycle(page, "모임 마치기", "/close");
   await expect(page.locator(".m-toast")).toContainText("모임을 마쳤습니다");
   await expect(page.getByText("기록 정리 중")).toBeVisible();
@@ -209,12 +222,16 @@ test("host creates session seven and member sees current session", async ({ page
   });
   await page.goto("/app/session/current");
   await expect(page.getByRole("heading", { level: 1, name: "테스트 책" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "호스트 화면" })).toHaveAttribute("href", "/app/host");
-
-  await page.getByRole("link", { name: "호스트 화면" }).click();
+  const memberWorkspaceSelector = page.locator(".desktop-only .rm-workspace-selector");
+  await memberWorkspaceSelector.locator("summary").click();
+  await expect(memberWorkspaceSelector.getByRole("link", { name: "호스트 공간" }))
+    .toHaveAttribute("href", hostMeetingPath);
+  await memberWorkspaceSelector.getByRole("link", { name: "호스트 공간" }).click();
   await expectCanonicalMeetingUrl(page);
-  await page.getByRole("link", { name: "멤버 화면으로" }).first().click();
-  await expect(page).toHaveURL(/\/app$/);
+  const hostWorkspaceSelector = page.locator(".desktop-only .rm-workspace-selector");
+  await hostWorkspaceSelector.locator("summary").click();
+  await hostWorkspaceSelector.getByRole("link", { name: "멤버 공간" }).click();
+  await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/session\/current\/?$/);
 
   await loginWithGoogleFixture(page, "member5@example.com");
   await page.goto("/app/session/current");

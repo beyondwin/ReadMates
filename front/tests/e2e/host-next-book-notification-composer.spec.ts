@@ -131,7 +131,7 @@ test("confirm creates exactly one dispatch and retry remains one", async ({ page
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "X-Readmates-Client-Contract": "v2",
+          "X-Readmates-Client-Contract": "v3",
         },
         body: JSON.stringify(body),
       },

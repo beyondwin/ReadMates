@@ -23,6 +23,7 @@ import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCa
 import com.readmates.sessionrecord.application.port.out.ReplaceSessionRecordContentPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacement
 import com.readmates.sessionrecord.application.port.out.SessionRecordContentReplacementResult
+import com.readmates.sessionrecord.application.port.out.SessionRecordMutationReceiptPort
 import com.readmates.sessionrecord.application.port.out.SessionRecordSnapshotCodec
 import com.readmates.sessionrecord.application.port.out.SessionRecordStorePort
 import com.readmates.shared.listing.application.model.HostListEpochKind
@@ -41,10 +42,12 @@ import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
 @Service
+@Suppress("TooManyFunctions")
 class SessionRecordApplyService(
     private val store: SessionRecordStorePort,
     private val codec: SessionRecordSnapshotCodec,
     private val replacer: ReplaceSessionRecordContentPort,
+    private val mutationReceipts: SessionRecordMutationReceiptPort,
     private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
     private val idempotency: MutationIdempotencyService? = null,
 ) : ApplySessionRecordUseCase {
@@ -107,6 +110,7 @@ class SessionRecordApplyService(
                     )
             ) {
                 is MutationClaimResult.Replayed -> {
+                    requireMutationReceipt(host, command, claim.receiptId)
                     val completed =
                         store.findApplyReceipt(host, command.sessionId, claim.receiptId)
                             ?: throw notFound()
@@ -118,6 +122,7 @@ class SessionRecordApplyService(
         }
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId)?.let { completed ->
             if (identity != null) {
+                requireMutationReceipt(host, command, command.applyRequestId)
                 idempotency?.complete(identity, command.applyRequestId)
             }
             return replay(host, command, completed)
@@ -200,6 +205,7 @@ class SessionRecordApplyService(
     ): SessionRecordApplyResult {
         store.findApplyReceipt(host, command.sessionId, command.applyRequestId, forUpdate = true)?.let { completed ->
             if (identity != null) {
+                requireMutationReceipt(host, command, command.applyRequestId)
                 idempotency?.complete(identity, command.applyRequestId)
             }
             return replay(host, command, completed)
@@ -248,14 +254,30 @@ class SessionRecordApplyService(
         afterReplacement()
         val revision = store.insertAppliedRevision(host, editor, encodedDraft)
         store.insertApplyReceipt(host, command, requestHash, eventType, revision)
-        if (identity != null) {
-            idempotency?.complete(identity, command.applyRequestId)
-        }
         if (!store.deleteAppliedDraft(host, command.sessionId, command.expectedDraftRevision)) {
             throw draftStale()
         }
+        if (!allowHostOnlyVisibility) {
+            mutationReceipts.recordCommitted(host, command.sessionId, command.applyRequestId)
+        }
+        if (identity != null) {
+            idempotency?.complete(identity, command.applyRequestId)
+        }
         epochPort.bump(host.clubId, HostListEpochKind.RECORD)
         return result(revision, eventType)
+    }
+
+    private fun requireMutationReceipt(
+        host: CurrentMember,
+        command: ApplySessionRecordCommand,
+        receiptId: UUID,
+    ) {
+        if (!mutationReceipts.matchesCommitted(host, command.sessionId, receiptId)) {
+            throw SessionRecordException(
+                SessionRecordError.APPLY_REQUEST_ALREADY_USED,
+                "Session record apply receipt is unavailable",
+            )
+        }
     }
 
     private fun replay(

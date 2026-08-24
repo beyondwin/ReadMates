@@ -11,6 +11,7 @@ import {
   readSessionRecordRevisionCount,
   resetE2eState,
   runMysql,
+  sessionRecordApplyReceiptCount,
 } from "./readmates-e2e-db";
 
 test.describe.configure({ mode: "serial" });
@@ -62,6 +63,17 @@ order by session_participants.created_at, session_participants.id;
     .split("\n")
     .slice(1)
     .filter(Boolean);
+}
+
+function mutationIdempotencyStatus(sessionId: string, idempotencyKey: string) {
+  const output = runMysql(`
+select status
+from mutation_idempotency_keys
+where operation = 'SESSION_RECORD_APPLY'
+  and resource_slot = ${sqlValue(sessionId)}
+  and idempotency_key = ${sqlValue(idempotencyKey)};
+`);
+  return output.trim().split("\n")[1] ?? null;
 }
 
 function feedbackMarkdown(sessionNumber: number, authorName: string) {
@@ -270,7 +282,7 @@ async function applyConcurrentRecordRevision(page: Page, sessionId: string) {
         ...init,
         headers: {
           "Content-Type": "application/json",
-          "X-Readmates-Client-Contract": "v2",
+          "X-Readmates-Client-Contract": "v3",
           ...init?.headers,
         },
       });
@@ -474,18 +486,50 @@ where id = ${sqlValue(sessionId)};
   await expect(page.getByLabel("공개 요약")).toHaveValue(IMPORT_SUMMARY);
   const revisionsBeforeApply = await readSessionRecordRevisionCount(sessionId);
   const applyRequestIds: string[] = [];
+  const idempotencyKeys: string[] = [];
   let loseFirstResponse = true;
   await page.route(`**/api/bff/api/host/sessions/${sessionId}/record-apply**`, async (route) => {
     if (new URL(route.request().url()).pathname.endsWith("/record-apply-preview")) {
       await route.fallback();
       return;
     }
-    const body = route.request().postDataJSON() as { applyRequestId: string };
-    applyRequestIds.push(body.applyRequestId);
+    const body = route.request().postDataJSON() as {
+      idempotencyKey?: string;
+      command?: { applyRequestId: string };
+      applyRequestId?: string;
+    };
+    const applyRequestId = body.command?.applyRequestId ?? body.applyRequestId;
+    if (!applyRequestId) {
+      throw new Error("record apply fixture is missing applyRequestId");
+    }
+    applyRequestIds.push(applyRequestId);
+    if (body.idempotencyKey) {
+      idempotencyKeys.push(body.idempotencyKey);
+    }
     if (loseFirstResponse) {
       loseFirstResponse = false;
-      const response = await route.fetch();
-      expect(response.status(), await response.text()).toBe(200);
+      if (!body.idempotencyKey || !body.command) {
+        throw new Error("response-loss fixture requires a v3 record apply envelope");
+      }
+      const requestUrl = route.request().url();
+      const browserHeaders = await route.request().allHeaders();
+      const response = await page.request.fetch(requestUrl, {
+        method: route.request().method(),
+        headers: {
+          "Content-Type": "application/json",
+          "Origin": new URL(requestUrl).origin,
+          "X-Readmates-Client-Contract": "v3",
+          ...(browserHeaders.cookie ? { Cookie: browserHeaders.cookie } : {}),
+        },
+        data: body,
+        failOnStatusCode: false,
+      });
+      const responseBody = await response.json();
+      expect(response.status(), JSON.stringify(responseBody)).toBe(200);
+      expect(responseBody).toMatchObject({
+        liveRevision: expect.any(Number),
+      });
+      expect(mutationIdempotencyStatus(sessionId, body.idempotencyKey)).toBe("COMPLETED");
       await route.abort("failed");
       return;
     }
@@ -493,20 +537,24 @@ where id = ${sqlValue(sessionId)};
   });
 
   const applyDialog = await reviewAndApply(page, sessionId);
+  const reconciliationResponse = page.waitForResponse(
+    (response) =>
+      response.request().method() === "GET"
+      && response.url().includes(`/host/mutations/SESSION_RECORD_APPLY/${sessionId}/`)
+      && new URL(response.url()).pathname.endsWith(`/${idempotencyKeys[0]}`),
+  );
   await applyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
-  await expect(page.getByText(/처리 결과를 확인하지 못했습니다/)).toBeVisible();
+  const reconciled = await reconciliationResponse;
+  expect(reconciled.status(), await reconciled.text()).toBe(200);
+  await expect(reconciled.json()).resolves.toMatchObject({ status: "COMMITTED" });
+  await expect(page.getByText("변경사항을 반영했습니다. 알림은 작성기에서 별도로 선택해 주세요."))
+    .toBeVisible();
   const revisionsAfterLostResponse = await readSessionRecordRevisionCount(sessionId);
   expect(revisionsAfterLostResponse).toBeGreaterThan(revisionsBeforeApply);
-  await applyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
-  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
-  expect(applyRequestIds).toHaveLength(2);
-  expect(new Set(applyRequestIds).size).toBe(1);
-  await expect.poll(() => readSessionRecordRevisionCount(sessionId))
-    .toBe(revisionsAfterLostResponse);
-  expect(await readNotificationEventCount(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
-
-  await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();
-  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeHidden();
+  expect(applyRequestIds).toHaveLength(1);
+  expect(idempotencyKeys).toHaveLength(1);
+  expect(sessionRecordApplyReceiptCount(sessionId, applyRequestIds[0])).toBe(1);
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(await readNotificationEventCount(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "FEEDBACK_DOCUMENT_PUBLISHED")).toBe(0);
 

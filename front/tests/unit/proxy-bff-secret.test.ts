@@ -201,6 +201,30 @@ describe("hostClientContractViteBypass", () => {
   }
 
   it.each([
+    { capability: undefined, supported: ["v2", "v3"] },
+    { capability: "V2_ONLY" as const, supported: ["v2"] },
+  ])("serves the public-safe no-store capability for $capability", ({ capability, supported }) => {
+    const req = incomingReq({
+      method: "GET",
+      url: "/api/bff/__internal/client-contract-status?ignored=true",
+    });
+    const res = mockRes();
+
+    const bypass = hostClientContractViteBypass(req, res, capability);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.headers["Content-Type"]).toContain("application/json");
+    expect(res.headers["Cache-Control"]).toBe("no-store");
+    expect(JSON.parse(res.body())).toEqual({
+      schemaVersion: 1,
+      supportedHostClientContracts: supported,
+    });
+    expect(res.body()).not.toMatch(/secret|origin|environment|deploy/i);
+    expect(res.writableEnded).toBe(true);
+    expect(bypass).toBe(req.url);
+  });
+
+  it.each([
     { name: "missing", contract: undefined, capability: undefined },
     { name: "unknown", contract: "attacker-version", capability: undefined },
     { name: "V2_ONLY+v3", contract: "v3", capability: "V2_ONLY" as const },

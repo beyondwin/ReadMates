@@ -1,5 +1,6 @@
 package com.readmates.sessionrecord.api
 
+import com.readmates.session.application.port.out.HostMutationReceiptPort
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -21,6 +22,7 @@ import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
 import tools.jackson.databind.JsonNode
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -32,9 +34,11 @@ import tools.jackson.databind.JsonNode
 @Tag("integration")
 @Sql(statements = [RESET_RECORD_API_FIXTURES], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEAN_RECORD_API_FIXTURES], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
+@Suppress("LargeClass")
 class HostSessionRecordControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val mutationReceipts: HostMutationReceiptPort,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     @Test
     fun `host capabilities and editor are host scoped and public safe`() {
@@ -181,6 +185,227 @@ class HostSessionRecordControllerDbTest(
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_RECORD_DRAFT_STALE") }
+            }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `committed record apply reconciles immutable receipt after response loss without replaying effects`() {
+        val liveSnapshot =
+            mockMvc
+                .get("/api/host/sessions/$SESSION_ID/record-editor") {
+                    with(user("host@example.com"))
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response.contentAsString
+                .let {
+                    tools.jackson.databind
+                        .ObjectMapper()
+                        .readTree(it)
+                        .get("liveSnapshot")
+                        .toString()
+                }
+        mockMvc
+            .patch("/api/host/sessions/$SESSION_ID/record-draft") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedDraftRevision":null,"snapshot":$liveSnapshot}"""
+            }.andExpect {
+                status { isOk() }
+            }
+        val draftHash =
+            mockMvc
+                .post("/api/host/sessions/$SESSION_ID/record-apply-preview") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"expectedDraftRevision":1,"expectedLiveRevision":0}"""
+                }.andExpect {
+                    status { isOk() }
+                }.andReturn()
+                .response.contentAsString
+                .let {
+                    tools.jackson.databind
+                        .ObjectMapper()
+                        .readTree(it)
+                        .get("expectedDraftHash")
+                        .asText()
+                }
+        val applyRequestId = "00000000-0000-0000-0000-000000000126"
+        val idempotencyKey = "record-loss-aa"
+        val applyBody =
+            """
+            {
+              "idempotencyKey": "$idempotencyKey",
+              "expected": {"draftRevision":1,"liveRevision":0},
+              "command": {"applyRequestId":"$applyRequestId","expectedDraftHash":"$draftHash"}
+            }
+            """.trimIndent()
+
+        val revisionId =
+            mockMvc
+                .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = applyBody
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.liveRevision") { value(1) }
+                }.andReturn()
+                .response.contentAsString
+                .let {
+                    tools.jackson.databind
+                        .ObjectMapper()
+                        .readTree(it)
+                        .get("revisionId")
+                        .asText()
+                }
+
+        jdbcTemplate.update(
+            """
+            update sessions
+            set session_revision = 2, exposure_revision = 3, participant_set_revision = 4
+            where id = ?
+            """.trimIndent(),
+            SESSION_ID,
+        )
+        jdbcTemplate.update(
+            "update session_publication_versions set publication_revision = 5 where session_id = ?",
+            SESSION_ID,
+        )
+
+        mockMvc
+            .get("/api/host/mutations/SESSION_RECORD_APPLY/$SESSION_ID/$idempotencyKey") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("COMMITTED") }
+                jsonPath("$.receipt.operation") { value("SESSION_RECORD_APPLY") }
+                jsonPath("$.receipt.resourceId") { value(SESSION_ID) }
+                jsonPath("$.receipt.resultingVersions.sessionRevision") { value(0) }
+                jsonPath("$.receipt.resultingVersions.exposureRevision") { value(0) }
+                jsonPath("$.receipt.resultingVersions.participantSetRevision") { value(0) }
+                jsonPath("$.receipt.resultingVersions.recordDraftRevision") { value(null) }
+                jsonPath("$.receipt.resultingVersions.liveRecordRevision") { value(1) }
+                jsonPath("$.receipt.resultingVersions.publicationRevision") { value(0) }
+                jsonPath("$.current.versions.sessionRevision") { value(2) }
+                jsonPath("$.current.versions.exposureRevision") { value(3) }
+                jsonPath("$.current.versions.participantSetRevision") { value(4) }
+                jsonPath("$.current.versions.liveRecordRevision") { value(1) }
+                jsonPath("$.current.versions.publicationRevision") { value(5) }
+            }
+
+        val receiptId = UUID.fromString(applyRequestId)
+        val receipt =
+            mutationReceipts.find(
+                UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                receiptId,
+            )
+        assertThat(receipt).isNotNull
+        assertThat(receipt?.actorMembershipId)
+            .isEqualTo(UUID.fromString("00000000-0000-0000-0000-000000000201"))
+        assertThat(receipt?.operation).isEqualTo("SESSION_RECORD_APPLY")
+        assertThat(receipt?.resourceId).isEqualTo(UUID.fromString(SESSION_ID))
+        assertThat(receipt?.resultingVersions?.liveRecordRevision).isEqualTo(1)
+        assertThat(
+            mutationReceipts.find(
+                UUID.fromString("00000000-0000-0000-0000-000000000002"),
+                receiptId,
+            ),
+        ).isNull()
+
+        mockMvc
+            .get("/api/host/mutations/SESSION_CLOSE/$SESSION_ID/$idempotencyKey") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("NOT_EXECUTED") }
+            }
+        mockMvc
+            .get("/api/host/mutations/SESSION_RECORD_APPLY/$VISIBILITY_SESSION_ID/$idempotencyKey") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("NOT_EXECUTED") }
+            }
+
+        mockMvc
+            .get("/api/host/mutations/SESSION_RECORD_APPLY/$SESSION_ID/$idempotencyKey") {
+                with(user("member1@example.com"))
+            }.andExpect {
+                status { isForbidden() }
+            }
+
+        mockMvc
+            .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = applyBody
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.revisionId") { value(revisionId) }
+            }
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from session_record_revisions where session_id = ?",
+                Int::class.java,
+                SESSION_ID,
+            ),
+        ).isEqualTo(1)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from session_record_apply_receipts where session_id = ?",
+                Int::class.java,
+                SESSION_ID,
+            ),
+        ).isEqualTo(1)
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select count(*) from host_session_mutation_receipts where id = ? and resource_id = ?",
+                Int::class.java,
+                applyRequestId,
+                SESSION_ID,
+            ),
+        ).isEqualTo(1)
+    }
+
+    @Test
+    fun `record apply reconciliation distinguishes missing and in progress execution`() {
+        val missingKey = "record-missing-aa"
+        mockMvc
+            .get("/api/host/mutations/SESSION_RECORD_APPLY/$SESSION_ID/$missingKey") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("NOT_EXECUTED") }
+                jsonPath("$.current.sessionId") { value(SESSION_ID) }
+            }
+
+        val pendingKey = "record-pending-aa"
+        jdbcTemplate.update(
+            """
+            insert into mutation_idempotency_keys (
+              club_id, actor_membership_id, operation, resource_slot, idempotency_key,
+              canonical_schema_version, digest_key_version, request_hmac, status, receipt_id, expires_at
+            ) values (?, ?, 'SESSION_RECORD_APPLY', ?, ?, 1, 0, unhex(repeat('00', 32)),
+                      'IN_PROGRESS', null, timestampadd(hour, 1, utc_timestamp(6)))
+            """.trimIndent(),
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000201",
+            SESSION_ID,
+            pendingKey,
+        )
+        mockMvc
+            .get("/api/host/mutations/SESSION_RECORD_APPLY/$SESSION_ID/$pendingKey") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("PENDING") }
+                jsonPath("$.receipt") { doesNotExist() }
             }
     }
 
@@ -406,7 +631,7 @@ class HostSessionRecordControllerDbTest(
 
     @Test
     @Suppress("LongMethod")
-    fun `mid transaction revision constraint failure rolls back every record apply table`() {
+    fun `generic receipt failure rolls back every record apply table`() {
         val liveSnapshot =
             mockMvc
                 .get("/api/host/sessions/$SESSION_ID/record-editor") {
@@ -451,7 +676,7 @@ class HostSessionRecordControllerDbTest(
                         .asText()
                 }
 
-        installFailureAfterProjectionLink()
+        installGenericReceiptFailure()
         val before = recordApplyState()
 
         try {
@@ -464,20 +689,29 @@ class HostSessionRecordControllerDbTest(
                         content =
                             """
                             {
-                              "applyRequestId": "00000000-0000-0000-0000-000000000125",
-                              "expectedDraftRevision": 1,
-                              "expectedLiveRevision": 0,
-                              "expectedDraftHash": "$draftHash"
+                              "idempotencyKey": "record-failed-aa",
+                              "expected": {"draftRevision":1,"liveRevision":0},
+                              "command": {
+                                "applyRequestId":"00000000-0000-0000-0000-000000000125",
+                                "expectedDraftHash":"$draftHash"
+                              }
                             }
                             """.trimIndent()
                     }.andReturn()
             }.hasRootCauseInstanceOf(java.sql.SQLException::class.java)
-                .hasStackTraceContaining("c1_fail_after_projection_link")
+                .hasStackTraceContaining("record_receipt_fail")
         } finally {
-            jdbcTemplate.execute("drop trigger if exists c1_fail_after_projection_link")
+            jdbcTemplate.execute("drop trigger if exists record_receipt_fail")
         }
 
         assertThat(recordApplyState()).isEqualTo(before)
+        mockMvc
+            .get("/api/host/mutations/SESSION_RECORD_APPLY/$SESSION_ID/record-failed-aa") {
+                with(user("host@example.com"))
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.status") { value("NOT_EXECUTED") }
+            }
     }
 
     @Test
@@ -575,16 +809,16 @@ class HostSessionRecordControllerDbTest(
             VISIBILITY_SESSION_ID,
         ) ?: 0
 
-    private fun installFailureAfterProjectionLink() {
-        jdbcTemplate.execute("drop trigger if exists c1_fail_after_projection_link")
+    private fun installGenericReceiptFailure() {
+        jdbcTemplate.execute("drop trigger if exists record_receipt_fail")
         jdbcTemplate.execute(
             """
-            create trigger c1_fail_after_projection_link
-            before delete on session_record_drafts
+            create trigger record_receipt_fail
+            before insert on host_session_mutation_receipts
             for each row
             begin
-              if old.session_id = '$SESSION_ID' then
-                signal sqlstate '45000' set message_text = 'c1_fail_after_projection_link';
+              if new.resource_id = '$SESSION_ID' then
+                signal sqlstate '45000' set message_text = 'record_receipt_fail';
               end if;
             end
             """.trimIndent(),
@@ -718,6 +952,19 @@ class HostSessionRecordControllerDbTest(
                     from mutation_idempotency_keys
                     where resource_slot = ?
                     order by operation, idempotency_key
+                    """.trimIndent(),
+                    SESSION_ID,
+                ),
+            mutationReceipts =
+                jdbcTemplate.queryForList(
+                    """
+                    select id, club_id, actor_membership_id, operation, resource_id,
+                           session_revision, exposure_revision, participant_set_revision,
+                           record_draft_revision, live_record_revision, publication_revision,
+                           notification_decision, dispatch_receipt_id
+                    from host_session_mutation_receipts
+                    where resource_id = ?
+                    order by id
                     """.trimIndent(),
                     SESSION_ID,
                 ),
@@ -1112,6 +1359,7 @@ private data class RecordApplyState(
     val convergenceLinks: List<Map<String, Any?>>,
     val convergenceWork: List<Map<String, Any?>>,
     val mutationKeys: List<Map<String, Any?>>,
+    val mutationReceipts: List<Map<String, Any?>>,
     val outbox: List<Map<String, Any?>>,
 )
 
@@ -1150,9 +1398,21 @@ private const val CLEAN_RECORD_API_FIXTURES = """
       '00000000-0000-0000-0000-000000099302'
     );
     delete from mutation_idempotency_keys
-    where resource_slot = '00000000-0000-0000-0000-000000099302';
+    where resource_slot in (
+      '00000000-0000-0000-0000-000000000301',
+      '00000000-0000-0000-0000-000000099302'
+    );
     delete from host_session_mutation_receipts
-    where resource_id = '00000000-0000-0000-0000-000000099302';
+    where resource_id in (
+      '00000000-0000-0000-0000-000000000301',
+      '00000000-0000-0000-0000-000000099302'
+    );
+    update sessions
+    set session_revision = 0, exposure_revision = 0, participant_set_revision = 0
+    where id = '00000000-0000-0000-0000-000000000301';
+    update session_publication_versions
+    set publication_revision = 0
+    where session_id = '00000000-0000-0000-0000-000000000301';
     delete from public_session_publications
     where session_id = '00000000-0000-0000-0000-000000099302';
     delete from session_publication_versions
