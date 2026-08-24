@@ -13,6 +13,7 @@ import com.readmates.session.application.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.model.CorrectionPublicationPreview
 import com.readmates.session.application.model.CorrectionPublicationVersionVector
+import com.readmates.session.application.model.HostPublicProjectionEffect
 import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
@@ -59,6 +60,16 @@ import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
 
+private data class VisibilityMutation(
+    val result: HostSessionVisibilityUpdateResult,
+    val publicProjectionEffect: HostPublicProjectionEffect?,
+)
+
+private data class LifecycleMutation(
+    val detail: HostSessionDetailResponse,
+    val publicProjectionEffect: HostPublicProjectionEffect?,
+)
+
 @Service
 @Suppress("TooManyFunctions")
 class HostSessionLifecycleService(
@@ -86,7 +97,14 @@ class HostSessionLifecycleService(
                 resourceSlot = command.sessionId.toString(),
                 idempotencyKey = command.idempotencyKey,
                 payload = HostMutationPayloads.exposure(command),
-                mutate = { HostMutationOutcome(command.sessionId, updateVisibilityOnce(command)) },
+                mutate = {
+                    val outcome = updateVisibilityOnce(command)
+                    HostMutationOutcome(
+                        resourceId = command.sessionId,
+                        result = outcome.result,
+                        publicProjectionEffect = outcome.publicProjectionEffect,
+                    )
+                },
                 replay = { _, projection ->
                     HostSessionVisibilityUpdateResult(
                         session = projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException(),
@@ -95,10 +113,10 @@ class HostSessionLifecycleService(
                 },
             )
         }
-        return updateVisibilityOnce(command)
+        return updateVisibilityOnce(command).result
     }
 
-    private fun updateVisibilityOnce(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
+    private fun updateVisibilityOnce(command: UpdateHostSessionVisibilityCommand): VisibilityMutation {
         val current = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
         if (command.accessScope == null) {
             requireLegacyVisibilityWriteAllowed(current, command.visibility)
@@ -123,24 +141,28 @@ class HostSessionLifecycleService(
             epochPort.bump(command.host.clubId, HostListEpochKind.RECORD)
             cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
         }
-        return HostSessionVisibilityUpdateResult(
-            session = applied.detail,
-            composer =
-                if (firstPublication && write.changed) {
-                    HostNotificationComposerContext(
-                        sessionId = command.sessionId,
-                        eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
-                        contentRevision =
-                            ManualNotificationContentRevision.nextBook(
-                                command.sessionId,
-                                applied.detail.sessionNumber,
-                                applied.detail.bookTitle,
-                                applied.detail.visibility.name,
-                            ),
-                    )
-                } else {
-                    null
-                },
+        return VisibilityMutation(
+            result =
+                HostSessionVisibilityUpdateResult(
+                    session = applied.detail,
+                    composer =
+                        if (firstPublication && write.changed) {
+                            HostNotificationComposerContext(
+                                sessionId = command.sessionId,
+                                eventType = NotificationEventType.NEXT_BOOK_PUBLISHED,
+                                contentRevision =
+                                    ManualNotificationContentRevision.nextBook(
+                                        command.sessionId,
+                                        applied.detail.sessionNumber,
+                                        applied.detail.bookTitle,
+                                        applied.detail.visibility.name,
+                                    ),
+                            )
+                        } else {
+                            null
+                        },
+                ),
+            publicProjectionEffect = write.publicProjectionEffect,
         )
     }
 
@@ -421,16 +443,23 @@ class HostSessionLifecycleService(
         command: HostSessionIdCommand,
         operation: HostMutationOperation,
         payload: CanonicalMutationPayload,
-        mutate: () -> HostSessionDetailResponse,
+        mutate: () -> LifecycleMutation,
     ): HostSessionDetailResponse {
-        val coordinator = mutations ?: return mutate()
+        val coordinator = mutations ?: return mutate().detail
         return coordinator.execute(
             host = command.host,
             operation = operation,
             resourceSlot = command.sessionId.toString(),
             idempotencyKey = command.idempotencyKey,
             payload = payload,
-            mutate = { HostMutationOutcome(command.sessionId, mutate()) },
+            mutate = {
+                val outcome = mutate()
+                HostMutationOutcome(
+                    resourceId = command.sessionId,
+                    result = outcome.detail,
+                    publicProjectionEffect = outcome.publicProjectionEffect,
+                )
+            },
             replay = { _, projection ->
                 projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException()
             },
@@ -439,16 +468,23 @@ class HostSessionLifecycleService(
 
     private fun executeReverse(
         command: HostSessionReverseCommand,
-        mutate: () -> HostSessionDetailResponse,
+        mutate: () -> LifecycleMutation,
     ): HostSessionDetailResponse {
-        val coordinator = mutations ?: return mutate()
+        val coordinator = mutations ?: return mutate().detail
         return coordinator.execute(
             host = command.host,
             operation = HostMutationOperation.SESSION_REVERSE,
             resourceSlot = command.sessionId.toString(),
             idempotencyKey = command.idempotencyKey,
             payload = HostMutationPayloads.reverse(command),
-            mutate = { HostMutationOutcome(command.sessionId, mutate()) },
+            mutate = {
+                val outcome = mutate()
+                HostMutationOutcome(
+                    resourceId = command.sessionId,
+                    result = outcome.detail,
+                    publicProjectionEffect = outcome.publicProjectionEffect,
+                )
+            },
             replay = { _, projection ->
                 projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException()
             },
@@ -461,7 +497,7 @@ class HostSessionLifecycleService(
         from: String,
         to: String,
         write: (HostSessionIdCommand) -> HostSessionTransitionResult,
-    ): HostSessionDetailResponse {
+    ): LifecycleMutation {
         val normalized = command.normalized(lifecycleProperties.requireReverseReason)
         val idCommand =
             HostSessionIdCommand(
@@ -469,17 +505,15 @@ class HostSessionLifecycleService(
                 normalized.sessionId,
                 normalized.expectedSessionRevision,
             )
-        val detail =
-            transition(
-                command = idCommand,
-                action = action,
-                from = from,
-                to = to,
-                reasonCode = normalized.reasonCode,
-                reasonNote = normalized.reasonNote,
-                write = { write(idCommand) },
-            )
-        return detail
+        return transition(
+            command = idCommand,
+            action = action,
+            from = from,
+            to = to,
+            reasonCode = normalized.reasonCode,
+            reasonNote = normalized.reasonNote,
+            write = { write(idCommand) },
+        )
     }
 
     private fun transition(
@@ -490,7 +524,7 @@ class HostSessionLifecycleService(
         reasonCode: HostSessionLifecycleReasonCode? = null,
         reasonNote: String? = null,
         write: () -> HostSessionTransitionResult,
-    ): HostSessionDetailResponse {
+    ): LifecycleMutation {
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
         return recordTransitionFailure(command, action, requestId) {
             val result = write()
@@ -531,15 +565,19 @@ class HostSessionLifecycleService(
                 )
             }
             metrics.lifecycle(action, if (result.changed) "changed" else "unchanged")
-            result.detail.copy(
-                changeReceipt =
-                    changeId?.let { id ->
-                        HostSessionChangeReceipt(
-                            changeId = id,
-                            kind = HostSessionChangeKind.LIFECYCLE,
-                            undoAvailable = true,
-                        )
-                    },
+            LifecycleMutation(
+                detail =
+                    result.detail.copy(
+                        changeReceipt =
+                            changeId?.let { id ->
+                                HostSessionChangeReceipt(
+                                    changeId = id,
+                                    kind = HostSessionChangeKind.LIFECYCLE,
+                                    undoAvailable = true,
+                                )
+                            },
+                    ),
+                publicProjectionEffect = result.publicProjectionEffect,
             )
         }
     }

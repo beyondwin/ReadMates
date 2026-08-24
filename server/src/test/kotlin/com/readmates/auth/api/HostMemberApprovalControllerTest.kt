@@ -107,6 +107,7 @@ class HostMemberApprovalControllerTest(
         val hostCookie = sessionCookieForEmail("host@example.com")
         val sessionId = createOpenSession()
         val membershipId = insertViewerMember(uniqueEmail("viewer.activate"), "Viewer Activate")
+        val generationBefore = clubGeneration()
 
         mockMvc
             .post("/api/host/members/$membershipId/activate") {
@@ -127,6 +128,20 @@ class HostMemberApprovalControllerTest(
             )
         assertEquals("ACTIVE", membership["status"])
         assertNotNull(membership["joined_at"])
+        assertEquals(generationBefore + 1, clubGeneration())
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*) from auth_public_projection_mutation_receipts
+                where subject_membership_id_snapshot = ?
+                  and operation = 'VIEWER_ACTIVATED'
+                  and session_id_snapshot is null
+                """.trimIndent(),
+                Int::class.java,
+                membershipId,
+            ),
+        )
 
         val participantCount =
             jdbcTemplate.queryForObject(
@@ -142,6 +157,17 @@ class HostMemberApprovalControllerTest(
             ) ?: 0
         assertEquals(0, participantCount)
     }
+
+    private fun clubGeneration(): Long =
+        jdbcTemplate.queryForObject(
+            """
+            select coalesce((
+              select generation from public_club_projection_generations
+              where club_id = '00000000-0000-0000-0000-000000000001'
+            ), 0)
+            """.trimIndent(),
+            Long::class.java,
+        ) ?: 0
 
     @Test
     fun `leftover addToCurrentOpenSession cannot change an open snapshot`() {

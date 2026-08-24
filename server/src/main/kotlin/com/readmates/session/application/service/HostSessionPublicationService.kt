@@ -4,6 +4,7 @@ import com.readmates.session.application.HostPublicationResponse
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.port.`in`.UpsertPublicationUseCase
+import com.readmates.session.application.port.out.HostPublicationWriteResult
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.shared.cache.ReadCacheInvalidationPort
 import com.readmates.shared.listing.application.model.HostListEpochKind
@@ -22,14 +23,21 @@ class HostSessionPublicationService(
 ) : UpsertPublicationUseCase {
     @Transactional
     override fun upsertPublication(command: UpsertPublicationCommand): HostPublicationResponse {
-        val coordinator = mutations ?: return upsertOnce(command)
+        val coordinator = mutations ?: return upsertOnce(command).response
         return coordinator.execute(
             host = command.host,
             operation = HostMutationOperation.SESSION_PUBLICATION,
             resourceSlot = command.sessionId.toString(),
             idempotencyKey = command.idempotencyKey,
             payload = HostMutationPayloads.publication(command),
-            mutate = { HostMutationOutcome(command.sessionId, upsertOnce(command)) },
+            mutate = {
+                val write = upsertOnce(command)
+                HostMutationOutcome(
+                    resourceId = command.sessionId,
+                    result = write.response,
+                    publicProjectionEffect = write.publicProjectionEffect,
+                )
+            },
             replay = { _, projection ->
                 val snapshot = projection ?: throw HostSessionNotFoundException()
                 HostPublicationResponse(
@@ -43,12 +51,12 @@ class HostSessionPublicationService(
         )
     }
 
-    private fun upsertOnce(command: UpsertPublicationCommand): HostPublicationResponse {
+    private fun upsertOnce(command: UpsertPublicationCommand): HostPublicationWriteResult {
         val write = publicationPort.upsertPublication(command)
         if (write.changed) {
             epochPort.bump(command.host.clubId, HostListEpochKind.RECORD)
             cacheInvalidation.evictClubContentAfterCommit(command.host.clubId)
         }
-        return write.response
+        return write
     }
 }

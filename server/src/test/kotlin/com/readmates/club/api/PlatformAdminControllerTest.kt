@@ -5,7 +5,10 @@ import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.club.application.model.ClubDomainActualCheckResult
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
+import com.readmates.club.application.service.ClubLifecycleService
 import com.readmates.club.domain.ClubDomainStatus
+import com.readmates.club.domain.PlatformAdminRole
+import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.hamcrest.Matchers
@@ -39,11 +42,13 @@ import java.util.UUID
 @AutoConfigureMockMvc
 @Import(PlatformAdminDomainCheckTestConfiguration::class)
 @Tag("integration")
+@Suppress("LargeClass")
 class PlatformAdminControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val domainActualStateChecker: FakeClubDomainActualStateChecker,
+    @param:Autowired private val clubLifecycleService: ClubLifecycleService,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
@@ -56,6 +61,12 @@ class PlatformAdminControllerTest(
     @AfterEach
     fun cleanupCreatedRows() {
         try {
+            deleteWhereIn("public_convergence_work", "club_id_snapshot", createdClubIds)
+            deleteWhereIn("public_mutation_convergence_links", "club_id_snapshot", createdClubIds)
+            deleteWhereIn("club_public_projection_mutation_receipts", "club_id_snapshot", createdClubIds)
+            deleteWhereIn("public_projection_current", "club_id", createdClubIds)
+            deleteWhereIn("public_club_projection_generations", "club_id", createdClubIds)
+            deleteWhereIn("club_audit_events", "club_id", createdClubIds)
             deleteWhereIn("invitations", "id", createdInvitationIds)
             deleteWhereIn("club_domains", "id", createdClubDomainIds)
             deleteWhereIn("memberships", "id", createdMembershipIds)
@@ -338,6 +349,60 @@ class PlatformAdminControllerTest(
                 jsonPath("$.status") { value("ACTIVE") }
                 jsonPath("$.publicVisibility") { value("PUBLIC") }
             }
+        assertEquals(1L, clubProjectionGeneration(clubId))
+        assertEquals(true, clubProjectionReadable(clubId))
+        assertEquals(1, clubOnlyReceiptCount(clubId, "PLATFORM_CLUB_EXPOSURE_UPDATED"))
+    }
+
+    @Test
+    fun `platform metadata and lifecycle transitions rotate club-only convergence without sessions`() {
+        val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val clubId = createSetupClubWithActiveHost()
+        val cookie = sessionCookieForUser(operator)
+        mockMvc
+            .patch("/api/admin/clubs/$clubId") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"publicVisibility":"PUBLIC"}"""
+                cookie(cookie)
+            }.andExpect { status { isOk() } }
+
+        jdbcTemplate.update(
+            "update public_club_projection_generations set origin_readable = false where club_id = ?",
+            clubId,
+        )
+
+        mockMvc
+            .patch("/api/admin/clubs/$clubId") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"name":"Updated Public Club","tagline":"Updated tagline","about":"Updated about"}"""
+                cookie(cookie)
+            }.andExpect { status { isOk() } }
+        assertEquals(2L, clubProjectionGeneration(clubId))
+        assertEquals(false, clubProjectionReadable(clubId))
+        assertEquals(1, clubOnlyReceiptCount(clubId, "PLATFORM_CLUB_METADATA_UPDATED"))
+
+        val actor =
+            CurrentPlatformAdmin(
+                userId = UUID.fromString(operator),
+                email = "operator@example.com",
+                role = PlatformAdminRole.OPERATOR,
+            )
+        clubLifecycleService.suspend(UUID.fromString(clubId), actor, "synthetic test reason")
+        assertEquals(3L, clubProjectionGeneration(clubId))
+        assertEquals(false, clubProjectionReadable(clubId))
+        clubLifecycleService.restore(UUID.fromString(clubId), actor)
+        assertEquals(4L, clubProjectionGeneration(clubId))
+        assertEquals(true, clubProjectionReadable(clubId))
+        clubLifecycleService.archive(UUID.fromString(clubId), actor)
+        assertEquals(5L, clubProjectionGeneration(clubId))
+        assertEquals(false, clubProjectionReadable(clubId))
+        assertEquals(1, clubOnlyReceiptCount(clubId, "CLUB_SUSPENDED"))
+        assertEquals(1, clubOnlyReceiptCount(clubId, "CLUB_RESTORED"))
+        assertEquals(1, clubOnlyReceiptCount(clubId, "CLUB_ARCHIVED"))
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject("select count(*) from sessions where club_id = ?", Int::class.java, clubId),
+        )
     }
 
     @Test
@@ -570,6 +635,34 @@ class PlatformAdminControllerTest(
         createdMembershipIds += membershipId
         return clubId
     }
+
+    private fun clubProjectionGeneration(clubId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select generation from public_club_projection_generations where club_id = ?",
+            Long::class.java,
+            clubId,
+        ) ?: error("Missing club projection generation")
+
+    private fun clubProjectionReadable(clubId: String): Boolean =
+        jdbcTemplate.queryForObject(
+            "select origin_readable from public_club_projection_generations where club_id = ?",
+            Boolean::class.java,
+            clubId,
+        ) ?: false
+
+    private fun clubOnlyReceiptCount(
+        clubId: String,
+        operation: String,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*) from club_public_projection_mutation_receipts
+            where club_id_snapshot = ? and operation = ? and session_id_snapshot is null
+            """.trimIndent(),
+            Int::class.java,
+            clubId,
+            operation,
+        ) ?: 0
 
     private fun onboardingRequestJson(
         hostEmail: String,

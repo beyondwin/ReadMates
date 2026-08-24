@@ -2,6 +2,7 @@ package com.readmates.auth.adapter.out.persistence
 
 import com.readmates.auth.application.InvitationDomainError
 import com.readmates.auth.application.InvitationDomainException
+import com.readmates.auth.application.port.out.ActiveMembershipUpsertResult
 import com.readmates.auth.application.port.out.CreateHostInvitationCommand
 import com.readmates.auth.application.port.out.HostInvitationListRow
 import com.readmates.auth.application.port.out.HostInvitationStorePort
@@ -296,23 +297,23 @@ class JdbcHostInvitationStoreAdapter(
         userId: UUID,
         role: MembershipRole,
         avatarKey: BookClubAvatarKey,
-    ): UUID {
-        val existingMembershipId =
+    ): ActiveMembershipUpsertResult {
+        val existingMembership =
             jdbcTemplate
                 .query(
                     """
-                    select id
+                    select id, status
                     from memberships
                     where club_id = ?
                       and user_id = ?
                     limit 1
                     """.trimIndent(),
-                    { resultSet, _ -> resultSet.uuid("id") },
+                    { resultSet, _ -> resultSet.uuid("id") to resultSet.getString("status") },
                     clubId.dbString(),
                     userId.dbString(),
                 ).firstOrNull()
 
-        if (existingMembershipId != null) {
+        if (existingMembership != null) {
             jdbcTemplate.update(
                 """
                 update memberships
@@ -325,9 +326,12 @@ class JdbcHostInvitationStoreAdapter(
                 """.trimIndent(),
                 role.name,
                 avatarKey.wireValue,
-                existingMembershipId.dbString(),
+                existingMembership.first.dbString(),
             )
-            return existingMembershipId
+            return ActiveMembershipUpsertResult(
+                membershipId = existingMembership.first,
+                becameActive = existingMembership.second != "ACTIVE",
+            )
         }
 
         val membershipId = UUID.randomUUID()
@@ -344,7 +348,7 @@ class JdbcHostInvitationStoreAdapter(
             avatarKey.wireValue,
             userId.dbString(),
         )
-        return membershipId
+        return ActiveMembershipUpsertResult(membershipId, becameActive = true)
     }
 
     override fun acceptInvitation(

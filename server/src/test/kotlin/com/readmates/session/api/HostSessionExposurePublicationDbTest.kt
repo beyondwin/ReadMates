@@ -61,14 +61,14 @@ class HostSessionExposurePublicationDbTest(
     @Test
     fun `publication idempotency distinguishes omitted placement from explicit hidden and legacy audience`() {
         val omittedSession = closedGuestReadableSession("canonical omitted placement")
-        val omittedKey = "key-canonical-omitted-01"
+        val omittedReplayFixture = "fixture-omitted-placement"
         mockMvc
             .put("/api/host/sessions/$omittedSession/publication") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     envelope(
-                        omittedKey,
+                        omittedReplayFixture,
                         """{"publicationRevision":0}""",
                         """{"publicSummary":"canonical summary","visibility":"MEMBER"}""",
                     )
@@ -81,7 +81,7 @@ class HostSessionExposurePublicationDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     envelope(
-                        omittedKey,
+                        omittedReplayFixture,
                         """{"publicationRevision":0}""",
                         """{"publicSummary":"canonical summary","siteVisibility":"HIDDEN","visibility":"MEMBER"}""",
                     )
@@ -92,14 +92,14 @@ class HostSessionExposurePublicationDbTest(
         assertThat(atomicFingerprint(omittedSession)).isEqualTo(afterOmitted)
 
         val legacySession = closedGuestReadableSession("canonical legacy audience")
-        val legacyKey = "key-canonical-legacy-01"
+        val legacyReplayFixture = "fixture-legacy-audience"
         mockMvc
             .put("/api/host/sessions/$legacySession/publication") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     envelope(
-                        legacyKey,
+                        legacyReplayFixture,
                         """{"publicationRevision":0}""",
                         """{"publicSummary":"legacy summary","visibility":"MEMBER"}""",
                     )
@@ -111,7 +111,7 @@ class HostSessionExposurePublicationDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     envelope(
-                        legacyKey,
+                        legacyReplayFixture,
                         """{"publicationRevision":0}""",
                         """{"publicSummary":"legacy summary","visibility":"PUBLIC"}""",
                     )
@@ -680,6 +680,7 @@ class HostSessionExposurePublicationDbTest(
         val initialApplyReceiptCount = applyReceiptCount(sessionId)
         val initialPublishReceiptCount = operationReceiptCount(sessionId, "SESSION_PUBLISH")
         val initialCorrectionReceiptCount = operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH")
+        val initialPublicGeneration = publicProjectionGeneration(sessionId)
 
         mockMvc
             .post("/api/host/sessions/$sessionId/publish") {
@@ -721,6 +722,7 @@ class HostSessionExposurePublicationDbTest(
         assertThat(operationReceiptCount(sessionId, "SESSION_CORRECTION_PUBLISH"))
             .isEqualTo(initialCorrectionReceiptCount)
         assertThat(recordEpoch()).isEqualTo(epochBeforeStale)
+        assertThat(publicProjectionGeneration(sessionId)).isEqualTo(initialPublicGeneration)
 
         val epochBefore = recordEpoch()
         mockMvc
@@ -742,6 +744,8 @@ class HostSessionExposurePublicationDbTest(
         assertThat(revisionSnapshot(oldRevisionId)).isEqualTo(oldSnapshot)
         assertThat(publicSummary(sessionId)).isEqualTo("corrected summary")
         assertThat(originTexts(sessionId)).containsExactly("corrected highlight", "corrected one line")
+        assertThat(publicProjectionGeneration(sessionId)).isEqualTo(initialPublicGeneration + 1)
+        assertThat(publicConvergenceLinks(sessionId, initialPublicGeneration + 1)).isEqualTo(1)
 
         assertCorrectedAudienceProjections(sessionId)
     }
@@ -773,6 +777,28 @@ class HostSessionExposurePublicationDbTest(
                 jsonPath("$.oneLiners[0].text") { value("corrected one line") }
             }
     }
+
+    private fun publicProjectionGeneration(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select generation from public_projection_current where session_id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
+
+    private fun publicConvergenceLinks(
+        sessionId: String,
+        generation: Long,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from public_mutation_convergence_links
+            where session_id_snapshot = ? and committed_generation = ?
+            """.trimIndent(),
+            Int::class.java,
+            sessionId,
+            generation,
+        ) ?: 0
 
     private fun assertCorrectionPreview(
         sessionId: String,

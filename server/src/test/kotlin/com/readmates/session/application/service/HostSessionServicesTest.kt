@@ -1943,7 +1943,9 @@ class HostSessionServicesTest {
             hostSessionDetail(command.sessionId).also { calls += "detail:${command.sessionId}" }
 
         override fun update(command: UpdateHostSessionCommand) =
-            hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" }
+            com.readmates.session.application.port.out.HostSessionDraftUpdateResult(
+                hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" },
+            )
 
         override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot {
             visibilityLockCount += 1

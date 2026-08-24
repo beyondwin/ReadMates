@@ -4,6 +4,9 @@ import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.CurrentSessionPolicyResult
 import com.readmates.auth.application.MemberLifecycleRequest
+import com.readmates.auth.application.port.out.AuthPublicProjectionLock
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutation
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.HostMemberListRow
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
@@ -54,6 +57,21 @@ class MemberLifecycleServiceTest {
         assertEquals(MembershipStatus.SUSPENDED, response.member.status)
         assertEquals(listOf(clubId), invalidation.clubs)
         assertEquals(listOf("lock-club", "find-membership", "suspend"), store.mutationCalls)
+    }
+
+    @Test
+    fun `public session prelock precedes lifecycle club lock and projection record`() {
+        val calls = mutableListOf<String>()
+        val store = RecordingMemberLifecycleStorePort(mutationCalls = calls)
+        val projection = RecordingProjectionPort(calls)
+        val service = MemberLifecycleService(store, publicProjection = projection)
+
+        service.suspend(host, targetMembershipId, MemberLifecycleRequest())
+
+        assertEquals(
+            listOf("projection-prelock", "lock-club", "find-membership", "suspend", "projection-record"),
+            calls,
+        )
     }
 
     @Test
@@ -156,9 +174,9 @@ class MemberLifecycleServiceTest {
     private inner class RecordingMemberLifecycleStorePort(
         private val role: MembershipRole = MembershipRole.MEMBER,
         private val activeHostCount: Int = 2,
+        val mutationCalls: MutableList<String> = mutableListOf(),
     ) : MemberLifecycleStorePort {
         private var targetStatus = MembershipStatus.ACTIVE
-        val mutationCalls = mutableListOf<String>()
 
         override fun lockClubForUpdate(clubId: UUID) {
             mutationCalls += "lock-club"
@@ -298,4 +316,23 @@ class MemberLifecycleServiceTest {
             clubs += clubId
         }
     }
+
+    private class RecordingProjectionPort(
+        private val calls: MutableList<String>,
+    ) : AuthPublicProjectionMutationPort {
+        override fun lockPotentiallyAffectedSessions(clubId: UUID): AuthPublicProjectionLock {
+            calls += "projection-prelock"
+            return TestProjectionLock
+        }
+
+        override fun record(
+            lock: AuthPublicProjectionLock,
+            mutation: AuthPublicProjectionMutation,
+        ): Int {
+            calls += "projection-record"
+            return 1
+        }
+    }
+
+    private data object TestProjectionLock : AuthPublicProjectionLock
 }

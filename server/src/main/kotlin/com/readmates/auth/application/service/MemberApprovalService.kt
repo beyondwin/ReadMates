@@ -3,6 +3,8 @@ package com.readmates.auth.application.service
 import com.readmates.auth.application.AuthApplicationError
 import com.readmates.auth.application.AuthApplicationException
 import com.readmates.auth.application.port.`in`.ManageMemberApprovalsUseCase
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutation
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.MemberApprovalStorePort
 import com.readmates.auth.application.port.out.ViewerMemberRow
 import com.readmates.auth.domain.MembershipStatus
@@ -28,6 +30,7 @@ data class ViewerMemberResponse(
 @Service
 class MemberApprovalService(
     private val memberApprovalStore: MemberApprovalStorePort,
+    private val publicProjection: AuthPublicProjectionMutationPort = AuthPublicProjectionMutationPort.Noop(),
 ) : ManageMemberApprovalsUseCase {
     override fun listViewers(
         host: ClubActor,
@@ -47,9 +50,21 @@ class MemberApprovalService(
         membershipId: UUID,
     ): ViewerMemberResponse {
         requireMemberManager(host)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(host.clubId)
         if (!memberApprovalStore.activateViewer(host.clubId, membershipId)) {
             throw viewerMemberNotFound()
         }
+        publicProjection.record(
+            projectionLock,
+            AuthPublicProjectionMutation(
+                host.clubId,
+                host.membershipId,
+                membershipId,
+                "VIEWER_ACTIVATED",
+                clubBodyChanged = true,
+                includeSubjectPublicContent = false,
+            ),
+        )
 
         return findForHost(host.clubId, membershipId)
     }

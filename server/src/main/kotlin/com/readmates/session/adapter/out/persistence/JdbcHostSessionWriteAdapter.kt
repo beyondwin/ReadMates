@@ -55,10 +55,13 @@ class JdbcHostSessionWriteAdapter(
     private val scheduleDefaultsQueries = HostSessionScheduleDefaultsQueries()
     private val writeQueries = HostSessionWriteQueries(jdbcTemplate, queries)
     private val writePolicy = HostSessionWritePolicy
-    private val draftWrites = HostSessionDraftWriteOperations(jdbcTemplate, writeQueries, writePolicy)
+    private val publicProjection = HostPublicProjectionWriteOperations(jdbcTemplate)
+    private val draftWrites = HostSessionDraftWriteOperations(jdbcTemplate, writeQueries, writePolicy, publicProjection)
     private val attendance = HostSessionAttendanceWriteOperations(jdbcTemplate, writeQueries, writePolicy)
-    private val publication = HostSessionPublicationWriteOperations(jdbcTemplate, writeQueries, writePolicy)
-    private val lifecycle = HostSessionLifecycleWriteOperations(jdbcTemplate, writeQueries, writePolicy)
+    private val publication =
+        HostSessionPublicationWriteOperations(jdbcTemplate, writeQueries, writePolicy, publicProjection)
+    private val lifecycle =
+        HostSessionLifecycleWriteOperations(jdbcTemplate, writeQueries, writePolicy, publicProjection)
 
     override fun create(command: HostSessionCommand) = draftWrites.create(command)
 

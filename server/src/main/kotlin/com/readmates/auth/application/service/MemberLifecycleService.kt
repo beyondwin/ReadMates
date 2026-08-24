@@ -9,6 +9,8 @@ import com.readmates.auth.application.MemberLifecycleRequest
 import com.readmates.auth.application.MemberLifecycleResponse
 import com.readmates.auth.application.port.`in`.LeaveMembershipUseCase
 import com.readmates.auth.application.port.`in`.ManageMemberLifecycleUseCase
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutation
+import com.readmates.auth.application.port.out.AuthPublicProjectionMutationPort
 import com.readmates.auth.application.port.out.LifecycleMembershipRow
 import com.readmates.auth.application.port.out.MemberLifecycleStorePort
 import com.readmates.auth.application.port.out.SessionParticipationChange
@@ -35,6 +37,7 @@ class MemberLifecycleService(
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
     private val participantAudit: SessionParticipantAuditPort = SessionParticipantAuditPort.Noop(),
+    private val publicProjection: AuthPublicProjectionMutationPort = AuthPublicProjectionMutationPort.Noop(),
 ) : ManageMemberLifecycleUseCase,
     LeaveMembershipUseCase {
     override fun listMembers(
@@ -56,6 +59,7 @@ class MemberLifecycleService(
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
         requireMemberManager(host)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(host.clubId)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.SUSPENDED)) {
@@ -66,11 +70,23 @@ class MemberLifecycleService(
             throw lifecycleConflict("Member could not be suspended")
         }
 
-        val policyResult =
+        val policy =
             applyCurrentSessionPolicy(host.membershipId, host.clubId, membershipId, request.currentSessionPolicy)
+        publicProjection.record(
+            projectionLock,
+            AuthPublicProjectionMutation(
+                host.clubId,
+                host.membershipId,
+                membershipId,
+                "MEMBER_SUSPENDED",
+                clubBodyChanged = true,
+                includeSubjectPublicContent = false,
+                affectedSessionIds = policy.affectedSessionIds,
+            ),
+        )
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
-            currentSessionPolicyResult = policyResult,
+            currentSessionPolicyResult = policy.result,
         ).also { cacheInvalidation.evictClubContentAfterCommit(host.clubId) }
     }
 
@@ -80,6 +96,7 @@ class MemberLifecycleService(
         membershipId: UUID,
     ): MemberLifecycleResponse {
         requireMemberManager(host)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(host.clubId)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.ACTIVE)) {
@@ -89,6 +106,17 @@ class MemberLifecycleService(
         if (!memberLifecycleStore.restoreSuspendedMember(host.clubId, membershipId)) {
             throw lifecycleConflict("Member could not be restored")
         }
+        publicProjection.record(
+            projectionLock,
+            AuthPublicProjectionMutation(
+                host.clubId,
+                host.membershipId,
+                membershipId,
+                "MEMBER_RESTORED",
+                clubBodyChanged = true,
+                includeSubjectPublicContent = false,
+            ),
+        )
 
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
@@ -103,6 +131,7 @@ class MemberLifecycleService(
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
         requireMemberManager(host)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(host.clubId)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (!membership.status.canTransitionTo(MembershipStatus.LEFT)) {
@@ -113,11 +142,22 @@ class MemberLifecycleService(
             throw lifecycleConflict("Member could not be deactivated")
         }
 
-        val policyResult =
+        val policy =
             applyCurrentSessionPolicy(host.membershipId, host.clubId, membershipId, request.currentSessionPolicy)
+        publicProjection.record(
+            projectionLock,
+            AuthPublicProjectionMutation(
+                host.clubId,
+                host.membershipId,
+                membershipId,
+                "MEMBER_DEACTIVATED",
+                clubBodyChanged = membership.status == MembershipStatus.ACTIVE,
+                affectedSessionIds = policy.affectedSessionIds,
+            ),
+        )
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
-            currentSessionPolicyResult = policyResult,
+            currentSessionPolicyResult = policy.result,
         ).also { cacheInvalidation.evictClubContentAfterCommit(host.clubId) }
     }
 
@@ -127,6 +167,7 @@ class MemberLifecycleService(
         membershipId: UUID,
     ): MemberLifecycleResponse {
         requireMemberManager(host)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(host.clubId)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         val membership = ensureMutableMembership(host, membershipId)
         if (membership.status != MembershipStatus.ACTIVE) {
@@ -139,11 +180,26 @@ class MemberLifecycleService(
                     member = findHostMemberListItem(host, membershipId),
                     currentSessionPolicyResult = CurrentSessionPolicyResult.NOT_APPLICABLE,
                 )
-        recordParticipationChange(
-            actorMembershipId = host.membershipId,
-            clubId = host.clubId,
-            change = memberLifecycleStore.addToCurrentSession(host.clubId, openSessionId, membershipId),
-        )
+        val change = memberLifecycleStore.addToCurrentSession(host.clubId, openSessionId, membershipId)
+        val changed =
+            recordParticipationChange(
+                actorMembershipId = host.membershipId,
+                clubId = host.clubId,
+                change = change,
+            )
+        if (changed) {
+            publicProjection.record(
+                projectionLock,
+                AuthPublicProjectionMutation(
+                    host.clubId,
+                    host.membershipId,
+                    membershipId,
+                    "SESSION_PARTICIPANT_ADDED",
+                    includeSubjectPublicContent = false,
+                    affectedSessionIds = setOf(change.sessionId),
+                ),
+            )
+        }
 
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
@@ -157,6 +213,7 @@ class MemberLifecycleService(
         membershipId: UUID,
     ): MemberLifecycleResponse {
         requireMemberManager(host)
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(host.clubId)
         memberLifecycleStore.lockClubForUpdate(host.clubId)
         ensureMutableMembership(host, membershipId)
         val openSessionId =
@@ -165,11 +222,26 @@ class MemberLifecycleService(
                     member = findHostMemberListItem(host, membershipId),
                     currentSessionPolicyResult = CurrentSessionPolicyResult.NOT_APPLICABLE,
                 )
-        recordParticipationChange(
-            actorMembershipId = host.membershipId,
-            clubId = host.clubId,
-            change = memberLifecycleStore.markRemovedFromCurrentSession(host.clubId, openSessionId, membershipId),
-        )
+        val change = memberLifecycleStore.markRemovedFromCurrentSession(host.clubId, openSessionId, membershipId)
+        val changed =
+            recordParticipationChange(
+                actorMembershipId = host.membershipId,
+                clubId = host.clubId,
+                change = change,
+            )
+        if (changed) {
+            publicProjection.record(
+                projectionLock,
+                AuthPublicProjectionMutation(
+                    host.clubId,
+                    host.membershipId,
+                    membershipId,
+                    "SESSION_PARTICIPANT_REMOVED",
+                    includeSubjectPublicContent = false,
+                    affectedSessionIds = setOf(change.sessionId),
+                ),
+            )
+        }
 
         return MemberLifecycleResponse(
             member = findHostMemberListItem(host, membershipId),
@@ -182,6 +254,7 @@ class MemberLifecycleService(
         actor: ClubActor,
         request: MemberLifecycleRequest,
     ): MemberLifecycleResponse {
+        val projectionLock = publicProjection.lockPotentiallyAffectedSessions(actor.clubId)
         memberLifecycleStore.lockClubForUpdate(actor.clubId)
         memberLifecycleStore.lockActiveHostRows(actor.clubId)
         val membership =
@@ -196,16 +269,27 @@ class MemberLifecycleService(
 
         memberLifecycleStore.markMembershipLeft(actor.clubId, actor.membershipId)
 
-        val policyResult =
+        val policy =
             applyCurrentSessionPolicy(
                 actor.membershipId,
                 actor.clubId,
                 actor.membershipId,
                 request.currentSessionPolicy,
             )
+        publicProjection.record(
+            projectionLock,
+            AuthPublicProjectionMutation(
+                actor.clubId,
+                actor.membershipId,
+                actor.membershipId,
+                "MEMBERSHIP_LEFT",
+                clubBodyChanged = membership.status == MembershipStatus.ACTIVE,
+                affectedSessionIds = policy.affectedSessionIds,
+            ),
+        )
         return MemberLifecycleResponse(
             member = findHostMemberListItem(actor, actor.membershipId),
-            currentSessionPolicyResult = policyResult,
+            currentSessionPolicyResult = policy.result,
         ).also { cacheInvalidation.evictClubContentAfterCommit(actor.clubId) }
     }
 
@@ -233,27 +317,36 @@ class MemberLifecycleService(
         clubId: UUID,
         membershipId: UUID,
         policy: CurrentSessionPolicy,
-    ): CurrentSessionPolicyResult {
+    ): AppliedCurrentSessionPolicy {
         val openSessionId =
             memberLifecycleStore.lockOpenSessionForUpdate(clubId)
-                ?: return CurrentSessionPolicyResult.NOT_APPLICABLE
-        if (policy == CurrentSessionPolicy.NEXT_SESSION) {
-            return CurrentSessionPolicyResult.DEFERRED
+        return when {
+            openSessionId == null -> AppliedCurrentSessionPolicy(CurrentSessionPolicyResult.NOT_APPLICABLE)
+            policy == CurrentSessionPolicy.NEXT_SESSION ->
+                AppliedCurrentSessionPolicy(CurrentSessionPolicyResult.DEFERRED)
+            else -> {
+                val change =
+                    memberLifecycleStore.markRemovedFromCurrentSession(clubId, openSessionId, membershipId)
+                val changed =
+                    recordParticipationChange(
+                        actorMembershipId = actorMembershipId,
+                        clubId = clubId,
+                        change = change,
+                    )
+                AppliedCurrentSessionPolicy(
+                    CurrentSessionPolicyResult.APPLIED,
+                    if (changed) setOf(change.sessionId) else emptySet(),
+                )
+            }
         }
-        recordParticipationChange(
-            actorMembershipId = actorMembershipId,
-            clubId = clubId,
-            change = memberLifecycleStore.markRemovedFromCurrentSession(clubId, openSessionId, membershipId),
-        )
-        return CurrentSessionPolicyResult.APPLIED
     }
 
     private fun recordParticipationChange(
         actorMembershipId: UUID,
         clubId: UUID,
         change: SessionParticipationChange,
-    ) {
-        if (!change.changed) return
+    ): Boolean {
+        if (!change.changed) return false
         participantAudit.record(
             SessionParticipantChangeAuditEntry(
                 actorMembershipId = actorMembershipId,
@@ -266,6 +359,7 @@ class MemberLifecycleService(
             ),
         )
         epochPort.bump(clubId, HostListEpochKind.MEETING)
+        return true
     }
 
     private fun findHostMemberListItem(
@@ -289,4 +383,9 @@ class MemberLifecycleService(
 
     private fun lifecycleConflict(message: String): AuthApplicationException =
         AuthApplicationException(AuthApplicationError.MEMBER_CONFLICT, message)
+
+    private data class AppliedCurrentSessionPolicy(
+        val result: CurrentSessionPolicyResult,
+        val affectedSessionIds: Set<UUID> = emptySet(),
+    )
 }

@@ -29,6 +29,7 @@ import com.readmates.session.application.port.out.AttendanceRestoreRow
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
+import com.readmates.session.application.port.out.HostSessionDraftUpdateResult
 import com.readmates.session.application.port.out.HostSessionRecoverableChange
 import com.readmates.session.application.port.out.HostSessionRecoveryPort
 import com.readmates.session.application.port.out.HostSessionRestoreCurrentState
@@ -447,9 +448,9 @@ class HostSessionRecoveryServiceTest {
 
         override fun create(command: HostSessionCommand) = error("unused")
 
-        override fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse {
+        override fun update(command: UpdateHostSessionCommand): HostSessionDraftUpdateResult {
             updated = command
-            return detail()
+            return HostSessionDraftUpdateResult(detail())
         }
 
         override fun lockVisibilitySnapshot(command: HostSessionIdCommand) =

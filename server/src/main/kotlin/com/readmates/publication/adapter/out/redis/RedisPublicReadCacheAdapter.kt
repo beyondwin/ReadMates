@@ -30,6 +30,11 @@ class RedisPublicReadCacheAdapter(
 
     override fun getClub(clubId: UUID): PublicClubResult? = loadClubFromCache(clubKey(clubId))
 
+    override fun getClub(
+        clubId: UUID,
+        clubGeneration: Long,
+    ): PublicClubResult? = loadClubFromCache(clubKey(clubId, clubGeneration))
+
     private fun loadClubFromCache(key: String): PublicClubResult? =
         circuitBreakers.execute(
             name = CIRCUIT_BREAKER_NAME,
@@ -79,6 +84,14 @@ class RedisPublicReadCacheAdapter(
         store(clubKey(clubId), result, properties.clubTtl, "put-club")
     }
 
+    override fun putClub(
+        clubId: UUID,
+        clubGeneration: Long,
+        result: PublicClubResult,
+    ) {
+        store(clubKey(clubId, clubGeneration), result, properties.clubTtl, "put-club")
+    }
+
     override fun getSession(sessionId: UUID): PublicSessionDetailResult? =
         loadSessionFromCache(sessionKey(UUID.fromString(LEGACY_PUBLIC_CLUB_ID), sessionId))
 
@@ -91,6 +104,13 @@ class RedisPublicReadCacheAdapter(
         clubId: UUID,
         sessionId: UUID,
     ): PublicSessionDetailResult? = loadSessionFromCache(sessionKey(clubId, sessionId))
+
+    override fun getSession(
+        clubId: UUID,
+        clubGeneration: Long,
+        generation: Long,
+        sessionId: UUID,
+    ): PublicSessionDetailResult? = loadSessionFromCache(sessionKey(clubId, clubGeneration, generation, sessionId))
 
     private fun loadSessionFromCache(key: String): PublicSessionDetailResult? =
         circuitBreakers.execute(
@@ -144,6 +164,16 @@ class RedisPublicReadCacheAdapter(
         result: PublicSessionDetailResult,
     ) {
         store(sessionKey(clubId, sessionId), result, properties.sessionTtl, "put-session")
+    }
+
+    override fun putSession(
+        clubId: UUID,
+        clubGeneration: Long,
+        generation: Long,
+        sessionId: UUID,
+        result: PublicSessionDetailResult,
+    ) {
+        store(sessionKey(clubId, clubGeneration, generation, sessionId), result, properties.sessionTtl, "put-session")
     }
 
     override fun getClubId(clubSlug: String): UUID? =
@@ -251,10 +281,22 @@ class RedisPublicReadCacheAdapter(
 
         fun clubKey(clubId: UUID) = "public:club:$clubId:home:v1"
 
+        fun clubKey(
+            clubId: UUID,
+            clubGeneration: Long,
+        ) = "public:club:$clubId:g:$clubGeneration:home:v2"
+
         fun sessionKey(
             clubId: UUID,
             sessionId: UUID,
         ) = "public:club:$clubId:session:$sessionId:v1"
+
+        fun sessionKey(
+            clubId: UUID,
+            clubGeneration: Long,
+            generation: Long,
+            sessionId: UUID,
+        ) = "public:club:$clubId:g:$clubGeneration:session:$sessionId:g:$generation:v2"
 
         fun clubIdKey(clubSlug: String) = "public:club-slug:$clubSlug:id:v1"
     }

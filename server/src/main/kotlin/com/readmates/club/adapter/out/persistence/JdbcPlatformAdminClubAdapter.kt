@@ -36,6 +36,14 @@ class JdbcPlatformAdminClubAdapter(
             .query("$CLUB_BASE_SQL where clubs.id = ? limit 1", ::mapPlatformAdminClub, clubId.dbString())
             .firstOrNull()
 
+    override fun loadClubForUpdate(clubId: UUID): PlatformAdminClubListItem? =
+        jdbcTemplate
+            .query(
+                "$CLUB_BASE_SQL where clubs.id = ? limit 1 for update",
+                ::mapPlatformAdminClub,
+                clubId.dbString(),
+            ).firstOrNull()
+
     override fun activeHostCount(clubId: UUID): Int =
         jdbcTemplate.queryForObject(
             """

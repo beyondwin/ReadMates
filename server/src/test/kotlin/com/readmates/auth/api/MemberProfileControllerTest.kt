@@ -27,8 +27,10 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.put
+import java.sql.Timestamp
 import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
@@ -57,6 +59,26 @@ class MemberProfileControllerTest(
     private val createdMembershipIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
     private val createdClubIds = linkedSetOf<String>()
+    private val projectionSnapshots = linkedMapOf<String, PublicProjectionSnapshot?>()
+    private val clubProjectionSnapshots = linkedMapOf<String, ClubProjectionSnapshot?>()
+
+    private data class PublicProjectionSnapshot(
+        val clubId: String,
+        val publicationId: String?,
+        val generation: Long,
+        val clubGeneration: Long,
+        val liveRecordRevision: Long?,
+        val originReadable: Boolean,
+        val convergenceId: String?,
+        val updatedAt: Timestamp,
+    )
+
+    private data class ClubProjectionSnapshot(
+        val generation: Long,
+        val originReadable: Boolean,
+        val convergenceId: String?,
+        val updatedAt: Timestamp,
+    )
 
     private data class ProfileErrorResponseCase(
         val error: MemberProfileError,
@@ -188,6 +210,140 @@ class MemberProfileControllerTest(
         assertEquals("cloud-green-book", avatarKeyForMembership(primaryMembershipId))
         assertEquals("OtherAvatar", shortNameForMembership(otherMembershipId))
         assertEquals("starfish-notebook", avatarKeyForMembership(otherMembershipId))
+    }
+
+    @Suppress("LongMethod")
+    @Test
+    fun `public member profile change rotates projection atomically while no-op and rollback do not`() {
+        val email = insertProfileMember("public.profile.projection", "ACTIVE", shortName = "Before")
+        val membershipId = membershipIdForEmail(email)
+        val cookie = sessionCookieForEmail(email)
+        val publicSessionId = "00000000-0000-0000-0000-000000000306"
+        val unrelatedPublicSessionId = "00000000-0000-0000-0000-000000000305"
+        val participantId = UUID.randomUUID().toString()
+        val highlightId = UUID.randomUUID().toString()
+        rememberProjectionState(publicSessionId)
+        rememberClubProjectionState("00000000-0000-0000-0000-000000000001")
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status
+            ) values (?, '00000000-0000-0000-0000-000000000001', ?, ?, 'GOING', 'ATTENDED', 'ACTIVE')
+            """.trimIndent(),
+            participantId,
+            publicSessionId,
+            membershipId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
+            values (?, '00000000-0000-0000-0000-000000000001', ?, ?, 'Synthetic public profile projection', 99)
+            """.trimIndent(),
+            highlightId,
+            publicSessionId,
+            membershipId,
+        )
+        val before = projectionGeneration(publicSessionId)
+        val unrelatedBefore = projectionGeneration(unrelatedPublicSessionId)
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$publicSessionId") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.highlights[?(@.text == 'Synthetic public profile projection')].authorShortName") {
+                    value("Before")
+                }
+            }
+
+        mockMvc
+            .put("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+            }.andExpect { status { isOk() } }
+
+        val changed = projectionGeneration(publicSessionId)
+        assertEquals(before + 1, changed)
+        assertEquals(unrelatedBefore, projectionGeneration(unrelatedPublicSessionId))
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from auth_public_projection_mutation_receipts receipts
+                join public_mutation_convergence_links links on links.mutation_receipt_id = receipts.id
+                join public_convergence_work work on work.convergence_id = links.convergence_id
+                where receipts.subject_membership_id_snapshot = ?
+                  and receipts.session_id_snapshot = ?
+                  and receipts.operation = 'PROFILE_REPLACED'
+                """.trimIndent(),
+                Int::class.java,
+                membershipId,
+                publicSessionId,
+            ),
+        )
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$publicSessionId") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.highlights[?(@.text == 'Synthetic public profile projection')].authorShortName") {
+                    value("After")
+                }
+                jsonPath("$.highlights[?(@.text == 'Synthetic public profile projection')].avatarKey") {
+                    value("cloud-green-book")
+                }
+            }
+
+        mockMvc
+            .put("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After","avatarKey":"cloud-green-book"}"""
+            }.andExpect { status { isOk() } }
+        assertEquals(changed, projectionGeneration(publicSessionId))
+
+        jdbcTemplate.update(
+            "update public_projection_current set origin_readable = false where session_id = ?",
+            publicSessionId,
+        )
+        mockMvc
+            .put("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After deny","avatarKey":"starfish-notebook"}"""
+            }.andExpect { status { isOk() } }
+        val denied = projectionGeneration(publicSessionId)
+        assertEquals(changed + 1, denied)
+        assertEquals(false, projectionReadable(publicSessionId))
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$publicSessionId") {
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect { status { isNotFound() } }
+
+        mockMvc
+            .put("/api/me/profile") {
+                cookie(cookie)
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+                header(AuthClubContextHeader.CLUB_SLUG, "reading-sai")
+                header("Origin", "http://localhost:3000")
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"displayName":"After rollback","avatarKey":"invalid-avatar"}"""
+            }.andExpect { status { isBadRequest() } }
+        assertEquals(denied, projectionGeneration(publicSessionId))
     }
 
     @Test
@@ -490,6 +646,10 @@ class MemberProfileControllerTest(
         try {
             deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
             deleteWhereIn("auth_sessions", "user_id", createdUserIds)
+            cleanupCreatedPublicProjectionMutations()
+            restoreProjectionSnapshots()
+            deleteWhereIn("highlights", "membership_id", createdMembershipIds)
+            deleteWhereIn("session_participants", "membership_id", createdMembershipIds)
             deleteWhereIn("memberships", "id", createdMembershipIds)
             deleteWhereIn("memberships", "user_id", createdUserIds)
             deleteWhereIn("users", "id", createdUserIds)
@@ -499,6 +659,8 @@ class MemberProfileControllerTest(
             createdMembershipIds.clear()
             createdUserIds.clear()
             createdClubIds.clear()
+            projectionSnapshots.clear()
+            clubProjectionSnapshots.clear()
         }
     }
 
@@ -1267,6 +1429,160 @@ class MemberProfileControllerTest(
             String::class.java,
             membershipId,
         ) ?: error("Expected avatar key for $membershipId")
+
+    private fun projectionGeneration(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select coalesce((select generation from public_projection_current where session_id = ?), 0)",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
+
+    private fun projectionReadable(sessionId: String): Boolean =
+        jdbcTemplate.queryForObject(
+            "select origin_readable from public_projection_current where session_id = ?",
+            Boolean::class.java,
+            sessionId,
+        ) ?: false
+
+    private fun rememberProjectionState(sessionId: String) {
+        projectionSnapshots.putIfAbsent(
+            sessionId,
+            loadProjectionSnapshot(sessionId),
+        )
+    }
+
+    private fun rememberClubProjectionState(clubId: String) {
+        clubProjectionSnapshots.putIfAbsent(
+            clubId,
+            loadClubProjectionSnapshot(clubId),
+        )
+    }
+
+    private fun loadProjectionSnapshot(sessionId: String): PublicProjectionSnapshot? =
+        jdbcTemplate
+            .query(
+                """
+                select club_id, publication_id_snapshot, generation, club_generation,
+                       live_record_revision, origin_readable, convergence_id, updated_at
+                from public_projection_current
+                where session_id = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    PublicProjectionSnapshot(
+                        clubId = rs.getString("club_id"),
+                        publicationId = rs.getString("publication_id_snapshot"),
+                        generation = rs.getLong("generation"),
+                        clubGeneration = rs.getLong("club_generation"),
+                        liveRecordRevision = rs.getLong("live_record_revision").takeUnless { rs.wasNull() },
+                        originReadable = rs.getBoolean("origin_readable"),
+                        convergenceId = rs.getString("convergence_id"),
+                        updatedAt = rs.getTimestamp("updated_at"),
+                    )
+                },
+                sessionId,
+            ).singleOrNull()
+
+    private fun loadClubProjectionSnapshot(clubId: String): ClubProjectionSnapshot? =
+        jdbcTemplate
+            .query(
+                """
+                select generation, origin_readable, convergence_id, updated_at
+                from public_club_projection_generations
+                where club_id = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    ClubProjectionSnapshot(
+                        generation = rs.getLong("generation"),
+                        originReadable = rs.getBoolean("origin_readable"),
+                        convergenceId = rs.getString("convergence_id"),
+                        updatedAt = rs.getTimestamp("updated_at"),
+                    )
+                },
+                clubId,
+            ).singleOrNull()
+
+    private fun cleanupCreatedPublicProjectionMutations() {
+        if (createdMembershipIds.isEmpty()) return
+        val placeholders = createdMembershipIds.joinToString(", ") { "?" }
+        val receiptIds =
+            jdbcTemplate
+                .queryForList(
+                    """
+                    select id from auth_public_projection_mutation_receipts
+                    where subject_membership_id_snapshot in ($placeholders)
+                    """.trimIndent(),
+                    String::class.java,
+                    *createdMembershipIds.toTypedArray(),
+                ).filterNotNull()
+                .toSet()
+        if (receiptIds.isEmpty()) return
+        val receiptPlaceholders = receiptIds.joinToString(", ") { "?" }
+        val convergenceIds =
+            jdbcTemplate
+                .queryForList(
+                    """
+                    select convergence_id from public_mutation_convergence_links
+                    where mutation_receipt_id in ($receiptPlaceholders)
+                    """.trimIndent(),
+                    String::class.java,
+                    *receiptIds.toTypedArray(),
+                ).filterNotNull()
+                .toSet()
+        deleteWhereIn("public_convergence_events", "convergence_id", convergenceIds)
+        deleteWhereIn("public_convergence_work", "convergence_id", convergenceIds)
+        deleteWhereIn("public_mutation_convergence_links", "mutation_receipt_id", receiptIds)
+        deleteWhereIn("auth_public_projection_mutation_receipts", "id", receiptIds)
+    }
+
+    private fun restoreProjectionSnapshots() {
+        projectionSnapshots.forEach { (sessionId, snapshot) ->
+            if (snapshot == null) {
+                jdbcTemplate.update("delete from public_projection_current where session_id = ?", sessionId)
+            } else {
+                jdbcTemplate.update(
+                    """
+                    update public_projection_current
+                    set club_id = ?, publication_id_snapshot = ?, generation = ?, club_generation = ?,
+                        live_record_revision = ?, origin_readable = ?, convergence_id = ?, updated_at = ?
+                    where session_id = ?
+                    """.trimIndent(),
+                    snapshot.clubId,
+                    snapshot.publicationId,
+                    snapshot.generation,
+                    snapshot.clubGeneration,
+                    snapshot.liveRecordRevision,
+                    snapshot.originReadable,
+                    snapshot.convergenceId,
+                    snapshot.updatedAt,
+                    sessionId,
+                )
+            }
+        }
+        clubProjectionSnapshots.forEach { (clubId, snapshot) ->
+            if (snapshot == null) {
+                jdbcTemplate.update("delete from public_club_projection_generations where club_id = ?", clubId)
+            } else {
+                jdbcTemplate.update(
+                    """
+                    update public_club_projection_generations
+                    set generation = ?, origin_readable = ?, convergence_id = ?, updated_at = ?
+                    where club_id = ?
+                    """.trimIndent(),
+                    snapshot.generation,
+                    snapshot.originReadable,
+                    snapshot.convergenceId,
+                    snapshot.updatedAt,
+                    clubId,
+                )
+            }
+        }
+        projectionSnapshots.forEach { (sessionId, snapshot) ->
+            assertEquals(snapshot, loadProjectionSnapshot(sessionId), "Projection fixture leaked for $sessionId")
+        }
+        clubProjectionSnapshots.forEach { (clubId, snapshot) ->
+            assertEquals(snapshot, loadClubProjectionSnapshot(clubId), "Club projection fixture leaked for $clubId")
+        }
+    }
 
     private fun jsonString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n")}\""
 

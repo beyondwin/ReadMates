@@ -469,7 +469,9 @@ class HostSessionTrashServiceTest {
         override fun create(command: com.readmates.session.application.model.HostSessionCommand) = error("unused")
 
         override fun update(command: com.readmates.session.application.model.UpdateHostSessionCommand) =
-            hostSessionDetail(command.sessionId, state)
+            com.readmates.session.application.port.out.HostSessionDraftUpdateResult(
+                hostSessionDetail(command.sessionId, state),
+            )
 
         override fun lockVisibilitySnapshot(command: HostSessionIdCommand) = error("unused")
 

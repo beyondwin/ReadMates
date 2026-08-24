@@ -240,6 +240,22 @@ class HostSessionRecordControllerDbTest(
               "expectedDraftHash": "$draftHash"
             }
             """.trimIndent()
+        jdbcTemplate.update(
+            """
+            insert into public_projection_current (
+              session_id, club_id, publication_id_snapshot, generation, club_generation,
+              live_record_revision, origin_readable, convergence_id, updated_at
+            )
+            select sessions.id, sessions.club_id, publications.id, 1,
+                   coalesce(club_generation.generation, 0), 0, false, null, utc_timestamp(6)
+            from sessions
+            join public_session_publications publications on publications.session_id = sessions.id
+            left join public_club_projection_generations club_generation on club_generation.club_id = sessions.club_id
+            where sessions.id = ?
+            on duplicate key update origin_readable = false
+            """.trimIndent(),
+            SESSION_ID,
+        )
         val firstRevisionId =
             mockMvc
                 .post("/api/host/sessions/$SESSION_ID/record-apply") {
@@ -258,6 +274,13 @@ class HostSessionRecordControllerDbTest(
                         .get("revisionId")
                         .asText()
                 }
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select origin_readable from public_projection_current where session_id = ?",
+                Boolean::class.java,
+                SESSION_ID,
+            ),
+        ).isFalse()
 
         mockMvc
             .post("/api/host/sessions/$SESSION_ID/record-apply") {
@@ -428,27 +451,31 @@ class HostSessionRecordControllerDbTest(
                         .asText()
                 }
 
-        makeDraftFailAppliedRevisionForeignKey()
+        installFailureAfterProjectionLink()
         val before = recordApplyState()
 
-        assertThatThrownBy {
-            mockMvc
-                .post("/api/host/sessions/$SESSION_ID/record-apply") {
-                    with(user("host@example.com"))
-                    with(csrf())
-                    contentType = MediaType.APPLICATION_JSON
-                    content =
-                        """
-                        {
-                          "applyRequestId": "00000000-0000-0000-0000-000000000125",
-                          "expectedDraftRevision": 1,
-                          "expectedLiveRevision": 0,
-                          "expectedDraftHash": "$draftHash"
-                        }
-                        """.trimIndent()
-                }.andReturn()
-        }.hasRootCauseInstanceOf(java.sql.SQLIntegrityConstraintViolationException::class.java)
-            .hasStackTraceContaining("session_record_revisions_restore_fk")
+        try {
+            assertThatThrownBy {
+                mockMvc
+                    .post("/api/host/sessions/$SESSION_ID/record-apply") {
+                        with(user("host@example.com"))
+                        with(csrf())
+                        contentType = MediaType.APPLICATION_JSON
+                        content =
+                            """
+                            {
+                              "applyRequestId": "00000000-0000-0000-0000-000000000125",
+                              "expectedDraftRevision": 1,
+                              "expectedLiveRevision": 0,
+                              "expectedDraftHash": "$draftHash"
+                            }
+                            """.trimIndent()
+                    }.andReturn()
+            }.hasRootCauseInstanceOf(java.sql.SQLException::class.java)
+                .hasStackTraceContaining("c1_fail_after_projection_link")
+        } finally {
+            jdbcTemplate.execute("drop trigger if exists c1_fail_after_projection_link")
+        }
 
         assertThat(recordApplyState()).isEqualTo(before)
     }
@@ -548,25 +575,19 @@ class HostSessionRecordControllerDbTest(
             VISIBILITY_SESSION_ID,
         ) ?: 0
 
-    private fun makeDraftFailAppliedRevisionForeignKey() {
+    private fun installFailureAfterProjectionLink() {
+        jdbcTemplate.execute("drop trigger if exists c1_fail_after_projection_link")
         jdbcTemplate.execute(
-            ConnectionCallback {
-                it.createStatement().use { statement ->
-                    statement.execute("set foreign_key_checks = 0")
-                    try {
-                        statement.executeUpdate(
-                            """
-                            update session_record_drafts
-                            set source = 'RESTORED',
-                                restored_from_revision_id = '00000000-0000-0000-0000-000000000998'
-                            where session_id = '$SESSION_ID'
-                            """.trimIndent(),
-                        )
-                    } finally {
-                        statement.execute("set foreign_key_checks = 1")
-                    }
-                }
-            },
+            """
+            create trigger c1_fail_after_projection_link
+            before delete on session_record_drafts
+            for each row
+            begin
+              if old.session_id = '$SESSION_ID' then
+                signal sqlstate '45000' set message_text = 'c1_fail_after_projection_link';
+              end if;
+            end
+            """.trimIndent(),
         )
     }
 
@@ -649,6 +670,54 @@ class HostSessionRecordControllerDbTest(
                     from session_record_apply_receipts
                     where session_id = ?
                     order by id
+                    """.trimIndent(),
+                    SESSION_ID,
+                ),
+            projectionCurrent =
+                jdbcTemplate.queryForList(
+                    """
+                    select generation, club_generation, live_record_revision, origin_readable, convergence_id
+                    from public_projection_current
+                    where session_id = ?
+                    """.trimIndent(),
+                    SESSION_ID,
+                ),
+            clubGeneration =
+                jdbcTemplate.queryForList(
+                    """
+                    select generation
+                    from public_club_projection_generations
+                    where club_id = '00000000-0000-0000-0000-000000000001'
+                    """.trimIndent(),
+                ),
+            convergenceLinks =
+                jdbcTemplate.queryForList(
+                    """
+                    select mutation_receipt_id, convergence_id, committed_generation,
+                           committed_club_generation, live_record_revision, origin_readable
+                    from public_mutation_convergence_links
+                    where session_id_snapshot = ?
+                    order by mutation_receipt_id
+                    """.trimIndent(),
+                    SESSION_ID,
+                ),
+            convergenceWork =
+                jdbcTemplate.queryForList(
+                    """
+                    select convergence_id, next_attempt_no, lease_owner, lease_expires_at, available_at, retention_until
+                    from public_convergence_work
+                    where session_id_snapshot = ?
+                    order by convergence_id
+                    """.trimIndent(),
+                    SESSION_ID,
+                ),
+            mutationKeys =
+                jdbcTemplate.queryForList(
+                    """
+                    select operation, resource_slot, idempotency_key, status, receipt_id
+                    from mutation_idempotency_keys
+                    where resource_slot = ?
+                    order by operation, idempotency_key
                     """.trimIndent(),
                     SESSION_ID,
                 ),
@@ -1038,10 +1107,18 @@ private data class RecordApplyState(
     val revisions: List<Map<String, Any?>>,
     val draft: List<Map<String, Any?>>,
     val receipts: List<Map<String, Any?>>,
+    val projectionCurrent: List<Map<String, Any?>>,
+    val clubGeneration: List<Map<String, Any?>>,
+    val convergenceLinks: List<Map<String, Any?>>,
+    val convergenceWork: List<Map<String, Any?>>,
+    val mutationKeys: List<Map<String, Any?>>,
     val outbox: List<Map<String, Any?>>,
 )
 
 private const val CLEAN_RECORD_API_FIXTURES = """
+    update public_projection_current
+    set origin_readable = true
+    where session_id = '00000000-0000-0000-0000-000000000301';
     update host_action_notification_previews
     set consumed_at = null, consumed_decision_id = null
     where session_id in (

@@ -2,6 +2,7 @@ package com.readmates.session.application.port.out
 
 import com.readmates.session.application.CreatedSessionResponse
 import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.model.HostPublicProjectionEffect
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
@@ -12,12 +13,17 @@ import java.time.OffsetDateTime
 interface HostSessionDraftPort {
     fun create(command: HostSessionCommand): CreatedSessionResponse
 
-    fun update(command: UpdateHostSessionCommand): HostSessionDetailResponse
+    fun update(command: UpdateHostSessionCommand): HostSessionDraftUpdateResult
 
     fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot
 
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult
 }
+
+data class HostSessionDraftUpdateResult(
+    val detail: HostSessionDetailResponse,
+    val publicProjectionEffect: HostPublicProjectionEffect? = null,
+)
 
 data class HostSessionVisibilitySnapshot(
     val detail: HostSessionDetailResponse,
@@ -30,6 +36,7 @@ data class HostSessionVisibilityUpdateResult(
     val exposureChanged: Boolean,
     val publicationChanged: Boolean = false,
     val compatibilityChanged: Boolean,
+    val publicProjectionEffect: HostPublicProjectionEffect? = null,
 ) {
     val changed: Boolean
         get() = exposureChanged || publicationChanged || compatibilityChanged

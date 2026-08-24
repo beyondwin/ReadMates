@@ -1,5 +1,6 @@
 package com.readmates.architecture
 
+import com.readmates.publication.application.port.out.PublicConvergencePort
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
@@ -10,6 +11,33 @@ import java.nio.file.Path
 
 @Tag("architecture")
 class ServerArchitectureInventoryTest {
+    @Test
+    fun `mutation owners expose neutral public effects without importing publication application`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val mutationOwnerApplications =
+            listOf("auth/application", "club/application", "session/application", "sessionrecord/application")
+        mutationOwnerApplications.forEach { relative ->
+            Files.walk(productionSourceRoot.resolve("com/readmates/$relative")).use { paths ->
+                paths
+                    .filter(Files::isRegularFile)
+                    .filter { sourceFile -> sourceFile.fileName.toString().endsWith(".kt") }
+                    .forEach { sourceFile ->
+                        assertThat(Files.readString(sourceFile))
+                            .doesNotContain("import com.readmates.publication.application")
+                    }
+            }
+        }
+        assertThat(
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/publication/adapter/out/persistence/JdbcPublicConvergenceAdapter.kt",
+                ),
+            ),
+        ).contains("PublicConvergencePort")
+        assertThat(PublicConvergencePort::class.java.declaredMethods.map { it.name })
+            .containsExactlyInAnyOrder("loadReceipt", "loadWork", "loadCurrentEvent")
+    }
+
     @Test
     fun `club application imports no auth source`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")

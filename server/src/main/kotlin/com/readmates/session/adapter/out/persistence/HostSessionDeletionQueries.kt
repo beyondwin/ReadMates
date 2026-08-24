@@ -524,6 +524,16 @@ class HostSessionDeletionQueries(
     ) {
         // Lifecycle audit and AI provider/job audit are durable evidence, not cleanup targets.
         jdbcTemplate.update(
+            "delete from public_convergence_work where club_id_snapshot = ? and session_id_snapshot = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
+        jdbcTemplate.update(
+            "delete from public_projection_current where club_id = ? and session_id = ?",
+            clubId.dbString(),
+            sessionId.dbString(),
+        )
+        jdbcTemplate.update(
             "delete from ai_generation_commit_receipts where club_id = ? and session_id = ?",
             clubId.dbString(),
             sessionId.dbString(),

@@ -1,10 +1,17 @@
 package com.readmates.club.application.port.out
 
+import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
 import java.util.UUID
 
+data class ClubLifecycleState(
+    val clubId: UUID,
+    val status: ClubStatus,
+    val publicVisibility: ClubPublicVisibility,
+)
+
 interface ClubLifecyclePort {
-    fun loadCurrentStatus(clubId: UUID): ClubStatus?
+    fun loadCurrentForUpdate(clubId: UUID): ClubLifecycleState?
 
     fun transitionStatus(
         clubId: UUID,

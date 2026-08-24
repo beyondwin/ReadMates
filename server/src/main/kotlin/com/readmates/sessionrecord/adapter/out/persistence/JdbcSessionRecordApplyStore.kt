@@ -26,6 +26,8 @@ internal class JdbcSessionRecordApplyStore(
     private val draftStore: SessionRecordDraftStorePort,
     private val rows: SessionRecordPersistenceRows,
 ) : SessionRecordApplyStorePort {
+    private val publicProjection = SessionRecordPublicProjectionWriteOperations(jdbcTemplate)
+
     override fun lockEditor(
         host: AuthenticatedClubActor,
         sessionId: UUID,
@@ -237,6 +239,7 @@ internal class JdbcSessionRecordApplyStore(
             composerEventType.name,
             revision.id.dbString(),
         )
+        publicProjection.rotateAffected(host.clubId, command.sessionId, applyRequestId)
         return requireNotNull(findApplyReceipt(host, command.sessionId, applyRequestId))
     }
 

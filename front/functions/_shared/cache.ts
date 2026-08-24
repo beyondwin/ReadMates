@@ -1,7 +1,4 @@
-export const PUBLIC_CACHEABLE_PATH_PREFIXES = [
-  "/api/public/clubs/",
-  "/api/public/records/",
-] as const;
+export const PUBLIC_CACHEABLE_PATH_PREFIXES: readonly string[] = [];
 
 export function isPublicCacheableRequest(method: string, upstreamPath: string): boolean {
   if (method !== "GET") return false;

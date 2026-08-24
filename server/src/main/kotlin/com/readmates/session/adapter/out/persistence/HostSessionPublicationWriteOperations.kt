@@ -12,6 +12,7 @@ internal class HostSessionPublicationWriteOperations(
     private val jdbcTemplate: JdbcTemplate,
     private val queries: HostSessionWriteQueries,
     private val policy: HostSessionWritePolicy,
+    private val publicProjection: HostPublicProjectionWriteOperations,
 ) {
     fun upsert(
         command: UpsertPublicationCommand,
@@ -73,7 +74,17 @@ internal class HostSessionPublicationWriteOperations(
             exposureChanged = changes.access,
             publicationChanged = changes.publication,
             compatibilityChanged = changes.compatibilityOnly,
+            publicProjectionEffect = rotatePublicProjection(command, changes),
         )
+    }
+
+    private fun rotatePublicProjection(
+        command: UpsertPublicationCommand,
+        changes: HostPublicationSemanticChanges,
+    ) = if (changes.changed) {
+        publicProjection.rotate(command.host.clubId, command.sessionId)
+    } else {
+        null
     }
 
     private fun bumpPublicationRevision(

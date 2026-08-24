@@ -43,6 +43,7 @@ class HostSessionCorrectionSafetyDbTest(
     @Test
     fun `correction preview and confirm project public record to draft host only audience`() {
         val sessionId = publishedSessionWithInitialRecord()
+        val generationBefore = publicProjectionGeneration(sessionId)
         insertNotesQuestion(sessionId)
         assertNotesProjection(sessionId, visible = true)
         saveRecordDraft(sessionId, "host target", "HOST_ONLY")
@@ -52,6 +53,10 @@ class HostSessionCorrectionSafetyDbTest(
         publishCorrection(sessionId, "key-public-to-host-01", current)
 
         assertExposure(sessionId, "HOST_ONLY", "MEMBER", "HIDDEN", "MEMBER", false)
+        assertThat(publicProjectionGeneration(sessionId)).isEqualTo(generationBefore + 1)
+        assertThat(publicProjectionOriginReadable(sessionId)).isFalse()
+        assertThat(publicProjectionLiveRevision(sessionId)).isEqualTo(current.live + 1)
+        assertThat(publicConvergenceLinks(sessionId, generationBefore + 1)).isEqualTo(1)
         mockMvc
             .get("/api/archive/sessions/$sessionId") { with(user("member1@example.com")) }
             .andExpect { status { isNotFound() } }
@@ -87,6 +92,7 @@ class HostSessionCorrectionSafetyDbTest(
         assertThat(versions(sessionId)).isEqualTo(noOpVersions)
         assertThat(sessionUpdatedAt(sessionId)).isEqualTo(updatedAtBefore)
         assertThat(recordEpoch()).isEqualTo(epochBefore)
+        assertThat(publicProjectionGeneration(sessionId)).isEqualTo(generationBefore + 1)
     }
 
     @Test
@@ -317,6 +323,44 @@ class HostSessionCorrectionSafetyDbTest(
             }.andExpect { status { isOk() } }
         return sessionId
     }
+
+    private fun publicProjectionGeneration(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select generation from public_projection_current where session_id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
+
+    private fun publicProjectionOriginReadable(sessionId: String): Boolean =
+        jdbcTemplate.queryForObject(
+            "select origin_readable from public_projection_current where session_id = ?",
+            Boolean::class.java,
+            sessionId,
+        ) ?: false
+
+    private fun publicProjectionLiveRevision(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select live_record_revision from public_projection_current where session_id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
+
+    private fun publicConvergenceLinks(
+        sessionId: String,
+        generation: Long,
+    ): Int =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from public_mutation_convergence_links
+            where session_id_snapshot = ?
+              and committed_generation = ?
+              and origin_readable = false
+            """.trimIndent(),
+            Int::class.java,
+            sessionId,
+            generation,
+        ) ?: 0
 
     private fun closedGuestReadableSession(): String {
         val sessionId = createDraft("correction review", "key-create-${UUID.randomUUID()}").first

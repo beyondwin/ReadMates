@@ -1,10 +1,12 @@
 package com.readmates.publication.adapter.out.persistence
 
 import com.readmates.publication.application.model.LEGACY_PUBLIC_CLUB_SLUG
+import com.readmates.publication.application.model.PublicClubProjectionGeneration
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
 import com.readmates.publication.application.model.PublicHighlightResult
 import com.readmates.publication.application.model.PublicOneLinerResult
+import com.readmates.publication.application.model.PublicProjectionGeneration
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.model.PublicSessionSummaryResult
 import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
@@ -19,6 +21,95 @@ import java.util.UUID
 class JdbcPublicQueryAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : LoadPublishedPublicDataPort {
+    override fun loadClubProjectionGeneration(clubSlug: String): PublicClubProjectionGeneration? =
+        jdbcTemplate
+            .query(
+                """
+                select clubs.id,
+                       coalesce(generations.generation, 0) as generation,
+                       case
+                         when generations.club_id is null then
+                           binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                         else
+                           generations.origin_readable
+                           and binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                       end as origin_readable
+                from clubs
+                left join public_club_projection_generations generations on generations.club_id = clubs.id
+                where clubs.slug = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    PublicClubProjectionGeneration(
+                        clubId = rs.uuid("id"),
+                        generation = rs.getLong("generation"),
+                        originReadable = rs.getBoolean("origin_readable"),
+                    )
+                },
+                clubSlug,
+            ).firstOrNull()
+
+    override fun loadSessionProjectionGeneration(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicProjectionGeneration? =
+        jdbcTemplate
+            .query(
+                """
+                select sessions.id as session_id,
+                       sessions.club_id,
+                       publications.id as publication_id,
+                       coalesce(current_projection.generation, 0) as generation,
+                       coalesce(current_projection.club_generation, club_generation.generation, 0) as club_generation,
+                       coalesce(
+                         current_projection.live_record_revision,
+                         (select max(revisions.version)
+                          from session_record_revisions revisions
+                          where revisions.club_id = sessions.club_id
+                            and revisions.session_id = sessions.id),
+                         0
+                       ) as live_record_revision,
+                       case
+                         when current_projection.session_id is null then
+                           sessions.deleted_at is null
+                           and binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                           and binary sessions.state = binary 'PUBLISHED'
+                           and binary sessions.access_scope = binary 'GUEST_READABLE'
+                           and binary publications.site_visibility = binary 'PUBLIC_RECORD'
+                         else
+                           current_projection.origin_readable
+                           and sessions.deleted_at is null
+                           and binary clubs.status = binary 'ACTIVE'
+                           and binary clubs.public_visibility = binary 'PUBLIC'
+                           and binary sessions.state = binary 'PUBLISHED'
+                           and binary sessions.access_scope = binary 'GUEST_READABLE'
+                           and binary publications.site_visibility = binary 'PUBLIC_RECORD'
+                       end as origin_readable
+                from sessions
+                join clubs on clubs.id = sessions.club_id
+                left join public_session_publications publications
+                  on publications.club_id = sessions.club_id and publications.session_id = sessions.id
+                left join public_projection_current current_projection on current_projection.session_id = sessions.id
+                left join public_club_projection_generations club_generation on club_generation.club_id = sessions.club_id
+                where clubs.slug = ? and sessions.id = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    PublicProjectionGeneration(
+                        publicationId = rs.getString("publication_id")?.let(UUID::fromString),
+                        clubId = rs.uuid("club_id"),
+                        sessionId = rs.uuid("session_id"),
+                        generation = rs.getLong("generation"),
+                        clubGeneration = rs.getLong("club_generation"),
+                        liveRecordRevision = rs.getLong("live_record_revision"),
+                        originReadable = rs.getBoolean("origin_readable"),
+                    )
+                },
+                clubSlug,
+                sessionId.dbString(),
+            ).firstOrNull()
+
     override fun loadClub(): PublicClubResult? = loadClub(LEGACY_PUBLIC_CLUB_SLUG)
 
     override fun loadClub(clubSlug: String): PublicClubResult? =

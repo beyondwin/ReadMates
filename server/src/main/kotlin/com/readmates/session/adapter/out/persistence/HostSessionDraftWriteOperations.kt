@@ -5,6 +5,7 @@ import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
+import com.readmates.session.application.port.out.HostSessionDraftUpdateResult
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.application.requireHost
 import com.readmates.session.domain.PublicSiteVisibility
@@ -21,6 +22,7 @@ internal class HostSessionDraftWriteOperations(
     private val jdbcTemplate: JdbcTemplate,
     private val queries: HostSessionWriteQueries,
     private val policy: HostSessionWritePolicy,
+    private val publicProjection: HostPublicProjectionWriteOperations,
 ) {
     fun create(command: HostSessionCommand): CreatedSessionResponse {
         val host = command.host
@@ -38,10 +40,21 @@ internal class HostSessionDraftWriteOperations(
     fun update(command: UpdateHostSessionCommand) =
         with(command) {
             requireHost(host)
+            val before = queries.detail(host, sessionId)
             val values = policy.normalizeUpdate(session, queries.existingSchedule(host, sessionId))
-            val updated = updateDraft(host, sessionId, session, values, queries.expectedRevision(expectedSessionRevision))
+            val updated =
+                updateDraft(host, sessionId, session, values, queries.expectedRevision(expectedSessionRevision))
             queries.throwIfStale(updated, host, sessionId)
-            queries.detail(host, sessionId)
+            val detail = queries.detail(host, sessionId)
+            HostSessionDraftUpdateResult(
+                detail = detail,
+                publicProjectionEffect =
+                    if (before.publicBodyFingerprint() != detail.publicBodyFingerprint()) {
+                        publicProjection.rotateAffectedContent(host.clubId, sessionId)
+                    } else {
+                        null
+                    },
+            )
         }
 
     fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
@@ -90,6 +103,12 @@ internal class HostSessionDraftWriteOperations(
             exposureChanged = changes.access,
             publicationChanged = changes.placement,
             compatibilityChanged = changes.compatibilityOnly,
+            publicProjectionEffect =
+                if (changes.changed) {
+                    publicProjection.rotate(command.host.clubId, command.sessionId)
+                } else {
+                    null
+                },
         )
     }
 
@@ -300,6 +319,9 @@ internal class HostSessionDraftWriteOperations(
             siteVisibility = PublicSiteVisibility.HIDDEN,
         )
 }
+
+private fun com.readmates.session.application.HostSessionDetailResponse.publicBodyFingerprint() =
+    listOf(bookTitle, bookAuthor, bookImageUrl, date)
 
 private data class HostVisibilitySemanticChanges(
     val access: Boolean,

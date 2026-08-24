@@ -36,6 +36,7 @@ class RedisReadCacheInvalidationAdapter(
         ) {
             val publicKeys = mutableSetOf("public:club:$clubId:home:v1")
             publicKeys.addAll(scanKeys("public:club:$clubId:session:*:v1"))
+            publicKeys.addAll(scanKeys("public:club:$clubId:g:*"))
             delete(publicKeys)
             metrics.increment("readmates.public_cache.evicted", "scope", "club")
             true

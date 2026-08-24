@@ -131,6 +131,20 @@ class RedisPublicReadCacheAdapterTest(
     }
 
     @Test
+    fun `generation scoped session cache never returns an older generation`() {
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+        val old = publicSession(sessionId).copy(summary = "Old generation")
+        val current = publicSession(sessionId).copy(summary = "Current generation")
+
+        adapter.putSession(BASELINE_CLUB_ID, 6, 2, sessionId, old)
+        adapter.putSession(BASELINE_CLUB_ID, 7, 3, sessionId, current)
+
+        assertThat(adapter.getSession(BASELINE_CLUB_ID, 7, 3, sessionId)?.summary)
+            .isEqualTo("Current generation")
+        assertThat(adapter.getSession(BASELINE_CLUB_ID, 7, 2, sessionId)).isNull()
+    }
+
+    @Test
     fun `non legacy slug overloads do not create slug scoped public cache keys`() {
         val slug = "sample-book-club"
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")

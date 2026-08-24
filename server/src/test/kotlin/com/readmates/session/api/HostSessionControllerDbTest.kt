@@ -4324,6 +4324,10 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
         )
         jdbcTemplate.update(
+            "insert into session_publication_versions (session_id, publication_revision) values (?, 0)",
+            "00000000-0000-0000-0000-000000009777",
+        )
+        jdbcTemplate.update(
             """
             insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
             select uuid(), memberships.club_id, '00000000-0000-0000-0000-000000009777', memberships.id, 'NO_RESPONSE', 'UNKNOWN'

@@ -39,6 +39,17 @@ type PagesFunction<Env> = (context: {
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const MAX_AI_GENERATION_MULTIPART_BYTES = 2 * 1024 * 1024;
 
+function isAuthoritativePublicProjectionRequest(method: string, path: string) {
+  return (
+    method === "GET" &&
+    (
+      path === "/api/public/club" ||
+      /^\/api\/public\/sessions\/[^/]+$/.test(path) ||
+      /^\/api\/public\/clubs\/[^/]+(?:\/sessions\/[^/]+)?$/.test(path)
+    )
+  );
+}
+
 function isAiGenerationTranscriptUpload(method: string, path: string, contentType: string | null) {
   return (
     method === "POST" &&
@@ -252,6 +263,11 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     headers: copyUpstreamHeaders(upstream.headers),
   });
   outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
+
+  if (isAuthoritativePublicProjectionRequest(context.request.method, upstreamPath)) {
+    outboundResponse.headers.set("CDN-Cache-Control", "no-store");
+    outboundResponse.headers.set("Cloudflare-CDN-Cache-Control", "no-store");
+  }
 
   if (isPublicCacheableRequest(context.request.method, upstreamPath) && isCacheableUpstreamResponse(upstream)) {
     const cacheKey = buildPublicCacheKey(context.request);

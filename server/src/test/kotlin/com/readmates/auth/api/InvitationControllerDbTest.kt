@@ -139,6 +139,7 @@ class InvitationControllerDbTest(
 
     @Test
     fun `accepted google invitation creates active member instead of viewer`() {
+        val generationBefore = clubGeneration()
         val invite = createPendingInvitation(email = "invited.active.${UUID.randomUUID()}@example.com")
         val cookie = completeGoogleInvite(invite.acceptUrl, invite.email)
 
@@ -150,6 +151,23 @@ class InvitationControllerDbTest(
                 jsonPath("$.membershipStatus") { value("ACTIVE") }
                 jsonPath("$.approvalState") { value("ACTIVE") }
             }
+        assertEquals(generationBefore + 1, clubGeneration())
+        assertEquals(
+            1,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from auth_public_projection_mutation_receipts receipts
+                join memberships on memberships.id = receipts.subject_membership_id_snapshot
+                join users on users.id = memberships.user_id
+                where users.email = ?
+                  and receipts.operation = 'INVITATION_ACCEPTED'
+                  and receipts.session_id_snapshot is null
+                """.trimIndent(),
+                Int::class.java,
+                invite.email,
+            ),
+        )
     }
 
     @Test
@@ -266,6 +284,17 @@ class InvitationControllerDbTest(
 
         return acceptUrl.substringAfterLast("/")
     }
+
+    private fun clubGeneration(): Long =
+        jdbcTemplate.queryForObject(
+            """
+            select coalesce((
+              select generation from public_club_projection_generations
+              where club_id = '00000000-0000-0000-0000-000000000001'
+            ), 0)
+            """.trimIndent(),
+            Long::class.java,
+        ) ?: 0
 
     private fun createPendingInvitation(email: String): PendingInvitation {
         val token = createInvitation(email = email, name = "초대 활성 멤버")

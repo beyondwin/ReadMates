@@ -7,25 +7,24 @@ import {
 } from "../../functions/_shared/cache";
 
 describe("PUBLIC_CACHEABLE_PATH_PREFIXES", () => {
-  it("contains clubs and records prefixes with trailing slashes", () => {
-    expect(PUBLIC_CACHEABLE_PATH_PREFIXES).toContain("/api/public/clubs/");
-    expect(PUBLIC_CACHEABLE_PATH_PREFIXES).toContain("/api/public/records/");
+  it("keeps authoritative public projections out of the custom edge cache", () => {
+    expect(PUBLIC_CACHEABLE_PATH_PREFIXES).toEqual([]);
   });
 });
 
 describe("isPublicCacheableRequest", () => {
-  it("returns true for GET requests to clubs paths", () => {
-    expect(isPublicCacheableRequest("GET", "/api/public/clubs/reading-sai")).toBe(true);
+  it("returns false for GET requests to clubs paths", () => {
+    expect(isPublicCacheableRequest("GET", "/api/public/clubs/reading-sai")).toBe(false);
   });
 
-  it("returns true for GET requests to clubs session paths", () => {
+  it("returns false for GET requests to clubs session paths", () => {
     expect(isPublicCacheableRequest("GET", "/api/public/clubs/reading-sai/sessions/123")).toBe(
-      true,
+      false,
     );
   });
 
-  it("returns true for GET requests to records paths", () => {
-    expect(isPublicCacheableRequest("GET", "/api/public/records/some-item")).toBe(true);
+  it("returns false for GET requests to records paths", () => {
+    expect(isPublicCacheableRequest("GET", "/api/public/records/some-item")).toBe(false);
   });
 
   it("returns false for POST requests even on cacheable paths", () => {
@@ -44,8 +43,8 @@ describe("isPublicCacheableRequest", () => {
     expect(isPublicCacheableRequest("GET", "/api/public/clubs")).toBe(false);
   });
 
-  it("returns true for /api/public/clubs/sample", () => {
-    expect(isPublicCacheableRequest("GET", "/api/public/clubs/sample")).toBe(true);
+  it("returns false for /api/public/clubs/sample", () => {
+    expect(isPublicCacheableRequest("GET", "/api/public/clubs/sample")).toBe(false);
   });
 });
 

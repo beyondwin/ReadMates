@@ -62,6 +62,8 @@ interface LoadPlatformAdminClubsPort {
 
     fun loadClub(clubId: UUID): PlatformAdminClubListItem?
 
+    fun loadClubForUpdate(clubId: UUID): PlatformAdminClubListItem?
+
     fun activeHostCount(clubId: UUID): Int
 }
 

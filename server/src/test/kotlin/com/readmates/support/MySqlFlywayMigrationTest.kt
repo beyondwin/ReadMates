@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(11)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(12)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,10 +94,11 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("53")
+            assertThat(latestVersion).isEqualTo("54")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
+            assertV54ProjectionConvergenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -374,7 +375,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(10)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -386,10 +387,11 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("53")
+            assertThat(latestVersion).isEqualTo("54")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
+            assertV54ProjectionConvergenceSchema(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1651,9 +1653,10 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("53")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("54")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
+            assertV54ProjectionConvergenceSchema(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1766,7 +1769,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgrade.migrationsExecuted).isEqualTo(1)
+            assertThat(upgrade.migrationsExecuted).isEqualTo(2)
             assertThat(
                 jdbc.queryForMap(
                     """
@@ -1843,10 +1846,11 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(2)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("53")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("54")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
+            assertV54ProjectionConvergenceSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertEquals(publicationCountBefore, countRows(upgradeJdbc, "public_session_publications"))
             assertEquals(5, sessionsWithoutPublication)
@@ -1861,6 +1865,29 @@ class MySqlFlywayMigrationTest(
             assertEquals(
                 "V51 preserved public summary",
                 publicSummaryBefore,
+            )
+            assertEquals(
+                false,
+                upgradeJdbc.queryForObject(
+                    "select origin_readable from public_projection_current where session_id = ?",
+                    Boolean::class.java,
+                    fixtures.publishedSessionId,
+                ),
+                "V54 backfill must deny a publication owned by a private club",
+            )
+            assertEquals(
+                false,
+                upgradeJdbc.queryForObject(
+                    """
+                    select club_generation.origin_readable
+                    from public_club_projection_generations club_generation
+                    join sessions on sessions.club_id = club_generation.club_id
+                    where sessions.id = ?
+                    """.trimIndent(),
+                    Boolean::class.java,
+                    fixtures.publishedSessionId,
+                ),
+                "V54 club backfill must deny an inactive or private club",
             )
             assertEquals(
                 1,
@@ -1896,6 +1923,7 @@ class MySqlFlywayMigrationTest(
     fun `mysql adds revision domains participant audit and application snapshot identity`() {
         assertV52RevisionSchema(jdbcTemplate)
         assertV53IdempotencySchema(jdbcTemplate)
+        assertV54ProjectionConvergenceSchema(jdbcTemplate)
         val fixture = V52LiveRevisionFixture()
         try {
             insertV52RevisionClubGraph(
@@ -3644,6 +3672,119 @@ class MySqlFlywayMigrationTest(
             .contains("IN_PROGRESS", "COMPLETED")
         assertThat(checkConstraintClause(jdbcTemplate, "host_session_mutation_receipts_decision_check"))
             .contains("NOT_SENT", "DISPATCH_REFERENCED")
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV54ProjectionConvergenceSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "public_club_projection_generations")).containsExactlyInAnyOrder(
+            "club_id",
+            "generation",
+            "origin_readable",
+            "convergence_id",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_projection_current")).containsExactlyInAnyOrder(
+            "session_id",
+            "club_id",
+            "publication_id_snapshot",
+            "generation",
+            "club_generation",
+            "live_record_revision",
+            "origin_readable",
+            "convergence_id",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_links")).containsExactlyInAnyOrder(
+            "mutation_receipt_id",
+            "convergence_id",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "committed_generation",
+            "committed_club_generation",
+            "live_record_revision",
+            "origin_readable",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "auth_public_projection_mutation_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "mutation_group_id",
+            "club_id_snapshot",
+            "actor_membership_id_snapshot",
+            "subject_membership_id_snapshot",
+            "session_id_snapshot",
+            "operation",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "club_public_projection_mutation_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "mutation_group_id",
+            "club_id_snapshot",
+            "actor_user_id_snapshot",
+            "session_id_snapshot",
+            "operation",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_convergence_work")).containsExactlyInAnyOrder(
+            "convergence_id",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "next_attempt_no",
+            "lease_owner",
+            "lease_expires_at",
+            "available_at",
+            "retention_until",
+            "created_at",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_convergence_events")).containsExactlyInAnyOrder(
+            "convergence_id",
+            "attempt_no",
+            "event_seq",
+            "pending_event_seq",
+            "status",
+            "observed_at",
+            "result_category",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "created_at",
+        )
+        assertEquals(
+            "convergence_id,attempt_no,event_seq",
+            indexColumns(jdbcTemplate, "public_convergence_events", "PRIMARY"),
+        )
+        assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_sequence_check"))
+            .contains("PENDING", "SUCCEEDED", "FAILED")
+        assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_pending_reference_check"))
+            .contains("pending_event_seq", "= 0")
+        assertThat(importedKeys(jdbcTemplate, "public_mutation_convergence_links")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_convergence_work")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_projection_current")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "auth_public_projection_mutation_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "club_public_projection_mutation_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_convergence_events"))
+            .containsExactlyInAnyOrder("public_convergence_events")
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_links"))
+            .doesNotContain("provider_response", "private_body", "credentials", "reason")
+        assertThat(
+            columnMetadata(jdbcTemplate, "public_mutation_convergence_links", "session_id_snapshot")["IS_NULLABLE"],
+        ).isEqualTo("YES")
+        assertThat(
+            columnMetadata(jdbcTemplate, "public_convergence_work", "session_id_snapshot")["IS_NULLABLE"],
+        ).isEqualTo("YES")
+        assertThat(
+            columnMetadata(
+                jdbcTemplate,
+                "auth_public_projection_mutation_receipts",
+                "session_id_snapshot",
+            )["IS_NULLABLE"],
+        ).isEqualTo("YES")
+        assertThat(columns(jdbcTemplate, "public_convergence_events"))
+            .doesNotContain("provider_response", "private_body", "credentials", "reason")
+        assertThat(columns(jdbcTemplate, "auth_public_projection_mutation_receipts"))
+            .doesNotContain("provider_response", "private_body", "credentials", "reason")
     }
 
     @Suppress("LongMethod")

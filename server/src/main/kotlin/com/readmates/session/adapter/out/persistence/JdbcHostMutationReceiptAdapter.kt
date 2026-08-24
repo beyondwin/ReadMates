@@ -45,6 +45,27 @@ class JdbcHostMutationReceiptAdapter(
             record.dispatchReceiptId?.dbString(),
             createdAt.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
         )
+        record.publicProjectionEffect?.let { effect ->
+            jdbcTemplate.update(
+                """
+                insert into public_mutation_convergence_links (
+                  mutation_receipt_id, convergence_id, club_id_snapshot, session_id_snapshot,
+                  publication_id_snapshot, committed_generation, committed_club_generation,
+                  live_record_revision, origin_readable, created_at
+                ) values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """.trimIndent(),
+                record.receiptId.dbString(),
+                effect.convergenceId.dbString(),
+                effect.clubId.dbString(),
+                effect.sessionId.dbString(),
+                effect.publicationId?.dbString(),
+                effect.generation,
+                effect.clubGeneration,
+                effect.liveRecordRevision,
+                effect.originReadable,
+                createdAt.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
+            )
+        }
     }
 
     override fun find(

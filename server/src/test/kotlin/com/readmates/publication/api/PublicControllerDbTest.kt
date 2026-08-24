@@ -493,6 +493,10 @@ class PublicControllerDbTest(
             sessionId,
         )
         jdbcTemplate.update(
+            "insert into session_publication_versions (session_id, publication_revision) values (?, 0)",
+            sessionId,
+        )
+        jdbcTemplate.update(
             """
             insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
             select uuid(), memberships.club_id, ?, memberships.id, 'NO_RESPONSE', 'UNKNOWN'
@@ -607,7 +611,13 @@ class PublicControllerDbTest(
         """
 
         private const val CLEANUP_PUBLISH_TEST_SESSION_SQL = """
+            delete from public_convergence_work
+            where session_id_snapshot = '00000000-0000-0000-0000-000000009777';
+            delete from public_projection_current
+            where session_id = '00000000-0000-0000-0000-000000009777';
             delete from public_session_publications
+            where session_id = '00000000-0000-0000-0000-000000009777';
+            delete from session_publication_versions
             where session_id = '00000000-0000-0000-0000-000000009777';
             delete from session_participants
             where session_id = '00000000-0000-0000-0000-000000009777';

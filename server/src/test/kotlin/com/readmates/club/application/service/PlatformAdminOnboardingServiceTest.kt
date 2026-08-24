@@ -265,6 +265,8 @@ private class FakePlatformAdminOnboardingPorts :
             .firstOrNull { it.clubId == clubId }
             ?.let(::toListItem)
 
+    override fun loadClubForUpdate(clubId: UUID): PlatformAdminClubListItem? = loadClub(clubId)
+
     override fun activeHostCount(clubId: UUID): Int = 0
 
     override fun createClubDomain(

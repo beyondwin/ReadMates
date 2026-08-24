@@ -18,6 +18,7 @@ internal class HostSessionLifecycleWriteOperations(
     private val jdbcTemplate: JdbcTemplate,
     private val queries: HostSessionWriteQueries,
     private val policy: HostSessionWritePolicy,
+    private val publicProjection: HostPublicProjectionWriteOperations,
 ) {
     fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
@@ -60,7 +61,7 @@ internal class HostSessionLifecycleWriteOperations(
         queries.throwIfStale(updated, command.host, command.sessionId)
         hidePublicPlacement(command)
         createActiveParticipants(command.host.clubId, command.sessionId)
-        return result(command, true)
+        return result(command, true, rotatePublicProjection = true)
     }
 
     fun close(command: HostSessionIdCommand): HostSessionTransitionResult {
@@ -129,7 +130,7 @@ internal class HostSessionLifecycleWriteOperations(
             return result(command, false)
         }
         exposePublicPublication(command)
-        return result(command, true)
+        return result(command, true, rotatePublicProjection = true)
     }
 
     fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult {
@@ -140,7 +141,7 @@ internal class HostSessionLifecycleWriteOperations(
             verifyRevision(command)
             return result(command, false)
         }
-        return result(command, reopenClosedSession(command))
+        return result(command, reopenClosedSession(command), rotatePublicProjection = true)
     }
 
     fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult {
@@ -162,7 +163,7 @@ internal class HostSessionLifecycleWriteOperations(
                 command.host.clubId.dbString(),
                 queries.expectedRevision(command.expectedSessionRevision),
             )
-        if (unpublishedRows > 0) return result(command, true)
+        if (unpublishedRows > 0) return result(command, true, rotatePublicProjection = true)
         verifyRevision(command)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         unpublishDecision(state)
@@ -334,8 +335,15 @@ internal class HostSessionLifecycleWriteOperations(
     private fun result(
         command: HostSessionIdCommand,
         changed: Boolean,
+        rotatePublicProjection: Boolean = false,
     ) = HostSessionTransitionResult(
         detail = queries.detail(command.host, command.sessionId),
         changed = changed,
+        publicProjectionEffect =
+            if (changed && rotatePublicProjection) {
+                publicProjection.rotate(command.host.clubId, command.sessionId)
+            } else {
+                null
+            },
     )
 }

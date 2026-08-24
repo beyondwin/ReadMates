@@ -7,6 +7,9 @@ import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
 import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
 import com.readmates.club.application.port.`in`.UpdatePlatformAdminClubUseCase
+import com.readmates.club.application.port.out.ClubPublicProjectionLock
+import com.readmates.club.application.port.out.ClubPublicProjectionMutation
+import com.readmates.club.application.port.out.ClubPublicProjectionMutationPort
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPatch
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
@@ -25,6 +28,7 @@ private const val PLATFORM_ADMIN_CLUB_LIST_LIMIT = 100
 class PlatformAdminClubRegistryService(
     private val loadClubsPort: LoadPlatformAdminClubsPort,
     private val updateClubPort: UpdatePlatformAdminClubPort,
+    private val publicProjection: ClubPublicProjectionMutationPort = ClubPublicProjectionMutationPort.Noop(),
 ) : ListPlatformAdminClubsUseCase,
     UpdatePlatformAdminClubUseCase {
     override fun listClubs(admin: PlatformActor): PlatformAdminClubList {
@@ -46,48 +50,90 @@ class PlatformAdminClubRegistryService(
             throw AccessDeniedException("Platform admin role cannot update clubs")
         }
 
+        val exposureLock =
+            command.publicVisibility?.let { publicProjection.lockForExposure(clubId) }
         val current =
-            loadClubsPort.loadClub(clubId)
+            loadClubsPort.loadClubForUpdate(clubId)
                 ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
         validatePublicInfo(
             name = command.name ?: current.name,
             tagline = command.tagline ?: current.tagline,
             about = command.about ?: current.about,
         )
+        validatePublishTransition(command.publicVisibility, current.status)
+        val nextStatus = activationStatus(clubId, command.publicVisibility, current.status)
+        val updated =
+            updateClubPort.updateClub(
+                clubId = clubId,
+                patch =
+                    UpdatePlatformAdminClubPatch(
+                        name = command.name?.trim(),
+                        tagline = command.tagline?.trim(),
+                        about = command.about?.trim(),
+                        status = nextStatus,
+                        publicVisibility = command.publicVisibility,
+                    ),
+            ) ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
+        recordPublicChange(admin, current, updated, exposureLock)
+        return updated
+    }
 
+    private fun recordPublicChange(
+        admin: PlatformActor,
+        current: PlatformAdminClubListItem,
+        updated: PlatformAdminClubListItem,
+        exposureLock: ClubPublicProjectionLock?,
+    ) {
+        val exposureChanged =
+            current.status != updated.status || current.publicVisibility != updated.publicVisibility
+        val metadataChanged =
+            current.name != updated.name || current.tagline != updated.tagline || current.about != updated.about
+        if (!exposureChanged && !metadataChanged) return
+        publicProjection.record(
+            ClubPublicProjectionMutation(
+                clubId = updated.clubId,
+                actorUserId = admin.adminId,
+                operation =
+                    if (exposureChanged) {
+                        "PLATFORM_CLUB_EXPOSURE_UPDATED"
+                    } else {
+                        "PLATFORM_CLUB_METADATA_UPDATED"
+                    },
+                exposureChanged = exposureChanged,
+                exposureLock = exposureLock,
+            ),
+        )
+    }
+
+    private fun validatePublishTransition(
+        publicVisibility: ClubPublicVisibility?,
+        currentStatus: ClubStatus,
+    ) {
         if (
-            command.publicVisibility == ClubPublicVisibility.PUBLIC &&
-            current.status in setOf(ClubStatus.SUSPENDED, ClubStatus.ARCHIVED)
+            publicVisibility == ClubPublicVisibility.PUBLIC &&
+            currentStatus in setOf(ClubStatus.SUSPENDED, ClubStatus.ARCHIVED)
         ) {
             throw PlatformAdminException(
                 PlatformAdminError.CLUB_PUBLISH_NOT_ALLOWED,
                 "Club cannot be made public",
             )
         }
-
-        val shouldActivateClub =
-            command.publicVisibility == ClubPublicVisibility.PUBLIC &&
-                current.status == ClubStatus.SETUP_REQUIRED
-        val nextStatus =
-            if (shouldActivateClub) {
-                requireActiveHost(clubId)
-                ClubStatus.ACTIVE
-            } else {
-                null
-            }
-
-        return updateClubPort.updateClub(
-            clubId = clubId,
-            patch =
-                UpdatePlatformAdminClubPatch(
-                    name = command.name?.trim(),
-                    tagline = command.tagline?.trim(),
-                    about = command.about?.trim(),
-                    status = nextStatus,
-                    publicVisibility = command.publicVisibility,
-                ),
-        ) ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
     }
+
+    private fun activationStatus(
+        clubId: UUID,
+        publicVisibility: ClubPublicVisibility?,
+        currentStatus: ClubStatus,
+    ): ClubStatus? =
+        if (
+            publicVisibility == ClubPublicVisibility.PUBLIC &&
+            currentStatus == ClubStatus.SETUP_REQUIRED
+        ) {
+            requireActiveHost(clubId)
+            ClubStatus.ACTIVE
+        } else {
+            null
+        }
 
     private fun requireActiveHost(clubId: UUID) {
         if (loadClubsPort.activeHostCount(clubId) == 0) {
