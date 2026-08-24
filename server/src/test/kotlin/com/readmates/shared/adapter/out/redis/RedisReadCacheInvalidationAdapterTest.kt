@@ -12,6 +12,7 @@ import com.readmates.note.application.service.NotesFeedService
 import com.readmates.publication.adapter.out.redis.RedisPublicReadCacheAdapter
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
+import com.readmates.publication.application.model.PublicProjectionGeneration
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
 import com.readmates.publication.application.service.PublicQueryService
@@ -123,13 +124,18 @@ class RedisReadCacheInvalidationAdapterTest(
         assertTargetKeysMissAndUnrelatedKeysHit()
         val publicResult = refetchPublicSession("Refetched source summary")
         val notesResult = refetchNotesFeed("Refetched source note")
+        val cachedRefetchedSummary =
+            publicCache
+                .getSession(
+                    TARGET_CLUB_ID,
+                    CLUB_GENERATION,
+                    SESSION_GENERATION,
+                    SESSION_ID,
+                )?.summary
 
         assertEquals("Refetched source summary", publicResult?.summary)
         assertEquals("Refetched source note", notesResult.items.single().text)
-        assertEquals(
-            "Refetched source summary",
-            publicCache.getSession(TARGET_CLUB_ID, SESSION_ID)?.summary,
-        )
+        assertEquals("Refetched source summary", cachedRefetchedSummary)
         assertEquals(
             "Unrelated cached summary",
             publicCache.getSession(UNRELATED_CLUB_ID, OTHER_SESSION_ID)?.summary,
@@ -145,6 +151,8 @@ class RedisReadCacheInvalidationAdapterTest(
         redisTemplate.delete(cleanupKeys)
         publicCache.putSession(
             TARGET_CLUB_ID,
+            CLUB_GENERATION,
+            SESSION_GENERATION,
             SESSION_ID,
             publicSession(SESSION_ID, "Stale cached summary"),
         )
@@ -483,12 +491,17 @@ class RedisReadCacheInvalidationAdapterTest(
         private val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000803")
         private val OTHER_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000804")
         private const val TARGET_CLUB_SLUG = "target-reading-club"
+        private const val CLUB_GENERATION = 7L
+        private const val SESSION_GENERATION = 11L
         private val NOTES_FIRST_PAGE = PageRequest.cursor(null, null, defaultLimit = 60, maxLimit = 120)
 
         private val PUBLIC_CLUB_KEY = "public:club:$TARGET_CLUB_ID:home:v1"
         private val UNRELATED_PUBLIC_CLUB_KEY = "public:club:$UNRELATED_CLUB_ID:home:v1"
 
         private fun publicSessionKey(sessionId: UUID) = "public:club:$TARGET_CLUB_ID:session:$sessionId:v1"
+
+        private fun versionedPublicSessionKey(sessionId: UUID) =
+            "public:club:$TARGET_CLUB_ID:g:$CLUB_GENERATION:session:$sessionId:g:$SESSION_GENERATION:v2"
 
         private fun unrelatedPublicSessionKey(sessionId: UUID) = "public:club:$UNRELATED_CLUB_ID:session:$sessionId:v1"
 
@@ -520,7 +533,10 @@ class RedisReadCacheInvalidationAdapterTest(
                 notesSessionFeedKey(UNRELATED_CLUB_ID, OTHER_SESSION_ID),
             )
         private val allKeys = targetKeys + unrelatedClubKeys
-        private val cleanupKeys = allKeys + "public:club-slug:$TARGET_CLUB_SLUG:id:v1"
+        private val cleanupKeys =
+            allKeys +
+                versionedPublicSessionKey(SESSION_ID) +
+                "public:club-slug:$TARGET_CLUB_SLUG:id:v1"
 
         private val targetHost =
             CurrentMember(
@@ -569,6 +585,19 @@ private class StaticClubContextResolver(
 private class SourcePublicLoader(
     private val session: PublicSessionDetailResult,
 ) : LoadPublishedPublicDataPort {
+    override fun loadSessionProjectionGeneration(
+        clubSlug: String,
+        sessionId: UUID,
+    ) = PublicProjectionGeneration(
+        publicationId = sessionId,
+        generation = 11,
+        liveRecordRevision = 1,
+        originReadable = true,
+        clubId = UUID.fromString("00000000-0000-0000-0000-000000000801"),
+        sessionId = sessionId,
+        clubGeneration = 7,
+    )
+
     override fun loadClub(): PublicClubResult? = null
 
     override fun loadClub(clubSlug: String): PublicClubResult? = null

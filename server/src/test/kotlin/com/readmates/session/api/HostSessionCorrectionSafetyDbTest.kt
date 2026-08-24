@@ -445,7 +445,7 @@ class HostSessionCorrectionSafetyDbTest(
                     envelope(
                         "key-initial-apply-01",
                         """{"draftRevision":1,"liveRevision":0}""",
-                        """{"applyRequestId":"00000000-0000-4000-8000-000000000701","expectedDraftHash":"$hash"}""",
+                        """{"applyRequestId":"${UUID.randomUUID()}","expectedDraftHash":"$hash"}""",
                     )
             }.andExpect { status { isOk() } }
     }

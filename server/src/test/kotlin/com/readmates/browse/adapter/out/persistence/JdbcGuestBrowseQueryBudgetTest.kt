@@ -41,6 +41,7 @@ class JdbcGuestBrowseQueryBudgetTest(
 
     @AfterEach
     fun cleanupFixture() {
+        jdbcTemplate.update("delete from public_projection_current where club_id = ?", CLUB_ID)
         jdbcTemplate.update("delete from public_projection_generations where club_id = ?", CLUB_ID)
         jdbcTemplate.update("delete from public_session_publications where club_id = ?", CLUB_ID)
         jdbcTemplate.update("delete from highlights where club_id = ?", CLUB_ID)
@@ -204,6 +205,17 @@ class JdbcGuestBrowseQueryBudgetTest(
                 insert into public_projection_generations (
                   publication_id, club_id, session_id, generation, live_record_revision, origin_readable
                 ) values (?, ?, ?, 1, null, true)
+                """.trimIndent(),
+                sessionId,
+                CLUB_ID,
+                sessionId,
+            )
+            jdbcTemplate.update(
+                """
+                insert into public_projection_current (
+                  session_id, club_id, publication_id_snapshot, generation, club_generation,
+                  live_record_revision, origin_readable, emergency_denied
+                ) values (?, ?, ?, 1, 1, 0, true, false)
                 """.trimIndent(),
                 sessionId,
                 CLUB_ID,

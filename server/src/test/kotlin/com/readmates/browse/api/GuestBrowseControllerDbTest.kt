@@ -268,6 +268,17 @@ class GuestBrowseControllerDbTest(
         )
         jdbcTemplate.update(
             """
+            insert into public_projection_current (
+              session_id, club_id, publication_id_snapshot, generation, club_generation,
+              live_record_revision, origin_readable, emergency_denied
+            ) values (?, ?, ?, 1, 1, 0, true, false)
+            """.trimIndent(),
+            PUBLISHED_ID,
+            CLUB_ID,
+            PUBLICATION_ID,
+        )
+        jdbcTemplate.update(
+            """
             insert into public_session_publications (
               id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
             ) values
@@ -291,6 +302,17 @@ class GuestBrowseControllerDbTest(
             DENIED_CLOSED_PUBLICATION_ID,
             CLUB_ID,
             DENIED_CLOSED_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_projection_current (
+              session_id, club_id, publication_id_snapshot, generation, club_generation,
+              live_record_revision, origin_readable, emergency_denied
+            ) values (?, ?, ?, 1, 1, 0, false, true)
+            """.trimIndent(),
+            DENIED_CLOSED_ID,
+            CLUB_ID,
+            DENIED_CLOSED_PUBLICATION_ID,
         )
         jdbcTemplate.update(
             "update questions set created_at = ? where id = ?",
@@ -347,6 +369,12 @@ class GuestBrowseControllerDbTest(
     }
 
     private fun cleanupGuestPublicationMarkers() {
+        jdbcTemplate.update(
+            "delete from public_projection_current where session_id in (?, ?, ?)",
+            PUBLISHED_ID,
+            PUBLICATION_ONLY_CLOSED_ID,
+            DENIED_CLOSED_ID,
+        )
         jdbcTemplate.update(
             "delete from public_projection_generations where publication_id in (?, ?, ?)",
             PUBLICATION_ID,

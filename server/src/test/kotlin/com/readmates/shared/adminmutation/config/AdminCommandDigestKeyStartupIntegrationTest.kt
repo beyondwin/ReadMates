@@ -71,7 +71,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
     }
 
     @Test
-    fun `empty first deployment starts after Flyway has created V58`() {
+    fun `empty first deployment starts after Flyway has created the latest migration`() {
         withFreshDatabase { database ->
             runContext(
                 previousKey = "",
@@ -83,7 +83,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                 val migratedJdbc = JdbcTemplate(context.getBean(DataSource::class.java))
                 assertThat(context.getBean(AdminCommandDigestKeyStartupValidator::class.java)).isNotNull
                 assertThat(tableExists(migratedJdbc, "platform_admin_command_idempotency_keys")).isTrue()
-                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("58")
+                assertThat(latestFlywayVersion(migratedJdbc)).isEqualTo("60")
             }
         }
     }
@@ -190,7 +190,7 @@ class AdminCommandDigestKeyStartupIntegrationTest(
                     """.trimIndent(),
                     String::class.java,
                 ),
-            ).isEqualTo("58")
+            ).isEqualTo("60")
         } else {
             assertThat(generateSequence(failure) { it.cause }.mapNotNull { it.message }.toList())
                 .contains("Admin command digest keys cannot safely replay or retire persisted command references")

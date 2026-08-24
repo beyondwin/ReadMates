@@ -107,7 +107,9 @@ class HostMutationEnvelopeReader(
                         rows =
                             entries.map { entry ->
                                 ExpectedAttendanceRowBody(
-                                    membershipId = UUID.fromString(entry.membershipId),
+                                    membershipId =
+                                        runCatching { UUID.fromString(entry.membershipId) }
+                                            .getOrElse { throw InvalidSessionScheduleException() },
                                     attendanceRevision = entry.expectedAttendanceRevision,
                                 )
                             },
