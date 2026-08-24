@@ -114,9 +114,9 @@ async function routePlatformAdminShell(page: Page): Promise<void> {
     },
   );
   await page.route(
-    `**/api/bff/api/admin/support-access-grants?clubId=${CLUB_ID}`,
+    `**/api/bff/api/admin/support/grants?clubId=${CLUB_ID}&status=ACTIVE`,
     async (route) => {
-      await json(route, 200, [{ id: "grant-1" }]);
+      await json(route, 200, { items: [{ grantId: "grant-1" }], nextCursor: null });
     },
   );
   await page.route(

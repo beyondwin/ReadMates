@@ -13,7 +13,6 @@ import {
   type ConfirmPlatformAdminClubVisibilityRequest,
   type ConfirmPlatformAdminDomainRequest,
   type ConfirmPlatformAdminOnboardingRequest,
-  CreateSupportAccessGrantRequest,
   PlatformAdminAiGenerationCapabilitiesResponse,
   PlatformAdminAiOpsFilters,
   PlatformAdminAiOpsJob,
@@ -27,7 +26,6 @@ import {
   PlatformAdminOnboardingRequest,
   PlatformAdminSummaryResponse,
   PlatformAdminTodayClosingRisksResponse,
-  SupportAccessGrantResponse,
   PreviewPlatformAdminClubVisibilityRequest,
   PreviewPlatformAdminDomainRequest,
   RecheckPlatformAdminDomainRequest,
@@ -177,35 +175,6 @@ export function checkPlatformAdminDomainProvisioning(
     { method: "POST", body: JSON.stringify(request) },
     { clubSlug: undefined },
   ).then(parsePlatformAdminClubCommandReceipt);
-}
-
-export function createSupportAccessGrant(
-  request: CreateSupportAccessGrantRequest,
-) {
-  return readmatesFetch<SupportAccessGrantResponse>(
-    "/api/admin/support-access-grants",
-    {
-      method: "POST",
-      body: JSON.stringify(request),
-    },
-    { clubSlug: undefined },
-  );
-}
-
-export function revokeSupportAccessGrant(grantId: string) {
-  return readmatesFetch<void>(
-    `/api/admin/support-access-grants/${encodeURIComponent(grantId)}`,
-    { method: "DELETE" },
-    { clubSlug: undefined },
-  );
-}
-
-export function listSupportAccessGrantsByClub(clubId: string) {
-  return readmatesFetch<SupportAccessGrantResponse[]>(
-    `/api/admin/support-access-grants?clubId=${encodeURIComponent(clubId)}`,
-    undefined,
-    { clubSlug: undefined },
-  );
 }
 
 export function fetchPlatformAdminAiOpsSummary(window?: string) {

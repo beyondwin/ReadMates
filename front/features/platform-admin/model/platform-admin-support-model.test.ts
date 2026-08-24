@@ -2,7 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   SUPPORT_REASON_PRESETS,
   buildSupportGrantRiskSummary,
+  flattenSupportGrantLedgerPages,
   isSupportReasonPresetSafe,
+  normalizeSupportGrantStatus,
+  supportGrantCommandRecovery,
+  type AdminSupportGrantLedgerPage,
   type AdminSupportSearchResult,
 } from "./platform-admin-support-model";
 
@@ -108,4 +112,49 @@ describe("SUPPORT_REASON_PRESETS", () => {
     expect(isSupportReasonPresetSafe("member@example.com")).toBe(false);
     expect(isSupportReasonPresetSafe("secret-token")).toBe(false);
   });
+});
+
+describe("support grant ledger", () => {
+  it("accumulates cursor pages and removes duplicate boundary grants", () => {
+    const grant = {
+      grantId: "grant-1",
+      clubId: "club-1",
+      clubName: "읽는사이",
+      granteeDisplayName: "지원 대상",
+      granteeMaskedEmail: "s***@example.com",
+      scope: "HOST_SUPPORT_READ" as const,
+      reasonCategory: "MEMBER_ASSISTANCE" as const,
+      notePresent: true,
+      expiresAt: "2026-08-25T12:00:00Z",
+      createdAt: "2026-08-25T10:00:00Z",
+      revokedAt: null,
+      status: "ACTIVE" as const,
+      createdByRole: "OWNER",
+    };
+    const pages: AdminSupportGrantLedgerPage[] = [
+      { items: [grant], nextCursor: "next" },
+      { items: [grant, { ...grant, grantId: "grant-2" }], nextCursor: null },
+    ];
+
+    expect(flattenSupportGrantLedgerPages(pages).map((item) => item.grantId)).toEqual(["grant-1", "grant-2"]);
+  });
+
+  it("allows only share-safe status values in the URL", () => {
+    expect(normalizeSupportGrantStatus("EXPIRING")).toBe("EXPIRING");
+    expect(normalizeSupportGrantStatus("grantee@example.com")).toBeUndefined();
+    expect(normalizeSupportGrantStatus(null)).toBeUndefined();
+  });
+});
+
+describe("support grant command recovery", () => {
+  it.each(["COMMAND_IN_PROGRESS", "NETWORK_UNKNOWN"])("keeps the same intent for %s", (code) => {
+    expect(supportGrantCommandRecovery({ code }).kind).toBe("SAME_INTENT");
+  });
+
+  it.each(["PREVIEW_EXPIRED", "PREVIEW_CONSUMED", "PREVIEW_MISMATCH", "IDEMPOTENCY_CONFLICT"])(
+    "requires a fresh preview for %s",
+    (code) => {
+      expect(supportGrantCommandRecovery({ code }).kind).toBe("RESTART_PREVIEW");
+    },
+  );
 });

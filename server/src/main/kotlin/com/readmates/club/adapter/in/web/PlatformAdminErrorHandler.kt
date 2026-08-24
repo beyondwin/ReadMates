@@ -55,4 +55,5 @@ private val PLATFORM_ADMIN_ERROR_STATUSES: Map<PlatformAdminError, HttpStatus> =
         PlatformAdminError.GRANT_EXPIRY_IN_PAST to HttpStatus.BAD_REQUEST,
         PlatformAdminError.GRANT_EXPIRY_TOO_LONG to HttpStatus.BAD_REQUEST,
         PlatformAdminError.GRANT_DUPLICATE_ACTIVE to HttpStatus.CONFLICT,
+        PlatformAdminError.SAFE_CONFIRM_REQUIRED to HttpStatus.GONE,
     )

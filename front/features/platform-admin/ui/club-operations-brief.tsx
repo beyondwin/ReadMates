@@ -6,11 +6,7 @@ import type { PlatformAdminClubRegistryItem } from "@/features/platform-admin/ui
 import { ClubPublishChecklist } from "@/features/platform-admin/ui/club-publish-checklist";
 import { DomainProvisioningPanel } from "@/features/platform-admin/ui/legacy-domain-provisioning-panel";
 import { PlatformAdminClubDetail } from "@/features/platform-admin/ui/platform-admin-club-detail";
-import {
-  SupportAccessGrantsPanel,
-  type CreateSupportAccessGrantFields,
-  type SupportAccessGrantView,
-} from "@/features/platform-admin/ui/support-access-grants-panel";
+import { SupportAccessGrantsPanel } from "@/features/platform-admin/ui/support-access-grants-panel";
 
 type Props = {
   club: PlatformAdminSelectedClubBrief | null;
@@ -18,9 +14,6 @@ type Props = {
   savingClub?: boolean;
   checkingDomainIds?: ReadonlySet<string>;
   domainCheckErrors?: Record<string, string>;
-  activeGrants?: SupportAccessGrantView[];
-  loadingSupportGrants?: boolean;
-  supportGrantLoadError?: string | null;
   onUpdateClub?: (
     clubId: string,
     request: {
@@ -32,8 +25,6 @@ type Props = {
   ) => Promise<PlatformAdminClubRegistryItem>;
   onSetVisibility?: (publicVisibility: "PRIVATE" | "PUBLIC") => void;
   onCheckDomain?: (domainId: string) => void;
-  onCreateGrant?: (fields: CreateSupportAccessGrantFields) => Promise<void>;
-  onRevokeGrant?: (grantId: string) => Promise<void>;
 };
 
 export function ClubOperationsBrief({
@@ -42,14 +33,9 @@ export function ClubOperationsBrief({
   savingClub = false,
   checkingDomainIds,
   domainCheckErrors,
-  activeGrants = [],
-  loadingSupportGrants = false,
-  supportGrantLoadError = null,
   onUpdateClub,
   onSetVisibility,
   onCheckDomain,
-  onCreateGrant,
-  onRevokeGrant,
 }: Props) {
   if (!club) {
     return (
@@ -91,13 +77,7 @@ export function ClubOperationsBrief({
       />
       <SupportAccessGrantsPanel
         selectedClub={club}
-        grants={activeGrants}
-        loading={loadingSupportGrants}
-        loadError={supportGrantLoadError}
-        canCreateGrant={permissions.canCreateSupportGrant}
-        canRevokeGrant={permissions.canRevokeSupportGrant}
-        onCreateGrant={onCreateGrant}
-        onRevokeGrant={onRevokeGrant}
+        canManageGrant={permissions.canCreateSupportGrant}
       />
     </section>
   );

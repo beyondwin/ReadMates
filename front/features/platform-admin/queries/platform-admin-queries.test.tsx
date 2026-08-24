@@ -14,7 +14,6 @@ import type {
   PlatformAdminClubDetail,
   PlatformAdminOnboardingResultResponse,
   PlatformAdminSummaryResponse,
-  SupportAccessGrantResponse,
 } from "@/features/platform-admin/api/platform-admin-contracts";
 import type { PlatformAdminCapabilities } from "@/features/platform-admin/model/platform-admin-capabilities";
 
@@ -23,14 +22,11 @@ vi.mock("@/features/platform-admin/api/platform-admin-api", () => ({
   commitPlatformAdminOnboarding: vi.fn(),
   confirmPlatformAdminClubVisibility: vi.fn(),
   confirmPlatformAdminDomain: vi.fn(),
-  createSupportAccessGrant: vi.fn(),
   fetchPlatformAdminClub: vi.fn(),
   fetchPlatformAdminClubs: vi.fn(),
   fetchPlatformAdminSummary: vi.fn(),
-  listSupportAccessGrantsByClub: vi.fn(),
   previewPlatformAdminClubVisibility: vi.fn(),
   previewPlatformAdminDomain: vi.fn(),
-  revokeSupportAccessGrant: vi.fn(),
   updatePlatformAdminClubMetadata: vi.fn(),
 }));
 
@@ -46,14 +42,11 @@ import {
   commitPlatformAdminOnboarding,
   confirmPlatformAdminClubVisibility,
   confirmPlatformAdminDomain,
-  createSupportAccessGrant,
   fetchPlatformAdminClub,
   fetchPlatformAdminClubs,
   fetchPlatformAdminSummary,
-  listSupportAccessGrantsByClub,
   previewPlatformAdminClubVisibility,
   previewPlatformAdminDomain,
-  revokeSupportAccessGrant,
   updatePlatformAdminClubMetadata,
 } from "@/features/platform-admin/api/platform-admin-api";
 import { fetchPlatformAdminCapabilities } from "@/features/platform-admin/api/platform-admin-capabilities-api";
@@ -65,14 +58,11 @@ import {
   platformAdminClubsQuery,
   platformAdminKeys,
   platformAdminSummaryQuery,
-  platformAdminSupportGrantsQuery,
   purgePlatformAdminState,
   useCheckPlatformAdminDomainProvisioningMutation,
   useCommitPlatformAdminOnboardingMutation,
   useConfirmPlatformAdminClubVisibilityMutation,
   useConfirmPlatformAdminDomainMutation,
-  useCreateSupportAccessGrantMutation,
-  useRevokeSupportAccessGrantMutation,
   useUpdatePlatformAdminClubMutation,
 } from "./platform-admin-queries";
 
@@ -163,18 +153,6 @@ const onboardingResult: PlatformAdminOnboardingResultResponse = {
   invitationDelivery: "PENDING",
 };
 
-const grant: SupportAccessGrantResponse = {
-  id: "grant-1",
-  clubId: "club-1",
-  grantedByUserId: "owner-1",
-  granteeUserId: "support-1",
-  scope: "HOST_SUPPORT_READ",
-  reason: "Support review",
-  expiresAt: "2099-01-01T00:00:00Z",
-  revokedAt: null,
-  createdAt: "2026-05-18T00:00:00Z",
-};
-
 function createWrapper() {
   const client = new QueryClient({
     defaultOptions: {
@@ -202,7 +180,6 @@ beforeEach(() => {
   vi.mocked(fetchPlatformAdminClubs).mockReset();
   vi.mocked(fetchPlatformAdminClub).mockReset();
   vi.mocked(fetchPlatformAdminCapabilities).mockReset();
-  vi.mocked(listSupportAccessGrantsByClub).mockReset();
   vi.mocked(checkPlatformAdminDomainProvisioning).mockReset();
   vi.mocked(commitPlatformAdminOnboarding).mockReset();
   vi.mocked(confirmPlatformAdminClubVisibility).mockReset();
@@ -210,8 +187,6 @@ beforeEach(() => {
   vi.mocked(previewPlatformAdminClubVisibility).mockReset();
   vi.mocked(previewPlatformAdminDomain).mockReset();
   vi.mocked(updatePlatformAdminClubMetadata).mockReset();
-  vi.mocked(createSupportAccessGrant).mockReset();
-  vi.mocked(revokeSupportAccessGrant).mockReset();
 });
 
 describe("platform admin query keys", () => {
@@ -234,16 +209,6 @@ describe("platform admin query keys", () => {
       "platform-admin",
       "capabilities",
     ]);
-    expect(platformAdminKeys.supportGrants("club-1")).toEqual([
-      "platform-admin",
-      "support-grants",
-      "club-1",
-    ]);
-    expect(platformAdminKeys.supportGrants(null)).toEqual([
-      "platform-admin",
-      "support-grants",
-      null,
-    ]);
   });
 
   it("query functions call platform admin API wrappers", async () => {
@@ -254,19 +219,16 @@ describe("platform admin query keys", () => {
     });
     vi.mocked(fetchPlatformAdminClub).mockResolvedValue(detail);
     vi.mocked(fetchPlatformAdminCapabilities).mockResolvedValue(capabilities);
-    vi.mocked(listSupportAccessGrantsByClub).mockResolvedValue([grant]);
 
     await runQuery(platformAdminSummaryQuery());
     await runQuery(platformAdminClubsQuery());
     await runQuery(platformAdminClubDetailQuery("club-1"));
     await runQuery(platformAdminCapabilitiesQuery());
-    await runQuery(platformAdminSupportGrantsQuery("club-1"));
 
     expect(fetchPlatformAdminSummary).toHaveBeenCalledOnce();
     expect(fetchPlatformAdminClubs).toHaveBeenCalledOnce();
     expect(fetchPlatformAdminClub).toHaveBeenCalledWith("club-1");
     expect(fetchPlatformAdminCapabilities).toHaveBeenCalledOnce();
-    expect(listSupportAccessGrantsByClub).toHaveBeenCalledWith("club-1");
   });
 
   it("appends cursor pages with the same normalized filter key", async () => {
@@ -307,12 +269,6 @@ describe("platform admin query keys", () => {
     ).toHaveLength(2);
   });
 
-  it("returns an empty grant list for null selected club", async () => {
-    await expect(
-      runQuery(platformAdminSupportGrantsQuery(null)),
-    ).resolves.toEqual([]);
-    expect(listSupportAccessGrantsByClub).not.toHaveBeenCalled();
-  });
 });
 
 describe("platform admin mutation cache behavior", () => {
@@ -455,46 +411,6 @@ describe("platform admin mutation cache behavior", () => {
     });
   });
 
-  it("adds and removes support grants in the selected club cache", async () => {
-    vi.mocked(createSupportAccessGrant).mockResolvedValue(grant);
-    vi.mocked(revokeSupportAccessGrant).mockResolvedValue(undefined);
-    const { client, Wrapper } = createWrapper();
-    client.setQueryData(platformAdminKeys.supportGrants("club-1"), []);
-    const createHook = renderHook(
-      () => useCreateSupportAccessGrantMutation("club-1"),
-      { wrapper: Wrapper },
-    );
-    const revokeHook = renderHook(
-      () => useRevokeSupportAccessGrantMutation("club-1"),
-      { wrapper: Wrapper },
-    );
-
-    await act(async () => {
-      await createHook.result.current.mutateAsync({
-        clubId: "club-1",
-        granteeUserId: "support-1",
-        scope: "HOST_SUPPORT_READ",
-        reason: "Support review",
-        expiresAt: "2099-01-01T00:00:00Z",
-      });
-    });
-
-    expect(
-      client.getQueryData<SupportAccessGrantResponse[]>(
-        platformAdminKeys.supportGrants("club-1"),
-      ),
-    ).toEqual([grant]);
-
-    await act(async () => {
-      await revokeHook.result.current.mutateAsync("grant-1");
-    });
-
-    expect(
-      client.getQueryData<SupportAccessGrantResponse[]>(
-        platformAdminKeys.supportGrants("club-1"),
-      ),
-    ).toEqual([]);
-  });
 });
 
 describe("platform admin authority-loss purge", () => {

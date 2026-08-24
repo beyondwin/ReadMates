@@ -1,48 +1,107 @@
-import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
+import { infiniteQueryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
-  createAdminSupportGrant,
+  confirmAdminSupportGrant,
+  confirmAdminSupportGrantRevoke,
   fetchAdminSupportGrantLedger,
-  revokeAdminSupportGrant,
+  previewAdminSupportGrant,
+  previewAdminSupportGrantRevoke,
   searchAdminSupportSubjects,
 } from "@/features/platform-admin/api/platform-admin-support-api";
-import type { AdminSupportGrantRequest } from "@/features/platform-admin/model/platform-admin-support-model";
+import type {
+  AdminSupportGrantCreateConfirmRequest,
+  AdminSupportGrantCreateDraft,
+  AdminSupportGrantLedgerFilters,
+  AdminSupportGrantRevokeConfirmRequest,
+  AdminSupportGrantRevokeDraft,
+} from "@/features/platform-admin/model/platform-admin-support-model";
 
 export const platformAdminSupportKeys = {
   all: ["platform-admin", "support"] as const,
-  search: (query: string, clubId?: string) => [...platformAdminSupportKeys.all, "search", query, clubId ?? null] as const,
-  ledger: (filters: { clubId?: string; granteeUserId?: string } = {}) =>
-    [...platformAdminSupportKeys.all, "ledger", filters.clubId ?? null, filters.granteeUserId ?? null] as const,
+  ledgerRoot: () => [...platformAdminSupportKeys.all, "ledger"] as const,
+  ledger: (filters: AdminSupportGrantLedgerFilters = {}) => [
+    ...platformAdminSupportKeys.ledgerRoot(),
+    filters.clubId ?? null,
+    filters.status ?? null,
+  ] as const,
+  searchMutation: () => [...platformAdminSupportKeys.all, "search", "ephemeral"] as const,
+  createMutation: () => [...platformAdminSupportKeys.all, "create", "ephemeral"] as const,
+  revokeMutation: () => [...platformAdminSupportKeys.all, "revoke", "ephemeral"] as const,
 } as const;
 
-export function platformAdminSupportSearchQuery(query: string, clubId?: string) {
-  return queryOptions({
-    queryKey: platformAdminSupportKeys.search(query, clubId),
-    queryFn: () => searchAdminSupportSubjects(query, clubId),
-    enabled: query.trim().length > 0,
-  });
-}
-
-export function platformAdminSupportLedgerQuery(filters: { clubId?: string; granteeUserId?: string } = {}) {
-  return queryOptions({
+export function platformAdminSupportLedgerInfiniteQuery(filters: AdminSupportGrantLedgerFilters = {}) {
+  return infiniteQueryOptions({
     queryKey: platformAdminSupportKeys.ledger(filters),
-    queryFn: () => fetchAdminSupportGrantLedger(filters),
+    initialPageParam: undefined as string | undefined,
+    queryFn: ({ pageParam }) => fetchAdminSupportGrantLedger(filters, pageParam),
+    getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
   });
 }
 
-export function useCreateAdminSupportGrantMutation() {
+type PrivateRequest<TResult> = () => Promise<TResult>;
+
+function usePrivateSupportMutation<TResult>(key: readonly unknown[], invalidateLedger = false) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationKey: platformAdminSupportKeys.all,
-    mutationFn: (request: AdminSupportGrantRequest) => createAdminSupportGrant(request),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminSupportKeys.all }),
+    mutationKey: key,
+    gcTime: 0,
+    mutationFn: (request: PrivateRequest<TResult>) => request(),
+    onSuccess: invalidateLedger
+      ? () => queryClient.invalidateQueries({ queryKey: platformAdminSupportKeys.ledgerRoot() })
+      : undefined,
   });
 }
 
-export function useRevokeAdminSupportGrantMutation() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationKey: platformAdminSupportKeys.all,
-    mutationFn: (grantId: string) => revokeAdminSupportGrant(grantId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: platformAdminSupportKeys.all }),
-  });
+export function useAdminSupportSearchMutation() {
+  const mutation = usePrivateSupportMutation<Awaited<ReturnType<typeof searchAdminSupportSubjects>>>(
+    platformAdminSupportKeys.searchMutation(),
+  );
+  return {
+    ...mutation,
+    search: (query: string, clubId?: string) => mutation.mutateAsync(() => searchAdminSupportSubjects(query, clubId)),
+  };
+}
+
+export function useAdminSupportCreatePreviewMutation() {
+  const mutation = usePrivateSupportMutation<Awaited<ReturnType<typeof previewAdminSupportGrant>>>(
+    platformAdminSupportKeys.createMutation(),
+  );
+  return {
+    ...mutation,
+    preview: (request: AdminSupportGrantCreateDraft) => mutation.mutateAsync(() => previewAdminSupportGrant(request)),
+  };
+}
+
+export function useAdminSupportCreateConfirmMutation() {
+  const mutation = usePrivateSupportMutation<Awaited<ReturnType<typeof confirmAdminSupportGrant>>>(
+    platformAdminSupportKeys.createMutation(),
+    true,
+  );
+  return {
+    ...mutation,
+    confirm: (request: AdminSupportGrantCreateConfirmRequest) =>
+      mutation.mutateAsync(() => confirmAdminSupportGrant(request)),
+  };
+}
+
+export function useAdminSupportRevokePreviewMutation() {
+  const mutation = usePrivateSupportMutation<Awaited<ReturnType<typeof previewAdminSupportGrantRevoke>>>(
+    platformAdminSupportKeys.revokeMutation(),
+  );
+  return {
+    ...mutation,
+    preview: (grantId: string, request: AdminSupportGrantRevokeDraft) =>
+      mutation.mutateAsync(() => previewAdminSupportGrantRevoke(grantId, request)),
+  };
+}
+
+export function useAdminSupportRevokeConfirmMutation() {
+  const mutation = usePrivateSupportMutation<Awaited<ReturnType<typeof confirmAdminSupportGrantRevoke>>>(
+    platformAdminSupportKeys.revokeMutation(),
+    true,
+  );
+  return {
+    ...mutation,
+    confirm: (grantId: string, request: AdminSupportGrantRevokeConfirmRequest) =>
+      mutation.mutateAsync(() => confirmAdminSupportGrantRevoke(grantId, request)),
+  };
 }

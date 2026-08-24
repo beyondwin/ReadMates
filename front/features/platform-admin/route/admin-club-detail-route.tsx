@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useParams } from "react-router";
 import type {
   PlatformAdminClubCommandReceipt,
@@ -14,7 +14,6 @@ import {
 import {
   platformAdminCapabilitiesQuery,
   platformAdminClubDetailQuery,
-  platformAdminSupportGrantsQuery,
   useCheckPlatformAdminDomainProvisioningMutation,
   useConfirmPlatformAdminClubVisibilityMutation,
   useConfirmPlatformAdminDomainMutation,
@@ -22,6 +21,8 @@ import {
   usePreviewPlatformAdminDomainMutation,
   useUpdatePlatformAdminClubMutation,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { flattenSupportGrantLedgerPages } from "@/features/platform-admin/model/platform-admin-support-model";
+import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
 import { AdminClubOperationsPage } from "@/features/platform-admin/ui/admin-club-operations-page";
 import { AdminClubDomainCommandPanel } from "@/features/platform-admin/ui/domain-provisioning-panel";
@@ -29,14 +30,15 @@ import { useAdminBreadcrumbExtra } from "./admin-breadcrumb-hook";
 
 export function AdminClubDetailRoute() {
   const { clubId = "" } = useParams<{ clubId: string }>();
+  const queryClient = useQueryClient();
   const detailQuery = useQuery(platformAdminClubDetailQuery(clubId));
   const capabilities = useQuery(platformAdminCapabilitiesQuery()).data ?? null;
   const canViewOperations =
     capabilities != null && canAdmin(capabilities, "VIEW_CLUB_OPERATIONS");
   const canViewSupport =
     capabilities != null && canAdmin(capabilities, "VIEW_SUPPORT");
-  const supportGrantsQuery = useQuery({
-    ...platformAdminSupportGrantsQuery(clubId),
+  const supportGrantsQuery = useInfiniteQuery({
+    ...platformAdminSupportLedgerInfiniteQuery({ clubId, status: "ACTIVE" }),
     enabled: canViewOperations && canViewSupport,
   });
   const operationsQuery = useQuery({
@@ -50,6 +52,14 @@ export function AdminClubDetailRoute() {
     setExtra(club?.name ?? null);
     return () => setExtra(null);
   }, [club?.name, setExtra]);
+  useEffect(() => {
+    const queryKey = platformAdminSupportLedgerInfiniteQuery({
+      clubId,
+      status: "ACTIVE",
+    }).queryKey;
+    if (!canViewSupport) queryClient.removeQueries({ queryKey, exact: true });
+    return () => queryClient.removeQueries({ queryKey, exact: true });
+  }, [canViewSupport, clubId, queryClient]);
 
   if (detailQuery.isPending)
     return (
@@ -134,8 +144,8 @@ export function AdminClubDetailRoute() {
             <AdminClubOperationsPage
               snapshot={operationsQuery.data}
               supportGrantCount={
-                canViewSupport && !supportGrantsQuery.isError
-                  ? supportGrantsQuery.data?.length
+                canViewSupport && !supportGrantsQuery.isError && !supportGrantsQuery.hasNextPage
+                  ? flattenSupportGrantLedgerPages(supportGrantsQuery.data?.pages ?? []).length
                   : undefined
               }
               supportGrantUnavailable={

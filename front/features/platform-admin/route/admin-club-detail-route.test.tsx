@@ -6,8 +6,8 @@ import type { PlatformAdminClubDetail } from "@/features/platform-admin/api/plat
 import {
   platformAdminCapabilitiesQuery,
   platformAdminClubDetailQuery,
-  platformAdminSupportGrantsQuery,
 } from "@/features/platform-admin/queries/platform-admin-queries";
+import { platformAdminSupportLedgerInfiniteQuery } from "@/features/platform-admin/queries/platform-admin-support-queries";
 import { platformAdminClubOperationsQuery } from "@/features/platform-admin/queries/platform-admin-club-operations-queries";
 import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
 import { AdminBreadcrumbProvider } from "./admin-breadcrumb-context";
@@ -26,19 +26,22 @@ vi.mock(
     previewPlatformAdminDomain: vi.fn(),
     confirmPlatformAdminDomain: vi.fn(),
     checkPlatformAdminDomainProvisioning: vi.fn(),
-    listSupportAccessGrantsByClub: vi.fn(),
   }),
 );
+
+vi.mock("@/features/platform-admin/api/platform-admin-support-api", () => ({
+  fetchAdminSupportGrantLedger: vi.fn(),
+}));
 
 import {
   checkPlatformAdminDomainProvisioning,
   confirmPlatformAdminClubVisibility,
   fetchPlatformAdminClub,
-  listSupportAccessGrantsByClub,
   previewPlatformAdminClubVisibility,
   previewPlatformAdminDomain,
   updatePlatformAdminClubMetadata,
 } from "@/features/platform-admin/api/platform-admin-api";
+import { fetchAdminSupportGrantLedger } from "@/features/platform-admin/api/platform-admin-support-api";
 
 const detail: PlatformAdminClubDetail = {
   clubId: "c-1",
@@ -96,8 +99,8 @@ function renderRoute(
   });
   if (seedSupportGrants) {
     queryClient.setQueryData(
-      platformAdminSupportGrantsQuery("c-1").queryKey,
-      [],
+      platformAdminSupportLedgerInfiniteQuery({ clubId: "c-1", status: "ACTIVE" }).queryKey,
+      { pages: [{ items: [], nextCursor: null }], pageParams: [undefined] },
     );
   }
   queryClient.setQueryData(platformAdminClubOperationsQuery("c-1").queryKey, {
@@ -163,6 +166,7 @@ function renderRoute(
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(fetchPlatformAdminClub).mockResolvedValue(detail);
+  vi.mocked(fetchAdminSupportGrantLedger).mockResolvedValue({ items: [], nextCursor: null });
 });
 
 describe("AdminClubDetailRoute", () => {
@@ -226,9 +230,9 @@ describe("AdminClubDetailRoute", () => {
   });
 
   it("shows support grant unavailability and retries a permitted failed query", async () => {
-    vi.mocked(listSupportAccessGrantsByClub)
+    vi.mocked(fetchAdminSupportGrantLedger)
       .mockRejectedValueOnce(new Error("safe failure"))
-      .mockResolvedValueOnce([]);
+      .mockResolvedValueOnce({ items: [], nextCursor: null });
     renderRoute(
       detail,
       ["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS", "VIEW_SUPPORT"],
@@ -241,8 +245,24 @@ describe("AdminClubDetailRoute", () => {
       screen.getByRole("button", { name: "지원 grant 다시 시도" }),
     );
     await waitFor(() =>
-      expect(listSupportAccessGrantsByClub).toHaveBeenCalledTimes(2),
+      expect(fetchAdminSupportGrantLedger).toHaveBeenCalledTimes(2),
     );
+  });
+
+  it("removes the private support ledger cache when the detail route unmounts", () => {
+    const { queryClient, unmount } = renderRoute(
+      detail,
+      ["VIEW_CLUBS", "VIEW_CLUB_OPERATIONS", "VIEW_SUPPORT"],
+    );
+    const queryKey = platformAdminSupportLedgerInfiniteQuery({
+      clubId: "c-1",
+      status: "ACTIVE",
+    }).queryKey;
+    expect(queryClient.getQueryData(queryKey)).toBeDefined();
+
+    unmount();
+
+    expect(queryClient.getQueryData(queryKey)).toBeUndefined();
   });
 
   it("requires preview review and explicit confirmation before a visibility command", async () => {

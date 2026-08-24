@@ -8,7 +8,6 @@ export type {
 
 export type {
   AdminSupportGrantLedgerItem,
-  AdminSupportGrantRequest,
   AdminSupportSearchResult,
 } from "@/features/platform-admin/model/platform-admin-support-model";
 
@@ -28,9 +27,6 @@ export type {
 
 export type {
   PlatformAdminRole,
-  SupportAccessGrantScope,
-  SupportAccessGrantResponse,
-  CreateSupportAccessGrantRequest,
   PlatformAdminSummaryResponse,
   PlatformAdminTodayClosingRisk,
   PlatformAdminTodayClosingRiskState,

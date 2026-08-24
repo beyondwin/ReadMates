@@ -14,24 +14,93 @@ export type AdminSupportGrantLedgerItem = {
   grantId: string;
   clubId: string;
   clubName: string;
-  granteeUserId: string;
   granteeDisplayName: string;
   granteeMaskedEmail: string;
   scope: "METADATA_READ" | "HOST_SUPPORT_READ";
-  reason: string;
+  reasonCategory: SupportGrantReasonCategory;
+  notePresent: boolean;
   expiresAt: string;
   createdAt: string;
   revokedAt: string | null;
-  status: string;
+  status: SupportGrantStatus;
   createdByRole: string;
 };
 
-export type AdminSupportGrantRequest = {
+export type SupportGrantScope = "METADATA_READ" | "HOST_SUPPORT_READ";
+export type SupportGrantStatus = "ACTIVE" | "EXPIRING" | "EXPIRED" | "REVOKED";
+export type SupportGrantReasonCategory =
+  | "INCIDENT_INVESTIGATION"
+  | "MEMBER_ASSISTANCE"
+  | "DATA_CORRECTION"
+  | "SECURITY_REVIEW";
+
+export type AdminSupportGrantLedgerPage = {
+  items: AdminSupportGrantLedgerItem[];
+  nextCursor: string | null;
+};
+
+export type AdminSupportGrantLedgerFilters = {
+  clubId?: string;
+  status?: SupportGrantStatus;
+};
+
+export type AdminSupportGrantCreateDraft = {
   clubId: string;
   granteeSubjectId: string;
-  scope: "METADATA_READ" | "HOST_SUPPORT_READ";
-  reason: string;
+  scope: SupportGrantScope;
   expiresAt: string;
+  reasonCategory: SupportGrantReasonCategory;
+  note: string | null;
+};
+
+export type AdminSupportGrantPreview = {
+  previewId: string;
+  commandType: "CREATE" | "REVOKE";
+  grantId: string | null;
+  clubId: string;
+  scope: SupportGrantScope;
+  grantExpiresAt: string;
+  reasonCategory: SupportGrantReasonCategory;
+  notePresent: boolean;
+  impactCodes: string[];
+  expiresAt: string;
+  fingerprintPrefix: string;
+};
+
+export type AdminSupportGrantReceipt = {
+  receiptId: string;
+  previewId: string;
+  commandType: "CREATE" | "REVOKE";
+  grantId: string;
+  clubId: string;
+  scope: SupportGrantScope;
+  grantExpiresAt: string;
+  reasonCategory: SupportGrantReasonCategory;
+  notePresent: boolean;
+  beforeStatus: string;
+  afterStatus: string;
+  outcome: string;
+  createdAt: string;
+};
+
+export type AdminSupportGrantCreateConfirmRequest = AdminSupportGrantCreateDraft & {
+  previewId: string;
+  idempotencyKey: string;
+  confirmed: true;
+};
+
+export type AdminSupportGrantRevokeDraft = {
+  reasonCategory: SupportGrantReasonCategory;
+  note: string | null;
+};
+
+export type AdminSupportGrantRevokeConfirmRequest = AdminSupportGrantRevokeDraft & {
+  previewId: string;
+  idempotencyKey: string;
+  clubId: string;
+  scope: SupportGrantScope;
+  expiresAt: string;
+  confirmed: true;
 };
 
 export type SupportGrantRiskStatus = "READY" | "WARNING" | "BLOCKED";
@@ -67,6 +136,50 @@ export const SUPPORT_REASON_PRESETS = [
 ] as const;
 
 const SHORT_SUPPORT_WINDOW_HOURS = 24;
+const SUPPORT_GRANT_STATUSES: ReadonlySet<string> = new Set(["ACTIVE", "EXPIRING", "EXPIRED", "REVOKED"]);
+const RESTART_PREVIEW_CODES: ReadonlySet<string> = new Set([
+  "PREVIEW_NOT_FOUND",
+  "PREVIEW_EXPIRED",
+  "PREVIEW_CONSUMED",
+  "PREVIEW_MISMATCH",
+  "IDEMPOTENCY_CONFLICT",
+  "GRANT_NOT_FOUND",
+  "GRANT_DUPLICATE_ACTIVE",
+  "SUPPORT_TARGET_NOT_FOUND",
+  "SUPPORT_TARGET_NOT_ELIGIBLE",
+  "GRANT_EXPIRY_REQUIRED",
+  "GRANT_EXPIRY_IN_PAST",
+  "GRANT_EXPIRY_TOO_LONG",
+  "GRANT_REASON_REQUIRED",
+]);
+
+export function normalizeSupportGrantStatus(value: string | null): SupportGrantStatus | undefined {
+  return value && SUPPORT_GRANT_STATUSES.has(value) ? (value as SupportGrantStatus) : undefined;
+}
+
+export function flattenSupportGrantLedgerPages(
+  pages: readonly AdminSupportGrantLedgerPage[],
+): AdminSupportGrantLedgerItem[] {
+  const seen = new Set<string>();
+  return pages.flatMap((page) => page.items.filter((item) => {
+    if (seen.has(item.grantId)) return false;
+    seen.add(item.grantId);
+    return true;
+  }));
+}
+
+export function supportGrantCommandRecovery(error: unknown): {
+  kind: "SAME_INTENT" | "RESTART_PREVIEW";
+  message: string;
+} {
+  const code = typeof error === "object" && error !== null && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : "NETWORK_UNKNOWN";
+  if (RESTART_PREVIEW_CODES.has(code)) {
+    return { kind: "RESTART_PREVIEW", message: "상태가 변경되었습니다. 다시 검토해 주세요." };
+  }
+  return { kind: "SAME_INTENT", message: "결과를 확인하지 못했습니다. 같은 요청으로 다시 확인해 주세요." };
+}
 
 export function isSupportReasonPresetSafe(value: string): boolean {
   const normalized = value.toLowerCase();

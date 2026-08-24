@@ -14,28 +14,23 @@ import {
   commitPlatformAdminOnboarding,
   confirmPlatformAdminClubVisibility,
   confirmPlatformAdminDomain,
-  createSupportAccessGrant,
   fetchPlatformAdminClub,
   fetchPlatformAdminClubs,
   fetchPlatformAdminSummary,
-  listSupportAccessGrantsByClub,
   previewPlatformAdminOnboarding,
   previewPlatformAdminClubVisibility,
   previewPlatformAdminDomain,
-  revokeSupportAccessGrant,
   updatePlatformAdminClubMetadata,
 } from "@/features/platform-admin/api/platform-admin-api";
 import type {
   ConfirmPlatformAdminClubVisibilityRequest,
   ConfirmPlatformAdminDomainRequest,
   ConfirmPlatformAdminOnboardingRequest,
-  CreateSupportAccessGrantRequest,
   PlatformAdminClubListFilters,
   PreviewPlatformAdminClubVisibilityRequest,
   PreviewPlatformAdminDomainRequest,
   RecheckPlatformAdminDomainRequest,
   PlatformAdminTodayClosingRisksResponse,
-  SupportAccessGrantResponse,
   UpdatePlatformAdminClubRequest,
 } from "@/features/platform-admin/api/platform-admin-contracts";
 
@@ -53,10 +48,6 @@ export const platformAdminKeys = {
     [...platformAdminKeys.all, "today", "closing-risks"] as const,
   todayClosingRisksUnavailable: () =>
     [...platformAdminKeys.todayClosingRisks(), "unavailable"] as const,
-  supportGrantsRoot: () =>
-    [...platformAdminKeys.all, "support-grants"] as const,
-  supportGrants: (clubId: string | null) =>
-    [...platformAdminKeys.supportGrantsRoot(), clubId] as const,
 } as const;
 
 const PLATFORM_ADMIN_MUTATION_KEY = [
@@ -208,22 +199,6 @@ export function platformAdminTodayClosingRisksQuery() {
   });
 }
 
-export function platformAdminSupportGrantsQuery(clubId: string | null) {
-  return queryOptions({
-    queryKey: platformAdminKeys.supportGrants(clubId),
-    queryFn: () =>
-      clubId ? listSupportAccessGrantsByClub(clubId) : Promise.resolve([]),
-  });
-}
-
-function prependSupportGrant(
-  grants: SupportAccessGrantResponse[] | undefined,
-  grant: SupportAccessGrantResponse,
-): SupportAccessGrantResponse[] {
-  const existing = grants ?? [];
-  return [grant, ...existing.filter((item) => item.id !== grant.id)];
-}
-
 function setRetainedQueryData<T>(
   queryClient: QueryClient,
   queryKey: readonly unknown[],
@@ -357,46 +332,5 @@ export function useConfirmPlatformAdminDomainMutation(clubId: string) {
     mutationFn: (request: ConfirmPlatformAdminDomainRequest) =>
       confirmPlatformAdminDomain(clubId, request),
     onSuccess: () => invalidateClubState(queryClient, clubId),
-  });
-}
-
-export function useCreateSupportAccessGrantMutation(clubId: string | null) {
-  const queryClient = useQueryClient();
-  const grantsSnapshot = queryClient.getQueryData<SupportAccessGrantResponse[]>(
-    platformAdminKeys.supportGrants(clubId),
-  );
-  return useMutation({
-    mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
-    mutationFn: (request: CreateSupportAccessGrantRequest) =>
-      createSupportAccessGrant(request),
-    onSuccess: (grant) => {
-      setRetainedQueryData(
-        queryClient,
-        platformAdminKeys.supportGrants(clubId),
-        (grants: SupportAccessGrantResponse[] | undefined) =>
-          prependSupportGrant(grants ?? grantsSnapshot, grant),
-      );
-    },
-  });
-}
-
-export function useRevokeSupportAccessGrantMutation(clubId: string | null) {
-  const queryClient = useQueryClient();
-  const grantsSnapshot = queryClient.getQueryData<SupportAccessGrantResponse[]>(
-    platformAdminKeys.supportGrants(clubId),
-  );
-  return useMutation({
-    mutationKey: PLATFORM_ADMIN_MUTATION_KEY,
-    mutationFn: (grantId: string) => revokeSupportAccessGrant(grantId),
-    onSuccess: (_result, grantId) => {
-      setRetainedQueryData(
-        queryClient,
-        platformAdminKeys.supportGrants(clubId),
-        (grants: SupportAccessGrantResponse[] | undefined) =>
-          (grants ?? grantsSnapshot ?? []).filter(
-            (grant) => grant.id !== grantId,
-          ),
-      );
-    },
   });
 }

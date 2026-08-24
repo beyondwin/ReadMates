@@ -2,169 +2,103 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ComponentProps } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { AdminSupportWorkbench } from "@/features/platform-admin/ui/admin-support-workbench";
-import type { AdminSupportSearchResult } from "@/features/platform-admin/model/platform-admin-support-model";
+import { findUnnamedInteractiveElements } from "@/shared/testing/accessibility-checks";
+import { AdminSupportWorkbench } from "./admin-support-workbench";
 
-const result: AdminSupportSearchResult = {
-  subjectId: "user-1",
-  displayName: "지원관리자",
-  maskedEmail: "a***@example.com",
-  kind: "PLATFORM_ADMIN",
-  platformAdminRole: "SUPPORT",
-  platformAdminStatus: "ACTIVE",
-  clubMembershipSummary: [],
-  grantEligible: true,
-  grantBlockedReason: null,
+const grant = {
+  grantId: "grant-1",
+  clubId: "club-1",
+  clubName: "읽는사이",
+  granteeDisplayName: "지원 대상",
+  granteeMaskedEmail: "s***@example.com",
+  scope: "HOST_SUPPORT_READ" as const,
+  reasonCategory: "MEMBER_ASSISTANCE" as const,
+  notePresent: true,
+  expiresAt: "2026-08-25T12:00:00Z",
+  createdAt: "2026-08-25T10:00:00Z",
+  revokedAt: null,
+  status: "ACTIVE" as const,
+  createdByRole: "OWNER",
 };
 
-function renderWorkbench(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> = {}) {
-  return render(
-    <AdminSupportWorkbench
-      clubs={[{ clubId: "club-1", slug: "reading-sai", name: "읽는사이", tagline: "", about: "", status: "ACTIVE", publicVisibility: "PUBLIC", domainCount: 0, domainActionRequiredCount: 0, firstHostOnboardingState: "ASSIGNED" }]}
-      selectedClubId="club-1"
-      query=""
-      results={[]}
-      selectedResult={null}
-      hasSearched={false}
-      ledger={[]}
-      reason=""
-      expiresAt="2026-05-27T11:00"
-      busy={false}
-      error={null}
-      canCreateGrant
-      onQueryChange={vi.fn()}
-      onSearch={vi.fn()}
-      onSelectResult={vi.fn()}
-      onClubChange={vi.fn()}
-      onReasonChange={vi.fn()}
-      onExpiresAtChange={vi.fn()}
-      onCreateGrant={vi.fn()}
-      onRevokeGrant={vi.fn()}
-      {...overrides}
-    />,
-  );
+function props(overrides: Partial<ComponentProps<typeof AdminSupportWorkbench>> = {}): ComponentProps<typeof AdminSupportWorkbench> {
+  return {
+    clubs: [{ clubId: "club-1", name: "읽는사이" }],
+    selectedClubId: "club-1",
+    status: "",
+    canManage: true,
+    latestReceipt: null,
+    search: { query: "", results: [], selected: null, hasSearched: false, pending: false, error: null, onQueryChange: vi.fn(), onSubmit: vi.fn(), onSelect: vi.fn(), onClear: vi.fn() },
+    create: { reasonCategory: "MEMBER_ASSISTANCE", note: "", expiresAt: "2026-08-25T12:00", preview: null, receipt: null, recovery: null, previewPending: false, confirmPending: false, outcomeUnknown: false, onReasonCategoryChange: vi.fn(), onNoteChange: vi.fn(), onExpiresAtChange: vi.fn(), onPreview: vi.fn(), onConfirm: vi.fn(), onReset: vi.fn() },
+    ledger: { items: [grant], pending: false, error: null, nextPageError: false, hasNextPage: false, loadingMore: false, onRetry: vi.fn(), onLoadMore: vi.fn() },
+    revoke: { target: null, reasonCategory: "MEMBER_ASSISTANCE", note: "", preview: null, receipt: null, recovery: null, previewPending: false, confirmPending: false, outcomeUnknown: false, onStart: vi.fn(), onCancel: vi.fn(), onReasonCategoryChange: vi.fn(), onNoteChange: vi.fn(), onPreview: vi.fn(), onConfirm: vi.fn() },
+    onClubChange: vi.fn(),
+    onStatusChange: vi.fn(),
+    ...overrides,
+  };
 }
 
 describe("AdminSupportWorkbench", () => {
-  it("shows an initial search prompt before the first submitted search", () => {
-    renderWorkbench({ hasSearched: false, results: [], busy: false });
-
-    expect(screen.getByText("이름 또는 이메일로 지원 대상을 검색하세요.")).toBeInTheDocument();
-    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
+  it("keeps search accessible and has no unnamed controls", () => {
+    const { container } = render(<AdminSupportWorkbench {...props()} />);
+    expect(screen.getByRole("searchbox", { name: "지원 대상 검색" })).toBeInTheDocument();
+    expect(findUnnamedInteractiveElements(container)).toEqual([]);
   });
 
-  it("shows no-results copy only after a submitted search returns no results", () => {
-    renderWorkbench({ hasSearched: true, query: "없는 사용자", results: [], busy: false });
-
-    expect(screen.getByText("검색 결과가 없습니다.")).toBeInTheDocument();
-    expect(screen.queryByText("이름 또는 이메일로 지원 대상을 검색하세요.")).not.toBeInTheDocument();
+  it("keeps prior ledger rows visible beside a later-page recovery action", async () => {
+    const onLoadMore = vi.fn();
+    render(<AdminSupportWorkbench {...props({ ledger: { ...props().ledger, nextPageError: true, hasNextPage: true, onLoadMore } })} />);
+    expect(document.querySelectorAll(".admin-support-workbench__ledger-row")).toHaveLength(1);
+    expect(screen.getByRole("alert")).toHaveTextContent("현재 목록은 유지됩니다");
+    await userEvent.click(screen.getByRole("button", { name: "다시 불러오기" }));
+    expect(onLoadMore).toHaveBeenCalledOnce();
   });
 
-  it("shows a loading state while a submitted search is running", () => {
-    renderWorkbench({ hasSearched: true, query: "지원", results: [], busy: true });
+  it("starts revoke review only when the current capability permits it", async () => {
+    const onStart = vi.fn();
+    const { rerender } = render(<AdminSupportWorkbench {...props({ revoke: { ...props().revoke, onStart } })} />);
+    await userEvent.click(screen.getByRole("button", { name: "권한 취소 검토" }));
+    expect(onStart).toHaveBeenCalledWith(grant);
 
-    expect(screen.getByText("지원 대상을 검색하는 중입니다.")).toBeInTheDocument();
-    expect(screen.queryByText("검색 결과가 없습니다.")).not.toBeInTheDocument();
+    rerender(<AdminSupportWorkbench {...props({ canManage: false })} />);
+    expect(screen.queryByRole("button", { name: "권한 취소 검토" })).not.toBeInTheDocument();
+    expect(screen.getByText("현재 권한으로는 지원 접근 권한을 변경할 수 없습니다.")).toBeInTheDocument();
   });
 
-  it("renders search before grant form", () => {
-    renderWorkbench();
+  it("disables existing create and revoke confirmations after capability loss", () => {
+    const preview = {
+      previewId: "preview-1",
+      commandType: "CREATE" as const,
+      grantId: null,
+      clubId: "club-1",
+      scope: "HOST_SUPPORT_READ" as const,
+      grantExpiresAt: "2026-08-25T12:00:00Z",
+      reasonCategory: "MEMBER_ASSISTANCE" as const,
+      notePresent: false,
+      impactCodes: ["GRANT_SUPPORT_ACCESS"],
+      expiresAt: "2026-08-25T10:10:00Z",
+      fingerprintPrefix: "00112233",
+    };
+    render(<AdminSupportWorkbench {...props({
+      canManage: false,
+      search: { ...props().search, selected: {
+        subjectId: "subject-1", displayName: "지원 대상", maskedEmail: "s***@example.com", kind: "USER", platformAdminRole: null, platformAdminStatus: null, clubMembershipSummary: [], grantEligible: true, grantBlockedReason: null,
+      } },
+      create: { ...props().create, preview },
+      revoke: { ...props().revoke, target: grant, preview: { ...preview, commandType: "REVOKE", grantId: grant.grantId, impactCodes: ["REVOKE_SUPPORT_ACCESS"] } },
+    })} />);
 
-    expect(screen.getByRole("heading", { name: "지원 대상 검색" })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "지원 접근 권한 발급" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "발급 확정" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "취소 확정" })).toBeDisabled();
   });
 
-  it("selecting an eligible result reveals grant form without raw id label", async () => {
-    const onSelectResult = vi.fn();
-    const user = userEvent.setup();
-    renderWorkbench({ results: [result], onSelectResult });
-
-    await user.click(screen.getByRole("button", { name: /지원관리자/ }));
-    expect(onSelectResult).toHaveBeenCalledWith(result);
-
-    renderWorkbench({ selectedResult: result });
-    expect(screen.getByRole("heading", { name: "지원 접근 권한 발급" })).toBeInTheDocument();
-    expect(screen.queryByText("Grantee User ID")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "발급" })).toBeDisabled();
-  });
-
-  it("revoke button calls callback with grant id", async () => {
-    const onRevokeGrant = vi.fn();
-    const user = userEvent.setup();
-    renderWorkbench({
-      onRevokeGrant,
-      ledger: [{
-        grantId: "grant-1",
-        clubId: "club-1",
-        clubName: "읽는사이",
-        granteeUserId: "user-1",
-        granteeDisplayName: "지원관리자",
-        granteeMaskedEmail: "a***@example.com",
-        scope: "HOST_SUPPORT_READ",
-        reason: "ticket",
-        expiresAt: "2026-05-27T11:00:00Z",
-        createdAt: "2026-05-27T10:00:00Z",
-        revokedAt: null,
-        status: "ACTIVE",
-        createdByRole: "OWNER",
-      }],
-    });
-
-    await user.click(screen.getByRole("button", { name: "권한 취소" }));
-
-    expect(onRevokeGrant).toHaveBeenCalledWith("grant-1");
-  });
-
-  it("uses supporting copy for the selected target and ledger metadata", () => {
-    renderWorkbench({
-      selectedResult: result,
-      ledger: [{
-        grantId: "grant-1",
-        clubId: "club-1",
-        clubName: "읽는사이",
-        granteeUserId: "user-1",
-        granteeDisplayName: "지원관리자",
-        granteeMaskedEmail: "a***@example.com",
-        scope: "HOST_SUPPORT_READ",
-        reason: "고객 문의 재현 지원",
-        expiresAt: "2026-05-27T11:00:00Z",
-        createdAt: "2026-05-27T10:00:00Z",
-        revokedAt: null,
-        status: "ACTIVE",
-        createdByRole: "OWNER",
-      }],
-    });
-
-    expect(screen.getByText(/^대상: 지원관리자/)).toHaveClass("small");
-    expect(screen.getByText(/ACTIVE · 고객 문의 재현 지원/)).toHaveClass("small");
-  });
-
-  it("renders support risk summary and reason presets for a selected result", async () => {
-    const onReasonChange = vi.fn();
-    const user = userEvent.setup();
-    renderWorkbench({ selectedResult: result, onReasonChange });
-
-    expect(screen.getByRole("heading", { name: "지원 접근 검토" })).toBeInTheDocument();
-    expect(screen.getByText("지원 사유를 입력하세요.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "고객 문의 재현 지원" }));
-
-    expect(onReasonChange).toHaveBeenCalledWith("고객 문의 재현 지원");
-  });
-
-  it("keeps grant creation disabled when the risk summary is blocked", () => {
-    renderWorkbench({ selectedResult: result, reason: "", expiresAt: "2026-05-27T11:00" });
-
-    expect(screen.getByText("지원 사유를 입력하세요.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "발급" })).toBeDisabled();
-  });
-
-  it("shows ready risk summary when reason and expiry are valid", () => {
-    const oneHourFromNowDate = new Date(Date.now() + 60 * 60 * 1000);
-    const pad = (value: number) => String(value).padStart(2, "0");
-    const oneHourFromNow = `${oneHourFromNowDate.getFullYear()}-${pad(oneHourFromNowDate.getMonth() + 1)}-${pad(oneHourFromNowDate.getDate())}T${pad(oneHourFromNowDate.getHours())}:${pad(oneHourFromNowDate.getMinutes())}`;
-    renderWorkbench({ selectedResult: result, reason: "고객 문의 재현 지원", expiresAt: oneHourFromNow });
-
-    expect(screen.getByText("지원 접근 권한을 발급할 준비가 되었습니다.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "발급" })).not.toBeDisabled();
+  it("shows only safe receipt evidence after completion", () => {
+    render(<AdminSupportWorkbench {...props({ latestReceipt: {
+      receiptId: "receipt-1", previewId: "preview-1", commandType: "CREATE", grantId: "grant-1", clubId: "club-1", scope: "HOST_SUPPORT_READ", grantExpiresAt: "2026-08-25T12:00:00Z", reasonCategory: "MEMBER_ASSISTANCE", notePresent: true, beforeStatus: "ABSENT", afterStatus: "ACTIVE", outcome: "SUCCEEDED", createdAt: "2026-08-25T10:00:00Z",
+    } })} />);
+    const receipt = screen.getByLabelText("명령 영수증");
+    expect(receipt).toHaveTextContent("receipt-1");
+    expect(receipt).toHaveTextContent("메모 있음");
+    expect(receipt).not.toHaveTextContent("raw private note");
   });
 });

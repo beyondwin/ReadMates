@@ -7,7 +7,6 @@ import com.readmates.club.application.model.AdminSupportGrantLedgerPage
 import com.readmates.club.application.model.AdminSupportSearchResult
 import com.readmates.club.application.model.ConfirmSupportGrantCreateCommand
 import com.readmates.club.application.model.ConfirmSupportGrantRevokeCommand
-import com.readmates.club.application.model.CreateSupportAccessGrantCommand
 import com.readmates.club.application.model.PreviewSupportGrantCreateCommand
 import com.readmates.club.application.model.PreviewSupportGrantRevokeCommand
 import com.readmates.club.application.model.SupportGrantCommandPreview
@@ -15,9 +14,7 @@ import com.readmates.club.application.model.SupportGrantCommandReceipt
 import com.readmates.club.application.model.SupportGrantReasonCategory
 import com.readmates.club.application.port.`in`.AdminSupportWorkbenchUseCase
 import com.readmates.club.application.port.`in`.ConfirmSupportGrantCommandUseCase
-import com.readmates.club.application.port.`in`.CreateSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.PreviewSupportGrantCommandUseCase
-import com.readmates.club.application.port.`in`.RevokeSupportAccessGrantUseCase
 import com.readmates.club.domain.SupportAccessGrantScope
 import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.toPlatformActor
@@ -40,8 +37,6 @@ import java.util.UUID
 @RequestMapping("/api/admin/support")
 class PlatformAdminSupportWorkbenchController(
     private val workbenchUseCase: AdminSupportWorkbenchUseCase,
-    private val createUseCase: CreateSupportAccessGrantUseCase,
-    private val revokeUseCase: RevokeSupportAccessGrantUseCase,
     private val previewCommandUseCase: PreviewSupportGrantCommandUseCase,
     private val confirmCommandUseCase: ConfirmSupportGrantCommandUseCase,
 ) {
@@ -98,28 +93,14 @@ class PlatformAdminSupportWorkbenchController(
     fun create(
         admin: CurrentPlatformAdmin,
         @RequestBody request: AdminSupportGrantRequest,
-    ): SupportAccessGrantResponse =
-        SupportAccessGrantResponse.from(
-            createUseCase.createSupportAccessGrant(
-                admin,
-                CreateSupportAccessGrantCommand(
-                    clubId = request.clubId,
-                    granteeUserId = request.granteeSubjectId,
-                    scope = request.scope,
-                    reason = request.reason,
-                    expiresAt = request.expiresAt,
-                ),
-            ),
-        )
+    ): Nothing = requireSafeConfirmation(admin)
 
     @DeleteMapping("/grants/{grantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun revoke(
         admin: CurrentPlatformAdmin,
         @PathVariable grantId: UUID,
-    ) {
-        revokeUseCase.revokeSupportAccessGrant(admin, grantId)
-    }
+    ): Nothing = requireSafeConfirmation(admin)
 }
 
 data class AdminSupportSearchRequest(

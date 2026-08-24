@@ -4,7 +4,6 @@ import { adminClubDetailLoaderFactory } from "./admin-club-detail-data";
 
 const api = vi.hoisted(() => ({
   fetchClub: vi.fn(),
-  listSupportGrants: vi.fn(),
   fetchOperations: vi.fn(),
 }));
 
@@ -15,7 +14,6 @@ vi.mock(
       typeof import("@/features/platform-admin/api/platform-admin-api")
     >()),
     fetchPlatformAdminClub: api.fetchClub,
-    listSupportAccessGrantsByClub: api.listSupportGrants,
   }),
 );
 
@@ -32,7 +30,6 @@ vi.mock(
 beforeEach(() => {
   vi.clearAllMocks();
   api.fetchClub.mockResolvedValue({ clubId: "c-1" });
-  api.listSupportGrants.mockRejectedValue(new Error("secondary unavailable"));
   api.fetchOperations.mockRejectedValue(new Error("secondary unavailable"));
 });
 
@@ -50,7 +47,6 @@ describe("adminClubDetailLoaderFactory", () => {
     ).resolves.toEqual({ clubId: "c-1" });
 
     expect(api.fetchClub).toHaveBeenCalledWith("c-1");
-    expect(api.listSupportGrants).not.toHaveBeenCalled();
     expect(api.fetchOperations).not.toHaveBeenCalled();
   });
 });

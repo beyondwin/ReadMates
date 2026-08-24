@@ -3035,6 +3035,20 @@ a.rm-recent-record__destination:hover {
   min-width: min(320px, 100%);
 }
 
+.admin-support-workbench__filters,
+.admin-support-workbench__section-heading,
+.admin-support-workbench__command-actions,
+.admin-support-workbench__load-more {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-support-workbench__filters .field-group {
+  min-width: min(210px, 100%);
+}
+
 .admin-support-workbench__panel,
 .admin-support-workbench__error {
   border: 1px solid var(--line);
@@ -3048,6 +3062,10 @@ a.rm-recent-record__destination:hover {
 }
 
 .admin-support-workbench__search .input {
+  flex: 1;
+}
+
+.admin-support-workbench__search-field {
   flex: 1;
 }
 
@@ -3120,6 +3138,58 @@ a.rm-recent-record__destination:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.admin-support-workbench__notice,
+.admin-support-workbench__review,
+.admin-support-workbench__receipt {
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+  padding: 14px;
+  background: var(--bg-sub);
+}
+
+.admin-support-workbench__command-fields {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.7fr) minmax(260px, 1.3fr) minmax(190px, 0.8fr);
+  gap: 12px;
+  margin-block: 16px;
+}
+
+.admin-support-workbench__command-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  justify-content: flex-end;
+  margin: 16px -18px -18px;
+  padding: 12px 18px max(12px, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  backdrop-filter: blur(8px);
+}
+
+.admin-support-workbench__review ul {
+  margin-block: 8px;
+  padding-inline-start: 20px;
+}
+
+@media (max-width: 700px) {
+  .admin-support-workbench__filters,
+  .admin-support-workbench__section-heading,
+  .admin-support-workbench__command-fields {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .admin-support-workbench__filters,
+  .admin-support-workbench__filters .field-group {
+    width: 100%;
+  }
+
+  .admin-support-workbench__command-actions .btn {
+    width: 100%;
+  }
 }
 
 .rm-route-stage {

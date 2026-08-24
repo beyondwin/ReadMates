@@ -48,6 +48,7 @@ import com.readmates.club.adapter.`in`.web.PlatformAdminClubController
 import com.readmates.club.adapter.`in`.web.PlatformAdminController
 import com.readmates.club.adapter.`in`.web.PlatformAdminErrorHandler
 import com.readmates.club.adapter.`in`.web.PlatformAdminSupportWorkbenchController
+import com.readmates.club.adapter.`in`.web.SupportAccessGrantController
 import com.readmates.club.application.model.AdminSupportGrantLedgerPage
 import com.readmates.club.application.model.AdminSupportSearchResult
 import com.readmates.club.application.model.ConfirmCreateClubDomainCommand
@@ -360,6 +361,44 @@ class PlatformAdminBffSecurityTest(
         commandRequest(route, path = "${route.path}%2Fnear-miss").andExpect(status().isBadRequest)
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("legacySupportOneClickRoutes")
+    fun `legacy support one click commands return safe confirm required only after the full trust chain`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OWNER)
+        commandRequest(route)
+            .andExpect(status().isGone)
+            .andExpect(jsonPath("$.code").value("SAFE_CONFIRM_REQUIRED"))
+
+        listOf<String?>(null, "wrong-secret").forEach { secret ->
+            commandRequest(route, secret = secret).andExpect(status().isUnauthorized)
+        }
+        commandRequest(route, origin = "https://attacker.example").andExpect(status().isForbidden)
+        commandRequest(route, origin = null, referer = "https://attacker.example/path")
+            .andExpect(status().isForbidden)
+
+        identities.inactiveSession()
+        commandRequest(route).andExpect(status().isUnauthorized)
+        identities.nonAdmin()
+        commandRequest(route).andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.OPERATOR)
+        commandRequest(route).andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.SUPPORT)
+        commandRequest(route).andExpect(status().isForbidden)
+
+        assertThat(supportCommandInvocations.legacyCalls).isZero()
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("legacySupportOneClickRoutes")
+    fun `legacy support wrong method suffix and encoded slash near misses stay protected`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OWNER)
+
+        commandRequest(route, method = HttpMethod.PUT).andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}/near-miss").andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}%2Fnear-miss").andExpect(status().isBadRequest)
+        assertThat(supportCommandInvocations.legacyCalls).isZero()
+    }
+
     private fun commandRequest(
         route: ClubCommandRoute,
         method: HttpMethod = route.method,
@@ -540,6 +579,38 @@ class PlatformAdminBffSecurityTest(
             ).map(Arguments::of)
         }
 
+        @JvmStatic
+        fun legacySupportOneClickRoutes(): List<Arguments> {
+            val grantId = "dddddddd-0000-4000-8000-000000060012"
+            val expiry = "2026-08-25T12:00:00Z"
+            return listOf(
+                ClubCommandRoute(
+                    "legacy support-access create",
+                    HttpMethod.POST,
+                    "/api/admin/support-access-grants",
+                    """{"clubId":"$CLUB_ID","granteeUserId":"$USER_ID","scope":"HOST_SUPPORT_READ","reason":"legacy","expiresAt":"$expiry"}""",
+                ),
+                ClubCommandRoute(
+                    "legacy support-access revoke",
+                    HttpMethod.DELETE,
+                    "/api/admin/support-access-grants/$grantId",
+                    "{}",
+                ),
+                ClubCommandRoute(
+                    "legacy support workbench create",
+                    HttpMethod.POST,
+                    "/api/admin/support/grants",
+                    """{"clubId":"$CLUB_ID","granteeSubjectId":"$USER_ID","scope":"HOST_SUPPORT_READ","reason":"legacy","expiresAt":"$expiry"}""",
+                ),
+                ClubCommandRoute(
+                    "legacy support workbench revoke",
+                    HttpMethod.DELETE,
+                    "/api/admin/support/grants/$grantId",
+                    "{}",
+                ),
+            ).map(Arguments::of)
+        }
+
         private fun supportCreateBody(expiry: String): String =
             """
             {
@@ -615,9 +686,11 @@ class PlatformAdminAiCommandInvocations {
 
 class PlatformAdminSupportCommandInvocations {
     var calls: Int = 0
+    var legacyCalls: Int = 0
 
     fun reset() {
         calls = 0
+        legacyCalls = 0
     }
 }
 
@@ -631,6 +704,7 @@ class PlatformAdminSupportCommandInvocations {
     PlatformAdminController::class,
     PlatformAdminClubController::class,
     PlatformAdminSupportWorkbenchController::class,
+    SupportAccessGrantController::class,
     AiGenerationOpsController::class,
     AiGenerationErrorHandler::class,
     PlatformAdminErrorHandler::class,
@@ -745,10 +819,32 @@ class PlatformAdminBffSecurityHarnessConfiguration {
         }
 
     @Bean
-    fun legacyCreateSupportGrant(): CreateSupportAccessGrantUseCase = mock(CreateSupportAccessGrantUseCase::class.java)
+    fun legacyCreateSupportGrant(invocations: PlatformAdminSupportCommandInvocations): CreateSupportAccessGrantUseCase =
+        object : CreateSupportAccessGrantUseCase {
+            override fun createSupportAccessGrant(
+                admin: CurrentPlatformAdmin,
+                command: com.readmates.club.application.model.CreateSupportAccessGrantCommand,
+            ): com.readmates.club.application.model.SupportAccessGrant {
+                invocations.legacyCalls += 1
+                error("legacy support create invoked")
+            }
+        }
 
     @Bean
-    fun legacyRevokeSupportGrant(): RevokeSupportAccessGrantUseCase = mock(RevokeSupportAccessGrantUseCase::class.java)
+    fun legacyRevokeSupportGrant(invocations: PlatformAdminSupportCommandInvocations): RevokeSupportAccessGrantUseCase =
+        object : RevokeSupportAccessGrantUseCase {
+            override fun revokeSupportAccessGrant(
+                admin: CurrentPlatformAdmin,
+                grantId: UUID,
+            ) {
+                invocations.legacyCalls += 1
+                error("legacy support revoke invoked")
+            }
+        }
+
+    @Bean
+    fun legacyListSupportGrant(): com.readmates.club.application.port.`in`.ListSupportAccessGrantsUseCase =
+        mock(com.readmates.club.application.port.`in`.ListSupportAccessGrantsUseCase::class.java)
 
     @Bean
     fun previewSupportCommand(invocations: PlatformAdminSupportCommandInvocations): PreviewSupportGrantCommandUseCase =

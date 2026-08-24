@@ -1,13 +1,15 @@
 package com.readmates.club.adapter.`in`.web
 
-import com.readmates.club.application.model.CreateSupportAccessGrantCommand
+import com.readmates.club.application.PlatformAdminError
+import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.SupportAccessGrant
-import com.readmates.club.application.port.`in`.CreateSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ListSupportAccessGrantsUseCase
-import com.readmates.club.application.port.`in`.RevokeSupportAccessGrantUseCase
 import com.readmates.club.domain.SupportAccessGrantScope
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformCapability
+import com.readmates.shared.security.toPlatformActor
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
@@ -23,37 +25,20 @@ import java.util.UUID
 @RestController
 @RequestMapping("/api/admin/support-access-grants")
 class SupportAccessGrantController(
-    private val createUseCase: CreateSupportAccessGrantUseCase,
-    private val revokeUseCase: RevokeSupportAccessGrantUseCase,
     private val listUseCase: ListSupportAccessGrantsUseCase,
 ) {
     @PostMapping
     fun create(
         admin: CurrentPlatformAdmin,
         @RequestBody request: CreateSupportAccessGrantRequest,
-    ): SupportAccessGrantResponse =
-        SupportAccessGrantResponse.from(
-            createUseCase.createSupportAccessGrant(
-                admin = admin,
-                command =
-                    CreateSupportAccessGrantCommand(
-                        clubId = request.clubId,
-                        granteeUserId = request.granteeUserId,
-                        scope = request.scope,
-                        reason = request.reason,
-                        expiresAt = request.expiresAt,
-                    ),
-            ),
-        )
+    ): Nothing = requireSafeConfirmation(admin)
 
     @DeleteMapping("/{grantId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     fun revoke(
         admin: CurrentPlatformAdmin,
         @PathVariable grantId: UUID,
-    ) {
-        revokeUseCase.revokeSupportAccessGrant(admin = admin, grantId = grantId)
-    }
+    ): Nothing = requireSafeConfirmation(admin)
 
     @GetMapping
     fun list(
@@ -66,6 +51,16 @@ class SupportAccessGrantController(
             granteeUserId != null -> listUseCase.listByGrantee(admin, granteeUserId)
             else -> emptyList()
         }.map(SupportAccessGrantResponse::from)
+}
+
+internal fun requireSafeConfirmation(admin: CurrentPlatformAdmin): Nothing {
+    if (PlatformCapability.MANAGE_SUPPORT_ACCESS !in admin.toPlatformActor().capabilities) {
+        throw AccessDeniedException("Platform admin role cannot manage support access grants")
+    }
+    throw PlatformAdminException(
+        PlatformAdminError.SAFE_CONFIRM_REQUIRED,
+        "Support access changes require preview and confirmation",
+    )
 }
 
 data class CreateSupportAccessGrantRequest(

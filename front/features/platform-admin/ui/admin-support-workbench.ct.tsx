@@ -1,104 +1,101 @@
 import { expect, test } from "@playwright/experimental-ct-react";
-import type { Locator } from "@playwright/test";
 import { AdminSupportWorkbench, type AdminSupportWorkbenchProps } from "./admin-support-workbench";
 
 test.use({ timezoneId: "UTC" });
 
-const sizeOf = (locator: Locator) =>
-  locator.evaluate((element) => Number.parseFloat(getComputedStyle(element).fontSize));
-
+const noop = () => undefined;
 const selectedSupportProps: AdminSupportWorkbenchProps = {
-  clubs: [
-    { clubId: "00000000-0000-0000-0000-000000000001", name: "읽는사이" },
-    { clubId: "00000000-0000-0000-0000-000000000002", name: "밤의 독서실" },
-  ],
-  selectedClubId: "00000000-0000-0000-0000-000000000001",
-  query: "지원 대상",
-  results: [
-    {
-      subjectId: "00000000-0000-0000-0000-00000000a001",
+  clubs: [{ clubId: "club-1", name: "읽는사이" }],
+  selectedClubId: "club-1",
+  status: "ACTIVE",
+  canManage: true,
+  latestReceipt: null,
+  search: {
+    query: "지원 대상",
+    results: [],
+    selected: {
+      subjectId: "subject-1",
       displayName: "지원 대상",
       maskedEmail: "su***@example.com",
       kind: "USER",
       platformAdminRole: null,
       platformAdminStatus: null,
-      clubMembershipSummary: [
-        {
-          clubId: "00000000-0000-0000-0000-000000000001",
-          clubName: "읽는사이",
-          role: "HOST",
-          status: "ACTIVE",
-        },
-      ],
+      clubMembershipSummary: [],
       grantEligible: true,
       grantBlockedReason: null,
     },
-  ],
-  selectedResult: {
-    subjectId: "00000000-0000-0000-0000-00000000a001",
-    displayName: "지원 대상",
-    maskedEmail: "su***@example.com",
-    kind: "USER",
-    platformAdminRole: null,
-    platformAdminStatus: null,
-    clubMembershipSummary: [
-      {
-        clubId: "00000000-0000-0000-0000-000000000001",
-        clubName: "읽는사이",
-        role: "HOST",
-        status: "ACTIVE",
-      },
-    ],
-    grantEligible: true,
-    grantBlockedReason: null,
+    hasSearched: true,
+    pending: false,
+    error: null,
+    onQueryChange: noop,
+    onSubmit: noop,
+    onSelect: noop,
+    onClear: noop,
   },
-  hasSearched: true,
-  ledger: [
-    {
-      grantId: "00000000-0000-0000-0000-00000000b001",
-      clubId: "00000000-0000-0000-0000-000000000001",
+  create: {
+    reasonCategory: "MEMBER_ASSISTANCE",
+    note: "",
+    expiresAt: "2026-08-25T12:00",
+    preview: null,
+    receipt: null,
+    recovery: null,
+    previewPending: false,
+    confirmPending: false,
+    outcomeUnknown: false,
+    onReasonCategoryChange: noop,
+    onNoteChange: noop,
+    onExpiresAtChange: noop,
+    onPreview: noop,
+    onConfirm: noop,
+    onReset: noop,
+  },
+  ledger: {
+    items: [{
+      grantId: "grant-1",
+      clubId: "club-1",
       clubName: "읽는사이",
-      granteeUserId: "00000000-0000-0000-0000-00000000a001",
       granteeDisplayName: "지원 대상",
       granteeMaskedEmail: "su***@example.com",
       scope: "HOST_SUPPORT_READ",
-      reason: "고객 문의 재현 지원",
-      expiresAt: "2026-06-25T12:00:00Z",
-      createdAt: "2026-06-25T09:00:00Z",
+      reasonCategory: "MEMBER_ASSISTANCE",
+      notePresent: true,
+      expiresAt: "2026-08-25T12:00:00Z",
+      createdAt: "2026-08-25T10:00:00Z",
       revokedAt: null,
       status: "ACTIVE",
       createdByRole: "OWNER",
-    },
-  ],
-  reason: "고객 문의 재현 지원",
-  expiresAt: "2026-06-25T18:00",
-  busy: false,
-  error: null,
-  canCreateGrant: true,
-  onQueryChange: () => undefined,
-  onSearch: async () => undefined,
-  onSelectResult: () => undefined,
-  onClubChange: () => undefined,
-  onReasonChange: () => undefined,
-  onExpiresAtChange: () => undefined,
-  onCreateGrant: async () => undefined,
-  onRevokeGrant: async () => undefined,
+    }],
+    pending: false,
+    error: null,
+    nextPageError: false,
+    hasNextPage: false,
+    loadingMore: false,
+    onRetry: noop,
+    onLoadMore: noop,
+  },
+  revoke: {
+    target: null,
+    reasonCategory: "MEMBER_ASSISTANCE",
+    note: "",
+    preview: null,
+    receipt: null,
+    recovery: null,
+    previewPending: false,
+    confirmPending: false,
+    outcomeUnknown: false,
+    onStart: noop,
+    onCancel: noop,
+    onReasonCategoryChange: noop,
+    onNoteChange: noop,
+    onPreview: noop,
+    onConfirm: noop,
+  },
+  onClubChange: noop,
+  onStatusChange: noop,
 };
 
-test("AdminSupportWorkbench renders selected support grant risk review", async ({ mount, page }) => {
-  await page.clock.setFixedTime(new Date("2026-06-25T09:30:00Z"));
-
-  const component = await mount(
-    <div style={{ width: 480 }}>
-      <AdminSupportWorkbench {...selectedSupportProps} />
-    </div>,
-  );
-
-  await expect(component.getByText("지원 접근 권한을 발급할 준비가 되었습니다.")).toBeVisible();
-  await expect(component.getByRole("button", { name: "발급" })).toBeEnabled();
-  expect(await sizeOf(component.locator(".label").first())).toBeGreaterThanOrEqual(14);
-  expect(await sizeOf(component.locator(".admin-support-workbench__results em").first())).toBeGreaterThanOrEqual(14);
-  expect(await sizeOf(component.locator(".admin-support-workbench__ledger-row .small").first())).toBeGreaterThanOrEqual(14);
-  expect(await sizeOf(component.getByRole("button", { name: "발급" }))).toBeGreaterThanOrEqual(14);
-  await expect(component).toHaveScreenshot("admin-support-workbench-selected.png");
+test("AdminSupportWorkbench remains operable at a narrow width", async ({ mount }) => {
+  const component = await mount(<div style={{ width: 320 }}><AdminSupportWorkbench {...selectedSupportProps} /></div>);
+  await expect(component.getByRole("button", { name: "발급 검토" })).toBeVisible();
+  await expect(component.getByRole("button", { name: "권한 취소 검토" })).toBeVisible();
 });
