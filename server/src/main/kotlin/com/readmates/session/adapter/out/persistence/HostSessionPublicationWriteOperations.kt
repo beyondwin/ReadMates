@@ -35,24 +35,24 @@ internal class HostSessionPublicationWriteOperations(
         val compatibility = policy.compatibility(exposure, locked.state)
         val changes =
             HostPublicationSemanticChanges(
-                exposure = exposure.accessScope != locked.exposure.accessScope,
-                sessionProjection = compatibility.sessionVisibility != locked.sessionVisibility,
-                publication =
+                access = exposure.accessScope != locked.exposure.accessScope,
+                placement = exposure.siteVisibility != locked.exposure.siteVisibility,
+                summary = !locked.publicationExists || command.publicSummary != locked.publicSummary,
+                sessionCompatibility = compatibility.sessionVisibility != locked.sessionVisibility,
+                publicationCompatibility =
                     !locked.publicationExists ||
-                        command.publicSummary != locked.publicSummary ||
-                        exposure.siteVisibility != locked.exposure.siteVisibility ||
                         compatibility.publicationVisibility != locked.publicationVisibility ||
                         compatibility.isPublic != locked.publicationIsPublic,
             )
-        if (changes.exposure || changes.sessionProjection) {
+        if (changes.changed) {
             updateSessionExposure(
                 command,
                 exposure.accessScope.name,
                 compatibility.sessionVisibility,
-                bumpExposureRevision = changes.exposure,
+                bumpExposureRevision = changes.access,
             )
         }
-        if (changes.publication) {
+        if (changes.publicationWrite) {
             upsertPublication(
                 command,
                 exposure.siteVisibility.name,
@@ -70,9 +70,9 @@ internal class HostSessionPublicationWriteOperations(
                     accessScope = exposure.accessScope,
                     siteVisibility = exposure.siteVisibility,
                 ),
-            exposureChanged = changes.exposure,
+            exposureChanged = changes.access,
             publicationChanged = changes.publication,
-            compatibilityChanged = changes.sessionProjection,
+            compatibilityChanged = changes.compatibilityOnly,
         )
     }
 
@@ -119,7 +119,7 @@ internal class HostSessionPublicationWriteOperations(
             set access_scope = ?,
                 visibility = ?,
                 exposure_revision = exposure_revision + ?,
-                updated_at = utc_timestamp(6)
+                updated_at = greatest(utc_timestamp(6), timestampadd(microsecond, 1, updated_at))
             where id = ?
               and club_id = ?
               and deleted_at is null
@@ -166,7 +166,15 @@ internal class HostSessionPublicationWriteOperations(
 }
 
 private data class HostPublicationSemanticChanges(
-    val exposure: Boolean,
-    val sessionProjection: Boolean,
-    val publication: Boolean,
-)
+    val access: Boolean,
+    val placement: Boolean,
+    val summary: Boolean,
+    val sessionCompatibility: Boolean,
+    val publicationCompatibility: Boolean,
+) {
+    val publication: Boolean = placement || summary
+    val compatibilityOnly: Boolean =
+        !access && !publication && (sessionCompatibility || publicationCompatibility)
+    val publicationWrite: Boolean = publication || publicationCompatibility
+    val changed: Boolean = access || publication || sessionCompatibility || publicationCompatibility
+}

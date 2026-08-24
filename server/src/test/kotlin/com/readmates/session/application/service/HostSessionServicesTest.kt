@@ -401,6 +401,70 @@ class HostSessionServicesTest {
     }
 
     @Test
+    fun `actual legacy placement change evicts cache and bumps record epoch exactly once`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityExposureChanged = false
+                visibilityPublicationChanged = true
+                visibilityCompatibilityChanged = false
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                visibility = SessionRecordVisibility.PUBLIC,
+            ),
+        )
+
+        assertThat(invalidation.clubs).containsExactly(host.clubId)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
+    fun `legacy visibility compatibility repair evicts cache and bumps record epoch exactly once`() {
+        val port =
+            RecordingHostSessionPorts().apply {
+                visibilityExposureChanged = false
+                visibilityPublicationChanged = false
+                visibilityCompatibilityChanged = true
+            }
+        val invalidation = RecordingReadCacheInvalidationPort()
+        val epochs = RecordingAttendanceEpochPort()
+        val service =
+            HostSessionLifecycleService(
+                port,
+                port,
+                port,
+                TestApplySessionRecordUseCaseStub,
+                invalidation,
+                epochPort = epochs,
+            )
+
+        service.updateVisibility(
+            UpdateHostSessionVisibilityCommand(
+                host = host,
+                sessionId = sessionId,
+                visibility = SessionRecordVisibility.MEMBER,
+            ),
+        )
+
+        assertThat(invalidation.clubs).containsExactly(host.clubId)
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.RECORD))
+    }
+
+    @Test
     fun `service delegates open transition`() {
         val port = RecordingHostSessionPorts()
         val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
@@ -1776,6 +1840,7 @@ class HostSessionServicesTest {
         var visibilityUpdateCount = 0
         var visibilityLockCount = 0
         var visibilityExposureChanged = true
+        var visibilityPublicationChanged = false
         var visibilityCompatibilityChanged = false
         val basicSnapshots = ArrayDeque<HostSessionBasicAuditSnapshot>()
         var basicAuditBefore: HostSessionBasicAuditSnapshot? = null
@@ -1926,6 +1991,7 @@ class HostSessionServicesTest {
                         bookTitle = visibilityBookTitle,
                     ),
                 exposureChanged = visibilityExposureChanged,
+                publicationChanged = visibilityPublicationChanged,
                 compatibilityChanged = visibilityCompatibilityChanged,
             )
         }

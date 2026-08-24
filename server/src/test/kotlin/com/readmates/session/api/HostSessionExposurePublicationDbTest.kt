@@ -158,6 +158,7 @@ class HostSessionExposurePublicationDbTest(
             summary = "semantic summary",
         )
         val first = versions(sessionId)
+        val firstUpdatedAt = sessionUpdatedAt(sessionId)
         assertThat(first.exposure).isEqualTo(initial.exposure)
         assertThat(first.publication).isEqualTo(initial.publication + 1)
         assertThat(recordEpoch()).isEqualTo(epochBeforeFirst + 1)
@@ -175,6 +176,7 @@ class HostSessionExposurePublicationDbTest(
         )
         val afterNoop = versions(sessionId)
         assertThat(afterNoop).isEqualTo(first)
+        assertThat(sessionUpdatedAt(sessionId)).isEqualTo(firstUpdatedAt)
         assertThat(recordEpoch()).isEqualTo(epochBeforeNoop)
         assertThat(operationReceiptCount(sessionId, "SESSION_PUBLICATION")).isEqualTo(receiptsBeforeNoop + 1)
 
@@ -204,6 +206,116 @@ class HostSessionExposurePublicationDbTest(
         assertThat(afterSiteChange.exposure).isEqualTo(first.exposure)
         assertThat(afterSiteChange.publication).isEqualTo(first.publication + 1)
         assertThat(recordEpoch()).isEqualTo(epochBeforeNoop + 1)
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `legacy visibility classifies placement changes and compatibility repairs without counterfeit revisions`() {
+        val closedSession = closedGuestReadableSession("legacy placement classification")
+        placePublicRecord(closedSession, "legacy placement summary", "key-legacy-placement-setup-01")
+        saveRecordDraft(closedSession, "legacy placement reviewed", "MEMBER")
+        val beforeHide = versions(closedSession)
+        val beforeHideUpdatedAt = sessionUpdatedAt(closedSession)
+        val beforeHideEpoch = recordEpoch()
+        val beforeHideAudit = changeAuditCount(closedSession)
+
+        patchLegacyVisibility(closedSession, "MEMBER")
+
+        val hidden = versions(closedSession)
+        val hiddenUpdatedAt = sessionUpdatedAt(closedSession)
+        assertThat(hidden.exposure).isEqualTo(beforeHide.exposure)
+        assertThat(hidden.publication).isEqualTo(beforeHide.publication + 1)
+        assertThat(hiddenUpdatedAt).isAfter(beforeHideUpdatedAt)
+        assertThat(recordEpoch()).isEqualTo(beforeHideEpoch + 1)
+        assertThat(changeAuditCount(closedSession)).isEqualTo(beforeHideAudit)
+        assertThat(recordEditorDraftStale(closedSession)).isTrue()
+        assertExposure(closedSession, "GUEST_READABLE", "MEMBER", "HIDDEN", "MEMBER", false, "legacy placement summary")
+
+        patchLegacyVisibility(closedSession, "MEMBER")
+
+        assertThat(versions(closedSession)).isEqualTo(hidden)
+        assertThat(sessionUpdatedAt(closedSession)).isEqualTo(hiddenUpdatedAt)
+        assertThat(recordEpoch()).isEqualTo(beforeHideEpoch + 1)
+        assertThat(changeAuditCount(closedSession)).isEqualTo(beforeHideAudit)
+
+        patchLegacyVisibility(closedSession, "PUBLIC")
+
+        val publicAgain = versions(closedSession)
+        assertThat(publicAgain.exposure).isEqualTo(hidden.exposure)
+        assertThat(publicAgain.publication).isEqualTo(hidden.publication + 1)
+        assertThat(sessionUpdatedAt(closedSession)).isAfter(hiddenUpdatedAt)
+        assertThat(recordEpoch()).isEqualTo(beforeHideEpoch + 2)
+        assertExposure(
+            closedSession,
+            "GUEST_READABLE",
+            "PUBLIC",
+            "PUBLIC_RECORD",
+            "PUBLIC",
+            true,
+            "legacy placement summary",
+        )
+
+        val publishedSession = publishedSessionWithInitialRecord()
+        val publishedBefore = versions(publishedSession)
+        val publishedUpdatedAt = sessionUpdatedAt(publishedSession)
+        val publishedEpoch = recordEpoch()
+
+        patchLegacyVisibility(publishedSession, "MEMBER")
+
+        assertThat(versions(publishedSession).publication).isEqualTo(publishedBefore.publication + 1)
+        assertThat(sessionUpdatedAt(publishedSession)).isAfter(publishedUpdatedAt)
+        assertThat(recordEpoch()).isEqualTo(publishedEpoch + 1)
+    }
+
+    @Test
+    fun `legacy visibility compatibility repair signals once without domain revision bumps`() {
+        val sessionId = closedGuestReadableSession("legacy compatibility repair")
+        putPublication(
+            sessionId = sessionId,
+            key = "key-legacy-compat-setup-01",
+            expectedExposure = exposureRevision(sessionId),
+            expectedPublication = publicationRevision(sessionId),
+            accessScope = "GUEST_READABLE",
+            siteVisibility = "HIDDEN",
+            summary = "legacy compatibility repair summary",
+        )
+        val canonical = versions(sessionId)
+        jdbcTemplate.update("update sessions set visibility = 'PUBLIC' where id = ?", sessionId)
+        jdbcTemplate.update(
+            """
+            update public_session_publications
+            set visibility = 'PUBLIC', is_public = true, published_at = utc_timestamp(6)
+            where session_id = ?
+            """.trimIndent(),
+            sessionId,
+        )
+        val beforeRepairAt = sessionUpdatedAt(sessionId)
+        val beforeRepairEpoch = recordEpoch()
+        val beforeRepairAudit = changeAuditCount(sessionId)
+
+        patchLegacyVisibility(sessionId, "MEMBER")
+
+        val repairedAt = sessionUpdatedAt(sessionId)
+        assertThat(versions(sessionId)).isEqualTo(canonical)
+        assertThat(repairedAt).isAfter(beforeRepairAt)
+        assertThat(recordEpoch()).isEqualTo(beforeRepairEpoch + 1)
+        assertThat(changeAuditCount(sessionId)).isEqualTo(beforeRepairAudit)
+        assertExposure(
+            sessionId,
+            "GUEST_READABLE",
+            "MEMBER",
+            "HIDDEN",
+            "MEMBER",
+            false,
+            "legacy compatibility repair summary",
+        )
+
+        patchLegacyVisibility(sessionId, "MEMBER")
+
+        assertThat(versions(sessionId)).isEqualTo(canonical)
+        assertThat(sessionUpdatedAt(sessionId)).isEqualTo(repairedAt)
+        assertThat(recordEpoch()).isEqualTo(beforeRepairEpoch + 1)
+        assertThat(changeAuditCount(sessionId)).isEqualTo(beforeRepairAudit)
     }
 
     @Test
@@ -840,6 +952,29 @@ class HostSessionExposurePublicationDbTest(
             }.andExpect { status { isOk() } }
     }
 
+    private fun patchLegacyVisibility(
+        sessionId: String,
+        visibility: String,
+    ) {
+        mockMvc
+            .patch("/api/host/sessions/$sessionId/visibility") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"visibility":"$visibility"}"""
+            }.andExpect { status { isOk() } }
+    }
+
+    private fun recordEditorDraftStale(sessionId: String): Boolean =
+        mockMvc
+            .get("/api/host/sessions/$sessionId/record-editor") {
+                withHost()
+            }.andExpect { status { isOk() } }
+            .andReturn()
+            .response.contentAsString
+            .let(jsonMapper::readTree)
+            .get("draftLiveBaseStale")
+            .asBoolean()
+
     private fun publishVector(versions: Versions): String =
         """
         {"sessionRevision":${versions.session},"liveRecordRevision":${versions.live},
@@ -904,6 +1039,13 @@ class HostSessionExposurePublicationDbTest(
             java.time.LocalDateTime::class.java,
             sessionId,
         ) ?: error("missing session updated_at")
+
+    private fun changeAuditCount(sessionId: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from host_session_change_audit where session_id = ?",
+            Int::class.java,
+            sessionId,
+        ) ?: 0
 
     private fun hostDisplayName(): String =
         jdbcTemplate.queryForObject(

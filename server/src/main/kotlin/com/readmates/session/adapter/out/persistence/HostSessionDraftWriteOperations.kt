@@ -53,85 +53,133 @@ internal class HostSessionDraftWriteOperations(
         }
         val exposure = policy.visibilityExposure(command, locked)
         val compatibility = policy.compatibility(exposure, locked.state)
-        val exposureChanged = exposure.accessScope != locked.exposure.accessScope
-        val sessionProjectionChanged = compatibility.sessionVisibility != locked.sessionVisibility
-        val publicationProjectionChanged =
-            locked.publicationExists &&
-                (
-                    exposure.siteVisibility != locked.exposure.siteVisibility ||
-                        compatibility.publicationVisibility != locked.publicationVisibility ||
-                        compatibility.isPublic != locked.publicationIsPublic
-                )
-        if (exposureChanged || sessionProjectionChanged) {
-            val expectedExposure = command.expectedExposureRevision
-            val updated =
-                if (expectedExposure == null) {
-                    jdbcTemplate.update(
-                        """
-                        update sessions
-                        set access_scope = ?,
-                            visibility = ?,
-                            exposure_revision = exposure_revision + ?,
-                            updated_at = utc_timestamp(6)
-                        where id = ?
-                          and club_id = ?
-                          and deleted_at is null
-                        """.trimIndent(),
-                        exposure.accessScope.name,
-                        compatibility.sessionVisibility,
-                        if (exposureChanged) 1 else 0,
-                        command.sessionId.dbString(),
-                        command.host.clubId.dbString(),
-                    )
-                } else {
-                    jdbcTemplate.update(
-                        """
-                        update sessions
-                        set access_scope = ?,
-                            visibility = ?,
-                            exposure_revision = exposure_revision + ?,
-                            updated_at = utc_timestamp(6)
-                        where id = ?
-                          and club_id = ?
-                          and deleted_at is null
-                          and exposure_revision = ?
-                        """.trimIndent(),
-                        exposure.accessScope.name,
-                        compatibility.sessionVisibility,
-                        if (exposureChanged) 1 else 0,
-                        command.sessionId.dbString(),
-                        command.host.clubId.dbString(),
-                        expectedExposure,
-                    )
-                }
-            queries.throwIfStale(updated, command.host, command.sessionId)
+        val changes =
+            HostVisibilitySemanticChanges(
+                access = exposure.accessScope != locked.exposure.accessScope,
+                placement =
+                    locked.publicationExists &&
+                        exposure.siteVisibility != locked.exposure.siteVisibility,
+                sessionCompatibility = compatibility.sessionVisibility != locked.sessionVisibility,
+                publicationCompatibility =
+                    locked.publicationExists &&
+                        (
+                            compatibility.publicationVisibility != locked.publicationVisibility ||
+                                compatibility.isPublic != locked.publicationIsPublic
+                        ),
+            )
+        if (changes.changed) {
+            updateSessionExposure(
+                command,
+                exposure.accessScope.name,
+                compatibility.sessionVisibility,
+                changes.access,
+            )
         }
-        if (publicationProjectionChanged) {
-            jdbcTemplate.update(
-                """
-                update public_session_publications
-                set site_visibility = ?,
-                    visibility = ?,
-                    is_public = ?,
-                    published_at = case when ? then coalesce(published_at, utc_timestamp(6)) else null end,
-                    updated_at = utc_timestamp(6)
-                where session_id = ?
-                  and club_id = ?
-                """.trimIndent(),
+        if (changes.publicationWrite) {
+            updatePublicationProjection(
+                command,
                 exposure.siteVisibility.name,
                 compatibility.publicationVisibility,
                 compatibility.isPublic,
-                compatibility.isPublic,
-                command.sessionId.dbString(),
-                command.host.clubId.dbString(),
             )
         }
+        if (changes.placement) bumpPublicationRevision(command)
         return HostSessionVisibilityUpdateResult(
             previousVisibility = SessionRecordVisibility.valueOf(locked.sessionVisibility),
             detail = queries.detail(command.host, command.sessionId),
-            exposureChanged = exposureChanged,
-            compatibilityChanged = sessionProjectionChanged || publicationProjectionChanged,
+            exposureChanged = changes.access,
+            publicationChanged = changes.placement,
+            compatibilityChanged = changes.compatibilityOnly,
         )
+    }
+
+    private fun updateSessionExposure(
+        command: UpdateHostSessionVisibilityCommand,
+        accessScope: String,
+        sessionVisibility: String,
+        bumpExposureRevision: Boolean,
+    ) {
+        val expectedExposure = command.expectedExposureRevision
+        val updated =
+            if (expectedExposure == null) {
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set access_scope = ?,
+                        visibility = ?,
+                        exposure_revision = exposure_revision + ?,
+                        updated_at = greatest(utc_timestamp(6), timestampadd(microsecond, 1, updated_at))
+                    where id = ?
+                      and club_id = ?
+                      and deleted_at is null
+                    """.trimIndent(),
+                    accessScope,
+                    sessionVisibility,
+                    if (bumpExposureRevision) 1 else 0,
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                )
+            } else {
+                jdbcTemplate.update(
+                    """
+                    update sessions
+                    set access_scope = ?,
+                        visibility = ?,
+                        exposure_revision = exposure_revision + ?,
+                        updated_at = greatest(utc_timestamp(6), timestampadd(microsecond, 1, updated_at))
+                    where id = ?
+                      and club_id = ?
+                      and deleted_at is null
+                      and exposure_revision = ?
+                    """.trimIndent(),
+                    accessScope,
+                    sessionVisibility,
+                    if (bumpExposureRevision) 1 else 0,
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                    expectedExposure,
+                )
+            }
+        queries.throwIfStale(updated, command.host, command.sessionId)
+    }
+
+    private fun updatePublicationProjection(
+        command: UpdateHostSessionVisibilityCommand,
+        siteVisibility: String,
+        publicationVisibility: String,
+        isPublic: Boolean,
+    ) {
+        jdbcTemplate.update(
+            """
+            update public_session_publications
+            set site_visibility = ?,
+                visibility = ?,
+                is_public = ?,
+                published_at = case when ? then coalesce(published_at, utc_timestamp(6)) else null end,
+                updated_at = utc_timestamp(6)
+            where session_id = ?
+              and club_id = ?
+            """.trimIndent(),
+            siteVisibility,
+            publicationVisibility,
+            isPublic,
+            isPublic,
+            command.sessionId.dbString(),
+            command.host.clubId.dbString(),
+        )
+    }
+
+    private fun bumpPublicationRevision(command: UpdateHostSessionVisibilityCommand) {
+        val bumped =
+            jdbcTemplate.update(
+                """
+                update session_publication_versions
+                set publication_revision = publication_revision + 1
+                where session_id = ?
+                """.trimIndent(),
+                command.sessionId.dbString(),
+            )
+        queries.throwIfStale(bumped, command.host, command.sessionId)
     }
 
     private fun insertDraft(
@@ -191,7 +239,7 @@ internal class HostSessionDraftWriteOperations(
                 meeting_passcode = case when ? then ? else meeting_passcode end,
                 question_deadline_at = ?,
                 session_revision = session_revision + 1,
-                updated_at = utc_timestamp(6)
+                updated_at = greatest(utc_timestamp(6), timestampadd(microsecond, 1, updated_at))
             where id = ? and club_id = ? and deleted_at is null and session_revision = ?
             """.trimIndent(),
             request.title,
@@ -251,4 +299,16 @@ internal class HostSessionDraftWriteOperations(
             accessScope = command.accessScope ?: SessionAccessScope.HOST_ONLY,
             siteVisibility = PublicSiteVisibility.HIDDEN,
         )
+}
+
+private data class HostVisibilitySemanticChanges(
+    val access: Boolean,
+    val placement: Boolean,
+    val sessionCompatibility: Boolean,
+    val publicationCompatibility: Boolean,
+) {
+    val compatibilityOnly: Boolean =
+        !access && !placement && (sessionCompatibility || publicationCompatibility)
+    val publicationWrite: Boolean = placement || publicationCompatibility
+    val changed: Boolean = access || placement || sessionCompatibility || publicationCompatibility
 }

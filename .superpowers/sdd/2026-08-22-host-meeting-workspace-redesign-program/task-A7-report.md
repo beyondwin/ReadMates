@@ -617,3 +617,73 @@ Excluded:
 - C1 convergence generation or attempts, BFF/CDN denial convergence, cache propagation SLA, deployment/runtime, OAuth/provider behavior, and browser UI redesign. A7 proves the origin transaction and signal only.
 
 Self-review confirms that participant-only timestamp movement cannot stale an unchanged five-component correction base; any correction-owned revision movement does stale it; v2 review cannot record a vector it did not validate under lock; legacy semantic no-ops cannot move timestamps/revisions/epochs; and schema-version changes cannot replay a weaker stored canonical identity. C1 remains the non-release boundary and retains exclusive ownership of V54.
+
+## Fix round 4: publication review timestamps and legacy visibility domain classification
+
+This round closes the remaining one Critical and one Important review findings without reopening the origin, receipt, migration, or C1 surfaces. It separates canonical access, canonical placement, and compatibility-only repairs at both publication write owners. No migration, frontend runtime contract, V53 shape, or reserved V54/C1 artifact changed.
+
+### Root cause and ADR impact
+
+- Publication summary/site-only writes advanced `publication_revision` but skipped the `sessions` row when access and session compatibility were unchanged. Browser v2 therefore compared an unchanged `liveSessionUpdatedAt` and could rebase a reviewed draft onto a publication vector it had never seen.
+- Legacy `/visibility` derived the correct V45 target exposure but grouped canonical `site_visibility` movement with legacy `visibility`/`is_public` projection repairs. The reader projection changed, but the publication domain revision did not.
+- ADR-0022 impact remains `update`: the V45 mapper is still authoritative and the three axes remain separate. MEMBER/PUBLIC compatibility input maps HIDDEN/PUBLIC_RECORD placement only where a publication row and lifecycle policy allow it.
+- ADR-0023 impact remains `update`: a real correction-owned summary/site/placement change advances the v2 legacy review timestamp and the exact publication revision. A compatibility-only repair advances only the conservative timestamp signal and reader epoch/cache signal, never exposure/publication revisions. No ADR status is promoted.
+- ADR-0028 and ADR-0033 are unchanged. Existing HMAC identities, application-service transaction ownership, receipt binding, and exact v3 vectors remain intact.
+
+### TDD RED evidence
+
+The first test compile failed because `HostSessionVisibilityUpdateResult` had no `publicationChanged` axis; the compatibility endpoint could not report a canonical placement mutation independently from access or repair.
+
+Two mutation checks then proved the regression tests exercise the missing production effects:
+
+- Removing publication-only `sessions.updated_at` advancement made `HostSessionRecordDraftRebaseControllerDbTest.v2 rebase review timestamp rejects summary and site changes then records refreshed exact vectors` fail 0/1: the old v2 timestamp was incorrectly accepted.
+- Removing the legacy visibility publication-revision bump made `HostSessionExposurePublicationDbTest.legacy visibility classifies placement changes and compatibility repairs without counterfeit revisions` fail 0/1 at the exact publication revision assertion.
+
+### Implementation
+
+- `HostSessionPublicationWriteOperations` now classifies access, placement, summary, session compatibility, and publication compatibility separately. Any actual publication-domain change bumps `publication_revision` and touches `sessions.updated_at` once; compatibility-only repair touches the legacy review timestamp and reader projection without counterfeiting a domain revision; exact repeats write nothing.
+- `HostSessionDraftWriteOperations` applies the same classification to `/visibility`. A real placement change updates the public row, bumps `publication_revision`, advances the monotonic legacy timestamp, and reports `publicationChanged`; compatibility-only `visibility`/`is_public` repair reports only `compatibilityChanged`. The application service therefore emits one record epoch and one cache invalidation for either real change or repair, and none for a repeat.
+- Correction-owned session timestamps use `greatest(utc_timestamp(6), timestampadd(microsecond, 1, updated_at))`, so an actual change cannot leave the v2 signal byte-identical even when two statements share a microsecond. Semantic no-ops still skip the statement entirely.
+- CLOSED and PUBLISHED integration coverage checks HIDDEN↔PUBLIC_RECORD placement, exposure/publication revisions, monotonic/no-op timestamps, one record epoch, unchanged unrelated change-audit count, exact draft staleness, compatibility repair, and true repeat no-op.
+
+### GREEN and regression evidence
+
+Current frontend contract, v2/v3 rebase, correction/publication/authorization, HMAC/idempotency, and migrations:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*FrontendZodSchemaContractTest*' --tests '*HostSessionRecordDraftRebaseControllerDbTest*' --tests '*HostSessionCorrectionSafetyDbTest*' --tests '*HostSessionExposurePublicationDbTest*' --tests '*HostSessionIdempotencyDbTest*' --tests '*MySqlFlywayMigrationTest*' --console=plain --no-parallel --max-workers=1
+```
+
+- PASS, 67/67: frontend Zod 14, v2/v3 rebase 4, correction safety 8, exposure/publication/auth 13, idempotency 10, Flyway 18.
+- V53/V54 remain unchanged. The refreshed v2 rebase records the exact session/live/exposure/publication vector it loaded; old summary-only and site-only timestamps fail typed `SESSION_RECORD_LIVE_STALE` with an unchanged draft.
+
+Notes/archive, ordinary import, A6/sessionrecord, HMAC adapter, and Redis/cache regression:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*ArchiveAndNotesDbTest*' --tests '*ArchiveControllerDbTest*' --tests '*HostSessionImportControllerDbTest*' --tests '*HostSessionRecordControllerDbTest*' --tests '*JdbcSessionRecordAdapterTest*' --tests '*JdbcMutationIdempotencyAdapterDbTest*' --tests '*RedisReadCacheInvalidationAdapterTest*' --tests '*RedisNotesReadCacheAdapterTest*' --tests '*RedisPublicReadCacheAdapterTest*' --console=plain --no-parallel --max-workers=1
+```
+
+- 102/103 passed. The only failure was the inherited order-sensitive `MutableClock` digest-key retirement case documented in round 3; its exact isolated rerun passed 1/1. Every Notes/archive/import/sessionrecord/Redis test passed.
+
+Final changed-surface verification:
+
+```bash
+./server/gradlew -p server integrationTest --tests '*HostSessionExposurePublicationDbTest*' --tests '*HostSessionCorrectionSafetyDbTest*' --tests '*HostSessionRecordDraftRebaseControllerDbTest*' unitTest --tests '*HostSessionServicesTest*' --tests '*SessionRecordDraftServiceTest*' architectureTest --tests '*ServerArchitectureBoundaryTest*' --console=plain --no-parallel --max-workers=1
+```
+
+- PASS: integration 25/25, unit 78/78, architecture 38/38.
+
+Full-lane and quality evidence:
+
+- Full unit executed 1,638 tests: 1,636 passed, 1 skipped, and the inherited `ActiveSessionProjectionArchitectureTest` failed.
+- Full architecture executed 97 tests: 96 passed, with the inherited `HostSessionQueryPort.listMode` default-runtime-failure finding.
+- `ktlintCheck` retains exactly the 13 inherited `CanonicalMeetingLanguageInventoryTest.kt` findings and no changed-file finding.
+- Detekt improves from the round-3/base 122 issues to 121 by removing the prior `HostSessionDraftWriteOperations.updateVisibility` long-method finding; no new changed-file issue remains.
+- `./scripts/server-ci-check.sh` reaches and fails at the inherited detekt gate with those 121 issues. It does not produce a false pass claim.
+- `git diff --check` passes.
+
+### Compatibility limitation and residual boundary
+
+The v2 contract intentionally remains conservative: participant-only operations may historically advance `sessions.updated_at`, so an old v2 timestamp can stale even though participants are outside the exact correction vector. The v3 exact session/live/exposure/publication vector does not false-stale for that participant-only timestamp movement; `SessionRecordDraftServiceTest` and `HostSessionCorrectionSafetyDbTest` retain this proof. This dual-support limitation is accepted for R2a and is not weakened by this round.
+
+C1 remains the non-release boundary. This round does not create convergence generations/attempts, claim BFF/CDN/cache propagation SLA, consume V54, or perform rollout/deployment/runtime mutation.

@@ -20,6 +20,7 @@ import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import tools.jackson.databind.JsonNode
 
 @SpringBootTest(
     properties = [
@@ -570,7 +571,7 @@ class HostSessionRecordControllerDbTest(
     }
 
     @Suppress("LongMethod")
-    private fun recordApplyState() =
+    private fun recordApplyState(): RecordApplyState =
         RecordApplyState(
             liveSession =
                 jdbcTemplate.queryForList(
@@ -758,6 +759,54 @@ class HostSessionRecordDraftRebaseControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
+    fun `v2 rebase review timestamp rejects summary and site changes then records refreshed exact vectors`() {
+        val reviewedSummary = loadEditor(PUBLICATION_REBASE_SESSION_ID, expectedStale = false)
+        saveInitialDraft(PUBLICATION_REBASE_SESSION_ID, reviewedSummary.get("liveSnapshot"))
+        val originalDraft = draftBaseFingerprint(PUBLICATION_REBASE_SESSION_ID)
+
+        putPublication(
+            sessionId = PUBLICATION_REBASE_SESSION_ID,
+            reviewed = reviewedSummary,
+            summary = "summary changed after v2 review",
+            siteVisibility = "HIDDEN",
+            key = "key-v2-summary-change-01",
+        )
+
+        rejectV2Rebase(PUBLICATION_REBASE_SESSION_ID, expectedDraftRevision = 1, reviewedSummary)
+        assertThat(draftBaseFingerprint(PUBLICATION_REBASE_SESSION_ID)).isEqualTo(originalDraft)
+        val refreshedSummary = loadEditor(PUBLICATION_REBASE_SESSION_ID, expectedStale = true)
+        rebaseV2(
+            PUBLICATION_REBASE_SESSION_ID,
+            expectedDraftRevision = 1,
+            refreshedSummary,
+            expectedDraftRevisionAfter = 2,
+        )
+        assertDraftBaseMatches(PUBLICATION_REBASE_SESSION_ID, refreshedSummary)
+
+        val reviewedSite = loadEditor(PUBLICATION_REBASE_SESSION_ID, expectedStale = false)
+        val summaryRebasedDraft = draftBaseFingerprint(PUBLICATION_REBASE_SESSION_ID)
+        putPublication(
+            sessionId = PUBLICATION_REBASE_SESSION_ID,
+            reviewed = reviewedSite,
+            summary = "summary changed after v2 review",
+            siteVisibility = "PUBLIC_RECORD",
+            key = "key-v2-site-change-01",
+        )
+
+        rejectV2Rebase(PUBLICATION_REBASE_SESSION_ID, expectedDraftRevision = 2, reviewedSite)
+        assertThat(draftBaseFingerprint(PUBLICATION_REBASE_SESSION_ID)).isEqualTo(summaryRebasedDraft)
+        val refreshedSite = loadEditor(PUBLICATION_REBASE_SESSION_ID, expectedStale = true)
+        rebaseV2(
+            PUBLICATION_REBASE_SESSION_ID,
+            expectedDraftRevision = 2,
+            refreshedSite,
+            expectedDraftRevisionAfter = 3,
+        )
+        assertDraftBaseMatches(PUBLICATION_REBASE_SESSION_ID, refreshedSite)
+    }
+
+    @Test
     fun `rebase rejects mixed legacy timestamp and exact revision bases`() {
         val initialEditor = loadEditor(expectedStale = false)
         saveInitialDraft(initialEditor.get("liveSnapshot"))
@@ -784,9 +833,14 @@ class HostSessionRecordDraftRebaseControllerDbTest(
             }
     }
 
-    private fun loadEditor(expectedStale: Boolean): tools.jackson.databind.JsonNode =
+    private fun loadEditor(expectedStale: Boolean): JsonNode = loadEditor(REBASE_SESSION_ID, expectedStale)
+
+    private fun loadEditor(
+        sessionId: String,
+        expectedStale: Boolean,
+    ): tools.jackson.databind.JsonNode =
         mockMvc
-            .get("/api/host/sessions/$REBASE_SESSION_ID/record-editor") {
+            .get("/api/host/sessions/$sessionId/record-editor") {
                 with(user("host@example.com"))
             }.andExpect {
                 status { isOk() }
@@ -800,8 +854,15 @@ class HostSessionRecordDraftRebaseControllerDbTest(
             .let(tools.jackson.databind.ObjectMapper()::readTree)
 
     private fun saveInitialDraft(snapshot: tools.jackson.databind.JsonNode) {
+        saveInitialDraft(REBASE_SESSION_ID, snapshot)
+    }
+
+    private fun saveInitialDraft(
+        sessionId: String,
+        snapshot: tools.jackson.databind.JsonNode,
+    ) {
         mockMvc
-            .patch("/api/host/sessions/$REBASE_SESSION_ID/record-draft") {
+            .patch("/api/host/sessions/$sessionId/record-draft") {
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
@@ -853,6 +914,102 @@ class HostSessionRecordDraftRebaseControllerDbTest(
             }
     }
 
+    private fun putPublication(
+        sessionId: String,
+        reviewed: tools.jackson.databind.JsonNode,
+        summary: String,
+        siteVisibility: String,
+        key: String,
+    ) {
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "idempotencyKey": "$key",
+                      "expected": {
+                        "publicationRevision": ${reviewed.get("livePublicationRevision").asLong()}
+                      },
+                      "command": {
+                        "publicSummary": "$summary",
+                        "siteVisibility": "$siteVisibility"
+                      }
+                    }
+                    """.trimIndent()
+            }.andExpect { status { isOk() } }
+    }
+
+    private fun rejectV2Rebase(
+        sessionId: String,
+        expectedDraftRevision: Long,
+        reviewed: tools.jackson.databind.JsonNode,
+    ) {
+        mockMvc
+            .post("/api/host/sessions/$sessionId/record-draft/rebase") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = v2RebaseJson(expectedDraftRevision, reviewed)
+            }.andExpect {
+                status { isConflict() }
+                jsonPath("$.code") { value("SESSION_RECORD_LIVE_STALE") }
+            }
+    }
+
+    private fun rebaseV2(
+        sessionId: String,
+        expectedDraftRevision: Long,
+        reviewed: tools.jackson.databind.JsonNode,
+        expectedDraftRevisionAfter: Long,
+    ) {
+        mockMvc
+            .post("/api/host/sessions/$sessionId/record-draft/rebase") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = v2RebaseJson(expectedDraftRevision, reviewed)
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.draftRevision") { value(expectedDraftRevisionAfter) }
+            }
+    }
+
+    private fun v2RebaseJson(
+        expectedDraftRevision: Long,
+        reviewed: tools.jackson.databind.JsonNode,
+    ) = """
+        {
+          "expectedDraftRevision": $expectedDraftRevision,
+          "expectedLiveRevision": ${reviewed.get("liveRevision").asLong()},
+          "expectedSessionUpdatedAt": "${reviewed.get("liveSessionUpdatedAt").asString()}"
+        }
+        """.trimIndent()
+
+    private fun draftBaseFingerprint(sessionId: String): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select base_live_revision, base_session_revision, base_exposure_revision,
+                   base_publication_revision, base_vector_known, base_session_updated_at, draft_revision
+            from session_record_drafts where session_id = ?
+            """.trimIndent(),
+            sessionId,
+        )
+
+    private fun assertDraftBaseMatches(
+        sessionId: String,
+        reviewed: tools.jackson.databind.JsonNode,
+    ) {
+        val base = draftBaseFingerprint(sessionId)
+        assertThat(base["base_live_revision"]).isEqualTo(reviewed.get("liveRevision").asLong())
+        assertThat(base["base_session_revision"]).isEqualTo(reviewed.get("liveSessionRevision").asLong())
+        assertThat(base["base_exposure_revision"]).isEqualTo(reviewed.get("liveExposureRevision").asLong())
+        assertThat(base["base_publication_revision"]).isEqualTo(reviewed.get("livePublicationRevision").asLong())
+        assertThat(base["base_vector_known"]).isEqualTo(true)
+    }
+
     private fun rebaseJson(
         expectedDraftRevision: Long,
         reviewed: tools.jackson.databind.JsonNode,
@@ -868,6 +1025,7 @@ class HostSessionRecordDraftRebaseControllerDbTest(
 
     private companion object {
         const val REBASE_SESSION_ID = "00000000-0000-0000-0000-000000000301"
+        const val PUBLICATION_REBASE_SESSION_ID = "00000000-0000-0000-0000-000000099302"
     }
 }
 
@@ -905,11 +1063,28 @@ private const val CLEAN_RECORD_API_FIXTURES = """
     delete from session_record_apply_receipts
     where session_id = '00000000-0000-0000-0000-000000000301';
     delete from session_record_drafts
-    where session_id = '00000000-0000-0000-0000-000000000301';
+    where session_id in (
+      '00000000-0000-0000-0000-000000000301',
+      '00000000-0000-0000-0000-000000099302'
+    );
     delete from session_record_revisions
-    where session_id = '00000000-0000-0000-0000-000000000301';
+    where session_id in (
+      '00000000-0000-0000-0000-000000000301',
+      '00000000-0000-0000-0000-000000099302'
+    );
+    delete from mutation_idempotency_keys
+    where resource_slot = '00000000-0000-0000-0000-000000099302';
+    delete from host_session_mutation_receipts
+    where resource_id = '00000000-0000-0000-0000-000000099302';
+    delete from public_session_publications
+    where session_id = '00000000-0000-0000-0000-000000099302';
+    delete from session_publication_versions
+    where session_id = '00000000-0000-0000-0000-000000099302';
     delete from sessions
-    where id = '00000000-0000-0000-0000-000000099301';
+    where id in (
+      '00000000-0000-0000-0000-000000099301',
+      '00000000-0000-0000-0000-000000099302'
+    );
 """
 
 private const val RESET_RECORD_API_FIXTURES = """
@@ -931,5 +1106,38 @@ private const val RESET_RECORD_API_FIXTURES = """
       '2026-12-22 12:00:00',
       'DRAFT',
       'HOST_ONLY'
+    );
+    insert into sessions (
+      id, club_id, number, title, book_title, book_author, session_date,
+      start_time, end_time, location_label, question_deadline_at, state, visibility,
+      access_scope
+    ) values (
+      '00000000-0000-0000-0000-000000099302',
+      '00000000-0000-0000-0000-000000000001',
+      100,
+      'Publication rebase session',
+      'Publication review book',
+      'Example author',
+      '2026-12-24',
+      '19:00:00',
+      '21:00:00',
+      'Online',
+      '2026-12-23 12:00:00',
+      'PUBLISHED',
+      'MEMBER',
+      'GUEST_READABLE'
+    );
+    insert into session_publication_versions (session_id, publication_revision)
+    values ('00000000-0000-0000-0000-000000099302', 0);
+    insert into public_session_publications (
+      id, club_id, session_id, public_summary, is_public, visibility, site_visibility
+    ) values (
+      '00000000-0000-0000-0000-000000099502',
+      '00000000-0000-0000-0000-000000000001',
+      '00000000-0000-0000-0000-000000099302',
+      'Publication review summary',
+      false,
+      'MEMBER',
+      'HIDDEN'
     );
 """
