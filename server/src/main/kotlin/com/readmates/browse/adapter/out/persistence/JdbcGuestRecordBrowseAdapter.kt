@@ -297,7 +297,6 @@ class JdbcGuestRecordBrowseAdapter(
             join clubs on clubs.id = sessions.club_id
             left join public_session_publications publication on publication.session_id = sessions.id
               and publication.club_id = sessions.club_id
-              and publication.site_visibility = 'PUBLIC_RECORD'
             left join public_projection_generations generation on generation.publication_id = publication.id
               and generation.club_id = sessions.club_id
               and generation.session_id = sessions.id
@@ -320,6 +319,7 @@ class JdbcGuestRecordBrowseAdapter(
                 or (
                   sessions.state = 'PUBLISHED'
                   and publication.id is not null
+                  and publication.site_visibility = 'PUBLIC_RECORD'
                   and generation.publication_id is not null
                   and generation.origin_readable = true
                   and generation.emergency_denied = false
@@ -345,7 +345,11 @@ class JdbcGuestRecordBrowseAdapter(
                     select
                       sessions.id, sessions.number, sessions.title, sessions.book_title, sessions.book_author,
                       sessions.book_image_url, date_format(sessions.session_date, '%Y-%m-%d') as session_date,
-                      sessions.state, publication.public_summary,
+                      sessions.state,
+                      case when publication.site_visibility = 'PUBLIC_RECORD'
+                        then publication.public_summary
+                        else null
+                      end as public_summary,
                       (select count(*) from session_participants
                        where session_participants.session_id = sessions.id
                          and session_participants.club_id = sessions.club_id
@@ -359,7 +363,6 @@ class JdbcGuestRecordBrowseAdapter(
                     join clubs on clubs.id = sessions.club_id
                     left join public_session_publications publication on publication.session_id = sessions.id
                       and publication.club_id = sessions.club_id
-                      and publication.site_visibility = 'PUBLIC_RECORD'
                     left join public_projection_generations generation
                       on generation.publication_id = publication.id
                      and generation.club_id = sessions.club_id
@@ -384,6 +387,7 @@ class JdbcGuestRecordBrowseAdapter(
                         or (
                           sessions.state = 'PUBLISHED'
                           and publication.id is not null
+                          and publication.site_visibility = 'PUBLIC_RECORD'
                           and generation.publication_id is not null
                           and generation.origin_readable = true
                           and generation.emergency_denied = false

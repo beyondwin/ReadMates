@@ -8,6 +8,8 @@ import com.readmates.sessionrecord.application.port.out.AppliedSessionRecordPubl
 import com.readmates.sessionrecord.application.port.out.SessionRecordPublicProjectionPort
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.hamcrest.Matchers.hasItem
+import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -238,6 +240,62 @@ class SessionRecordPublicProjectionDbTest(
         generation += 1
         assertEmergencyDenied(sessionId, generation)
         assertLatestHostConvergence(sessionId, "SESSION_PUBLICATION", generation, false)
+    }
+
+    @Test
+    fun `hidden publication remains denied in closed guest archive after unpublish`() {
+        val sessionId = publishedSessionWithInitialRecord()
+        val publicationId =
+            requiredString(
+                "select id from public_session_publications where session_id = ?",
+                sessionId,
+            )
+        val deniedGeneration =
+            publicTakedownWriter.denyOrigin(
+                PublicTakedownTarget(
+                    clubId = UUID.fromString(CLUB_ID),
+                    sessionId = UUID.fromString(sessionId),
+                    publicationId = UUID.fromString(publicationId),
+                    generation = publicGeneration(sessionId),
+                    originReadable = true,
+                    currentSurfaces = setOf("ORIGIN"),
+                ),
+            )
+        assertEmergencyDenied(sessionId, deniedGeneration)
+
+        writePublicationVisibility(sessionId, "HIDDEN", "key-denied-hidden-before-unpublish-01")
+        mockMvc
+            .post("/api/host/sessions/$sessionId/unpublish") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-denied-lifecycle-unpublish-01",
+                        """{"sessionRevision":${sessionRevision(sessionId)}}""",
+                        "{}",
+                    )
+            }.andExpect {
+                status { isOk() }
+                jsonPath("$.state") { value("CLOSED") }
+            }
+
+        assertThat(
+            requiredString(
+                "select site_visibility from public_session_publications where session_id = ?",
+                sessionId,
+            ),
+        ).isEqualTo("HIDDEN")
+        assertEmergencyDenied(sessionId, publicGeneration(sessionId))
+
+        mockMvc
+            .get("/api/public/clubs/reading-sai/browse/archive?limit=20")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.items[*].sessionId") { value(not(hasItem(sessionId))) }
+            }
+        mockMvc
+            .get("/api/public/clubs/reading-sai/browse/archive/$sessionId")
+            .andExpect { status { isNotFound() } }
     }
 
     private fun publishedSessionWithInitialRecord(): String {
