@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://readmates.example/schemas/host-client-rollout-evidence-v1.schema.json",
+  "title": "ReadMates host client rollout evidence v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "evidenceKind",
+    "gitSha",
+    "candidateId",
+    "backendDigest",
+    "pagesDigest",
+    "cacheSafetySourceSetDigest",
+    "producer",
+    "commands",
+    "cases",
+    "provenance",
+    "stage"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "host-client-rollout-evidence/v1"
+    },
+    "evidenceKind": {
+      "enum": ["cache-safety", "compatibility", "security"]
+    },
+    "gitSha": {
+      "$ref": "#/$defs/gitSha"
+    },
+    "candidateId": {
+      "type": "string",
+      "pattern": "^r2[ab]-[0-9a-f]{12}$",
+      "maxLength": 16
+    },
+    "backendDigest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "pagesDigest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "cacheSafetySourceSetDigest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "repository",
+        "workflowRef",
+        "sourceRef",
+        "runId",
+        "runAttempt",
+        "job"
+      ],
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$",
+          "maxLength": 160
+        },
+        "workflowRef": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+/\\.github/workflows/host-client-rollout-evidence\\.yml@refs/(heads/[A-Za-z0-9._/-]+|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$",
+          "maxLength": 320
+        },
+        "sourceRef": {
+          "type": "string",
+          "pattern": "^refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$",
+          "maxLength": 96
+        },
+        "runId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,19}$",
+          "maxLength": 20
+        },
+        "runAttempt": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "job": {
+          "enum": ["cache-safety", "compatibility", "security"]
+        }
+      }
+    },
+    "commands": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 12,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/result"
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 40,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/result"
+      }
+    },
+    "provenance": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "gitSha"],
+        "properties": {
+          "id": {
+            "enum": ["A7", "C1", "B7", "D3", "D5"]
+          },
+          "gitSha": {
+            "$ref": "#/$defs/gitSha"
+          }
+        }
+      }
+    },
+    "stage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "releaseTag", "browserContract", "evidenceProducedAt"],
+      "properties": {
+        "name": {
+          "enum": ["R2a", "R2b"]
+        },
+        "releaseTag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "maxLength": 32
+        },
+        "browserContract": {
+          "enum": ["v2", "v3"]
+        },
+        "evidenceProducedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "preChangeCachedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "policyDeployedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "waitCompletedAt": {
+          "$ref": "#/$defs/timestamp"
+        },
+        "browserProofCompletedAt": {
+          "$ref": "#/$defs/timestamp"
+        }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "evidenceKind": {
+            "const": "cache-safety"
+          }
+        },
+        "required": ["evidenceKind"]
+      },
+      "then": {
+        "properties": {
+          "stage": {
+            "required": [
+              "preChangeCachedAt",
+              "policyDeployedAt",
+              "waitCompletedAt",
+              "browserProofCompletedAt"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "gitSha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40}$",
+      "maxLength": 40
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$",
+      "maxLength": 71
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "maxLength": 20
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "result"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9-]{0,79}$",
+          "maxLength": 80
+        },
+        "result": {
+          "const": "PASS"
+        }
+      }
+    }
+  }
+}

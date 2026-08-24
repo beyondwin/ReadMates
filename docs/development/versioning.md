@@ -41,7 +41,7 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 
 `main` 또는 tag push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend는 backend promotion 뒤 `Deploy Front` workflow에 검증할 release tag를 명시해 수동 dispatch합니다. 이 순서는 새 frontend가 구 backend의 미지원 API를 먼저 호출하는 배포 window를 막습니다.
 
-Major host-write contract release는 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`를 backend promotion 전에 동기화합니다. 새 backend는 구 browser/BFF의 mutating `/api/host/**`를 409로 잠시 동결하고, 같은 tag의 새 browser bundle과 Pages BFF가 함께 배포된 뒤에만 write를 재개합니다. Frontend-only rollback은 host write 동결을 유지하므로 호환 frontend 재배포 또는 backend rollback/forward-fix까지 운영 계획에 포함합니다.
+Host-client generation 전환은 단일 tag 안의 backend-first window가 아니라 서로 다른 immutable R1, R2a, R2b tag로 진행합니다. R1과 R2a는 `SUPPORT_V2_V3` backend/BFF와 browser v2를 유지하고, R2a의 720초 cache-safety attestation 뒤 R2b가 browser v3 Pages candidate를 배포합니다. Named 24시간 residue-zero 관측을 통과한 뒤에만 R3에서 `ENFORCE_V3`로 바꿉니다. 각 stage의 tag는 이동하지 않으며 상세 preflight/success/abort/rollback은 [release publish runbook](../deploy/release-publish-runbook.md#host-client-v3-staged-rollout)을 따릅니다.
 
 ## Server Image Tags
 

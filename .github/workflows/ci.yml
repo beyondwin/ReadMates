@@ -63,6 +63,14 @@ jobs:
       - name: Deploy workflow contract
         run: python3 -B scripts/check-deploy-workflow-contract.py
 
+      - name: Host client rollout contract self-tests
+        run: |
+          python3 -B scripts/check-host-client-rollout-contract.py --self-test
+          python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
+
+      - name: Host client rollout structural contract
+        run: python3 -B scripts/check-host-client-rollout-contract.py
+
       - name: Flyway migration checker self-tests
         run: python3 -B scripts/check-flyway-migration-immutability.py --self-test
 

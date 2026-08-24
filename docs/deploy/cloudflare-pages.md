@@ -117,7 +117,8 @@ READMATES_BFF_SECRET=<shared-bff-secret>
 # 무중단 rotation 중에만 설정. READMATES_BFF_SECRETS가 있으면 READMATES_BFF_SECRET보다 우선합니다.
 READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_BFF_SECRET_REQUIRED=true
-READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true
+# Server-side typed rollout mode. Set only through the approved R1/R2a/R2b/R3 runbook.
+READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=V2_ONLY
 READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 ```

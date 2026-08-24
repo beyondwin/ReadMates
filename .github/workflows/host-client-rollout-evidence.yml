@@ -1,0 +1,217 @@
+name: Host Client Rollout Evidence
+
+on:
+  workflow_call:
+    inputs:
+      evidence-kind:
+        description: "Exact producer kind: cache-safety, compatibility, or security"
+        required: true
+        type: string
+      trusted-manifest-artifact-id:
+        description: "Artifact ID emitted by the required trusted producer job"
+        required: true
+        type: string
+      trusted-git-sha:
+        description: "Full candidate SHA emitted by the trusted checkout/build job"
+        required: true
+        type: string
+      trusted-candidate-id:
+        description: "Candidate ID emitted by the trusted producer job"
+        required: true
+        type: string
+      trusted-backend-digest:
+        description: "Backend digest emitted by the trusted build/deployment job"
+        required: true
+        type: string
+      trusted-pages-digest:
+        description: "Pages digest emitted by pinned upload-artifact"
+        required: true
+        type: string
+      trusted-cache-source-set-digest:
+        description: "C1 source-set digest emitted by the trusted cache producer"
+        required: true
+        type: string
+      trusted-release-tag:
+        description: "Immutable release tag emitted by the trusted release job"
+        required: true
+        type: string
+    outputs:
+      attested-artifact-id:
+        description: "Artifact ID containing the explicit manifest and bundle"
+        value: ${{ jobs.attest.outputs.artifact-id }}
+      attested-artifact-digest:
+        description: "Upload digest for the attested evidence package"
+        value: ${{ jobs.attest.outputs.artifact-digest }}
+
+permissions:
+  contents: read
+  id-token: write
+  attestations: write
+  artifact-metadata: write
+
+env:
+  READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+  READMATES_HOST_ROLLOUT_REF_PROTECTED: ${{ github.ref_protected }}
+
+jobs:
+  attest:
+    name: Attest protected host rollout evidence
+    if: ${{ github.ref_protected && github.event_name != 'workflow_dispatch' && !startsWith(github.event_name, 'pull_request') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment:
+      name: host-client-rollout-evidence
+    outputs:
+      artifact-id: ${{ steps.upload.outputs.artifact-id }}
+      artifact-digest: ${{ steps.upload.outputs.artifact-digest }}
+    steps:
+      - name: Check out protected candidate
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.trusted-git-sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate protected source identity
+        env:
+          TRUSTED_GIT_SHA: ${{ inputs.trusted-git-sha }}
+          TRUSTED_RELEASE_TAG: ${{ inputs.trusted-release-tag }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$TRUSTED_GIT_SHA" =~ ^[0-9a-f]{40}$ ]]
+          [[ "$TRUSTED_RELEASE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$TRUSTED_GIT_SHA" = "$GITHUB_SHA"
+          test "$(git rev-parse HEAD)" = "$TRUSTED_GIT_SHA"
+          test "$(git rev-list -n 1 "$TRUSTED_RELEASE_TAG")" = "$TRUSTED_GIT_SHA"
+
+      - name: Download trusted manifest artifact
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ inputs.trusted-manifest-artifact-id }}
+          path: front/output/host-rollout/incoming
+          merge-multiple: true
+          digest-mismatch: error
+
+      - name: Select fixed evidence paths
+        id: evidence
+        env:
+          EVIDENCE_KIND: ${{ inputs.evidence-kind }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$EVIDENCE_KIND" in
+            cache-safety)
+              manifest="front/output/host-rollout/incoming/cache-safety.manifest.json"
+              bundle="front/output/host-rollout/attested/cache-safety.intoto.jsonl"
+              ;;
+            compatibility)
+              manifest="front/output/host-rollout/incoming/compatibility.manifest.json"
+              bundle="front/output/host-rollout/attested/compatibility.intoto.jsonl"
+              ;;
+            security)
+              manifest="front/output/host-rollout/incoming/security.manifest.json"
+              bundle="front/output/host-rollout/attested/security.intoto.jsonl"
+              ;;
+            *)
+              echo "Unsupported evidence kind." >&2
+              exit 1
+              ;;
+          esac
+          test -f "$manifest"
+          test ! -L "$manifest"
+          mkdir -p front/output/host-rollout/attested
+          printf 'manifest=%s\n' "$manifest" >> "$GITHUB_OUTPUT"
+          printf 'bundle=%s\n' "$bundle" >> "$GITHUB_OUTPUT"
+
+      - name: Validate schema and bounded evidence policy
+        env:
+          EVIDENCE_KIND: ${{ inputs.evidence-kind }}
+          MANIFEST: ${{ steps.evidence.outputs.manifest }}
+        run: >-
+          python3 -B scripts/verify-host-client-rollout-evidence.py
+          --manifest "$MANIFEST"
+          --kind "$EVIDENCE_KIND"
+          --schema scripts/schemas/host-client-rollout-evidence-v1.schema.json
+          --schema-only
+
+      - name: Bind manifest to trusted job outputs
+        env:
+          EVIDENCE_KIND: ${{ inputs.evidence-kind }}
+          MANIFEST: ${{ steps.evidence.outputs.manifest }}
+          TRUSTED_GIT_SHA: ${{ inputs.trusted-git-sha }}
+          TRUSTED_CANDIDATE_ID: ${{ inputs.trusted-candidate-id }}
+          TRUSTED_BACKEND_DIGEST: ${{ inputs.trusted-backend-digest }}
+          TRUSTED_PAGES_DIGEST: ${{ inputs.trusted-pages-digest }}
+          TRUSTED_CACHE_SOURCE_SET_DIGEST: ${{ inputs.trusted-cache-source-set-digest }}
+          TRUSTED_RELEASE_TAG: ${{ inputs.trusted-release-tag }}
+          TRUSTED_PRODUCER_WORKFLOW_REF: ${{ format('{0}/.github/workflows/host-client-rollout-evidence.yml@{1}', github.repository, github.ref) }}
+          TRUSTED_PRODUCER_RUN_ID: ${{ github.run_id }}
+          TRUSTED_PRODUCER_RUN_ATTEMPT: ${{ github.run_attempt }}
+          READMATES_HOST_ROLLOUT_SIGNER_WORKFLOW_REF: ${{ format('{0}/.github/workflows/host-client-rollout-evidence.yml@{1}', github.repository, github.ref) }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B - "$MANIFEST" <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+
+          path = pathlib.Path(sys.argv[1])
+          if path.is_symlink() or path.stat().st_size > 262144:
+              raise SystemExit("Manifest path or size is invalid.")
+          manifest = json.loads(path.read_text(encoding="utf-8"))
+          expected = {
+              "evidenceKind": os.environ["EVIDENCE_KIND"],
+              "gitSha": os.environ["TRUSTED_GIT_SHA"],
+              "candidateId": os.environ["TRUSTED_CANDIDATE_ID"],
+              "backendDigest": os.environ["TRUSTED_BACKEND_DIGEST"],
+              "pagesDigest": os.environ["TRUSTED_PAGES_DIGEST"],
+              "cacheSafetySourceSetDigest": os.environ["TRUSTED_CACHE_SOURCE_SET_DIGEST"],
+          }
+          if any(manifest.get(key) != value for key, value in expected.items()):
+              raise SystemExit("Manifest does not match trusted job outputs.")
+          if manifest.get("stage", {}).get("releaseTag") != os.environ["TRUSTED_RELEASE_TAG"]:
+              raise SystemExit("Manifest release tag does not match the trusted job output.")
+          if manifest.get("producer", {}).get("repository") != os.environ["GITHUB_REPOSITORY"]:
+              raise SystemExit("Manifest repository does not match the workflow repository.")
+          if manifest.get("producer", {}).get("sourceRef") != os.environ["GITHUB_REF"]:
+              raise SystemExit("Manifest source ref does not match the protected workflow ref.")
+          if manifest["producer"]["workflowRef"] != os.environ["TRUSTED_PRODUCER_WORKFLOW_REF"]:
+              raise SystemExit("Manifest workflow ref does not match the protected producer.")
+          if manifest["producer"]["runId"] != os.environ["TRUSTED_PRODUCER_RUN_ID"]:
+              raise SystemExit("Manifest run ID does not match the protected producer.")
+          if manifest["producer"]["runAttempt"] != int(os.environ["TRUSTED_PRODUCER_RUN_ATTEMPT"]):
+              raise SystemExit("Manifest run attempt does not match the protected producer.")
+          PY
+
+      - name: Attest exact manifest
+        id: attest
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1
+        with:
+          subject-path: ${{ steps.evidence.outputs.manifest }}
+
+      - name: Stage explicit attestation bundle
+        env:
+          GENERATED_BUNDLE: ${{ steps.attest.outputs.bundle-path }}
+          EVIDENCE_BUNDLE: ${{ steps.evidence.outputs.bundle }}
+          EVIDENCE_MANIFEST: ${{ steps.evidence.outputs.manifest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f "$GENERATED_BUNDLE"
+          test ! -L "$GENERATED_BUNDLE"
+          install -m 0600 "$GENERATED_BUNDLE" "$EVIDENCE_BUNDLE"
+          install -m 0600 "$EVIDENCE_MANIFEST" front/output/host-rollout/attested/
+
+      - name: Upload explicit manifest and bundle
+        id: upload
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: host-rollout-${{ inputs.evidence-kind }}-attested
+          path: front/output/host-rollout/attested/
+          if-no-files-found: error
+          retention-days: 14
+          include-hidden-files: false

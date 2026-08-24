@@ -33,6 +33,20 @@ python3 -B scripts/check-deploy-workflow-contract.py
 
 다른 candidate나 fixture의 workflow를 검사할 때만 `--workflow <path>`를 사용합니다. 이 검사는 workflow를 실행하거나 image를 publish하지 않습니다.
 
+## Host client rollout evidence checkers
+
+`check-host-client-rollout-contract.py`는 R1 → R2a → R2b → R3 host-client rollout의 구조 계약과 최종 세 manifest 결합 정책을 검사합니다. 일반 CI와 공개 릴리즈 후보에서는 self-test와 인자 없는 structural mode만 실행합니다.
+
+```bash
+python3 -B scripts/check-host-client-rollout-contract.py --self-test
+python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
+python3 -B scripts/check-host-client-rollout-contract.py
+```
+
+`verify-host-client-rollout-evidence.py`는 별도로 전달된 manifest와 attestation bundle만 받습니다. JSON Schema와 exact command/case/provenance allowlist를 먼저 검사하고, GitHub 공식 release checksum으로 고정한 `gh` binary가 `gh attestation verify`에 성공한 JSON만 추가 policy input으로 사용합니다. Python은 signature, certificate chain, transparency log, timestamp authority를 재구현하지 않습니다. GitHub CLI download/checksum/trust root/network/verified timestamp 중 하나라도 사용할 수 없으면 실패합니다.
+
+세 artifact를 결합하는 live-evidence mode는 `host-client-rollout-evidence` protected workflow가 explicit manifest/bundle, protected SHA, trusted job digest를 내려받은 뒤에만 실행합니다. Digest는 `workflow_dispatch` 입력이나 tracked 문서에서 받지 않습니다. R2a cache manifest, R2b compatibility manifest, R2b security manifest의 실제 호출 형식은 [release publish runbook](../docs/deploy/release-publish-runbook.md#host-client-v3-staged-rollout)을 따릅니다. 구조 checker 통과는 live evidence, 배포, 720초 대기, 24시간 adoption 관측을 수행했다는 뜻이 아닙니다.
+
 ## `check-flyway-migration-immutability.py`
 
 기준 commit에 존재하는 production Flyway migration을 현재 worktree와 비교해 과거 SQL의 수정, 삭제,
