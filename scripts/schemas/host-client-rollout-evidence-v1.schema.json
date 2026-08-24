@@ -42,6 +42,71 @@
     "cacheSafetySourceSetDigest": {
       "$ref": "#/$defs/sha256"
     },
+    "cacheTransport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactId",
+        "profileIdentity",
+        "transportDigest",
+        "profileContentDigest",
+        "stateDigest",
+        "targetIdentity",
+        "boundaryIdentities",
+        "syntheticMarkerIdentity",
+        "ownershipResponseIdentity",
+        "mutationReceiptDigest"
+      ],
+      "properties": {
+        "artifactId": {
+          "type": "string",
+          "pattern": "^[1-9][0-9]{0,19}$",
+          "maxLength": 20
+        },
+        "profileIdentity": {
+          "type": "string",
+          "pattern": "^run-[1-9][0-9]{0,19}-attempt-[1-9][0-9]{0,2}-r2a-public-cache$",
+          "maxLength": 64
+        },
+        "transportDigest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "profileContentDigest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "stateDigest": {
+          "$ref": "#/$defs/sha256"
+        },
+        "targetIdentity": {
+          "$ref": "#/$defs/hmacSha256"
+        },
+        "boundaryIdentities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["origin", "bff", "cdn"],
+          "properties": {
+            "origin": {
+              "$ref": "#/$defs/hmacSha256"
+            },
+            "bff": {
+              "$ref": "#/$defs/hmacSha256"
+            },
+            "cdn": {
+              "$ref": "#/$defs/hmacSha256"
+            }
+          }
+        },
+        "syntheticMarkerIdentity": {
+          "$ref": "#/$defs/hmacSha256"
+        },
+        "ownershipResponseIdentity": {
+          "$ref": "#/$defs/hmacSha256"
+        },
+        "mutationReceiptDigest": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
     "producer": {
       "type": "object",
       "additionalProperties": false,
@@ -121,9 +186,9 @@
           },
           "gitSha": {
             "$ref": "#/$defs/gitSha"
+            }
           }
         }
-      }
     },
     "stage": {
       "type": "object",
@@ -170,6 +235,7 @@
         "required": ["evidenceKind"]
       },
       "then": {
+        "required": ["cacheTransport"],
         "properties": {
           "stage": {
             "required": [
@@ -193,6 +259,11 @@
       "type": "string",
       "pattern": "^sha256:[0-9a-f]{64}$",
       "maxLength": 71
+    },
+    "hmacSha256": {
+      "type": "string",
+      "pattern": "^hmac-sha256:[0-9a-f]{64}$",
+      "maxLength": 76
     },
     "timestamp": {
       "type": "string",

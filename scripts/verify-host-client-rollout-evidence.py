@@ -341,11 +341,24 @@ def validate_manifest_policy(
     if expected_kind == "cache-safety":
         if stage["name"] != "R2a" or stage["browserContract"] != "v2":
             raise EvidenceError("cache evidence must bind R2a browser v2")
+        transport = manifest.get("cacheTransport")
+        if not isinstance(transport, dict):
+            raise EvidenceError("cache evidence must bind its browser profile transport")
+        expected_profile_identity = (
+            f"run-{manifest['producer']['runId']}-attempt-{manifest['producer']['runAttempt']}-r2a-public-cache"
+        )
+        if transport.get("profileIdentity") != expected_profile_identity:
+            raise EvidenceError("cache profile identity is not bound to the producer run and attempt")
+        boundary_identities = transport.get("boundaryIdentities")
+        if not isinstance(boundary_identities, dict) or len(set(boundary_identities.values())) != 3:
+            raise EvidenceError("cache evidence boundary identities must be exact and distinct")
     else:
         if stage["name"] != "R2b" or stage["browserContract"] != "v3":
             raise EvidenceError("R2b evidence must bind browser v3")
         if cache_timestamp_fields.intersection(stage):
             raise EvidenceError("R2b evidence must not carry R2a cache timestamps")
+        if "cacheTransport" in manifest:
+            raise EvidenceError("R2b evidence must not carry R2a browser profile transport")
 
 
 def _checksum_command(path: Path) -> list[str]:
@@ -493,6 +506,8 @@ def cleanup_verified_gh(binary: Path) -> None:
             and not parent.is_symlink()
         ):
             shutil.rmtree(parent)
+            install_parent.rmdir()
+            install_parent.parent.rmdir()
     except OSError:
         return
 
@@ -735,7 +750,7 @@ def _sample_manifest(kind: str) -> dict[str, Any]:
                 "browserProofCompletedAt": "2026-08-24T01:15:00Z",
             }
         )
-    return {
+    manifest = {
         "schemaVersion": "host-client-rollout-evidence/v1",
         "evidenceKind": kind,
         "gitSha": sha,
@@ -757,6 +772,24 @@ def _sample_manifest(kind: str) -> dict[str, Any]:
         "provenance": [{"id": item, "gitSha": sha} for item in sorted(EXPECTED_PROVENANCE[kind])],
         "stage": stage,
     }
+    if kind == "cache-safety":
+        manifest["cacheTransport"] = {
+            "artifactId": "12345",
+            "profileIdentity": "run-1234-attempt-1-r2a-public-cache",
+            "transportDigest": "sha256:" + "6" * 64,
+            "profileContentDigest": "sha256:" + "7" * 64,
+            "stateDigest": "sha256:" + "8" * 64,
+            "targetIdentity": "hmac-sha256:" + "9" * 64,
+            "boundaryIdentities": {
+                "origin": "hmac-sha256:" + "a" * 64,
+                "bff": "hmac-sha256:" + "b" * 64,
+                "cdn": "hmac-sha256:" + "c" * 64,
+            },
+            "syntheticMarkerIdentity": "hmac-sha256:" + "e" * 64,
+            "ownershipResponseIdentity": "hmac-sha256:" + "f" * 64,
+            "mutationReceiptDigest": "sha256:" + "d" * 64,
+        }
+    return manifest
 
 
 class EvidenceVerifierTests(unittest.TestCase):
@@ -820,6 +853,53 @@ class EvidenceVerifierTests(unittest.TestCase):
         with self.assertRaises(EvidenceError):
             validate_manifest_policy(manifest, self.schema, "compatibility")
 
+    def test_cache_manifest_requires_exact_redacted_profile_transport_binding(self) -> None:
+        missing_ownership = _sample_manifest("cache-safety")
+        missing_ownership["cacheTransport"].pop("ownershipResponseIdentity")
+        with self.assertRaises(EvidenceError):
+            validate_manifest_policy(missing_ownership, self.schema, "cache-safety")
+
+        manifest = _sample_manifest("cache-safety")
+        manifest["cacheTransport"] = {
+            "artifactId": "12345",
+            "profileIdentity": "run-1234-attempt-1-r2a-public-cache",
+            "transportDigest": "sha256:" + "6" * 64,
+            "profileContentDigest": "sha256:" + "7" * 64,
+            "stateDigest": "sha256:" + "8" * 64,
+            "targetIdentity": "hmac-sha256:" + "9" * 64,
+            "boundaryIdentities": {
+                "origin": "hmac-sha256:" + "a" * 64,
+                "bff": "hmac-sha256:" + "b" * 64,
+                "cdn": "hmac-sha256:" + "c" * 64,
+            },
+            "syntheticMarkerIdentity": "hmac-sha256:" + "e" * 64,
+            "ownershipResponseIdentity": "hmac-sha256:" + "f" * 64,
+            "mutationReceiptDigest": "sha256:" + "d" * 64,
+        }
+        validate_manifest_policy(manifest, self.schema, "cache-safety")
+        for name, mutate in (
+            ("missing artifact", lambda value: value["cacheTransport"].pop("artifactId")),
+            ("tampered digest", lambda value: value["cacheTransport"].update(transportDigest="sha256:" + "0" * 63)),
+            ("target mismatch", lambda value: value["cacheTransport"].update(targetIdentity="sha256:" + "9" * 64)),
+            ("missing synthetic marker", lambda value: value["cacheTransport"].pop("syntheticMarkerIdentity")),
+            ("missing ownership response", lambda value: value["cacheTransport"].pop("ownershipResponseIdentity")),
+            ("duplicate boundaries", lambda value: value["cacheTransport"]["boundaryIdentities"].update(bff="hmac-sha256:" + "a" * 64)),
+            ("producer run mismatch", lambda value: value["producer"].update(runId="9999")),
+            ("producer attempt mismatch", lambda value: value["producer"].update(runAttempt=2)),
+            (
+                "logical profile mismatch",
+                lambda value: value["cacheTransport"].update(profileIdentity="run-9999-attempt-2-r2a-public-cache"),
+            ),
+        ):
+            changed = json.loads(json.dumps(manifest))
+            mutate(changed)
+            with self.subTest(name=name), self.assertRaises(EvidenceError):
+                validate_manifest_policy(changed, self.schema, "cache-safety")
+        compatibility = _sample_manifest("compatibility")
+        compatibility["cacheTransport"] = manifest["cacheTransport"]
+        with self.assertRaises(EvidenceError):
+            validate_manifest_policy(compatibility, self.schema, "compatibility")
+
     def test_checksum_uses_platform_verifier_and_detects_mismatch(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "archive"
@@ -846,31 +926,39 @@ class EvidenceVerifierTests(unittest.TestCase):
         )
 
     def test_verified_gh_temporary_install_is_removed_and_bounded(self) -> None:
-        install_parent = REPO_ROOT / ".tmp/host-rollout-gh"
-        install_parent.mkdir(parents=True, exist_ok=True)
-        install_dir = Path(tempfile.mkdtemp(prefix="gh-fixture-", dir=install_parent))
-        binary = install_dir / "gh"
-        binary.write_bytes(b"fixture")
-        cleanup_verified_gh(binary)
-        self.assertFalse(install_dir.exists())
-        with tempfile.TemporaryDirectory() as directory:
-            outside = Path(directory) / "gh"
+        with tempfile.TemporaryDirectory() as directory, mock.patch.object(
+            sys.modules[__name__], "REPO_ROOT", Path(directory)
+        ):
+            install_parent = Path(directory) / ".tmp/host-rollout-gh"
+            install_parent.mkdir(parents=True, exist_ok=True)
+            install_dir = Path(tempfile.mkdtemp(prefix="gh-fixture-", dir=install_parent))
+            binary = install_dir / "gh"
+            binary.write_bytes(b"fixture")
+            cleanup_verified_gh(binary)
+            self.assertFalse(install_dir.exists())
+            self.assertFalse(install_parent.exists())
+            self.assertFalse(install_parent.parent.exists())
+
+            outside = Path(directory) / "outside/gh"
+            outside.parent.mkdir()
             outside.write_bytes(b"fixture")
             cleanup_verified_gh(outside)
             self.assertTrue(outside.exists())
 
     def test_verified_gh_failed_install_is_cleaned_in_finally_path(self) -> None:
-        install_parent = REPO_ROOT / ".tmp/host-rollout-gh"
-        install_parent.mkdir(parents=True, exist_ok=True)
-        before = {item.name for item in install_parent.iterdir()}
-        with (
-            mock.patch.object(platform, "system", return_value="Linux"),
-            mock.patch.object(platform, "machine", return_value="x86_64"),
-            mock.patch.object(sys.modules[__name__], "_download_bounded", side_effect=EvidenceError("fixture")),
-            self.assertRaises(EvidenceError),
+        with tempfile.TemporaryDirectory() as directory, (
+            mock.patch.object(sys.modules[__name__], "REPO_ROOT", Path(directory))
         ):
-            ensure_verified_gh()
-        self.assertEqual({item.name for item in install_parent.iterdir()}, before)
+            install_parent = Path(directory) / ".tmp/host-rollout-gh"
+            with (
+                mock.patch.object(platform, "system", return_value="Linux"),
+                mock.patch.object(platform, "machine", return_value="x86_64"),
+                mock.patch.object(sys.modules[__name__], "_download_bounded", side_effect=EvidenceError("fixture")),
+                self.assertRaises(EvidenceError),
+            ):
+                ensure_verified_gh()
+            self.assertFalse(install_parent.exists())
+            self.assertFalse(install_parent.parent.exists())
 
     def test_verified_output_requires_subject_predicate_and_timestamp(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -11,7 +11,7 @@ import sys
 import tempfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -23,6 +23,7 @@ ALLOWED_EXECUTABLES = {"corepack", "./server/gradlew"}
 FORBIDDEN_ARGUMENTS = {"true", "false", ":", "echo", "printf", "--skip", "--passWithNoTests", "--allow-empty"}
 ID_PATTERN = re.compile(r"[a-z0-9-]{1,100}")
 TIMESTAMP_PATTERN = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z")
+PROFILE_ID_PATTERN = re.compile(r"run-[1-9][0-9]{0,19}-attempt-[1-9][0-9]{0,2}-r2a-public-cache")
 
 
 class ReporterError(ValueError):
@@ -147,8 +148,25 @@ def _timestamp(value: Any) -> str:
     return value
 
 
+def protected_profile_identity(environment: Mapping[str, str] = os.environ) -> str:
+    run_id = environment.get("GITHUB_RUN_ID", "")
+    run_attempt = environment.get("GITHUB_RUN_ATTEMPT", "")
+    carried = environment.get("READMATES_HOST_ROLLOUT_PRIMED_BROWSER_ARTIFACT_ID", "")
+    if re.fullmatch(r"[1-9][0-9]{0,19}", run_id) is None or re.fullmatch(r"[1-9][0-9]{0,2}", run_attempt) is None:
+        raise ReporterError("protected report run identity is invalid")
+    if int(run_attempt) > 100:
+        raise ReporterError("protected report run attempt is outside the bounded range")
+    expected = f"run-{run_id}-attempt-{run_attempt}-r2a-public-cache"
+    if carried != expected or PROFILE_ID_PATTERN.fullmatch(carried) is None:
+        raise ReporterError("cache report profile identity is not bound to the protected run")
+    return carried
+
+
 def _validate_report_shape(report: dict[str, Any]) -> None:
-    if set(report) != {"schemaVersion", "group", "commands", "cases", "completedAt"}:
+    fields = {"schemaVersion", "group", "commands", "cases", "completedAt"}
+    if report.get("group") == "cache-safety":
+        fields.add("bindings")
+    if set(report) != fields:
         raise ReporterError("report fields are invalid")
     if report.get("schemaVersion") != "readmates.host-rollout.test-report.v1":
         raise ReporterError("report schema version is invalid")
@@ -158,6 +176,14 @@ def _validate_report_shape(report: dict[str, Any]) -> None:
         raise ReporterError("report commands are empty or oversized")
     if not isinstance(cases, list) or not 1 <= len(cases) <= MAX_CASES:
         raise ReporterError("report cases are empty or oversized")
+    if report.get("group") == "cache-safety":
+        bindings = report.get("bindings")
+        if (
+            not isinstance(bindings, dict)
+            or set(bindings) != {"profileIdentity"}
+            or PROFILE_ID_PATTERN.fullmatch(str(bindings.get("profileIdentity", ""))) is None
+        ):
+            raise ReporterError("cache report profile binding is invalid")
     _timestamp(report.get("completedAt"))
     command_ids: list[str] = []
     for command in commands:
@@ -311,6 +337,10 @@ def run_command(config: dict[str, Any], group: str, command_id: str, output: Pat
         value = _read_json(raw_path, "structured test command result")
     if not isinstance(value, dict):
         raise ReporterError("structured test command result must be an object")
+    if group == "cache-safety":
+        if "bindings" in value:
+            raise ReporterError("structured test command cannot author its own transport binding")
+        value["bindings"] = {"profileIdentity": protected_profile_identity(environment)}
     validate_report(value, group, config, allow_partial=True)
     if [item["id"] for item in value["commands"]] != [command_id]:
         raise ReporterError("structured test command result is not bound to the invoked command")
@@ -324,6 +354,7 @@ def combine_reports(config: dict[str, Any], group: str, inputs: list[Path], outp
     commands: list[dict[str, str]] = []
     cases: list[dict[str, str]] = []
     times: list[str] = []
+    profile_identity: str | None = None
     for path in inputs:
         value = _read_json(path, "partial report")
         if not isinstance(value, dict):
@@ -332,6 +363,12 @@ def combine_reports(config: dict[str, Any], group: str, inputs: list[Path], outp
         commands.extend(value["commands"])
         cases.extend(value["cases"])
         times.append(value["completedAt"])
+        if group == "cache-safety":
+            candidate = value["bindings"]["profileIdentity"]
+            if profile_identity is None:
+                profile_identity = candidate
+            elif candidate != profile_identity:
+                raise ReporterError("cache partial reports do not bind the same protected profile")
     report = {
         "schemaVersion": "readmates.host-rollout.test-report.v1",
         "group": group,
@@ -339,6 +376,8 @@ def combine_reports(config: dict[str, Any], group: str, inputs: list[Path], outp
         "cases": cases,
         "completedAt": max(times),
     }
+    if group == "cache-safety":
+        report["bindings"] = {"profileIdentity": profile_identity}
     validate_report(report, group, config)
     _write_report(output, report)
 

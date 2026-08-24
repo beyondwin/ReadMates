@@ -311,9 +311,11 @@ for required_workspace_file in \
   "scripts/check-host-client-rollout-contract.py" \
   "scripts/check-flyway-migration-immutability.py" \
   "scripts/host-rollout-evidence-reporter.py" \
+  "scripts/host-rollout-cache-evidence.py" \
   "scripts/host-rollout-test-contract.json" \
   "scripts/host-rollout-workflow-contract.json" \
   "scripts/test-host-rollout-evidence-reporter.py" \
+  "scripts/test-host-rollout-cache-evidence.py" \
   "scripts/validate-host-rollout-candidate.py" \
   "scripts/verify-host-client-rollout-evidence.py" \
   "scripts/schemas/host-client-rollout-evidence-v1.schema.json" \
@@ -363,6 +365,7 @@ if ! (
   python3 -B scripts/check-host-client-rollout-contract.py --self-test
   python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
   python3 -B scripts/test-host-rollout-evidence-reporter.py
+  python3 -B scripts/test-host-rollout-cache-evidence.py
   python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready
   python3 -B scripts/validate-host-rollout-candidate.py --self-test
   python3 -B scripts/check-host-client-rollout-contract.py

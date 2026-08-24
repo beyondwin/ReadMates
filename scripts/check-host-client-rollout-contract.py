@@ -39,10 +39,12 @@ REQUIRED_SOURCES = (
     ".github/workflows/deploy-front.yml",
     "server/src/main/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilter.kt",
     "scripts/check-host-client-rollout-contract.py",
+    "scripts/host-rollout-cache-evidence.py",
     "scripts/host-rollout-evidence-reporter.py",
     "scripts/host-rollout-test-contract.json",
     "scripts/host-rollout-workflow-contract.json",
     "scripts/test-host-rollout-evidence-reporter.py",
+    "scripts/test-host-rollout-cache-evidence.py",
     "scripts/validate-host-rollout-candidate.py",
     "scripts/verify-host-client-rollout-evidence.py",
     "scripts/schemas/host-client-rollout-evidence-v1.schema.json",
@@ -617,6 +619,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     _require(ci_runs, "python3 -B scripts/check-host-client-rollout-contract.py", "CI omits rollout structural mode", errors)
     _require(ci_runs, "python3 -B scripts/verify-host-client-rollout-evidence.py --self-test", "CI omits evidence verifier self-test", errors)
     _require(ci_runs, "python3 -B scripts/test-host-rollout-evidence-reporter.py", "CI omits structured reporter self-test", errors)
+    _require(ci_runs, "python3 -B scripts/test-host-rollout-cache-evidence.py", "CI omits cache transport adversarial self-test", errors)
     _require(ci_runs, "python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready", "CI omits artifact-ready reporter contract check", errors)
     _require(ci_runs, "python3 -B scripts/validate-host-rollout-candidate.py --self-test", "CI omits candidate archive adversarial self-test", errors)
     if "--cache-manifest" in ci_runs or "READMATES_HOST_ROLLOUT_LIVE_EVIDENCE" in ci_runs:
@@ -719,6 +722,9 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     for needle, message in (
         ("subprocess.run(", "structured reporter does not execute commands with subprocess argument arrays"),
         ("READMATES_HOST_ROLLOUT_CASE_REPORT", "structured reporter does not require per-test structured output"),
+        ("protected_profile_identity", "structured reporter does not bind cache reports to the protected run profile"),
+        ('value["bindings"] = {"profileIdentity": protected_profile_identity(environment)}', "structured reporter does not add the trusted cache profile binding"),
+        ("cache partial reports do not bind the same protected profile", "structured reporter combines mismatched cache profile reports"),
         ("require_paths=True", "structured reporter live mode does not fail closed on missing prerequisites"),
         ("timeout=command[\"timeoutSeconds\"]", "structured reporter command timeout is not bounded"),
         ("structured test report timestamp is outside the actual command window", "structured reporter time is not bound to the actual command window"),
@@ -765,7 +771,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         errors.append("R2a Pages deploy does not consume only trusted package job outputs")
     pair_job = _mapping(jobs.get("bind-r2a-runtime-pair"))
     pair_run = str(_step(pair_job, step_id="bind").get("run", ""))
-    if _needs(pair_job) != {"source", "pages-candidate", "deploy-r2a-policy", "deploy-r2a-pages"}:
+    if _needs(pair_job) != {"source", "prime-r2a-cache", "pages-candidate", "deploy-r2a-policy", "deploy-r2a-pages"}:
         errors.append("R2a backend and Pages deployed pair binding is incomplete")
     if not all(needle in pair_run for needle in ("DEPLOYED_PAGES_DIGEST", "BACKEND_DIGEST", "PAGES_RUNTIME_HEALTH_AT", "policy-deployed-at=")):
         errors.append("policyDeployedAt is not generated after exact pair digest and runtime health binding")
@@ -773,7 +779,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     wait_run = str(_step(wait_job, step_id="wait").get("run", ""))
     if _needs(wait_job) != {"source", "prime-r2a-cache", "bind-r2a-runtime-pair"} or "base_epoch + 720" not in wait_run or "sleep" not in wait_run:
         errors.append("R2a wait job does not enforce a real max-timestamp plus 720-second wait")
-    if _needs(_mapping(jobs.get("browser-r2a-proof"))) != {"source", "wait-r2a-cache-lifetime"}:
+    if _needs(_mapping(jobs.get("browser-r2a-proof"))) != {"source", "prime-r2a-cache", "bind-r2a-runtime-pair", "wait-r2a-cache-lifetime"}:
         errors.append("R2a browser proof must run only after the real wait")
 
     for job_name in ("prime-r2a-cache", "bind-r2a-runtime-pair", "browser-r2a-proof", "compatibility-r2b", "security-r2b"):
@@ -785,9 +791,8 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         for needle in ("pnpm@11.13.1", "pnpm install --frozen-lockfile", "playwright install --with-deps chromium"):
             _require(runs, needle, f"{job_name} omits exact frozen browser setup", errors)
     producer_commands = {
-        "prime-r2a-cache": {"seed-r2a-prechange-cache"},
         "bind-r2a-runtime-pair": {"deploy-r2a-cache-policy"},
-        "browser-r2a-proof": {"playwright-r2a-cache-safety"},
+        "browser-r2a-proof": {"seed-r2a-prechange-cache", "playwright-r2a-cache-safety"},
         "compatibility-r2b": verifier.EXPECTED_COMMANDS["compatibility"],
         "security-r2b": verifier.EXPECTED_COMMANDS["security"],
     }
@@ -797,12 +802,235 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         for command_id in command_ids:
             _require(runs, command_id, f"{job_name} omits exact reporter command {command_id}", errors)
 
+    prime_runs = "\n".join(str(item.get("run", "")) for item in _steps(_mapping(jobs.get("prime-r2a-cache"))))
+    for needle, message in (
+        ("host-rollout-cache-evidence.py validate-config", "R2a prime omits protected boundary and synthetic-target preflight"),
+        ("--probe", "R2a prime does not capture the actual old generation validator"),
+        ("playwright test", "R2a prime does not execute C1 Playwright directly"),
+        ("--grep @prechange", "R2a prime does not execute the exact prechange phase"),
+        ("host-rollout-cache-evidence.py package-profile", "R2a prime does not package the persistent browser state"),
+        ("retention-days: 1", "R2a prime profile does not use short artifact retention"),
+    ):
+        _require(workflow + prime_runs, needle, message, errors)
+    if "host-rollout-evidence-reporter.py run-command" in prime_runs:
+        errors.append("R2a prime must not produce an accepted PASS report")
+    prime_job = _mapping(jobs.get("prime-r2a-cache"))
+    prime_browser_steps = [step for step in _steps(prime_job) if step.get("name") == "Prime only the protected public synthetic browser profile"]
+    prime_expected_urls = {
+        "READMATES_HOST_ROLLOUT_EXPECTED_ORIGIN_REVOKED_URL": "${{ steps.preflight.outputs.expected-origin-revoked-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_BFF_REVOKED_URL": "${{ steps.preflight.outputs.expected-bff-revoked-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL": "${{ steps.preflight.outputs.expected-cdn-revoked-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_CDN_CLUB_URL": "${{ steps.preflight.outputs.expected-cdn-club-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_CDN_STABLE_SESSION_URL": "${{ steps.preflight.outputs.expected-cdn-stable-session-url }}",
+    }
+    if len(prime_browser_steps) != 1 or any(
+        _mapping(prime_browser_steps[0].get("env")).get(key) != value
+        for key, value in prime_expected_urls.items()
+    ):
+        errors.append("R2a prime does not hand C1 exact helper-derived public URLs")
+
+    cache_helper = sources["scripts/host-rollout-cache-evidence.py"]
+    for needle, message in (
+        ("validate_protected_config", "cache helper does not fail closed on protected configuration"),
+        ("_canonical_https_origin", "cache helper does not canonicalize HTTPS boundaries"),
+        ("rollout-synthetic-", "cache helper does not reserve a synthetic public namespace"),
+        ("class _NoRedirect(urllib.request.HTTPRedirectHandler)", "cache helper does not deny privileged HTTP redirects"),
+        ("hmac.new(", "cache helper does not derive redacted identities without an argv leak"),
+        ("validate_synthetic_ownership", "cache helper does not validate authoritative synthetic ownership"),
+        ("syntheticMarkerIdentity", "cache helper does not bind the synthetic ownership marker"),
+        ("ownershipResponseIdentity", "cache helper does not bind the normalized existing-endpoint ownership response"),
+        ("api/bff/api/host/club-operations", "cache helper does not use the existing authenticated host club context"),
+        ("api/bff/api/host/sessions/{config.synthetic_session_id}", "cache helper does not use the existing authenticated host session detail"),
+        ("_open_public_exact", "cache helper does not deny redirects and final-URL changes at public boundaries"),
+        ('with _open_public_exact(request, f"prechange {label}", expected_url) as response:', "public probes bypass the exact no-redirect opener"),
+        ('"ownershipResponseIdentity": ownership_response_identity,', "profile transport does not bind the validated ownership response identity"),
+        ("package_profile", "cache helper does not package a persistent browser profile"),
+        ("inspect_archive", "cache helper does not safely inspect the browser transport"),
+        ("_validated_archive_payload", "cache helper does not validate all transport metadata before extraction"),
+        ("mutate_synthetic_target", "cache helper does not perform the protected same-target transition"),
+        ("SESSION_REVERSE", "cache helper does not bind the exact synthetic mutation operation"),
+        ("MAX_PROFILE_BYTES", "cache helper profile transport is not bounded"),
+        ("subprocess.run(", "cache helper does not use bounded subprocess argument arrays"),
+    ):
+        _require(cache_helper, needle, message, errors)
+    if cache_helper.count("verify_synthetic_ownership(config)") != 3:
+        errors.append("cache helper must verify existing-endpoint ownership before prime, after prime packaging, and immediately before mutation")
+    if "/api/bff/api/host/rollout-evidence/synthetic-targets/" in cache_helper:
+        errors.append("cache helper depends on a bespoke synthetic ownership endpoint that does not exist")
+    if cache_helper.count("_validated_archive_payload") != 2:
+        errors.append("cache helper pre-extraction trust validator must have one definition and one exact use")
+    extract_start = cache_helper.find("def extract_profile(")
+    validation_position = cache_helper.find("_validated_archive_payload(raw_archive, expected, config)", extract_start)
+    destination_position = cache_helper.find("destination.mkdir", extract_start)
+    if extract_start < 0 or validation_position < extract_start or destination_position < validation_position:
+        errors.append("cache helper writes extraction bytes before every carried digest and HMAC binding is verified")
+    for forbidden in ("cryptography", "shell=True", 'shutil.which("openssl")'):
+        if forbidden in cache_helper:
+            errors.append("cache helper must not expose HMAC secrets to an external crypto argv or a shell")
+    if "READMATES_HOST_ROLLOUT_SYNTHETIC_IDEMPOTENCY_KEY" in workflow:
+        errors.append("rollout workflow must derive a non-secret run idempotency identifier instead of reading a secret")
+
+    protected_cache_jobs = ("prime-r2a-cache", "bind-r2a-runtime-pair", "browser-r2a-proof")
+    required_cache_env = {
+        "READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL": "${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}",
+        "READMATES_HOST_ROLLOUT_BFF_BASE_URL": "${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}",
+        "READMATES_HOST_ROLLOUT_CDN_BASE_URL": "${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}",
+        "READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH": "${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}",
+        "READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH": "${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}",
+        "READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH": "${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}",
+        "READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID": "${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}",
+        "READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE": "${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}",
+        "READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY": "${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}",
+    }
+    for job_name in protected_cache_jobs:
+        job = _mapping(jobs.get(job_name))
+        envs = [_mapping(step.get("env")) for step in _steps(job)]
+        for key, expected in required_cache_env.items():
+            if not any(env.get(key) == expected for env in envs):
+                errors.append(f"{job_name} does not receive protected {key} authority")
+    for forbidden in ("https://localhost", "http://", ".example/", ".test/"):
+        if forbidden in workflow:
+            errors.append("rollout workflow contains a local, fake, or non-HTTPS boundary")
+
+    marker_environment = "${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}"
+    club_environment = "${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}"
+    marker_value_environment = "${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}"
+    for job, step_ids in (
+        (prime_job, ("preflight", "profile")),
+        (pair_job, ("extracted", "mutation")),
+        (_mapping(jobs.get("browser-r2a-proof")), ("extracted",)),
+    ):
+        for step_id in step_ids:
+            if _mapping(_step(job, step_id=step_id).get("env")).get("READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY") != marker_environment:
+                errors.append(f"protected cache helper step {step_id} omits the authoritative synthetic marker identity")
+            if _mapping(_step(job, step_id=step_id).get("env")).get("READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID") != club_environment:
+                errors.append(f"protected cache helper step {step_id} omits the authoritative synthetic club identity")
+            if _mapping(_step(job, step_id=step_id).get("env")).get("READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE") != marker_value_environment:
+                errors.append(f"protected cache helper step {step_id} omits the authoritative synthetic marker value")
+    prime_outputs = _mapping(prime_job.get("outputs"))
+    exact_prime_outputs = {
+        "pre-change-cached-at": "${{ steps.profile.outputs.pre-change-cached-at }}",
+        "old-generation-etag": "${{ steps.profile.outputs.old-generation-etag }}",
+        "profile-artifact-id": "${{ steps.upload-profile.outputs.artifact-id }}",
+        "profile-identity": "${{ steps.profile.outputs.profile-identity }}",
+        "profile-transport-digest": "${{ steps.profile.outputs.profile-transport-digest }}",
+        "profile-content-digest": "${{ steps.profile.outputs.profile-content-digest }}",
+        "profile-state-digest": "${{ steps.profile.outputs.profile-state-digest }}",
+        "target-identity": "${{ steps.profile.outputs.target-identity }}",
+        "boundary-identities": "${{ steps.profile.outputs.boundary-identities }}",
+        "synthetic-marker-identity": "${{ steps.profile.outputs.synthetic-marker-identity }}",
+        "ownership-response-identity": "${{ steps.profile.outputs.ownership-response-identity }}",
+        "expected-origin-revoked-url": "${{ steps.preflight.outputs.expected-origin-revoked-url }}",
+        "expected-bff-revoked-url": "${{ steps.preflight.outputs.expected-bff-revoked-url }}",
+        "expected-cdn-revoked-url": "${{ steps.preflight.outputs.expected-cdn-revoked-url }}",
+        "expected-cdn-club-url": "${{ steps.preflight.outputs.expected-cdn-club-url }}",
+        "expected-cdn-stable-session-url": "${{ steps.preflight.outputs.expected-cdn-stable-session-url }}",
+    }
+    if prime_outputs != exact_prime_outputs:
+        errors.append("R2a prime outputs do not bind the exact profile transport and redacted identities")
+    profile_step = _step(prime_job, step_id="profile")
+    if (
+        _mapping(profile_step.get("env")).get("EXPECTED_OWNERSHIP_RESPONSE_IDENTITY")
+        != "${{ steps.preflight.outputs.ownership-response-identity }}"
+        or '--ownership-response-identity "$EXPECTED_OWNERSHIP_RESPONSE_IDENTITY"' not in str(profile_step.get("run", ""))
+    ):
+        errors.append("R2a profile package is not bound to the pre-prime existing-endpoint ownership response")
+    profile_upload = _step(prime_job, step_id="upload-profile")
+    profile_upload_with = _mapping(profile_upload.get("with"))
+    if (
+        profile_upload.get("uses") != UPLOAD_USE
+        or profile_upload_with.get("archive") is not False
+        or profile_upload_with.get("retention-days") != 1
+    ):
+        errors.append("R2a profile transport must be an exact unarchived one-day artifact")
+
+    pair_steps = _steps(pair_job)
+    pair_tokens = [_step_identity(item) for item in pair_steps]
+    if not _ordered_tokens(pair_tokens, ("id:extracted", "id:mutation", "id:bind", "name:Prove exact same-target deny at origin BFF and CDN")):
+        errors.append("R2a profile validation, mutation, pair timestamp, and deny proof are not causally ordered")
+    pair_downloads = [step for step in pair_steps if step.get("uses") == DOWNLOAD_USE]
+    if len(pair_downloads) != 1 or _mapping(pair_downloads[0].get("with")).get("artifact-ids") != "${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}":
+        errors.append("R2a policy proof does not download the exact primed profile artifact ID")
+    exact_extract_bindings = {
+        "EXPECTED_PROFILE_IDENTITY": "${{ needs.prime-r2a-cache.outputs.profile-identity }}",
+        "EXPECTED_TRANSPORT_DIGEST": "${{ needs.prime-r2a-cache.outputs.profile-transport-digest }}",
+        "EXPECTED_PROFILE_CONTENT_DIGEST": "${{ needs.prime-r2a-cache.outputs.profile-content-digest }}",
+        "EXPECTED_PROFILE_STATE_DIGEST": "${{ needs.prime-r2a-cache.outputs.profile-state-digest }}",
+        "EXPECTED_TARGET_IDENTITY": "${{ needs.prime-r2a-cache.outputs.target-identity }}",
+        "EXPECTED_BOUNDARY_IDENTITIES": "${{ needs.prime-r2a-cache.outputs.boundary-identities }}",
+        "EXPECTED_SYNTHETIC_MARKER_IDENTITY": "${{ needs.prime-r2a-cache.outputs.synthetic-marker-identity }}",
+        "EXPECTED_OWNERSHIP_RESPONSE_IDENTITY": "${{ needs.prime-r2a-cache.outputs.ownership-response-identity }}",
+        "EXPECTED_OLD_GENERATION_ETAG": "${{ needs.prime-r2a-cache.outputs.old-generation-etag }}",
+        "EXPECTED_TRANSPORT_ARTIFACT_ID": "${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}",
+    }
+    pair_extract_env = _mapping(_step(pair_job, step_id="extracted").get("env"))
+    if any(pair_extract_env.get(key) != value for key, value in exact_extract_bindings.items()):
+        errors.append("R2a policy proof extraction is not bound to exact trusted profile outputs")
+    pair_material = "\n".join(str(step.get("run", "")) for step in pair_steps)
+    for needle in (
+        '--transport-digest "$EXPECTED_TRANSPORT_DIGEST"',
+        '--profile-content-digest "$EXPECTED_PROFILE_CONTENT_DIGEST"',
+        '--state-digest "$EXPECTED_PROFILE_STATE_DIGEST"',
+        '--target-identity "$EXPECTED_TARGET_IDENTITY"',
+        '--synthetic-marker-identity "$EXPECTED_SYNTHETIC_MARKER_IDENTITY"',
+        '--ownership-response-identity "$EXPECTED_OWNERSHIP_RESPONSE_IDENTITY"',
+        '--old-generation-etag "$EXPECTED_OLD_GENERATION_ETAG"',
+        "host-rollout-cache-evidence.py mutate-synthetic-target",
+    ):
+        _require(pair_material, needle, "R2a policy proof is not bound to the exact carried profile or mutation", errors)
+    exact_expected_url_bindings = {
+        "READMATES_HOST_ROLLOUT_EXPECTED_ORIGIN_REVOKED_URL": "${{ needs.prime-r2a-cache.outputs.expected-origin-revoked-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_BFF_REVOKED_URL": "${{ needs.prime-r2a-cache.outputs.expected-bff-revoked-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL": "${{ needs.prime-r2a-cache.outputs.expected-cdn-revoked-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_CDN_CLUB_URL": "${{ needs.prime-r2a-cache.outputs.expected-cdn-club-url }}",
+        "READMATES_HOST_ROLLOUT_EXPECTED_CDN_STABLE_SESSION_URL": "${{ needs.prime-r2a-cache.outputs.expected-cdn-stable-session-url }}",
+    }
+    pair_proof_steps = [step for step in pair_steps if step.get("name") == "Prove exact same-target deny at origin BFF and CDN"]
+    if len(pair_proof_steps) != 1 or any(
+        _mapping(pair_proof_steps[0].get("env")).get(key) != value
+        for key, value in exact_expected_url_bindings.items()
+    ):
+        errors.append("R2a policy proof does not receive exact helper-derived public URLs")
+
+    browser_job = _mapping(jobs.get("browser-r2a-proof"))
+    browser_steps = _steps(browser_job)
+    browser_downloads = [step for step in browser_steps if step.get("uses") == DOWNLOAD_USE]
+    if len(browser_downloads) != 1 or _mapping(browser_downloads[0].get("with")).get("artifact-ids") != "${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}":
+        errors.append("post-wait browser proof does not download the exact primed profile artifact ID")
+    browser_extract_env = _mapping(_step(browser_job, step_id="extracted").get("env"))
+    if any(browser_extract_env.get(key) != value for key, value in exact_extract_bindings.items()):
+        errors.append("post-wait browser extraction is not bound to exact trusted profile outputs")
+    browser_material = "\n".join(str(step.get("run", "")) for step in browser_steps)
+    for needle in (
+        "host-rollout-cache-evidence.py extract-profile",
+        '--transport-artifact-id "$EXPECTED_TRANSPORT_ARTIFACT_ID"',
+        "--command seed-r2a-prechange-cache",
+        "--command playwright-r2a-cache-safety",
+    ):
+        _require(browser_material, needle, "post-wait browser proof is not bound to the same carried profile and exact reports", errors)
+    proof_env = _mapping(_step(browser_job, step_id="proof").get("env"))
+    exact_proof_bindings = {
+        "READMATES_ROLLOUT_CACHE_PHASE": "post-wait",
+        "READMATES_HOST_ROLLOUT_OLD_GENERATION_ETAG": "${{ steps.extracted.outputs.old-generation-etag }}",
+        "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_PROFILE": "${{ steps.extracted.outputs.profile-path }}",
+        "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_STATE": "${{ steps.extracted.outputs.state-path }}",
+        "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_ARTIFACT_ID": "${{ steps.extracted.outputs.profile-identity }}",
+        "READMATES_HOST_ROLLOUT_PRECHANGE_PRIMED_AT": "${{ needs.prime-r2a-cache.outputs.pre-change-cached-at }}",
+        "READMATES_HOST_ROLLOUT_POLICY_DEPLOYED_AT": "${{ needs.bind-r2a-runtime-pair.outputs.policy-deployed-at }}",
+        "READMATES_HOST_ROLLOUT_WAIT_COMPLETED_AT": "${{ needs.wait-r2a-cache-lifetime.outputs.wait-completed-at }}",
+        **exact_expected_url_bindings,
+    }
+    if any(proof_env.get(key) != value for key, value in exact_proof_bindings.items()):
+        errors.append("post-wait browser proof phase, profile, validator, or timestamps are misbound")
+
     cache_report_job = _mapping(jobs.get("cache-report-r2a"))
     cache_report_runs = "\n".join(str(item.get("run", "")) for item in _steps(cache_report_job))
     if _needs(cache_report_job) != {"source", "prime-r2a-cache", "bind-r2a-runtime-pair", "browser-r2a-proof"}:
         errors.append("R2a structured report combiner is not bound to all exact producer jobs")
     for needle in ("report-sha256", "sha256sum", "host-rollout-evidence-reporter.py combine", "cache-safety.report.json"):
         _require(workflow + cache_report_runs, needle, "R2a structured report artifact is not exactly bound and validated", errors)
+    if "needs.prime-r2a-cache.outputs.report-" in cache_report_runs or "needs.prime-r2a-cache.outputs.report-" in workflow:
+        errors.append("R2a report combiner must not accept a pre-wait prime PASS artifact")
 
     for job_name, job_value in jobs.items():
         job = _mapping(job_value)
@@ -831,12 +1059,33 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         "POLICY_DEPLOYED_AT": "${{ needs.bind-r2a-runtime-pair.outputs.policy-deployed-at }}",
         "WAIT_COMPLETED_AT": "${{ needs.wait-r2a-cache-lifetime.outputs.wait-completed-at }}",
         "BROWSER_PROOF_COMPLETED_AT": "${{ needs.browser-r2a-proof.outputs.browser-proof-completed-at }}",
+        "CACHE_PROFILE_ARTIFACT_ID": "${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}",
+        "CACHE_PROFILE_IDENTITY": "${{ needs.prime-r2a-cache.outputs.profile-identity }}",
+        "CACHE_PROFILE_TRANSPORT_DIGEST": "${{ needs.prime-r2a-cache.outputs.profile-transport-digest }}",
+        "CACHE_PROFILE_CONTENT_DIGEST": "${{ needs.prime-r2a-cache.outputs.profile-content-digest }}",
+        "CACHE_PROFILE_STATE_DIGEST": "${{ needs.prime-r2a-cache.outputs.profile-state-digest }}",
+        "CACHE_TARGET_IDENTITY": "${{ needs.prime-r2a-cache.outputs.target-identity }}",
+        "CACHE_BOUNDARY_IDENTITIES": "${{ needs.prime-r2a-cache.outputs.boundary-identities }}",
+        "CACHE_SYNTHETIC_MARKER_IDENTITY": "${{ needs.prime-r2a-cache.outputs.synthetic-marker-identity }}",
+        "CACHE_OWNERSHIP_RESPONSE_IDENTITY": "${{ needs.prime-r2a-cache.outputs.ownership-response-identity }}",
+        "CACHE_MUTATION_RECEIPT_DIGEST": "${{ needs.bind-r2a-runtime-pair.outputs.mutation-receipt-digest }}",
     }
     if any(manifest_env.get(key) != value for key, value in required_bindings.items()):
         errors.append("manifest identity, digest, or time is not bound to exact protected job outputs")
     manifest_run = str(manifest_step.get("run", ""))
     if "json.dumps(manifest" not in manifest_run or "date -u" not in manifest_run or "--schema-only" not in manifest_run:
         errors.append("signer does not construct and schema-check its own bounded manifest")
+    for needle in (
+        "cacheTransport",
+        "profileIdentity",
+        "boundaryIdentities",
+        "syntheticMarkerIdentity",
+        "ownershipResponseIdentity",
+        "mutationReceiptDigest",
+        'report_profile_identity = report["bindings"]["profileIdentity"]',
+        "expected_profile_identity = f\"run-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}-r2a-public-cache\"",
+    ):
+        _require(manifest_run, needle, "signer does not bind the redacted browser profile transport contract", errors)
     if "download" in str(manifest_step.get("name", "")).lower() or "incoming" in manifest_run:
         errors.append("signer must not attest a downloaded caller-authored manifest")
     attest_runs = "\n".join(str(item.get("run", "")) for item in _steps(attest_job))
@@ -952,10 +1201,13 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     for forbidden in ("secret", "hostname", "actorId", "memberId", "resourceId", "tracePath", "notes"):
         if f'"{forbidden}"' in schema:
             errors.append("evidence schema contains a forbidden sensitive/deployment field")
+    for needle in ('"cacheTransport"', '"profileIdentity"', '"targetIdentity"', '"boundaryIdentities"', '"syntheticMarkerIdentity"', '"ownershipResponseIdentity"', '"mutationReceiptDigest"'):
+        _require(schema, needle, "evidence schema omits the redacted cache transport binding", errors)
     report_schema = sources["scripts/schemas/host-rollout-test-report-v1.schema.json"]
     for needle, message in (
         ('"additionalProperties": false', "structured report schema does not deny unknown fields"),
         ('"structured-test-reporter"', "structured report schema does not identify substantive test reporters"),
+        ('"bindings"', "structured report schema omits the cache profile binding"),
     ):
         _require(report_schema, needle, message, errors)
 
@@ -975,10 +1227,12 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     for relative in (
         ".github/workflows/host-client-rollout-evidence.yml",
         "scripts/check-host-client-rollout-contract.py",
+        "scripts/host-rollout-cache-evidence.py",
         "scripts/host-rollout-evidence-reporter.py",
         "scripts/host-rollout-test-contract.json",
         "scripts/host-rollout-workflow-contract.json",
         "scripts/test-host-rollout-evidence-reporter.py",
+        "scripts/test-host-rollout-cache-evidence.py",
         "scripts/validate-host-rollout-candidate.py",
         "scripts/verify-host-client-rollout-evidence.py",
         "scripts/schemas/host-client-rollout-evidence-v1.schema.json",
@@ -993,6 +1247,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     _require(fixtures, "python3 -B scripts/check-host-client-rollout-contract.py", "public fixtures omit structural mode", errors)
     _require(fixtures, "python3 -B scripts/verify-host-client-rollout-evidence.py --self-test", "public fixtures omit verifier self-test", errors)
     _require(fixtures, "python3 -B scripts/test-host-rollout-evidence-reporter.py", "public fixtures omit structured reporter self-test", errors)
+    _require(fixtures, "python3 -B scripts/test-host-rollout-cache-evidence.py", "public fixtures omit cache transport adversarial self-test", errors)
     _require(fixtures, "python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready", "public fixtures omit artifact-ready reporter contract check", errors)
     _require(fixtures, "python3 -B scripts/validate-host-rollout-candidate.py --self-test", "public fixtures omit candidate archive adversarial self-test", errors)
 
@@ -1030,6 +1285,18 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         ("artifact-ready", "repository-only readiness boundary is undocumented"),
         ("OCI_SSH_KNOWN_HOSTS", "pinned OCI host identity secret contract is undocumented"),
         ("StrictHostKeyChecking=yes", "strict OCI host identity verification is undocumented"),
+        ("rollout-synthetic-", "protected synthetic public fixture namespace is undocumented"),
+        ("numeric transport artifact ID", "numeric profile transport artifact binding is undocumented"),
+        ("public-only tar", "public-only persistent browser transport is undocumented"),
+        ("SESSION_REVERSE", "same-target synthetic revoke mutation is undocumented"),
+        ("target와 boundary category별 HMAC", "redacted target and boundary manifest identities are undocumented"),
+        ("/api/bff/api/host/club-operations", "existing host club ownership endpoint is undocumented"),
+        ("/api/bff/api/host/sessions/{sessionId}", "existing host session ownership endpoint is undocumented"),
+        ("ownershipResponseIdentity", "normalized ownership response HMAC is undocumented"),
+        ("run-derived non-secret idempotency identifier", "non-secret reconciliation identifier contract is undocumented"),
+        ("same-origin 3xx", "privileged no-redirect cookie boundary is undocumented"),
+        ("response.url()", "C1 exact browser final-URL handoff is undocumented"),
+        ("O_NOFOLLOW", "pre-extraction single-read trust boundary is undocumented"),
     ):
         _require(docs, needle, message, errors)
     if re.search(r"sha256:[0-9a-f]{64}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", docs):
@@ -1349,14 +1616,14 @@ class RolloutContractTests(unittest.TestCase):
             (
                 "direct wrangler bypass",
                 workflow_path,
-                "printf 'pre-change-cached-at=%s\\n'",
-                "npx wrangler pages deploy dist\\n          printf 'pre-change-cached-at=%s\\n'",
+                "python3 -B scripts/host-rollout-cache-evidence.py validate-config \\",
+                "npx wrangler pages deploy dist\\n          python3 -B scripts/host-rollout-cache-evidence.py validate-config \\",
             ),
             (
                 "direct OCI bypass",
                 workflow_path,
-                "printf 'pre-change-cached-at=%s\\n'",
-                "./deploy/oci/05-deploy-compose-stack.sh\\n          printf 'pre-change-cached-at=%s\\n'",
+                "python3 -B scripts/host-rollout-cache-evidence.py validate-config \\",
+                "./deploy/oci/05-deploy-compose-stack.sh\\n          python3 -B scripts/host-rollout-cache-evidence.py validate-config \\",
             ),
             (
                 "direct ghcr bypass",
@@ -1581,6 +1848,231 @@ class RolloutContractTests(unittest.TestCase):
                 self.assertIn("actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e", uses)
                 self.assertIn("pnpm install --frozen-lockfile", runs)
                 self.assertIn("playwright install --with-deps chromium", runs)
+
+    def test_r2a_cache_transport_is_causal_and_rejects_adversarial_workflow_mutations(self) -> None:
+        workflow_path = ".github/workflows/host-client-rollout-evidence.yml"
+        baseline = _read_sources(REPO_ROOT)
+        workflow = baseline[workflow_path]
+        required = (
+            "python3 -B scripts/host-rollout-cache-evidence.py validate-config",
+            "python3 -B scripts/host-rollout-cache-evidence.py package-profile",
+            "python3 -B scripts/host-rollout-cache-evidence.py mutate-synthetic-target",
+            "python3 -B scripts/host-rollout-cache-evidence.py extract-profile",
+            "READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}",
+            "READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}",
+            "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_PROFILE:",
+            "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_STATE:",
+            "READMATES_HOST_ROLLOUT_OLD_GENERATION_ETAG:",
+            "retention-days: 1",
+            "artifact-ids: ${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}",
+            "CACHE_PROFILE_TRANSPORT_DIGEST",
+            "CACHE_PROFILE_CONTENT_DIGEST",
+            "CACHE_PROFILE_STATE_DIGEST",
+            "CACHE_TARGET_IDENTITY",
+            "CACHE_BOUNDARY_IDENTITIES",
+        )
+        for needle in required:
+            self.assertIn(needle, workflow)
+        self.assertNotIn("host-rollout-evidence-reporter.py run-command", "\n".join(
+            str(step.get("run", ""))
+            for step in _steps(_mapping(_mapping(_parse_workflow_yaml(workflow).get("jobs")).get("prime-r2a-cache")))
+        ))
+
+        cases = (
+            (
+                "missing boundary env",
+                "          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}\n",
+                "",
+            ),
+            (
+                "localhost boundary",
+                "${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}",
+                "https://localhost",
+            ),
+            (
+                "fresh profile",
+                "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_PROFILE: ${{ runner.temp }}/host-rollout-cache/profile",
+                "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_PROFILE: ${{ runner.temp }}/fresh-profile",
+            ),
+            (
+                "tampered transport digest",
+                "${{ needs.prime-r2a-cache.outputs.profile-transport-digest }}",
+                "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+            ),
+            (
+                "wrong transport artifact",
+                "artifact-ids: ${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}",
+                "artifact-ids: ${{ needs.pages-candidate.outputs.artifact-id }}",
+            ),
+            (
+                "sub 720 wait",
+                "base_epoch + 720",
+                "base_epoch + 719",
+            ),
+            (
+                "target mismatch",
+                "${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}",
+                "${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}",
+            ),
+            (
+                "mutation no-op",
+                "mutate-synthetic-target",
+                "validate-config",
+            ),
+            (
+                "prime produces PASS",
+                "python3 -B scripts/host-rollout-cache-evidence.py package-profile",
+                "python3 -B scripts/host-rollout-evidence-reporter.py run-command --group cache-safety --command seed-r2a-prechange-cache && python3 -B scripts/host-rollout-cache-evidence.py package-profile",
+            ),
+            (
+                "report command misbinding",
+                "--command seed-r2a-prechange-cache",
+                "--command playwright-r2a-cache-safety",
+            ),
+        )
+        for name, old, new in cases:
+            sources = _read_sources(REPO_ROOT)
+            self.assertIn(old, sources[workflow_path], name)
+            sources[workflow_path] = sources[workflow_path].replace(old, new, 1)
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(sources))
+
+    def test_cache_security_boundary_rejects_redirect_hmac_marker_identity_and_preextract_bypasses(self) -> None:
+        workflow_path = ".github/workflows/host-client-rollout-evidence.yml"
+        helper_path = "scripts/host-rollout-cache-evidence.py"
+        sources = _read_sources(REPO_ROOT)
+        helper = sources[helper_path]
+        workflow = sources[workflow_path]
+        for needle in (
+            "class _NoRedirect(urllib.request.HTTPRedirectHandler)",
+            "hmac.new(",
+            "validate_synthetic_ownership",
+            "verify_synthetic_ownership(config)",
+            "_validated_archive_payload",
+            "syntheticMarkerIdentity",
+        ):
+            self.assertIn(needle, helper)
+        for needle in (
+            "READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}",
+            'report["bindings"]["profileIdentity"]',
+            'expected_profile_identity = f"run-{os.environ[\'GITHUB_RUN_ID\']}-attempt-{os.environ[\'GITHUB_RUN_ATTEMPT\']}-r2a-public-cache"',
+            '"syntheticMarkerIdentity"',
+        ):
+            self.assertIn(needle, workflow)
+        self.assertNotIn("READMATES_HOST_ROLLOUT_SYNTHETIC_IDEMPOTENCY_KEY", workflow)
+
+        def refresh_contract(mutated: dict[str, str]) -> dict[str, str]:
+            asts = {path: _parse_workflow_yaml(mutated[path]) for path in WORKFLOW_CONTRACT_WORKFLOWS}
+            contract = json.loads(mutated[WORKFLOW_CONTRACT_PATH])
+            contract["workflows"] = _workflow_contract_document(asts)["workflows"]
+            mutated[WORKFLOW_CONTRACT_PATH] = json.dumps(contract)
+            return mutated
+
+        helper_cases = (
+            (
+                "redirect handler removed",
+                "class _NoRedirect(urllib.request.HTTPRedirectHandler)",
+                "class _NoRedirect(object)",
+            ),
+            ("stdlib HMAC removed", "hmac.new(", "hmac_removed("),
+            ("ownership check removed", "verify_synthetic_ownership(config)", "None"),
+            ("pre-extraction verifier removed", "_validated_archive_payload", "_untrusted_archive_payload"),
+        )
+        for name, old, new in helper_cases:
+            mutated = _read_sources(REPO_ROOT)
+            self.assertIn(old, mutated[helper_path], name)
+            mutated[helper_path] = mutated[helper_path].replace(old, new, 1)
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(mutated))
+
+    def test_existing_ownership_endpoints_and_exact_public_url_handoff_fail_closed(self) -> None:
+        workflow_path = ".github/workflows/host-client-rollout-evidence.yml"
+        helper_path = "scripts/host-rollout-cache-evidence.py"
+        sources = _read_sources(REPO_ROOT)
+        helper = sources[helper_path]
+        workflow = sources[workflow_path]
+        self.assertNotIn("/api/bff/api/host/rollout-evidence/synthetic-targets/", helper)
+        for needle in (
+            "api/bff/api/host/club-operations",
+            "api/bff/api/host/sessions/{config.synthetic_session_id}",
+            "_open_public_exact",
+            "ownershipResponseIdentity",
+        ):
+            self.assertIn(needle, helper)
+        for needle in (
+            "READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}",
+            "READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}",
+            "READMATES_HOST_ROLLOUT_EXPECTED_ORIGIN_REVOKED_URL:",
+            "READMATES_HOST_ROLLOUT_EXPECTED_BFF_REVOKED_URL:",
+            "READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL:",
+            "READMATES_HOST_ROLLOUT_EXPECTED_CDN_CLUB_URL:",
+            "READMATES_HOST_ROLLOUT_EXPECTED_CDN_STABLE_SESSION_URL:",
+            '"ownershipResponseIdentity"',
+        ):
+            self.assertIn(needle, workflow)
+
+        def refresh_contract(mutated: dict[str, str]) -> dict[str, str]:
+            asts = {path: _parse_workflow_yaml(mutated[path]) for path in WORKFLOW_CONTRACT_WORKFLOWS}
+            contract = json.loads(mutated[WORKFLOW_CONTRACT_PATH])
+            contract["workflows"] = _workflow_contract_document(asts)["workflows"]
+            mutated[WORKFLOW_CONTRACT_PATH] = json.dumps(contract)
+            return mutated
+
+        for name, old, new in (
+            (
+                "bespoke missing ownership endpoint restored",
+                "api/bff/api/host/club-operations",
+                "api/bff/api/host/rollout-evidence/synthetic-targets/{config.synthetic_session_id}",
+            ),
+            (
+                "public exact opener bypassed",
+                'with _open_public_exact(request, f"prechange {label}", expected_url) as response:',
+                "with urllib.request.urlopen(request, timeout=HTTP_TIMEOUT_SECONDS) as response:",
+            ),
+            (
+                "ownership response binding omitted",
+                '"ownershipResponseIdentity": ownership_response_identity,',
+                '"ignoredOwnershipResponseIdentity": ownership_response_identity,',
+            ),
+        ):
+            mutated = _read_sources(REPO_ROOT)
+            self.assertIn(old, mutated[helper_path], name)
+            mutated[helper_path] = mutated[helper_path].replace(old, new, 1)
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(mutated))
+
+        mutated = _read_sources(REPO_ROOT)
+        old = "          READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL: ${{ needs.prime-r2a-cache.outputs.expected-cdn-revoked-url }}\n"
+        self.assertIn(old, mutated[workflow_path])
+        mutated[workflow_path] = mutated[workflow_path].replace(old, "", 1)
+        mutated = refresh_contract(mutated)
+        self.assertTrue(validate_structural_sources(mutated))
+
+        workflow_cases = (
+            (
+                "marker identity omitted",
+                "          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}\n",
+                "",
+            ),
+            (
+                "secret idempotency key restored",
+                "          READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}\n",
+                "          READMATES_HOST_ROLLOUT_SYNTHETIC_IDEMPOTENCY_KEY: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_IDEMPOTENCY_KEY }}\n"
+                "          READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}\n",
+            ),
+            (
+                "report profile binding ignored",
+                'report["bindings"]["profileIdentity"]',
+                'os.environ["CACHE_PROFILE_IDENTITY"]',
+            ),
+        )
+        for name, old, new in workflow_cases:
+            mutated = _read_sources(REPO_ROOT)
+            self.assertIn(old, mutated[workflow_path], name)
+            mutated[workflow_path] = mutated[workflow_path].replace(old, new, 1)
+            mutated = refresh_contract(mutated)
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(mutated))
 
     def test_pages_only_digest_candidate_source_set_and_repository_bindings_fail_closed(self) -> None:
         mutations = []

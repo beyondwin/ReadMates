@@ -126,6 +126,88 @@ class HostRolloutEvidenceReporterTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(self.reporter.ReporterError):
                 self.reporter.validate_report(mutation, "compatibility", self.config)
 
+    def test_cache_reports_bind_one_exact_protected_run_profile_across_partials_and_combined_report(self) -> None:
+        config = {
+            "schemaVersion": "readmates.host-rollout.test-contract.v1",
+            "groups": {
+                "cache-safety": {
+                    "commands": [
+                        {
+                            "id": "seed-r2a-prechange-cache",
+                            "argv": ["corepack", "pnpm", "--dir", "front", "test"],
+                            "timeoutSeconds": 60,
+                            "requiredPaths": ["front/package.json"],
+                            "cases": ["case-a"],
+                        },
+                        {
+                            "id": "playwright-r2a-cache-safety",
+                            "argv": ["corepack", "pnpm", "--dir", "front", "test"],
+                            "timeoutSeconds": 60,
+                            "requiredPaths": ["front/package.json"],
+                            "cases": ["case-b"],
+                        },
+                    ]
+                }
+            },
+        }
+        profile_identity = "run-1234-attempt-2-r2a-public-cache"
+        reports = []
+        for command_id, case_id, completed in (
+            ("seed-r2a-prechange-cache", "case-a", "2026-08-24T01:00:00Z"),
+            ("playwright-r2a-cache-safety", "case-b", "2026-08-24T01:13:00Z"),
+        ):
+            reports.append(
+                {
+                    "schemaVersion": "readmates.host-rollout.test-report.v1",
+                    "group": "cache-safety",
+                    "bindings": {"profileIdentity": profile_identity},
+                    "commands": [{"id": command_id, "result": "PASS", "source": "structured-test-reporter"}],
+                    "cases": [{"id": case_id, "result": "PASS", "commandId": command_id}],
+                    "completedAt": completed,
+                }
+            )
+        for report in reports:
+            self.reporter.validate_report(report, "cache-safety", config, allow_partial=True)
+
+        environment = {
+            "GITHUB_RUN_ID": "1234",
+            "GITHUB_RUN_ATTEMPT": "2",
+            "READMATES_HOST_ROLLOUT_PRIMED_BROWSER_ARTIFACT_ID": profile_identity,
+        }
+        self.assertEqual(self.reporter.protected_profile_identity(environment), profile_identity)
+        for name, mutate in (
+            ("run mismatch", lambda value: value.update(GITHUB_RUN_ID="9999")),
+            ("attempt mismatch", lambda value: value.update(GITHUB_RUN_ATTEMPT="3")),
+            (
+                "logical artifact mismatch",
+                lambda value: value.update(
+                    READMATES_HOST_ROLLOUT_PRIMED_BROWSER_ARTIFACT_ID="run-9999-attempt-3-r2a-public-cache"
+                ),
+            ),
+        ):
+            changed = dict(environment)
+            mutate(changed)
+            with self.subTest(name=name), self.assertRaises(self.reporter.ReporterError):
+                self.reporter.protected_profile_identity(changed)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            inputs = []
+            for index, report in enumerate(reports):
+                path = root / f"partial-{index}.json"
+                path.write_text(json.dumps(report), encoding="utf-8")
+                inputs.append(path)
+            output = root / "combined.json"
+            self.reporter.combine_reports(config, "cache-safety", inputs, output)
+            combined = json.loads(output.read_text(encoding="utf-8"))
+            self.assertEqual(combined["bindings"]["profileIdentity"], profile_identity)
+
+            mismatch = json.loads(json.dumps(reports[1]))
+            mismatch["bindings"]["profileIdentity"] = "run-9999-attempt-1-r2a-public-cache"
+            inputs[1].write_text(json.dumps(mismatch), encoding="utf-8")
+            with self.assertRaises(self.reporter.ReporterError):
+                self.reporter.combine_reports(config, "cache-safety", inputs, root / "mismatch.json")
+
     def test_report_timestamp_must_be_inside_actual_command_window(self) -> None:
         started = datetime(2026, 8, 24, 1, 0, tzinfo=timezone.utc)
         completed = datetime(2026, 8, 24, 1, 1, tzinfo=timezone.utc)

@@ -205,9 +205,22 @@ jobs:
       name: host-client-rollout-r2a
       deployment: false
     outputs:
-      pre-change-cached-at: ${{ steps.prime.outputs.pre-change-cached-at }}
-      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
-      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
+      pre-change-cached-at: ${{ steps.profile.outputs.pre-change-cached-at }}
+      old-generation-etag: ${{ steps.profile.outputs.old-generation-etag }}
+      profile-artifact-id: ${{ steps.upload-profile.outputs.artifact-id }}
+      profile-identity: ${{ steps.profile.outputs.profile-identity }}
+      profile-transport-digest: ${{ steps.profile.outputs.profile-transport-digest }}
+      profile-content-digest: ${{ steps.profile.outputs.profile-content-digest }}
+      profile-state-digest: ${{ steps.profile.outputs.profile-state-digest }}
+      target-identity: ${{ steps.profile.outputs.target-identity }}
+      boundary-identities: ${{ steps.profile.outputs.boundary-identities }}
+      synthetic-marker-identity: ${{ steps.profile.outputs.synthetic-marker-identity }}
+      ownership-response-identity: ${{ steps.profile.outputs.ownership-response-identity }}
+      expected-origin-revoked-url: ${{ steps.preflight.outputs.expected-origin-revoked-url }}
+      expected-bff-revoked-url: ${{ steps.preflight.outputs.expected-bff-revoked-url }}
+      expected-cdn-revoked-url: ${{ steps.preflight.outputs.expected-cdn-revoked-url }}
+      expected-cdn-club-url: ${{ steps.preflight.outputs.expected-cdn-club-url }}
+      expected-cdn-stable-session-url: ${{ steps.preflight.outputs.expected-cdn-stable-session-url }}
     steps:
       - name: Check out exact protected SHA
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -227,37 +240,99 @@ jobs:
           corepack prepare pnpm@11.13.1 --activate
           corepack pnpm install --frozen-lockfile
           corepack pnpm --dir front exec playwright install --with-deps chromium
-      - name: Prime real previous-policy browser cache
-        id: prime
+      - name: Validate protected synthetic target and capture its old validator
+        id: preflight
         env:
-          READMATES_ROLLOUT_CACHE_PHASE: pre-change
           GITHUB_ACTIONS: "true"
           READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_HOST_ROLLOUT_REF_PROTECTED: ${{ github.ref_protected }}
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}
+          READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY: ${{ secrets.READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p front/output/host-rollout/reports
-          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
-            --group cache-safety \
-            --command seed-r2a-prechange-cache \
-            --output front/output/host-rollout/reports/cache-seed.report.json
-          printf 'pre-change-cached-at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-      - name: Hash structured pre-change report
-        id: report-digest
+          python3 -B scripts/host-rollout-cache-evidence.py validate-config \
+            --probe \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Prime only the protected public synthetic browser profile
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_ROLLOUT_CACHE_PHASE: pre-change
+          READMATES_HOST_ROLLOUT_COMMAND_ID: seed-r2a-prechange-cache
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_EXPECTED_ORIGIN_REVOKED_URL: ${{ steps.preflight.outputs.expected-origin-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_BFF_REVOKED_URL: ${{ steps.preflight.outputs.expected-bff-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL: ${{ steps.preflight.outputs.expected-cdn-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_CLUB_URL: ${{ steps.preflight.outputs.expected-cdn-club-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_STABLE_SESSION_URL: ${{ steps.preflight.outputs.expected-cdn-stable-session-url }}
+          READMATES_HOST_ROLLOUT_OLD_GENERATION_ETAG: ${{ steps.preflight.outputs.old-generation-etag }}
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_PROFILE: ${{ runner.temp }}/host-rollout-cache/profile
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_STATE: ${{ runner.temp }}/host-rollout-cache/primed-browser-state.json
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_ARTIFACT_ID: run-${{ github.run_id }}-attempt-${{ github.run_attempt }}-r2a-public-cache
         shell: bash
         run: |
           set -euo pipefail
-          digest="$(sha256sum front/output/host-rollout/reports/cache-seed.report.json | cut -d ' ' -f 1)"
-          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
-          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
-      - name: Upload structured pre-change report without repackaging
-        id: upload-report
+          mkdir -p "$RUNNER_TEMP/host-rollout-cache"
+          corepack pnpm --dir front exec playwright test \
+            tests/e2e/public-projection-cache-safety.spec.ts \
+            --grep @prechange
+          test ! -e front/output/host-rollout/reports/cache-seed.report.json
+      - name: Package the public-only persistent profile and state
+        id: profile
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_HOST_ROLLOUT_REF_PROTECTED: ${{ github.ref_protected }}
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}
+          READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY: ${{ secrets.READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY }}
+          EXPECTED_OLD_GENERATION_ETAG: ${{ steps.preflight.outputs.old-generation-etag }}
+          EXPECTED_OWNERSHIP_RESPONSE_IDENTITY: ${{ steps.preflight.outputs.ownership-response-identity }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/host-rollout-cache-evidence.py package-profile \
+            --profile "$RUNNER_TEMP/host-rollout-cache/profile" \
+            --state "$RUNNER_TEMP/host-rollout-cache/primed-browser-state.json" \
+            --archive "$RUNNER_TEMP/readmates-r2a-public-cache-profile.tar" \
+            --profile-identity "run-${GITHUB_RUN_ID}-attempt-${GITHUB_RUN_ATTEMPT}-r2a-public-cache" \
+            --ownership-response-identity "$EXPECTED_OWNERSHIP_RESPONSE_IDENTITY" \
+            --github-output "$GITHUB_OUTPUT"
+          test "$EXPECTED_OLD_GENERATION_ETAG" = "$(python3 -B -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["oldGenerationEtag"])' "$RUNNER_TEMP/host-rollout-cache/primed-browser-state.json")"
+      - name: Upload exact public-only browser profile transport
+        id: upload-profile
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          path: front/output/host-rollout/reports/cache-seed.report.json
+          name: r2a-public-cache-profile-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/readmates-r2a-public-cache-profile.tar
           archive: false
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
 
   build-r2a-policy:
     name: Build and publish exact R2a backend policy
@@ -343,6 +418,7 @@ jobs:
     name: Bind deployed R2a backend and Pages runtime pair
     needs:
       - source
+      - prime-r2a-cache
       - pages-candidate
       - deploy-r2a-policy
       - deploy-r2a-pages
@@ -352,10 +428,14 @@ jobs:
     environment:
       name: host-client-rollout-r2a
       deployment: false
+    permissions:
+      actions: read
+      contents: read
     outputs:
       backend-digest: ${{ steps.bind.outputs.backend-digest }}
       pages-digest: ${{ steps.bind.outputs.pages-digest }}
       policy-deployed-at: ${{ steps.bind.outputs.policy-deployed-at }}
+      mutation-receipt-digest: ${{ steps.mutation.outputs.mutation-receipt-digest }}
       report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
       report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
     steps:
@@ -377,7 +457,82 @@ jobs:
           corepack prepare pnpm@11.13.1 --activate
           corepack pnpm install --frozen-lockfile
           corepack pnpm --dir front exec playwright install --with-deps chromium
-      - name: Bind exact deployed digests after both runtime health proofs
+      - name: Download the exact primed public browser transport
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}
+          path: ${{ runner.temp }}/host-rollout-cache-transport
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Validate and extract the exact primed profile
+        id: extracted
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_HOST_ROLLOUT_REF_PROTECTED: ${{ github.ref_protected }}
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}
+          READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY: ${{ secrets.READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY }}
+          EXPECTED_PROFILE_IDENTITY: ${{ needs.prime-r2a-cache.outputs.profile-identity }}
+          EXPECTED_TRANSPORT_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-transport-digest }}
+          EXPECTED_PROFILE_CONTENT_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-content-digest }}
+          EXPECTED_PROFILE_STATE_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-state-digest }}
+          EXPECTED_TARGET_IDENTITY: ${{ needs.prime-r2a-cache.outputs.target-identity }}
+          EXPECTED_BOUNDARY_IDENTITIES: ${{ needs.prime-r2a-cache.outputs.boundary-identities }}
+          EXPECTED_SYNTHETIC_MARKER_IDENTITY: ${{ needs.prime-r2a-cache.outputs.synthetic-marker-identity }}
+          EXPECTED_OWNERSHIP_RESPONSE_IDENTITY: ${{ needs.prime-r2a-cache.outputs.ownership-response-identity }}
+          EXPECTED_OLD_GENERATION_ETAG: ${{ needs.prime-r2a-cache.outputs.old-generation-etag }}
+          EXPECTED_TRANSPORT_ARTIFACT_ID: ${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/host-rollout-cache-evidence.py extract-profile \
+            --archive "$RUNNER_TEMP/host-rollout-cache-transport/readmates-r2a-public-cache-profile.tar" \
+            --destination "$RUNNER_TEMP/host-rollout-cache" \
+            --profile-identity "$EXPECTED_PROFILE_IDENTITY" \
+            --transport-digest "$EXPECTED_TRANSPORT_DIGEST" \
+            --profile-content-digest "$EXPECTED_PROFILE_CONTENT_DIGEST" \
+            --state-digest "$EXPECTED_PROFILE_STATE_DIGEST" \
+            --target-identity "$EXPECTED_TARGET_IDENTITY" \
+            --boundary-identities "$EXPECTED_BOUNDARY_IDENTITIES" \
+            --synthetic-marker-identity "$EXPECTED_SYNTHETIC_MARKER_IDENTITY" \
+            --ownership-response-identity "$EXPECTED_OWNERSHIP_RESPONSE_IDENTITY" \
+            --old-generation-etag "$EXPECTED_OLD_GENERATION_ETAG" \
+            --transport-artifact-id "$EXPECTED_TRANSPORT_ARTIFACT_ID" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Revoke the same pre-provisioned synthetic target idempotently
+        id: mutation
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_HOST_ROLLOUT_REF_PROTECTED: ${{ github.ref_protected }}
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}
+          READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY: ${{ secrets.READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/host-rollout-cache-evidence.py mutate-synthetic-target \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Bind exact deployed digests and post-mutation policy timestamp
         id: bind
         env:
           EXPECTED_PAGES_DIGEST: ${{ needs.pages-candidate.outputs.pages-digest }}
@@ -386,8 +541,6 @@ jobs:
           BACKEND_DEPLOYED_AT: ${{ needs.deploy-r2a-policy.outputs.backend-deployed-at }}
           PAGES_DEPLOYED_AT: ${{ needs.deploy-r2a-pages.outputs.deployed-at }}
           PAGES_RUNTIME_HEALTH_AT: ${{ needs.deploy-r2a-pages.outputs.runtime-health-at }}
-          GITHUB_ACTIONS: "true"
-          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
         shell: bash
         run: |
           set -euo pipefail
@@ -396,13 +549,6 @@ jobs:
           for timestamp in "$BACKEND_DEPLOYED_AT" "$PAGES_DEPLOYED_AT" "$PAGES_RUNTIME_HEALTH_AT"; do
             date -u -d "$timestamp" +%s >/dev/null
           done
-          curl --fail --silent --show-error --location --max-time 20 --retry 5 --retry-all-errors \
-            --output /dev/null https://readmates.pages.dev/app
-          mkdir -p front/output/host-rollout/reports
-          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
-            --group cache-safety \
-            --command deploy-r2a-cache-policy \
-            --output front/output/host-rollout/reports/cache-deploy.report.json
           paired_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           test "$(date -u -d "$paired_at" +%s)" -ge "$(date -u -d "$PAGES_RUNTIME_HEALTH_AT" +%s)"
           {
@@ -410,6 +556,36 @@ jobs:
             printf 'pages-digest=%s\n' "$DEPLOYED_PAGES_DIGEST"
             printf 'policy-deployed-at=%s\n' "$paired_at"
           } >> "$GITHUB_OUTPUT"
+      - name: Prove exact same-target deny at origin BFF and CDN
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_ROLLOUT_CACHE_PHASE: policy-deployed
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_EXPECTED_ORIGIN_REVOKED_URL: ${{ needs.prime-r2a-cache.outputs.expected-origin-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_BFF_REVOKED_URL: ${{ needs.prime-r2a-cache.outputs.expected-bff-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL: ${{ needs.prime-r2a-cache.outputs.expected-cdn-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_CLUB_URL: ${{ needs.prime-r2a-cache.outputs.expected-cdn-club-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_STABLE_SESSION_URL: ${{ needs.prime-r2a-cache.outputs.expected-cdn-stable-session-url }}
+          READMATES_HOST_ROLLOUT_OLD_GENERATION_ETAG: ${{ steps.extracted.outputs.old-generation-etag }}
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_PROFILE: ${{ steps.extracted.outputs.profile-path }}
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_STATE: ${{ steps.extracted.outputs.state-path }}
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_ARTIFACT_ID: ${{ steps.extracted.outputs.profile-identity }}
+          READMATES_HOST_ROLLOUT_PRECHANGE_PRIMED_AT: ${{ needs.prime-r2a-cache.outputs.pre-change-cached-at }}
+          READMATES_HOST_ROLLOUT_POLICY_DEPLOYED_AT: ${{ steps.bind.outputs.policy-deployed-at }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p front/output/host-rollout/reports
+          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
+            --group cache-safety \
+            --command deploy-r2a-cache-policy \
+            --output front/output/host-rollout/reports/cache-deploy.report.json
       - name: Hash structured deployed-pair report
         id: report-digest
         shell: bash
@@ -461,6 +637,8 @@ jobs:
     name: Prove R2a cache behavior after the real wait
     needs:
       - source
+      - prime-r2a-cache
+      - bind-r2a-runtime-pair
       - wait-r2a-cache-lifetime
     if: ${{ needs.source.outputs.stage == 'r2a' && needs.wait-r2a-cache-lifetime.result == 'success' }}
     runs-on: ubuntu-latest
@@ -468,10 +646,15 @@ jobs:
     environment:
       name: host-client-rollout-r2a
       deployment: false
+    permissions:
+      actions: read
+      contents: read
     outputs:
       browser-proof-completed-at: ${{ steps.proof.outputs.browser-proof-completed-at }}
-      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
-      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
+      seed-report-artifact-id: ${{ steps.upload-seed-report.outputs.artifact-id }}
+      seed-report-sha256: ${{ steps.report-digests.outputs.seed-report-sha256 }}
+      browser-report-artifact-id: ${{ steps.upload-browser-report.outputs.artifact-id }}
+      browser-report-sha256: ${{ steps.report-digests.outputs.browser-report-sha256 }}
     steps:
       - name: Check out exact protected SHA
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -491,30 +674,118 @@ jobs:
           corepack prepare pnpm@11.13.1 --activate
           corepack pnpm install --frozen-lockfile
           corepack pnpm --dir front exec playwright install --with-deps chromium
-      - name: Run the bounded C1 cache proof
+      - name: Download the exact primed public browser transport
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}
+          path: ${{ runner.temp }}/host-rollout-cache-transport
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Validate and extract the same primed profile
+        id: extracted
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_HOST_ROLLOUT_REF_PROTECTED: ${{ github.ref_protected }}
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_CLUB_ID }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_VALUE }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_EXPECTED_REVISION }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY: ${{ vars.READMATES_HOST_ROLLOUT_SYNTHETIC_MARKER_IDENTITY }}
+          READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE: ${{ secrets.READMATES_HOST_ROLLOUT_SYNTHETIC_AUTH_COOKIE }}
+          READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY: ${{ secrets.READMATES_HOST_ROLLOUT_EVIDENCE_HMAC_KEY }}
+          EXPECTED_PROFILE_IDENTITY: ${{ needs.prime-r2a-cache.outputs.profile-identity }}
+          EXPECTED_TRANSPORT_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-transport-digest }}
+          EXPECTED_PROFILE_CONTENT_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-content-digest }}
+          EXPECTED_PROFILE_STATE_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-state-digest }}
+          EXPECTED_TARGET_IDENTITY: ${{ needs.prime-r2a-cache.outputs.target-identity }}
+          EXPECTED_BOUNDARY_IDENTITIES: ${{ needs.prime-r2a-cache.outputs.boundary-identities }}
+          EXPECTED_SYNTHETIC_MARKER_IDENTITY: ${{ needs.prime-r2a-cache.outputs.synthetic-marker-identity }}
+          EXPECTED_OWNERSHIP_RESPONSE_IDENTITY: ${{ needs.prime-r2a-cache.outputs.ownership-response-identity }}
+          EXPECTED_OLD_GENERATION_ETAG: ${{ needs.prime-r2a-cache.outputs.old-generation-etag }}
+          EXPECTED_TRANSPORT_ARTIFACT_ID: ${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -B scripts/host-rollout-cache-evidence.py extract-profile \
+            --archive "$RUNNER_TEMP/host-rollout-cache-transport/readmates-r2a-public-cache-profile.tar" \
+            --destination "$RUNNER_TEMP/host-rollout-cache" \
+            --profile-identity "$EXPECTED_PROFILE_IDENTITY" \
+            --transport-digest "$EXPECTED_TRANSPORT_DIGEST" \
+            --profile-content-digest "$EXPECTED_PROFILE_CONTENT_DIGEST" \
+            --state-digest "$EXPECTED_PROFILE_STATE_DIGEST" \
+            --target-identity "$EXPECTED_TARGET_IDENTITY" \
+            --boundary-identities "$EXPECTED_BOUNDARY_IDENTITIES" \
+            --synthetic-marker-identity "$EXPECTED_SYNTHETIC_MARKER_IDENTITY" \
+            --ownership-response-identity "$EXPECTED_OWNERSHIP_RESPONSE_IDENTITY" \
+            --old-generation-etag "$EXPECTED_OLD_GENERATION_ETAG" \
+            --transport-artifact-id "$EXPECTED_TRANSPORT_ARTIFACT_ID" \
+            --github-output "$GITHUB_OUTPUT"
+      - name: Run seed and browser cases only with the carried profile after the wait
         id: proof
         env:
           GITHUB_ACTIONS: "true"
           READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+          READMATES_ROLLOUT_CACHE_PHASE: post-wait
+          READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_ORIGIN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_BFF_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_BFF_BASE_URL }}
+          READMATES_HOST_ROLLOUT_CDN_BASE_URL: ${{ vars.READMATES_HOST_ROLLOUT_CDN_BASE_URL }}
+          READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_CLUB_PATH }}
+          READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_PUBLIC_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH: ${{ vars.READMATES_HOST_ROLLOUT_REVOKED_SESSION_PATH }}
+          READMATES_HOST_ROLLOUT_EXPECTED_ORIGIN_REVOKED_URL: ${{ needs.prime-r2a-cache.outputs.expected-origin-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_BFF_REVOKED_URL: ${{ needs.prime-r2a-cache.outputs.expected-bff-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_REVOKED_URL: ${{ needs.prime-r2a-cache.outputs.expected-cdn-revoked-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_CLUB_URL: ${{ needs.prime-r2a-cache.outputs.expected-cdn-club-url }}
+          READMATES_HOST_ROLLOUT_EXPECTED_CDN_STABLE_SESSION_URL: ${{ needs.prime-r2a-cache.outputs.expected-cdn-stable-session-url }}
+          READMATES_HOST_ROLLOUT_OLD_GENERATION_ETAG: ${{ steps.extracted.outputs.old-generation-etag }}
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_PROFILE: ${{ steps.extracted.outputs.profile-path }}
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_STATE: ${{ steps.extracted.outputs.state-path }}
+          READMATES_HOST_ROLLOUT_PRIMED_BROWSER_ARTIFACT_ID: ${{ steps.extracted.outputs.profile-identity }}
+          READMATES_HOST_ROLLOUT_PRECHANGE_PRIMED_AT: ${{ needs.prime-r2a-cache.outputs.pre-change-cached-at }}
+          READMATES_HOST_ROLLOUT_POLICY_DEPLOYED_AT: ${{ needs.bind-r2a-runtime-pair.outputs.policy-deployed-at }}
+          READMATES_HOST_ROLLOUT_WAIT_COMPLETED_AT: ${{ needs.wait-r2a-cache-lifetime.outputs.wait-completed-at }}
         shell: bash
         run: |
           set -euo pipefail
           mkdir -p front/output/host-rollout/reports
           python3 -B scripts/host-rollout-evidence-reporter.py run-command \
             --group cache-safety \
+            --command seed-r2a-prechange-cache \
+            --output front/output/host-rollout/reports/cache-seed.report.json
+          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
+            --group cache-safety \
             --command playwright-r2a-cache-safety \
             --output front/output/host-rollout/reports/cache-browser.report.json
           printf 'browser-proof-completed-at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
-      - name: Hash structured browser report
-        id: report-digest
+      - name: Hash exact structured seed and browser reports
+        id: report-digests
         shell: bash
         run: |
           set -euo pipefail
-          digest="$(sha256sum front/output/host-rollout/reports/cache-browser.report.json | cut -d ' ' -f 1)"
-          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
-          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+          seed_digest="$(sha256sum front/output/host-rollout/reports/cache-seed.report.json | cut -d ' ' -f 1)"
+          browser_digest="$(sha256sum front/output/host-rollout/reports/cache-browser.report.json | cut -d ' ' -f 1)"
+          [[ "$seed_digest" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$browser_digest" =~ ^[0-9a-f]{64}$ ]]
+          {
+            printf 'seed-report-sha256=sha256:%s\n' "$seed_digest"
+            printf 'browser-report-sha256=sha256:%s\n' "$browser_digest"
+          } >> "$GITHUB_OUTPUT"
+      - name: Upload structured seed report without repackaging
+        id: upload-seed-report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: front/output/host-rollout/reports/cache-seed.report.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
       - name: Upload structured browser report without repackaging
-        id: upload-report
+        id: upload-browser-report
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           path: front/output/host-rollout/reports/cache-browser.report.json
@@ -544,10 +815,10 @@ jobs:
         with:
           ref: ${{ needs.source.outputs.git-sha }}
           persist-credentials: false
-      - name: Download pre-change structured report
+      - name: Download post-wait carried-profile seed report
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
-          artifact-ids: ${{ needs.prime-r2a-cache.outputs.report-artifact-id }}
+          artifact-ids: ${{ needs.browser-r2a-proof.outputs.seed-report-artifact-id }}
           path: front/output/host-rollout/reports
           skip-decompress: true
           digest-mismatch: error
@@ -561,15 +832,15 @@ jobs:
       - name: Download browser structured report
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
-          artifact-ids: ${{ needs.browser-r2a-proof.outputs.report-artifact-id }}
+          artifact-ids: ${{ needs.browser-r2a-proof.outputs.browser-report-artifact-id }}
           path: front/output/host-rollout/reports
           skip-decompress: true
           digest-mismatch: error
       - name: Bind and combine exact report bytes
         env:
-          SEED_SHA256: ${{ needs.prime-r2a-cache.outputs.report-sha256 }}
+          SEED_SHA256: ${{ needs.browser-r2a-proof.outputs.seed-report-sha256 }}
           DEPLOY_SHA256: ${{ needs.bind-r2a-runtime-pair.outputs.report-sha256 }}
-          BROWSER_SHA256: ${{ needs.browser-r2a-proof.outputs.report-sha256 }}
+          BROWSER_SHA256: ${{ needs.browser-r2a-proof.outputs.browser-report-sha256 }}
         shell: bash
         run: |
           set -euo pipefail
@@ -761,10 +1032,11 @@ jobs:
         id: run
         env:
           GH_TOKEN: ${{ github.token }}
+          CURRENT_RELEASE_TAG: ${{ needs.source.outputs.release-tag }}
         shell: bash
         run: |
           set -euo pipefail
-          current_tag="${{ needs.source.outputs.release-tag }}"
+          current_tag="$CURRENT_RELEASE_TAG"
           r2a_tag="$(git describe --tags --abbrev=0 "${current_tag}^" --match 'v[0-9]*.[0-9]*.[0-9]*')"
           r2a_sha="$(git rev-list -n 1 "$r2a_tag")"
           [[ "$r2a_sha" =~ ^[0-9a-f]{40}$ ]]
@@ -939,6 +1211,16 @@ jobs:
           POLICY_DEPLOYED_AT: ${{ needs.bind-r2a-runtime-pair.outputs.policy-deployed-at }}
           WAIT_COMPLETED_AT: ${{ needs.wait-r2a-cache-lifetime.outputs.wait-completed-at }}
           BROWSER_PROOF_COMPLETED_AT: ${{ needs.browser-r2a-proof.outputs.browser-proof-completed-at }}
+          CACHE_PROFILE_ARTIFACT_ID: ${{ needs.prime-r2a-cache.outputs.profile-artifact-id }}
+          CACHE_PROFILE_IDENTITY: ${{ needs.prime-r2a-cache.outputs.profile-identity }}
+          CACHE_PROFILE_TRANSPORT_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-transport-digest }}
+          CACHE_PROFILE_CONTENT_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-content-digest }}
+          CACHE_PROFILE_STATE_DIGEST: ${{ needs.prime-r2a-cache.outputs.profile-state-digest }}
+          CACHE_TARGET_IDENTITY: ${{ needs.prime-r2a-cache.outputs.target-identity }}
+          CACHE_BOUNDARY_IDENTITIES: ${{ needs.prime-r2a-cache.outputs.boundary-identities }}
+          CACHE_SYNTHETIC_MARKER_IDENTITY: ${{ needs.prime-r2a-cache.outputs.synthetic-marker-identity }}
+          CACHE_OWNERSHIP_RESPONSE_IDENTITY: ${{ needs.prime-r2a-cache.outputs.ownership-response-identity }}
+          CACHE_MUTATION_RECEIPT_DIGEST: ${{ needs.bind-r2a-runtime-pair.outputs.mutation-receipt-digest }}
           A7_SHA: ${{ needs.source.outputs.a7-sha }}
           C1_SHA: ${{ needs.source.outputs.c1-sha }}
           B7_SHA: ${{ needs.source.outputs.b7-sha }}
@@ -970,6 +1252,11 @@ jobs:
           for kind in kinds:
               report_path = pathlib.Path(f"front/output/host-rollout/reports/{kind}.report.json")
               report = json.loads(report_path.read_text(encoding="utf-8"))
+              if stage == "r2a":
+                  expected_profile_identity = f"run-{os.environ['GITHUB_RUN_ID']}-attempt-{os.environ['GITHUB_RUN_ATTEMPT']}-r2a-public-cache"
+                  report_profile_identity = report["bindings"]["profileIdentity"]
+                  if report_profile_identity != expected_profile_identity or report_profile_identity != os.environ["CACHE_PROFILE_IDENTITY"]:
+                      raise SystemExit("Cache report profile identity is not bound to the protected producer run.")
               stage_value = {
                   "name": "R2a" if stage == "r2a" else "R2b",
                   "releaseTag": os.environ["RELEASE_TAG"],
@@ -1005,6 +1292,19 @@ jobs:
                   "provenance": [{"id": item, "gitSha": sha} for item, sha in provenance[kind]],
                   "stage": stage_value,
               }
+              if stage == "r2a":
+                  manifest["cacheTransport"] = {
+                      "artifactId": os.environ["CACHE_PROFILE_ARTIFACT_ID"],
+                      "profileIdentity": report["bindings"]["profileIdentity"],
+                      "transportDigest": os.environ["CACHE_PROFILE_TRANSPORT_DIGEST"],
+                      "profileContentDigest": os.environ["CACHE_PROFILE_CONTENT_DIGEST"],
+                      "stateDigest": os.environ["CACHE_PROFILE_STATE_DIGEST"],
+                      "targetIdentity": os.environ["CACHE_TARGET_IDENTITY"],
+                      "boundaryIdentities": json.loads(os.environ["CACHE_BOUNDARY_IDENTITIES"]),
+                      "syntheticMarkerIdentity": os.environ["CACHE_SYNTHETIC_MARKER_IDENTITY"],
+                      "ownershipResponseIdentity": os.environ["CACHE_OWNERSHIP_RESPONSE_IDENTITY"],
+                      "mutationReceiptDigest": os.environ["CACHE_MUTATION_RECEIPT_DIGEST"],
+                  }
               path = pathlib.Path(f"front/output/host-rollout/attested/{kind}.manifest.json")
               path.write_text(json.dumps(manifest, sort_keys=True, separators=(",", ":")) + "\n", encoding="utf-8")
           PY
@@ -1112,6 +1412,12 @@ jobs:
           READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
           READMATES_HOST_ROLLOUT_REF_PROTECTED: ${{ github.ref_protected }}
           READMATES_HOST_ROLLOUT_SIGNER_WORKFLOW_REF: ${{ format('{0}/.github/workflows/host-client-rollout-evidence.yml@{1}', github.repository, github.ref) }}
+          R2A_GIT_SHA: ${{ needs.resolve-r2a.outputs.git-sha }}
+          R2A_BACKEND_DIGEST: ${{ needs.resolve-r2a.outputs.backend-digest }}
+          R2A_PAGES_DIGEST: ${{ needs.resolve-r2a.outputs.pages-digest }}
+          R2B_GIT_SHA: ${{ needs.source.outputs.git-sha }}
+          R2B_BACKEND_DIGEST: ${{ needs.resolve-r2a.outputs.backend-digest }}
+          R2B_PAGES_DIGEST: ${{ needs.pages-candidate.outputs.pages-digest }}
         shell: bash
         run: |
           set -euo pipefail
@@ -1124,12 +1430,12 @@ jobs:
             --security-attestation front/output/host-rollout/r2b/security.intoto.jsonl \
             --pages-candidate front/output/host-rollout/pages/readmates-pages-candidate.tar \
             --pages-attestation front/output/host-rollout/r2b/pages-candidate.intoto.jsonl \
-            --r2a-git-sha '${{ needs.resolve-r2a.outputs.git-sha }}' \
-            --r2a-backend-digest '${{ needs.resolve-r2a.outputs.backend-digest }}' \
-            --r2a-pages-digest '${{ needs.resolve-r2a.outputs.pages-digest }}' \
-            --r2b-git-sha '${{ needs.source.outputs.git-sha }}' \
-            --r2b-backend-digest '${{ needs.resolve-r2a.outputs.backend-digest }}' \
-            --r2b-pages-digest '${{ needs.pages-candidate.outputs.pages-digest }}' \
+            --r2a-git-sha "$R2A_GIT_SHA" \
+            --r2a-backend-digest "$R2A_BACKEND_DIGEST" \
+            --r2a-pages-digest "$R2A_PAGES_DIGEST" \
+            --r2b-git-sha "$R2B_GIT_SHA" \
+            --r2b-backend-digest "$R2B_BACKEND_DIGEST" \
+            --r2b-pages-digest "$R2B_PAGES_DIGEST" \
             --attestation-repository "$GITHUB_REPOSITORY"
 
   deploy-r2b-pages:
