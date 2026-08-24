@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   type ReactNode,
   type RefObject,
@@ -45,7 +46,7 @@ export function AdminModalDialog({
   const dialogRef = useRef<HTMLDivElement>(null);
   const onRequestCloseRef = useRef(onRequestClose);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     onRequestCloseRef.current = onRequestClose;
   }, [onRequestClose]);
 

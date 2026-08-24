@@ -17,11 +17,9 @@ export function AdminOnboardingModal({
   triggerRef,
 }: AdminOnboardingModalProps) {
   const fallbackTriggerRef = useRef<HTMLElement | null>(activeTrigger());
-  const effectPendingRef = useRef(effectPending);
-  effectPendingRef.current = effectPending;
 
   function requestClose() {
-    if (effectPendingRef.current) return;
+    if (effectPending) return;
     if (isDirty) {
       const ok = window.confirm("작성 중인 내용이 사라집니다. 닫을까요?");
       if (!ok) return;
