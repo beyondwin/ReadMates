@@ -132,6 +132,7 @@ data class AdminCommandDigest(
 )
 
 data class AdminCommandDigestSet(
+    val current: AdminCommandDigest,
     val lookupCandidates: List<AdminCommandDigest>,
     val aliasCandidates: List<AdminCommandDigest>,
     val writePreviousAlias: Boolean,
@@ -143,9 +144,9 @@ interface CanonicalAdminCommandRequest {
 }
 ```
 
-Canonicalization applies NFC, explicit UTF-8 byte framing, field-name sorting, length prefixes, and command-specific schema version. `targetId` is a stable UUID or documented synthetic slot such as `new-club`; free text is included in the request HMAC but never persisted.
+Canonicalization applies NFC, locale-independent ASCII lowercase command/target tokens, explicit UTF-8 byte framing, field-name sorting, length prefixes, and command-specific schema version. `targetId` is a lowercase stable UUID or lowercase documented synthetic slot such as `new-club`; free text is included in the request HMAC but never persisted.
 
-`AdminCommandDigest`는 한 key version의 alias material이고 `AdminCommandDigestSet`은 raw key를 persistence 밖에 둔 rotation envelope다. `lookupCandidates`는 current와 lookup-capable previous version을 version 오름차순으로 담는다. `aliasCandidates`는 current를 항상 포함하고 `writePreviousAlias=true`인 overlap 동안에만 previous도 포함한다. Old-version writer drain이 확인되면 flag를 `false`로 바꾸지만 previous digest는 response-loss lookup을 위해 `lookupCandidates`에 유지한다. `aliasCandidates`는 `lookupCandidates`의 ordered subset이어야 하며 둘 다 version duplicate를 거절한다.
+`AdminCommandDigest`는 한 key version의 alias material이고 `AdminCommandDigestSet`은 raw key를 persistence 밖에 둔 rotation envelope다. `current`는 caller가 새 immutable domain receipt에 연결할 safe digest이며 `lookupCandidates`와 `aliasCandidates` 모두에 반드시 포함된다. `lookupCandidates`는 current와 lookup-capable previous version을 version 오름차순으로 담는다. `aliasCandidates`는 current를 항상 포함하고 `writePreviousAlias=true`인 overlap 동안에만 previous도 포함한다. Old-version writer drain이 확인되면 flag를 `false`로 바꾸지만 previous digest는 response-loss lookup을 위해 `lookupCandidates`에 유지한다. `aliasCandidates`는 `lookupCandidates`의 ordered subset이어야 하며 둘 다 version duplicate를 거절한다.
 
 - [ ] **Step 1: Write RED canonicalization tests.** Cover Unicode NFC equivalence, field-order invariance, absent vs empty distinction, delimiter collision, target/actor/command separation, same/different key behavior, key rotation, unknown/retired key, constant-time verification path, and log capture proving no raw inputs.
 - [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server unitTest --tests com.readmates.shared.adminmutation.application.service.AdminCommandIdentityServiceTest`; expected FAIL.
@@ -183,6 +184,11 @@ data class AdminCommandScope(
     val targetId: String,
 )
 
+data class AdminCommandIdentityEnvelope(
+    val scope: AdminCommandScope,
+    val digests: AdminCommandDigestSet,
+)
+
 data class AdminCommandClaimAttempt(
     val claimId: UUID,
     val claimToken: UUID,
@@ -192,7 +198,11 @@ data class AdminCommandClaimAttempt(
 )
 
 sealed interface AdminCommandClaimResult {
-    data class Claimed(val claimId: UUID, val claimToken: UUID) : AdminCommandClaimResult
+    data class Claimed(
+        val claimId: UUID,
+        val claimToken: UUID,
+        val currentDigest: AdminCommandDigest,
+    ) : AdminCommandClaimResult
     data class Completed(val receiptType: String, val receiptId: String) : AdminCommandClaimResult
     data object InProgress : AdminCommandClaimResult
     data object Conflict : AdminCommandClaimResult
@@ -216,7 +226,7 @@ interface AdminCommandIdempotencyPort {
 }
 ```
 
-`PlatformAdminCommandIdentity`와 raw idempotency key는 `AdminCommandIdentityService`에서 canonicalize/HMAC한 뒤 persistence 경계를 넘지 않는다. `AdminCommandIdempotencyPort`는 stripped `AdminCommandScope`, generated `AdminCommandClaimAttempt`, HMAC-only `AdminCommandDigestSet`만 받는다. The service exposes claim primitives to domain application services; it does not open a nested transaction. Domain code must claim, perform effect, insert immutable receipt/audit, and complete the pointer inside one outer transaction. A response-loss retry obtains `Completed` and reauthorizes before loading the domain receipt. A committed `IN_PROGRESS` returns `InProgress` and is never automatically taken over or failed.
+`PlatformAdminCommandIdentity`와 raw idempotency key는 `AdminCommandIdentityService`가 한 번 canonicalize/HMAC하여 `AdminCommandIdentityEnvelope`로 바꾼 뒤 persistence 경계를 넘지 않는다. 이 envelope의 canonical `AdminCommandScope`를 사용하므로 uppercase UUID 입력도 lowercase UUID retry와 같은 operational scope에 수렴하고, canonicalized command/target token만 저장된다. `AdminCommandIdempotencyPort`는 stripped `AdminCommandScope`, generated `AdminCommandClaimAttempt`, HMAC-only `AdminCommandDigestSet`만 받는다. A successful `Claimed` returns the set's `currentDigest` so downstream immutable domain receipts can persist the safe versioned digest without recomputing from raw input. The service exposes claim primitives to domain application services; it does not open a nested transaction. Domain code must claim, perform effect, insert immutable receipt/audit, and complete the pointer inside one outer transaction. A response-loss retry obtains `Completed` and reauthorizes before loading the domain receipt. A committed `IN_PROGRESS` returns `InProgress` and is never automatically taken over or failed.
 
 - [ ] **Step 1: Write RED unit state-machine/config tests.** Cover digest-set invariants, overlap dual-write, drained current-only alias write with previous lookup, first claim, either-version replay, live/committed `IN_PROGRESS` fail-closed, identical completed replay, conflicting request HMAC, stale-token completion, invalid receipt pointer, and rejection of retention below 24 hours. Assert the port never accepts `PlatformAdminCommandIdentity` or a raw key and no failed/takeover transition exists.
 - [ ] **Step 2: Write RED two-connection integration tests.** Synchronize concurrent overlapping-version claims with latches; assert exactly one claim, aliases from both versions point to it, and savepoint rollback removes a partial candidate reservation before duplicate reconciliation. For every `aliasCandidate`, upsert then lock `platform_admin_command_digest_key_state` in globally sorted key-version order inside the same savepoint and outer transaction as claim/alias reservation, update `last_referenced_at`, and clear `unreferenced_since`; assert rollback also restores key-state values. Assert outer transaction rollback removes the incomplete claim, and completion plus a fixture domain receipt commit atomically.

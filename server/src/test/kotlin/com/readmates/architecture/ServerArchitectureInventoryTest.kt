@@ -204,6 +204,56 @@ class ServerArchitectureInventoryTest {
     }
 
     @Test
+    fun `admin command persistence boundary contains only stripped hmac claim data`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val adminMutationRoot = productionSourceRoot.resolve("com/readmates/shared/adminmutation")
+        val persistenceBoundary =
+            listOf(
+                "application/port/out/AdminCommandIdempotencyPort.kt",
+                "adapter/out/persistence/AdminCommandIdempotencyRows.kt",
+                "adapter/out/persistence/JdbcAdminCommandIdempotencyAdapter.kt",
+            )
+        val forbiddenRawIdentity =
+            Regex("""\b(PlatformAdminCommandIdentity|CanonicalAdminCommandRequest|idempotencyKey|canonicalFields)\b""")
+
+        persistenceBoundary.forEach { relative ->
+            val source = Files.readString(adminMutationRoot.resolve(relative))
+            assertThat(forbiddenRawIdentity.find(source))
+                .describedAs("raw admin command identity in %s", relative)
+                .isNull()
+            assertThat(source).doesNotContain("@Transactional")
+        }
+        val rows =
+            Files.readString(
+                adminMutationRoot.resolve("adapter/out/persistence/AdminCommandIdempotencyRows.kt"),
+            )
+        assertThat(rows).contains(
+            "RequestIdentityHmac.equal(idempotencyKeyHmac, digest.idempotencyKeyHmac)",
+            "RequestIdentityHmac.equal(requestHmac, digest.requestHmac)",
+            "return idempotencyKeyMatches and requestMatches",
+        )
+        val adapter =
+            Files.readString(
+                adminMutationRoot.resolve("adapter/out/persistence/JdbcAdminCommandIdempotencyAdapter.kt"),
+            )
+        assertThat(adapter).contains(
+            "select claim_id, digest_key_version, idempotency_key_hmac, request_hmac",
+        )
+
+        val service =
+            Files.readString(
+                adminMutationRoot.resolve("application/service/AdminCommandIdempotencyService.kt"),
+            )
+        assertThat(service)
+            .contains(
+                "PlatformAdminCommandIdentity",
+                "CanonicalAdminCommandRequest",
+                "identityService.resolve(identity, request)",
+                "scope = envelope.scope",
+            ).doesNotContain("@Transactional", "import com.readmates.shared.adminmutation.adapter")
+    }
+
+    @Test
     fun `joined club summary test imports match corrected inventory exactly`() {
         val root = projectRoot()
         val testSourceRoot = root.resolve("server/src/test/kotlin")

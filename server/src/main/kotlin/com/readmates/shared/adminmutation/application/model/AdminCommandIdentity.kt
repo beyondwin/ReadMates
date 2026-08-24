@@ -56,6 +56,48 @@ data class AdminCommandDigest(
     }
 }
 
+data class AdminCommandDigestSet(
+    val current: AdminCommandDigest,
+    val lookupCandidates: List<AdminCommandDigest>,
+    val aliasCandidates: List<AdminCommandDigest>,
+    val writePreviousAlias: Boolean,
+) {
+    init {
+        requireSortedUnique(lookupCandidates, "lookupCandidates")
+        requireSortedUnique(aliasCandidates, "aliasCandidates")
+        require(lookupCandidates.any { candidate -> candidate == current }) {
+            "current must be a lookup candidate"
+        }
+        require(aliasCandidates.any { candidate -> candidate == current }) {
+            "current must be an alias candidate"
+        }
+        val lookupByVersion = lookupCandidates.associateBy(AdminCommandDigest::digestKeyVersion)
+        require(
+            aliasCandidates.all { alias ->
+                lookupByVersion[alias.digestKeyVersion] == alias
+            },
+        ) { "aliasCandidates must be an ordered subset of lookupCandidates" }
+        val expectedAliases = if (writePreviousAlias) lookupCandidates else listOf(current)
+        require(aliasCandidates == expectedAliases) {
+            "aliasCandidates must follow writePreviousAlias"
+        }
+    }
+
+    private fun requireSortedUnique(
+        candidates: List<AdminCommandDigest>,
+        name: String,
+    ) {
+        val versions = candidates.map(AdminCommandDigest::digestKeyVersion)
+        require(versions == versions.sorted()) { "$name must be sorted by digestKeyVersion" }
+        require(versions.distinct().size == versions.size) { "$name must not contain duplicate versions" }
+    }
+}
+
+data class AdminCommandIdentityEnvelope(
+    val scope: AdminCommandScope,
+    val digests: AdminCommandDigestSet,
+)
+
 interface CanonicalAdminCommandRequest {
     val schemaVersion: String
 

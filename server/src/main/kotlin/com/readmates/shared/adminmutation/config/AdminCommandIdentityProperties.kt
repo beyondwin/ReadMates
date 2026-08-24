@@ -15,14 +15,17 @@ data class AdminCommandIdentityProperties(
     val currentKeyVersion: Int = 1,
     val previousKey: String = "",
     val previousKeyVersion: Int = 0,
+    val writePreviousAlias: Boolean = false,
     val allowEmptySecret: Boolean = false,
 ) {
     fun currentKeyBytes(): ByteArray? = currentKey.takeIf { it.isNotBlank() }?.toByteArray(StandardCharsets.UTF_8)
 
+    fun previousKeyBytes(): ByteArray? = previousKey.takeIf { it.isNotBlank() }?.toByteArray(StandardCharsets.UTF_8)
+
     fun keyBytes(version: Int): ByteArray? =
         when (version) {
             currentKeyVersion -> currentKeyBytes()
-            previousKeyVersion -> previousKey.takeIf { it.isNotBlank() }?.toByteArray(StandardCharsets.UTF_8)
+            previousKeyVersion -> previousKeyBytes()
             else -> null
         }
 
@@ -63,12 +66,18 @@ data class AdminCommandIdentityProperties(
                 "readmates.admin.command-identity current and previous key versions must differ",
             )
         }
+        if (writePreviousAlias && previousKey.isBlank()) {
+            throw IllegalStateException(
+                "readmates.admin.command-identity.write-previous-alias requires previous-key",
+            )
+        }
     }
 
     override fun toString(): String =
         "AdminCommandIdentityProperties(currentKeyVersion=$currentKeyVersion, " +
             "previousKeyVersion=$previousKeyVersion, currentKeyConfigured=${currentKey.isNotBlank()}, " +
-            "previousKeyConfigured=${previousKey.isNotBlank()}, allowEmptySecret=$allowEmptySecret)"
+            "previousKeyConfigured=${previousKey.isNotBlank()}, writePreviousAlias=$writePreviousAlias, " +
+            "allowEmptySecret=$allowEmptySecret)"
 
     private companion object {
         private val log = LoggerFactory.getLogger(AdminCommandIdentityProperties::class.java)

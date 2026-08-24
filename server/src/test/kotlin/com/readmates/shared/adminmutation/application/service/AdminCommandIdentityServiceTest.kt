@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.core.read.ListAppender
 import com.readmates.shared.adminmutation.application.model.ADMIN_COMMAND_IDENTITY_PURPOSE
 import com.readmates.shared.adminmutation.application.model.AdminCommandDigest
+import com.readmates.shared.adminmutation.application.model.AdminCommandDigestSet
 import com.readmates.shared.adminmutation.application.model.CanonicalAdminCommandRequest
 import com.readmates.shared.adminmutation.application.model.DigestKeyUnavailableException
 import com.readmates.shared.adminmutation.application.model.InvalidAdminCommandIdentityException
@@ -182,6 +183,115 @@ class AdminCommandIdentityServiceTest {
         assertThat(rotated.matches(identity(), request(), versionOne)).isTrue()
         assertThat(rotated.matches(identity(), request(), versionTwo)).isTrue()
         assertThat(service().matches(identity(), request(), versionOne)).isTrue()
+    }
+
+    @Test
+    fun `overlap digest set keeps current in sorted lookup and alias candidates`() {
+        val digests =
+            service(
+                properties(
+                    currentKey = ROTATED_CURRENT_KEY,
+                    currentKeyVersion = 2,
+                    previousKey = CURRENT_KEY,
+                    previousKeyVersion = 1,
+                    writePreviousAlias = true,
+                ),
+            ).digests(identity(), request())
+
+        assertThat(digests.current.digestKeyVersion).isEqualTo(2)
+        assertThat(digests.lookupCandidates.map(AdminCommandDigest::digestKeyVersion)).containsExactly(1, 2)
+        assertThat(digests.aliasCandidates.map(AdminCommandDigest::digestKeyVersion)).containsExactly(1, 2)
+        assertThat(digests.lookupCandidates).contains(digests.current)
+        assertThat(digests.aliasCandidates).contains(digests.current)
+        assertThat(digests.writePreviousAlias).isTrue()
+    }
+
+    @Test
+    fun `drained digest set keeps previous lookup capable but writes current only`() {
+        val digests =
+            service(
+                properties(
+                    currentKey = ROTATED_CURRENT_KEY,
+                    currentKeyVersion = 2,
+                    previousKey = CURRENT_KEY,
+                    previousKeyVersion = 1,
+                    writePreviousAlias = false,
+                ),
+            ).digests(identity(), request())
+
+        assertThat(digests.current.digestKeyVersion).isEqualTo(2)
+        assertThat(digests.lookupCandidates.map(AdminCommandDigest::digestKeyVersion)).containsExactly(1, 2)
+        assertThat(digests.aliasCandidates.map(AdminCommandDigest::digestKeyVersion)).containsExactly(2)
+        assertThat(digests.writePreviousAlias).isFalse()
+    }
+
+    @Test
+    fun `identity envelope lowercases command and target tokens for the persistence scope`() {
+        val envelope =
+            service().resolve(
+                identity(commandType = "Club.Create", targetType = "Club"),
+                request(),
+            )
+
+        assertThat(envelope.scope.commandType).isEqualTo("club.create")
+        assertThat(envelope.scope.targetType).isEqualTo("club")
+        assertSameDigest(envelope.digests.current, service().digest(identity(), request()))
+    }
+
+    @Test
+    fun `digest set rejects missing current duplicate versions unsorted candidates and foreign aliases`() {
+        val current = service().digest(identity(), request())
+        val previous = current.copy(digestKeyVersion = 0)
+        val foreign = current.copy(digestKeyVersion = 2)
+
+        assertThatThrownBy {
+            AdminCommandDigestSet(
+                current = current,
+                lookupCandidates = listOf(previous),
+                aliasCandidates = listOf(previous),
+                writePreviousAlias = true,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            AdminCommandDigestSet(
+                current = current,
+                lookupCandidates = listOf(previous, current, current.copy()),
+                aliasCandidates = listOf(previous, current),
+                writePreviousAlias = true,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            AdminCommandDigestSet(
+                current = current,
+                lookupCandidates = listOf(current, previous),
+                aliasCandidates = listOf(previous, current),
+                writePreviousAlias = true,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            AdminCommandDigestSet(
+                current = current,
+                lookupCandidates = listOf(previous, current),
+                aliasCandidates = listOf(previous, foreign, current),
+                writePreviousAlias = true,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            AdminCommandDigestSet(
+                current = current,
+                lookupCandidates = listOf(previous, current),
+                aliasCandidates = listOf(previous, current),
+                writePreviousAlias = false,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
+        assertThatThrownBy {
+            AdminCommandDigestSet(
+                current = current,
+                lookupCandidates = listOf(previous, current),
+                aliasCandidates = listOf(current),
+                writePreviousAlias = true,
+            )
+        }.isInstanceOf(IllegalArgumentException::class.java)
     }
 
     @Test
@@ -365,11 +475,13 @@ class AdminCommandIdentityServiceTest {
             currentKeyVersion: Int = 1,
             previousKey: String = PREVIOUS_KEY,
             previousKeyVersion: Int = 0,
+            writePreviousAlias: Boolean = false,
         ) = AdminCommandIdentityProperties(
             currentKey = currentKey,
             currentKeyVersion = currentKeyVersion,
             previousKey = previousKey,
             previousKeyVersion = previousKeyVersion,
+            writePreviousAlias = writePreviousAlias,
             allowEmptySecret = false,
         )
 

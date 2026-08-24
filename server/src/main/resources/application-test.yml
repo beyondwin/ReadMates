@@ -5,7 +5,11 @@ readmates:
       current-key-version: 1
       previous-key: test-admin-command-digest-previous-key
       previous-key-version: 0
+      write-previous-alias: false
       allow-empty-secret: false
+    command-idempotency:
+      retention: 168h
+      initial-claim-ttl: 15m
   security:
     ip-hash:
       base-secret: test-ip-hash-base-secret

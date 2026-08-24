@@ -3,6 +3,9 @@ package com.readmates.shared.adminmutation.application.service
 import com.readmates.shared.adminmutation.application.model.ADMIN_COMMAND_IDENTITY_PURPOSE
 import com.readmates.shared.adminmutation.application.model.ADMIN_COMMAND_SYNTHETIC_TARGET_NEW_CLUB
 import com.readmates.shared.adminmutation.application.model.AdminCommandDigest
+import com.readmates.shared.adminmutation.application.model.AdminCommandDigestSet
+import com.readmates.shared.adminmutation.application.model.AdminCommandIdentityEnvelope
+import com.readmates.shared.adminmutation.application.model.AdminCommandScope
 import com.readmates.shared.adminmutation.application.model.CanonicalAdminCommandRequest
 import com.readmates.shared.adminmutation.application.model.DigestKeyUnavailableException
 import com.readmates.shared.adminmutation.application.model.InvalidAdminCommandIdentityException
@@ -16,6 +19,7 @@ import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.charset.StandardCharsets
 import java.text.Normalizer
+import java.util.Locale
 import java.util.UUID
 
 @Service
@@ -27,7 +31,50 @@ class AdminCommandIdentityService(
         request: CanonicalAdminCommandRequest,
     ): AdminCommandDigest {
         val key = properties.currentKeyBytes() ?: throw DigestKeyUnavailableException()
-        return compute(identity, request, key, properties.currentKeyVersion)
+        return compute(canonicalizeIdentity(identity), request, key, properties.currentKeyVersion)
+    }
+
+    fun digests(
+        identity: PlatformAdminCommandIdentity,
+        request: CanonicalAdminCommandRequest,
+    ): AdminCommandDigestSet = resolve(identity, request).digests
+
+    fun resolve(
+        identity: PlatformAdminCommandIdentity,
+        request: CanonicalAdminCommandRequest,
+    ): AdminCommandIdentityEnvelope {
+        val canonicalIdentity = canonicalizeIdentity(identity)
+        val currentKey = properties.currentKeyBytes() ?: throw DigestKeyUnavailableException()
+        val current = compute(canonicalIdentity, request, currentKey, properties.currentKeyVersion)
+        val lookupCandidates =
+            buildList {
+                properties.previousKeyBytes()?.let { previousKey ->
+                    add(compute(canonicalIdentity, request, previousKey, properties.previousKeyVersion))
+                }
+                add(current)
+            }.sortedBy(AdminCommandDigest::digestKeyVersion)
+        val aliasCandidates =
+            if (properties.writePreviousAlias) {
+                lookupCandidates
+            } else {
+                listOf(current)
+            }
+        return AdminCommandIdentityEnvelope(
+            scope =
+                AdminCommandScope(
+                    platformAdminUserId = canonicalIdentity.platformAdminUserId,
+                    commandType = canonicalIdentity.commandType,
+                    targetType = canonicalIdentity.targetType,
+                    targetId = canonicalIdentity.targetId,
+                ),
+            digests =
+                AdminCommandDigestSet(
+                    current = current,
+                    lookupCandidates = lookupCandidates,
+                    aliasCandidates = aliasCandidates,
+                    writePreviousAlias = properties.writePreviousAlias,
+                ),
+        )
     }
 
     fun matches(
@@ -36,7 +83,7 @@ class AdminCommandIdentityService(
         digest: AdminCommandDigest,
     ): Boolean {
         val key = properties.keyBytes(digest.digestKeyVersion) ?: throw DigestKeyUnavailableException()
-        val expected = compute(identity, request, key, digest.digestKeyVersion)
+        val expected = compute(canonicalizeIdentity(identity), request, key, digest.digestKeyVersion)
         val requestOk = RequestIdentityHmac.equal(expected.requestHmac, digest.requestHmac)
         val idempotencyOk = RequestIdentityHmac.equal(expected.idempotencyKeyHmac, digest.idempotencyKeyHmac)
         val schemaOk = expected.schemaVersion == digest.schemaVersion
@@ -44,12 +91,11 @@ class AdminCommandIdentityService(
     }
 
     private fun compute(
-        identity: PlatformAdminCommandIdentity,
+        canonicalIdentity: CanonicalIdentity,
         request: CanonicalAdminCommandRequest,
         key: ByteArray,
         digestKeyVersion: Int,
     ): AdminCommandDigest {
-        val canonicalIdentity = canonicalizeIdentity(identity)
         val schemaVersion = requireToken(nfc(request.schemaVersion), SCHEMA_VERSION)
         val fields = canonicalizeFields(request.canonicalFields())
         val digest =
@@ -83,16 +129,16 @@ class AdminCommandIdentityService(
     private fun canonicalizeIdentity(identity: PlatformAdminCommandIdentity): CanonicalIdentity =
         CanonicalIdentity(
             platformAdminUserId = identity.platformAdminUserId,
-            commandType = requireToken(nfc(identity.commandType), COMMAND_TYPE),
-            targetType = requireToken(nfc(identity.targetType), TARGET_TYPE),
+            commandType = requireToken(nfc(identity.commandType).lowercase(Locale.ROOT), COMMAND_TYPE),
+            targetType = requireToken(nfc(identity.targetType).lowercase(Locale.ROOT), TARGET_TYPE),
             targetId = canonicalizeTargetId(identity.targetId),
             idempotencyKey = requireToken(nfc(identity.idempotencyKey), IDEMPOTENCY_KEY),
         )
 
     private fun canonicalizeTargetId(value: String): String {
         val normalized = nfc(value)
-        if (normalized == ADMIN_COMMAND_SYNTHETIC_TARGET_NEW_CLUB) {
-            return normalized
+        if (normalized.lowercase(Locale.ROOT) == ADMIN_COMMAND_SYNTHETIC_TARGET_NEW_CLUB) {
+            return ADMIN_COMMAND_SYNTHETIC_TARGET_NEW_CLUB
         }
         val uuid =
             runCatching { UUID.fromString(normalized) }.getOrNull()

@@ -98,7 +98,11 @@ readmates:
       current-key-version: ${READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION:1}
       previous-key: ${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY:}
       previous-key-version: ${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:0}
+      write-previous-alias: ${READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS:false}
       allow-empty-secret: false
+    command-idempotency:
+      retention: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION:168h}
+      initial-claim-ttl: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL:15m}
   host-action-confirmation:
     required: false
   session:
