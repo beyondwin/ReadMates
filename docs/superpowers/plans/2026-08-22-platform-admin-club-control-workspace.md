@@ -48,7 +48,17 @@ ADR impact: implements proposed ADR-0039 and ADR-0040; constraining reference â€
 - Modify: `server/src/main/kotlin/com/readmates/club/application/port/in/PlatformAdminUseCases.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/application/port/out/PlatformAdminPorts.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminClubRegistryService.kt`
+- Modify: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminService.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminClubVisibilityService.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminClubPublicInfoPolicy.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminDomainCommandService.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminDomainCommandPolicy.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminDomainConvergenceService.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminClubAdapter.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminClubCommandAdapter.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminClubPreviewStore.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminClubOriginStore.kt`
+- Create: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminDomainConvergenceStore.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/in/web/PlatformAdminClubController.kt`
 - Create: `server/src/test/kotlin/com/readmates/club/api/PlatformAdminClubRegistryCursorDbTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/club/application/service/PlatformAdminClubRegistryServiceTest.kt`
@@ -102,26 +112,49 @@ Ordering is `(normalized_name ASC, club_id ASC)`. The opaque cursor binds schema
 - Modify: `server/src/main/kotlin/com/readmates/club/application/port/out/PlatformAdminPorts.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/application/service/PlatformAdminClubRegistryService.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminClubAdapter.kt`
+- Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/PlatformAdminClubRegistrySql.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/in/web/PlatformAdminClubController.kt`
 - Modify: `server/src/main/kotlin/com/readmates/club/adapter/in/web/PlatformAdminController.kt`
-- Modify: `server/src/main/kotlin/com/readmates/club/adapter/out/persistence/JdbcPlatformAdminAdapter.kt`
+- Modify: `server/src/main/kotlin/com/readmates/club/adapter/in/web/PlatformAdminErrorHandler.kt`
+- Modify: `server/src/main/kotlin/com/readmates/club/application/PlatformAdminException.kt`
 - Modify: `server/src/main/kotlin/com/readmates/auth/infrastructure/security/SecurityConfig.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/security/Actors.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/security/CurrentPlatformAdmin.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/config/AdminCommandIdempotencyProperties.kt`
+- Modify: `server/src/main/resources/application.yml`
+- Modify: `server/src/test/resources/application.yml`
 - Create: `server/src/test/kotlin/com/readmates/club/api/PlatformAdminClubCommandDbTest.kt`
 - Modify: `server/src/test/kotlin/com/readmates/auth/api/PlatformAdminBffSecurityTest.kt`
+- Modify: registry/controller/service/security/config tests affected by the required `Long adminRevision` and explicit `PlatformActor.role` bridge
+- Modify: `docs/development/architecture.md`
 
 **API contracts:**
 
 - `PATCH /api/admin/clubs/{clubId}/metadata` accepts `expectedAdminRevision` and returns the new detail; stale is `409 REVISION_CONFLICT`.
 - `POST /api/admin/clubs/{clubId}/visibility/preview` returns `previewId`, expiry, current/target visibility, impact codes, and request fingerprint prefix.
-- `POST /api/admin/clubs/{clubId}/visibility/confirm` accepts preview ID, idempotency key, expected revision, and explicit confirmation; returns immutable receipt.
-- Domain creation and provisioning recheck remain domain-owned paths but accept idempotency key/expected state and return receipt plus convergence status. Recheck is L1 and uses a lease; target-domain creation is L2/L3.
+- `POST /api/admin/clubs/{clubId}/visibility/confirm` accepts preview ID, idempotency key, expected revision,
+  repeated target visibility, and explicit confirmation; the canonical request digest binds the full effect and
+  returns an immutable receipt.
+- `POST /api/admin/clubs/{clubId}/domains/preview` accepts expected revision and normalized domain intent, then returns a V58 durable preview without echoing the hostname. Existing `POST /api/admin/clubs/{clubId}/domains` is the preview-bound L2/L3 confirm and accepts preview ID, idempotency key, expected revision, the exact domain intent, and explicit confirmation.
+- `POST /api/admin/domains/{domainId}/check` is the L1 provisioning recheck. It accepts idempotency key plus expected status and returns the immutable receipt with live convergence status. The current actor/capability check and shared claim precede target loading, so completed replay survives target deletion/state drift while capability loss still denies replay.
+- Domain provider/DNS I/O runs outside DB transactions. Convergence leases serialize attempts; retryable failure returns to `PENDING`, while the configured bounded attempt budget ends in terminal `FAILED`, `available_at = null`, and safe error/event evidence.
+- Convergence acquisition locks the current safe target observation before leasing, while completion uses the same status/updated-at token as an affected-row CAS. Retry takeover derives its last-applied token from the previous immutable finish event rather than mutable lease timestamps. Missing or stale targets become terminal `DOMAIN_TARGET_NOT_FOUND|STALE` without overwriting newer state; expired lease start evidence is idempotent. The lease contains no hostname, and provider I/O loads the normalized operational hostname only after the transaction closes.
+- Safe-command conflicts and malformed user idempotency keys return the common coded API error envelope, cross-command preview IDs fail as `PREVIEW_MISMATCH`, and provider error persistence uses an explicit allowlist rather than regex pass-through. Visibility receipt and audit evidence both retain before/after visibility and lifecycle status.
+- PUBLIC confirm locks the club row and then ordered active-host membership rows in the existing member-lifecycle order. Its affected-row CAS matches expected revision, lifecycle status, and public visibility, so concurrent archive/suspend is never overwritten and last-host leave waits, rechecks, and remains fail closed.
+- Preview TTL must be positive and strictly less than the previous-key rollout buffer (minimum 24 hours). Preview HMAC validation selects the stored digest-key version from current/previous lookup candidates, so an overlap preview remains confirmable after rotation without extending V57 retirement reference accounting.
+- V58 receipt/audit role snapshots use the required `PlatformActor.role`; capability snapshots remain separate. Raw idempotency key, hostname, URL, provider response, reason, email, or token is absent from persistence port types, evidence, and logs.
 
-- [ ] **Step 1: Write RED service/DB tests.** Use two admins from one revision and assert one metadata/public winner; stale/conflict produces no domain/audit/receipt effect. Cover preview expiry/consumption/request mismatch, same-key response loss, different request conflict, public prerequisites, domain duplicate, recheck lease, partial external failure, and receipt replay reauthorization.
-- [ ] **Step 2: Extend the RED full security matrix.** Add exact methods/paths for every new mutation; assert wrong method, suffix, encoded slash, cross-origin, missing BFF secret, inactive actor, and insufficient capability fail closed.
-- [ ] **Step 3: Run RED.** Run: `./server/gradlew -p server integrationTest --tests com.readmates.club.api.PlatformAdminClubCommandDbTest` and `./server/gradlew -p server unitTest --tests com.readmates.auth.api.PlatformAdminBffSecurityTest`; expected FAIL.
-- [ ] **Step 4: Implement application-owned transactions and conditional JDBC.** Use the shared claim service inside the same transaction as revision update, receipt, audit, and origin convergence row.
-- [ ] **Step 5: Run GREEN.** Run both Task 3 commands; expected PASS.
-- [ ] **Step 6: Commit.** Commit: `feat(admin): harden club control commands`
+- [x] **Step 1: Write RED service/DB tests.** Use two admins from one revision and assert one metadata/public winner; stale/conflict produces no domain/audit/receipt effect. Cover preview expiry/consumption/request mismatch, same-key response loss, different request conflict, public prerequisites, domain duplicate, recheck lease, partial external failure, terminal safe failure, and receipt replay reauthorization after target drift/deletion.
+- [x] **Step 2: Extend the RED full security matrix.** Add exact methods/paths for every new mutation; assert wrong method, suffix, encoded slash, cross-origin, missing BFF secret, inactive actor, and insufficient capability fail closed.
+- [x] **Step 3: Run RED.** `PlatformAdminClubCommandDbTest` initially had no implementation/bean contract and the six-route `PlatformAdminBffSecurityTest` matrix returned non-success for every exact route. The focused commands failed before implementation as expected.
+- [x] **Step 4: Implement application-owned transactions and conditional JDBC.** The shared claim runs inside the same caller transaction as revision/origin mutation, immutable receipt, audit, preview consume, initial convergence, and claim completion. Provider I/O is post-commit and separately leased.
+- [x] **Step 5: Run GREEN.** The focused security/unit command plus integration tests for
+  `PlatformAdminClubCommandDbTest`, `PlatformAdminDomainCommandDbTest`,
+  `PlatformAdminControllerTest`, `PlatformAdminDomainControllerTest`, registry cursor, and public-takedown
+  regression passed. The
+  verification-driven service/adapter/test responsibility split keeps each class within the existing
+  detekt limits without a baseline or suppression while preserving the same transaction and lock order.
+- [x] **Step 6: Commit.** Commit: `feat(admin): harden club control commands`
 
 ### Task 4: Replace ephemeral onboarding with durable preview and receipt reconciliation
 

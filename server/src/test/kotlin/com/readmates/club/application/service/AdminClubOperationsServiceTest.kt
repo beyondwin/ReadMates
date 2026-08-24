@@ -229,7 +229,11 @@ class AdminClubOperationsServiceTest {
     private fun supportActor(): PlatformActor = actor(PlatformCapability.VIEW_CLUB_OPERATIONS)
 
     private fun actor(vararg capabilities: PlatformCapability): PlatformActor =
-        PlatformActor(UUID.fromString("00000000-0000-0000-0000-000000000901"), capabilities.toSet())
+        PlatformActor(
+            UUID.fromString("00000000-0000-0000-0000-000000000901"),
+            com.readmates.club.domain.PlatformAdminRole.OPERATOR,
+            capabilities.toSet(),
+        )
 
     private fun snapshot(closingRisks: AdminClubClosingRisks = EMPTY_CLOSING_RISKS): AdminClubOperationsSnapshot =
         AdminClubOperationsSnapshot(

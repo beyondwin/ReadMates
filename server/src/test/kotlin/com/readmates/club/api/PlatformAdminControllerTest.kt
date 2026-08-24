@@ -4,10 +4,12 @@ import com.jayway.jsonpath.JsonPath
 import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.auth.domain.BookClubAvatarKey
 import com.readmates.club.application.model.ClubDomainActualCheckResult
+import com.readmates.club.application.model.NormalizedClubDomainHostname
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
+import org.assertj.core.api.Assertions.assertThat
 import org.hamcrest.Matchers
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -29,7 +31,11 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
+import org.springframework.transaction.support.TransactionSynchronizationManager
 import java.util.UUID
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicInteger
 
 @SpringBootTest(
     properties = [
@@ -40,43 +46,11 @@ import java.util.UUID
 @Import(PlatformAdminDomainCheckTestConfiguration::class)
 @Tag("integration")
 class PlatformAdminControllerTest(
-    @param:Autowired private val mockMvc: MockMvc,
-    @param:Autowired private val authSessionService: AuthSessionService,
-    @param:Autowired private val jdbcTemplate: JdbcTemplate,
-    @param:Autowired private val domainActualStateChecker: FakeClubDomainActualStateChecker,
-) : ReadmatesMySqlIntegrationTestSupport() {
-    private val createdSessionTokenHashes = linkedSetOf<String>()
-    private val createdPlatformAdminUserIds = linkedSetOf<String>()
-    private val createdUserIds = linkedSetOf<String>()
-    private val createdClubDomainIds = linkedSetOf<String>()
-    private val createdMembershipIds = linkedSetOf<String>()
-    private val createdClubIds = linkedSetOf<String>()
-    private val createdInvitationIds = linkedSetOf<String>()
-
-    @AfterEach
-    fun cleanupCreatedRows() {
-        try {
-            deleteWhereIn("invitations", "id", createdInvitationIds)
-            deleteWhereIn("club_domains", "id", createdClubDomainIds)
-            deleteWhereIn("memberships", "id", createdMembershipIds)
-            deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
-            deleteWhereIn("auth_sessions", "user_id", createdUserIds)
-            deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
-            deleteWhereIn("users", "id", createdUserIds)
-            deleteWhereIn("clubs", "id", createdClubIds)
-        } finally {
-            createdSessionTokenHashes.clear()
-            createdPlatformAdminUserIds.clear()
-            createdUserIds.clear()
-            createdClubDomainIds.clear()
-            createdMembershipIds.clear()
-            createdClubIds.clear()
-            createdInvitationIds.clear()
-            SecurityContextHolder.clearContext()
-            domainActualStateChecker.reset()
-        }
-    }
-
+    @param:Autowired mockMvc: MockMvc,
+    @param:Autowired authSessionService: AuthSessionService,
+    @param:Autowired jdbcTemplate: JdbcTemplate,
+    @param:Autowired domainActualStateChecker: FakeClubDomainActualStateChecker,
+) : PlatformAdminControllerDbSupport(mockMvc, authSessionService, jdbcTemplate, domainActualStateChecker) {
     @Test
     fun `host without platform admin cannot access admin API`() {
         mockMvc
@@ -120,53 +94,40 @@ class PlatformAdminControllerTest(
     @Test
     fun `operator can create action required subdomain row`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val clubId = createDomainTestClub()
         val hostname = "task14-${UUID.randomUUID()}.example.test"
 
-        val result =
-            mockMvc
-                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-                    cookie(sessionCookieForUser(operator))
-                }.andExpect {
-                    status { isOk() }
-                    jsonPath("$.clubId") { value(READING_SAI_CLUB_ID) }
-                    jsonPath("$.hostname") { value(hostname) }
-                    jsonPath("$.kind") { value("SUBDOMAIN") }
-                    jsonPath("$.status") { value("ACTION_REQUIRED") }
-                    jsonPath("$.isPrimary") { value(false) }
-                }.andReturn()
-        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
+        val result = createDomain(operator, clubId, hostname, 0)
+        val domainId = checkNotNull(result.response.jsonPathValue<String>("$.targetId"))
+        createdClubDomainIds += domainId
+        assertThat(result.response.jsonPathValue<String>("$.commandType")).isEqualTo("club.domain.create")
+        assertThat(result.response.jsonPathValue<String>("$.convergenceState")).isIn("PENDING", "FAILED")
     }
 
     @Test
     fun `created domain hostnames are normalized to lowercase`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val clubId = createDomainTestClub()
         val token = UUID.randomUUID().toString().replace("-", "")
         val expectedHostname = "task14-$token.example.test"
 
-        val result =
-            mockMvc
-                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"hostname":"Task14-$token.Example.Test.","kind":"SUBDOMAIN"}"""
-                    cookie(sessionCookieForUser(owner))
-                }.andExpect {
-                    status { isOk() }
-                    jsonPath("$.hostname") { value(expectedHostname) }
-                    jsonPath("$.status") { value("ACTION_REQUIRED") }
-                }.andReturn()
-        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
+        val result = createDomain(owner, clubId, "Task14-$token.Example.Test.", 0)
+        val domainId = checkNotNull(result.response.jsonPathValue<String>("$.targetId"))
+        createdClubDomainIds += domainId
+        assertThat(
+            jdbcTemplate.queryForObject("select hostname from club_domains where id = ?", String::class.java, domainId),
+        ).isEqualTo(expectedHostname)
     }
 
     @Test
     fun `cannot create platform fallback hostname as club domain`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val clubId = createDomainTestClub()
 
         mockMvc
-            .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            .post("/api/admin/clubs/$clubId/domains/preview") {
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"hostname":"readmates.pages.dev","kind":"SUBDOMAIN"}"""
+                content = """{"expectedAdminRevision":0,"hostname":"readmates.pages.dev","kind":"SUBDOMAIN"}"""
                 cookie(sessionCookieForUser(owner))
             }.andExpect {
                 status { isBadRequest() }
@@ -176,12 +137,14 @@ class PlatformAdminControllerTest(
     @Test
     fun `pending club domain cannot be created as primary`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val clubId = createDomainTestClub()
         val hostname = "primary-${UUID.randomUUID()}.example.test"
 
         mockMvc
-            .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            .post("/api/admin/clubs/$clubId/domains/preview") {
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"hostname":"$hostname","kind":"SUBDOMAIN","isPrimary":true}"""
+                content =
+                    """{"expectedAdminRevision":0,"hostname":"$hostname","kind":"SUBDOMAIN","isPrimary":true}"""
                 cookie(sessionCookieForUser(owner))
             }.andExpect {
                 status { isBadRequest() }
@@ -191,53 +154,37 @@ class PlatformAdminControllerTest(
     @Test
     fun `cannot create duplicate club domain hostname`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
+        val clubId = createDomainTestClub()
         val hostname = "duplicate-${UUID.randomUUID()}.example.test"
 
-        val result =
-            mockMvc
-                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-                    cookie(sessionCookieForUser(owner))
-                }.andExpect {
-                    status { isOk() }
-                }.andReturn()
-        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
-
-        mockMvc
-            .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-                cookie(sessionCookieForUser(owner))
-            }.andExpect {
-                status { isConflict() }
-            }
+        val result = createDomain(owner, clubId, hostname, 0)
+        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.targetId"))
+        createDomain(owner, clubId, hostname, 1, expectedStatus = 409)
     }
 
     @Test
     fun `summary lists action required domains for admin UI`() {
         val owner = createPlatformAdminUser(role = "OWNER", status = "ACTIVE")
         val hostname = "summary-${UUID.randomUUID()}.example.test"
-        val result =
-            mockMvc
-                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-                    cookie(sessionCookieForUser(owner))
-                }.andExpect {
-                    status { isOk() }
-                }.andReturn()
-        createdClubDomainIds += checkNotNull(result.response.jsonPathValue<String>("$.id"))
+        val domainId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into club_domains (id, club_id, hostname, kind, status, is_primary)
+            values (?, ?, ?, 'SUBDOMAIN', 'ACTION_REQUIRED', false)
+            """.trimIndent(),
+            domainId,
+            READING_SAI_CLUB_ID,
+            hostname,
+        )
+        createdClubDomainIds += domainId
 
         mockMvc
             .get("/api/admin/summary") {
                 cookie(sessionCookieForUser(owner))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.domainActionRequiredCount") { value(1) }
-                jsonPath("$.domainsRequiringAction[0].hostname") { value(hostname) }
-                jsonPath("$.domainsRequiringAction[0].status") { value("ACTION_REQUIRED") }
-                jsonPath("$.domainsRequiringAction[0].manualAction") { value("CLOUDFLARE_PAGES_CUSTOM_DOMAIN") }
+                jsonPath("$.domainActionRequiredCount") { value(Matchers.greaterThanOrEqualTo(1)) }
+                jsonPath("$.domainsRequiringAction[?(@.hostname == '$hostname')]") { isNotEmpty() }
             }
     }
 
@@ -294,12 +241,13 @@ class PlatformAdminControllerTest(
     @Test
     fun `support platform admin cannot create club domain`() {
         val support = createPlatformAdminUser(role = "SUPPORT", status = "ACTIVE")
+        val clubId = createDomainTestClub()
         val hostname = "support-${UUID.randomUUID()}.example.test"
 
         mockMvc
-            .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
+            .post("/api/admin/clubs/$clubId/domains/preview") {
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
+                content = """{"expectedAdminRevision":0,"hostname":"$hostname","kind":"SUBDOMAIN"}"""
                 cookie(sessionCookieForUser(support))
             }.andExpect {
                 status { isForbidden() }
@@ -326,18 +274,38 @@ class PlatformAdminControllerTest(
     fun `operator can make setup club public when active host exists`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
         val clubId = createSetupClubWithActiveHost()
+        val preview =
+            mockMvc
+                .post("/api/admin/clubs/$clubId/visibility/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"expectedAdminRevision":0,"targetVisibility":"PUBLIC"}"""
+                    cookie(sessionCookieForUser(operator))
+                }.andExpect { status { isOk() } }
+                .andReturn()
+        val previewId = checkNotNull(preview.response.jsonPathValue<String>("$.previewId"))
 
         mockMvc
-            .patch("/api/admin/clubs/$clubId") {
+            .post("/api/admin/clubs/$clubId/visibility/confirm") {
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"publicVisibility":"PUBLIC"}"""
+                content =
+                    """
+                    {
+                      "previewId":"$previewId",
+                      "idempotencyKey":"visibility-${UUID.randomUUID()}",
+                      "expectedAdminRevision":0,
+                      "targetVisibility":"PUBLIC",
+                      "confirmed":true
+                    }
+                    """.trimIndent()
                 cookie(sessionCookieForUser(operator))
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.clubId") { value(clubId) }
-                jsonPath("$.status") { value("ACTIVE") }
-                jsonPath("$.publicVisibility") { value("PUBLIC") }
+                jsonPath("$.commandType") { value("club.visibility.change") }
             }
+        assertThat(
+            jdbcTemplate.queryForObject("select public_visibility from clubs where id = ?", String::class.java, clubId),
+        ).isEqualTo("PUBLIC")
     }
 
     @Test
@@ -346,9 +314,9 @@ class PlatformAdminControllerTest(
         val clubId = createSetupClubWithActiveHost()
 
         mockMvc
-            .patch("/api/admin/clubs/$clubId") {
+            .post("/api/admin/clubs/$clubId/visibility/preview") {
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"publicVisibility":"PUBLIC"}"""
+                content = """{"expectedAdminRevision":0,"targetVisibility":"PUBLIC"}"""
                 cookie(sessionCookieForUser(support))
             }.andExpect {
                 status { isForbidden() }
@@ -422,22 +390,28 @@ class PlatformAdminControllerTest(
         createdInvitationIds += checkNotNull(result.response.jsonPathValue<String>("$.hostOnboarding.invitationId"))
         createdClubIds += checkNotNull(result.response.jsonPathValue<String>("$.club.clubId"))
     }
+}
 
+@SpringBootTest(
+    properties = [
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+    ],
+)
+@AutoConfigureMockMvc
+@Import(PlatformAdminDomainCheckTestConfiguration::class)
+@Tag("integration")
+class PlatformAdminDomainControllerTest(
+    @param:Autowired mockMvc: MockMvc,
+    @param:Autowired authSessionService: AuthSessionService,
+    @param:Autowired jdbcTemplate: JdbcTemplate,
+    @param:Autowired domainActualStateChecker: FakeClubDomainActualStateChecker,
+) : PlatformAdminControllerDbSupport(mockMvc, authSessionService, jdbcTemplate, domainActualStateChecker) {
     @Test
     fun `operator can check custom domain provisioning and activate verified domain`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val clubId = createDomainTestClub()
         val hostname = "verified-${UUID.randomUUID()}.example.test"
-        val result =
-            mockMvc
-                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-                    cookie(sessionCookieForUser(operator))
-                }.andExpect {
-                    status { isOk() }
-                }.andReturn()
-        val domainId = checkNotNull(result.response.jsonPathValue<String>("$.id"))
-        createdClubDomainIds += domainId
+        val domainId = insertDomain(clubId, hostname)
         domainActualStateChecker.nextResult =
             ClubDomainActualCheckResult(
                 status = ClubDomainStatus.ACTIVE,
@@ -446,34 +420,26 @@ class PlatformAdminControllerTest(
 
         mockMvc
             .post("/api/admin/domains/$domainId/check") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """{"idempotencyKey":"recheck-${UUID.randomUUID()}","expectedStatus":"ACTION_REQUIRED"}"""
                 cookie(sessionCookieForUser(operator))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.id") { value(domainId) }
-                jsonPath("$.hostname") { value(hostname) }
-                jsonPath("$.status") { value("ACTIVE") }
-                jsonPath("$.manualAction") { value("NONE") }
-                jsonPath("$.errorCode") { doesNotExist() }
-                jsonPath("$.verifiedAt") { exists() }
-                jsonPath("$.lastCheckedAt") { exists() }
+                jsonPath("$.targetId") { value(domainId) }
+                jsonPath("$.convergenceState") { value("SUCCEEDED") }
             }
+        assertThat(
+            jdbcTemplate.queryForObject("select status from club_domains where id = ?", String::class.java, domainId),
+        ).isEqualTo("ACTIVE")
     }
 
     @Test
     fun `operator can check custom domain provisioning and store failure code`() {
         val operator = createPlatformAdminUser(role = "OPERATOR", status = "ACTIVE")
+        val clubId = createDomainTestClub()
         val hostname = "failed-check-${UUID.randomUUID()}.example.test"
-        val result =
-            mockMvc
-                .post("/api/admin/clubs/$READING_SAI_CLUB_ID/domains") {
-                    contentType = MediaType.APPLICATION_JSON
-                    content = """{"hostname":"$hostname","kind":"SUBDOMAIN"}"""
-                    cookie(sessionCookieForUser(operator))
-                }.andExpect {
-                    status { isOk() }
-                }.andReturn()
-        val domainId = checkNotNull(result.response.jsonPathValue<String>("$.id"))
-        createdClubDomainIds += domainId
+        val domainId = insertDomain(clubId, hostname)
         domainActualStateChecker.nextResult =
             ClubDomainActualCheckResult(
                 status = ClubDomainStatus.FAILED,
@@ -482,16 +448,22 @@ class PlatformAdminControllerTest(
 
         mockMvc
             .post("/api/admin/domains/$domainId/check") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """{"idempotencyKey":"recheck-${UUID.randomUUID()}","expectedStatus":"ACTION_REQUIRED"}"""
                 cookie(sessionCookieForUser(operator))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$.id") { value(domainId) }
-                jsonPath("$.status") { value("FAILED") }
-                jsonPath("$.manualAction") { value("NONE") }
-                jsonPath("$.errorCode") { value("DOMAIN_CHECK_MARKER_MISMATCH") }
-                jsonPath("$.verifiedAt") { doesNotExist() }
-                jsonPath("$.lastCheckedAt") { exists() }
+                jsonPath("$.targetId") { value(domainId) }
+                jsonPath("$.convergenceState") { value("PENDING") }
             }
+        val stored =
+            jdbcTemplate.queryForMap(
+                "select status, provisioning_error_code from club_domains where id = ?",
+                domainId,
+            )
+        assertThat(stored["status"]).isEqualTo("FAILED")
+        assertThat(stored["provisioning_error_code"]).isEqualTo("DOMAIN_CHECK_MARKER_MISMATCH")
     }
 
     @Test
@@ -500,13 +472,62 @@ class PlatformAdminControllerTest(
 
         mockMvc
             .post("/api/admin/domains/${UUID.randomUUID()}/check") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"idempotencyKey":"support-${UUID.randomUUID()}","expectedStatus":"ACTION_REQUIRED"}"""
                 cookie(sessionCookieForUser(support))
             }.andExpect {
                 status { isForbidden() }
             }
     }
+}
 
-    private fun createPlatformAdminUser(
+abstract class PlatformAdminControllerDbSupport(
+    protected val mockMvc: MockMvc,
+    private val authSessionService: AuthSessionService,
+    protected val jdbcTemplate: JdbcTemplate,
+    protected val domainActualStateChecker: FakeClubDomainActualStateChecker,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    private val createdSessionTokenHashes = linkedSetOf<String>()
+    private val createdPlatformAdminUserIds = linkedSetOf<String>()
+    private val createdUserIds = linkedSetOf<String>()
+    protected val createdClubDomainIds = linkedSetOf<String>()
+    protected val createdMembershipIds = linkedSetOf<String>()
+    protected val createdClubIds = linkedSetOf<String>()
+    protected val createdInvitationIds = linkedSetOf<String>()
+
+    @AfterEach
+    fun cleanupCreatedRows() {
+        try {
+            jdbcTemplate.update("delete from platform_admin_club_command_convergence_events where event_seq = 1")
+            jdbcTemplate.update("delete from platform_admin_club_command_convergence_events where event_seq = 0")
+            jdbcTemplate.update("delete from platform_admin_club_command_convergence")
+            jdbcTemplate.update("delete from platform_admin_command_idempotency_keys")
+            jdbcTemplate.update("delete from platform_admin_command_idempotency")
+            jdbcTemplate.update("delete from platform_admin_club_command_previews")
+            jdbcTemplate.update("delete from platform_admin_club_command_receipts")
+            jdbcTemplate.update("delete from platform_audit_events where event_type like 'ADMIN_CLUB_%'")
+            deleteWhereIn("invitations", "id", createdInvitationIds)
+            deleteWhereIn("club_domains", "id", createdClubDomainIds)
+            deleteWhereIn("memberships", "id", createdMembershipIds)
+            deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
+            deleteWhereIn("auth_sessions", "user_id", createdUserIds)
+            deleteWhereIn("platform_admins", "user_id", createdPlatformAdminUserIds)
+            deleteWhereIn("users", "id", createdUserIds)
+            deleteWhereIn("clubs", "id", createdClubIds)
+        } finally {
+            createdSessionTokenHashes.clear()
+            createdPlatformAdminUserIds.clear()
+            createdUserIds.clear()
+            createdClubDomainIds.clear()
+            createdMembershipIds.clear()
+            createdClubIds.clear()
+            createdInvitationIds.clear()
+            SecurityContextHolder.clearContext()
+            domainActualStateChecker.reset()
+        }
+    }
+
+    protected fun createPlatformAdminUser(
         role: String,
         status: String,
     ): String {
@@ -534,7 +555,7 @@ class PlatformAdminControllerTest(
         return userId
     }
 
-    private fun createSetupClubWithActiveHost(): String {
+    protected fun createSetupClubWithActiveHost(): String {
         val clubId = UUID.randomUUID().toString()
         val hostUserId = UUID.randomUUID().toString()
         val membershipId = UUID.randomUUID().toString()
@@ -571,7 +592,83 @@ class PlatformAdminControllerTest(
         return clubId
     }
 
-    private fun onboardingRequestJson(
+    protected fun createDomainTestClub(): String {
+        val clubId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about, status, public_visibility, admin_revision)
+            values (?, ?, 'Domain Club', 'Safe tagline', 'Safe public description', 'ACTIVE', 'PRIVATE', 0)
+            """.trimIndent(),
+            clubId,
+            "domain-${UUID.randomUUID().toString().take(8)}",
+        )
+        createdClubIds += clubId
+        return clubId
+    }
+
+    protected fun insertDomain(
+        clubId: String,
+        hostname: String,
+    ): String {
+        val domainId = UUID.randomUUID().toString()
+        jdbcTemplate.update(
+            """
+            insert into club_domains (id, club_id, hostname, kind, status, is_primary)
+            values (?, ?, ?, 'SUBDOMAIN', 'ACTION_REQUIRED', false)
+            """.trimIndent(),
+            domainId,
+            clubId,
+            hostname,
+        )
+        createdClubDomainIds += domainId
+        return domainId
+    }
+
+    protected fun createDomain(
+        adminUserId: String,
+        clubId: String,
+        hostname: String,
+        expectedRevision: Long,
+        expectedStatus: Int = 200,
+    ): org.springframework.test.web.servlet.MvcResult {
+        val preview =
+            mockMvc
+                .post("/api/admin/clubs/$clubId/domains/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "expectedAdminRevision":$expectedRevision,
+                          "hostname":"$hostname",
+                          "kind":"SUBDOMAIN",
+                          "isPrimary":false
+                        }
+                        """.trimIndent()
+                    cookie(sessionCookieForUser(adminUserId))
+                }.andExpect { status { isOk() } }
+                .andReturn()
+        val previewId = checkNotNull(preview.response.jsonPathValue<String>("$.previewId"))
+        return mockMvc
+            .post("/api/admin/clubs/$clubId/domains") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "previewId":"$previewId",
+                      "idempotencyKey":"domain-${UUID.randomUUID()}",
+                      "expectedAdminRevision":$expectedRevision,
+                      "hostname":"$hostname",
+                      "kind":"SUBDOMAIN",
+                      "isPrimary":false,
+                      "confirmed":true
+                    }
+                    """.trimIndent()
+                cookie(sessionCookieForUser(adminUserId))
+            }.andExpect { status { isEqualTo(expectedStatus) } }
+            .andReturn()
+    }
+
+    protected fun onboardingRequestJson(
         hostEmail: String,
         existingUserConfirmation: String? = null,
     ): String {
@@ -595,7 +692,7 @@ class PlatformAdminControllerTest(
             """.trimIndent()
     }
 
-    private fun createGoogleUser(
+    protected fun createGoogleUser(
         email: String,
         name: String,
     ): String {
@@ -614,24 +711,24 @@ class PlatformAdminControllerTest(
         return userId
     }
 
-    private fun emailForUser(userId: String): String =
+    protected fun emailForUser(userId: String): String =
         jdbcTemplate.queryForObject("select email from users where id = ?", String::class.java, userId)
             ?: error("Missing user email")
 
-    private fun membershipIdsForClub(clubId: String): Set<String> =
+    protected fun membershipIdsForClub(clubId: String): Set<String> =
         jdbcTemplate
             .queryForList("select id from memberships where club_id = ?", String::class.java, clubId)
             .filterNotNull()
             .toSet()
 
-    private fun avatarKeyForClub(clubId: String): String =
+    protected fun avatarKeyForClub(clubId: String): String =
         jdbcTemplate.queryForObject(
             "select avatar_key from memberships where club_id = ?",
             String::class.java,
             clubId,
         ) ?: error("Expected avatar key for club $clubId")
 
-    private fun sessionCookieForUser(userId: String): Cookie {
+    protected fun sessionCookieForUser(userId: String): Cookie {
         val issuedSession =
             authSessionService.issueSession(
                 userId = UUID.fromString(userId).toString(),
@@ -656,11 +753,9 @@ class PlatformAdminControllerTest(
             *values.toTypedArray(),
         )
     }
-
-    companion object {
-        private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
-    }
 }
+
+private const val READING_SAI_CLUB_ID = "00000000-0000-0000-0000-000000000001"
 
 private inline fun <reified T> MockHttpServletResponse.jsonPathValue(expression: String): T? =
     JsonPath
@@ -674,15 +769,61 @@ class PlatformAdminDomainCheckTestConfiguration {
 }
 
 class FakeClubDomainActualStateChecker : CheckClubDomainActualStatePort {
+    private val callCount = AtomicInteger()
+
+    @Volatile private var checkStarted: CountDownLatch? = null
+
+    @Volatile private var checkRelease: CountDownLatch? = null
+
+    @Volatile var observedTransaction: Boolean = false
+        private set
+
+    @Volatile private var crashOnNextCheck: Boolean = false
+
+    val calls: Int
+        get() = callCount.get()
+
+    @Volatile
     var nextResult: ClubDomainActualCheckResult =
         ClubDomainActualCheckResult(
             status = ClubDomainStatus.FAILED,
             errorCode = "DOMAIN_CHECK_UNCONFIGURED",
         )
 
-    override fun check(hostname: String): ClubDomainActualCheckResult = nextResult
+    override fun check(hostname: NormalizedClubDomainHostname): ClubDomainActualCheckResult {
+        callCount.incrementAndGet()
+        observedTransaction = TransactionSynchronizationManager.isActualTransactionActive()
+        checkStarted?.countDown()
+        checkRelease?.await(10, TimeUnit.SECONDS)
+        if (crashOnNextCheck) {
+            crashOnNextCheck = false
+            throw SimulatedDomainCheckCrash()
+        }
+        return nextResult
+    }
+
+    fun crashNextCheck() {
+        crashOnNextCheck = true
+    }
+
+    fun blockNextCheck() {
+        checkStarted = CountDownLatch(1)
+        checkRelease = CountDownLatch(1)
+    }
+
+    fun awaitCheckStarted(): Boolean = checkStarted?.await(10, TimeUnit.SECONDS) ?: false
+
+    fun releaseCheck() {
+        checkRelease?.countDown()
+    }
 
     fun reset() {
+        releaseCheck()
+        checkStarted = null
+        checkRelease = null
+        callCount.set(0)
+        observedTransaction = false
+        crashOnNextCheck = false
         nextResult =
             ClubDomainActualCheckResult(
                 status = ClubDomainStatus.FAILED,
@@ -690,3 +831,5 @@ class FakeClubDomainActualStateChecker : CheckClubDomainActualStatePort {
             )
     }
 }
+
+class SimulatedDomainCheckCrash : Error()

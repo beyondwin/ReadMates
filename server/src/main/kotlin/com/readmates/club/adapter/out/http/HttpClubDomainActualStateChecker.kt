@@ -1,6 +1,7 @@
 package com.readmates.club.adapter.out.http
 
 import com.readmates.club.application.model.ClubDomainActualCheckResult
+import com.readmates.club.application.model.NormalizedClubDomainHostname
 import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
@@ -53,10 +54,10 @@ class HttpClubDomainActualStateChecker
             this.markerFetcher = markerFetcher
         }
 
-        override fun check(hostname: String): ClubDomainActualCheckResult {
+        override fun check(hostname: NormalizedClubDomainHostname): ClubDomainActualCheckResult {
             val uri =
                 try {
-                    URI.create("https://$hostname$MARKER_PATH")
+                    URI.create("https://${hostname.value}$MARKER_PATH")
                 } catch (_: IllegalArgumentException) {
                     return failed("DOMAIN_CHECK_INVALID_HOSTNAME")
                 }

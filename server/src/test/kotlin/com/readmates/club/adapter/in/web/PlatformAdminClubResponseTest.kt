@@ -3,7 +3,6 @@
 package com.readmates.club.adapter.`in`.web
 
 import com.readmates.club.application.model.FirstHostOnboardingState
-import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_ADMIN_REVISION
 import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubList
@@ -33,6 +32,7 @@ class PlatformAdminClubResponseTest {
                 notificationFailureCount = 2,
                 aiFailureCount = 1,
                 firstHostOnboardingState = FirstHostOnboardingState.ASSIGNED,
+                adminRevision = 0,
             )
 
         val response = PlatformAdminClubResponse.from(item)
@@ -57,6 +57,7 @@ class PlatformAdminClubResponseTest {
                 notificationFailureCount = 0,
                 aiFailureCount = 0,
                 firstHostOnboardingState = FirstHostOnboardingState.ASSIGNED,
+                adminRevision = 0,
             )
 
         val response =
@@ -79,7 +80,7 @@ class PlatformAdminClubResponseTest {
                     name = "Failure Count Club",
                     tagline = "tag",
                     about = "about",
-                    adminRevision = PLATFORM_ADMIN_CLUB_ADMIN_REVISION,
+                    adminRevision = 0,
                     status = ClubStatus.ACTIVE,
                     publicVisibility = ClubPublicVisibility.PRIVATE,
                     domains =

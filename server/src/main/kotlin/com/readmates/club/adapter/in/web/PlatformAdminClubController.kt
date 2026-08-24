@@ -3,8 +3,11 @@
 package com.readmates.club.adapter.`in`.web
 
 import com.readmates.club.application.model.ClubLifecycleState
+import com.readmates.club.application.model.ConfirmPlatformAdminClubVisibilityCommand
 import com.readmates.club.application.model.FirstHostOnboardingState
 import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_LIST_DEFAULT_LIMIT
+import com.readmates.club.application.model.PlatformAdminClubCommandPreview
+import com.readmates.club.application.model.PlatformAdminClubCommandReceipt
 import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubList
 import com.readmates.club.application.model.PlatformAdminClubListItem
@@ -21,12 +24,15 @@ import com.readmates.club.application.model.PlatformAdminOnboardingDomainInput
 import com.readmates.club.application.model.PlatformAdminOnboardingHostInput
 import com.readmates.club.application.model.PlatformAdminOnboardingPreview
 import com.readmates.club.application.model.PlatformAdminOnboardingResult
+import com.readmates.club.application.model.PreviewPlatformAdminClubVisibilityCommand
 import com.readmates.club.application.model.PublicVisibility
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
 import com.readmates.club.application.port.`in`.CommitPlatformAdminClubOnboardingUseCase
+import com.readmates.club.application.port.`in`.ConfirmPlatformAdminClubVisibilityUseCase
 import com.readmates.club.application.port.`in`.GetPlatformAdminClubUseCase
 import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
 import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubOnboardingUseCase
+import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubVisibilityUseCase
 import com.readmates.club.application.port.`in`.UpdatePlatformAdminClubUseCase
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubPublicVisibility
@@ -47,6 +53,8 @@ class PlatformAdminClubController(
     private val listPlatformAdminClubsUseCase: ListPlatformAdminClubsUseCase,
     private val getPlatformAdminClubUseCase: GetPlatformAdminClubUseCase,
     private val updatePlatformAdminClubUseCase: UpdatePlatformAdminClubUseCase,
+    private val previewVisibilityUseCase: PreviewPlatformAdminClubVisibilityUseCase,
+    private val confirmVisibilityUseCase: ConfirmPlatformAdminClubVisibilityUseCase,
     private val previewOnboardingUseCase: PreviewPlatformAdminClubOnboardingUseCase,
     private val commitOnboardingUseCase: CommitPlatformAdminClubOnboardingUseCase,
 ) {
@@ -86,19 +94,119 @@ class PlatformAdminClubController(
             commitOnboardingUseCase.commit(admin.toPlatformActor(), request.toCommand()),
         )
 
-    @PatchMapping("/{clubId}")
+    @PatchMapping("/{clubId}/metadata")
     fun update(
         admin: CurrentPlatformAdmin,
         @PathVariable clubId: UUID,
         @RequestBody request: UpdatePlatformAdminClubRequest,
-    ): PlatformAdminClubResponse =
-        PlatformAdminClubResponse.from(
+    ): PlatformAdminClubDetailResponse =
+        PlatformAdminClubDetailResponse.from(
             updatePlatformAdminClubUseCase.updateClub(
                 admin = admin.toPlatformActor(),
                 clubId = clubId,
                 command = request.toCommand(),
             ),
         )
+
+    @PostMapping("/{clubId}/visibility/preview")
+    fun previewVisibility(
+        admin: CurrentPlatformAdmin,
+        @PathVariable clubId: UUID,
+        @RequestBody request: PreviewPlatformAdminClubVisibilityRequest,
+    ): PlatformAdminClubCommandPreviewResponse =
+        PlatformAdminClubCommandPreviewResponse.from(
+            previewVisibilityUseCase.previewVisibility(
+                admin.toPlatformActor(),
+                clubId,
+                PreviewPlatformAdminClubVisibilityCommand(
+                    expectedAdminRevision = request.expectedAdminRevision,
+                    targetVisibility = request.targetVisibility,
+                ),
+            ),
+        )
+
+    @PostMapping("/{clubId}/visibility/confirm")
+    fun confirmVisibility(
+        admin: CurrentPlatformAdmin,
+        @PathVariable clubId: UUID,
+        @RequestBody request: ConfirmPlatformAdminClubVisibilityRequest,
+    ): PlatformAdminClubCommandReceiptResponse =
+        PlatformAdminClubCommandReceiptResponse.from(
+            confirmVisibilityUseCase.confirmVisibility(
+                admin.toPlatformActor(),
+                clubId,
+                ConfirmPlatformAdminClubVisibilityCommand(
+                    previewId = request.previewId,
+                    idempotencyKey = request.idempotencyKey,
+                    expectedAdminRevision = request.expectedAdminRevision,
+                    targetVisibility = request.targetVisibility,
+                    confirmed = request.confirmed,
+                ),
+            ),
+        )
+}
+
+data class PreviewPlatformAdminClubVisibilityRequest(
+    val expectedAdminRevision: Long,
+    val targetVisibility: ClubPublicVisibility,
+)
+
+data class ConfirmPlatformAdminClubVisibilityRequest(
+    val previewId: UUID,
+    val idempotencyKey: String,
+    val expectedAdminRevision: Long,
+    val targetVisibility: ClubPublicVisibility,
+    val confirmed: Boolean,
+)
+
+data class PlatformAdminClubCommandPreviewResponse(
+    val previewId: String,
+    val expiresAt: java.time.Instant,
+    val currentVisibility: String,
+    val targetVisibility: String,
+    val impactCodes: List<String>,
+    val requestFingerprintPrefix: String,
+) {
+    companion object {
+        fun from(preview: PlatformAdminClubCommandPreview) =
+            PlatformAdminClubCommandPreviewResponse(
+                previewId = preview.previewId.toString(),
+                expiresAt = preview.expiresAt,
+                currentVisibility = preview.currentVisibility.name,
+                targetVisibility = preview.targetVisibility.name,
+                impactCodes = preview.impactCodes,
+                requestFingerprintPrefix = preview.requestFingerprintPrefix,
+            )
+    }
+}
+
+data class PlatformAdminClubCommandReceiptResponse(
+    val receiptId: String,
+    val commandType: String,
+    val clubId: String,
+    val beforeAdminRevision: Long?,
+    val afterAdminRevision: Long,
+    val outcome: String,
+    val resultCode: String,
+    val targetId: String?,
+    val convergenceId: String?,
+    val convergenceState: String?,
+) {
+    companion object {
+        fun from(receipt: PlatformAdminClubCommandReceipt) =
+            PlatformAdminClubCommandReceiptResponse(
+                receiptId = receipt.receiptId.toString(),
+                commandType = receipt.commandType,
+                clubId = receipt.clubId.toString(),
+                beforeAdminRevision = receipt.beforeAdminRevision,
+                afterAdminRevision = receipt.afterAdminRevision,
+                outcome = receipt.outcome,
+                resultCode = receipt.resultCode,
+                targetId = receipt.targetId?.toString(),
+                convergenceId = receipt.convergenceId?.toString(),
+                convergenceState = receipt.convergenceState,
+            )
+    }
 }
 
 data class PlatformAdminClubListRequest(
@@ -136,17 +244,17 @@ data class PlatformAdminClubListResponse(
 }
 
 data class UpdatePlatformAdminClubRequest(
+    val expectedAdminRevision: Long,
     val name: String? = null,
     val tagline: String? = null,
     val about: String? = null,
-    val publicVisibility: ClubPublicVisibility? = null,
 ) {
     fun toCommand(): UpdatePlatformAdminClubCommand =
         UpdatePlatformAdminClubCommand(
+            expectedAdminRevision = expectedAdminRevision,
             name = name,
             tagline = tagline,
             about = about,
-            publicVisibility = publicVisibility,
         )
 }
 
@@ -156,7 +264,7 @@ data class PlatformAdminClubDetailResponse(
     val name: String,
     val tagline: String,
     val about: String,
-    val adminRevision: Int,
+    val adminRevision: Long,
     val status: String,
     val publicVisibility: String,
     val domains: List<PlatformAdminDomainResponse>,
@@ -200,6 +308,7 @@ data class PlatformAdminClubResponse(
     val notificationFailureCount: Int,
     val aiFailureCount: Int,
     val firstHostOnboardingState: String,
+    val adminRevision: Long,
 ) {
     companion object {
         fun from(item: PlatformAdminClubListItem): PlatformAdminClubResponse =
@@ -216,6 +325,7 @@ data class PlatformAdminClubResponse(
                 notificationFailureCount = item.notificationFailureCount,
                 aiFailureCount = item.aiFailureCount,
                 firstHostOnboardingState = item.firstHostOnboardingState.name,
+                adminRevision = item.adminRevision,
             )
     }
 }

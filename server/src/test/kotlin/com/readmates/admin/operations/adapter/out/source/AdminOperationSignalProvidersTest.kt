@@ -349,6 +349,7 @@ class AdminOperationSignalProvidersTest {
         notificationFailureCount = 0,
         aiFailureCount = 0,
         firstHostOnboardingState = firstHostOnboardingState,
+        adminRevision = 0,
     )
 
     private fun notificationClub(

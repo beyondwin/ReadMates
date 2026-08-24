@@ -86,6 +86,7 @@ class ActorCapabilitiesTest {
     fun `owner maps to explicit platform capability allowlist`() {
         val actor = currentPlatformAdmin(PlatformAdminRole.OWNER).toPlatformActor()
 
+        assertThat(actor.role).isEqualTo(PlatformAdminRole.OWNER)
         assertThat(actor.capabilities).containsExactlyInAnyOrderElementsOf(OWNER_PLATFORM_CAPABILITIES)
         assertThat(actorSource(CURRENT_PLATFORM_ADMIN_SOURCE)).doesNotContain("PlatformCapability.entries")
     }
@@ -94,6 +95,7 @@ class ActorCapabilitiesTest {
     fun `operator maps to exactly operational platform capabilities`() {
         val actor = currentPlatformAdmin(PlatformAdminRole.OPERATOR).toPlatformActor()
 
+        assertThat(actor.role).isEqualTo(PlatformAdminRole.OPERATOR)
         assertThat(actor.capabilities).containsExactlyInAnyOrderElementsOf(OPERATOR_PLATFORM_CAPABILITIES)
     }
 
@@ -101,6 +103,7 @@ class ActorCapabilitiesTest {
     fun `support maps to exactly platform read capabilities`() {
         val actor = currentPlatformAdmin(PlatformAdminRole.SUPPORT).toPlatformActor()
 
+        assertThat(actor.role).isEqualTo(PlatformAdminRole.SUPPORT)
         assertThat(actor.capabilities).containsExactlyInAnyOrderElementsOf(SUPPORT_PLATFORM_CAPABILITIES)
     }
 
@@ -117,17 +120,16 @@ class ActorCapabilitiesTest {
     }
 
     @Test
-    fun `actor source contains no framework domain or profile dependencies`() {
+    fun `actor source contains only explicit platform role and no framework or profile dependencies`() {
         val source = actorSource()
 
         assertThat(source).doesNotContain("org.springframework")
         assertThat(source).doesNotContain("com.readmates.auth.domain")
-        assertThat(source).doesNotContain("com.readmates.club.domain")
+        assertThat(source).contains("PlatformAdminRole")
         assertThat(source).doesNotContain("email")
         assertThat(source).doesNotContain("accountName")
         assertThat(source).doesNotContain("displayName")
         assertThat(source).doesNotContain("avatar")
-        assertThat(source).doesNotContain("role")
         assertThat(source).doesNotContain("status")
     }
 

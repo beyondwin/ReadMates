@@ -17,6 +17,8 @@ class AdminCommandIdempotencyPropertiesTest {
         assertThat(properties.purgeBatchSize).isEqualTo(100)
         assertThat(properties.purgeInterval).isEqualTo(Duration.ofHours(1))
         assertThat(properties.previousKeyRolloutBuffer).isEqualTo(Duration.ofHours(24))
+        assertThat(properties.previewTtl).isEqualTo(Duration.ofMinutes(10))
+        assertThat(properties.domainConvergenceMaxAttempts).isEqualTo(3)
         assertThat(properties.boundedPurgeBatchSize()).isEqualTo(100)
     }
 
@@ -46,6 +48,37 @@ class AdminCommandIdempotencyPropertiesTest {
         ).forEach { properties ->
             assertThatThrownBy { properties.validate() }
                 .isInstanceOf(IllegalStateException::class.java)
+        }
+    }
+
+    @Test
+    fun `preview ttl must be positive and strictly shorter than fresh key rollout buffer`() {
+        listOf(
+            AdminCommandIdempotencyProperties(previewTtl = Duration.ZERO),
+            AdminCommandIdempotencyProperties(previewTtl = Duration.ofHours(24)),
+            AdminCommandIdempotencyProperties(
+                previewTtl = Duration.ofHours(25),
+                previousKeyRolloutBuffer = Duration.ofHours(24),
+            ),
+        ).forEach { properties ->
+            assertThatThrownBy { properties.validate() }
+                .isInstanceOf(IllegalStateException::class.java)
+                .hasMessageContaining("preview-ttl")
+        }
+
+        AdminCommandIdempotencyProperties(
+            previewTtl = Duration.ofHours(23),
+            previousKeyRolloutBuffer = Duration.ofHours(24),
+        ).validate()
+    }
+
+    @Test
+    fun `domain convergence retry budget is bounded`() {
+        listOf(0, 11).forEach { attempts ->
+            assertThatThrownBy {
+                AdminCommandIdempotencyProperties(domainConvergenceMaxAttempts = attempts).validate()
+            }.isInstanceOf(IllegalStateException::class.java)
+                .hasMessageContaining("domain-convergence-max-attempts")
         }
     }
 }

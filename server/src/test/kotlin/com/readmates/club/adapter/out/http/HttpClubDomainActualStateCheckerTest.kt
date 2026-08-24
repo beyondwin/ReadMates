@@ -1,5 +1,6 @@
 package com.readmates.club.adapter.out.http
 
+import com.readmates.club.application.model.NormalizedClubDomainHostname
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
@@ -20,7 +21,7 @@ class HttpClubDomainActualStateCheckerTest {
 
     @Test
     fun `rejects private or loopback addresses before fetching marker`() {
-        val result = checker.check("127.0.0.1")
+        val result = checker.check(NormalizedClubDomainHostname("127.0.0.1"))
 
         assertEquals(ClubDomainStatus.FAILED, result.status)
         assertEquals("DOMAIN_CHECK_PRIVATE_ADDRESS", result.errorCode)
@@ -28,7 +29,9 @@ class HttpClubDomainActualStateCheckerTest {
 
     @Test
     fun `rejects redirects instead of following them to a marker elsewhere`() {
-        val result = checkerWithFetcher(MarkerHttpResult(statusCode = 302)).check("club.example.test")
+        val result =
+            checkerWithFetcher(MarkerHttpResult(statusCode = 302))
+                .check(NormalizedClubDomainHostname("club.example.test"))
 
         assertEquals(ClubDomainStatus.FAILED, result.status)
         assertEquals("DOMAIN_CHECK_REDIRECT", result.errorCode)
@@ -36,7 +39,9 @@ class HttpClubDomainActualStateCheckerTest {
 
     @Test
     fun `rejects oversized marker responses`() {
-        val result = checkerWithFetcher(MarkerHttpResult(statusCode = 200, bodyTooLarge = true)).check("club.example.test")
+        val result =
+            checkerWithFetcher(MarkerHttpResult(statusCode = 200, bodyTooLarge = true))
+                .check(NormalizedClubDomainHostname("club.example.test"))
 
         assertEquals(ClubDomainStatus.FAILED, result.status)
         assertEquals("DOMAIN_CHECK_RESPONSE_TOO_LARGE", result.errorCode)
@@ -50,7 +55,7 @@ class HttpClubDomainActualStateCheckerTest {
                     statusCode = 200,
                     body = """{"service":"readmates","surface":"cloudflare-pages","version":1}""",
                 ),
-            ).check("club.example.test")
+            ).check(NormalizedClubDomainHostname("club.example.test"))
 
         assertEquals(ClubDomainStatus.ACTIVE, result.status)
         assertEquals(null, result.errorCode)

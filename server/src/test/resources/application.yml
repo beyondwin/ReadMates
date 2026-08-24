@@ -16,6 +16,8 @@ readmates:
       purge-batch-size: 100
       purge-interval: 1h
       previous-key-rollout-buffer: 24h
+      preview-ttl: 10m
+      domain-convergence-max-attempts: 3
   security:
     ip-hash:
       base-secret: test-ip-hash-base-secret

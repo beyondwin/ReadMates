@@ -4,7 +4,6 @@ import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.FirstHostOnboardingState
 import com.readmates.club.application.model.HostOnboardingResultKind
-import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_ADMIN_REVISION
 import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubListItem
@@ -166,6 +165,7 @@ private fun operatorActor(): PlatformActor =
 private fun actorWith(vararg capabilities: PlatformCapability): PlatformActor =
     PlatformActor(
         adminId = UUID.fromString("00000000-0000-0000-0000-0000000000aa"),
+        role = com.readmates.club.domain.PlatformAdminRole.OPERATOR,
         capabilities = capabilities.toSet(),
     )
 
@@ -281,7 +281,7 @@ private class FakePlatformAdminOnboardingPorts :
                 name = item.name,
                 tagline = item.tagline,
                 about = item.about,
-                adminRevision = PLATFORM_ADMIN_CLUB_ADMIN_REVISION,
+                adminRevision = 0,
                 status = item.status,
                 publicVisibility = item.publicVisibility,
                 domains = emptyList(),
@@ -330,5 +330,6 @@ private class FakePlatformAdminOnboardingPorts :
             notificationFailureCount = 0,
             aiFailureCount = 0,
             firstHostOnboardingState = FirstHostOnboardingState.MISSING,
+            adminRevision = 0,
         )
 }

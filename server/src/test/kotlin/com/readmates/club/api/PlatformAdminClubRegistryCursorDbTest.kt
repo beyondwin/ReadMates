@@ -40,6 +40,7 @@ class PlatformAdminClubRegistryCursorDbTest(
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val cursorSigner: PlatformAdminClubRegistryCursorSigner,
 ) : ReadmatesMySqlIntegrationTestSupport() {
+    private val bigintAdminRevision = 3_000_000_000L
     private val createdSessionTokenHashes = linkedSetOf<String>()
     private val createdPlatformAdminUserIds = linkedSetOf<String>()
     private val createdUserIds = linkedSetOf<String>()
@@ -252,7 +253,13 @@ class PlatformAdminClubRegistryCursorDbTest(
     @Test
     fun `by-id detail is authoritative outside page one`() {
         val admin = createPlatformAdminUser()
-        val ids = (1..8).map { index -> createClub(name = "$fixturePrefix ${index.toString().padStart(3, '0')}") }
+        val ids =
+            (1..8).map { index ->
+                createClub(
+                    name = "$fixturePrefix ${index.toString().padStart(3, '0')}",
+                    adminRevision = if (index == 7) bigintAdminRevision else 0,
+                )
+            }
         val outsidePageOne = ids[6]
         createDomain(outsidePageOne, ClubDomainStatus.FAILED, hostname = "detail-${UUID.randomUUID()}.example.test")
         val firstPage = listClubs(admin = admin, search = fixturePrefix, limit = 3)
@@ -264,7 +271,7 @@ class PlatformAdminClubRegistryCursorDbTest(
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.clubId") { value(outsidePageOne) }
-                jsonPath("$.adminRevision") { value(0) }
+                jsonPath("$.adminRevision") { value(bigintAdminRevision) }
                 jsonPath("$.name") { value("$fixturePrefix 007") }
                 jsonPath("$.domains[0].status") { value("FAILED") }
                 jsonPath("$.firstHostOnboardingState") { value("MISSING") }
@@ -345,18 +352,20 @@ class PlatformAdminClubRegistryCursorDbTest(
         status: ClubStatus = ClubStatus.ACTIVE,
         visibility: ClubPublicVisibility = ClubPublicVisibility.PRIVATE,
         clubId: UUID = UUID.randomUUID(),
+        adminRevision: Long = 0,
     ): String {
         val slug = "zzz-cursor-${UUID.randomUUID().toString().take(12)}"
         jdbcTemplate.update(
             """
-            insert into clubs (id, slug, name, tagline, about, status, public_visibility)
-            values (?, ?, ?, 'Cursor tagline', 'Cursor about', ?, ?)
+            insert into clubs (id, slug, name, tagline, about, status, public_visibility, admin_revision)
+            values (?, ?, ?, 'Cursor tagline', 'Cursor about', ?, ?, ?)
             """.trimIndent(),
             clubId.toString(),
             slug,
             name,
             status.name,
             visibility.name,
+            adminRevision,
         )
         createdClubIds += clubId.toString()
         return clubId.toString()

@@ -2,7 +2,6 @@ package com.readmates.club.adapter.out.persistence
 
 import com.readmates.auth.application.port.out.MemberAvatarAllocationPort
 import com.readmates.club.application.model.FirstHostOnboardingState
-import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_ADMIN_REVISION
 import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubDomain
 import com.readmates.club.application.model.PlatformAdminClubListItem
@@ -15,6 +14,7 @@ import com.readmates.club.application.port.out.PlatformAdminExistingUser
 import com.readmates.club.application.port.out.PlatformAdminOnboardingPort
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPatch
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
+import com.readmates.club.application.port.out.UpdatePlatformAdminClubResult
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.club.domain.ClubPublicVisibility
@@ -64,7 +64,7 @@ class JdbcPlatformAdminClubAdapter(
             name = item.name,
             tagline = item.tagline,
             about = item.about,
-            adminRevision = PLATFORM_ADMIN_CLUB_ADMIN_REVISION,
+            adminRevision = item.adminRevision,
             status = item.status,
             publicVisibility = item.publicVisibility,
             domains = domains,
@@ -90,10 +90,11 @@ class JdbcPlatformAdminClubAdapter(
         ) ?: 0
 
     @Transactional
-    override fun updateClub(
+    override fun updateClubMetadata(
         clubId: UUID,
+        expectedAdminRevision: Long,
         patch: UpdatePlatformAdminClubPatch,
-    ): PlatformAdminClubListItem? {
+    ): UpdatePlatformAdminClubResult {
         val updated =
             jdbcTemplate.update(
                 """
@@ -101,19 +102,24 @@ class JdbcPlatformAdminClubAdapter(
                 set name = coalesce(?, name),
                     tagline = coalesce(?, tagline),
                     about = coalesce(?, about),
-                    status = coalesce(?, status),
-                    public_visibility = coalesce(?, public_visibility),
+                    admin_revision = admin_revision + 1,
                     updated_at = utc_timestamp(6)
-                where id = ?
+                where id = ? and admin_revision = ?
                 """.trimIndent(),
                 patch.name,
                 patch.tagline,
                 patch.about,
-                patch.status?.name,
-                patch.publicVisibility?.name,
                 clubId.dbString(),
+                expectedAdminRevision,
             )
-        return if (updated == 0) null else loadClub(clubId)
+        if (updated == 0) {
+            return if (loadClub(clubId) == null) {
+                UpdatePlatformAdminClubResult.NotFound
+            } else {
+                UpdatePlatformAdminClubResult.RevisionConflict
+            }
+        }
+        return UpdatePlatformAdminClubResult.Updated(checkNotNull(loadClubDetail(clubId)))
     }
 
     override fun slugExists(slug: String): Boolean =
@@ -213,19 +219,9 @@ class JdbcPlatformAdminClubAdapter(
         jdbcTemplate.update(
             """
             insert into invitations (
-              id,
-              club_id,
-              invited_by_membership_id,
-              invited_by_platform_admin_user_id,
-              invited_email,
-              invited_name,
-              role,
-              token_hash,
-              status,
-              apply_to_current_session,
-              expires_at
-            )
-            values (?, ?, null, ?, ?, ?, 'HOST', ?, 'PENDING', false, ?)
+              id, club_id, invited_by_membership_id, invited_by_platform_admin_user_id,
+              invited_email, invited_name, role, token_hash, status, apply_to_current_session, expires_at
+            ) values (?, ?, null, ?, ?, ?, 'HOST', ?, 'PENDING', false, ?)
             """.trimIndent(),
             command.invitationId.dbString(),
             command.clubId.dbString(),
@@ -268,6 +264,7 @@ private fun mapPlatformAdminClub(
         notificationFailureCount = resultSet.getInt("notification_failure_count"),
         aiFailureCount = resultSet.getInt("ai_failure_count"),
         firstHostOnboardingState = FirstHostOnboardingState.valueOf(resultSet.getString("first_host_state")),
+        adminRevision = resultSet.getLong("admin_revision"),
     )
 
 private fun mapClubDomain(

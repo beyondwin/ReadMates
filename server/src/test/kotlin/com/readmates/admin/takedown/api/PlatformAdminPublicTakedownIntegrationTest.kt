@@ -202,7 +202,12 @@ class PlatformAdminPublicTakedownIntegrationTest(
 
     @Test
     fun `capability removed operator shaped actor is denied without a raw role comparison`() {
-        val actor = PlatformActor(UUID.fromString(OPERATOR_USER_ID), emptySet())
+        val actor =
+            PlatformActor(
+                UUID.fromString(OPERATOR_USER_ID),
+                com.readmates.club.domain.PlatformAdminRole.OPERATOR,
+                emptySet(),
+            )
 
         var error: PublicTakedownException? = null
         try {
@@ -276,6 +281,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
         val actor =
             PlatformActor(
                 UUID.fromString(OWNER_USER_ID),
+                com.readmates.club.domain.PlatformAdminRole.OWNER,
                 setOf(PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN),
             )
         val preview =

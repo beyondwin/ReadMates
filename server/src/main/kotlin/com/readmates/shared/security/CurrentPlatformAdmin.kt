@@ -24,6 +24,7 @@ data class CurrentPlatformAdmin(
 fun CurrentPlatformAdmin.toPlatformActor(): PlatformActor =
     PlatformActor(
         adminId = userId,
+        role = role,
         capabilities = platformCapabilitiesFor(role),
     )
 

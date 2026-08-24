@@ -35,6 +35,7 @@ internal object PlatformAdminClubRegistrySql {
           clubs.about,
           clubs.status,
           clubs.public_visibility,
+          clubs.admin_revision,
           $NORMALIZED_NAME_SQL as normalized_name,
           coalesce((
             select count(*) from club_domains

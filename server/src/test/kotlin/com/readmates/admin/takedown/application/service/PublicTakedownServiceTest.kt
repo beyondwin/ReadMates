@@ -81,7 +81,12 @@ class PublicTakedownServiceTest {
 
     private fun operator() = actor(OPERATOR_ID)
 
-    private fun actor(id: UUID) = PlatformActor(id, setOf(PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN))
+    private fun actor(id: UUID) =
+        PlatformActor(
+            id,
+            com.readmates.club.domain.PlatformAdminRole.OPERATOR,
+            setOf(PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN),
+        )
 }
 
 private class FakePublicTakedownPort : PublicTakedownPort {

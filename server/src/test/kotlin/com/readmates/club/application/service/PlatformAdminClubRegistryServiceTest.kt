@@ -3,20 +3,31 @@ package com.readmates.club.application.service
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.ClubRegistrySearch
+import com.readmates.club.application.model.ConfirmPlatformAdminClubVisibilityCommand
 import com.readmates.club.application.model.FirstHostOnboardingState
-import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_ADMIN_REVISION
+import com.readmates.club.application.model.PlatformAdminClubCommandReceipt
 import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubList
 import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.PlatformAdminClubListQuery
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
 import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
+import com.readmates.club.application.port.out.PlatformAdminClubCommandPort
 import com.readmates.club.application.port.out.PlatformAdminClubRegistryQuery
 import com.readmates.club.application.port.out.PlatformAdminClubRegistryRow
+import com.readmates.club.application.port.out.PlatformAdminClubVisibilityLockPort
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPatch
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
+import com.readmates.club.application.port.out.UpdatePlatformAdminClubResult
+import com.readmates.club.application.port.out.WritePlatformAuditEventPort
 import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
+import com.readmates.shared.adminmutation.application.model.AdminCommandClaimResult
+import com.readmates.shared.adminmutation.application.model.CanonicalAdminCommandRequest
+import com.readmates.shared.adminmutation.application.model.PlatformAdminCommandIdentity
+import com.readmates.shared.adminmutation.application.service.AdminCommandIdempotencyService
+import com.readmates.shared.adminmutation.application.service.AdminCommandIdentityService
+import com.readmates.shared.adminmutation.config.AdminCommandIdempotencyProperties
 import com.readmates.shared.adminmutation.config.AdminCommandIdentityProperties
 import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.security.AccessDeniedException
@@ -25,13 +36,137 @@ import com.readmates.shared.security.PlatformCapability
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.never
+import org.mockito.Mockito.verify
+import org.mockito.Mockito.`when`
 import java.time.Clock
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Base64
 import java.util.UUID
 
 class PlatformAdminClubRegistryServiceTest {
+    @Test
+    fun `completed visibility replay does not require preview row`() {
+        val port = CountingClubPort()
+        val commandPort = mock(PlatformAdminClubCommandPort::class.java)
+        val identityService = mock(AdminCommandIdentityService::class.java)
+        val idempotencyService = mock(AdminCommandIdempotencyService::class.java)
+        val receiptId = UUID.randomUUID()
+        val receipt =
+            PlatformAdminClubCommandReceipt(
+                receiptId,
+                "club.visibility.change",
+                CLUB_A,
+                0,
+                1,
+                "SUCCEEDED",
+                "VISIBILITY_CHANGED",
+            )
+        `when`(
+            idempotencyService.claim(
+                org.mockito.ArgumentMatchers.any(PlatformAdminCommandIdentity::class.java)
+                    ?: PlatformAdminCommandIdentity(ADMIN_ID, "test.command", "club", CLUB_A.toString(), "test-key"),
+                org.mockito.ArgumentMatchers.any(CanonicalAdminCommandRequest::class.java)
+                    ?: object : CanonicalAdminCommandRequest {
+                        override val schemaVersion: String = "test"
+
+                        override fun canonicalFields(): List<Pair<String, String>> = emptyList()
+                    },
+            ),
+        ).thenReturn(AdminCommandClaimResult.Completed("platform_admin_club_command_receipt", receiptId.toString()))
+        `when`(
+            commandPort.loadReceipt(
+                receiptId,
+                ADMIN_ID,
+                "club.visibility.change",
+                "club",
+                CLUB_A,
+            ),
+        ).thenReturn(receipt)
+        val service =
+            PlatformAdminClubVisibilityService(
+                loadClubsPort = port,
+                commandPort = commandPort,
+                visibilityLockPort = mock(PlatformAdminClubVisibilityLockPort::class.java),
+                identityService = identityService,
+                idempotencyService = idempotencyService,
+                properties = AdminCommandIdempotencyProperties(),
+                clock = Clock.systemUTC(),
+            )
+
+        val command =
+            ConfirmPlatformAdminClubVisibilityCommand(
+                UUID.randomUUID(),
+                "response-loss-key",
+                0,
+                ClubPublicVisibility.PUBLIC,
+                true,
+            )
+        val replay =
+            service.confirmVisibility(actor(PlatformCapability.MANAGE_CLUBS), CLUB_A, command)
+
+        assertThat(replay).isEqualTo(receipt)
+        verify(commandPort, never()).loadPreview(
+            org.mockito.ArgumentMatchers.any(UUID::class.java) ?: UUID.randomUUID(),
+        )
+    }
+
+    @Test
+    fun `visibility unpublish skips public info and host prerequisites`() {
+        val port =
+            CountingClubPort(
+                detail =
+                    PlatformAdminClubDetail(
+                        clubId = CLUB_A,
+                        slug = "legacy-club",
+                        name = "",
+                        tagline = "",
+                        about = "",
+                        adminRevision = 9,
+                        status = ClubStatus.ACTIVE,
+                        publicVisibility = ClubPublicVisibility.PUBLIC,
+                        domains = emptyList(),
+                        firstHostOnboardingState = FirstHostOnboardingState.ASSIGNED,
+                        domainCount = 0,
+                        domainActionRequiredCount = 0,
+                        notificationFailureCount = 0,
+                        aiFailureCount = 0,
+                    ),
+            )
+        val service =
+            PlatformAdminClubVisibilityService(
+                loadClubsPort = port,
+                commandPort = mock(PlatformAdminClubCommandPort::class.java),
+                visibilityLockPort = mock(PlatformAdminClubVisibilityLockPort::class.java),
+                identityService =
+                    AdminCommandIdentityService(
+                        AdminCommandIdentityProperties(
+                            currentKey = "test-visibility-digest-key",
+                            currentKeyVersion = 1,
+                        ),
+                    ),
+                idempotencyService = mock(AdminCommandIdempotencyService::class.java),
+                properties = AdminCommandIdempotencyProperties(),
+                clock = Clock.systemUTC(),
+            )
+
+        val preview =
+            service.previewVisibility(
+                actor(PlatformCapability.MANAGE_CLUBS),
+                CLUB_A,
+                com.readmates.club.application.model.PreviewPlatformAdminClubVisibilityCommand(
+                    expectedAdminRevision = 9,
+                    targetVisibility = ClubPublicVisibility.PRIVATE,
+                ),
+            )
+
+        assertThat(preview.targetVisibility).isEqualTo(ClubPublicVisibility.PRIVATE)
+        assertThat(port.activeHostCalls).isZero()
+    }
+
     @Test
     fun `actor without view clubs is denied before load port call`() {
         val port = CountingClubPort()
@@ -123,7 +258,10 @@ class PlatformAdminClubRegistryServiceTest {
                 lastNormalizedName = "alpha",
                 lastClubId = CLUB_A,
             )
-        val tampered = cursor.dropLast(1) + if (cursor.last() == 'A') 'B' else 'A'
+        val parts = cursor.split('.')
+        val tamperedMac = Base64.getUrlDecoder().decode(parts[2]).also { it[0] = (it[0].toInt() xor 1).toByte() }
+        val encodedMac = Base64.getUrlEncoder().withoutPadding().encodeToString(tamperedMac)
+        val tampered = listOf(parts[0], parts[1], encodedMac).joinToString(".")
 
         assertThatThrownBy {
             service.listClubs(
@@ -238,7 +376,7 @@ class PlatformAdminClubRegistryServiceTest {
                 name = "Alpha",
                 tagline = "tag",
                 about = "about",
-                adminRevision = PLATFORM_ADMIN_CLUB_ADMIN_REVISION,
+                adminRevision = 0,
                 status = ClubStatus.ACTIVE,
                 publicVisibility = ClubPublicVisibility.PRIVATE,
                 domains = emptyList(),
@@ -275,7 +413,7 @@ class PlatformAdminClubRegistryServiceTest {
             service.updateClub(
                 actor(PlatformCapability.MANAGE_CLUB_DOMAINS),
                 UUID.randomUUID(),
-                UpdatePlatformAdminClubCommand(null, null, null, null),
+                UpdatePlatformAdminClubCommand(0, null, null, null),
             )
         }.isInstanceOf(AccessDeniedException::class.java)
 
@@ -291,6 +429,16 @@ class PlatformAdminClubRegistryServiceTest {
             loadClubsPort = port,
             updateClubPort = port,
             cursorSigner = signer,
+            auditEventPort =
+                object : WritePlatformAuditEventPort {
+                    override fun writeEvent(
+                        actorUserId: UUID,
+                        actorPlatformRole: String,
+                        targetUserId: UUID?,
+                        eventType: String,
+                        metadataJson: String,
+                    ) = Unit
+                },
         )
 
     private fun signer(clock: Clock = Clock.systemUTC()): PlatformAdminClubRegistryCursorSigner =
@@ -306,7 +454,11 @@ class PlatformAdminClubRegistryServiceTest {
         )
 
     private fun actor(vararg capabilities: PlatformCapability): PlatformActor =
-        PlatformActor(UUID.fromString("00000000-0000-0000-0000-0000000000bb"), capabilities.toSet())
+        PlatformActor(
+            ADMIN_ID,
+            com.readmates.club.domain.PlatformAdminRole.OPERATOR,
+            capabilities.toSet(),
+        )
 
     private fun emptyFilter() =
         PlatformAdminClubListCursorFilter(
@@ -339,6 +491,7 @@ class PlatformAdminClubRegistryServiceTest {
                     notificationFailureCount = 0,
                     aiFailureCount = 0,
                     firstHostOnboardingState = onboarding,
+                    adminRevision = 0,
                 ),
             normalizedName = ClubRegistrySearch.normalize(name) ?: name.lowercase(),
         )
@@ -351,6 +504,7 @@ class PlatformAdminClubRegistryServiceTest {
         var listCalls = 0
         var loadCalls = 0
         var detailCalls = 0
+        var activeHostCalls = 0
         var updateCalls = 0
         var lastQuery: PlatformAdminClubRegistryQuery? = null
 
@@ -376,18 +530,23 @@ class PlatformAdminClubRegistryServiceTest {
             return detail
         }
 
-        override fun activeHostCount(clubId: UUID): Int = 0
+        override fun activeHostCount(clubId: UUID): Int {
+            activeHostCalls += 1
+            return 0
+        }
 
-        override fun updateClub(
+        override fun updateClubMetadata(
             clubId: UUID,
+            expectedAdminRevision: Long,
             patch: UpdatePlatformAdminClubPatch,
-        ): PlatformAdminClubListItem? {
+        ): UpdatePlatformAdminClubResult {
             updateCalls += 1
-            return null
+            return UpdatePlatformAdminClubResult.NotFound
         }
     }
 
     private companion object {
+        private val ADMIN_ID = UUID.fromString("00000000-0000-0000-0000-0000000000bb")
         private val CLUB_A = UUID.fromString("00000000-0000-4000-8000-0000000000a1")
         private val CLUB_B = UUID.fromString("00000000-0000-4000-8000-0000000000a2")
     }

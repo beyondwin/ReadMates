@@ -2,6 +2,8 @@ package com.readmates.club.adapter.`in`.web
 
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
+import com.readmates.shared.adapter.`in`.web.ApiErrorResponse
+import com.readmates.shared.adapter.`in`.web.apiErrorResponse
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
@@ -18,8 +20,10 @@ import org.springframework.web.bind.annotation.RestControllerAdvice
 )
 class PlatformAdminErrorHandler {
     @ExceptionHandler(PlatformAdminException::class)
-    fun handlePlatformAdminException(exception: PlatformAdminException): ResponseEntity<Void> =
-        ResponseEntity.status(PLATFORM_ADMIN_ERROR_STATUSES.getValue(exception.error)).build()
+    fun handlePlatformAdminException(exception: PlatformAdminException): ResponseEntity<ApiErrorResponse> {
+        val status = PLATFORM_ADMIN_ERROR_STATUSES.getValue(exception.error)
+        return apiErrorResponse(status, exception.error.name)
+    }
 }
 
 private val PLATFORM_ADMIN_ERROR_STATUSES: Map<PlatformAdminError, HttpStatus> =
@@ -30,6 +34,15 @@ private val PLATFORM_ADMIN_ERROR_STATUSES: Map<PlatformAdminError, HttpStatus> =
         PlatformAdminError.CLUB_NOT_FOUND to HttpStatus.NOT_FOUND,
         PlatformAdminError.CLUB_PUBLISH_NOT_ALLOWED to HttpStatus.CONFLICT,
         PlatformAdminError.CLUB_HOST_REQUIRED to HttpStatus.CONFLICT,
+        PlatformAdminError.REVISION_CONFLICT to HttpStatus.CONFLICT,
+        PlatformAdminError.PREVIEW_NOT_FOUND to HttpStatus.NOT_FOUND,
+        PlatformAdminError.PREVIEW_EXPIRED to HttpStatus.CONFLICT,
+        PlatformAdminError.PREVIEW_CONSUMED to HttpStatus.CONFLICT,
+        PlatformAdminError.PREVIEW_MISMATCH to HttpStatus.CONFLICT,
+        PlatformAdminError.CONFIRMATION_REQUIRED to HttpStatus.BAD_REQUEST,
+        PlatformAdminError.IDEMPOTENCY_CONFLICT to HttpStatus.CONFLICT,
+        PlatformAdminError.COMMAND_IN_PROGRESS to HttpStatus.CONFLICT,
+        PlatformAdminError.INVALID_IDEMPOTENCY_KEY to HttpStatus.BAD_REQUEST,
         PlatformAdminError.CLUB_SLUG_CONFLICT to HttpStatus.CONFLICT,
         PlatformAdminError.EXISTING_USER_CONFIRMATION_REQUIRED to HttpStatus.CONFLICT,
         PlatformAdminError.CLUB_DOMAIN_NOT_FOUND to HttpStatus.NOT_FOUND,

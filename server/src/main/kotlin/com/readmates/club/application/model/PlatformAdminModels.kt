@@ -6,6 +6,7 @@ import com.readmates.club.domain.ClubPublicVisibility
 import com.readmates.club.domain.ClubStatus
 import com.readmates.club.domain.PlatformAdminRole
 import java.text.Normalizer
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.Locale
 import java.util.UUID
@@ -16,7 +17,6 @@ typealias PlatformAdminDomainStatus = ClubDomainStatus
 
 const val PLATFORM_ADMIN_CLUB_LIST_DEFAULT_LIMIT = 100
 const val PLATFORM_ADMIN_CLUB_LIST_MAX_LIMIT = 100
-const val PLATFORM_ADMIN_CLUB_ADMIN_REVISION = 0
 
 data class PlatformAdminDashboardSummary(
     val platformRole: PlatformAdminRole,
@@ -26,10 +26,26 @@ data class PlatformAdminDashboardSummary(
     val domainsRequiringAction: List<PlatformAdminClubDomain>,
 )
 
-data class CreateClubDomainCommand(
+data class PreviewCreateClubDomainCommand(
+    val expectedAdminRevision: Long,
     val hostname: String,
     val kind: ClubDomainKind,
     val isPrimary: Boolean,
+)
+
+data class ConfirmCreateClubDomainCommand(
+    val previewId: UUID,
+    val idempotencyKey: String,
+    val expectedAdminRevision: Long,
+    val hostname: String,
+    val kind: ClubDomainKind,
+    val isPrimary: Boolean,
+    val confirmed: Boolean,
+)
+
+data class RecheckClubDomainCommand(
+    val idempotencyKey: String,
+    val expectedStatus: ClubDomainStatus,
 )
 
 data class PlatformAdminClubDomain(
@@ -48,6 +64,15 @@ data class ClubDomainActualCheckResult(
     val status: ClubDomainStatus,
     val errorCode: String?,
 )
+
+@JvmInline
+value class NormalizedClubDomainHostname(
+    val value: String,
+) {
+    init {
+        require(value.isNotBlank()) { "Normalized club domain hostname must not be blank" }
+    }
+}
 
 enum class PlatformAdminDomainDesiredState {
     ENABLED,
@@ -103,6 +128,7 @@ data class PlatformAdminClubListItem(
     val notificationFailureCount: Int,
     val aiFailureCount: Int,
     val firstHostOnboardingState: FirstHostOnboardingState,
+    val adminRevision: Long,
 )
 
 enum class FirstHostOnboardingState {
@@ -117,7 +143,7 @@ data class PlatformAdminClubDetail(
     val name: String,
     val tagline: String,
     val about: String,
-    val adminRevision: Int,
+    val adminRevision: Long,
     val status: ClubStatus,
     val publicVisibility: ClubPublicVisibility,
     val domains: List<PlatformAdminClubDomain>,
@@ -148,10 +174,62 @@ object ClubRegistrySearch {
 }
 
 data class UpdatePlatformAdminClubCommand(
+    val expectedAdminRevision: Long,
     val name: String?,
     val tagline: String?,
     val about: String?,
-    val publicVisibility: ClubPublicVisibility?,
+)
+
+const val CLUB_VISIBILITY_COMMAND_TYPE = "club.visibility.change"
+const val CLUB_VISIBILITY_SCHEMA_VERSION = "admin.club.visibility.v1"
+
+data class PreviewPlatformAdminClubVisibilityCommand(
+    val expectedAdminRevision: Long,
+    val targetVisibility: ClubPublicVisibility,
+)
+
+data class ConfirmPlatformAdminClubVisibilityCommand(
+    val previewId: UUID,
+    val idempotencyKey: String,
+    val expectedAdminRevision: Long,
+    val targetVisibility: ClubPublicVisibility,
+    val confirmed: Boolean,
+)
+
+data class PlatformAdminClubCommandPreview(
+    val previewId: UUID,
+    val expiresAt: Instant,
+    val currentVisibility: ClubPublicVisibility,
+    val targetVisibility: ClubPublicVisibility,
+    val impactCodes: List<String>,
+    val requestFingerprintPrefix: String,
+)
+
+data class PlatformAdminClubCommandReceipt(
+    val receiptId: UUID,
+    val commandType: String,
+    val clubId: UUID,
+    val beforeAdminRevision: Long?,
+    val afterAdminRevision: Long,
+    val outcome: String,
+    val resultCode: String,
+    val targetId: UUID? = null,
+    val convergenceId: UUID? = null,
+    val convergenceState: String? = null,
+)
+
+const val CLUB_DOMAIN_CREATE_COMMAND_TYPE = "club.domain.create"
+const val CLUB_DOMAIN_CREATE_SCHEMA_VERSION = "admin.club.domain.create.v1"
+const val CLUB_DOMAIN_RECHECK_COMMAND_TYPE = "club.domain.recheck"
+const val CLUB_DOMAIN_RECHECK_SCHEMA_VERSION = "admin.club.domain.recheck.v1"
+
+data class PlatformAdminDomainCommandPreview(
+    val previewId: UUID,
+    val expiresAt: Instant,
+    val kind: ClubDomainKind,
+    val isPrimary: Boolean,
+    val impactCodes: List<String>,
+    val requestFingerprintPrefix: String,
 )
 
 data class PlatformAdminOnboardingClubInput(

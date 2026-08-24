@@ -1,144 +1,104 @@
 package com.readmates.club.application.service
 
-import com.readmates.club.application.model.ClubDomainActualCheckResult
-import com.readmates.club.application.model.CreateClubDomainCommand
-import com.readmates.club.application.model.PlatformAdminClubDomain
-import com.readmates.club.application.port.out.CheckClubDomainActualStatePort
-import com.readmates.club.application.port.out.CreateClubDomainPort
-import com.readmates.club.application.port.out.CreateClubDomainResult
+import com.readmates.club.application.model.ConfirmCreateClubDomainCommand
+import com.readmates.club.application.model.PreviewCreateClubDomainCommand
+import com.readmates.club.application.model.RecheckClubDomainCommand
 import com.readmates.club.application.port.out.LoadClubDomainProvisioningPort
-import com.readmates.club.application.port.out.LoadPlatformAdminSummaryPort
-import com.readmates.club.application.port.out.UpdateClubDomainProvisioningPort
+import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
+import com.readmates.club.application.port.out.PlatformAdminClubCommandPort
 import com.readmates.club.domain.ClubDomainKind
 import com.readmates.club.domain.ClubDomainStatus
+import com.readmates.club.domain.PlatformAdminRole
+import com.readmates.shared.adminmutation.application.service.AdminCommandIdempotencyService
+import com.readmates.shared.adminmutation.application.service.AdminCommandIdentityService
+import com.readmates.shared.adminmutation.config.AdminCommandIdempotencyProperties
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.PlatformActor
 import com.readmates.shared.security.PlatformCapability
-import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
-import java.time.OffsetDateTime
-import java.time.ZoneOffset
+import org.mockito.Mockito.mock
+import org.mockito.Mockito.verifyNoInteractions
+import org.springframework.transaction.support.TransactionTemplate
+import java.time.Clock
 import java.util.UUID
 
 class PlatformAdminServiceTest {
-    @Test
-    fun `actor with manage clubs but not domains is denied before create domain port call`() {
-        val ports = DomainPorts()
-        val service = PlatformAdminService(ports, ports, ports, ports, ports)
+    private val domainPort = mock(LoadClubDomainProvisioningPort::class.java)
+    private val clubsPort = mock(LoadPlatformAdminClubsPort::class.java)
+    private val commandPort = mock(PlatformAdminClubCommandPort::class.java)
+    private val identityService = mock(AdminCommandIdentityService::class.java)
+    private val idempotencyService = mock(AdminCommandIdempotencyService::class.java)
+    private val transactionTemplate = mock(TransactionTemplate::class.java)
+    private val convergenceService = mock(PlatformAdminDomainConvergenceService::class.java)
+    private val service =
+        PlatformAdminDomainCommandService(
+            domainPort,
+            clubsPort,
+            commandPort,
+            identityService,
+            idempotencyService,
+            AdminCommandIdempotencyProperties(),
+            transactionTemplate,
+            convergenceService,
+            Clock.systemUTC(),
+        )
 
+    @Test
+    fun `actor without domain capability is denied before preview persistence`() {
         assertThatThrownBy {
-            service.createClubDomain(actor(PlatformCapability.MANAGE_CLUBS), CLUB_ID, CREATE_COMMAND)
+            service.previewClubDomain(
+                actor(PlatformCapability.MANAGE_CLUBS),
+                CLUB_ID,
+                PreviewCreateClubDomainCommand(0, "club.example.test", ClubDomainKind.CUSTOM_DOMAIN, false),
+            )
         }.isInstanceOf(AccessDeniedException::class.java)
 
-        assertThat(ports.createCalls).isZero()
+        verifyNoInteractions(clubsPort, commandPort, identityService)
     }
 
     @Test
-    fun `actor with manage clubs but not domains is denied before provisioning load port call`() {
-        val ports = DomainPorts()
-        val service = PlatformAdminService(ports, ports, ports, ports, ports)
-
+    fun `actor without domain capability is denied before confirm claim`() {
         assertThatThrownBy {
-            service.checkClubDomainProvisioning(actor(PlatformCapability.MANAGE_CLUBS), DOMAIN_ID)
+            service.createClubDomain(
+                actor(PlatformCapability.MANAGE_CLUBS),
+                CLUB_ID,
+                ConfirmCreateClubDomainCommand(
+                    UUID.randomUUID(),
+                    "safe-test-key",
+                    0,
+                    "club.example.test",
+                    ClubDomainKind.CUSTOM_DOMAIN,
+                    false,
+                    true,
+                ),
+            )
         }.isInstanceOf(AccessDeniedException::class.java)
 
-        assertThat(ports.provisioningLoadCalls).isZero()
-        assertThat(ports.actualCheckCalls).isZero()
-        assertThat(ports.provisioningUpdateCalls).isZero()
+        verifyNoInteractions(commandPort, identityService, idempotencyService, transactionTemplate)
     }
 
     @Test
-    fun `actor with domains but not manage clubs reaches deterministic domain ports`() {
-        val ports = DomainPorts()
-        val service = PlatformAdminService(ports, ports, ports, ports, ports)
-        val actor = actor(PlatformCapability.MANAGE_CLUB_DOMAINS)
+    fun `actor without domain capability is denied before recheck target load`() {
+        assertThatThrownBy {
+            service.checkClubDomainProvisioning(
+                actor(PlatformCapability.MANAGE_CLUBS),
+                UUID.randomUUID(),
+                RecheckClubDomainCommand("safe-test-key", ClubDomainStatus.ACTION_REQUIRED),
+            )
+        }.isInstanceOf(AccessDeniedException::class.java)
 
-        assertThat(service.createClubDomain(actor, CLUB_ID, CREATE_COMMAND)).isEqualTo(ports.createdDomain)
-        assertThat(service.checkClubDomainProvisioning(actor, DOMAIN_ID)).isEqualTo(ports.updatedDomain)
-
-        assertThat(ports.createCalls).isEqualTo(1)
-        assertThat(ports.provisioningLoadCalls).isEqualTo(1)
-        assertThat(ports.actualCheckCalls).isEqualTo(1)
-        assertThat(ports.provisioningUpdateCalls).isEqualTo(1)
+        verifyNoInteractions(domainPort, commandPort, idempotencyService, transactionTemplate)
     }
 
     private fun actor(vararg capabilities: PlatformCapability): PlatformActor =
-        PlatformActor(UUID.fromString("00000000-0000-0000-0000-0000000000cc"), capabilities.toSet())
-
-    private class DomainPorts :
-        LoadPlatformAdminSummaryPort,
-        CreateClubDomainPort,
-        LoadClubDomainProvisioningPort,
-        UpdateClubDomainProvisioningPort,
-        CheckClubDomainActualStatePort {
-        val createdDomain = domain(hostname = "club.example.test", status = ClubDomainStatus.REQUESTED)
-        val updatedDomain = domain(hostname = "club.example.test", status = ClubDomainStatus.ACTIVE)
-        var createCalls = 0
-        var provisioningLoadCalls = 0
-        var actualCheckCalls = 0
-        var provisioningUpdateCalls = 0
-
-        override fun countActiveClubs(): Long = 0
-
-        override fun countDomainsRequiringAction(): Long = 0
-
-        override fun listDomains(limit: Int): List<PlatformAdminClubDomain> = emptyList()
-
-        override fun listDomainsRequiringAction(limit: Int): List<PlatformAdminClubDomain> = emptyList()
-
-        override fun createClubDomain(
-            clubId: UUID,
-            hostname: String,
-            kind: ClubDomainKind,
-            isPrimary: Boolean,
-        ): CreateClubDomainResult {
-            createCalls += 1
-            return CreateClubDomainResult.Created(createdDomain)
-        }
-
-        override fun loadClubDomain(domainId: UUID): PlatformAdminClubDomain? {
-            provisioningLoadCalls += 1
-            return createdDomain
-        }
-
-        override fun updateClubDomainProvisioning(
-            domainId: UUID,
-            status: ClubDomainStatus,
-            verifiedAt: OffsetDateTime?,
-            lastCheckedAt: OffsetDateTime,
-            errorCode: String?,
-        ): PlatformAdminClubDomain? {
-            provisioningUpdateCalls += 1
-            return updatedDomain
-        }
-
-        override fun check(hostname: String): ClubDomainActualCheckResult {
-            actualCheckCalls += 1
-            return ClubDomainActualCheckResult(ClubDomainStatus.ACTIVE, null)
-        }
-
-        private fun domain(
-            hostname: String,
-            status: ClubDomainStatus,
-        ): PlatformAdminClubDomain =
-            PlatformAdminClubDomain(
-                id = DOMAIN_ID,
-                clubId = CLUB_ID,
-                hostname = hostname,
-                kind = ClubDomainKind.CUSTOM_DOMAIN,
-                status = status,
-                isPrimary = false,
-                verifiedAt = null,
-                lastCheckedAt = OffsetDateTime.of(2026, 8, 12, 0, 0, 0, 0, ZoneOffset.UTC),
-                errorCode = null,
-            )
-    }
+        PlatformActor(
+            UUID.fromString("00000000-0000-0000-0000-0000000000cc"),
+            PlatformAdminRole.OPERATOR,
+            capabilities.toSet(),
+        )
 
     private companion object {
         val CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
-        val DOMAIN_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000002")
-        val CREATE_COMMAND: CreateClubDomainCommand =
-            CreateClubDomainCommand("club.example.test", ClubDomainKind.CUSTOM_DOMAIN, false)
     }
 }

@@ -106,6 +106,8 @@ readmates:
       purge-batch-size: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE:100}
       purge-interval: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL:1h}
       previous-key-rollout-buffer: ${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER:24h}
+      preview-ttl: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_PREVIEW_TTL:10m}
+      domain-convergence-max-attempts: ${READMATES_ADMIN_COMMAND_DOMAIN_CONVERGENCE_MAX_ATTEMPTS:3}
   host-action-confirmation:
     required: false
   session:

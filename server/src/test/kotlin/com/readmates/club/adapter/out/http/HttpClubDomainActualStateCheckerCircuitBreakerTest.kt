@@ -1,5 +1,6 @@
 package com.readmates.club.adapter.out.http
 
+import com.readmates.club.application.model.NormalizedClubDomainHostname
 import com.readmates.club.domain.ClubDomainStatus
 import com.readmates.shared.adapter.out.resilience.OutboundCircuitBreakers
 import com.readmates.shared.adapter.out.resilience.OutboundResilienceProperties
@@ -26,13 +27,13 @@ class HttpClubDomainActualStateCheckerCircuitBreakerTest {
                 circuitBreakers = breakers(),
             )
 
-        val first = checker.check("club.example.com")
-        val second = checker.check("club.example.com")
+        val first = checker.check(NormalizedClubDomainHostname("club.example.com"))
+        val second = checker.check(NormalizedClubDomainHostname("club.example.com"))
         assertThat(first.status).isEqualTo(ClubDomainStatus.FAILED)
         assertThat(first.errorCode).isEqualTo("DOMAIN_CHECK_UNREACHABLE")
         assertThat(second.errorCode).isEqualTo("DOMAIN_CHECK_UNREACHABLE")
 
-        val third = checker.check("club.example.com")
+        val third = checker.check(NormalizedClubDomainHostname("club.example.com"))
         assertThat(third.status).isEqualTo(ClubDomainStatus.FAILED)
         assertThat(third.errorCode).isEqualTo("DOMAIN_CHECK_CIRCUIT_OPEN")
         assertThat(fetchCalls).isEqualTo(2)
@@ -53,7 +54,7 @@ class HttpClubDomainActualStateCheckerCircuitBreakerTest {
                 circuitBreakers = breakers(),
             )
 
-        val result = checker.check("club.example.com")
+        val result = checker.check(NormalizedClubDomainHostname("club.example.com"))
 
         assertThat(result.status).isEqualTo(ClubDomainStatus.ACTIVE)
         assertThat(result.errorCode).isNull()

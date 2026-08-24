@@ -30,21 +30,55 @@ import com.readmates.auth.infrastructure.security.RateLimitFilter
 import com.readmates.auth.infrastructure.security.ReadmatesOAuthSuccessHandler
 import com.readmates.auth.infrastructure.security.SecurityConfig
 import com.readmates.auth.infrastructure.security.SessionCookieAuthenticationFilter
+import com.readmates.club.adapter.`in`.web.PlatformAdminClubController
+import com.readmates.club.adapter.`in`.web.PlatformAdminController
+import com.readmates.club.adapter.`in`.web.PlatformAdminErrorHandler
+import com.readmates.club.application.model.ConfirmCreateClubDomainCommand
+import com.readmates.club.application.model.ConfirmPlatformAdminClubVisibilityCommand
+import com.readmates.club.application.model.FirstHostOnboardingState
+import com.readmates.club.application.model.PlatformAdminClubCommandPreview
+import com.readmates.club.application.model.PlatformAdminClubCommandReceipt
+import com.readmates.club.application.model.PlatformAdminClubDetail
+import com.readmates.club.application.model.PlatformAdminDomainCommandPreview
+import com.readmates.club.application.model.PreviewCreateClubDomainCommand
+import com.readmates.club.application.model.PreviewPlatformAdminClubVisibilityCommand
+import com.readmates.club.application.model.RecheckClubDomainCommand
 import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
+import com.readmates.club.application.port.`in`.CheckClubDomainProvisioningUseCase
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
+import com.readmates.club.application.port.`in`.CommitPlatformAdminClubOnboardingUseCase
+import com.readmates.club.application.port.`in`.ConfirmPlatformAdminClubVisibilityUseCase
+import com.readmates.club.application.port.`in`.CreateClubDomainUseCase
+import com.readmates.club.application.port.`in`.GetPlatformAdminClubUseCase
+import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
+import com.readmates.club.application.port.`in`.PlatformAdminSummaryUseCase
+import com.readmates.club.application.port.`in`.PreviewClubDomainUseCase
+import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubOnboardingUseCase
+import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubVisibilityUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
+import com.readmates.club.application.port.`in`.UpdatePlatformAdminClubUseCase
+import com.readmates.club.domain.ClubDomainKind
+import com.readmates.club.domain.ClubPublicVisibility
+import com.readmates.club.domain.ClubStatus
 import com.readmates.club.domain.PlatformAdminRole
+import com.readmates.shared.adapter.`in`.web.SharedApplicationErrorHandler
 import com.readmates.shared.cache.RateLimitProperties
+import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentPlatformAdmin
 import com.readmates.shared.security.CurrentUser
+import com.readmates.shared.security.PlatformActor
 import com.readmates.shared.security.PlatformCapability
 import com.readmatesharness.PlatformAdminBffSecurityHarnessApplication
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.Arguments
+import org.junit.jupiter.params.provider.MethodSource
 import org.mockito.Mockito.mock
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration
@@ -55,10 +89,13 @@ import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Import
+import org.springframework.http.HttpMethod
 import org.springframework.http.MediaType
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
@@ -150,6 +187,54 @@ class PlatformAdminBffSecurityTest(
             }.andExpect { status { isForbidden() } }
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("clubCommandRoutes")
+    fun `exact club command routes require trusted bff same origin active capable admin`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OPERATOR)
+        commandRequest(route).andExpect(status().isOk)
+
+        listOf<String?>(null, "wrong-secret").forEach { secret ->
+            commandRequest(route, secret = secret).andExpect(status().isUnauthorized)
+        }
+        commandRequest(route, origin = "https://attacker.example").andExpect(status().isForbidden)
+        commandRequest(route, origin = null, referer = "https://attacker.example/path")
+            .andExpect(status().isForbidden)
+
+        identities.inactiveSession()
+        commandRequest(route).andExpect(status().isUnauthorized)
+        identities.nonAdmin()
+        commandRequest(route).andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.SUPPORT)
+        commandRequest(route).andExpect(status().isForbidden)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("clubCommandRoutes")
+    fun `club command route method suffix and encoded slash near misses stay protected`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OPERATOR)
+
+        commandRequest(route, method = HttpMethod.PUT).andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}/near-miss").andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}%2Fnear-miss").andExpect(status().isBadRequest)
+    }
+
+    private fun commandRequest(
+        route: ClubCommandRoute,
+        method: HttpMethod = route.method,
+        path: String = route.path,
+        secret: String? = "test-bff-secret",
+        origin: String? = "http://localhost:3000",
+        referer: String? = null,
+    ) = mockMvc.perform(
+        request(method, path)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(route.body)
+            .cookie(Cookie(SESSION_COOKIE, SESSION_TOKEN))
+            .apply { secret?.let { header(BffSecretFilter.BFF_SECRET_HEADER, it) } }
+            .apply { origin?.let { header("Origin", it) } }
+            .apply { referer?.let { header("Referer", it) } },
+    )
+
     private fun exactRequest(
         secret: String? = "test-bff-secret",
         origin: String? = "http://localhost:3000",
@@ -175,7 +260,63 @@ class PlatformAdminBffSecurityTest(
         val PUBLICATION_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060004")
         val REQUEST_JSON =
             """{"clubId":"$CLUB_ID","sessionId":"$SESSION_ID","publicationId":"$PUBLICATION_ID"}"""
+
+        @JvmStatic
+        fun clubCommandRoutes(): List<Arguments> {
+            val previewId = "dddddddd-0000-4000-8000-000000060005"
+            val domainId = "dddddddd-0000-4000-8000-000000060007"
+            return listOf(
+                ClubCommandRoute(
+                    "metadata patch",
+                    HttpMethod.PATCH,
+                    "/api/admin/clubs/$CLUB_ID/metadata",
+                    """{"expectedAdminRevision":0,"name":"Safe Club"}""",
+                ),
+                ClubCommandRoute(
+                    "visibility preview",
+                    HttpMethod.POST,
+                    "/api/admin/clubs/$CLUB_ID/visibility/preview",
+                    """{"expectedAdminRevision":0,"targetVisibility":"PUBLIC"}""",
+                ),
+                ClubCommandRoute(
+                    "visibility confirm",
+                    HttpMethod.POST,
+                    "/api/admin/clubs/$CLUB_ID/visibility/confirm",
+                    """{"previewId":"$previewId","idempotencyKey":"safe-key",""" +
+                        """"expectedAdminRevision":0,"targetVisibility":"PUBLIC","confirmed":true}""",
+                ),
+                ClubCommandRoute(
+                    "domain preview",
+                    HttpMethod.POST,
+                    "/api/admin/clubs/$CLUB_ID/domains/preview",
+                    """{"expectedAdminRevision":0,"hostname":"club.example.test","kind":"SUBDOMAIN"}""",
+                ),
+                ClubCommandRoute(
+                    "domain confirm",
+                    HttpMethod.POST,
+                    "/api/admin/clubs/$CLUB_ID/domains",
+                    """{"previewId":"$previewId","idempotencyKey":"safe-key",""" +
+                        """"expectedAdminRevision":0,"hostname":"club.example.test",""" +
+                        """"kind":"SUBDOMAIN","confirmed":true}""",
+                ),
+                ClubCommandRoute(
+                    "domain recheck",
+                    HttpMethod.POST,
+                    "/api/admin/domains/$domainId/check",
+                    """{"idempotencyKey":"safe-key","expectedStatus":"ACTION_REQUIRED"}""",
+                ),
+            ).map(Arguments::of)
+        }
     }
+}
+
+data class ClubCommandRoute(
+    val label: String,
+    val method: HttpMethod,
+    val path: String,
+    val body: String,
+) {
+    override fun toString(): String = label
 }
 
 @TestConfiguration(proxyBeanMethods = false)
@@ -185,6 +326,10 @@ class PlatformAdminBffSecurityTest(
     CurrentMemberWebConfig::class,
     PlatformAdminPublicTakedownController::class,
     PlatformAdminPublicTakedownErrorHandler::class,
+    PlatformAdminController::class,
+    PlatformAdminClubController::class,
+    PlatformAdminErrorHandler::class,
+    SharedApplicationErrorHandler::class,
 )
 class PlatformAdminBffSecurityHarnessConfiguration {
     @Bean
@@ -349,6 +494,115 @@ class PlatformAdminBffSecurityHarnessConfiguration {
     fun confirmPublicTakedown(): ConfirmPublicTakedownUseCase = mock(ConfirmPublicTakedownUseCase::class.java)
 
     @Bean
+    fun platformAdminSummary(): PlatformAdminSummaryUseCase = mock(PlatformAdminSummaryUseCase::class.java)
+
+    @Bean
+    fun listPlatformAdminClubs(): ListPlatformAdminClubsUseCase = mock(ListPlatformAdminClubsUseCase::class.java)
+
+    @Bean
+    fun getPlatformAdminClub(): GetPlatformAdminClubUseCase = mock(GetPlatformAdminClubUseCase::class.java)
+
+    @Bean
+    fun previewPlatformAdminOnboarding(): PreviewPlatformAdminClubOnboardingUseCase =
+        mock(PreviewPlatformAdminClubOnboardingUseCase::class.java)
+
+    @Bean
+    fun commitPlatformAdminOnboarding(): CommitPlatformAdminClubOnboardingUseCase =
+        mock(CommitPlatformAdminClubOnboardingUseCase::class.java)
+
+    @Bean
+    fun updatePlatformAdminClub(): UpdatePlatformAdminClubUseCase =
+        object : UpdatePlatformAdminClubUseCase {
+            override fun updateClub(
+                admin: PlatformActor,
+                clubId: UUID,
+                command: UpdatePlatformAdminClubCommand,
+            ): PlatformAdminClubDetail {
+                admin.requireCapability(PlatformCapability.MANAGE_CLUBS)
+                return securityClubDetail(clubId, command.expectedAdminRevision + 1)
+            }
+        }
+
+    @Bean
+    fun previewPlatformAdminClubVisibility(): PreviewPlatformAdminClubVisibilityUseCase =
+        object : PreviewPlatformAdminClubVisibilityUseCase {
+            override fun previewVisibility(
+                admin: PlatformActor,
+                clubId: UUID,
+                command: PreviewPlatformAdminClubVisibilityCommand,
+            ): PlatformAdminClubCommandPreview =
+                admin.withCapability(PlatformCapability.MANAGE_CLUBS) {
+                    PlatformAdminClubCommandPreview(
+                        SECURITY_PREVIEW_ID,
+                        Instant.parse("2026-08-24T01:00:00Z"),
+                        ClubPublicVisibility.PRIVATE,
+                        command.targetVisibility,
+                        listOf("ENABLE_PUBLIC_ACCESS"),
+                        "a1b2c3d4",
+                    )
+                }
+        }
+
+    @Bean
+    fun confirmPlatformAdminClubVisibility(): ConfirmPlatformAdminClubVisibilityUseCase =
+        object : ConfirmPlatformAdminClubVisibilityUseCase {
+            override fun confirmVisibility(
+                admin: PlatformActor,
+                clubId: UUID,
+                command: ConfirmPlatformAdminClubVisibilityCommand,
+            ): PlatformAdminClubCommandReceipt =
+                admin.withCapability(PlatformCapability.MANAGE_CLUBS) {
+                    securityReceipt("club.visibility.change", clubId, null)
+                }
+        }
+
+    @Bean
+    fun previewClubDomain(): PreviewClubDomainUseCase =
+        object : PreviewClubDomainUseCase {
+            override fun previewClubDomain(
+                admin: PlatformActor,
+                clubId: UUID,
+                command: PreviewCreateClubDomainCommand,
+            ): PlatformAdminDomainCommandPreview =
+                admin.withCapability(PlatformCapability.MANAGE_CLUB_DOMAINS) {
+                    PlatformAdminDomainCommandPreview(
+                        SECURITY_PREVIEW_ID,
+                        Instant.parse("2026-08-24T01:00:00Z"),
+                        command.kind,
+                        false,
+                        listOf("CREATE_DOMAIN"),
+                        "a1b2c3d4",
+                    )
+                }
+        }
+
+    @Bean
+    fun createClubDomain(): CreateClubDomainUseCase =
+        object : CreateClubDomainUseCase {
+            override fun createClubDomain(
+                admin: PlatformActor,
+                clubId: UUID,
+                command: ConfirmCreateClubDomainCommand,
+            ): PlatformAdminClubCommandReceipt =
+                admin.withCapability(PlatformCapability.MANAGE_CLUB_DOMAINS) {
+                    securityReceipt("club.domain.create", clubId, SECURITY_DOMAIN_ID)
+                }
+        }
+
+    @Bean
+    fun checkClubDomain(): CheckClubDomainProvisioningUseCase =
+        object : CheckClubDomainProvisioningUseCase {
+            override fun checkClubDomainProvisioning(
+                admin: PlatformActor,
+                domainId: UUID,
+                command: RecheckClubDomainCommand,
+            ): PlatformAdminClubCommandReceipt =
+                admin.withCapability(PlatformCapability.MANAGE_CLUB_DOMAINS) {
+                    securityReceipt("club.domain.recheck", SECURITY_CLUB_ID, domainId)
+                }
+        }
+
+    @Bean
     fun oauthFlowContextRepository(): OAuthFlowContextRepository = mock(OAuthFlowContextRepository::class.java)
 
     @Bean
@@ -356,6 +610,61 @@ class PlatformAdminBffSecurityHarnessConfiguration {
 
     @Bean
     fun readmatesOAuthSuccessHandler(): ReadmatesOAuthSuccessHandler = mock(ReadmatesOAuthSuccessHandler::class.java)
+
+    private companion object {
+        val SECURITY_CLUB_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060002")
+        val SECURITY_PREVIEW_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060005")
+        val SECURITY_DOMAIN_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060007")
+
+        fun securityClubDetail(
+            clubId: UUID,
+            revision: Long,
+        ) = PlatformAdminClubDetail(
+            clubId = clubId,
+            slug = "safe-club",
+            name = "Safe Club",
+            tagline = "Safe tagline",
+            about = "Safe public description",
+            adminRevision = revision,
+            status = ClubStatus.ACTIVE,
+            publicVisibility = ClubPublicVisibility.PRIVATE,
+            domains = emptyList(),
+            firstHostOnboardingState = FirstHostOnboardingState.ASSIGNED,
+            domainCount = 0,
+            domainActionRequiredCount = 0,
+            notificationFailureCount = 0,
+            aiFailureCount = 0,
+        )
+
+        fun securityReceipt(
+            commandType: String,
+            clubId: UUID,
+            targetId: UUID?,
+        ) = PlatformAdminClubCommandReceipt(
+            receiptId = UUID.fromString("dddddddd-0000-4000-8000-000000060008"),
+            commandType = commandType,
+            clubId = clubId,
+            beforeAdminRevision = 0,
+            afterAdminRevision = 1,
+            outcome = "SUCCEEDED",
+            resultCode = "SECURITY_CHAIN_ACCEPTED",
+            targetId = targetId,
+        )
+
+        fun PlatformActor.requireCapability(capability: PlatformCapability) {
+            if (!can(capability)) {
+                throw AccessDeniedException("Platform admin role cannot execute this club command")
+            }
+        }
+
+        inline fun <T> PlatformActor.withCapability(
+            capability: PlatformCapability,
+            block: () -> T,
+        ): T {
+            requireCapability(capability)
+            return block()
+        }
+    }
 }
 
 class PlatformAdminSecurityIdentities {

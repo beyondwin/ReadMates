@@ -6,7 +6,6 @@ import com.readmates.club.application.model.ClubRegistrySearch
 import com.readmates.club.application.model.PLATFORM_ADMIN_CLUB_LIST_MAX_LIMIT
 import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminClubList
-import com.readmates.club.application.model.PlatformAdminClubListItem
 import com.readmates.club.application.model.PlatformAdminClubListQuery
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
 import com.readmates.club.application.port.`in`.GetPlatformAdminClubUseCase
@@ -16,8 +15,8 @@ import com.readmates.club.application.port.out.LoadPlatformAdminClubsPort
 import com.readmates.club.application.port.out.PlatformAdminClubRegistryQuery
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPatch
 import com.readmates.club.application.port.out.UpdatePlatformAdminClubPort
-import com.readmates.club.domain.ClubPublicVisibility
-import com.readmates.club.domain.ClubStatus
+import com.readmates.club.application.port.out.UpdatePlatformAdminClubResult
+import com.readmates.club.application.port.out.WritePlatformAuditEventPort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.PlatformActor
 import com.readmates.shared.security.PlatformCapability
@@ -30,6 +29,7 @@ class PlatformAdminClubRegistryService(
     private val loadClubsPort: LoadPlatformAdminClubsPort,
     private val updateClubPort: UpdatePlatformAdminClubPort,
     private val cursorSigner: PlatformAdminClubRegistryCursorSigner,
+    private val auditEventPort: WritePlatformAuditEventPort,
 ) : ListPlatformAdminClubsUseCase,
     GetPlatformAdminClubUseCase,
     UpdatePlatformAdminClubUseCase {
@@ -56,20 +56,11 @@ class PlatformAdminClubRegistryService(
             )
         val page = rows.take(limit)
         val nextCursor =
-            if (rows.size > limit) {
+            rows.takeIf { it.size > limit }?.let {
                 val last = page.last()
-                cursorSigner.issue(
-                    filter = filter,
-                    lastNormalizedName = last.normalizedName,
-                    lastClubId = last.item.clubId,
-                )
-            } else {
-                null
+                cursorSigner.issue(filter, last.normalizedName, last.item.clubId)
             }
-        return PlatformAdminClubList(
-            items = page.map { row -> row.item },
-            nextCursor = nextCursor,
-        )
+        return PlatformAdminClubList(page.map { row -> row.item }, nextCursor)
     }
 
     override fun getClub(
@@ -77,8 +68,7 @@ class PlatformAdminClubRegistryService(
         clubId: UUID,
     ): PlatformAdminClubDetail {
         requireViewClubs(admin)
-        return loadClubsPort.loadClubDetail(clubId)
-            ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
+        return requireClub(clubId)
     }
 
     @Transactional
@@ -86,52 +76,36 @@ class PlatformAdminClubRegistryService(
         admin: PlatformActor,
         clubId: UUID,
         command: UpdatePlatformAdminClubCommand,
-    ): PlatformAdminClubListItem {
-        if (!admin.can(PlatformCapability.MANAGE_CLUBS)) {
-            throw AccessDeniedException("Platform admin role cannot update clubs")
-        }
-
-        val current =
-            loadClubsPort.loadClub(clubId)
-                ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
-        validatePublicInfo(
-            name = command.name ?: current.name,
-            tagline = command.tagline ?: current.tagline,
-            about = command.about ?: current.about,
+    ): PlatformAdminClubDetail {
+        requireManageClubs(admin)
+        val current = requireClub(clubId)
+        PlatformAdminClubPublicInfoPolicy.validate(
+            command.name ?: current.name,
+            command.tagline ?: current.tagline,
+            command.about ?: current.about,
         )
-
-        if (
-            command.publicVisibility == ClubPublicVisibility.PUBLIC &&
-            current.status in setOf(ClubStatus.SUSPENDED, ClubStatus.ARCHIVED)
-        ) {
-            throw PlatformAdminException(
-                PlatformAdminError.CLUB_PUBLISH_NOT_ALLOWED,
-                "Club cannot be made public",
-            )
-        }
-
-        val shouldActivateClub =
-            command.publicVisibility == ClubPublicVisibility.PUBLIC &&
-                current.status == ClubStatus.SETUP_REQUIRED
-        val nextStatus =
-            if (shouldActivateClub) {
-                requireActiveHost(clubId)
-                ClubStatus.ACTIVE
-            } else {
-                null
-            }
-
-        return updateClubPort.updateClub(
-            clubId = clubId,
-            patch =
-                UpdatePlatformAdminClubPatch(
-                    name = command.name?.trim(),
-                    tagline = command.tagline?.trim(),
-                    about = command.about?.trim(),
-                    status = nextStatus,
-                    publicVisibility = command.publicVisibility,
+        val updated =
+            updatedDetail(
+                updateClubPort.updateClubMetadata(
+                    clubId,
+                    command.expectedAdminRevision,
+                    UpdatePlatformAdminClubPatch(
+                        command.name?.trim(),
+                        command.tagline?.trim(),
+                        command.about?.trim(),
+                    ),
                 ),
-        ) ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
+            )
+        auditEventPort.writeEvent(
+            actorUserId = admin.adminId,
+            actorPlatformRole = admin.role.name,
+            targetUserId = null,
+            eventType = "ADMIN_CLUB_METADATA_UPDATED",
+            metadataJson =
+                """{"clubId":"$clubId","beforeAdminRevision":${command.expectedAdminRevision},""" +
+                    """"afterAdminRevision":${updated.adminRevision}}""",
+        )
+        return updated
     }
 
     private fun requireViewClubs(admin: PlatformActor) {
@@ -139,6 +113,25 @@ class PlatformAdminClubRegistryService(
             throw AccessDeniedException("Platform admin role cannot view clubs")
         }
     }
+
+    private fun requireManageClubs(admin: PlatformActor) {
+        if (!admin.can(PlatformCapability.MANAGE_CLUBS)) {
+            throw AccessDeniedException("Platform admin role cannot update clubs")
+        }
+    }
+
+    private fun requireClub(clubId: UUID): PlatformAdminClubDetail =
+        loadClubsPort.loadClubDetail(clubId)
+            ?: throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
+
+    private fun updatedDetail(result: UpdatePlatformAdminClubResult): PlatformAdminClubDetail =
+        when (result) {
+            is UpdatePlatformAdminClubResult.Updated -> result.detail
+            UpdatePlatformAdminClubResult.NotFound ->
+                throw PlatformAdminException(PlatformAdminError.CLUB_NOT_FOUND, "Club not found")
+            UpdatePlatformAdminClubResult.RevisionConflict ->
+                throw PlatformAdminException(PlatformAdminError.REVISION_CONFLICT, "Club revision conflict")
+        }
 
     private fun validatedLimit(limit: Int): Int {
         if (limit !in MIN_LIMIT..PLATFORM_ADMIN_CLUB_LIST_MAX_LIMIT) {
@@ -160,26 +153,8 @@ class PlatformAdminClubRegistryService(
         rawCursor: String?,
         filter: PlatformAdminClubListCursorFilter,
     ): PlatformAdminClubListCursorClaims? {
-        if (rawCursor.isNullOrBlank()) {
-            return null
-        }
-        return cursorSigner.verify(rawCursor, filter)
-    }
-
-    private fun requireActiveHost(clubId: UUID) {
-        if (loadClubsPort.activeHostCount(clubId) == 0) {
-            throw PlatformAdminException(PlatformAdminError.CLUB_HOST_REQUIRED, "Active host required")
-        }
-    }
-
-    private fun validatePublicInfo(
-        name: String,
-        tagline: String,
-        about: String,
-    ) {
-        if (name.isBlank() || tagline.isBlank() || about.isBlank()) {
-            throw PlatformAdminException(PlatformAdminError.INVALID_CLUB, "Club public info is required")
-        }
+        val cursor = rawCursor?.takeUnless(String::isBlank)
+        return cursor?.let { cursorSigner.verify(it, filter) }
     }
 
     private companion object {

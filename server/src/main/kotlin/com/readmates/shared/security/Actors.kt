@@ -1,5 +1,6 @@
 package com.readmates.shared.security
 
+import com.readmates.club.domain.PlatformAdminRole
 import java.util.UUID
 
 enum class ClubCapability {
@@ -47,6 +48,7 @@ enum class PlatformCapability {
 
 data class PlatformActor(
     val adminId: UUID,
+    val role: PlatformAdminRole,
     val capabilities: Set<PlatformCapability>,
 ) {
     fun can(capability: PlatformCapability): Boolean = capability in capabilities
