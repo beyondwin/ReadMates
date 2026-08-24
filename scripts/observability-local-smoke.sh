@@ -17,16 +17,27 @@ admin_digest_write_previous_alias="${READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIO
 
 cd "$repo_root"
 
-if [[ -z "$admin_digest_current_key" ]]; then
-  printf 'observability-local-smoke: local admin command digest key must not be empty\n' >&2
+is_canonical_admin_digest_version() {
+  local value="$1"
+  local numeric_value
+  [[ "$value" =~ ^(0|[1-9][0-9]*)$ ]] || return 1
+  [[ "${#value}" -le 10 ]] || return 1
+  numeric_value=$((10#$value))
+  (( numeric_value <= 2147483647 ))
+}
+
+if [[ ! "$admin_digest_current_key" =~ [^[:space:]] ]]; then
+  printf 'observability-local-smoke: local admin command digest key must not be blank\n' >&2
   exit 2
 fi
-if [[ ! "$admin_digest_current_version" =~ ^[0-9]+$ ||
-  ! "$admin_digest_previous_version" =~ ^[0-9]+$ ]]; then
-  printf 'observability-local-smoke: admin command digest key versions must be non-negative integers\n' >&2
+if ! is_canonical_admin_digest_version "$admin_digest_current_version" ||
+  ! is_canonical_admin_digest_version "$admin_digest_previous_version"; then
+  printf 'observability-local-smoke: admin command digest key versions must be canonical 32-bit non-negative integers\n' >&2
   exit 2
 fi
-if [[ "$admin_digest_current_version" == "$admin_digest_previous_version" ]]; then
+admin_digest_current_version_number=$((10#$admin_digest_current_version))
+admin_digest_previous_version_number=$((10#$admin_digest_previous_version))
+if (( admin_digest_current_version_number == admin_digest_previous_version_number )); then
   printf 'observability-local-smoke: admin command digest key versions must differ\n' >&2
   exit 2
 fi
@@ -37,8 +48,9 @@ case "$admin_digest_write_previous_alias" in
     exit 2
     ;;
 esac
-if [[ "$admin_digest_write_previous_alias" == "true" && -z "$admin_digest_previous_key" ]]; then
-  printf 'observability-local-smoke: admin command digest previous-alias write requires a previous key\n' >&2
+if [[ "$admin_digest_write_previous_alias" == "true" &&
+  ! "$admin_digest_previous_key" =~ [^[:space:]] ]]; then
+  printf 'observability-local-smoke: admin command digest previous-alias write requires a non-blank previous key\n' >&2
   exit 2
 fi
 

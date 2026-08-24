@@ -12,6 +12,15 @@ fail() {
   exit 1
 }
 
+is_canonical_admin_digest_version() {
+  local value="$1"
+  local numeric_value
+  [[ "$value" =~ ^(0|[1-9][0-9]*)$ ]] || return 1
+  [[ "${#value}" -le 10 ]] || return 1
+  numeric_value=$((10#$value))
+  (( numeric_value <= 2147483647 ))
+}
+
 if [[ "$(uname -s)" != "Darwin" ]] || ! command -v security >/dev/null 2>&1; then
   fail "macOS Keychain is required; use an OS secret manager and inject the two Spring OAuth variables on other platforms"
 fi
@@ -57,22 +66,25 @@ export READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY="${READMATES_ADMIN_COMMAND_DI
 export READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION="${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION:-0}"
 export READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS="${READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS:-false}"
 
-if [[ -z "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY" ]]; then
-  fail "local admin command digest key must not be empty"
+if [[ ! "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY" =~ [^[:space:]] ]]; then
+  fail "local admin command digest key must not be blank"
 fi
-if [[ ! "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION" =~ ^[0-9]+$ ||
-  ! "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION" =~ ^[0-9]+$ ]]; then
-  fail "admin command digest key versions must be non-negative integers"
+if ! is_canonical_admin_digest_version "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION" ||
+  ! is_canonical_admin_digest_version "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION"; then
+  fail "admin command digest key versions must be canonical 32-bit non-negative integers"
 fi
-if [[ "$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION" == "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION" ]]; then
+admin_digest_current_version_number=$((10#$READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION))
+admin_digest_previous_version_number=$((10#$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION))
+if (( admin_digest_current_version_number == admin_digest_previous_version_number )); then
   fail "admin command digest key versions must differ"
 fi
 case "$READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS" in
   true|false) ;;
   *) fail "admin command digest previous-alias write flag must be true or false" ;;
 esac
-if [[ "$READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS" == "true" && -z "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY" ]]; then
-  fail "admin command digest previous-alias write requires a previous key"
+if [[ "$READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS" == "true" &&
+  ! "$READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY" =~ [^[:space:]] ]]; then
+  fail "admin command digest previous-alias write requires a non-blank previous key"
 fi
 
 unset google_client_id google_client_secret

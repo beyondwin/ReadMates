@@ -113,7 +113,8 @@ safe_remove_fixture_root
 mkdir -p \
   "$fixture_root/secret-dollar" \
   "$fixture_root/secret-comment" \
-  "$fixture_root/secret-admin-command-digest" \
+  "$fixture_root/secret-admin-command-digest-current" \
+  "$fixture_root/secret-admin-command-digest-previous" \
   "$fixture_root/placeholders"
 
 if [[ -L "$source_tmp_parent" ]]; then
@@ -174,21 +175,68 @@ if ! grep -q "real-looking deployment secret assignment" "$fixture_root/secret-c
   fail "comment-placeholder secret fixture failed for the wrong reason"
 fi
 
-admin_digest_key='READMATES_ADMIN_COMMAND_DIGEST_''CURRENT_KEY'
-admin_digest_value='AdminDigestFixture''Literal1234567890'
-printf '%s=%s\n' "$admin_digest_key" "$admin_digest_value" \
-  > "$fixture_root/secret-admin-command-digest/.env.example"
-
-if ./scripts/public-release-check.sh "$fixture_root/secret-admin-command-digest" \
-  > "$fixture_root/secret-admin-command-digest.out" \
-  2> "$fixture_root/secret-admin-command-digest.err"; then
-  fail "admin command digest literal fixture unexpectedly passed"
+gitleaks_available=false
+if command -v gitleaks >/dev/null 2>&1; then
+  gitleaks_available=true
 fi
 
-if ! grep -q "real-looking deployment secret assignment" \
-  "$fixture_root/secret-admin-command-digest.err"; then
-  sed 's/^/  /' "$fixture_root/secret-admin-command-digest.err" >&2
-  fail "admin command digest literal fixture failed for the wrong reason"
+grep -Fq 'READMATES_ADMIN_COMMAND_DIGEST_(?:CURRENT|PREVIOUS)_KEY' "$repo_abs/.gitleaks.toml" ||
+  fail "gitleaks admin command digest rule must cover current and previous keys"
+for admin_digest_key_name in \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY; do
+  grep -Fq "\"$admin_digest_key_name\"" "$repo_abs/.gitleaks.toml" ||
+    fail "gitleaks admin command digest keywords must include $admin_digest_key_name"
+done
+
+for admin_digest_slot in current previous; do
+  case "$admin_digest_slot" in
+    current) admin_digest_key='READMATES_ADMIN_COMMAND_DIGEST_''CURRENT_KEY' ;;
+    previous) admin_digest_key='READMATES_ADMIN_COMMAND_DIGEST_''PREVIOUS_KEY' ;;
+  esac
+  admin_digest_value="AdminDigest${admin_digest_slot}Fixture"'Literal1234567890'
+  admin_digest_fixture="$fixture_root/secret-admin-command-digest-$admin_digest_slot"
+  printf '%s=%s\n' "$admin_digest_key" "$admin_digest_value" \
+    > "$admin_digest_fixture/assignment.txt"
+
+  if ./scripts/public-release-check.sh "$admin_digest_fixture" \
+    > "$admin_digest_fixture.out" \
+    2> "$admin_digest_fixture.err"; then
+    fail "admin command digest $admin_digest_slot literal fallback fixture unexpectedly passed"
+  fi
+
+  if ! grep -q "real-looking deployment secret assignment" "$admin_digest_fixture.err"; then
+    sed 's/^/  /' "$admin_digest_fixture.err" >&2
+    fail "admin command digest $admin_digest_slot fallback fixture failed for the wrong reason"
+  fi
+
+  if [[ "$gitleaks_available" == "true" ]]; then
+    gitleaks_report="$admin_digest_fixture.gitleaks.json"
+    if gitleaks dir \
+      --config "$repo_abs/.gitleaks.toml" \
+      --redact \
+      --no-banner \
+      --report-format json \
+      --report-path "$gitleaks_report" \
+      "$admin_digest_fixture" \
+      > "$admin_digest_fixture.gitleaks.out" \
+      2> "$admin_digest_fixture.gitleaks.err"; then
+      fail "admin command digest $admin_digest_slot literal direct gitleaks fixture unexpectedly passed"
+    fi
+    grep -Fq 'readmates-real-secret-assignment' "$gitleaks_report" || {
+      sed 's/^/  /' "$admin_digest_fixture.gitleaks.err" >&2
+      fail "admin command digest $admin_digest_slot direct gitleaks fixture failed for the wrong reason"
+    }
+    if grep -Fq "$admin_digest_value" \
+      "$admin_digest_fixture.gitleaks.out" "$admin_digest_fixture.gitleaks.err" "$gitleaks_report"; then
+      fail "admin command digest $admin_digest_slot direct gitleaks fixture exposed literal material"
+    fi
+  fi
+done
+if [[ "$gitleaks_available" == "true" ]]; then
+  printf 'Direct CURRENT/PREVIOUS admin digest gitleaks fixtures passed.\n'
+else
+  printf 'SKIP: gitleaks not installed; fallback and static admin digest rule fixtures passed.\n'
 fi
 
 # The positive placeholder case carries the minimum complete release contract:

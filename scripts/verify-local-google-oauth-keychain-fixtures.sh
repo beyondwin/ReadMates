@@ -94,6 +94,36 @@ if [[ "$valid_output" == *"$MOCK_GOOGLE_CLIENT_ID"* ||
   exit 1
 fi
 
+if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY='   ' \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=1 \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=0 \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=false \
+  blank_key_output="$(run_fixture)"; then
+  printf 'expected whitespace-only local admin digest key to be rejected\n' >&2
+  exit 1
+fi
+if [[ "$blank_key_output" != *"local admin command digest key must not be blank"* ]]; then
+  printf 'expected a safe blank admin digest error, got: %s\n' "$blank_key_output" >&2
+  exit 1
+fi
+
+if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="$admin_digest_sentinel" \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=01 \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=1 \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=false \
+  noncanonical_version_output="$(run_fixture)"; then
+  printf 'expected leading-zero local admin digest version to be rejected\n' >&2
+  exit 1
+fi
+if [[ "$noncanonical_version_output" != *"admin command digest key versions must be canonical 32-bit non-negative integers"* ]]; then
+  printf 'expected a safe canonical admin digest version error, got: %s\n' "$noncanonical_version_output" >&2
+  exit 1
+fi
+if [[ "$noncanonical_version_output" == *"$admin_digest_sentinel"* ]]; then
+  printf 'canonical version validation exposed admin digest material\n' >&2
+  exit 1
+fi
+
 if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=1 \
   READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=1 \
   invalid_admin_output="$(run_fixture)"; then
@@ -112,8 +142,25 @@ if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=-1 \
   printf 'expected negative local admin digest version to be rejected\n' >&2
   exit 1
 fi
-if [[ "$invalid_version_output" != *"admin command digest key versions must be non-negative integers"* ]]; then
+if [[ "$invalid_version_output" != *"admin command digest key versions must be canonical 32-bit non-negative integers"* ]]; then
   printf 'expected a safe admin digest version-range error, got: %s\n' "$invalid_version_output" >&2
+  exit 1
+fi
+
+if READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY="$admin_digest_sentinel" \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=2147483648 \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=0 \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=false \
+  overflow_version_output="$(run_fixture)"; then
+  printf 'expected out-of-range local admin digest version to be rejected\n' >&2
+  exit 1
+fi
+if [[ "$overflow_version_output" != *"admin command digest key versions must be canonical 32-bit non-negative integers"* ]]; then
+  printf 'expected a safe admin digest version-range error, got: %s\n' "$overflow_version_output" >&2
+  exit 1
+fi
+if [[ "$overflow_version_output" == *"$admin_digest_sentinel"* ]]; then
+  printf 'version-range validation exposed admin digest material\n' >&2
   exit 1
 fi
 
@@ -125,12 +172,29 @@ if READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY= \
   printf 'expected previous-alias write without a previous key to be rejected\n' >&2
   exit 1
 fi
-if [[ "$invalid_alias_output" != *"previous-alias write requires a previous key"* ]]; then
+if [[ "$invalid_alias_output" != *"previous-alias write requires a non-blank previous key"* ]]; then
   printf 'expected a safe previous-alias validation error, got: %s\n' "$invalid_alias_output" >&2
   exit 1
 fi
 if [[ "$invalid_alias_output" == *"$admin_digest_sentinel"* ]]; then
   printf 'previous-alias validation exposed admin digest material\n' >&2
+  exit 1
+fi
+
+if READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY='   ' \
+  READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=1 \
+  READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=0 \
+  READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=true \
+  whitespace_alias_output="$(run_fixture)"; then
+  printf 'expected previous-alias write with a whitespace-only previous key to be rejected\n' >&2
+  exit 1
+fi
+if [[ "$whitespace_alias_output" != *"previous-alias write requires a non-blank previous key"* ]]; then
+  printf 'expected a safe whitespace previous-key error, got: %s\n' "$whitespace_alias_output" >&2
+  exit 1
+fi
+if [[ "$whitespace_alias_output" == *"$admin_digest_sentinel"* ]]; then
+  printf 'whitespace previous-key validation exposed admin digest material\n' >&2
   exit 1
 fi
 
