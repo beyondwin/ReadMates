@@ -270,6 +270,17 @@ class MutationCanonicalizationTest {
     }
 
     @Test
+    fun `purge batch sizes one and two fail startup validation`() {
+        listOf(1, 2).forEach { batchSize ->
+            val properties = TEST_PROPERTIES.copy(purgeBatchSize = batchSize)
+
+            assertThatThrownBy { properties.validate(MockEnvironment().withProperty("spring.profiles.active", "test")) }
+                .isInstanceOf(IllegalStateException::class.java)
+                .hasMessageContaining("purge-batch-size")
+        }
+    }
+
+    @Test
     fun `metrics use bounded outcome tags only`() {
         MutationIdempotencyMetrics(registry).claimOutcome("replayed")
         assertThat(registry.meters.flatMap { meter -> meter.id.tags.map { it.key } }.toSet())

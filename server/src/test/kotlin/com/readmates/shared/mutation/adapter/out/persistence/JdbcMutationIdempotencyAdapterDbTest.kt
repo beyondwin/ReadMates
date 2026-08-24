@@ -303,6 +303,56 @@ class JdbcMutationIdempotencyAdapterDbTest(
             .isEqualTo(4)
     }
 
+    @Test
+    fun `bounded purge rejects undersized positive limits and preserves zero no-op`() {
+        val adapter = JdbcMutationIdempotencyAdapter(jdbcTemplate)
+
+        assertThat(adapter.purgeExpired(clock.instant, 0)).isZero()
+        listOf(1, 2).forEach { limit ->
+            assertThatThrownBy { adapter.purgeExpired(clock.instant, limit) }
+                .isInstanceOf(IllegalArgumentException::class.java)
+                .hasMessageContaining("at least 3")
+        }
+    }
+
+    @Test
+    fun `every repeated bounded purge pass advances all three namespaces`() {
+        repeat(6) { index ->
+            insertFairAdminIdempotency(20 + index)
+            insertFairPreview(20 + index)
+            service().claim(identity("fair-host-repeat-$index"), payload(meetingPasscode = "repeat-$index"))
+        }
+        clock.instant = clock.instant.plus(Duration.ofHours(24)).plusSeconds(1)
+        val forceNonAdminRemainder = Math.floorMod(1L - Math.floorMod(clock.instant.epochSecond, 3L), 3L)
+        clock.instant = clock.instant.plusSeconds(forceNonAdminRemainder)
+
+        repeat(2) {
+            val before = fairNamespaceCounts("repeat")
+            assertThat(service().purgeExpired(4)).isEqualTo(4)
+            val after = fairNamespaceCounts("repeat")
+            assertThat(before.admin - after.admin).isEqualTo(2)
+            assertThat(before.preview - after.preview).isEqualTo(1)
+            assertThat(before.host - after.host).isEqualTo(1)
+            assertThat(before.total - after.total).isEqualTo(4)
+            clock.instant = clock.instant.plusSeconds(3)
+        }
+    }
+
+    private fun fairNamespaceCounts(scope: String): FairNamespaceCounts =
+        FairNamespaceCounts(
+            admin = fairRowCount("admin_public_takedown_idempotency", "idempotency_key", "fair-admin-%"),
+            preview = fairRowCount("admin_public_takedown_previews", "actor_user_id_snapshot", ACTOR_ID.toString()),
+            host = fairRowCount("mutation_idempotency_keys", "idempotency_key", "fair-host-$scope-%"),
+        )
+
+    private data class FairNamespaceCounts(
+        val admin: Int,
+        val preview: Int,
+        val host: Int,
+    ) {
+        val total: Int = admin + preview + host
+    }
+
     private fun insertFairAdminIdempotency(index: Int) {
         jdbcTemplate.update(
             """

@@ -249,6 +249,26 @@ class GuestBrowseControllerDbTest(
             PUBLISHED_ID,
         )
         jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
+            ) values (?, ?, ?, '종료 세션 공개 marker', true, 'PUBLIC', 'PUBLIC_RECORD', utc_timestamp(6))
+            """.trimIndent(),
+            CLOSED_PUBLICATION_ID,
+            CLUB_ID,
+            CLOSED_ID,
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_projection_generations (
+              publication_id, club_id, session_id, generation, live_record_revision, origin_readable
+            ) values (?, ?, ?, 1, null, false)
+            """.trimIndent(),
+            CLOSED_PUBLICATION_ID,
+            CLUB_ID,
+            CLOSED_ID,
+        )
+        jdbcTemplate.update(
             "update questions set created_at = ? where id = ?",
             FIXED_FEED_CREATED_AT,
             ARCHIVE_QUESTION_ID,
@@ -272,8 +292,7 @@ class GuestBrowseControllerDbTest(
 
     @AfterEach
     fun cleanupGuestBrowseMatrix() {
-        jdbcTemplate.update("delete from public_projection_generations where publication_id = ?", PUBLICATION_ID)
-        jdbcTemplate.update("delete from public_session_publications where id = ?", PUBLICATION_ID)
+        cleanupGuestPublicationMarkers()
         jdbcTemplate.update("delete from highlights where id in (?, ?)", HIGHLIGHT_ID, OUTSIDE_HIGHLIGHT_ID)
         jdbcTemplate.update(
             "delete from one_line_reviews where id in (?, ?)",
@@ -300,6 +319,23 @@ class GuestBrowseControllerDbTest(
             PUBLISHED_PARTICIPANT_ONE_ID,
             PUBLISHED_PARTICIPANT_TWO_ID,
         )
+        cleanupGuestSessionGraph()
+    }
+
+    private fun cleanupGuestPublicationMarkers() {
+        jdbcTemplate.update(
+            "delete from public_projection_generations where publication_id in (?, ?)",
+            PUBLICATION_ID,
+            CLOSED_PUBLICATION_ID,
+        )
+        jdbcTemplate.update(
+            "delete from public_session_publications where id in (?, ?)",
+            PUBLICATION_ID,
+            CLOSED_PUBLICATION_ID,
+        )
+    }
+
+    private fun cleanupGuestSessionGraph() {
         jdbcTemplate.update(
             "delete from sessions where id in (?, ?, ?, ?, ?, ?, ?, ?, ?)",
             OPEN_ID,
@@ -781,6 +817,7 @@ class GuestBrowseControllerDbTest(
         const val HIGHLIGHT_ID = "00000000-0000-0000-0000-000000007470"
         const val OUTSIDE_HIGHLIGHT_ID = "00000000-0000-0000-0000-000000007471"
         const val PUBLICATION_ID = "00000000-0000-0000-0000-000000007480"
+        const val CLOSED_PUBLICATION_ID = "00000000-0000-0000-0000-000000007481"
         const val ARCHIVE_QUESTION = "기록에서 보이는 질문"
         const val REMOVED_QUESTION = "제외된 참가자의 숨겨야 하는 질문"
         const val DRAFT_THOUGHT = "기록에서 보이는 생각 초안"

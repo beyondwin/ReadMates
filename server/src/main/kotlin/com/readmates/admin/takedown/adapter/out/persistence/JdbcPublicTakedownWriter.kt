@@ -48,9 +48,10 @@ class JdbcPublicTakedownWriter(
             jdbcTemplate.update(
                 """
                 update public_projection_generations
-                set generation = ?, origin_readable = false, updated_at = utc_timestamp(6)
+                set generation = ?, origin_readable = false, emergency_denied = true,
+                    updated_at = utc_timestamp(6)
                 where publication_id = ? and club_id = ? and session_id = ?
-                  and generation = ? and origin_readable = true
+                  and generation = ? and origin_readable = true and emergency_denied = false
                 """.trimIndent(),
                 committedGeneration,
                 target.publicationId.dbString(),

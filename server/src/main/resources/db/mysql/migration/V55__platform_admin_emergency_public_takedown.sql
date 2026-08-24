@@ -1,3 +1,9 @@
+alter table public_projection_generations
+  add column emergency_denied boolean not null default false after origin_readable,
+  add constraint public_projection_generations_emergency_deny_check check (
+    emergency_denied = false or origin_readable = false
+  );
+
 create table admin_public_takedown_previews (
   id char(36) not null,
   actor_user_id_snapshot char(36) not null,

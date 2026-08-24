@@ -62,7 +62,11 @@ class JdbcHostMutationReceiptAdapter(
             on duplicate key update
               generation = public_projection_generations.generation + 1,
               live_record_revision = values(live_record_revision),
-              origin_readable = values(origin_readable),
+              origin_readable = if(
+                public_projection_generations.emergency_denied,
+                false,
+                values(origin_readable)
+              ),
               updated_at = utc_timestamp(6)
             """.trimIndent(),
             publicProjection.publicationId.dbString(),
@@ -71,12 +75,13 @@ class JdbcHostMutationReceiptAdapter(
             record.resultingVersions.liveRecordRevision,
             publicProjection.originReadable,
         )
-        val committedGeneration =
-            jdbcTemplate.queryForObject(
-                "select generation from public_projection_generations where publication_id = ?",
-                Long::class.java,
+        val storedProjection =
+            jdbcTemplate.queryForMap(
+                "select generation, origin_readable from public_projection_generations where publication_id = ?",
                 publicProjection.publicationId.dbString(),
-            ) ?: error("Public projection generation was not persisted")
+            )
+        val committedGeneration = (storedProjection["generation"] as Number).toLong()
+        val originReadable = storedProjection["origin_readable"] as Boolean
         val convergenceId = UUID.randomUUID()
         jdbcTemplate.update(
             """
@@ -90,7 +95,7 @@ class JdbcHostMutationReceiptAdapter(
             publicProjection.publicationId.dbString(),
             record.resourceId.dbString(),
             committedGeneration,
-            publicProjection.originReadable,
+            originReadable,
             record.createdAt.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
         )
         jdbcTemplate.update(

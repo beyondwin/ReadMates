@@ -100,6 +100,7 @@ class JdbcGuestRecordBrowseAdapter(
               and generation.club_id = sessions.club_id
               and generation.session_id = sessions.id
               and generation.origin_readable = true
+              and generation.emergency_denied = false
             where clubs.slug = ?
               and clubs.status = 'ACTIVE'
               and clubs.public_visibility = 'PUBLIC'
@@ -174,6 +175,7 @@ class JdbcGuestRecordBrowseAdapter(
                 and generation.club_id = sessions.club_id
                 and generation.session_id = sessions.id
                 and generation.origin_readable = true
+                and generation.emergency_denied = false
               where clubs.slug = ?
                 and clubs.status = 'ACTIVE'
                 and clubs.public_visibility = 'PUBLIC'
@@ -305,6 +307,7 @@ class JdbcGuestRecordBrowseAdapter(
               and sessions.access_scope = 'GUEST_READABLE'
               and sessions.state in ('CLOSED', 'PUBLISHED')
               and (sessions.state = 'CLOSED' or generation.origin_readable = true)
+              and generation.emergency_denied = false
               $cursorClause
             order by sessions.number desc, sessions.id desc
             limit ?
@@ -351,6 +354,7 @@ class JdbcGuestRecordBrowseAdapter(
                       and sessions.access_scope = 'GUEST_READABLE'
                       and sessions.state in ('CLOSED', 'PUBLISHED')
                       and (sessions.state = 'CLOSED' or generation.origin_readable = true)
+                      and generation.emergency_denied = false
                     """.trimIndent(),
                     { resultSet, _ -> resultSet.toArchiveDetailHeader() },
                     clubSlug,

@@ -88,6 +88,7 @@ class JdbcPublicQueryAdapter(
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
                   and public_projection_generations.origin_readable = true
+                  and public_projection_generations.emergency_denied = false
                 """.trimIndent(),
                 { rs, _ ->
                     PublicSessionDetailResult(
@@ -158,6 +159,7 @@ class JdbcPublicQueryAdapter(
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
                   and public_projection_generations.origin_readable = true
+                  and public_projection_generations.emergency_denied = false
               ) as session_count,
               (
                 select count(distinct sessions.book_title)
@@ -172,6 +174,7 @@ class JdbcPublicQueryAdapter(
                   and sessions.access_scope = 'GUEST_READABLE'
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
                   and public_projection_generations.origin_readable = true
+                  and public_projection_generations.emergency_denied = false
               ) as book_count,
               (
                 select count(*)
@@ -245,6 +248,7 @@ class JdbcPublicQueryAdapter(
               and sessions.access_scope = 'GUEST_READABLE'
               and public_session_publications.site_visibility = 'PUBLIC_RECORD'
               and public_projection_generations.origin_readable = true
+              and public_projection_generations.emergency_denied = false
             order by sessions.number desc
             limit 6
             """.trimIndent(),

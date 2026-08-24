@@ -12,7 +12,7 @@ import java.nio.charset.StandardCharsets
 import java.time.Duration
 
 private const val DEFAULT_PURGE_BATCH_SIZE = 50
-private const val MIN_PURGE_BATCH_SIZE = 1
+private const val MIN_PURGE_BATCH_SIZE = 3
 private const val MAX_PURGE_BATCH_SIZE = 500
 private const val MINIMUM_RETENTION_HOURS = 24L
 
@@ -53,6 +53,12 @@ data class MutationIdempotencyProperties(
         }
         if (retention < Duration.ofHours(MINIMUM_RETENTION_HOURS)) {
             throw IllegalStateException("readmates.mutation.idempotency.retention must be at least 24h")
+        }
+        if (purgeBatchSize !in MIN_PURGE_BATCH_SIZE..MAX_PURGE_BATCH_SIZE) {
+            throw IllegalStateException(
+                "readmates.mutation.idempotency.purge-batch-size must be between " +
+                    "$MIN_PURGE_BATCH_SIZE and $MAX_PURGE_BATCH_SIZE",
+            )
         }
         if (currentKey.isNotBlank()) {
             return

@@ -65,6 +65,15 @@ class PublicTakedownReviewRegressionIntegrationTest(
     }
 
     @Test
+    fun `closed guest archive cannot bypass an emergency deny marker`() {
+        val countsBefore = fixture.assertTargetVisible()
+        fixture.confirmSuccessfully("key-review-closed-archive-deny")
+        jdbcTemplate.update("update sessions set state = 'CLOSED' where id = ?", REVIEW_SESSION_ID)
+
+        fixture.assertTargetHidden(countsBefore)
+    }
+
+    @Test
     fun `public club list uses the same sixty second freshness boundary as takedown detail`() {
         mockMvc
             .get("/api/public/clubs/reading-sai") {

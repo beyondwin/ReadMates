@@ -3544,7 +3544,7 @@ class MySqlFlywayMigrationTest(
 
     @Suppress("LongMethod")
     private fun assertV54PublicProjectionConvergenceSchema(jdbcTemplate: JdbcTemplate) {
-        assertThat(columns(jdbcTemplate, "public_projection_generations")).containsExactlyInAnyOrder(
+        assertThat(columns(jdbcTemplate, "public_projection_generations")).contains(
             "publication_id",
             "club_id",
             "session_id",
@@ -3592,6 +3592,9 @@ class MySqlFlywayMigrationTest(
     }
 
     private fun assertV55PlatformAdminPublicTakedownSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "public_projection_generations")).contains("emergency_denied")
+        assertThat(checkConstraintClause(jdbcTemplate, "public_projection_generations_emergency_deny_check"))
+            .contains("emergency_denied", "origin_readable")
         assertV55PreviewAndReceiptSchema(jdbcTemplate)
         assertV55IdempotencyAndPrivacySchema(jdbcTemplate)
     }

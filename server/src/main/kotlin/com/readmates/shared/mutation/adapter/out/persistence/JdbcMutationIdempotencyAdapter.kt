@@ -112,7 +112,10 @@ class JdbcMutationIdempotencyAdapter(
         limit: Int,
     ): Int {
         if (limit <= 0) return 0
-        val budgets = fairMutationNamespaceBudgets(limit, now)
+        require(limit >= MUTATION_NAMESPACE_COUNT) {
+            "Mutation idempotency purge limit must be at least $MUTATION_NAMESPACE_COUNT"
+        }
+        val budgets = fairMutationNamespaceBudgets(limit)
         val adminPurged =
             purgeOperationalRows(
                 """
@@ -280,14 +283,10 @@ class JdbcMutationIdempotencyAdapter(
     }
 }
 
-private fun fairMutationNamespaceBudgets(
-    limit: Int,
-    now: Instant,
-): IntArray {
+private fun fairMutationNamespaceBudgets(limit: Int): IntArray {
     val budgets = IntArray(MUTATION_NAMESPACE_COUNT) { limit / MUTATION_NAMESPACE_COUNT }
-    val remainderStart = Math.floorMod(now.epochSecond, MUTATION_NAMESPACE_COUNT.toLong()).toInt()
     repeat(limit % MUTATION_NAMESPACE_COUNT) { offset ->
-        budgets[(remainderStart + offset) % MUTATION_NAMESPACE_COUNT] += 1
+        budgets[offset] += 1
     }
     return budgets
 }

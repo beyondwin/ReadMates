@@ -1,5 +1,7 @@
 package com.readmates.session.api
 
+import com.readmates.admin.takedown.adapter.out.persistence.JdbcPublicTakedownWriter
+import com.readmates.admin.takedown.application.model.PublicTakedownTarget
 import com.readmates.session.application.port.`in`.PurgeExpiredHostSessionTrashUseCase
 import com.readmates.sessionrecord.adapter.out.persistence.JdbcSessionRecordPublicProjectionAdapter
 import com.readmates.sessionrecord.application.port.out.AppliedSessionRecordPublicEffect
@@ -19,6 +21,7 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
@@ -39,6 +42,7 @@ class SessionRecordPublicProjectionDbTest(
     @param:Autowired jdbcTemplate: JdbcTemplate,
     @param:Autowired purgeExpiredHostSessionTrash: PurgeExpiredHostSessionTrashUseCase,
     @param:Autowired private val controlledPublicProjection: ControlledSessionRecordPublicProjectionPort,
+    @param:Autowired private val publicTakedownWriter: JdbcPublicTakedownWriter,
 ) : HostSessionIdempotencyDbTestSupport(mockMvc, jdbcTemplate, purgeExpiredHostSessionTrash) {
     @Test
     fun `published general record apply rotates generation exactly once and stale apply commits nothing`() {
@@ -173,6 +177,69 @@ class SessionRecordPublicProjectionDbTest(
         assertThat(count("public_projection_generations", "session_id", privateSessionId)).isZero()
     }
 
+    @Test
+    @Suppress("LongMethod")
+    fun `emergency deny survives basic save record apply unpublish and republish`() {
+        val sessionId = publishedSessionWithInitialRecord()
+        val publicationId =
+            requiredString(
+                "select id from public_session_publications where session_id = ?",
+                sessionId,
+            )
+        var generation = publicGeneration(sessionId)
+        generation =
+            publicTakedownWriter.denyOrigin(
+                PublicTakedownTarget(
+                    clubId = UUID.fromString(CLUB_ID),
+                    sessionId = UUID.fromString(sessionId),
+                    publicationId = UUID.fromString(publicationId),
+                    generation = generation,
+                    originReadable = true,
+                    currentSurfaces = setOf("ORIGIN"),
+                ),
+            )
+        assertEmergencyDenied(sessionId, generation)
+
+        val expectedSessionRevision = sessionRevision(sessionId)
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        "key-denied-basic-save-01",
+                        """{"sessionRevision":$expectedSessionRevision}""",
+                        publicBasicCommand("차단 뒤 기본 저장", "차단 뒤 책"),
+                    )
+            }.andExpect { status { isOk() } }
+        generation += 1
+        assertEmergencyDenied(sessionId, generation)
+        assertLatestHostConvergence(sessionId, "SESSION_BASIC_SAVE", generation, false)
+
+        saveRecordDraft(sessionId, "denied direct apply", "PUBLIC")
+        val hash = recordDraftHash(sessionId)
+        applyRecordCommand(
+            sessionId,
+            "00000000-0000-4000-8000-000000000714",
+            "key-denied-record-apply-01",
+            expectedLiveRevision = 1,
+            hash = hash,
+        ).andExpect { status { isOk() } }
+        generation += 1
+        assertEmergencyDenied(sessionId, generation)
+        assertLatestRecordConvergence(sessionId, generation, false)
+
+        writePublicationVisibility(sessionId, "HIDDEN", "key-denied-unpublish-01")
+        generation += 1
+        assertEmergencyDenied(sessionId, generation)
+        assertLatestHostConvergence(sessionId, "SESSION_PUBLICATION", generation, false)
+
+        writePublicationVisibility(sessionId, "PUBLIC_RECORD", "key-denied-republish-01")
+        generation += 1
+        assertEmergencyDenied(sessionId, generation)
+        assertLatestHostConvergence(sessionId, "SESSION_PUBLICATION", generation, false)
+    }
+
     private fun publishedSessionWithInitialRecord(): String {
         val sessionId = closedGuestReadableSession()
         saveRecordDraft(sessionId, "initial", "MEMBER")
@@ -304,6 +371,86 @@ class SessionRecordPublicProjectionDbTest(
 
     private fun recordDraftHash(sessionId: String): String =
         requiredString("select snapshot_sha256 from session_record_drafts where session_id = ?", sessionId)
+
+    private fun writePublicationVisibility(
+        sessionId: String,
+        visibility: String,
+        key: String,
+    ) {
+        mockMvc
+            .put("/api/host/sessions/$sessionId/publication") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    envelope(
+                        key,
+                        """{"publicationRevision":${publicationRevision(sessionId)}}""",
+                        """{"publicSummary":"denied summary","siteVisibility":"$visibility"}""",
+                    )
+            }.andExpect { status { isOk() } }
+    }
+
+    private fun assertEmergencyDenied(
+        sessionId: String,
+        generation: Long,
+    ) {
+        val row =
+            jdbcTemplate.queryForMap(
+                "select generation, origin_readable, emergency_denied " +
+                    "from public_projection_generations where session_id = ?",
+                sessionId,
+            )
+        assertThat(row["generation"]).isEqualTo(generation)
+        assertThat(row["origin_readable"]).isEqualTo(false)
+        assertThat(row["emergency_denied"]).isEqualTo(true)
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$sessionId")
+            .andExpect { status { isNotFound() } }
+    }
+
+    private fun assertLatestHostConvergence(
+        sessionId: String,
+        operation: String,
+        generation: Long,
+        originReadable: Boolean,
+    ) {
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select convergence.committed_generation, convergence.origin_readable
+                from public_mutation_convergence_receipts convergence
+                join host_session_mutation_receipts host on host.id = convergence.mutation_receipt_id
+                where convergence.session_id_snapshot = ? and host.operation = ?
+                order by convergence.created_at desc
+                limit 1
+                """.trimIndent(),
+                sessionId,
+                operation,
+            )
+        assertThat(row["committed_generation"]).isEqualTo(generation)
+        assertThat(row["origin_readable"]).isEqualTo(originReadable)
+    }
+
+    private fun assertLatestRecordConvergence(
+        sessionId: String,
+        generation: Long,
+        originReadable: Boolean,
+    ) {
+        val row =
+            jdbcTemplate.queryForMap(
+                """
+                select convergence.committed_generation, convergence.origin_readable
+                from public_mutation_convergence_receipts convergence
+                join session_record_apply_receipts receipt on receipt.id = convergence.mutation_receipt_id
+                where convergence.session_id_snapshot = ?
+                order by convergence.created_at desc
+                limit 1
+                """.trimIndent(),
+                sessionId,
+            )
+        assertThat(row["committed_generation"]).isEqualTo(generation)
+        assertThat(row["origin_readable"]).isEqualTo(originReadable)
+    }
 
     private fun publicGeneration(sessionId: String): Long =
         jdbcTemplate.queryForObject(

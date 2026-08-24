@@ -44,7 +44,8 @@ Immutable admin audit은 actor ID/role, reason category와 redacted reason, targ
 - capability가 있는 active `OWNER|OPERATOR` 성공, 같은 role이지만 capability가 없는 actor와 `SUPPORT`·inactive·target mismatch 거절을 authorization test한다.
 - Duplicate/same-key-different-request/response-loss/purge-failure-resume가 mutation receipt 하나와 append-only attempt를 만드는지 integration test한다.
 - Admin DTO, audit, logs, evidence artifact에 raw reason/private content/provider error가 없는지 검사한다.
-- 각 retention pass는 admin idempotency, takedown preview, host idempotency에 독립적으로 공정한 budget을 배분하고 전체 batch limit과 실제 삭제 count 계약을 보존한다.
+- Production retention batch는 startup에서 최소 3으로 검증하고 각 pass는 admin idempotency, takedown preview, host idempotency에 최소 한 건의 독립 budget을 배분하며 전체 batch limit과 실제 삭제 count 계약을 보존한다. Adapter의 `limit=0`은 no-op이고 `1..2`는 명시적으로 거절한다.
+- Emergency deny는 일반 visibility와 별도인 durable marker다. Confirm은 marker를 설정하며 일반 host/session-record mutation은 이를 해제하거나 별도 restore 경로를 만들지 않는다.
 - 2026-08-24 server substrate는 V55 preview/idempotency/immutable receipt, capability-only application authorization, origin deny와 generation 회전의 단일 transaction, V54 convergence link/work 재사용, redacted platform audit를 구현했다. Concurrent duplicate locking read, fixed reason-category allowlist, namespace-fair retention과 실제 trash scheduler hard-delete 회귀를 포함한다. Production activation adapter는 조건 없이 confirm을 거절하고 test context만 typed mock으로 성공 경로를 검증한다. Protected Step 8 attestation verifier, active incident runbook, operator UI, 실제 CDN runtime evidence는 아직 없으므로 이 ADR은 `Proposed`를 유지한다.
 
 ## 후속 작업
