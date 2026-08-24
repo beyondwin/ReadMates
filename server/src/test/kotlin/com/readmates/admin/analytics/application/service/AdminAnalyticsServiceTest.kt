@@ -43,8 +43,11 @@ class AdminAnalyticsServiceTest {
                 .first { it.key == KpiKey.SESSION_COMPLETION }
 
         assertThat(card.availability).isEqualTo(Availability.AVAILABLE)
+        assertThat(card.label).isEqualTo("세션 완료율")
+        assertThat(card.definition).contains("완료")
         assertThat(card.current).isEqualTo(80.0)
         assertThat(card.prior).isEqualTo(50.0)
+        assertThat(card.delta).isEqualTo(30.0)
         assertThat(card.deltaDirection).isEqualTo(DeltaDirection.UP)
     }
 
@@ -59,7 +62,24 @@ class AdminAnalyticsServiceTest {
 
         assertThat(card.availability).isEqualTo(Availability.NOT_ENOUGH_DATA)
         assertThat(card.current).isNull()
+        assertThat(card.delta).isNull()
         assertThat(card.deltaDirection).isEqualTo(DeltaDirection.NONE)
+    }
+
+    @Test
+    fun `keeps a measured zero distinct from insufficient data`() {
+        val raw = sample(sessionsCurrent = 4, completedCurrent = 0, sessionsPrior = 4, completedPrior = 0)
+        val card =
+            service(raw)
+                .overview(admin, AnalyticsWindow.LAST_30D)
+                .kpis
+                .first { it.key == KpiKey.SESSION_COMPLETION }
+
+        assertThat(card.availability).isEqualTo(Availability.AVAILABLE)
+        assertThat(card.current).isEqualTo(0.0)
+        assertThat(card.prior).isEqualTo(0.0)
+        assertThat(card.delta).isEqualTo(0.0)
+        assertThat(card.deltaDirection).isEqualTo(DeltaDirection.FLAT)
     }
 
     @Test
@@ -79,6 +99,7 @@ class AdminAnalyticsServiceTest {
         assertThat(notification.availability).isEqualTo(Availability.MEASUREMENT_UNAVAILABLE)
         assertThat(notification.current).isNull()
         assertThat(notification.prior).isNull()
+        assertThat(notification.delta).isNull()
         assertThat(notification.deltaDirection).isEqualTo(DeltaDirection.NONE)
     }
 

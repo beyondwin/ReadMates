@@ -90,10 +90,13 @@ data class AdminAnalyticsOverview(
 
 data class AdminAnalyticsKpiCard(
     val key: KpiKey,
+    val label: String,
+    val definition: String,
     val unit: KpiUnit,
     val availability: Availability,
     val current: Double?,
     val prior: Double?,
+    val delta: Double?,
     val deltaDirection: DeltaDirection,
 )
 

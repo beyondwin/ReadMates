@@ -74,6 +74,44 @@ class PlatformAdminAnalyticsControllerTest(
             }
     }
 
+    @Test
+    fun `owner exports server csv with deterministic download and no-store headers`() {
+        val response =
+            mockMvc
+                .get("/api/admin/analytics/export.csv?window=30d") {
+                    cookie(sessionCookieForUser(OWNER_USER_ID))
+                }.andExpect {
+                    status { isOk() }
+                    content { contentType("text/csv;charset=UTF-8") }
+                    header { string("Cache-Control", "no-store") }
+                    header {
+                        string(
+                            "Content-Disposition",
+                            org.hamcrest.Matchers.matchesPattern(
+                                "attachment; filename=\"readmates-admin-analytics-30d-\\d{4}-\\d{2}-\\d{2}\\.csv\"",
+                            ),
+                        )
+                    }
+                }.andReturn()
+                .response
+
+        assertThat(response.contentAsString).startsWith("record_type,schema,generated_at,window")
+        assertThat(response.contentAsString).contains("\r\nmetadata,")
+        assertThat(response.contentAsString).contains("\r\nkpi,")
+        assertThat(response.contentAsString).contains("\r\nseries,")
+    }
+
+    @Test
+    fun `support cannot export analytics despite being allowed to view the screen`() {
+        mockMvc
+            .get("/api/admin/analytics/export.csv?window=30d") {
+                cookie(sessionCookieForUser(SUPPORT_USER_ID))
+            }.andExpect {
+                status { isForbidden() }
+                jsonPath("$.code") { value("PERMISSION_DENIED") }
+            }
+    }
+
     private fun sessionCookieForUser(userId: String): Cookie {
         val issuedSession =
             authSessionService.issueSession(
@@ -87,5 +125,6 @@ class PlatformAdminAnalyticsControllerTest(
 
     private companion object {
         private const val OWNER_USER_ID = "00000000-0000-0000-0000-000000000901"
+        private const val SUPPORT_USER_ID = "00000000-0000-0000-0000-000000000903"
     }
 }

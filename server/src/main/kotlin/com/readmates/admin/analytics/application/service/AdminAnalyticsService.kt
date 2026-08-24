@@ -27,6 +27,25 @@ private const val COST_SCALE = 4
 private const val RATE_SCALE = 1
 private const val RATE_MULTIPLIER = 100.0
 
+private data class KpiDefinition(
+    val label: String,
+    val description: String,
+)
+
+private val KPI_DEFINITIONS =
+    mapOf(
+        KpiKey.ACTIVE_MEMBERS to
+            KpiDefinition("활성 멤버", "선택 기간의 모임에 참여한 고유 멤버 수"),
+        KpiKey.SESSION_COMPLETION to
+            KpiDefinition("세션 완료율", "선택 기간의 전체 세션 중 완료 또는 공개된 세션 비율"),
+        KpiKey.RSVP_RATE to
+            KpiDefinition("RSVP 응답률", "선택 기간의 전체 참여자 중 참석 또는 미정으로 응답한 비율"),
+        KpiKey.AI_COST_PER_SESSION to
+            KpiDefinition("AI 비용/세션", "선택 기간의 AI 추정 비용을 전체 세션 수로 나눈 USD 비용"),
+        KpiKey.NOTIFICATION_DELIVERY to
+            KpiDefinition("알림 도달률", "선택 기간에 종료 상태가 된 알림 중 발송 성공 비율"),
+    )
+
 @Service
 class AdminAnalyticsService(
     private val port: AdminAnalyticsAggregatePort,
@@ -88,12 +107,16 @@ class AdminAnalyticsService(
     ): AdminAnalyticsKpiCard {
         val cur = if (hasCurrent) current.toDouble() else null
         val pri = if (hasPrior) prior.toDouble() else null
+        val definition = KPI_DEFINITIONS.getValue(key)
         return AdminAnalyticsKpiCard(
             key = key,
+            label = definition.label,
+            definition = definition.description,
             unit = KpiUnit.COUNT,
             availability = availability(hasCurrent),
             current = cur,
             prior = pri,
+            delta = delta(cur, pri),
             deltaDirection = direction(cur, pri),
         )
     }
@@ -108,8 +131,11 @@ class AdminAnalyticsService(
         val measurementFailed = numCurrent < 0 || denCurrent < 0 || numPrior < 0 || denPrior < 0
         val cur = if (measurementFailed) null else ratePercent(numCurrent, denCurrent)
         val pri = if (measurementFailed) null else ratePercent(numPrior, denPrior)
+        val definition = KPI_DEFINITIONS.getValue(key)
         return AdminAnalyticsKpiCard(
             key = key,
+            label = definition.label,
+            definition = definition.description,
             unit = KpiUnit.PERCENT,
             availability =
                 when {
@@ -119,6 +145,7 @@ class AdminAnalyticsService(
                 },
             current = cur,
             prior = pri,
+            delta = delta(cur, pri),
             deltaDirection = direction(cur, pri),
         )
     }
@@ -126,12 +153,16 @@ class AdminAnalyticsService(
     private fun costPerSession(raw: AdminAnalyticsRawAggregates): AdminAnalyticsKpiCard {
         val cur = perSession(raw.aiCostCurrent, raw.sessionsCurrent)
         val pri = perSession(raw.aiCostPrior, raw.sessionsPrior)
+        val definition = KPI_DEFINITIONS.getValue(KpiKey.AI_COST_PER_SESSION)
         return AdminAnalyticsKpiCard(
             key = KpiKey.AI_COST_PER_SESSION,
+            label = definition.label,
+            definition = definition.description,
             unit = KpiUnit.USD,
             availability = availability(raw.sessionsCurrent > 0),
             current = cur,
             prior = pri,
+            delta = delta(cur, pri),
             deltaDirection = direction(cur, pri),
         )
     }
@@ -232,4 +263,14 @@ private fun direction(
         current > prior -> DeltaDirection.UP
         current < prior -> DeltaDirection.DOWN
         else -> DeltaDirection.FLAT
+    }
+
+private fun delta(
+    current: Double?,
+    prior: Double?,
+): Double? =
+    if (current == null || prior == null) {
+        null
+    } else {
+        BigDecimal.valueOf(current - prior).setScale(COST_SCALE, RoundingMode.HALF_UP).toDouble()
     }
