@@ -41,6 +41,7 @@ class JdbcGuestBrowseQueryBudgetTest(
 
     @AfterEach
     fun cleanupFixture() {
+        jdbcTemplate.update("delete from public_projection_generations where club_id = ?", CLUB_ID)
         jdbcTemplate.update("delete from public_session_publications where club_id = ?", CLUB_ID)
         jdbcTemplate.update("delete from highlights where club_id = ?", CLUB_ID)
         jdbcTemplate.update("delete from long_reviews where club_id = ?", CLUB_ID)
@@ -187,6 +188,28 @@ class JdbcGuestBrowseQueryBudgetTest(
             state,
             if (state == "PUBLISHED") "PUBLIC" else "MEMBER",
         )
+        if (state == "PUBLISHED") {
+            jdbcTemplate.update(
+                """
+                insert into public_session_publications (
+                  id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
+                ) values (?, ?, ?, 'Query budget public summary', true, 'PUBLIC', 'PUBLIC_RECORD', utc_timestamp(6))
+                """.trimIndent(),
+                sessionId,
+                CLUB_ID,
+                sessionId,
+            )
+            jdbcTemplate.update(
+                """
+                insert into public_projection_generations (
+                  publication_id, club_id, session_id, generation, live_record_revision, origin_readable
+                ) values (?, ?, ?, 1, null, true)
+                """.trimIndent(),
+                sessionId,
+                CLUB_ID,
+                sessionId,
+            )
+        }
     }
 
     private fun <T> measured(block: () -> T): Measurement<T> {

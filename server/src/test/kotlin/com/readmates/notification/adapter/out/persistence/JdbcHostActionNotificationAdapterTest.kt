@@ -7,6 +7,7 @@ import com.readmates.notification.application.model.NotificationDecision
 import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.notification.application.port.out.HostActionNotificationPreviewRecord
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.session.application.model.ExpectedSessionRevision
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.service.HostSessionLifecycleService
@@ -133,7 +134,9 @@ class JdbcHostActionNotificationAdapterTest(
         insertRaceSession()
         val preview = racePreview()
         adapter.insertPreview(preview)
-        lifecycleService.delete(HostSessionIdCommand(hostMember(), RACE_SESSION_ID))
+        lifecycleService.delete(
+            HostSessionIdCommand(hostMember(), RACE_SESSION_ID, ExpectedSessionRevision(0)),
+        )
 
         assertThatThrownBy {
             adapter.completeDecision(
@@ -186,7 +189,9 @@ class JdbcHostActionNotificationAdapterTest(
                     check(start.await(10, TimeUnit.SECONDS))
                     try {
                         deleteTemplate.execute {
-                            lifecycleService.delete(HostSessionIdCommand(hostMember(), RACE_SESSION_ID))
+                            lifecycleService.delete(
+                                HostSessionIdCommand(hostMember(), RACE_SESSION_ID, ExpectedSessionRevision(0)),
+                            )
                         }
                         true
                     } catch (_: HostSessionDeletionBlockedException) {

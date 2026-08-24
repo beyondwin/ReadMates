@@ -5,6 +5,7 @@ import { stripCookieDomain } from "../../functions/_shared/proxy";
 type Env = {
   READMATES_API_BASE_URL: string;
   READMATES_BFF_SECRET?: string;
+  READMATES_HOST_CLIENT_CONTRACT_CAPABILITY?: "V2_ONLY" | "V2_V3";
 };
 
 type HeadersWithSetCookie = Headers & {
@@ -890,6 +891,96 @@ describe("Cloudflare BFF function", () => {
 });
 
 describe("Cloudflare BFF cache layer", () => {
+  it.each([403, 404, 500])(
+    "forces an upstream public %s without cache metadata to no-store",
+    async (status) => {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(async () => new Response('{"denied":true}', { status })),
+      );
+      const cachePut = vi.fn(async () => undefined);
+      const ctx = context(
+        new Request(
+          "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/sessions/session-1",
+        ),
+        { path: ["api", "public", "clubs", "reading-sai", "sessions", "session-1"] },
+      );
+      vi.stubGlobal("caches", {
+        default: { match: vi.fn(async () => undefined), put: cachePut },
+      });
+
+      const response = await onRequest(ctx);
+
+      expect(response.status).toBe(status);
+      expect(response.headers.get("Cache-Control")).toBe("no-store");
+      expect(cachePut).not.toHaveBeenCalled();
+      expect(ctx.waitUntil).not.toHaveBeenCalled();
+    },
+  );
+
+  it("clamps an old public detail policy before returning or storing it", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response('{"generation":2}', {
+          status: 200,
+          headers: {
+            "Cache-Control": "public, max-age=120, stale-while-revalidate=600",
+          },
+        }),
+      ),
+    );
+    const cacheMatch = vi.fn(async () => undefined);
+    const cachePut = vi.fn(async () => undefined);
+    const ctx = context(
+      new Request(
+        "https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai/sessions/session-1",
+      ),
+      { path: ["api", "public", "clubs", "reading-sai", "sessions", "session-1"] },
+    );
+    vi.stubGlobal("caches", { default: { match: cacheMatch, put: cachePut } });
+
+    const response = await onRequest(ctx);
+
+    expect(response.headers.get("Cache-Control")).toBe("public, max-age=60, must-revalidate");
+    expect(ctx.waitUntil).toHaveBeenCalledOnce();
+    await vi.waitFor(() => expect(cachePut).toHaveBeenCalledOnce());
+    const [, stored] = cachePut.mock.calls[0] as unknown as [Request, Response];
+    expect(stored.headers.get("Cache-Control")).toBe("public, max-age=60, must-revalidate");
+  });
+
+  it("ignores an unsafe cached response and revalidates against origin", async () => {
+    const fetchMock = vi.fn(async () =>
+      new Response('{"fresh":true}', {
+        status: 200,
+        headers: { "Cache-Control": "public, max-age=60" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const cacheMatch = vi.fn(async () =>
+      new Response('{"revokedBody":true}', {
+        status: 200,
+        headers: { "Cache-Control": "private, max-age=120" },
+      }),
+    );
+    const cachePut = vi.fn(async () => undefined);
+    const cacheDelete = vi.fn(async () => true);
+    vi.stubGlobal("caches", {
+      default: { match: cacheMatch, put: cachePut, delete: cacheDelete },
+    });
+
+    const response = await onRequest(
+      context(
+        new Request("https://readmates.pages.dev/api/bff/api/public/clubs/reading-sai"),
+        { path: ["api", "public", "clubs", "reading-sai"] },
+      ),
+    );
+
+    expect(fetchMock).toHaveBeenCalledOnce();
+    await expect(response.json()).resolves.toEqual({ fresh: true });
+    expect(cacheDelete).toHaveBeenCalledOnce();
+  });
+
   it("returns cached response on cache hit without calling upstream fetch", async () => {
     const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
@@ -1350,5 +1441,240 @@ describe("stripCookieDomain", () => {
       "secret",
     );
     expect(new TextDecoder().decode(forwardedInit?.body as ArrayBuffer)).toBe(body);
+  });
+});
+
+describe("Cloudflare BFF host client contract capability", () => {
+  const sessionCreate = {
+    name: "session create",
+    method: "POST",
+    url: "https://readmates.pages.dev/api/bff/api/host/sessions",
+    path: ["api", "host", "sessions"],
+    upstream: "https://api.example.com/api/host/sessions",
+  } as const;
+
+  const hostMutations = [
+    sessionCreate,
+    {
+      name: "member approve",
+      method: "POST",
+      url: "https://readmates.pages.dev/api/bff/api/host/members/m-1/approve",
+      path: ["api", "host", "members", "m-1", "approve"],
+      upstream: "https://api.example.com/api/host/members/m-1/approve",
+    },
+    {
+      name: "manual notification",
+      method: "POST",
+      url: "https://readmates.pages.dev/api/bff/api/host/notifications/manual",
+      path: ["api", "host", "notifications", "manual"],
+      upstream: "https://api.example.com/api/host/notifications/manual",
+    },
+    {
+      name: "ai defaults",
+      method: "PUT",
+      url: "https://readmates.pages.dev/api/bff/api/host/clubs/my-club/ai-defaults",
+      path: ["api", "host", "clubs", "my-club", "ai-defaults"],
+      upstream: "https://api.example.com/api/host/clubs/my-club/ai-defaults",
+    },
+    {
+      name: "session patch",
+      method: "PATCH",
+      url: "https://readmates.pages.dev/api/bff/api/host/sessions/s-1",
+      path: ["api", "host", "sessions", "s-1"],
+      upstream: "https://api.example.com/api/host/sessions/s-1",
+    },
+    {
+      name: "session delete",
+      method: "DELETE",
+      url: "https://readmates.pages.dev/api/bff/api/host/sessions/s-1",
+      path: ["api", "host", "sessions", "s-1"],
+      upstream: "https://api.example.com/api/host/sessions/s-1",
+    },
+  ] as const;
+
+  function envWithCapability(capability?: "V2_ONLY" | "V2_V3"): Env {
+    return {
+      READMATES_API_BASE_URL: "https://api.example.com",
+      READMATES_BFF_SECRET: "secret",
+      ...(capability ? { READMATES_HOST_CLIENT_CONTRACT_CAPABILITY: capability } : {}),
+    };
+  }
+
+  async function sendHostMutation(options: {
+    method?: string;
+    url: string;
+    path: readonly string[];
+    contract?: string;
+    origin?: string | null;
+    extraHeaders?: Record<string, string>;
+    body?: string;
+    capability?: "V2_ONLY" | "V2_V3";
+  }) {
+    let forwardedUrl: string | undefined;
+    let forwardedInit: RequestInit | undefined;
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      forwardedUrl = typeof input === "string" ? input : String(input);
+      forwardedInit = init;
+      return new Response("{}", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const headers = new Headers({
+      "Content-Type": "application/json",
+      ...options.extraHeaders,
+    });
+    if (options.origin !== null) {
+      headers.set("Origin", options.origin ?? "https://readmates.pages.dev");
+    }
+    if (options.contract !== undefined) {
+      headers.set("X-Readmates-Client-Contract", options.contract);
+    }
+
+    const method = options.method ?? "POST";
+    const response = await onRequest(
+      context(
+        new Request(options.url, {
+          method,
+          headers,
+          body: ["GET", "HEAD", "DELETE"].includes(method) ? undefined : (options.body ?? "{}"),
+        }),
+        { path: [...options.path] },
+        envWithCapability(options.capability),
+      ),
+    );
+
+    return {
+      response,
+      fetchMock,
+      forwardedUrl,
+      forwardedHeaders: (forwardedInit?.headers as Headers | undefined) ?? null,
+    };
+  }
+
+  it.each([
+    { capability: undefined, contract: "v2", allowed: true },
+    { capability: undefined, contract: "v3", allowed: true },
+    { capability: undefined, contract: undefined, allowed: false },
+    { capability: undefined, contract: "attacker-version", allowed: false },
+    { capability: undefined, contract: "V3", allowed: false },
+    { capability: "V2_V3" as const, contract: "v2", allowed: true },
+    { capability: "V2_V3" as const, contract: "v3", allowed: true },
+    { capability: "V2_V3" as const, contract: undefined, allowed: false },
+    { capability: "V2_V3" as const, contract: "v1", allowed: false },
+    { capability: "V2_ONLY" as const, contract: "v2", allowed: true },
+    { capability: "V2_ONLY" as const, contract: "v3", allowed: false },
+    { capability: "V2_ONLY" as const, contract: undefined, allowed: false },
+    { capability: "V2_ONLY" as const, contract: "v1", allowed: false },
+  ])(
+    "capability=$capability contract=$contract allowed=$allowed without downgrade",
+    async ({ capability, contract, allowed }) => {
+      const result = await sendHostMutation({
+        ...sessionCreate,
+        contract,
+        capability,
+      });
+
+      if (allowed) {
+        expect(result.response.status).toBe(200);
+        expect(result.fetchMock).toHaveBeenCalledWith(
+          sessionCreate.upstream,
+          expect.objectContaining({ method: "POST", redirect: "manual" }),
+        );
+        expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).toBe(contract);
+        expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).not.toBe(
+          contract === "v3" ? "v2" : "not-v3",
+        );
+        return;
+      }
+
+      await expectApiErrorBody(result.response, {
+        status: 409,
+        code: "HOST_CLIENT_UPGRADE_REQUIRED",
+      });
+      expect(result.fetchMock).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(hostMutations)(
+    "forwards v3 unchanged for $method $name and does not rewrite to v2",
+    async (caseItem) => {
+      const result = await sendHostMutation({
+        method: caseItem.method,
+        url: caseItem.url,
+        path: caseItem.path,
+        contract: "v3",
+      });
+
+      expect(result.response.status).toBe(200);
+      expect(result.fetchMock).toHaveBeenCalledWith(
+        caseItem.upstream,
+        expect.objectContaining({ method: caseItem.method, redirect: "manual" }),
+      );
+      expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).toBe("v3");
+      expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).not.toBe("v2");
+    },
+  );
+
+  it("rejects a v3 host mutation against V2_ONLY before upstream and never rewrites to v2", async () => {
+    const result = await sendHostMutation({
+      ...sessionCreate,
+      contract: "v3",
+      capability: "V2_ONLY",
+    });
+
+    await expectApiErrorBody(result.response, {
+      status: 409,
+      code: "HOST_CLIENT_UPGRADE_REQUIRED",
+    });
+    expect(result.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects cross-origin v3 host mutations with 403 before contract forwarding", async () => {
+    const result = await sendHostMutation({
+      ...sessionCreate,
+      contract: "v3",
+      origin: "https://attacker.example",
+    });
+
+    await expectApiErrorBody(result.response, { status: 403, code: "PERMISSION_DENIED" });
+    expect(result.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects v3 host mutations without Origin or Referer before upstream", async () => {
+    const result = await sendHostMutation({
+      ...sessionCreate,
+      contract: "v3",
+      origin: null,
+    });
+
+    await expectApiErrorBody(result.response, { status: 403, code: "PERMISSION_DENIED" });
+    expect(result.fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("strips browser trusted headers and recreates server v3 contract plus club context", async () => {
+    const result = await sendHostMutation({
+      method: "POST",
+      url: "https://readmates.pages.dev/api/bff/api/host/notifications/manual?clubSlug=reading-sai",
+      path: ["api", "host", "notifications", "manual"],
+      contract: "v3",
+      extraHeaders: {
+        "X-Readmates-Bff-Secret": "browser-secret-placeholder",
+        "X-Readmates-Client-IP": "browser-client-placeholder",
+        "X-Readmates-Club-Host": "browser-host.example.test",
+        "X-Readmates-Club-Slug": "browser-slug-placeholder",
+        "CF-Connecting-IP": "203.0.113.10",
+      },
+    });
+
+    expect(result.response.status).toBe(200);
+    expect(result.forwardedUrl).toBe(
+      "https://api.example.com/api/host/notifications/manual?clubSlug=reading-sai",
+    );
+    expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).toBe("v3");
+    expect(result.forwardedHeaders?.get("X-Readmates-Client-Contract")).not.toBe("v2");
+    expect(result.forwardedHeaders?.get("X-Readmates-Bff-Secret")).toBe("secret");
+    expect(result.forwardedHeaders?.get("X-Readmates-Client-IP")).toBe("203.0.113.10");
+    expect(result.forwardedHeaders?.get("X-Readmates-Club-Host")).toBe("readmates.pages.dev");
+    expect(result.forwardedHeaders?.get("X-Readmates-Club-Slug")).toBe("reading-sai");
   });
 });

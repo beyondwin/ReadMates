@@ -19,6 +19,7 @@ export const PLATFORM_ADMIN_CAPABILITIES = [
   "MANAGE_CLUBS",
   "MANAGE_CLUB_DOMAINS",
   "MANAGE_PLATFORM_ADMINS",
+  "EMERGENCY_PUBLIC_TAKEDOWN",
 ] as const;
 
 export type PlatformAdminCapability = (typeof PLATFORM_ADMIN_CAPABILITIES)[number];

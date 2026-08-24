@@ -12,6 +12,8 @@
 #   - The env file MUST be outside the repository (so it can't be committed).
 #   - Values are passed to `gh` via stdin (), never on the command
 #     line, so they don't leak to process listings or shell history.
+#   - Empty values are skipped and never delete existing GitHub Secrets. Follow the
+#     secrets-management runbook for an explicit, safety-gated deletion.
 #   - This script and its classification list are safe to commit; they hold
 #     no secret values.
 
@@ -81,6 +83,10 @@ SECRET_KEYS=(
   READMATES_BFF_SECRET
   READMATES_BFF_SECRETS
   READMATES_IP_HASH_BASE_SECRET
+  READMATES_HOST_LIST_CURSOR_CURRENT_KEY
+  READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY
+  READMATES_MUTATION_IDENTITY_CURRENT_KEY
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY
   SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID
   SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET
   READMATES_AIGEN_OPENAI_API_KEY
@@ -93,13 +99,21 @@ SECRET_KEYS=(
 # GitHub *Variables* (plaintext, vars.*)
 # Note: VM_USER / VM_SSH_PORT / DEPLOY_ROOT / BFF_SECRET_REQUIRED /
 # AUTH_SESSION_COOKIE_SECURE / AIGEN_FALLBACK_DEFAULT_MODEL / MAIL_PORT /
-# MAIL_PROPERTIES_* / SERVER_FORWARD_HEADERS_STRATEGY / all _ENABLED toggles
+# MAIL_PROPERTIES_* / SERVER_FORWARD_HEADERS_STRATEGY / most _ENABLED toggles
 # are inlined in the workflow YAML, so they are NOT imported.
 VARIABLE_KEYS=(
   READMATES_VM_HOST
   READMATES_APP_BASE_URL
   READMATES_AUTH_BASE_URL
   READMATES_ALLOWED_ORIGINS
+  READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION
+  READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION
+  READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION
+  READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED
+  READMATES_PUBLIC_CONVERGENCE_WORK_RETENTION
+  READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_FIXED_DELAY
+  READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_BATCH_SIZE
   READMATES_AIGEN_ENABLED
   READMATES_AIGEN_ENABLED_PROVIDERS
   READMATES_AIGEN_GOOGLE_PAID_TIER_RETENTION_CONFIRMED
@@ -201,6 +215,7 @@ done < <(parse_env "$ENV_FILE_ABS")
 
 echo "---"
 echo "Summary: secrets=$n_secret variables=$n_var skipped-placeholder/empty=$((n_skip+n_empty))"
+echo "Empty values are skipped; this importer never deletes existing GitHub Secrets."
 
 if [ ${#UNCLASSIFIED[@]} -gt 0 ]; then
   echo ""

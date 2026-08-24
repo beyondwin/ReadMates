@@ -19,10 +19,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
@@ -39,7 +36,6 @@ import java.time.LocalDate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
     update host_action_notification_previews
@@ -517,7 +513,8 @@ class HostSessionControllerDbTest(
                       "date": "2026-05-21",
                       "locationLabel": " ",
                       "meetingUrl": "",
-                      "questionDeadlineAt": ""
+                      "questionDeadlineAt": "",
+                      "expectedSessionRevision": 0
                     }
                     """.trimIndent()
             }.andExpect {
@@ -549,7 +546,8 @@ class HostSessionControllerDbTest(
                       "bookTitle": "수정된 책",
                       "bookAuthor": "수정된 저자",
                       "date": "2026-05-21",
-                      "endTime": "20:00"
+                      "endTime": "20:00",
+                      "expectedSessionRevision": 0
                     }
                     """.trimIndent()
             }.andExpect {
@@ -1153,7 +1151,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT"}]"""
+                content =
+                    """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT",""" +
+                    """"expectedAttendanceRevision":0}]"""
             }.andExpect {
                 status { isOk() }
             }
@@ -1170,6 +1170,24 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `legacy attendance array normalizes an invalid membership uuid to bad request`() {
+        createSessionSeven()
+
+        mockMvc
+            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/attendance") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    [{"membershipId":"not-a-uuid","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]
+                    """.trimIndent()
+            }.andExpect {
+                status { isBadRequest() }
+            }
+    }
+
+    @Test
     fun `attendance update persists sorted snapshots and returns a change receipt`() {
         createSessionSeven()
         val firstMembershipId = "00000000-0000-0000-0000-000000000201"
@@ -1178,15 +1196,15 @@ class HostSessionControllerDbTest(
 
         val body =
             mockMvc
-                .post("/api/host/sessions/$sessionId/attendance") {
+                .post("/api/host/sessions/$sessionId/attendance?expectedParticipantSetRevision=0") {
                     with(user("host@example.com"))
                     with(csrf())
                     contentType = MediaType.APPLICATION_JSON
                     content =
                         """
                         [
-                          {"membershipId":"$secondMembershipId","attendanceStatus":"ATTENDED"},
-                          {"membershipId":"$firstMembershipId","attendanceStatus":"ABSENT"}
+                          {"membershipId":"$secondMembershipId","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},
+                          {"membershipId":"$firstMembershipId","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}
                         ]
                         """.trimIndent()
                 }.andExpect {
@@ -1495,9 +1513,13 @@ class HostSessionControllerDbTest(
                 .post("/api/host/sessions/$sessionId/open") {
                     with(user("host@example.com"))
                     with(csrf())
+                    withExpectedRevision(sessionId)
                 }.andExpect {
                     status { isOk() }
                     jsonPath("$.state") { value("OPEN") }
+                    jsonPath("$.accessScope") { value("GUEST_READABLE") }
+                    jsonPath("$.siteVisibility") { value("HIDDEN") }
+                    jsonPath("$.visibility") { value("MEMBER") }
                     jsonPath("$.changeReceipt.kind") { value("LIFECYCLE") }
                     jsonPath("$.changeReceipt.undoAvailable") { value(true) }
                     jsonPath("$.changeReceipt.changeId") { exists() }
@@ -1587,6 +1609,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
@@ -1600,6 +1623,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
@@ -1622,6 +1646,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
@@ -1647,6 +1672,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
@@ -1666,6 +1692,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
@@ -1683,6 +1710,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
@@ -1695,6 +1723,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
@@ -1728,6 +1757,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("PUBLISHED") }
@@ -1749,6 +1779,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("CLOSED") }
@@ -1757,6 +1788,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("PUBLISHED") }
@@ -1768,6 +1800,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
@@ -1791,6 +1824,7 @@ class HostSessionControllerDbTest(
                 .post("/api/host/sessions/$sessionId/publish") {
                     with(user("host@example.com"))
                     with(csrf())
+                    withExpectedRevision(sessionId)
                 }.andExpect {
                     status { isConflict() }
                     jsonPath("$.code") { value("CONFLICT") }
@@ -1856,6 +1890,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("PUBLISHED") }
@@ -1913,6 +1948,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host cannot publish open draft host only or unpublished sessions`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
@@ -1922,6 +1958,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
@@ -1933,6 +1970,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -1942,6 +1980,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
@@ -1970,6 +2009,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
@@ -1982,19 +2022,28 @@ class HostSessionControllerDbTest(
     fun `host close does not overwrite session state changed before close update`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
+        val expectedRevision = sessionRevision(sessionId)
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'PUBLISHED',
+                visibility = 'MEMBER',
+                session_revision = session_revision + 1
+            where id = ?
+              and club_id = '00000000-0000-0000-0000-000000000001'
+            """.trimIndent(),
+            sessionId,
+        )
 
-        HostSessionCloseRaceProbe.publishBeforeNextCloseUpdate(sessionId)
-        try {
-            mockMvc
-                .post("/api/host/sessions/$sessionId/close") {
-                    with(user("host@example.com"))
-                    with(csrf())
-                }.andExpect {
-                    status { isConflict() }
-                }
-        } finally {
-            HostSessionCloseRaceProbe.clear()
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/close") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":$expectedRevision}"""
+            }.andExpect {
+                status { isConflict() }
+            }
 
         assertEquals("PUBLISHED", findSessionState(sessionId))
     }
@@ -2008,6 +2057,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
@@ -2024,6 +2074,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("CONFLICT") }
@@ -2083,6 +2134,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$firstSessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(firstSessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2092,6 +2144,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$secondSessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(secondSessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_OPEN_ALREADY_EXISTS") }
@@ -2106,6 +2159,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2113,6 +2167,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("CLOSED") }
@@ -2122,6 +2177,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
@@ -2165,6 +2221,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -2186,6 +2243,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2193,6 +2251,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2204,6 +2263,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -2220,6 +2280,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$openSessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(openSessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2231,6 +2292,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$closedSessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(closedSessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_OPEN_ALREADY_EXISTS") }
@@ -2252,6 +2314,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
@@ -2261,12 +2324,14 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host unpublishes a published session`() {
         val sessionId = createDraftSessionSeven()
         mockMvc
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2274,6 +2339,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/close") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2296,6 +2362,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("PUBLISHED") }
@@ -2309,6 +2376,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/unpublish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("CLOSED") }
@@ -2328,6 +2396,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2336,6 +2405,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/unpublish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_UNPUBLISH_NOT_ALLOWED") }
@@ -2351,6 +2421,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2373,6 +2444,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/return-to-draft") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("DRAFT") }
@@ -2386,6 +2458,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -2405,6 +2478,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/return-to-draft") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_RETURN_TO_DRAFT_NOT_ALLOWED") }
@@ -2422,6 +2496,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/reopen") {
                 with(user("member5@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isForbidden() }
             }
@@ -2435,6 +2510,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009778/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009778")
             }.andExpect {
                 status { isNotFound() }
             }
@@ -2447,6 +2523,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$openSessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(openSessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2455,6 +2532,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/00000000-0000-0000-0000-000000009778/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009778")
             }.andExpect {
                 status { isNotFound() }
                 jsonPath("$.code") { value("SESSION_NOT_FOUND") }
@@ -2470,6 +2548,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$openSessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(openSessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2479,6 +2558,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/00000000-0000-0000-0000-000000019777/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000019777")
             }.andExpect {
                 status { isNotFound() }
                 jsonPath("$.code") { value("SESSION_NOT_FOUND") }
@@ -2495,6 +2575,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$openSessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(openSessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2508,6 +2589,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$publishedSessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(publishedSessionId)
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
@@ -2524,6 +2606,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -2532,6 +2615,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
@@ -2550,6 +2634,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/unpublish") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
@@ -2567,6 +2652,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/return-to-draft") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(sessionId) }
@@ -2586,6 +2672,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/reopen") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -2615,7 +2702,7 @@ class HostSessionControllerDbTest(
                 content =
                     """
                     {
-                      "reasonCode": "MEETING_RESCHEDULED",
+                      "expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode": "MEETING_RESCHEDULED",
                       "reasonNote": "  moved online  "
                     }
                     """.trimIndent()
@@ -2641,7 +2728,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"reasonCode":"NOT_A_REASON"}"""
+                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"NOT_A_REASON"}"""
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2661,7 +2748,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"reasonCode":"LEGACY_UNSPECIFIED"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"LEGACY_UNSPECIFIED"}"""
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2672,7 +2761,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"reasonCode":"EMPTY_SESSION_DELETED"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"EMPTY_SESSION_DELETED"}"""
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2692,7 +2783,10 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = "{\"reasonCode\":\"ACCIDENTAL_TRANSITION\",\"reasonNote\":\"ok\\u0001nope\"}"
+                content =
+                    "{\"expectedSessionRevision\":${sessionRevision(
+                        sessionId,
+                    )},\"reasonCode\":\"ACCIDENTAL_TRANSITION\",\"reasonNote\":\"ok\\u0001nope\"}"
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2713,7 +2807,10 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"reasonCode":"ACCIDENTAL_TRANSITION","reasonNote":"$note"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(
+                        sessionId,
+                    )}, "reasonCode":"ACCIDENTAL_TRANSITION","reasonNote":"$note"}"""
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2735,7 +2832,9 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"reasonCode":"ACCIDENTAL_TRANSITION"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"ACCIDENTAL_TRANSITION"}"""
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
@@ -2753,6 +2852,7 @@ class HostSessionControllerDbTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -2779,7 +2879,9 @@ class HostSessionControllerDbTest(
                 with(csrf())
                 header(RequestIdFilter.HEADER, requestId)
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"reasonCode":"OPERATIONAL_RECOVERY"}"""
+                content =
+                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
+                    """"reasonCode":"OPERATIONAL_RECOVERY"}"""
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -2803,6 +2905,7 @@ class HostSessionControllerDbTest(
                     .post("/api/host/sessions/$sessionId/open") {
                         with(user("host@example.com"))
                         with(csrf())
+                        withExpectedRevision(sessionId)
                     }.andReturn()
                     .response.status
             }
@@ -2912,6 +3015,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009777") }
@@ -3093,6 +3197,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/$sessionId") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
             }
@@ -3143,8 +3248,10 @@ class HostSessionControllerDbTest(
                 jsonPath("$.blockers.length()") { value(0) }
             }
         mockMvc
-            .delete("/api/host/sessions/$sessionId") { withHost() }
-            .andExpect {
+            .delete("/api/host/sessions/$sessionId") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.trashed") { value(true) }
             }
@@ -3171,6 +3278,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
                 with(user("member5@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isForbidden() }
             }
@@ -3182,6 +3290,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000009778") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009778")
             }.andExpect {
                 status { isNotFound() }
             }
@@ -3286,6 +3395,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000019777") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000019777")
             }.andExpect {
                 status { isNotFound() }
             }
@@ -3304,6 +3414,8 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/not-a-uuid") {
                 with(user("host@example.com"))
                 with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":0}"""
             }.andExpect {
                 status { isBadRequest() }
             }
@@ -3317,6 +3429,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
             }
@@ -3350,6 +3463,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
             }
@@ -3358,6 +3472,7 @@ class HostSessionControllerDbTest(
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isNotFound() }
             }
@@ -3373,6 +3488,7 @@ class HostSessionControllerDbTest(
                     .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
                         with(user("host@example.com"))
                         with(csrf())
+                        withExpectedRevision("00000000-0000-0000-0000-000000009777")
                     }.andReturn()
                     .response.status
             }
@@ -3526,6 +3642,7 @@ class HostSessionControllerDbTest(
         mockMvc
             .delete("/api/host/sessions/00000000-0000-0000-0000-000000009777") {
                 withHost()
+                withExpectedRevision("00000000-0000-0000-0000-000000009777")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.trashed") { value(true) }
@@ -3555,8 +3672,10 @@ class HostSessionControllerDbTest(
         )
 
         mockMvc
-            .delete("/api/host/sessions/$sessionId") { withHost() }
-            .andExpect {
+            .delete("/api/host/sessions/$sessionId") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.trashed") { value(true) }
             }
@@ -3573,7 +3692,7 @@ class HostSessionControllerDbTest(
         assertEquals(1, countRows("ai_generation_audit_log", "session_id = '$sessionId'"))
     }
 
-    private fun hostSessionRequestJson() =
+    private fun hostSessionRequestJson(expectedSessionRevision: Long = 0) =
         """
         {
           "title": "7회차 · 테스트 책",
@@ -3587,9 +3706,23 @@ class HostSessionControllerDbTest(
           "questionDeadlineAt": "2026-05-18T22:30:00+09:00",
           "locationLabel": "온라인",
           "meetingUrl": "https://meet.google.com/readmates-test",
-          "meetingPasscode": "readmates"
+          "meetingPasscode": "readmates",
+          "expectedSessionRevision": $expectedSessionRevision
         }
         """.trimIndent()
+
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate
+            .query(
+                "select session_revision from sessions where id = ?",
+                { resultSet, _ -> resultSet.getLong("session_revision") },
+                sessionId,
+            ).firstOrNull() ?: 0
+
+    private fun MockHttpServletRequestDsl.withExpectedRevision(sessionId: String) {
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
+    }
 
     private fun hostMember() =
         CurrentMember(
@@ -3629,8 +3762,10 @@ class HostSessionControllerDbTest(
                 }
             }
         mockMvc
-            .delete("/api/host/sessions/$sessionId") { withHost() }
-            .andExpect {
+            .delete("/api/host/sessions/$sessionId") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_DELETE_BLOCKED") }
                 jsonPath("$.blockers.length()") { value(expected.size) }
@@ -3655,8 +3790,10 @@ class HostSessionControllerDbTest(
                 jsonPath("$.blockers") { doesNotExist() }
             }
         mockMvc
-            .delete("/api/host/sessions/$sessionId") { withHost() }
-            .andExpect {
+            .delete("/api/host/sessions/$sessionId") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_DELETION_NOT_ALLOWED") }
                 jsonPath("$.blockers") { doesNotExist() }
@@ -4878,67 +5015,4 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
             sessionId,
         )
-
-    @TestConfiguration
-    class CloseRaceJdbcTemplateConfig {
-        @Bean
-        @Primary
-        fun closeRaceJdbcTemplate(dataSource: DataSource): JdbcTemplate = CloseRaceJdbcTemplate(dataSource)
-    }
-}
-
-private object HostSessionCloseRaceProbe {
-    private val targetSessionId = ThreadLocal<String>()
-
-    fun publishBeforeNextCloseUpdate(sessionId: String) {
-        targetSessionId.set(sessionId)
-    }
-
-    fun clear() {
-        targetSessionId.remove()
-    }
-
-    fun consumeIfMatches(
-        sql: String,
-        args: Array<out Any?>,
-    ): String? {
-        val sessionId = targetSessionId.get() ?: return null
-        val normalizedSql = sql.trimIndent().replace(Regex("\\s+"), " ")
-        val isHostSessionCloseUpdate = normalizedSql.startsWith("update sessions set state = 'CLOSED', updated_at = utc_timestamp(6)")
-        if (!isHostSessionCloseUpdate || args.firstOrNull() != sessionId) {
-            return null
-        }
-
-        targetSessionId.remove()
-        return sessionId
-    }
-}
-
-private class CloseRaceJdbcTemplate(
-    private val rawDataSource: DataSource,
-) : JdbcTemplate(rawDataSource) {
-    override fun update(
-        sql: String,
-        vararg args: Any?,
-    ): Int {
-        val sessionId = HostSessionCloseRaceProbe.consumeIfMatches(sql, args)
-        if (sessionId != null) {
-            rawDataSource.connection.use { connection ->
-                connection.autoCommit = true
-                connection
-                    .prepareStatement(
-                        """
-                        update sessions
-                        set state = 'PUBLISHED', visibility = 'MEMBER'
-                        where id = ?
-                          and club_id = '00000000-0000-0000-0000-000000000001'
-                        """.trimIndent(),
-                    ).use { statement ->
-                        statement.setString(1, sessionId)
-                        statement.executeUpdate()
-                    }
-            }
-        }
-        return super.update(sql, *args)
-    }
 }

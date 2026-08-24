@@ -2,10 +2,12 @@
 
 # ADR-NNNN: <짧은 결정 제목>
 
-- 상태: Accepted | Proposed | Superseded by ADR-NNNN | Deprecated
+- 상태: Proposed
 - 결정일: YYYY-MM-DD
 - 작성자: <역할>
 - 관련: ADR-NNNN, <코드 경로>, <문서 경로>
+
+> 새 ADR은 승인됐지만 아직 미구현인 `Proposed`로 시작합니다. 코드·테스트·active architecture가 일치한 뒤에만 `Accepted`로 바꿉니다. 기존 결정을 바꾸면 새 ADR을 만들고 기존 ADR을 `Superseded by ADR-NNNN`으로 갱신합니다.
 
 ## 컨텍스트
 

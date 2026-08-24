@@ -26,6 +26,7 @@ const OWNER_CAPABILITIES = [
   "MANAGE_CLUBS",
   "MANAGE_CLUB_DOMAINS",
   "MANAGE_PLATFORM_ADMINS",
+  "EMERGENCY_PUBLIC_TAKEDOWN",
 ] as const;
 
 const validPayload = {

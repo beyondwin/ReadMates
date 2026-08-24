@@ -14,6 +14,14 @@ A full source checkout can provide repository-local contributor routing, preflig
 
 The clean public release candidate intentionally omits contributor-only guidance. Its shipped release helpers are self-contained and do not require a particular local agent tool.
 
+## `check-agent-guidance.py`
+
+Full source checkout의 agent router, canonical command, public-safety guidance와 ADR registry 계약을 fail closed로 검사합니다. ADR 검사는 파일 번호·제목·상태, `docs/development/adr/README.md`와 `docs/development/technical-decisions.md` 파생 인덱스의 exact 일치, malformed/duplicate 번호, superseded target 방향·cycle, 2026-08-22 이후 dated spec/plan의 `ADR impact`와 실제 ADR reference, `technical-decisions.md`의 parallel decision prose 재도입을 확인합니다. Pull request CI에서는 body의 `ADR impact`와 `ADR refs`를 실제 base diff와 비교하고, ADR rename/delete, `Accepted` 본문 rewrite, terminal ADR rewrite를 차단합니다. Accepted 결정 변경은 기존 ADR의 status-only supersede와 새 ADR 추가로만 통과합니다.
+
+Full source checkout에서 이 contributor checker가 제공될 때 built-in self-test를 먼저 실행한 뒤 default repository scan을 실행합니다. Clean public release candidate에는 이 contributor-only checker가 포함되지 않습니다.
+
+`Proposed`는 승인됐지만 아직 구현되지 않은 결정이고 `Accepted`는 코드·테스트·active architecture가 일치하는 결정입니다. Checker 통과만으로 Proposed를 Accepted로 승격하지 않습니다.
+
 ## `check-deploy-workflow-contract.py`
 
 `Deploy Server Image` workflow가 exact release semver의 annotated tag를 checkout하고, tag commit과 `HEAD`를 일치시킨 뒤, Trivy가 검사한 digest와 같은 digest만 release tag로 promote하는지 fail closed로 검사합니다. CI와 `pre-push-check.sh`, public release candidate가 같은 checker를 사용합니다.
@@ -225,8 +233,8 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 ./scripts/validate-prometheus-rules.sh    # ops/prometheus/alerts/*.yml rule 검사
 ./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml 검사
 bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/config 검사
-./scripts/validate-production-ai-config.sh # OCI internal OTLP, legacy 제거, Google retention sync 검사
-./scripts/verify-production-ai-config-fixtures.sh # active case study의 legacy selector 회귀 fixture 검사
+./scripts/validate-production-ai-config.sh # AI runtime과 필수 host HMAC sync-config surface 검사
+./scripts/verify-production-ai-config-fixtures.sh # config 누락과 importer 분류/secret 비노출 fixture 검사
 ./scripts/lint-grafana-dashboards.sh      # JSON, AI panels, Tempo datasource/exemplar contract
 ./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml 구조 검사
 ```
@@ -234,6 +242,14 @@ bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/c
 배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 
 `validate-alertmanager-config.sh`는 `${READMATES_ALERT_*}` 환경 placeholder를 dummy 값으로 치환한 임시 파일을 lint하므로 실제 SMTP credential 없이 구조만 검증합니다. 치환 결과는 `.tmp` 아래 임시 디렉터리에 만들고 종료 시 삭제합니다.
+
+Production config validator는 host list cursor와 mutation identity의 current/previous key 및 version이
+`.env.example`, `sync-config` source/required/render, bulk importer classification에 모두 연결됐는지도
+검사합니다. Previous key 삭제는 safety gate 뒤 runbook의 exact GitHub UI 또는
+`gh secret delete ... --repo ...` 절차로만 수행하며 bulk importer의 빈 값은 기존 Secret을 삭제하지
+않습니다. Fixture는 외부 temp env와 mock `gh`로 dry-run importer를 실행해 secret 값은 출력하지 않고
+key 이름과 version Variable만 분류하는지, 삭제 절차 계약이 유지되는지 확인합니다. 실제 GitHub
+Secret이나 운영 env는 변경하지 않습니다.
 
 ## `observability-local-smoke.sh`
 

@@ -196,6 +196,14 @@ on duplicate key update
   visibility = values(visibility),
   access_scope = values(access_scope);
 
+insert into session_publication_versions (session_id, publication_revision)
+select id, 0 from sessions
+on duplicate key update publication_revision = session_publication_versions.publication_revision;
+
+insert into club_host_list_epochs (club_id, meeting_epoch, record_epoch)
+select id, 0, 0 from clubs
+on duplicate key update club_id = club_host_list_epochs.club_id;
+
 insert into session_feedback_documents (id, club_id, session_id, version, source_text, file_name, content_type, file_size)
 with seed as (
   select 701 as id_suffix, 1 as session_number, 1 as version, '251126 1차.md' as file_name, 'text/markdown' as content_type, '<!-- readmates-feedback:v1 -->
@@ -1702,6 +1710,30 @@ on duplicate key update
   visibility = values(visibility),
   site_visibility = values(site_visibility),
   published_at = values(published_at);
+
+insert ignore into public_projection_generations (
+  publication_id,
+  club_id,
+  session_id,
+  generation,
+  live_record_revision,
+  origin_readable,
+  updated_at
+)
+select
+  publication.id,
+  publication.club_id,
+  publication.session_id,
+  1,
+  null,
+  true,
+  utc_timestamp(6)
+from public_session_publications publication
+join sessions on sessions.id = publication.session_id
+  and sessions.club_id = publication.club_id
+where sessions.state = 'PUBLISHED'
+  and sessions.access_scope = 'GUEST_READABLE'
+  and publication.site_visibility = 'PUBLIC_RECORD';
 
 insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
 with seed as (

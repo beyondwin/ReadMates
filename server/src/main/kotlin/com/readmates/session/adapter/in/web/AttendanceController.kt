@@ -1,41 +1,101 @@
 package com.readmates.session.adapter.`in`.web
 
+import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.port.`in`.ConfirmAttendanceUseCase
 import com.readmates.shared.security.CurrentMember
-import jakarta.validation.Valid
+import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
-import jakarta.validation.constraints.NotEmpty
+import jakarta.validation.constraints.NotNull
 import jakarta.validation.constraints.Pattern
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import tools.jackson.databind.JsonNode
 
 data class AttendanceEntry(
     @field:NotBlank val membershipId: String,
-    @field:Pattern(regexp = "ATTENDED|ABSENT") val attendanceStatus: String,
+    @field:Pattern(regexp = "ATTENDED|ABSENT|UNKNOWN") val attendanceStatus: String,
+    @field:NotNull @field:Min(0) val expectedAttendanceRevision: Long,
 )
 
-fun AttendanceEntry.toCommand(): AttendanceEntryCommand = AttendanceEntryCommand(membershipId, attendanceStatus)
+fun AttendanceEntry.toCommand(): AttendanceEntryCommand {
+    val command = AttendanceEntryCommand(membershipId, attendanceStatus, expectedAttendanceRevision)
+    return command
+}
+
+@Suppress("ThrowsCount")
+private fun bindExpectedAttendanceRows(
+    commandEntries: List<AttendanceEntry>,
+    expectedRows: List<ExpectedAttendanceRowBody>?,
+    envelope: Boolean,
+): List<AttendanceEntryCommand> {
+    if (!envelope || expectedRows.isNullOrEmpty()) {
+        return commandEntries.map { it.toCommand() }
+    }
+    val expectedByMembership =
+        expectedRows.associate { row ->
+            val membershipId = row.membershipId ?: throw InvalidSessionScheduleException()
+            val revision = row.attendanceRevision ?: throw InvalidSessionScheduleException()
+            membershipId to revision
+        }
+    val commandIds =
+        commandEntries.map { entry ->
+            runCatching { java.util.UUID.fromString(entry.membershipId) }
+                .getOrElse { throw InvalidSessionScheduleException() }
+        }
+    if (commandIds.toSet() != expectedByMembership.keys || commandIds.size != expectedByMembership.size) {
+        throw InvalidSessionScheduleException()
+    }
+    return commandEntries.map { entry ->
+        val membershipId = java.util.UUID.fromString(entry.membershipId)
+        val expectedRevision = expectedByMembership.getValue(membershipId)
+        if (entry.expectedAttendanceRevision != expectedRevision) {
+            throw InvalidSessionScheduleException()
+        }
+        AttendanceEntryCommand(entry.membershipId, entry.attendanceStatus, expectedRevision)
+    }
+}
 
 @RestController
 @RequestMapping("/api/host/sessions/{sessionId}/attendance")
 class AttendanceController(
     private val confirmAttendanceUseCase: ConfirmAttendanceUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
 ) {
     @PostMapping
+    @Suppress("ThrowsCount")
     fun confirm(
         @PathVariable sessionId: String,
-        @Valid @RequestBody @NotEmpty entries: List<@Valid AttendanceEntry>,
+        @RequestParam(required = false) expectedParticipantSetRevision: Long?,
+        @RequestBody body: JsonNode,
         member: CurrentMember,
-    ) = confirmAttendanceUseCase.confirmAttendance(
-        ConfirmAttendanceCommand(
-            host = member,
-            sessionId = parseHostSessionId(sessionId),
-            entries = entries.map { it.toCommand() },
-        ),
-    )
+    ): Any {
+        val envelope = envelopes.attendance(body)
+        val commandEntries = envelope.command.entries ?: throw InvalidSessionScheduleException()
+        val participantSetRevision =
+            envelope.expected.participantSetRevision ?: expectedParticipantSetRevision
+        if (body.has("idempotencyKey")) {
+            if (commandEntries.size == 1 && envelope.expected.participantSetRevision != null) {
+                throw InvalidSessionScheduleException()
+            }
+            if (commandEntries.size > 1 && envelope.expected.participantSetRevision == null) {
+                throw InvalidSessionScheduleException()
+            }
+        }
+        val entries = bindExpectedAttendanceRows(commandEntries, envelope.expected.rows, body.has("idempotencyKey"))
+        return confirmAttendanceUseCase.confirmAttendance(
+            ConfirmAttendanceCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                entries = entries,
+                expectedParticipantSetRevision = participantSetRevision,
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 }

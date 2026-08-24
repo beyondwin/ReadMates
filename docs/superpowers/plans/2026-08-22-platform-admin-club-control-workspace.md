@@ -6,7 +6,7 @@
 
 **Architecture:** Club registry는 서버 검색과 signed cursor를 사용하고 detail은 독립 by-ID aggregate를 조회한다. L1 메타데이터 수정은 `adminRevision` CAS, L2 공개 상태는 durable preview와 immutable receipt, L3 도메인/온보딩은 origin receipt와 delivery/provisioning convergence를 사용한다. React는 공통 admin page grammar를 사용하되 명령 DTO·receipt는 club 도메인이 소유한다.
 
-**Tech Stack:** React, TypeScript, TanStack Query, Playwright, Kotlin, Spring Boot, JDBC, MySQL 8, Flyway V57, Testcontainers.
+**Tech Stack:** React, TypeScript, TanStack Query, Playwright, Kotlin, Spring Boot, JDBC, MySQL 8, Flyway V58, Testcontainers.
 
 **Spec:** `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`
 
@@ -14,7 +14,7 @@ ADR impact: implements proposed ADR-0039 and ADR-0040; constraining reference �
 
 ## Global Constraints
 
-- Prerequisite: Service Spine Tasks 1–4 and Safe Command Tasks 1–3 are complete. V52–V56 must exist; otherwise stop and rebase the migration number.
+- Prerequisite: Service Spine Tasks 1–4 and Safe Command Tasks 1–3 are complete. V52–V57 must exist; otherwise stop and rebase the migration number.
 - Existing `/admin/clubs` and `/admin/clubs/:clubId` URLs remain canonical. Slug is read-only in this release.
 - List search, lifecycle/public/domain/onboarding filters, ordering, and pagination are server-owned; the browser never downloads all clubs to filter locally.
 - Detail fetch is authoritative by club UUID and does not depend on the current list page or cursor.
@@ -77,7 +77,7 @@ Ordering is `(normalized_name ASC, club_id ASC)`. The opaque cursor binds schema
 ### Task 2: Add club admin revisions, previews, receipts, and convergence schema
 
 **Files:**
-- Create: `server/src/main/resources/db/mysql/migration/V57__platform_admin_club_command_receipts.sql`
+- Create: `server/src/main/resources/db/mysql/migration/V58__platform_admin_club_command_receipts.sql`
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
 **Schema responsibilities:**
@@ -90,7 +90,7 @@ Ordering is `(normalized_name ASC, club_id ASC)`. The opaque cursor binds schema
 
 - [ ] **Step 1: Write RED migration tests.** Cover legacy backfill, checks/indexes, preview single-consumption, immutable receipt update/delete prevention at application port level, convergence transitions, hard club deletion with redacted evidence retained, and no token/URL/text columns.
 - [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest`; expected FAIL.
-- [ ] **Step 3: Implement V57 without altering earlier migrations.** Use binary UUID and JSON schema checks consistent with current migrations.
+- [ ] **Step 3: Implement V58 without altering earlier migrations.** Use binary UUID and JSON schema checks consistent with current migrations.
 - [ ] **Step 4: Run GREEN.** Run the Task 2 command; expected PASS.
 - [ ] **Step 5: Commit.** Commit: `feat(server): add club admin command evidence`
 

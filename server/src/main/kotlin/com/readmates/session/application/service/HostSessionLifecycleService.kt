@@ -5,8 +5,14 @@ import com.readmates.notification.application.model.HostActionNotificationExcept
 import com.readmates.notification.application.model.ManualNotificationContentRevision
 import com.readmates.notification.domain.NotificationEventType
 import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.HostSessionPublishNotAllowedException
 import com.readmates.session.application.HostSessionRecordStagingRequiredException
+import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.HostSessionVisibilityUpdateResult
+import com.readmates.session.application.InvalidSessionScheduleException
+import com.readmates.session.application.model.CorrectionPublicationPreview
+import com.readmates.session.application.model.CorrectionPublicationVersionVector
 import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
@@ -17,8 +23,10 @@ import com.readmates.session.application.model.HostSessionLifecycleAuditEntry
 import com.readmates.session.application.model.HostSessionLifecycleReasonCode
 import com.readmates.session.application.model.HostSessionReverseCommand
 import com.readmates.session.application.model.HostSessionTrashResponse
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.normalized
+import com.readmates.session.application.model.toDetail
 import com.readmates.session.application.port.`in`.HostSessionLifecycleUseCase
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
@@ -28,11 +36,20 @@ import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.toPreviewResponse
 import com.readmates.session.config.HostSessionLifecycleProperties
+import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.HostNotificationComposerContext
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionResult
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
+import com.readmates.sessionrecord.application.port.`in`.ApplySessionRecordUseCase
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
+import com.readmates.shared.mutation.application.model.CanonicalMutationPayload
+import com.readmates.shared.mutation.application.model.HostMutationOperation
 import com.readmates.shared.observability.RequestIdFilter
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.slf4j.LoggerFactory
@@ -48,16 +65,40 @@ class HostSessionLifecycleService(
     private val lifecyclePort: HostSessionLifecyclePort,
     private val deletionPort: HostSessionDeletionPort,
     private val draftPort: HostSessionDraftPort,
+    private val correctionPublisher: ApplySessionRecordUseCase,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
     private val confirmationProperties: HostActionConfirmationProperties = HostActionConfirmationProperties(),
     private val lifecycleAudit: HostSessionLifecycleAuditPort = NoopHostSessionLifecycleAuditPort,
     private val metrics: HostSessionOperationalMetrics = HostSessionOperationalMetrics(SimpleMeterRegistry()),
     private val lifecycleProperties: HostSessionLifecycleProperties = HostSessionLifecycleProperties(),
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
     private val deletionTransaction: HostSessionDeletionTransaction =
-        HostSessionDeletionTransaction(deletionPort, lifecycleAudit),
+        HostSessionDeletionTransaction(deletionPort, lifecycleAudit, epochPort),
+    private val mutations: HostSessionMutationCoordinator? = null,
 ) : HostSessionLifecycleUseCase {
     @Transactional
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
+        val coordinator = mutations
+        if (coordinator != null && command.accessScope != null) {
+            return coordinator.execute(
+                host = command.host,
+                operation = HostMutationOperation.SESSION_EXPOSURE,
+                resourceSlot = command.sessionId.toString(),
+                idempotencyKey = command.idempotencyKey,
+                payload = HostMutationPayloads.exposure(command),
+                mutate = { HostMutationOutcome(command.sessionId, updateVisibilityOnce(command)) },
+                replay = { _, projection ->
+                    HostSessionVisibilityUpdateResult(
+                        session = projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException(),
+                        composer = null,
+                    )
+                },
+            )
+        }
+        return updateVisibilityOnce(command)
+    }
+
+    private fun updateVisibilityOnce(command: UpdateHostSessionVisibilityCommand): HostSessionVisibilityUpdateResult {
         val current = draftPort.lockVisibilitySnapshot(HostSessionIdCommand(command.host, command.sessionId))
         if (command.accessScope == null) {
             requireLegacyVisibilityWriteAllowed(current, command.visibility)
@@ -114,69 +155,168 @@ class HostSessionLifecycleService(
 
     @Transactional
     override fun open(command: HostSessionIdCommand) =
-        transition(
+        executeLifecycle(
             command = command,
-            action = HostSessionLifecycleAction.OPENED,
-            from = "DRAFT",
-            to = "OPEN",
-            write = { lifecyclePort.open(command) },
-        )
+            operation = HostMutationOperation.SESSION_OPEN,
+            payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_OPEN),
+        ) {
+            transition(
+                command = command,
+                action = HostSessionLifecycleAction.OPENED,
+                from = "DRAFT",
+                to = "OPEN",
+                write = { lifecyclePort.open(command) },
+            )
+        }
 
     @Transactional
     override fun close(command: HostSessionIdCommand) =
-        transition(
+        executeLifecycle(
             command = command,
-            action = HostSessionLifecycleAction.CLOSED,
-            from = "OPEN",
-            to = "CLOSED",
-            write = { lifecyclePort.close(command) },
-        )
+            operation = HostMutationOperation.SESSION_CLOSE,
+            payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_CLOSE),
+        ) {
+            transition(
+                command = command,
+                action = HostSessionLifecycleAction.CLOSED,
+                from = "OPEN",
+                to = "CLOSED",
+                write = { lifecyclePort.close(command) },
+            )
+        }
 
     @Transactional
     override fun publish(command: HostSessionIdCommand) =
-        transition(
+        executeLifecycle(
             command = command,
-            action = HostSessionLifecycleAction.PUBLISHED,
-            from = "CLOSED",
-            to = "PUBLISHED",
-            write = { lifecyclePort.publish(command) },
+            operation = HostMutationOperation.SESSION_PUBLISH,
+            payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_PUBLISH),
+        ) {
+            verifyPublishVector(command)
+            transition(
+                command = command,
+                action = HostSessionLifecycleAction.PUBLISHED,
+                from = "CLOSED",
+                to = "PUBLISHED",
+                write = { lifecyclePort.publish(command) },
+            )
+        }
+
+    @Transactional
+    override fun correctionPublish(command: HostSessionIdCommand) =
+        command.expectedCorrectionVector.let { expected ->
+            if (expected == null) throw InvalidSessionScheduleException()
+            executeLifecycle(
+                command = command,
+                operation = HostMutationOperation.SESSION_CORRECTION_PUBLISH,
+                payload = HostMutationPayloads.correction(expected),
+            ) {
+                publishCorrection(command)
+                draftPort.lockVisibilitySnapshot(command).detail
+            }
+        }
+
+    override fun correctionPublishPreview(command: HostSessionIdCommand): CorrectionPublicationPreview {
+        val projection =
+            correctionPublisher.previewCorrection(command.host, command.sessionId)
+                ?: throw HostSessionPublishNotAllowedException()
+        val versions = projection.versions
+        val vector =
+            SessionVersionVector(
+                sessionRevision = versions.sessionRevision,
+                exposureRevision = versions.exposureRevision,
+                participantSetRevision = versions.participantSetRevision,
+                recordDraftRevision = versions.recordDraftRevision,
+                liveRecordRevision = versions.liveRecordRevision,
+                publicationRevision = versions.publicationRevision,
+            )
+        return CorrectionPublicationPreview(
+            snapshotId = vector.snapshotIdentity(command.sessionId).snapshotId,
+            versions =
+                CorrectionPublicationVersionVector(
+                    sessionRevision = versions.sessionRevision,
+                    recordDraftRevision = versions.recordDraftRevision ?: throw HostSessionPublishNotAllowedException(),
+                    liveRecordRevision = versions.liveRecordRevision,
+                    exposureRevision = versions.exposureRevision,
+                    publicationRevision = versions.publicationRevision,
+                ),
+            state = projection.state,
+            accessScope = SessionAccessScope.valueOf(projection.targetAudience.accessScope.name),
+            siteVisibility = PublicSiteVisibility.valueOf(projection.targetAudience.siteVisibility.name),
+            visibility = projection.targetAudience.visibility,
         )
+    }
 
     @Transactional
     override fun reopen(command: HostSessionReverseCommand) =
-        reverseTransition(
-            command = command,
-            action = HostSessionLifecycleAction.REOPENED,
-            from = "CLOSED",
-            to = "OPEN",
-            write = lifecyclePort::reopen,
-        )
+        executeReverse(command) {
+            reverseTransition(
+                command = command,
+                action = HostSessionLifecycleAction.REOPENED,
+                from = "CLOSED",
+                to = "OPEN",
+                write = lifecyclePort::reopen,
+            )
+        }
 
     @Transactional
     override fun unpublish(command: HostSessionReverseCommand) =
-        reverseTransition(
-            command = command,
-            action = HostSessionLifecycleAction.UNPUBLISHED,
-            from = "PUBLISHED",
-            to = "CLOSED",
-            write = lifecyclePort::unpublish,
-        )
+        executeReverse(command) {
+            reverseTransition(
+                command = command,
+                action = HostSessionLifecycleAction.UNPUBLISHED,
+                from = "PUBLISHED",
+                to = "CLOSED",
+                write = lifecyclePort::unpublish,
+            )
+        }
 
     @Transactional
     override fun returnToDraft(command: HostSessionReverseCommand) =
-        reverseTransition(
-            command = command,
-            action = HostSessionLifecycleAction.RETURNED_TO_DRAFT,
-            from = "OPEN",
-            to = "DRAFT",
-            write = lifecyclePort::returnToDraft,
-        )
+        executeReverse(command) {
+            reverseTransition(
+                command = command,
+                action = HostSessionLifecycleAction.RETURNED_TO_DRAFT,
+                from = "OPEN",
+                to = "DRAFT",
+                write = lifecyclePort::returnToDraft,
+            )
+        }
 
     override fun deletionPreview(command: HostSessionIdCommand) = deletionPort.assess(command).toPreviewResponse()
 
     override fun delete(command: HostSessionIdCommand): HostSessionTrashResponse {
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
-        return deleteRecordingOutcomes(command, requestId)
+        val coordinator = mutations ?: return deleteRecordingOutcomes(command, requestId)
+        return coordinator.execute(
+            host = command.host,
+            operation = HostMutationOperation.SESSION_TRASH,
+            resourceSlot = command.sessionId.toString(),
+            idempotencyKey = command.idempotencyKey,
+            payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_TRASH),
+            mutate = {
+                val snapshot = coordinator.loadProjection(command.host, command.sessionId)
+                HostMutationOutcome(
+                    resourceId = command.sessionId,
+                    result = deleteRecordingOutcomes(command, requestId),
+                    projection = snapshot,
+                )
+            },
+            replay = { _, _ ->
+                val trashed =
+                    deletionPort.findTrash(command) ?: throw HostSessionNotFoundException()
+                HostSessionTrashResponse(
+                    sessionId = trashed.sessionId.toString(),
+                    sessionNumber = trashed.sessionNumber,
+                    title = trashed.title,
+                    state = trashed.state,
+                    trashed = true,
+                    deletedAt = trashed.deletedAt.toString(),
+                    purgeAfter = trashed.purgeAfter.toString(),
+                    counts = deletionPort.deletionCounts(command.host.clubId, command.sessionId),
+                )
+            },
+        )
     }
 
     @Suppress("TooGenericExceptionCaught") // record deletion failure metrics for every runtime failure before rethrow
@@ -228,6 +368,76 @@ class HostSessionLifecycleService(
         throw failure
     }
 
+    private fun verifyPublishVector(command: HostSessionIdCommand) {
+        val expected = command.expectedPublishVector ?: return
+        val current = currentVersions(command)
+        if (expected.sessionRevision != current.sessionRevision ||
+            expected.exposureRevision != current.exposureRevision ||
+            expected.publicationRevision != current.publicationRevision ||
+            expected.liveRecordRevision != (current.liveRecordRevision ?: 0L)
+        ) {
+            throw HostSessionRevisionConflictException(current, null, null)
+        }
+    }
+
+    private fun publishCorrection(command: HostSessionIdCommand) {
+        val expected = command.expectedCorrectionVector ?: throw InvalidSessionScheduleException()
+        correctionPublisher
+            .publishCorrection(
+                command.host,
+                PublishSessionRecordCorrectionCommand(
+                    sessionId = command.sessionId,
+                    expectedSessionRevision = expected.sessionRevision,
+                    expectedDraftRevision = expected.recordDraftRevision,
+                    expectedLiveRevision = expected.liveRecordRevision,
+                    expectedExposureRevision = expected.exposureRevision,
+                    expectedPublicationRevision = expected.publicationRevision,
+                ),
+            ).requireApplied()
+    }
+
+    private fun currentVersions(command: HostSessionIdCommand) =
+        mutations?.loadProjection(command.host, command.sessionId)?.versions
+            ?: throw HostSessionNotFoundException()
+
+    private fun executeLifecycle(
+        command: HostSessionIdCommand,
+        operation: HostMutationOperation,
+        payload: CanonicalMutationPayload,
+        mutate: () -> HostSessionDetailResponse,
+    ): HostSessionDetailResponse {
+        val coordinator = mutations ?: return mutate()
+        return coordinator.execute(
+            host = command.host,
+            operation = operation,
+            resourceSlot = command.sessionId.toString(),
+            idempotencyKey = command.idempotencyKey,
+            payload = payload,
+            mutate = { HostMutationOutcome(command.sessionId, mutate()) },
+            replay = { _, projection ->
+                projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException()
+            },
+        )
+    }
+
+    private fun executeReverse(
+        command: HostSessionReverseCommand,
+        mutate: () -> HostSessionDetailResponse,
+    ): HostSessionDetailResponse {
+        val coordinator = mutations ?: return mutate()
+        return coordinator.execute(
+            host = command.host,
+            operation = HostMutationOperation.SESSION_REVERSE,
+            resourceSlot = command.sessionId.toString(),
+            idempotencyKey = command.idempotencyKey,
+            payload = HostMutationPayloads.reverse(command),
+            mutate = { HostMutationOutcome(command.sessionId, mutate()) },
+            replay = { _, projection ->
+                projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException()
+            },
+        )
+    }
+
     private fun reverseTransition(
         command: HostSessionReverseCommand,
         action: HostSessionLifecycleAction,
@@ -236,7 +446,12 @@ class HostSessionLifecycleService(
         write: (HostSessionIdCommand) -> HostSessionTransitionResult,
     ): HostSessionDetailResponse {
         val normalized = command.normalized(lifecycleProperties.requireReverseReason)
-        val idCommand = HostSessionIdCommand(normalized.host, normalized.sessionId)
+        val idCommand =
+            HostSessionIdCommand(
+                normalized.host,
+                normalized.sessionId,
+                normalized.expectedSessionRevision,
+            )
         val detail =
             transition(
                 command = idCommand,
@@ -262,6 +477,9 @@ class HostSessionLifecycleService(
         val requestId = MDC.get(RequestIdFilter.MDC_KEY)?.takeIf(String::isNotBlank)
         return recordTransitionFailure(command, action, requestId) {
             val result = write()
+            if (result.changed) {
+                epochPort.bump(command.host.clubId, *listEpochsForTransition(from, to).toTypedArray())
+            }
             val changeId =
                 if (result.changed) {
                     lifecycleAudit.record(
@@ -370,6 +588,17 @@ class HostSessionLifecycleService(
     }
 }
 
+private fun listEpochsForTransition(
+    from: String,
+    to: String,
+): Set<HostListEpochKind> {
+    val states = setOf(from, to)
+    return buildSet {
+        if (states.any { state -> state in setOf("DRAFT", "OPEN") }) add(HostListEpochKind.MEETING)
+        if (states.any { state -> state in setOf("CLOSED", "PUBLISHED") }) add(HostListEpochKind.RECORD)
+    }
+}
+
 private object NoopHostSessionLifecycleAuditPort : HostSessionLifecycleAuditPort {
     override fun record(entry: HostSessionLifecycleAuditEntry): UUID? = null
 }
@@ -382,3 +611,23 @@ private fun isFirstMemberPublication(
     state == "DRAFT" &&
         previousVisibility == SessionRecordVisibility.HOST_ONLY &&
         requestedVisibility != SessionRecordVisibility.HOST_ONLY
+
+private fun PublishSessionRecordCorrectionResult.requireApplied() {
+    when (this) {
+        is PublishSessionRecordCorrectionResult.Applied -> Unit
+        is PublishSessionRecordCorrectionResult.RevisionConflict ->
+            throw HostSessionRevisionConflictException(
+                SessionVersionVector(
+                    sessionRevision = current.sessionRevision,
+                    exposureRevision = current.exposureRevision,
+                    participantSetRevision = current.participantSetRevision,
+                    recordDraftRevision = current.recordDraftRevision,
+                    liveRecordRevision = current.liveRecordRevision.takeIf { it > 0 },
+                    publicationRevision = current.publicationRevision,
+                ),
+                null,
+                null,
+            )
+        PublishSessionRecordCorrectionResult.NotPublished -> throw HostSessionPublishNotAllowedException()
+    }
+}

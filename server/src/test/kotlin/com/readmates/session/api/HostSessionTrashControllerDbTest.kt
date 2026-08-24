@@ -48,8 +48,10 @@ class HostSessionTrashControllerDbTest(
 
         val trashed =
             mockMvc
-                .delete("/api/host/sessions/$first") { withHost() }
-                .andExpect {
+                .delete("/api/host/sessions/$first") {
+                    withHost()
+                    withExpectedRevision(first)
+                }.andExpect {
                     status { isOk() }
                     jsonPath("$.trashed") { value(true) }
                     jsonPath("$.sessionNumber") { exists() }
@@ -70,8 +72,10 @@ class HostSessionTrashControllerDbTest(
         mockMvc.get("/api/public/clubs/reading-sai/browse/sessions/current").andExpect { status { isOk() } }
 
         mockMvc
-            .delete("/api/host/sessions/$second") { withHost() }
-            .andExpect { status { isOk() } }
+            .delete("/api/host/sessions/$second") {
+                withHost()
+                withExpectedRevision(second)
+            }.andExpect { status { isOk() } }
 
         val firstPage =
             mockMvc
@@ -118,8 +122,10 @@ class HostSessionTrashControllerDbTest(
         }
 
         mockMvc
-            .post("/api/host/sessions/$first/restore") { withHost() }
-            .andExpect {
+            .post("/api/host/sessions/$first/restore") {
+                withHost()
+                withExpectedRevision(first)
+            }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value(first) }
                 jsonPath("$.state") { value("DRAFT") }
@@ -138,13 +144,19 @@ class HostSessionTrashControllerDbTest(
     fun `open restore conflicts with the existing open session and members cannot use trash`() {
         val sessionId = createDraft("10회차 · 열린 휴지통")
         jdbcTemplate.update("update sessions set state = 'OPEN' where id = ?", sessionId)
-        mockMvc.delete("/api/host/sessions/$sessionId") { withHost() }.andExpect { status { isOk() } }
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect { status { isOk() } }
         val openId = createDraft("11회차 · 다른 열린 모임")
         jdbcTemplate.update("update sessions set state = 'OPEN' where id = ?", openId)
 
         mockMvc
-            .post("/api/host/sessions/$sessionId/restore") { withHost() }
-            .andExpect {
+            .post("/api/host/sessions/$sessionId/restore") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_OPEN_ALREADY_EXISTS") }
                 jsonPath("$.openSessionId") { value(openId) }
@@ -160,6 +172,8 @@ class HostSessionTrashControllerDbTest(
             .post("/api/host/sessions/$sessionId/restore") {
                 with(user("member5@example.com"))
                 with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":0}"""
             }.andExpect { status { isForbidden() } }
     }
 
@@ -167,16 +181,24 @@ class HostSessionTrashControllerDbTest(
     fun `purge removes children after expiry and restore then returns gone`() {
         val sessionId = createDraft("11회차 · 만료 휴지통")
         insertQuestion(sessionId)
-        mockMvc.delete("/api/host/sessions/$sessionId") { withHost() }.andExpect { status { isOk() } }
+        mockMvc
+            .delete("/api/host/sessions/$sessionId") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect { status { isOk() } }
         jdbcTemplate.update(
             "update sessions set purge_after = timestampadd(day, -1, utc_timestamp(6)) where id = ?",
             sessionId,
         )
 
-        mockMvc.post("/api/host/sessions/$sessionId/restore") { withHost() }.andExpect {
-            status { isGone() }
-            jsonPath("$.code") { value("HOST_SESSION_TRASH_EXPIRED") }
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/restore") {
+                withHost()
+                withExpectedRevision(sessionId)
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("HOST_SESSION_TRASH_EXPIRED") }
+            }
 
         assertThat(countRows("questions", "session_id = '$sessionId'")).isEqualTo(1)
         assertThat(purgeExpiredHostSessionTrash.purgeExpired(50)).isGreaterThanOrEqualTo(1)
@@ -194,10 +216,15 @@ class HostSessionTrashControllerDbTest(
             status { isGone() }
             jsonPath("$.code") { value("HOST_SESSION_TRASH_EXPIRED") }
         }
-        mockMvc.post("/api/host/sessions/$sessionId/restore") { withHost() }.andExpect {
-            status { isGone() }
-            jsonPath("$.code") { value("HOST_SESSION_TRASH_EXPIRED") }
-        }
+        mockMvc
+            .post("/api/host/sessions/$sessionId/restore") {
+                withHost()
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":0}"""
+            }.andExpect {
+                status { isGone() }
+                jsonPath("$.code") { value("HOST_SESSION_TRASH_EXPIRED") }
+            }
         mockMvc.get("/api/host/sessions/$sessionId") { withHost() }.andExpect { status { isNotFound() } }
         mockMvc.get("/api/public/sessions/$sessionId").andExpect { status { isNotFound() } }
     }
@@ -248,9 +275,21 @@ class HostSessionTrashControllerDbTest(
             Int::class.java,
         ) ?: 0
 
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate.queryForObject(
+            "select session_revision from sessions where id = ?",
+            Long::class.java,
+            sessionId,
+        ) ?: 0
+
     private fun MockHttpServletRequestDsl.withHost() {
         with(user("host@example.com"))
         with(csrf())
+    }
+
+    private fun MockHttpServletRequestDsl.withExpectedRevision(sessionId: String) {
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
     }
 
     private companion object {

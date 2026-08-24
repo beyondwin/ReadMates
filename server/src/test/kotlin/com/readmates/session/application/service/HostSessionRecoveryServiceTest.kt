@@ -14,6 +14,7 @@ import com.readmates.session.application.HostSessionDetailResponse
 import com.readmates.session.application.HostSessionFeedbackDocument
 import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionRestoreStaleException
+import com.readmates.session.application.InvalidSessionScheduleException
 import com.readmates.session.application.model.AttendanceEntryCommand
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HostSessionChangeKind
@@ -24,6 +25,7 @@ import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.port.`in`.PreviewHostSessionRestoreCommand
 import com.readmates.session.application.port.`in`.RestoreHostSessionCommand
+import com.readmates.session.application.port.out.AttendanceRestoreRow
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
@@ -35,6 +37,9 @@ import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpoch
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
 import org.assertj.core.api.Assertions.assertThat
@@ -77,6 +82,9 @@ class HostSessionRecoveryServiceTest {
         ).isEqualTo("")
         assertThat(fixture.audit.basicRestoredFromChangeId).isEqualTo(CHANGE_ID)
         assertThat(fixture.cache.clubs).containsExactly(CLUB_ID)
+        assertThat(fixture.epochs.bumps).containsExactly(
+            setOf(HostListEpochKind.MEETING, HostListEpochKind.RECORD),
+        )
     }
 
     @Test
@@ -105,13 +113,98 @@ class HostSessionRecoveryServiceTest {
             attendanceItem(SECOND_MEMBER, current = "ABSENT", target = "UNKNOWN"),
         )
 
+        fixture.service.restore(
+            fixture.restoreCommand(preview.expectedCurrentHash, expectedAttendanceRevision = 0),
+        )
+
+        assertThat(fixture.attendance.confirmed?.entries).containsExactly(
+            AttendanceEntryCommand(
+                FIRST_MEMBER.toString(),
+                "UNKNOWN",
+                expectedAttendanceRevision = 0,
+                expectedCurrentStatus = "ATTENDED",
+            ),
+            AttendanceEntryCommand(
+                SECOND_MEMBER.toString(),
+                "UNKNOWN",
+                expectedAttendanceRevision = 0,
+                expectedCurrentStatus = "ABSENT",
+            ),
+        )
+        assertThat(fixture.attendance.confirmed?.expectedParticipantSetRevision).isEqualTo(0)
+        assertThat(fixture.audit.attendanceRestoredFromChangeId).isEqualTo(CHANGE_ID)
+        assertThat(fixture.epochs.bumps).containsExactly(setOf(HostListEpochKind.MEETING))
+    }
+
+    @Test
+    fun `bulk attendance restore uses each locked row revision after independent edits`() {
+        val fixture =
+            Fixture().withAttendanceChange(
+                current =
+                    mapOf(
+                        FIRST_MEMBER to AttendanceRestoreRow("ATTENDED", 2),
+                        SECOND_MEMBER to AttendanceRestoreRow("ABSENT", 1),
+                    ),
+            )
+        val preview = fixture.service.preview(fixture.previewCommand())
+
+        fixture.service.restore(
+            fixture.restoreCommand(preview.expectedCurrentHash, expectedAttendanceRevision = 1),
+        )
+
+        assertThat(fixture.attendance.confirmed?.entries).containsExactly(
+            AttendanceEntryCommand(
+                FIRST_MEMBER.toString(),
+                "UNKNOWN",
+                expectedAttendanceRevision = 2,
+                expectedCurrentStatus = "ATTENDED",
+            ),
+            AttendanceEntryCommand(
+                SECOND_MEMBER.toString(),
+                "UNKNOWN",
+                expectedAttendanceRevision = 1,
+                expectedCurrentStatus = "ABSENT",
+            ),
+        )
+        assertThat(fixture.audit.attendanceRestoredFromChangeId).isEqualTo(CHANGE_ID)
+    }
+
+    @Test
+    fun `bulk attendance restore without client revision uses locked row revisions`() {
+        val fixture = Fixture().withAttendanceChange()
+        val preview = fixture.service.preview(fixture.previewCommand())
+
         fixture.service.restore(fixture.restoreCommand(preview.expectedCurrentHash))
 
         assertThat(fixture.attendance.confirmed?.entries).containsExactly(
-            AttendanceEntryCommand(FIRST_MEMBER.toString(), "UNKNOWN"),
-            AttendanceEntryCommand(SECOND_MEMBER.toString(), "UNKNOWN"),
+            AttendanceEntryCommand(
+                FIRST_MEMBER.toString(),
+                "UNKNOWN",
+                expectedAttendanceRevision = 0,
+                expectedCurrentStatus = "ATTENDED",
+            ),
+            AttendanceEntryCommand(
+                SECOND_MEMBER.toString(),
+                "UNKNOWN",
+                expectedAttendanceRevision = 0,
+                expectedCurrentStatus = "ABSENT",
+            ),
         )
         assertThat(fixture.audit.attendanceRestoredFromChangeId).isEqualTo(CHANGE_ID)
+    }
+
+    @Test
+    fun `single attendance restore without expected revision writes nothing`() {
+        val fixture = Fixture().withAttendanceChange()
+        val preview = fixture.service.preview(fixture.previewCommand())
+
+        assertThatThrownBy {
+            fixture.service.restore(
+                fixture.restoreCommand(preview.expectedCurrentHash, membershipId = FIRST_MEMBER),
+            )
+        }.isInstanceOf(InvalidSessionScheduleException::class.java)
+        assertThat(fixture.attendance.confirmed).isNull()
+        assertThat(fixture.audit.attendanceRestoredFromChangeId).isNull()
     }
 
     @Test
@@ -147,7 +240,8 @@ class HostSessionRecoveryServiceTest {
 
     @Test
     fun `removed attendance participant blocks partial restore`() {
-        val fixture = Fixture().withAttendanceChange(current = mapOf(FIRST_MEMBER to "ATTENDED"))
+        val fixture =
+            Fixture().withAttendanceChange(current = mapOf(FIRST_MEMBER to AttendanceRestoreRow("ATTENDED", 0)))
         val preview = fixture.service.preview(fixture.previewCommand())
 
         assertThat(preview.canRestore).isFalse()
@@ -206,7 +300,8 @@ class HostSessionRecoveryServiceTest {
         val draft = FakeDraftPort()
         val attendance = FakeAttendancePort()
         val cache = RecordingCache()
-        val service = HostSessionRecoveryService(recovery, audit, draft, attendance, cache)
+        val epochs = RecordingEpochPort()
+        val service = HostSessionRecoveryService(recovery, audit, draft, attendance, cache, epochs)
         var currentBasic = afterSnapshot()
 
         fun withBasicChange(
@@ -231,8 +326,11 @@ class HostSessionRecoveryServiceTest {
         }
 
         fun withAttendanceChange(
-            current: Map<UUID, String> =
-                mapOf(FIRST_MEMBER to "ATTENDED", SECOND_MEMBER to "ABSENT"),
+            current: Map<UUID, AttendanceRestoreRow> =
+                mapOf(
+                    FIRST_MEMBER to AttendanceRestoreRow("ATTENDED", 0),
+                    SECOND_MEMBER to AttendanceRestoreRow("ABSENT", 0),
+                ),
             completeSnapshots: Boolean = true,
         ) = apply {
             recovery.change =
@@ -262,7 +360,19 @@ class HostSessionRecoveryServiceTest {
         fun restoreCommand(
             hash: String,
             actor: CurrentMember = host(),
-        ) = RestoreHostSessionCommand(actor, SESSION_ID, CHANGE_ID, hash)
+            expectedAttendanceRevision: Long? = null,
+            membershipId: UUID? = null,
+        ) = RestoreHostSessionCommand(
+            actor,
+            SESSION_ID,
+            CHANGE_ID,
+            hash,
+            expectedSessionRevision =
+                com.readmates.session.application.model
+                    .ExpectedSessionRevision(0),
+            expectedAttendanceRevision = expectedAttendanceRevision,
+            membershipId = membershipId,
+        )
 
         val basicReceipt =
             HostSessionChangeReceipt(RESTORE_CHANGE_ID, HostSessionChangeKind.BASIC_INFO, true)
@@ -363,6 +473,19 @@ class HostSessionRecoveryServiceTest {
 
         override fun evictClubContent(clubId: UUID) {
             clubs += clubId
+        }
+    }
+
+    private class RecordingEpochPort : HostListEpochPort {
+        val bumps = mutableListOf<Set<HostListEpochKind>>()
+
+        override fun load(clubId: UUID) = HostListEpoch(clubId, 0, 0)
+
+        override fun bump(
+            clubId: UUID,
+            kinds: Set<HostListEpochKind>,
+        ) {
+            bumps += kinds
         }
     }
 

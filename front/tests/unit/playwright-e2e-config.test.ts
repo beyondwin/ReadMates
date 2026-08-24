@@ -85,6 +85,13 @@ describe("Playwright E2E backend web server config", () => {
     );
   });
 
+  it("provides explicit public-safe host cursor and mutation identity keys", async () => {
+    const command = await backendWebServerCommand();
+
+    expect(command).toContain("READMATES_HOST_LIST_CURSOR_CURRENT_KEY='test-secret'");
+    expect(command).toContain("READMATES_MUTATION_IDENTITY_CURRENT_KEY='test-secret'");
+  });
+
   it("keeps one worker by default and supports explicit worker opt-in", async () => {
     await expect(loadPlaywrightConfigWithWorkers(undefined)).resolves.toMatchObject({ workers: 1 });
     await expect(loadPlaywrightConfigWithWorkers("2")).resolves.toMatchObject({ workers: 2 });

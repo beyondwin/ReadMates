@@ -46,10 +46,12 @@ class JdbcSessionRecordAdapterTest(
     fun `lockEditor takes a parent session row lock before insertAppliedRevision`() {
         val source = applyStoreSource()
         val lockEditorIndex = source.indexOf("fun lockEditor(")
-        val parentLockIndex = source.indexOf("loadLive(host, sessionId, forUpdate = true)")
+        val lockedEditorIndex = source.indexOf("editor(host, sessionId, forUpdate = true)")
+        val parentLockIndex = source.indexOf("readStore.loadLive(host, sessionId, forUpdate = forUpdate)")
         val insertIndex = source.indexOf("fun insertAppliedRevision(")
         assertThat(lockEditorIndex).isGreaterThanOrEqualTo(0)
-        assertThat(parentLockIndex).isGreaterThan(lockEditorIndex)
+        assertThat(lockedEditorIndex).isGreaterThan(lockEditorIndex)
+        assertThat(parentLockIndex).isGreaterThan(lockedEditorIndex)
         assertThat(insertIndex).isGreaterThan(parentLockIndex)
     }
 

@@ -93,6 +93,14 @@ class JdbcGuestRecordBrowseAdapter(
               ) as highlight_count
             from active_sessions sessions
             join clubs on clubs.id = sessions.club_id
+            join public_session_publications publication on publication.session_id = sessions.id
+              and publication.club_id = sessions.club_id
+              and publication.site_visibility = 'PUBLIC_RECORD'
+            join public_projection_generations generation on generation.publication_id = publication.id
+              and generation.club_id = sessions.club_id
+              and generation.session_id = sessions.id
+              and generation.origin_readable = true
+              and generation.emergency_denied = false
             where clubs.slug = ?
               and clubs.status = 'ACTIVE'
               and clubs.public_visibility = 'PUBLIC'
@@ -160,6 +168,14 @@ class JdbcGuestRecordBrowseAdapter(
               select sessions.id, sessions.club_id, sessions.number, sessions.book_title, sessions.session_date
               from active_sessions sessions
               join clubs on clubs.id = sessions.club_id
+              join public_session_publications publication on publication.session_id = sessions.id
+                and publication.club_id = sessions.club_id
+                and publication.site_visibility = 'PUBLIC_RECORD'
+              join public_projection_generations generation on generation.publication_id = publication.id
+                and generation.club_id = sessions.club_id
+                and generation.session_id = sessions.id
+                and generation.origin_readable = true
+                and generation.emergency_denied = false
               where clubs.slug = ?
                 and clubs.status = 'ACTIVE'
                 and clubs.public_visibility = 'PUBLIC'
@@ -279,11 +295,36 @@ class JdbcGuestRecordBrowseAdapter(
                  and session_participants.participation_status = 'ACTIVE') as total
             from active_sessions sessions
             join clubs on clubs.id = sessions.club_id
+            left join public_session_publications publication on publication.session_id = sessions.id
+              and publication.club_id = sessions.club_id
+            left join public_projection_generations generation on generation.publication_id = publication.id
+              and generation.club_id = sessions.club_id
+              and generation.session_id = sessions.id
             where clubs.slug = ?
               and clubs.status = 'ACTIVE'
               and clubs.public_visibility = 'PUBLIC'
               and sessions.access_scope = 'GUEST_READABLE'
               and sessions.state in ('CLOSED', 'PUBLISHED')
+              and (
+                (
+                  sessions.state = 'CLOSED'
+                  and (
+                    publication.id is null
+                    or (
+                      generation.publication_id is not null
+                      and generation.emergency_denied = false
+                    )
+                  )
+                )
+                or (
+                  sessions.state = 'PUBLISHED'
+                  and publication.id is not null
+                  and publication.site_visibility = 'PUBLIC_RECORD'
+                  and generation.publication_id is not null
+                  and generation.origin_readable = true
+                  and generation.emergency_denied = false
+                )
+              )
               $cursorClause
             order by sessions.number desc, sessions.id desc
             limit ?
@@ -304,7 +345,11 @@ class JdbcGuestRecordBrowseAdapter(
                     select
                       sessions.id, sessions.number, sessions.title, sessions.book_title, sessions.book_author,
                       sessions.book_image_url, date_format(sessions.session_date, '%Y-%m-%d') as session_date,
-                      sessions.state, public_session_publications.public_summary,
+                      sessions.state,
+                      case when publication.site_visibility = 'PUBLIC_RECORD'
+                        then publication.public_summary
+                        else null
+                      end as public_summary,
                       (select count(*) from session_participants
                        where session_participants.session_id = sessions.id
                          and session_participants.club_id = sessions.club_id
@@ -316,14 +361,38 @@ class JdbcGuestRecordBrowseAdapter(
                          and session_participants.participation_status = 'ACTIVE') as total
                     from active_sessions sessions
                     join clubs on clubs.id = sessions.club_id
-                    left join public_session_publications on public_session_publications.session_id = sessions.id
-                      and public_session_publications.club_id = sessions.club_id
+                    left join public_session_publications publication on publication.session_id = sessions.id
+                      and publication.club_id = sessions.club_id
+                    left join public_projection_generations generation
+                      on generation.publication_id = publication.id
+                     and generation.club_id = sessions.club_id
+                     and generation.session_id = sessions.id
                     where clubs.slug = ?
                       and clubs.status = 'ACTIVE'
                       and clubs.public_visibility = 'PUBLIC'
                       and sessions.id = ?
                       and sessions.access_scope = 'GUEST_READABLE'
                       and sessions.state in ('CLOSED', 'PUBLISHED')
+                      and (
+                        (
+                          sessions.state = 'CLOSED'
+                          and (
+                            publication.id is null
+                            or (
+                              generation.publication_id is not null
+                              and generation.emergency_denied = false
+                            )
+                          )
+                        )
+                        or (
+                          sessions.state = 'PUBLISHED'
+                          and publication.id is not null
+                          and publication.site_visibility = 'PUBLIC_RECORD'
+                          and generation.publication_id is not null
+                          and generation.origin_readable = true
+                          and generation.emergency_denied = false
+                        )
+                      )
                     """.trimIndent(),
                     { resultSet, _ -> resultSet.toArchiveDetailHeader() },
                     clubSlug,

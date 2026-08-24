@@ -199,6 +199,7 @@ class PlatformAdminCapabilitiesControllerTest {
                 "MANAGE_CLUBS",
                 "MANAGE_CLUB_DOMAINS",
                 "MANAGE_PLATFORM_ADMINS",
+                "EMERGENCY_PUBLIC_TAKEDOWN",
             )
         val OPERATOR_CAPABILITIES =
             arrayOf(
@@ -218,6 +219,7 @@ class PlatformAdminCapabilitiesControllerTest {
                 "CREATE_CLUB",
                 "MANAGE_CLUBS",
                 "MANAGE_CLUB_DOMAINS",
+                "EMERGENCY_PUBLIC_TAKEDOWN",
             )
         val SUPPORT_CAPABILITIES =
             arrayOf(

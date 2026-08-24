@@ -3,6 +3,7 @@
 package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.InvalidHostSessionCursorException
+import com.readmates.session.application.model.ExpectedSessionRevision
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.port.`in`.GetHostSessionTrashUseCase
 import com.readmates.session.application.port.`in`.ListHostSessionTrashCommand
@@ -14,9 +15,11 @@ import com.readmates.shared.security.CurrentMember
 import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.PathVariable
 import org.springframework.web.bind.annotation.PostMapping
+import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.RestController
+import tools.jackson.databind.JsonNode
 
 @RestController
 @RequestMapping("/api/host/sessions")
@@ -24,6 +27,7 @@ class HostSessionTrashController(
     private val listHostSessionTrashUseCase: ListHostSessionTrashUseCase,
     private val getHostSessionTrashUseCase: GetHostSessionTrashUseCase,
     private val restoreTrashedHostSessionUseCase: RestoreTrashedHostSessionUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
 ) {
     @GetMapping("/trash")
     fun list(
@@ -47,7 +51,18 @@ class HostSessionTrashController(
     fun restore(
         member: CurrentMember,
         @PathVariable sessionId: String,
-    ) = restoreTrashedHostSessionUseCase.restore(HostSessionIdCommand(member, parseHostSessionId(sessionId)))
+        @RequestBody body: JsonNode,
+    ): Any {
+        val envelope = envelopes.sessionRevision(body)
+        return restoreTrashedHostSessionUseCase.restore(
+            HostSessionIdCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 }
 
 private fun requireValidTrashCursor(cursor: String?): String? {

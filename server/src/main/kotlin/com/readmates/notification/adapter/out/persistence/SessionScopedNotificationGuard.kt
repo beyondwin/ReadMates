@@ -44,7 +44,7 @@ class SessionScopedNotificationGuard(
             from active_sessions sessions
             where sessions.session_date = ?
               and sessions.state in ('DRAFT', 'OPEN')
-              and sessions.visibility in ('MEMBER', 'PUBLIC')
+              and sessions.access_scope = 'GUEST_READABLE'
               and exists (
                 select 1
                 from club_notification_policies

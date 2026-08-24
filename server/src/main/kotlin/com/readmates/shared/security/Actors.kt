@@ -42,6 +42,7 @@ enum class PlatformCapability {
     MANAGE_CLUBS,
     MANAGE_CLUB_DOMAINS,
     MANAGE_PLATFORM_ADMINS,
+    EMERGENCY_PUBLIC_TAKEDOWN,
 }
 
 data class PlatformActor(

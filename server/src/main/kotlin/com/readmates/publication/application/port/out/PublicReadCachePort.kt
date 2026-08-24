@@ -13,6 +13,11 @@ interface PublicReadCachePort {
 
     fun getClub(clubId: UUID): PublicClubResult? = if (clubId == UUID.fromString(LEGACY_PUBLIC_CLUB_ID)) getClub() else null
 
+    fun getClub(
+        clubId: UUID,
+        generation: Long,
+    ): PublicClubResult? = if (generation == 1L) getClub(clubId) else null
+
     fun putClub(result: PublicClubResult)
 
     fun putClub(
@@ -21,6 +26,16 @@ interface PublicReadCachePort {
     ) {
         if (clubSlug == LEGACY_PUBLIC_CLUB_SLUG) {
             putClub(result)
+        }
+    }
+
+    fun putClub(
+        clubId: UUID,
+        generation: Long,
+        result: PublicClubResult,
+    ) {
+        if (generation == 1L) {
+            putClub(clubId, result)
         }
     }
 
@@ -45,6 +60,12 @@ interface PublicReadCachePort {
         sessionId: UUID,
     ): PublicSessionDetailResult? = if (clubId == UUID.fromString(LEGACY_PUBLIC_CLUB_ID)) getSession(sessionId) else null
 
+    fun getSession(
+        clubId: UUID,
+        sessionId: UUID,
+        generation: Long,
+    ): PublicSessionDetailResult? = if (generation == 1L) getSession(clubId, sessionId) else null
+
     fun putSession(
         sessionId: UUID,
         result: PublicSessionDetailResult,
@@ -67,6 +88,17 @@ interface PublicReadCachePort {
     ) {
         if (clubId == UUID.fromString(LEGACY_PUBLIC_CLUB_ID)) {
             putSession(sessionId, result)
+        }
+    }
+
+    fun putSession(
+        clubId: UUID,
+        sessionId: UUID,
+        generation: Long,
+        result: PublicSessionDetailResult,
+    ) {
+        if (generation == 1L) {
+            putSession(clubId, sessionId, result)
         }
     }
 

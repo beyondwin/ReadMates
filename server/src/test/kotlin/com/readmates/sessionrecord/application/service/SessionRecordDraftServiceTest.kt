@@ -342,6 +342,7 @@ class SessionRecordDraftServiceTest {
             composerEventType: NotificationEventType,
             revision: SessionRecordRevision,
         ) = SessionRecordApplyReceipt(
+            receiptId = command.applyRequestId,
             applyRequestId = command.applyRequestId,
             hostMembershipId = host.membershipId,
             expectedDraftRevision = command.expectedDraftRevision,

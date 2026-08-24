@@ -65,6 +65,7 @@ private val OPERATOR_PLATFORM_CAPABILITIES =
         PlatformCapability.CREATE_CLUB,
         PlatformCapability.MANAGE_CLUBS,
         PlatformCapability.MANAGE_CLUB_DOMAINS,
+        PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN,
     )
 
 private val OWNER_PLATFORM_CAPABILITIES =
@@ -87,6 +88,7 @@ private val OWNER_PLATFORM_CAPABILITIES =
         PlatformCapability.MANAGE_CLUBS,
         PlatformCapability.MANAGE_CLUB_DOMAINS,
         PlatformCapability.MANAGE_PLATFORM_ADMINS,
+        PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN,
     )
 
 data class CurrentUser(

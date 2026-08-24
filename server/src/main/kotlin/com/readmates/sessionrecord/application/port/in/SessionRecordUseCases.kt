@@ -6,11 +6,14 @@ import com.readmates.sessionrecord.application.model.ApplySessionRecordCommand
 import com.readmates.sessionrecord.application.model.HostSessionHistoryItem
 import com.readmates.sessionrecord.application.model.HostSessionRecordCapabilities
 import com.readmates.sessionrecord.application.model.PreviewSessionRecordApplyCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionCommand
+import com.readmates.sessionrecord.application.model.PublishSessionRecordCorrectionResult
 import com.readmates.sessionrecord.application.model.RebaseSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.RestoreSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SaveSessionRecordDraftCommand
 import com.readmates.sessionrecord.application.model.SessionRecordApplyPreview
 import com.readmates.sessionrecord.application.model.SessionRecordApplyResult
+import com.readmates.sessionrecord.application.model.SessionRecordCorrectionPreview
 import com.readmates.sessionrecord.application.model.SessionRecordDraft
 import com.readmates.sessionrecord.application.model.SessionRecordEditor
 import com.readmates.shared.paging.CursorPage
@@ -53,6 +56,11 @@ interface ManageSessionRecordDraftUseCase {
 }
 
 interface ApplySessionRecordUseCase {
+    fun previewCorrection(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): SessionRecordCorrectionPreview?
+
     fun preview(
         host: CurrentMember,
         command: PreviewSessionRecordApplyCommand,
@@ -62,6 +70,11 @@ interface ApplySessionRecordUseCase {
         host: CurrentMember,
         command: ApplySessionRecordCommand,
     ): SessionRecordApplyResult
+
+    fun publishCorrection(
+        host: CurrentMember,
+        command: PublishSessionRecordCorrectionCommand,
+    ): PublishSessionRecordCorrectionResult
 }
 
 interface GetHostSessionHistoryUseCase {

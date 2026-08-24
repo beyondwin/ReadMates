@@ -18,6 +18,10 @@ data class RestoreHostSessionCommand(
     val sessionId: UUID,
     val changeId: UUID,
     val expectedCurrentHash: String,
+    val expectedSessionRevision: com.readmates.session.application.model.ExpectedSessionRevision? = null,
+    val expectedAttendanceRevision: Long? = null,
+    val membershipId: UUID? = null,
+    val idempotencyKey: String? = null,
 )
 
 interface PreviewHostSessionRestoreUseCase {

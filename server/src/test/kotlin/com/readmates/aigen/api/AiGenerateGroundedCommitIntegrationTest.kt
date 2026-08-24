@@ -73,6 +73,7 @@ private const val GROUNDED_CLEANUP_SQL = """
     delete from sessions where id = '$GROUNDED_SESSION_ID';
     delete from memberships where id in ('$GROUNDED_HOST_MEMBERSHIP_ID', '$GROUNDED_MEMBER_A_MEMBERSHIP_ID', '$GROUNDED_MEMBER_B_MEMBERSHIP_ID');
     delete from users where id in ('$GROUNDED_HOST_USER_ID', '$GROUNDED_MEMBER_A_USER_ID', '$GROUNDED_MEMBER_B_USER_ID');
+    delete from club_host_list_epochs where club_id = '$GROUNDED_CLUB_ID';
     delete from clubs where id = '$GROUNDED_CLUB_ID';
 """
 

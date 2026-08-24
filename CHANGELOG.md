@@ -9,14 +9,30 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 ### Highlights
 
 - **플랫폼 어드민 서비스 스파인:** 관리 화면을 오늘·클럽·서비스·검토 네 영역으로 정리하고, 서버가 발급한 capability allowlist로 탐색을 제한합니다. `/admin/today`는 공통 페이지 문법(loading/empty/partial/unavailable/forbidden)과 접근 가능한 작업 dock·확인 dialog를 기준 운영 화면으로 사용합니다. 401/403이면 platform-admin 상태를 폐기합니다.
+- **플랫폼 관리자 긴급 공개 회수 기반:** active OWNER/OPERATOR의 전용 capability로 공개 projection을 preview하고 confirm하는 V55 API substrate를 추가했습니다. Confirm은 durable emergency deny를 저장해 일반 host 수정·기록 적용·공개 설정 변경이 origin을 다시 열지 못하게 하고 generation을 한 번 회전하며 redacted immutable receipt/audit와 기존 convergence work를 같은 transaction에 연결합니다. 이미 저장·표시·offline인 사본은 원격 삭제할 수 없습니다.
+- **호스트 revision·idempotency와 공개 convergence:** 호스트 mutation은 V52 revision vector와 V53 HMAC request identity/immutable receipt를 사용하고, 목록 cursor epoch와 응답 revision을 additive하게 제공합니다. V54는 공개 generation, immutable convergence receipt/event, bounded provider work queue와 host 상태 조회를 추가합니다. 새 Pages BFF/frontend는 이 계약과 함께 배포하며 구 contract가 남은 혼합 구간에는 host write gate를 유지합니다.
 - **모임 집중 작업 화면:** 특정 모임 화면은 지금 할 일과 주 행동 하나를 먼저 보여 줍니다. 기존 단계 rail과 편집 탭 대신 같은 화면에서 기본 정보·출석·기록·변경 내역을 엽니다. 기본 정보와 출석은 바로 되돌릴 수 있고, 지운 모임은 7일 동안 휴지통에서 복구할 수 있습니다.
 - **모임 운영 장부:** 호스트 홈이 지금 다루는 모임의 모임 전·진행 중·모임 후 장부입니다. 다음 책은 여러 권 미리 넣고 멤버에게 보일 수 있으며, 기록은 정리본 파일로 올립니다. 모임 주소는 `/app/host/sessions/:sessionId`이고 `/edit`와 `/closing`은 그 화면으로 이동합니다. 새 모임은 `GET /api/host/sessions/schedule-defaults`로 최근 일정을 채우고, 내구 이력이 없는 `DRAFT`는 목록에서 휴지통으로 옮길 수 있습니다.
 - **호스트 세션 되돌리기:** 호스트가 확인 후 공개 취소, 마감 취소, 예정 환원을 한 단계씩 할 수 있습니다. 기록과 알림은 남고, 다른 진행 중 세션이 있으면 다시 열 수 없습니다.
 
 ### Fixed
 
+- **긴급 회수 공개 reader·중복 실행 안전성:** 공개 club 목록·통계·상세와 PUBLISHED guest record reader는 current generation의 `origin_readable=true`, `emergency_denied=false`를 요구하고 공개 freshness를 60초로 맞춥니다. CLOSED guest archive는 publication marker가 없는 legacy/never-published row를 계속 읽되, marker가 있으면 exact generation과 non-denied 상태를 요구해 긴급 차단을 우회하지 않습니다. 동일 idempotency key 동시 confirm은 locking current read로 같은 receipt에 수렴하며 다른 payload는 conflict입니다. Reason category는 고정 allowlist만 허용합니다. Retention purge batch는 production startup에서 최소 3으로 검증하고, 각 pass에서 admin idempotency·preview·host idempotency에 최소 한 건씩 배분하면서 전체 limit과 실제 삭제 count를 보존합니다.
+- **HMAC key rotation 재시작 안전성:** host cursor와 mutation identity의 current key는 production config sync에서 필수이며 previous key는 선택적입니다. Mutation digest의 durable key state가 없거나 마지막 unreferenced 시점부터 24시간 rollout buffer가 지나지 않은 historical version을 설정에서 제거하면 startup이 값·version을 로그에 노출하지 않고 fail closed합니다. 첫 배포의 current-only 설정과 안전하게 retired된 historical version은 허용합니다.
+- **공개 convergence 운영 보존:** provider·feature가 꺼져도 독립 maintenance scheduler가 오래된 non-leased 또는 만료 lease work를 7일 기본 보존, 최대 500건의 검증된 batch로 삭제합니다. Mutable work가 제거돼도 immutable receipt/event는 남고 host 조회는 terminal 결과를 그대로 표시하며 미시도·pending 만료를 성공이나 404가 아닌 non-retryable `EXPIRED`로 표시합니다. Purge count와 backlog metric은 tag 없이 노출합니다.
 - **호스트 운영 무결성:** 모임 삭제의 기록·알림 blocker와 동시성 검사를 fail-closed로 통합하고, 수명주기 사유 감사, revision 0 호환, 명시적 온라인 정보 채택, 전체 주의 목록과 독립 실패 운영 허브를 추가했습니다. Flyway lifecycle audit은 additive이며 기존 적용 기록 backfill은 수행하지 않습니다. 혼합 배포 구간에서는 reverse 사유를 optional로 받고(`readmates.session.lifecycle.require-reverse-reason=false`) top-level 일정 필드와 `GET /api/host/dashboard`를 유지합니다. 지원 클라이언트의 `session.lifecycle.legacy.reason`이 0이 된 뒤에 enforcement를 켜고 호환 경로를 제거합니다.
 - **세션 되돌리기 후 화면 정합성:** 공개 취소·마감 취소·예정 환원 직후 멤버 current/archive와 공개 클럽 캐시를 바로 무효화합니다. 잘못된 세션 id로 `/reopen`하면 다른 진행 중 세션이 있어도 `404`를 유지합니다.
+
+### Database
+
+- **Flyway V52–V56:** V52는 독립 host session/exposure/participant/record/publication revision domain을, V53은 HMAC 기반 host mutation idempotency와 immutable receipt·durable digest-key retirement state를, V54는 public generation과 immutable receipt/event 및 mutable convergence work를 additive하게 추가합니다. V55는 긴급 공개 회수 substrate를 추가하고, V56은 이미 적용 가능한 V54를 수정하지 않은 채 work retention index를 forward-only로 추가해 provider-disabled backlog도 bounded batch로 정리합니다.
+- **Flyway V55:** `public_projection_generations`에 monotonic `emergency_denied` marker와 `emergency_denied => origin_readable=false` CHECK를 더하고, 긴급 공개 회수 preview, admin-scoped idempotency, immutable redacted receipt를 additive table로 저장하며 reason category를 `PRIVATE_DATA|LEGAL_REQUEST|SECURITY_INCIDENT|PUBLIC_SAFETY`로 제한합니다. Rollback은 V55를 삭제하거나 수정하지 않고 schema를 보존하는 compatible image 또는 새 forward-fix migration을 사용합니다.
+
+### Deployment Notes
+
+- Backend startup보다 먼저 GitHub Secrets에 두 current HMAC key를 provision하고 version Variables를 확인한 뒤 `sync-config(restart_api=false, dry_run=false)`로 env를 렌더링합니다. 그 다음 같은 tag의 backend를 배포해 additive Flyway V52–V56과 health를 확인하고, 마지막에 호환되는 Pages BFF/frontend를 배포합니다. 이 순서를 지킬 수 없으면 backend promotion을 시작하지 않습니다.
+- Public convergence feature, scheduler와 HTTP provider는 모두 기본 off이고 세 토글을 명시적으로 켠 경우에만 외부 provider 호출을 시작합니다. Provider와 feature가 off여도 operational work maintenance는 기본 on입니다. V55 backend를 먼저 적용해도 preview/confirm route는 production confirm을 열지 않으며 protected Step 8 cache-safety evidence와 active runbook이 연결될 때까지 fail closed입니다.
+- V52–V56은 additive forward-only migration입니다. 회귀 시 적용 migration을 수정·삭제하거나 tag를 이동하지 않고 schema와 immutable evidence를 보존한 compatible image 또는 더 높은 version의 forward-fix migration을 사용합니다.
 
 ## v2.4.1 - 2026-08-17
 

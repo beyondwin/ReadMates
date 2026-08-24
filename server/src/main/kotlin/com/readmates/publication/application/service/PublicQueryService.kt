@@ -21,14 +21,17 @@ class PublicQueryService(
     GetPublicSessionUseCase {
     override fun getClub(clubSlug: String): PublicClubResult? {
         val clubId = resolveClubId(clubSlug)
-        if (clubId != null) {
-            return cache.getClub(clubId) ?: loadPublishedPublicDataPort.loadClub(clubSlug)?.also {
-                cache.putClub(clubId, it)
+        return if (clubId != null) {
+            val generation = authoritativeClubGenerationOrNull(clubSlug)
+            if (generation == null) {
+                loadPublishedPublicDataPort.loadClub(clubSlug)
+            } else {
+                cache.getClub(clubId, generation) ?: loadPublishedPublicDataPort.loadClub(clubSlug)?.also {
+                    cache.putClub(clubId, generation, it)
+                }
             }
-        }
-
-        return cache.getClub(clubSlug) ?: loadPublishedPublicDataPort.loadClub(clubSlug)?.also {
-            cache.putClub(clubSlug, it)
+        } else {
+            loadPublishedPublicDataPort.loadClub(clubSlug)
         }
     }
 
@@ -37,15 +40,36 @@ class PublicQueryService(
         sessionId: UUID,
     ): PublicSessionDetailResult? {
         val clubId = resolveClubId(clubSlug)
-        if (clubId != null) {
-            return cache.getSession(clubId, sessionId) ?: loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)?.also {
-                cache.putSession(clubId, sessionId, it)
+        return if (clubId != null) {
+            val marker = authoritativeSessionGenerationOrNull(clubSlug, sessionId)
+            when {
+                marker == null -> loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)
+                !marker.originReadable -> null
+                else ->
+                    cache.getSession(clubId, sessionId, marker.generation)
+                        ?: loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)?.also {
+                            cache.putSession(clubId, sessionId, marker.generation, it)
+                        }
             }
+        } else {
+            loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)
+        }
+    }
+
+    private fun authoritativeClubGenerationOrNull(clubSlug: String): Long? =
+        try {
+            loadPublishedPublicDataPort.loadClubGeneration(clubSlug)
+        } catch (_: RuntimeException) {
+            null
         }
 
-        return cache.getSession(clubSlug, sessionId) ?: loadPublishedPublicDataPort.loadSession(clubSlug, sessionId)?.also {
-            cache.putSession(clubSlug, sessionId, it)
-        }
+    private fun authoritativeSessionGenerationOrNull(
+        clubSlug: String,
+        sessionId: UUID,
+    ) = try {
+        loadPublishedPublicDataPort.loadSessionGeneration(clubSlug, sessionId)
+    } catch (_: RuntimeException) {
+        null
     }
 
     private fun resolveClubId(clubSlug: String): UUID? =

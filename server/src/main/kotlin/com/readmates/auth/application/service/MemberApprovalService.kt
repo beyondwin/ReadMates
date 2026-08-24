@@ -51,7 +51,6 @@ class MemberApprovalService(
             throw viewerMemberNotFound()
         }
 
-        memberApprovalStore.addToCurrentOpenSession(host.clubId, membershipId)
         return findForHost(host.clubId, membershipId)
     }
 

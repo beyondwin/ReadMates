@@ -189,6 +189,7 @@ class ActorCapabilitiesTest {
                     PlatformCapability.CREATE_CLUB,
                     PlatformCapability.MANAGE_CLUBS,
                     PlatformCapability.MANAGE_CLUB_DOMAINS,
+                    PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN,
                 )
         val OWNER_PLATFORM_CAPABILITIES =
             OPERATOR_PLATFORM_CAPABILITIES +

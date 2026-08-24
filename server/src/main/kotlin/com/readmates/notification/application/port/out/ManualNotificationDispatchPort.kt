@@ -26,6 +26,7 @@ data class ManualNotificationSessionContext(
     val feedbackDocumentUploaded: Boolean,
     val feedbackDocumentVersion: Int? = null,
     val sessionRecordContentRevision: String? = null,
+    val participantSetRevision: Long = 0,
 )
 
 fun ManualNotificationSessionContext.contentRevision(eventType: NotificationEventType): String? =
@@ -56,6 +57,7 @@ data class ManualNotificationTargetSnapshot(
     val targetMembershipIds: List<UUID> = emptyList(),
     val inAppMembershipIds: List<UUID> = emptyList(),
     val emailMembershipIds: List<UUID> = emptyList(),
+    val audienceRevision: String = "",
 )
 
 data class ManualNotificationPreviewRecord(
@@ -122,19 +124,20 @@ sealed interface ManualNotificationConfirmAttempt {
 
 fun ManualNotificationTargetSnapshot.snapshotHash(): String =
     Sha256.hex(
-        listOf(
-            baseCount,
-            excludedCount,
-            includedCount,
-            finalTargetCount,
-            inAppEligibleCount,
-            emailEligibleCount,
-            emailSkippedByPreferenceCount,
-            emailMissingCount,
-            targetMembershipIds.sorted(),
-            inAppMembershipIds.sorted(),
-            emailMembershipIds.sorted(),
-        ).joinToString("|"),
+        buildList {
+            add(baseCount)
+            add(excludedCount)
+            add(includedCount)
+            add(finalTargetCount)
+            add(inAppEligibleCount)
+            add(emailEligibleCount)
+            add(emailSkippedByPreferenceCount)
+            add(emailMissingCount)
+            add(targetMembershipIds.sorted())
+            add(inAppMembershipIds.sorted())
+            add(emailMembershipIds.sorted())
+            if (audienceRevision.isNotEmpty()) add(audienceRevision)
+        }.joinToString("|"),
     )
 
 fun ManualNotificationSessionContext.manualDispatchDisabledReason(eventType: NotificationEventType): String? =

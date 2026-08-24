@@ -791,11 +791,11 @@ class ArchiveAndNotesDbTest(
               id, club_id, number, title, book_title, book_author, book_translator,
               book_link, book_image_url, session_date, start_time, end_time,
               location_label, meeting_url, meeting_passcode, question_deadline_at,
-              state, visibility
+              state, visibility, access_scope
             )
             values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
               null, null, null, '2026-09-16', '20:00:00', '22:00:00',
-              '온라인', null, null, '2026-09-15 14:59:00.000000', 'CLOSED', 'HOST_ONLY')
+              '온라인', null, null, '2026-09-15 14:59:00.000000', 'CLOSED', 'HOST_ONLY', 'HOST_ONLY')
             """.trimIndent(),
             HOST_ONLY_PUBLISHED_NOTE_SESSION_ID,
             number,
@@ -834,11 +834,11 @@ class ArchiveAndNotesDbTest(
               id, club_id, number, title, book_title, book_author, book_translator,
               book_link, book_image_url, session_date, start_time, end_time,
               location_label, meeting_url, meeting_passcode, question_deadline_at,
-              state, visibility
+              state, visibility, access_scope
             )
             values (?, '00000000-0000-0000-0000-000000000001', ?, ?, ?, '테스트 저자',
               null, null, null, '2026-10-21', '20:00:00', '22:00:00',
-              '온라인', null, null, '2026-10-20 14:59:00.000000', 'CLOSED', 'PUBLIC')
+              '온라인', null, null, '2026-10-20 14:59:00.000000', 'CLOSED', 'PUBLIC', 'GUEST_READABLE')
             """.trimIndent(),
             sessionId,
             number,
@@ -1465,6 +1465,13 @@ class ArchiveAndNotesDbTest(
         private fun removedJsonPath(vararg parts: String) = parts.joinToString(separator = "")
 
         private const val CLEANUP_VISIBILITY_ACTOR_MATRIX_SQL = """
+            delete from public_projection_generations
+            where session_id in (
+              '00000000-0000-0000-0000-0000000092b1',
+              '00000000-0000-0000-0000-0000000092b2',
+              '00000000-0000-0000-0000-0000000092b3',
+              '00000000-0000-0000-0000-0000000092bb'
+            );
             delete from public_session_publications
             where session_id in (
               '00000000-0000-0000-0000-0000000092b1',
@@ -1559,6 +1566,16 @@ class ArchiveAndNotesDbTest(
                 '00000000-0000-0000-0000-0000000092b3',
                 '호스트 actor matrix 요약입니다.', false, 'HOST_ONLY', 'HIDDEN', null
               );
+            insert into public_projection_generations (
+              publication_id, club_id, session_id, generation, live_record_revision, origin_readable
+            ) values (
+              '00000000-0000-0000-0000-0000000092b4',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-0000000092b1',
+              1,
+              null,
+              true
+            );
             insert into session_participants (
               id, club_id, session_id, membership_id,
               rsvp_status, attendance_status, participation_status
@@ -1849,7 +1866,8 @@ class ArchiveAndNotesDbTest(
               meeting_passcode,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             values (
               '00000000-0000-0000-0000-000000009181',
@@ -1869,7 +1887,8 @@ class ArchiveAndNotesDbTest(
               null,
               '2026-10-09 14:59:00.000000',
               'PUBLISHED',
-              'PUBLIC'
+              'PUBLIC',
+              'GUEST_READABLE'
             );
         """
 
@@ -1943,7 +1962,8 @@ class ArchiveAndNotesDbTest(
               meeting_passcode,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             select
               '00000000-0000-0000-0000-000000009991',
@@ -1963,7 +1983,8 @@ class ArchiveAndNotesDbTest(
               null,
               '2030-03-31 14:59:00.000000',
               'DRAFT',
-              'MEMBER'
+              'MEMBER',
+              'GUEST_READABLE'
             from clubs
             where clubs.id = '00000000-0000-0000-0000-000000000001';
         """
@@ -2031,7 +2052,8 @@ class ArchiveAndNotesDbTest(
               meeting_passcode,
               question_deadline_at,
               state,
-              visibility
+              visibility,
+              access_scope
             )
             select
               '00000000-0000-0000-0000-000000009993',
@@ -2051,7 +2073,8 @@ class ArchiveAndNotesDbTest(
               null,
               '2030-01-31 14:59:00.000000',
               'CLOSED',
-              'MEMBER'
+              'MEMBER',
+              'GUEST_READABLE'
             from clubs
             where clubs.id = '00000000-0000-0000-0000-000000000001';
         """

@@ -54,6 +54,8 @@ export default defineConfig({
         `${envAssignment("READMATES_BFF_SECRET", "e2e-secret")} ` +
         `${envAssignment("READMATES_IP_HASH_BASE_SECRET", "test-secret")} ` +
         `${envAssignment("READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY", "test-admin-command-digest-key")} ` +
+        `${envAssignment("READMATES_MUTATION_IDENTITY_CURRENT_KEY", "test-secret")} ` +
+        `${envAssignment("READMATES_HOST_LIST_CURSOR_CURRENT_KEY", "test-secret")} ` +
         `${envAssignment("READMATES_MANAGEMENT_PORT", "0")} ` +
         `${envAssignment("READMATES_FLYWAY_LOCATIONS", "classpath:db/mysql/migration,classpath:db/mysql/dev")} ` +
         `${envAssignment("READMATES_AUTH_SESSION_COOKIE_SECURE", "false")} ` +

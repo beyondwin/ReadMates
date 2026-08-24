@@ -387,9 +387,11 @@ class MyJourneyQueriesTest(
             """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, book_image_url, session_date,
-              start_time, end_time, question_deadline_at, location_label, state, visibility
+              start_time, end_time, question_deadline_at, location_label, state, visibility, access_scope
             )
-            values (?, ?, ?, ?, ?, ?, ?, ?, '19:00:00', '21:00:00', '2026-07-01 12:00:00', 'Online', ?, ?)
+            values (
+              ?, ?, ?, ?, ?, ?, ?, ?, '19:00:00', '21:00:00', '2026-07-01 12:00:00', 'Online', ?, ?, ?
+            )
             """.trimIndent(),
             sessionId.toString(),
             clubId.toString(),
@@ -401,6 +403,7 @@ class MyJourneyQueriesTest(
             date,
             state,
             visibility,
+            if (visibility == "HOST_ONLY") "HOST_ONLY" else "GUEST_READABLE",
         )
     }
 

@@ -6,7 +6,7 @@
 
 **Architecture:** Health는 기존 provider snapshot과 partial-source 모델을 시각적으로 정돈한다. Notifications는 기존 V48 durable preview/atomic confirm을 유지하며 cursor 페이지와 immutable receipt/convergence 표현을 강화한다. AI는 force-cancel/retry-commit을 preview/confirm + shared idempotency + CAS + domain receipt로 전환하고, 정확한 BFF/CSRF method-path matcher를 full security chain으로 검증한다.
 
-**Tech Stack:** React, TypeScript, TanStack Query, Playwright, Kotlin, Spring Boot, JDBC, MySQL 8, Flyway V58, Testcontainers, Micrometer.
+**Tech Stack:** React, TypeScript, TanStack Query, Playwright, Kotlin, Spring Boot, JDBC, MySQL 8, Flyway V59, Testcontainers, Micrometer.
 
 **Spec:** `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`
 
@@ -14,7 +14,7 @@ ADR impact: implements proposed ADR-0039 and ADR-0040; constraining reference �
 
 ## Global Constraints
 
-- Prerequisite: Service Spine Tasks 1–4 and Safe Command Tasks 1–3; V52–V57 exist before V58. Stop and rebase if the sequence differs.
+- Prerequisite: Service Spine Tasks 1–4 and Safe Command Tasks 1–3; V52–V58 exist before V59. Stop and rebase if the sequence differs.
 - Health reads never become dangerous command endpoints. A drill-down may link to the owning service page but never silently mutate.
 - Notification V48 preview/confirm atomicity and selection semantics remain authoritative. Strengthen in place; do not create a competing replay engine.
 - AI and notification pages paginate until the operator stops; first-page-only data must not be labeled “전체”.
@@ -67,7 +67,7 @@ Each card shows state, primary reading, source, last evidence time, freshness, a
 ### Task 2: Add service command receipt and convergence evidence
 
 **Files:**
-- Create: `server/src/main/resources/db/mysql/migration/V58__platform_admin_service_command_receipts.sql`
+- Create: `server/src/main/resources/db/mysql/migration/V59__platform_admin_service_command_receipts.sql`
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
 **Schema responsibilities:**
@@ -80,7 +80,7 @@ Each card shows state, primary reading, source, last evidence time, freshness, a
 
 - [ ] **Step 1: Write RED migration tests.** Cover V48 backfill with deterministic receipt IDs, uniqueness/checks, AI preview TTL, receipt immutability, convergence transitions, deletable source jobs/events, and absence of prompt/provider payload/error text columns.
 - [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest`; expected FAIL.
-- [ ] **Step 3: Implement V58 without rewriting V48 or V34.** Backfill legacy selection hashes as legacy schema evidence; new commands use versioned HMAC.
+- [ ] **Step 3: Implement V59 without rewriting V48 or V34.** Backfill legacy selection hashes as legacy schema evidence; new commands use versioned HMAC.
 - [ ] **Step 4: Run GREEN.** Run the Task 2 command; expected PASS.
 - [ ] **Step 5: Commit.** Commit: `feat(server): add service command receipts`
 

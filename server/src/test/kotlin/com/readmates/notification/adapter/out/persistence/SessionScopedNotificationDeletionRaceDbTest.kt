@@ -11,6 +11,7 @@ import com.readmates.notification.application.model.NotificationManualDispatchPa
 import com.readmates.notification.application.model.NotificationSessionNotFoundException
 import com.readmates.notification.application.port.out.ManualNotificationTargetSnapshot
 import com.readmates.notification.domain.NotificationEventType
+import com.readmates.session.application.model.ExpectedSessionRevision
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.service.HostSessionLifecycleService
@@ -99,7 +100,7 @@ class SessionScopedNotificationDeletionRaceDbTest(
     fun `session outbox cannot commit after its session is deleted`() {
         val sessionId = insertDeletableSession("9401")
 
-        deleteTemplate.execute { lifecycleService.delete(HostSessionIdCommand(host, sessionId)) }
+        deleteTemplate.execute { lifecycleService.delete(deleteCommand(sessionId)) }
 
         assertThatThrownBy { enqueueSessionOutbox(sessionId, "race-outbox-after-delete") }
             .isInstanceOf(NotificationSessionNotFoundException::class.java)
@@ -113,7 +114,7 @@ class SessionScopedNotificationDeletionRaceDbTest(
         val sessionId = insertDeletableSession("9402")
 
         assertThat(enqueueSessionOutbox(sessionId, "race-outbox-before-delete")).isTrue()
-        assertThatThrownBy { lifecycleService.delete(HostSessionIdCommand(host, sessionId)) }
+        assertThatThrownBy { lifecycleService.delete(deleteCommand(sessionId)) }
             .isInstanceOf(HostSessionDeletionBlockedException::class.java)
         assertThat(orphanSessionAggregateCount(sessionId)).isZero()
         assertThat(sessionExists(sessionId)).isTrue()
@@ -139,7 +140,7 @@ class SessionScopedNotificationDeletionRaceDbTest(
     fun `manual dispatch cannot commit after its session is deleted`() {
         val sessionId = insertDeletableSession("9404")
 
-        deleteTemplate.execute { lifecycleService.delete(HostSessionIdCommand(host, sessionId)) }
+        deleteTemplate.execute { lifecycleService.delete(deleteCommand(sessionId)) }
 
         assertThatThrownBy { insertManualDispatch(sessionId, "race-manual-after-delete") }
             .isInstanceOf(NotificationSessionNotFoundException::class.java)
@@ -153,7 +154,7 @@ class SessionScopedNotificationDeletionRaceDbTest(
         val sessionId = insertDeletableSession("9405")
 
         insertManualDispatch(sessionId, "race-manual-before-delete")
-        assertThatThrownBy { lifecycleService.delete(HostSessionIdCommand(host, sessionId)) }
+        assertThatThrownBy { lifecycleService.delete(deleteCommand(sessionId)) }
             .isInstanceOf(HostSessionDeletionBlockedException::class.java)
         assertThat(orphanSessionAggregateCount(sessionId)).isZero()
         assertThat(sessionExists(sessionId)).isTrue()
@@ -227,9 +228,11 @@ class SessionScopedNotificationDeletionRaceDbTest(
             false
         }
 
+    private fun deleteCommand(sessionId: UUID) = HostSessionIdCommand(host, sessionId, ExpectedSessionRevision(0))
+
     private fun runDelete(sessionId: UUID): DeleteAttempt =
         try {
-            deleteTemplate.execute { lifecycleService.delete(HostSessionIdCommand(host, sessionId)) }
+            deleteTemplate.execute { lifecycleService.delete(deleteCommand(sessionId)) }
             DeleteAttempt.DELETED
         } catch (_: HostSessionDeletionBlockedException) {
             DeleteAttempt.BLOCKED

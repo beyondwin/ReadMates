@@ -12,6 +12,7 @@ import com.readmates.note.application.service.NotesFeedService
 import com.readmates.publication.adapter.out.redis.RedisPublicReadCacheAdapter
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
+import com.readmates.publication.application.model.PublicProjectionGeneration
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
 import com.readmates.publication.application.service.PublicQueryService
@@ -127,7 +128,7 @@ class RedisReadCacheInvalidationAdapterTest(
         assertEquals("Refetched source note", notesResult.items.single().text)
         assertEquals(
             "Refetched source summary",
-            publicCache.getSession(TARGET_CLUB_ID, SESSION_ID)?.summary,
+            publicCache.getSession(TARGET_CLUB_ID, SESSION_ID, 2)?.summary,
         )
         assertEquals(
             "Unrelated cached summary",
@@ -140,7 +141,7 @@ class RedisReadCacheInvalidationAdapterTest(
     }
 
     @Test
-    fun `post commit redis failure leaves stale cache observable and records content free failure metrics`() {
+    fun `post commit redis failure still refetches authoritative origin and records content free failure metrics`() {
         redisTemplate.delete(cleanupKeys)
         publicCache.putSession(
             TARGET_CLUB_ID,
@@ -168,7 +169,7 @@ class RedisReadCacheInvalidationAdapterTest(
         val observedAfterFailure = refetchPublicSession("Refetched source summary")
 
         assertEquals("Refetched source summary", mutationResult.publicSummary)
-        assertEquals("Stale cached summary", observedAfterFailure?.summary)
+        assertEquals("Refetched source summary", observedAfterFailure?.summary)
         assertInvalidationFailureMetrics(registry)
         assertMeterLabelsAreContentFree(registry)
     }
@@ -484,12 +485,14 @@ class RedisReadCacheInvalidationAdapterTest(
         private const val TARGET_CLUB_SLUG = "target-reading-club"
         private val NOTES_FIRST_PAGE = PageRequest.cursor(null, null, defaultLimit = 60, maxLimit = 120)
 
-        private val PUBLIC_CLUB_KEY = "public:club:$TARGET_CLUB_ID:home:v1"
-        private val UNRELATED_PUBLIC_CLUB_KEY = "public:club:$UNRELATED_CLUB_ID:home:v1"
+        private val PUBLIC_CLUB_KEY = "public:club:$TARGET_CLUB_ID:generation:1:home:v2"
+        private val UNRELATED_PUBLIC_CLUB_KEY = "public:club:$UNRELATED_CLUB_ID:generation:1:home:v2"
 
-        private fun publicSessionKey(sessionId: UUID) = "public:club:$TARGET_CLUB_ID:session:$sessionId:v1"
+        private fun publicSessionKey(sessionId: UUID) = "public:club:$TARGET_CLUB_ID:generation:1:session:$sessionId:v2"
 
-        private fun unrelatedPublicSessionKey(sessionId: UUID) = "public:club:$UNRELATED_CLUB_ID:session:$sessionId:v1"
+        private fun unrelatedPublicSessionKey(sessionId: UUID) =
+            "public:club:$UNRELATED_CLUB_ID:generation:1:" +
+                "session:$sessionId:v2"
 
         private fun notesFeedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
 
@@ -573,6 +576,20 @@ private class SourcePublicLoader(
         clubSlug: String,
         sessionId: UUID,
     ): PublicSessionDetailResult = session
+
+    override fun loadSessionGeneration(
+        clubSlug: String,
+        sessionId: UUID,
+    ) = PublicProjectionGeneration(
+        publicationId = PUBLICATION_ID,
+        generation = 2,
+        liveRecordRevision = 1,
+        originReadable = true,
+    )
+
+    private companion object {
+        val PUBLICATION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000807")
+    }
 }
 
 private class SourceNotesLoader(

@@ -82,6 +82,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/open$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/close$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/publish$")),
+                    methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/correction-publish$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/reopen$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/unpublish$")),
                     methodAndPath("POST", Regex("^/api/host/sessions/[^/]+/return-to-draft$")),
@@ -125,6 +126,7 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/admin/domains/[^/]+/check$")),
                     methodAndPath("POST", Regex("^/api/admin/notifications/replay-preview$")),
                     methodAndPath("POST", Regex("^/api/admin/notifications/replay-confirm$")),
+                    methodAndPath("POST", Regex("^/api/admin/public-takedowns/(preview|confirm)$")),
                     methodAndPath(
                         "POST",
                         Regex("^/api/admin/operations/cases/[^/]+/(acknowledge|snooze|resolve)$"),

@@ -19,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.put
+import java.util.UUID
 
 @SpringBootTest(
     properties = [
@@ -37,6 +38,7 @@ class PublicControllerDbTest(
             .get("/api/public/club")
             .andExpect {
                 status { isOk() }
+                header { string("Cache-Control", "public, max-age=60, must-revalidate") }
                 jsonPath("$.clubName") { value("읽는사이") }
                 jsonPath("$.stats.sessions") { value(6) }
                 jsonPath("$.recentSessions[0].sessionNumber") { value(6) }
@@ -57,6 +59,7 @@ class PublicControllerDbTest(
             .get("/api/public/sessions/00000000-0000-0000-0000-000000000306")
             .andExpect {
                 status { isOk() }
+                header { string("Cache-Control", "public, max-age=60, must-revalidate") }
                 jsonPath("$.sessionNumber") { value(6) }
                 jsonPath("$.bookTitle") { value("가난한 찰리의 연감") }
                 jsonPath("$.bookImageUrl") { value("https://image.aladin.co.kr/product/35068/81/cover500/8934911387_1.jpg") }
@@ -243,6 +246,8 @@ class PublicControllerDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 with(user("host@example.com"))
                 with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
             }.andExpect {
                 status { isOk() }
             }
@@ -306,6 +311,49 @@ class PublicControllerDbTest(
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 종료 공개"))) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 예정 공개"))) }
                 jsonPath("$.recentSessions[*].bookTitle") { value(not(hasItem("공개 범위 테스트 책 - 진행 공개"))) }
+            }
+    }
+
+    @Test
+    @Sql(
+        statements = [CLEANUP_PUBLISH_TEST_SESSION_SQL],
+        executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
+    )
+    @Sql(
+        statements = [CLEANUP_PUBLISH_TEST_SESSION_SQL],
+        executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
+    )
+    fun `public origin requires published guest readable and public record placement together`() {
+        val sessionId = createSessionSeven()
+        jdbcTemplate.update(
+            """
+            update sessions
+            set state = 'PUBLISHED', access_scope = 'HOST_ONLY', visibility = 'PUBLIC'
+            where id = ?
+            """.trimIndent(),
+            sessionId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public,
+              visibility, site_visibility, published_at
+            ) values (?, ?, ?, ?, true, 'PUBLIC', 'PUBLIC_RECORD', utc_timestamp(6))
+            """.trimIndent(),
+            UUID.randomUUID().toString(),
+            "00000000-0000-0000-0000-000000000001",
+            sessionId,
+            "must stay private",
+        )
+
+        mockMvc
+            .get("/api/public/clubs/reading-sai/sessions/$sessionId")
+            .andExpect { status { isNotFound() } }
+        mockMvc
+            .get("/api/public/clubs/reading-sai")
+            .andExpect {
+                status { isOk() }
+                jsonPath("$.recentSessions[*].sessionId") { value(not(hasItem(sessionId))) }
             }
     }
 
@@ -475,6 +523,14 @@ class PublicControllerDbTest(
         )
     }
 
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate
+            .query(
+                "select session_revision from sessions where id = ?",
+                { resultSet, _ -> resultSet.getLong("session_revision") },
+                sessionId,
+            ).firstOrNull() ?: 0
+
     companion object {
         private const val MARK_MEMBER5_SESSION_SIX_ONE_LINER_SESSION_SQL = """
             update one_line_reviews
@@ -562,6 +618,15 @@ class PublicControllerDbTest(
         """
 
         private const val CLEANUP_PUBLIC_PUBLICATION_MATRIX_SQL = """
+            delete from public_projection_generations
+            where session_id in (
+              '00000000-0000-0000-0000-000000000990',
+              '00000000-0000-0000-0000-000000000991',
+              '00000000-0000-0000-0000-000000000992',
+              '00000000-0000-0000-0000-000000000993',
+              '00000000-0000-0000-0000-000000000994',
+              '00000000-0000-0000-0000-000000000995'
+            );
             delete from public_session_publications
             where session_id in (
               '00000000-0000-0000-0000-000000000990',
@@ -585,7 +650,7 @@ class PublicControllerDbTest(
         private const val INSERT_PUBLIC_PUBLICATION_MATRIX_SESSIONS_SQL = """
             insert into sessions (
               id, club_id, number, title, book_title, book_author, book_translator, book_link, book_image_url,
-              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility
+              session_date, start_time, end_time, location_label, question_deadline_at, state, visibility, access_scope
             )
             values
             (
@@ -593,42 +658,42 @@ class PublicControllerDbTest(
               '00000000-0000-0000-0000-000000000001',
               990, '990회차 · 공개 범위 테스트 책 - 호스트 전용', '공개 범위 테스트 책 - 호스트 전용',
               '공개 범위 테스트 저자', null, null, null, '2026-10-31', '20:00', '22:00', '온라인',
-              '2026-10-30 14:59:00.000000', 'CLOSED', 'HOST_ONLY'
+              '2026-10-30 14:59:00.000000', 'CLOSED', 'HOST_ONLY', 'HOST_ONLY'
             ),
             (
               '00000000-0000-0000-0000-000000000991',
               '00000000-0000-0000-0000-000000000001',
               991, '991회차 · 공개 범위 테스트 책 - 발행 공개', '공개 범위 테스트 책 - 발행 공개',
               '공개 범위 테스트 저자', null, null, null, '2026-11-01', '20:00', '22:00', '온라인',
-              '2026-10-31 14:59:00.000000', 'PUBLISHED', 'PUBLIC'
+              '2026-10-31 14:59:00.000000', 'PUBLISHED', 'PUBLIC', 'GUEST_READABLE'
             ),
             (
               '00000000-0000-0000-0000-000000000992',
               '00000000-0000-0000-0000-000000000001',
               992, '992회차 · 공개 범위 테스트 책 - 발행 멤버', '공개 범위 테스트 책 - 발행 멤버',
               '공개 범위 테스트 저자', null, null, null, '2026-11-02', '20:00', '22:00', '온라인',
-              '2026-11-01 14:59:00.000000', 'PUBLISHED', 'MEMBER'
+              '2026-11-01 14:59:00.000000', 'PUBLISHED', 'MEMBER', 'GUEST_READABLE'
             ),
             (
               '00000000-0000-0000-0000-000000000993',
               '00000000-0000-0000-0000-000000000001',
               993, '993회차 · 공개 범위 테스트 책 - 종료 공개', '공개 범위 테스트 책 - 종료 공개',
               '공개 범위 테스트 저자', null, null, null, '2026-11-03', '20:00', '22:00', '온라인',
-              '2026-11-02 14:59:00.000000', 'CLOSED', 'PUBLIC'
+              '2026-11-02 14:59:00.000000', 'CLOSED', 'PUBLIC', 'GUEST_READABLE'
             ),
             (
               '00000000-0000-0000-0000-000000000994',
               '00000000-0000-0000-0000-000000000001',
               994, '994회차 · 공개 범위 테스트 책 - 예정 공개', '공개 범위 테스트 책 - 예정 공개',
               '공개 범위 테스트 저자', null, null, null, '2026-11-04', '20:00', '22:00', '온라인',
-              '2026-11-03 14:59:00.000000', 'DRAFT', 'MEMBER'
+              '2026-11-03 14:59:00.000000', 'DRAFT', 'MEMBER', 'GUEST_READABLE'
             ),
             (
               '00000000-0000-0000-0000-000000000995',
               '00000000-0000-0000-0000-000000000001',
               995, '995회차 · 공개 범위 테스트 책 - 진행 공개', '공개 범위 테스트 책 - 진행 공개',
               '공개 범위 테스트 저자', null, null, null, '2026-11-05', '20:00', '22:00', '온라인',
-              '2026-11-04 14:59:00.000000', 'OPEN', 'PUBLIC'
+              '2026-11-04 14:59:00.000000', 'OPEN', 'PUBLIC', 'GUEST_READABLE'
             );
         """
 
@@ -696,6 +761,16 @@ class PublicControllerDbTest(
               'PUBLIC',
               'HIDDEN',
               null
+            );
+            insert into public_projection_generations (
+              publication_id, club_id, session_id, generation, live_record_revision, origin_readable
+            ) values (
+              '00000000-0000-0000-0000-000000001991',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000000991',
+              1,
+              null,
+              true
             );
         """
 

@@ -70,8 +70,12 @@ private val serverSlices =
         ),
         ServerSlice(
             name = "publication",
-            type = ServerSliceType.READ,
-            inboundAdapterPackages = listOf("com.readmates.publication.adapter.in.web.."),
+            type = ServerSliceType.WORKFLOW,
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.publication.adapter.in.web..",
+                    "com.readmates.publication.adapter.in.scheduling..",
+                ),
             applicationPackages = listOf("com.readmates.publication.application.."),
         ),
         ServerSlice(
@@ -149,6 +153,12 @@ private val serverSlices =
             applicationPackages = listOf("com.readmates.admin.operations.application.."),
         ),
         ServerSlice(
+            name = "admin.takedown",
+            type = ServerSliceType.WORKFLOW,
+            inboundAdapterPackages = listOf("com.readmates.admin.takedown.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.admin.takedown.application.."),
+        ),
+        ServerSlice(
             name = "observability",
             type = ServerSliceType.OPS_READ,
             inboundAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
@@ -186,8 +196,16 @@ private val serverSlices =
         ServerSlice(
             name = "shared",
             type = ServerSliceType.SHARED,
-            inboundAdapterPackages = listOf("com.readmates.shared.adapter.in.web.."),
-            applicationPackages = listOf("com.readmates.shared.adminmutation.application.."),
+            inboundAdapterPackages =
+                listOf(
+                    "com.readmates.shared.adapter.in.web..",
+                    "com.readmates.shared.mutation.adapter.in.scheduling..",
+                ),
+            applicationPackages =
+                listOf(
+                    "com.readmates.shared.adminmutation.application..",
+                    "com.readmates.shared.mutation.application..",
+                ),
         ),
     )
 
@@ -413,6 +431,7 @@ class ServerArchitectureBoundaryTest {
         assertTrue(inboundPackages.contains("com.readmates.notification.adapter.in.scheduler.."))
         assertTrue(inboundPackages.contains("com.readmates.admin.health.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.session.adapter.in.scheduling.."))
+        assertTrue(inboundPackages.contains("com.readmates.shared.mutation.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.adapter.in.security.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.infrastructure.security.."))
     }
@@ -711,7 +730,10 @@ class ServerArchitectureBoundaryTest {
                 "com.readmates.aigen.adapter.out..",
             ).check(importedClasses)
     }
+}
 
+@Tag("architecture")
+class ServerAdapterArchitectureBoundaryTest {
     @Test
     fun `aigen scheduling inbound adapter depends on application ports instead of services or outbound adapters`() {
         noClasses()
@@ -763,6 +785,31 @@ class ServerArchitectureBoundaryTest {
             .orShould()
             .dependOnClassesThat()
             .haveFullyQualifiedName("com.readmates.aigen.application.service.ProviderCircuitState")
+            .check(importedClasses)
+    }
+
+    @Test
+    fun `session sessionrecord and notification do not form forbidden feature edges`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.session..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.publication..")
+            .check(importedClasses)
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.sessionrecord..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.publication..")
+            .check(importedClasses)
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.notification..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage("com.readmates.session..")
             .check(importedClasses)
     }
 
@@ -1652,6 +1699,9 @@ private val sessionRecordCapabilityMethods =
         "SessionRecordApplyStorePort" to
             setOf(
                 "lockEditor",
+                "loadCorrectionEditor",
+                "lockCorrectionEditor",
+                "bumpCorrectionProjectionRevisions",
                 "findCompletedApply",
                 "findApplyReceipt",
                 "insertApplyReceipt",

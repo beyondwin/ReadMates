@@ -9,16 +9,25 @@ import {
 } from "../../_shared/proxy";
 import { bffErrorResponse } from "../../_shared/errors";
 import {
+  boundedPublicCacheControl,
   buildPublicCacheKey,
   isCacheableUpstreamResponse,
   isPublicCacheableRequest,
 } from "../../_shared/cache";
 import { normalizedClubSlug } from "../../../shared/security/club-slug";
+import {
+  HOST_CLIENT_CONTRACT_HEADER,
+  HOST_CLIENT_UPGRADE_REQUIRED,
+  acceptedHostClientContract,
+  hostClientContractCapabilityFromEnv,
+  type HostClientContractCapability,
+} from "../../../shared/security/host-client-contract";
 
 type Env = {
   READMATES_API_BASE_URL: string;
   READMATES_BFF_SECRET?: string;    // legacy fallback
   READMATES_BFF_SECRETS?: string;   // comma-separated, primary first
+  READMATES_HOST_CLIENT_CONTRACT_CAPABILITY?: string;
 };
 
 type PagesFunction<Env> = (context: {
@@ -30,8 +39,6 @@ type PagesFunction<Env> = (context: {
 
 const MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const MAX_AI_GENERATION_MULTIPART_BYTES = 2 * 1024 * 1024;
-const READMATES_CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract";
-const READMATES_CLIENT_CONTRACT = "v2";
 
 function isAiGenerationTranscriptUpload(method: string, path: string, contentType: string | null) {
   return (
@@ -107,12 +114,18 @@ function isHostMutation(request: Request, upstreamPath: string) {
   return MUTATING_METHODS.has(request.method) && upstreamPath.startsWith("/api/host/");
 }
 
-function hasCurrentHostWriteClientContract(request: Request, upstreamPath: string) {
+function hasAcceptedHostWriteClientContract(
+  request: Request,
+  upstreamPath: string,
+  capability: HostClientContractCapability,
+) {
   if (!isHostMutation(request, upstreamPath)) {
     return true;
   }
 
-  return request.headers.get(READMATES_CLIENT_CONTRACT_HEADER) === READMATES_CLIENT_CONTRACT;
+  return (
+    acceptedHostClientContract(request.headers.get(HOST_CLIENT_CONTRACT_HEADER), capability) !== null
+  );
 }
 
 function normalizedClubSlugFromRequest(request: Request) {
@@ -139,11 +152,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
     return bffErrorResponse(403, "PERMISSION_DENIED");
   }
 
-  if (!hasCurrentHostWriteClientContract(context.request, upstreamPath)) {
+  const capability = hostClientContractCapabilityFromEnv(context.env);
+  if (!hasAcceptedHostWriteClientContract(context.request, upstreamPath, capability)) {
     return bffErrorResponse(
-      409,
-      "HOST_CLIENT_UPGRADE_REQUIRED",
-      "호스트 운영 화면을 최신 버전으로 새로고침해 주세요.",
+      HOST_CLIENT_UPGRADE_REQUIRED.status,
+      HOST_CLIENT_UPGRADE_REQUIRED.code,
+      HOST_CLIENT_UPGRADE_REQUIRED.message,
     );
   }
 
@@ -156,8 +170,16 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
     const cacheKey = buildPublicCacheKey(context.request);
     const cached = await caches.default.match(cacheKey);
+    if (cached && isCacheableUpstreamResponse(cached)) {
+      const bounded = new Response(cached.body, cached);
+      bounded.headers.set(
+        "Cache-Control",
+        boundedPublicCacheControl(upstreamPath, cached.headers.get("Cache-Control") ?? ""),
+      );
+      return bounded;
+    }
     if (cached) {
-      return cached;
+      await caches.default.delete(cacheKey);
     }
   }
 
@@ -195,11 +217,12 @@ export const onRequest: PagesFunction<Env> = async (context) => {
 
   const requestId = requestIdForUpstream(context.request);
   headers.set(READMATES_REQUEST_ID_HEADER, requestId);
-  if (
-    isHostMutation(context.request, upstreamPath)
-    && context.request.headers.get(READMATES_CLIENT_CONTRACT_HEADER) === READMATES_CLIENT_CONTRACT
-  ) {
-    headers.set(READMATES_CLIENT_CONTRACT_HEADER, READMATES_CLIENT_CONTRACT);
+  const acceptedContract = acceptedHostClientContract(
+    context.request.headers.get(HOST_CLIENT_CONTRACT_HEADER),
+    capability,
+  );
+  if (isHostMutation(context.request, upstreamPath) && acceptedContract) {
+    headers.set(HOST_CLIENT_CONTRACT_HEADER, acceptedContract);
   }
 
   headers.set("X-Readmates-Club-Host", normalizedHostFromRequest(context.request));
@@ -239,7 +262,25 @@ export const onRequest: PagesFunction<Env> = async (context) => {
   });
   outboundResponse.headers.set(READMATES_REQUEST_ID_HEADER, requestId);
 
-  if (isPublicCacheableRequest(context.request.method, upstreamPath) && isCacheableUpstreamResponse(upstream)) {
+  if (isPublicCacheableRequest(context.request.method, upstreamPath)) {
+    if (!isCacheableUpstreamResponse(outboundResponse)) {
+      outboundResponse.headers.set("Cache-Control", "no-store");
+    } else {
+      outboundResponse.headers.set(
+        "Cache-Control",
+        boundedPublicCacheControl(
+          upstreamPath,
+          outboundResponse.headers.get("Cache-Control") ?? "",
+        ),
+      );
+    }
+  }
+
+  if (
+    isPublicCacheableRequest(context.request.method, upstreamPath) &&
+    isCacheableUpstreamResponse(upstream) &&
+    isCacheableUpstreamResponse(outboundResponse)
+  ) {
     const cacheKey = buildPublicCacheKey(context.request);
     context.waitUntil(caches.default.put(cacheKey, outboundResponse.clone()));
   }

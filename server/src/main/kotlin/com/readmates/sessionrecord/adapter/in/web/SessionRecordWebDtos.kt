@@ -107,13 +107,17 @@ data class PreviewSessionRecordApplyRequest(
 }
 
 data class ApplySessionRecordRequest(
-    val applyRequestId: String,
-    @field:Positive val expectedDraftRevision: Long,
-    @field:PositiveOrZero val expectedLiveRevision: Long,
-    val expectedDraftHash: String,
+    val applyRequestId: String? = null,
+    @field:Positive val expectedDraftRevision: Long? = null,
+    @field:PositiveOrZero val expectedLiveRevision: Long? = null,
+    val expectedDraftHash: String? = null,
     val previewId: String? = null,
     val notificationDecision: NotificationDecision? = null,
+    val idempotencyKey: String? = null,
+    val expected: ApplySessionRecordExpectedBody? = null,
+    val command: ApplySessionRecordCommandBody? = null,
 ) {
+    @Suppress("CyclomaticComplexMethod", "ThrowsCount")
     fun toCommand(sessionId: UUID): ApplySessionRecordCommand {
         if (previewId != null || notificationDecision != null) {
             throw SessionRecordException(
@@ -121,15 +125,64 @@ data class ApplySessionRecordRequest(
                 "Legacy notification decision contract is not accepted",
             )
         }
+        if (idempotencyKey != null || expected != null || command != null) {
+            val extra =
+                listOfNotNull(
+                    applyRequestId?.let { "applyRequestId" },
+                    expectedDraftRevision?.let { "expectedDraftRevision" },
+                    expectedLiveRevision?.let { "expectedLiveRevision" },
+                    expectedDraftHash?.let { "expectedDraftHash" },
+                )
+            if (extra.isNotEmpty() || expected == null || command == null || idempotencyKey.isNullOrBlank()) {
+                throw SessionRecordException(
+                    SessionRecordError.INVALID_APPLY_CONTRACT,
+                    "Session record apply envelope is invalid",
+                )
+            }
+            return ApplySessionRecordCommand(
+                sessionId,
+                parseRecordUuid(command.applyRequestId),
+                expected.draftRevision,
+                expected.liveRevision,
+                command.expectedDraftHash,
+                idempotencyKey,
+            )
+        }
         return ApplySessionRecordCommand(
             sessionId,
-            parseRecordUuid(applyRequestId),
-            expectedDraftRevision,
-            expectedLiveRevision,
-            expectedDraftHash,
+            parseRecordUuid(
+                applyRequestId
+                    ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "applyRequestId"),
+            ),
+            expectedDraftRevision
+                ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedDraftRevision"),
+            expectedLiveRevision
+                ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedLiveRevision"),
+            expectedDraftHash
+                ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedDraftHash"),
         )
     }
 }
+
+data class ApplySessionRecordExpectedBody(
+    @field:Positive val draftRevision: Long,
+    @field:PositiveOrZero val liveRevision: Long,
+) {
+    @com.fasterxml.jackson.annotation.JsonAnySetter
+    fun rejectUnknown(
+        name: String,
+        @Suppress("UNUSED_PARAMETER") value: Any?,
+    ): Unit =
+        throw SessionRecordException(
+            SessionRecordError.INVALID_APPLY_CONTRACT,
+            "Unexpected apply expected field: $name",
+        )
+}
+
+data class ApplySessionRecordCommandBody(
+    val applyRequestId: String,
+    val expectedDraftHash: String,
+)
 
 data class RestoreSessionRecordDraftRequest(
     @field:Positive val expectedDraftRevision: Long?,

@@ -10,6 +10,7 @@ ReadMates 문서의 진입점입니다. 어떤 일을 할 때 어디 문서를 �
 | 공통 작업 계약과 권한·local-runtime 경계를 확인한다 | [`agents/execution.md`](agents/execution.md) |
 | 변경 slice의 risk evidence를 고른다 | [`development/acceptance-matrix.md`](development/acceptance-matrix.md) |
 | 코드의 현재 동작·경계를 이해하고 싶다 | [`development/architecture.md`](development/architecture.md) |
+| 앞으로의 판단에 적용할 구조적 결정을 찾거나 남긴다 | [`development/adr/README.md`](development/adr/README.md) |
 | 로컬에서 실행·테스트해 보고 싶다 | [`development/local-setup.md`](development/local-setup.md), [`development/test-guide.md`](development/test-guide.md) |
 | Lighthouse 진단이나 route-critical 시각 회귀 baseline을 확인한다 | [`development/test-guide.md#lighthouse-diagnostic`](development/test-guide.md#lighthouse-diagnostic), [`development/test-guide.md#시각-회귀-컴포넌트-하니스`](development/test-guide.md#시각-회귀-컴포넌트-하니스) |
 | frontend/server/BFF/auth/persistence를 함께 건드리는 변경 기준을 확인한다 | [`development/vertical-slice-checklist.md`](development/vertical-slice-checklist.md) |
@@ -26,6 +27,7 @@ ReadMates 문서의 진입점입니다. 어떤 일을 할 때 어디 문서를 �
 
 - [Showcase](showcase/README.md): 처음 보는 리뷰어를 위한 guest-mode walkthrough, architecture evidence, engineering confidence, operational proof 진입점입니다.
 - [`development/`](development) — 현재 동작 기준의 정전 가이드 (architecture, local setup, test, technical decisions, versioning, release management). 코드와 충돌하면 코드와 함께 갱신합니다.
+- [`development/adr/`](development/adr) — 한 결정씩 보존하는 ADR. `Accepted`는 앞으로의 판단 근거이고 `Proposed`는 구현 전 승인 방향입니다.
 - [`../design/`](../design) — 재사용 UI source package와 정적 디자인 catalog. 제품 코드가 공유하는 디자인 primitive와 pattern preview를 확인합니다.
 - [`deploy/`](deploy) — 운영 배포 runbook. Cloudflare Pages, OCI Compose stack, OCI MySQL HeatWave, multi-club domain, public repo safety.
 - [`operations/`](operations) — 반복 운영 runbook, observability 권장 구성, post-mortem 기록. 실제 운영 출력 전문은 Git 밖에 둡니다.

@@ -6,7 +6,7 @@
 
 **Architecture:** Support는 body-based subject search와 domain-owned preview/confirm receipts를 사용하고 DB uniqueness로 동시 active grant를 막는다. Audit는 first-page snapshot과 filter fingerprint를 서명한 source-aware cursor로 각 source SQL에 continuation/filter를 push down한 뒤 안정적으로 k-way merge한다. Analytics는 동일 aggregate contract에서 화면과 server-generated CSV를 만들고 capability별 export를 분리한다.
 
-**Tech Stack:** React, TypeScript, TanStack Query, Playwright, Kotlin, Spring Boot, JDBC, MySQL 8, Flyway V59, Testcontainers.
+**Tech Stack:** React, TypeScript, TanStack Query, Playwright, Kotlin, Spring Boot, JDBC, MySQL 8, Flyway V60, Testcontainers.
 
 **Spec:** `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`
 
@@ -14,7 +14,7 @@ ADR impact: implements proposed ADR-0039 and ADR-0040; constraining reference �
 
 ## Global Constraints
 
-- Prerequisite: Service Spine Tasks 1–4, Safe Command Tasks 1–3, and V52–V58. Stop and rebase V59 if the migration sequence differs.
+- Prerequisite: Service Spine Tasks 1–4, Safe Command Tasks 1–3, and V52–V59. Stop and rebase V60 if the migration sequence differs.
 - Support name/email free text, subject user UUID, bounded reason note, preview ID, and idempotency key remain in-memory only in the browser. They never enter route URL, history, Referer, local/session storage, analytics, or client logs.
 - Support browser URL may retain only share-safe club/status/time scope. Subject search uses a JSON request body and `Cache-Control: no-store`.
 - Reason category may be durable; bounded note is redacted, has explicit retention, and is returned only with `VIEW_SENSITIVE_AUDIT`.
@@ -45,7 +45,7 @@ ADR impact: implements proposed ADR-0039 and ADR-0040; constraining reference �
 ### Task 1: Add support preview, immutable receipt, and active-grant uniqueness
 
 **Files:**
-- Create: `server/src/main/resources/db/mysql/migration/V59__platform_admin_support_command_receipts.sql`
+- Create: `server/src/main/resources/db/mysql/migration/V60__platform_admin_support_command_receipts.sql`
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
 **Schema responsibilities:**
@@ -58,7 +58,7 @@ ADR impact: implements proposed ADR-0039 and ADR-0040; constraining reference �
 
 - [ ] **Step 1: Write RED migration tests.** Cover legacy active/expired/revoked backfill, duplicate cleanup policy, unique race guard, state checks, preview TTL, receipt immutability, subject/user deletion with redacted evidence retained, and absence of raw reason/email/name columns.
 - [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest`; expected FAIL.
-- [ ] **Step 3: Implement V59.** Before adding the unique index, deterministically retain the newest valid active row and mark older duplicates inactive while recording a migration-safe audit count, never private values.
+- [ ] **Step 3: Implement V60.** Before adding the unique index, deterministically retain the newest valid active row and mark older duplicates inactive while recording a migration-safe audit count, never private values.
 - [ ] **Step 4: Run GREEN.** Run the Task 1 command; expected PASS.
 - [ ] **Step 5: Commit.** Commit: `feat(server): add support command evidence`
 

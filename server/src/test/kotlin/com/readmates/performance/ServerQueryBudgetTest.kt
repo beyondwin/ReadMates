@@ -202,8 +202,10 @@ class ServerQueryBudgetTest(
     @Test
     fun `public session detail stays within public-detail query budget`() {
         assertQueryBudget(
-            budget = 3,
-            reason = "public session detail loads the session plus public highlights and one-liners",
+            budget = 4,
+            reason =
+                "public session detail loads its authoritative generation marker, session, " +
+                    "public highlights, and one-liners",
         ) {
             mockMvc
                 .get("/api/public/clubs/reading-sai/sessions/00000000-0000-0000-0000-000000000306") {

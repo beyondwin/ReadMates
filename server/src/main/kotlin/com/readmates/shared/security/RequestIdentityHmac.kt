@@ -5,6 +5,8 @@ import java.security.MessageDigest
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
 
+const val MUTATION_IDENTITY_HMAC_PURPOSE = "readmates:mutation-identity:v1"
+
 object RequestIdentityHmac {
     fun hmac(
         key: ByteArray,

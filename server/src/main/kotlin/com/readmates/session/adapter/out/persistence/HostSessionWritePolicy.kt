@@ -79,7 +79,14 @@ internal object HostSessionWritePolicy {
         command: UpsertPublicationCommand,
         locked: LockedHostSessionExposure,
     ): SessionExposure =
-        command.siteVisibility?.let { locked.exposure.copy(siteVisibility = it) }
+        if (command.accessScope != null || command.siteVisibility != null) {
+            locked.exposure.copy(
+                accessScope = command.accessScope ?: locked.exposure.accessScope,
+                siteVisibility = command.siteVisibility ?: locked.exposure.siteVisibility,
+            )
+        } else {
+            null
+        }
             ?: SessionExposure.fromCompatibility(
                 locked.state,
                 command.visibility.name,

@@ -13,6 +13,7 @@ import com.readmates.session.application.model.HostSessionTrashPage
 import com.readmates.session.application.model.HostSessionTrashPurgeTarget
 import com.readmates.session.application.model.HostSessionTrashRecord
 import com.readmates.session.application.model.HostSessionTrashResponse
+import com.readmates.session.application.model.toDetail
 import com.readmates.session.application.port.`in`.GetHostSessionTrashUseCase
 import com.readmates.session.application.port.`in`.ListHostSessionTrashCommand
 import com.readmates.session.application.port.`in`.ListHostSessionTrashUseCase
@@ -23,6 +24,10 @@ import com.readmates.session.application.port.out.HostSessionLifecycleAuditPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.requireHost
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
+import com.readmates.shared.listing.application.port.out.bump
+import com.readmates.shared.mutation.application.model.HostMutationOperation
 import org.springframework.stereotype.Service
 import org.springframework.transaction.annotation.Transactional
 import java.util.UUID
@@ -35,6 +40,8 @@ class HostSessionTrashService(
     private val queryPort: HostSessionQueryPort,
     private val lifecycleAudit: HostSessionLifecycleAuditPort,
     private val cacheInvalidation: ReadCacheInvalidationPort = ReadCacheInvalidationPort.Noop(),
+    private val epochPort: HostListEpochPort = HostListEpochPort.Noop(),
+    private val mutations: HostSessionMutationCoordinator? = null,
 ) : ListHostSessionTrashUseCase,
     GetHostSessionTrashUseCase,
     RestoreTrashedHostSessionUseCase,
@@ -55,6 +62,25 @@ class HostSessionTrashService(
     @Transactional
     @Suppress("ThrowsCount")
     override fun restore(command: HostSessionIdCommand): HostSessionDetailResponse {
+        val coordinator = mutations
+        if (coordinator != null) {
+            return coordinator.execute(
+                host = command.host,
+                operation = HostMutationOperation.SESSION_RESTORE,
+                resourceSlot = command.sessionId.toString(),
+                idempotencyKey = command.idempotencyKey,
+                payload = HostMutationPayloads.resourceOnly(HostMutationOperation.SESSION_RESTORE),
+                mutate = { HostMutationOutcome(command.sessionId, restoreOnce(command)) },
+                replay = { _, projection ->
+                    projection?.toDetail(command.sessionId) ?: throw HostSessionNotFoundException()
+                },
+            )
+        }
+        return restoreOnce(command)
+    }
+
+    @Suppress("ThrowsCount")
+    private fun restoreOnce(command: HostSessionIdCommand): HostSessionDetailResponse {
         requireHost(command.host)
         deletionPort.lockClub(command.host.clubId)
         val locked = deletionPort.lockTrash(command) ?: throwMissingTrash(command)
@@ -70,6 +96,7 @@ class HostSessionTrashService(
         if (!deletionPort.restoreTrash(command)) {
             throw HostSessionTrashExpiredException()
         }
+        epochPort.bump(command.host.clubId, HostListEpochKind.MEETING, HostListEpochKind.RECORD)
         lifecycleAudit.record(
             HostSessionLifecycleAuditEntry(
                 host = command.host,

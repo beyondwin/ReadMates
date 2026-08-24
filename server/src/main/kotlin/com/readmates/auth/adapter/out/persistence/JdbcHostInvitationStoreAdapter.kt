@@ -370,33 +370,7 @@ class JdbcHostInvitationStoreAdapter(
         clubId: UUID,
         membershipId: UUID,
     ) {
-        jdbcTemplate.update(
-            """
-            insert into session_participants (
-              id,
-              club_id,
-              session_id,
-              membership_id,
-              rsvp_status,
-              attendance_status,
-              participation_status
-            )
-            select ?, sessions.club_id, sessions.id, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE'
-            from active_sessions sessions
-            where sessions.club_id = ?
-              and sessions.state = 'OPEN'
-              and sessions.question_deadline_at > utc_timestamp(6)
-              and sessions.session_date >= date(date_add(utc_timestamp(6), interval 9 hour))
-            order by sessions.number desc
-            limit 1
-            on duplicate key update
-              participation_status = 'ACTIVE',
-              updated_at = utc_timestamp(6)
-            """.trimIndent(),
-            UUID.randomUUID().dbString(),
-            membershipId.dbString(),
-            clubId.dbString(),
-        )
+        // Join after OPEN is host-explicit. Invitation accept must not mutate the snapshot.
     }
 
     override fun findCurrentMember(membershipId: UUID): CurrentMember? =

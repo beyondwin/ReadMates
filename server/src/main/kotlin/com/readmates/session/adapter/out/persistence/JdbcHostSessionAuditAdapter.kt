@@ -72,14 +72,21 @@ class JdbcHostSessionAuditAdapter(
         return jdbcTemplate
             .query(
                 """
-                select membership_id, attendance_status
+                select membership_id, attendance_status, rsvp_status, attendance_revision
                 from session_participants
                 where club_id = ?
                   and session_id = ?
                   and participation_status = 'ACTIVE'
                   and membership_id in ($placeholders)
+                order by membership_id
                 """.trimIndent(),
-                { rs, _ -> UUID.fromString(rs.getString("membership_id")) to rs.getString("attendance_status") },
+                { rs, _ ->
+                    val membershipId = UUID.fromString(rs.getString("membership_id"))
+                    val status = rs.getString("attendance_status")
+                    check(rs.getString("rsvp_status").isNotBlank())
+                    check(rs.getLong("attendance_revision") >= 0)
+                    membershipId to status
+                },
                 *arguments.toTypedArray(),
             ).toMap()
     }

@@ -2,6 +2,7 @@ package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.InvalidHostSessionCursorException
+import com.readmates.session.application.model.ExpectedSessionRevision
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
@@ -25,6 +26,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.JsonNode
 import java.util.UUID
 
 data class HostSessionVisibilityRequest(
@@ -64,13 +66,19 @@ data class HostSessionAccessScopeRequest(
 class HostSessionController(
     private val hostSessionQueryUseCase: HostSessionQueryUseCase,
     private val hostSessionDraftUseCase: HostSessionDraftUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
 ) {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     fun create(
-        @Valid @RequestBody request: HostSessionRequest,
+        @RequestBody body: JsonNode,
         member: CurrentMember,
-    ) = hostSessionDraftUseCase.create(request.toCommand(member))
+    ): Any {
+        val envelope = envelopes.create(body)
+        return hostSessionDraftUseCase.create(
+            envelope.command.toCommand(member).copy(idempotencyKey = envelope.idempotencyKey),
+        )
+    }
 
     @GetMapping
     fun list(
@@ -81,10 +89,25 @@ class HostSessionController(
         @RequestParam(required = false) state: String?,
         @RequestParam(required = false) recordStatus: SessionRecordStatus?,
         @RequestParam(required = false) needsAttention: Boolean?,
+        @RequestParam(required = false) mode: String?,
+        @RequestParam(required = false) states: List<String>?,
     ) = hostSessionQueryUseCase.list(
         member,
-        PageRequest.cursor(limit, requireValidCursor(cursor), defaultLimit = 50, maxLimit = 100),
-        HostSessionListQuery(search, state, recordStatus, needsAttention),
+        PageRequest.cursor(
+            limit,
+            if (mode.isNullOrBlank() && states.isNullOrEmpty()) requireValidCursor(cursor) else null,
+            defaultLimit = 50,
+            maxLimit = 100,
+        ),
+        HostSessionListQuery(
+            search = search,
+            state = state,
+            recordStatus = recordStatus,
+            needsAttention = needsAttention,
+            mode = mode,
+            states = states,
+            rawCursor = cursor,
+        ),
     )
 
     @GetMapping("/schedule-defaults")
@@ -100,15 +123,20 @@ class HostSessionController(
     @PatchMapping("/{sessionId}")
     fun update(
         @PathVariable sessionId: String,
-        @Valid @RequestBody request: HostSessionRequest,
+        @RequestBody body: JsonNode,
         member: CurrentMember,
-    ) = hostSessionDraftUseCase.update(
-        UpdateHostSessionCommand(
-            host = member,
-            sessionId = parseHostSessionId(sessionId),
-            session = request.toCommand(member),
-        ),
-    )
+    ): Any {
+        val envelope = envelopes.update(body)
+        return hostSessionDraftUseCase.update(
+            UpdateHostSessionCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                session = envelope.command.toCommand(member),
+                expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
 }
 
 private fun requireValidCursor(cursor: String?): String? {

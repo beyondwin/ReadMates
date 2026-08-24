@@ -166,7 +166,7 @@ class AdminAuditLedgerService(
                     clubId = row.clubId ?: metadata?.uuid("clubId"),
                     userId = targetUser,
                     jobId = null,
-                    eventId = metadata?.string("eventId"),
+                    eventId = metadata?.string("eventId") ?: metadata?.string("receiptId"),
                     label = targetLabel(admin.role, row.targetUserId),
                 ),
             summary = platformSummary(row.actionType),
@@ -281,8 +281,26 @@ class AdminAuditLedgerService(
                     metadata.number("replayedCount")?.let { AdminAuditMetadata("replayedCount", it, "count") },
                     metadata.number("skippedCount")?.let { AdminAuditMetadata("skippedCount", it, "count") },
                 )
+            "EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED" ->
+                publicTakedownMetadata(metadata)
             else -> listOf(AdminAuditMetadata("eventType", actionType, "code"))
         }
+
+    private fun publicTakedownMetadata(metadata: Map<String, Any?>): List<AdminAuditMetadata> =
+        listOfNotNull(
+            metadata.string("receiptId")?.let { AdminAuditMetadata("receiptId", it, "id") },
+            metadata.string("convergenceId")?.let { AdminAuditMetadata("convergenceId", it, "id") },
+            metadata.string("publicationId")?.let { AdminAuditMetadata("publicationId", it, "id") },
+            metadata.number("committedGeneration")?.let {
+                AdminAuditMetadata("committedGeneration", it, "count")
+            },
+            metadata.string("originResult")?.let { AdminAuditMetadata("originResult", it, "code") },
+            metadata.string("reasonCategory")?.let { AdminAuditMetadata("reasonCategory", it, "code") },
+            metadata.string("reasonRedacted")?.let { AdminAuditMetadata("reasonRedacted", it, "boolean") },
+            metadata.string("remoteCopyLimitationCode")?.let {
+                AdminAuditMetadata("remoteCopyLimitationCode", it, "code")
+            },
+        )
 
     private fun clubMetadata(
         actionType: String,
@@ -389,6 +407,7 @@ private fun platformSummary(actionType: String): String =
         "SUPPORT_ACCESS_GRANT_CREATED" -> "support grant가 생성되었습니다."
         "SUPPORT_ACCESS_GRANT_REVOKED" -> "support grant가 회수되었습니다."
         "ADMIN_NOTIFICATION_REPLAY_CONFIRMED" -> "알림 재처리가 확정되었습니다."
+        "EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED" -> "긴급 공개 회수의 origin 차단이 기록되었습니다."
         else -> "platform admin 이벤트가 기록되었습니다."
     }
 

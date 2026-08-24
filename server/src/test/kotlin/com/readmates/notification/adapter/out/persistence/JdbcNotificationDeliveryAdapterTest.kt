@@ -18,6 +18,7 @@ import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
+import org.assertj.core.api.SoftAssertions.assertSoftly
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -246,6 +247,38 @@ class JdbcNotificationDeliveryAdapterTest(
             assertThat(deliveryRowsFor(nextBookEventId, viewer.membershipId)).isZero()
         } finally {
             deleteInsertedMember(viewer)
+        }
+    }
+
+    @Test
+    fun `planned member deliveries exclude canonical host only sessions with legacy member visibility`() {
+        val nextBookEventId = UUID.fromString("00000000-0000-0000-0000-000000009714")
+        val reviewEventId = UUID.fromString("00000000-0000-0000-0000-000000009715")
+        try {
+            updateSessionAudience(state = "DRAFT", visibility = "MEMBER", accessScope = "HOST_ONLY")
+            insertEventOutboxRow(nextBookEventId, NotificationEventType.NEXT_BOOK_PUBLISHED)
+            val nextBookDeliveries =
+                deliveryAdapter.persistPlannedDeliveries(
+                    message(nextBookEventId, NotificationEventType.NEXT_BOOK_PUBLISHED),
+                )
+
+            updateSessionAudience(state = "PUBLISHED", visibility = "MEMBER", accessScope = "HOST_ONLY")
+            insertEventOutboxRow(reviewEventId, NotificationEventType.REVIEW_PUBLISHED)
+            val reviewDeliveries =
+                deliveryAdapter.persistPlannedDeliveries(
+                    message(
+                        reviewEventId,
+                        NotificationEventType.REVIEW_PUBLISHED,
+                        authorMembershipId = membershipIdForEmail("member1@example.com"),
+                    ),
+                )
+
+            assertSoftly { softly ->
+                softly.assertThat(nextBookDeliveries).isEmpty()
+                softly.assertThat(reviewDeliveries).isEmpty()
+            }
+        } finally {
+            updateSessionAudience(state = "PUBLISHED", visibility = "PUBLIC", accessScope = "GUEST_READABLE")
         }
     }
 
@@ -783,6 +816,21 @@ class JdbcNotificationDeliveryAdapterTest(
             """.trimIndent(),
             state,
             visibility,
+            sessionId.toString(),
+            clubId.toString(),
+        )
+    }
+
+    private fun updateSessionAudience(
+        state: String,
+        visibility: String,
+        accessScope: String,
+    ) {
+        jdbcTemplate.update(
+            "update sessions set state = ?, visibility = ?, access_scope = ? where id = ? and club_id = ?",
+            state,
+            visibility,
+            accessScope,
             sessionId.toString(),
             clubId.toString(),
         )

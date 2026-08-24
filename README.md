@@ -252,6 +252,7 @@ pnpm --dir front dev
 | AI 생성 운영 절차 | [docs/operations/runbooks/ai-session-generation.md](docs/operations/runbooks/ai-session-generation.md) |
 | 디자인 시스템 | [design/README.md](design/README.md) |
 | 주요 기술적 의사결정 | [docs/development/technical-decisions.md](docs/development/technical-decisions.md) |
+| Architecture Decision Records | [docs/development/adr/README.md](docs/development/adr/README.md) |
 | 테스트 가이드 | [docs/development/test-guide.md](docs/development/test-guide.md) |
 | 버저닝 | [docs/development/versioning.md](docs/development/versioning.md) |
 | 릴리즈 관리와 CHANGELOG | [docs/development/release-management.md](docs/development/release-management.md), [CHANGELOG.md](CHANGELOG.md) |

@@ -19,9 +19,11 @@ import com.readmates.session.application.HostSessionNotFoundException
 import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.OpenSessionAlreadyExistsException
 import com.readmates.session.application.UpcomingSessionItem
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
 import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.model.HostSessionDeletionBlockedException
 import com.readmates.session.application.model.HostSessionDeletionBlocker
 import com.readmates.session.application.model.HostSessionDeletionBlockerCode
@@ -35,6 +37,7 @@ import com.readmates.session.application.model.HostSessionTrashPage
 import com.readmates.session.application.model.HostSessionTrashPurgeTarget
 import com.readmates.session.application.model.HostSessionTrashRecord
 import com.readmates.session.application.port.`in`.ListHostSessionTrashCommand
+import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionLifecycleAuditPort
@@ -51,6 +54,7 @@ import org.junit.jupiter.api.Test
 import org.slf4j.LoggerFactory
 import org.springframework.scheduling.annotation.Scheduled
 import java.time.Duration
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
 
@@ -279,7 +283,15 @@ class HostSessionTrashServiceTest {
         val audit = RecordingAudit()
         val cache = RecordingCache()
         val service = HostSessionTrashService(port, query, audit, cache)
-        val deletion = HostSessionLifecycleService(query, port, query, cache, lifecycleAudit = audit)
+        val deletion =
+            HostSessionLifecycleService(
+                query,
+                port,
+                query,
+                TestApplySessionRecordUseCaseStub,
+                cache,
+                lifecycleAudit = audit,
+            )
 
         fun withTrashed(
             state: String = "DRAFT",
@@ -433,6 +445,14 @@ class HostSessionTrashServiceTest {
             pageRequest: PageRequest,
             query: HostSessionListQuery,
         ) = HostSessionListPage(emptyList(), null, HostSessionListSummary(0, 0, 0))
+
+        override fun listMode(
+            host: CurrentMember,
+            limit: Int,
+            query: CanonicalHostSessionListQuery,
+            evaluatedAt: Instant,
+            cursor: HostMeetingListTuple?,
+        ) = HostMeetingListPageRead(emptyList(), null, false, HostSessionListSummary(0, 0, 0))
 
         override fun detail(command: HostSessionIdCommand) = hostSessionDetail(command.sessionId, state)
 

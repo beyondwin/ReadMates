@@ -46,7 +46,7 @@ class JdbcMemberArchiveReviewWriteAdapter(
                     where sessions.club_id = ?
                       and sessions.id = ?
                       and sessions.state = 'PUBLISHED'
-                      and sessions.visibility in ('MEMBER', 'PUBLIC')
+                      and sessions.access_scope = 'GUEST_READABLE'
                     """.trimIndent(),
                     { resultSet, _ -> resultSet.toArchiveReviewWriteTarget() },
                     command.member.membershipId.dbString(),

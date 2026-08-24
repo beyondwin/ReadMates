@@ -13,6 +13,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
@@ -435,7 +436,8 @@ class HostDashboardControllerTest(
                       "questionDeadlineAt": "2026-05-25T23:00:00+09:00",
                       "locationLabel": "강남 스터디룸",
                       "meetingUrl": "https://meet.google.com/readmates-updated",
-                      "meetingPasscode": "updated"
+                      "meetingPasscode": "updated",
+                      "expectedSessionRevision": ${sessionRevision(sessionId)}
                     }
                     """.trimIndent()
             }.andExpect {
@@ -487,15 +489,21 @@ class HostDashboardControllerTest(
             }
 
         val attendees = findFirstTwoSessionAttendees(UUID.fromString(sessionId))
+        val participantSetRevision =
+            jdbcTemplate.queryForObject(
+                "select participant_set_revision from sessions where id = ?",
+                Long::class.java,
+                sessionId,
+            ) ?: 0
         mockMvc
-            .post("/api/host/sessions/$sessionId/attendance") {
+            .post("/api/host/sessions/$sessionId/attendance?expectedParticipantSetRevision=$participantSetRevision") {
                 with(user("host@example.com"))
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     """
                     [
-                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED" },
-                      { "membershipId": "${attendees.second}", "attendanceStatus": "ABSENT" }
+                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 },
+                      { "membershipId": "${attendees.second}", "attendanceStatus": "ABSENT", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
@@ -544,11 +552,12 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED" }
+                      { "membershipId": "${attendees.first}", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
-                status { isNotFound() }
+                status { isConflict() }
+                jsonPath("$.code") { value("REVISION_CONFLICT") }
             }
 
         val attendanceStatus =
@@ -590,7 +599,8 @@ class HostDashboardControllerTest(
                       "title": "7회차 · 레거시 수정",
                       "bookTitle": "레거시 수정 책",
                       "bookAuthor": "레거시 수정 저자",
-                      "date": "2026-05-27"
+                      "date": "2026-05-27",
+                      "expectedSessionRevision": ${sessionRevision(sessionId)}
                     }
                     """.trimIndent()
             }.andExpect {
@@ -656,7 +666,8 @@ class HostDashboardControllerTest(
                       "date": "2026-05-27",
                       "locationLabel": " ",
                       "meetingUrl": " ",
-                      "meetingPasscode": " "
+                      "meetingPasscode": " ",
+                      "expectedSessionRevision": ${sessionRevision(sessionId)}
                     }
                     """.trimIndent()
             }.andExpect {
@@ -713,7 +724,8 @@ class HostDashboardControllerTest(
                       "bookTitle": "시간 수정 책",
                       "bookAuthor": "시간 저자",
                       "date": "2026-05-20",
-                      "endTime": "20:30"
+                      "endTime": "20:30",
+                      "expectedSessionRevision": ${sessionRevision(sessionId)}
                     }
                     """.trimIndent()
             }.andExpect {
@@ -832,7 +844,8 @@ class HostDashboardControllerTest(
                       "title": "7회차 · 수정된 책",
                       "bookTitle": "수정된 책",
                       "bookAuthor": "수정 저자",
-                      "date": "2026-05-27"
+                      "date": "2026-05-27",
+                      "expectedSessionRevision": 0
                     }
                     """.trimIndent()
             }.andExpect {
@@ -847,7 +860,7 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "ATTENDED" }
+                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
@@ -947,7 +960,8 @@ class HostDashboardControllerTest(
                       "title": "14회차 수정 모임",
                       "bookTitle": "물고기는 존재하지 않는다",
                       "bookAuthor": "룰루 밀러",
-                      "date": "04/16/2026"
+                      "date": "04/16/2026",
+                      "expectedSessionRevision": ${sessionRevision(SEEDED_SESSION_ID)}
                     }
                     """.trimIndent()
             }.andExpect {
@@ -989,7 +1003,8 @@ class HostDashboardControllerTest(
                       "title": "14회차 수정 모임",
                       "bookTitle": "물고기는 존재하지 않는다",
                       "bookAuthor": "룰루 밀러",
-                      "date": "2026-02-31"
+                      "date": "2026-02-31",
+                      "expectedSessionRevision": ${sessionRevision(SEEDED_SESSION_ID)}
                     }
                     """.trimIndent()
             }.andExpect {
@@ -1065,7 +1080,7 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "LATE" }
+                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "LATE", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
@@ -1083,7 +1098,7 @@ class HostDashboardControllerTest(
                 content =
                     """
                     [
-                      { "membershipId": " ", "attendanceStatus": "ATTENDED" }
+                      { "membershipId": " ", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
                     ]
                     """.trimIndent()
             }.andExpect {
@@ -1149,6 +1164,7 @@ class HostDashboardControllerTest(
             .post("/api/host/sessions/$sessionId/open") {
                 with(user("host@example.com"))
                 with(csrf())
+                withExpectedRevision(sessionId)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -1211,5 +1227,18 @@ class HostDashboardControllerTest(
                 sessionId.toString(),
             )
         return ThreeAttendees(attendeeIds[0], attendeeIds[1], attendeeIds[2])
+    }
+
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate
+            .query(
+                "select session_revision from sessions where id = ?",
+                { resultSet, _ -> resultSet.getLong("session_revision") },
+                sessionId,
+            ).firstOrNull() ?: 0
+
+    private fun MockHttpServletRequestDsl.withExpectedRevision(sessionId: String) {
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
     }
 }

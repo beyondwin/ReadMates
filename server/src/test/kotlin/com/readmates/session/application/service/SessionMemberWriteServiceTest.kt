@@ -40,7 +40,7 @@ class SessionMemberWriteServiceTest {
         val result = service.updateRsvp(UpdateRsvpCommand(member, "GOING"))
 
         assertEquals("GOING", result.status)
-        assertEquals("updateRsvp:GOING", port.calls.single())
+        assertEquals(listOf("lockOpenSession", "updateRsvp:GOING"), port.calls)
         assertEquals(emptyList<UUID>(), invalidation.clubs)
     }
 
@@ -53,7 +53,7 @@ class SessionMemberWriteServiceTest {
         val result = service.saveCheckin(SaveCheckinCommand(member, 80))
 
         assertEquals(80, result.readingProgress)
-        assertEquals("saveCheckin:80", port.calls.single())
+        assertEquals(listOf("lockOpenSession", "saveCheckin:80"), port.calls)
         assertEquals(emptyList<UUID>(), invalidation.clubs)
     }
 
@@ -75,7 +75,7 @@ class SessionMemberWriteServiceTest {
 
         assertEquals(listOf("첫 질문", "셋째 질문"), result.questions.map { it.text })
         assertEquals(listOf(1, 3), result.questions.map { it.priority })
-        assertEquals("replaceQuestions:1:첫 질문|3:셋째 질문", port.calls.single())
+        assertEquals(listOf("lockOpenSession", "replaceQuestions:1:첫 질문|3:셋째 질문"), port.calls)
     }
 
     @Test
@@ -120,6 +120,9 @@ class SessionMemberWriteServiceTest {
     private class RecordingSessionParticipationWritePort : SessionParticipationWritePort {
         val calls = mutableListOf<String>()
         var throwOnSaveOneLineReview = false
+
+        override fun lockOpenSession(member: com.readmates.shared.security.CurrentMember) =
+            member.clubId.also { calls += "lockOpenSession" }
 
         override fun updateRsvp(command: UpdateRsvpCommand) =
             com.readmates.session.application.model

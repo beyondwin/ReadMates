@@ -30,7 +30,7 @@ class JdbcAdminAuditLedgerAdapter(
                    cast(metadata_json as char) as metadata_json, created_at
             from platform_audit_events
             where created_at >= ? and created_at < ?
-              and (? is null or json_unquote(json_extract(metadata_json, '$.clubId')) = ?)
+              and (? is null or binary json_unquote(json_extract(metadata_json, '$.clubId')) = binary ?)
             order by created_at desc, id desc
             limit ?
             """.trimIndent(),

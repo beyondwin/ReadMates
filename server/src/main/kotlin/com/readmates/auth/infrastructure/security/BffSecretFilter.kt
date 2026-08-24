@@ -5,6 +5,8 @@ import com.readmates.auth.application.port.out.BffSecretRotationAuditPort
 import com.readmates.shared.security.ClientIpHashing
 import com.readmates.shared.security.ClientIpHashingProperties
 import com.readmates.shared.security.SecretComparator
+import io.micrometer.core.instrument.Counter
+import io.micrometer.core.instrument.MeterRegistry
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
@@ -20,6 +22,7 @@ import org.springframework.web.filter.OncePerRequestFilter
 import java.net.URI
 
 @Component
+@Suppress("LongParameterList")
 class BffSecretFilter(
     @param:Value("\${readmates.security.bff.secrets:}")
     private val configuredSecretsRaw: String,
@@ -28,8 +31,7 @@ class BffSecretFilter(
     @param:Value("\${readmates.bff-secret-required:true}")
     private val bffSecretRequired: Boolean,
     private val allowedOriginPort: AllowedOriginPort,
-    @param:Value("\${readmates.security.host-write-client-contract.required:false}")
-    private val hostWriteClientContractRequired: Boolean = false,
+    private val hostClientContractProperties: HostClientContractProperties = HostClientContractProperties(),
     private val ipHashingProperties: ClientIpHashingProperties = ClientIpHashingProperties(),
     @param:Autowired(required = false)
     private val auditPort: BffSecretRotationAuditPort? = null,
@@ -38,6 +40,8 @@ class BffSecretFilter(
     @param:Qualifier("bffSecretAuditExecutor")
     @param:Autowired(required = false)
     private val auditExecutor: TaskExecutor? = null,
+    @param:Autowired(required = false)
+    private val meterRegistry: MeterRegistry? = null,
 ) : OncePerRequestFilter() {
     private val auditMode = BffSecretAuditMode.from(auditModeRaw)
 
@@ -58,6 +62,7 @@ class BffSecretFilter(
         }
 
     init {
+        hostClientContractProperties.effectiveMode()
         if (bffSecretRequired && secrets.isEmpty()) {
             throw IllegalStateException(
                 "readmates.security.bff.secrets must contain at least one entry " +
@@ -98,12 +103,13 @@ class BffSecretFilter(
             }
         }
 
-        if (requiresCurrentHostWriteClientContract(request) && !hasCurrentHostWriteClientContract(request)) {
+        val rejection = hostClientContractRejection(request)
+        if (rejection != null) {
             operationalLogger.warn(
                 "Host write client contract rejected method={}",
                 request.method,
             )
-            writeHostClientUpgradeRequired(response)
+            writeHostClientContractProblem(response, rejection)
         } else {
             filterChain.doFilter(request, response)
         }
@@ -165,19 +171,60 @@ class BffSecretFilter(
 
     private fun isMutatingRequest(request: HttpServletRequest): Boolean = request.method in MUTATING_METHODS
 
-    private fun requiresCurrentHostWriteClientContract(request: HttpServletRequest): Boolean =
-        hostWriteClientContractRequired &&
-            isMutatingRequest(request) &&
-            request.requestPath().let { it == HOST_API_ROOT || it.startsWith(HOST_API_PREFIX) }
+    private fun isMutatingHostApi(request: HttpServletRequest): Boolean {
+        if (!isMutatingRequest(request)) {
+            return false
+        }
+        val path = request.requestPath()
+        return path == HOST_API_ROOT || path.startsWith(HOST_API_PREFIX)
+    }
 
-    private fun hasCurrentHostWriteClientContract(request: HttpServletRequest): Boolean =
-        request.getHeader(CLIENT_CONTRACT_HEADER) == CURRENT_CLIENT_CONTRACT
+    private fun hostClientContractRejection(request: HttpServletRequest): HostClientContractRejection? {
+        if (!isMutatingHostApi(request)) {
+            return null
+        }
+        val generation =
+            ObservedHostClientGeneration.fromHeader(request.getHeader(CLIENT_CONTRACT_HEADER))
+        val mode = hostClientContractProperties.effectiveMode()
+        recordHostClientGeneration(mode, generation)
+        return mode.rejectionFor(generation)
+    }
 
-    private fun writeHostClientUpgradeRequired(response: HttpServletResponse) {
-        response.status = HttpServletResponse.SC_CONFLICT
+    private fun recordHostClientGeneration(
+        mode: HostClientContractMode,
+        generation: ObservedHostClientGeneration,
+    ) {
+        val registry = meterRegistry ?: return
+        val modeTag = mode.residueModeTag() ?: return
+        Counter
+            .builder(HOST_CLIENT_CONTRACT_METRIC)
+            .description("Observed host write client contract generation on mutating /api/host requests")
+            .tag("generation", generation.metricTag)
+            .tag("mode", modeTag)
+            .register(registry)
+            .increment()
+    }
+
+    private fun writeHostClientContractProblem(
+        response: HttpServletResponse,
+        rejection: HostClientContractRejection,
+    ) {
+        response.status = rejection.status
         response.characterEncoding = Charsets.UTF_8.name()
         response.contentType = MediaType.APPLICATION_PROBLEM_JSON_VALUE
-        response.writer.write(HOST_CLIENT_UPGRADE_REQUIRED_BODY)
+        response.writer.write(
+            buildString {
+                append("""{"type":"about:blank","title":"""")
+                append(rejection.title)
+                append("""","status":""")
+                append(rejection.status)
+                append(""","detail":"""")
+                append(HOST_CLIENT_CONTRACT_DETAIL)
+                append("""","code":"""")
+                append(rejection.code)
+                append(""""}""")
+            },
+        )
     }
 
     private fun isApiRequest(request: HttpServletRequest): Boolean {
@@ -195,11 +242,10 @@ class BffSecretFilter(
         private val operationalLogger = LoggerFactory.getLogger(BffSecretFilter::class.java)
         const val BFF_SECRET_HEADER = "X-Readmates-Bff-Secret"
         const val CLIENT_CONTRACT_HEADER = "X-Readmates-Client-Contract"
-        const val CURRENT_CLIENT_CONTRACT = "v2"
         private const val HOST_API_ROOT = "/api/host"
         private const val HOST_API_PREFIX = "/api/host/"
-        private const val HOST_CLIENT_UPGRADE_REQUIRED_BODY =
-            """{"type":"about:blank","title":"Conflict","status":409,"detail":"호스트 운영 화면을 최신 버전으로 새로고침해 주세요.","code":"HOST_CLIENT_UPGRADE_REQUIRED"}"""
+        private const val HOST_CLIENT_CONTRACT_METRIC = "readmates.host.client_contract"
+        private const val HOST_CLIENT_CONTRACT_DETAIL = "호스트 운영 화면을 최신 버전으로 새로고침해 주세요."
         val MUTATING_METHODS = setOf("POST", "PUT", "PATCH", "DELETE")
 
         fun parseAllowedOrigins(

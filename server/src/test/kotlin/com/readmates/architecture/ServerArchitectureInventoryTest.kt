@@ -1,5 +1,6 @@
 package com.readmates.architecture
 
+import com.readmates.publication.application.port.out.PublicConvergencePort
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
@@ -10,6 +11,31 @@ import java.nio.file.Path
 
 @Tag("architecture")
 class ServerArchitectureInventoryTest {
+    @Test
+    fun `emergency takedown authorization is capability based and evidence activation is fail closed`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val service =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/admin/takedown/application/service/PublicTakedownService.kt",
+                ),
+            )
+        assertThat(service)
+            .contains("actor.can(PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN)")
+            .doesNotContain("PlatformAdminRole", ".role ==", ".role in")
+
+        val productionEvidence =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/admin/takedown/adapter/out/evidence/" +
+                        "ProtectedPublicTakedownActivationEvidenceAdapter.kt",
+                ),
+            )
+        assertThat(productionEvidence)
+            .contains("override fun confirmEnabled(): Boolean = false")
+            .doesNotContain("@Value", "ConfigurationProperties", "System.getenv", "environment")
+    }
+
     @Test
     fun `club application imports no auth source`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
@@ -33,6 +59,148 @@ class ServerArchitectureInventoryTest {
             }
 
         assertThat(violations).isEmpty()
+    }
+
+    @Test
+    fun `host list epoch mutations depend on listing port not adapter`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val forbidden = "import com.readmates.shared.listing.adapter"
+        val required = "import com.readmates.shared.listing.application.port.out.HostListEpochPort"
+        val owners =
+            listOf(
+                "com/readmates/session/application/service/HostSessionDraftCommandService.kt",
+                "com/readmates/session/application/service/HostSessionLifecycleService.kt",
+                "com/readmates/session/application/service/HostSessionTrashService.kt",
+                "com/readmates/session/application/service/HostSessionDeletionTransaction.kt",
+                "com/readmates/session/application/service/SessionMemberWriteService.kt",
+                "com/readmates/session/application/service/HostSessionAttendanceService.kt",
+                "com/readmates/auth/application/service/MemberLifecycleService.kt",
+                "com/readmates/session/application/service/HostSessionPublicationService.kt",
+                "com/readmates/sessionrecord/application/service/SessionRecordDraftService.kt",
+                "com/readmates/sessionrecord/application/service/SessionRecordApplyService.kt",
+            )
+        owners.forEach { relative ->
+            val source = Files.readString(productionSourceRoot.resolve(relative))
+            assertThat(source).doesNotContain(forbidden)
+            assertThat(source).contains(required)
+        }
+        val adapter =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/shared/listing/adapter/out/persistence/JdbcHostListEpochAdapter.kt",
+                ),
+            )
+        assertThat(adapter).doesNotContain("import com.readmates.session.")
+    }
+
+    @Test
+    fun `public convergence writes preserve transaction ownership and immutable port shape`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        listOf("session/application", "sessionrecord/application").forEach { relative ->
+            Files.walk(productionSourceRoot.resolve("com/readmates/$relative")).use { paths ->
+                paths
+                    .filter(Files::isRegularFile)
+                    .filter { it.fileName.toString().endsWith(".kt") }
+                    .forEach { sourceFile ->
+                        assertThat(Files.readString(sourceFile)).doesNotContain("import com.readmates.publication.")
+                    }
+            }
+        }
+
+        val ownerAdapter =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/session/adapter/out/persistence/JdbcHostMutationReceiptAdapter.kt",
+                ),
+            )
+        assertThat(ownerAdapter)
+            .contains("insert into public_projection_generations")
+            .contains("insert into public_mutation_convergence_receipts")
+            .contains("insert into public_convergence_work")
+            .doesNotContain("import com.readmates.publication.")
+
+        val convergencePort =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/publication/application/port/out/PublicConvergencePort.kt",
+                ),
+            )
+        assertThat(convergencePort)
+            .doesNotContain("updateReceipt", "deleteReceipt", "updateEvent", "deleteEvent")
+        assertThat(
+            PublicConvergencePort::class.java.methods
+                .single { it.name == "appendEvent" }
+                .parameterCount,
+        ).isEqualTo(1)
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `mutation idempotency substrate stays shared and session receipts stay session owned`() {
+        val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
+        val mutationRoot = productionSourceRoot.resolve("com/readmates/shared/mutation")
+        val mutationSources =
+            Files.walk(mutationRoot).use { paths ->
+                paths
+                    .filter { sourceFile ->
+                        Files.isRegularFile(sourceFile) && sourceFile.fileName.toString().endsWith(".kt")
+                    }.toList()
+            }
+        mutationSources.forEach { sourceFile ->
+            val source = Files.readString(sourceFile)
+            assertThat(source).doesNotContain("import com.readmates.session.")
+            assertThat(source).doesNotContain("import com.readmates.notification.")
+        }
+        val service =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/shared/mutation/application/service/MutationIdempotencyService.kt",
+                ),
+            )
+        assertThat(service).contains(
+            "import com.readmates.shared.mutation.application.port.out.MutationIdempotencyPort",
+        )
+        assertThat(service).doesNotContain("import com.readmates.shared.mutation.adapter")
+        val scheduler =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/shared/mutation/adapter/in/scheduling/MutationIdempotencyPurgeScheduler.kt",
+                ),
+            )
+        assertThat(scheduler).contains(
+            "import com.readmates.shared.mutation.application.port.`in`.PurgeExpiredMutationIdempotencyUseCase",
+        )
+        assertThat(scheduler).doesNotContain("import com.readmates.shared.mutation.application.service")
+        val receiptAdapter =
+            Files.readString(
+                productionSourceRoot.resolve(
+                    "com/readmates/session/adapter/out/persistence/JdbcHostMutationReceiptAdapter.kt",
+                ),
+            )
+        assertThat(receiptAdapter).doesNotContain("import com.readmates.notification")
+        val notificationRoot = productionSourceRoot.resolve("com/readmates/notification")
+        Files.walk(notificationRoot).use { paths ->
+            paths
+                .filter { sourceFile ->
+                    Files.isRegularFile(sourceFile) && sourceFile.fileName.toString().endsWith(".kt")
+                }.forEach { sourceFile ->
+                    val source = Files.readString(sourceFile)
+                    assertThat(source).doesNotContain("HostMutationReceipt")
+                    assertThat(source).doesNotContain(
+                        "import com.readmates.session.application.model.NotificationDecision",
+                    )
+                }
+        }
+        val confirmTest =
+            Files.readString(
+                projectRoot().resolve(
+                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/" +
+                        "JdbcManualNotificationDispatchAdapterTest.kt",
+                ),
+            )
+        assertThat(confirmTest).doesNotContain("HostMutationReceipt")
+        assertThat(confirmTest).doesNotContain("HostMutationEnvelope")
+        assertThat(confirmTest).doesNotContain("session.application.model.NotificationDecision")
     }
 
     @Test

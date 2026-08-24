@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(9)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(14)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,13 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("51")
+            assertThat(latestVersion).isEqualTo("56")
+            assertV52RevisionSchema(upgradeJdbc)
+            assertV52RevisionBackfill(upgradeJdbc)
+            assertV53IdempotencySchema(upgradeJdbc)
+            assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
+            assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -371,7 +377,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(7)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(12)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -383,7 +389,13 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("51")
+            assertThat(latestVersion).isEqualTo("56")
+            assertV52RevisionSchema(upgradeJdbc)
+            assertV52RevisionBackfill(upgradeJdbc)
+            assertV53IdempotencySchema(upgradeJdbc)
+            assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
+            assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1630,6 +1642,306 @@ class MySqlFlywayMigrationTest(
         }
     }
 
+    @Test
+    @Suppress("LongMethod")
+    fun `mysql migrates an empty schema through independent revision domains`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val migrateResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+            val jdbc = JdbcTemplate(dataSource)
+
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("56")
+            assertV52RevisionSchema(jdbc)
+            assertV53IdempotencySchema(jdbc)
+            assertV54PublicProjectionConvergenceSchema(jdbc)
+            assertV55PlatformAdminPublicTakedownSchema(jdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(jdbc)
+            assertThat(countRows(jdbc, "sessions")).isZero()
+            assertThat(countRows(jdbc, "session_publication_versions")).isZero()
+            assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
+            assertThat(countRows(jdbc, "session_participant_change_audit")).isZero()
+
+            insertV52RevisionClubGraph(jdbc, V52_EMPTY_CLUB_ID, "empty-revision")
+            insertV52RevisionSession(
+                jdbc,
+                V52_EMPTY_SESSION_ID,
+                V52_EMPTY_CLUB_ID,
+                number = 1,
+                state = "DRAFT",
+            )
+            assertEquals(
+                0L,
+                jdbc.queryForObject(
+                    """
+                    select session_revision + exposure_revision + participant_set_revision
+                    from sessions
+                    where id = ?
+                    """.trimIndent(),
+                    Long::class.java,
+                    V52_EMPTY_SESSION_ID,
+                ),
+            )
+            jdbc.update(
+                """
+                insert into session_publication_versions (session_id, publication_revision)
+                values (?, 0)
+                """.trimIndent(),
+                V52_EMPTY_SESSION_ID,
+            )
+            jdbc.update(
+                """
+                insert into club_host_list_epochs (club_id, meeting_epoch, record_epoch)
+                values (?, 0, 0)
+                """.trimIndent(),
+                V52_EMPTY_CLUB_ID,
+            )
+            assertThat(countRows(jdbc, "public_session_publications")).isZero()
+            assertEquals(
+                0,
+                jdbc.queryForObject(
+                    "select publication_revision from session_publication_versions where session_id = ?",
+                    Int::class.java,
+                    V52_EMPTY_SESSION_ID,
+                ),
+            )
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `mysql upgrades populated v51 rows with revision backfill without changing publication content`() {
+        FlywayUpgradeMySqlContainer().use { database ->
+            database.start()
+            val dataSource = DriverManagerDataSource(database.jdbcUrl, database.username, database.password)
+            val v51Flyway =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .target("51")
+                    .load()
+            assertThat(v51Flyway.migrate().targetSchemaVersion.toString()).isEqualTo("51")
+            val upgradeJdbc = JdbcTemplate(dataSource)
+            val fixtures = insertV51RevisionUpgradeFixtures(upgradeJdbc)
+            val publicationCountBefore = countRows(upgradeJdbc, "public_session_publications")
+            val publicSummaryBefore =
+                upgradeJdbc.queryForObject(
+                    "select public_summary from public_session_publications where session_id = ?",
+                    String::class.java,
+                    fixtures.publishedSessionId,
+                )
+            val sessionsWithoutPublication =
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from sessions
+                    where id in (?, ?, ?, ?, ?)
+                      and id not in (select session_id from public_session_publications)
+                    """.trimIndent(),
+                    Int::class.java,
+                    fixtures.draftSessionId,
+                    fixtures.openSessionId,
+                    fixtures.closedSessionId,
+                    fixtures.openWithoutPublicationSessionId,
+                    fixtures.trashedSessionId,
+                )
+
+            val upgradeResult =
+                Flyway
+                    .configure()
+                    .dataSource(dataSource)
+                    .locations("classpath:db/mysql/migration")
+                    .load()
+                    .migrate()
+
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(5)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("56")
+            assertV52RevisionSchema(upgradeJdbc)
+            assertV53IdempotencySchema(upgradeJdbc)
+            assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
+            assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
+            assertThat(
+                upgradeJdbc.queryForMap(
+                    """
+                    select generation, live_record_revision, origin_readable
+                    from public_projection_generations
+                    where session_id = ?
+                    """.trimIndent(),
+                    fixtures.publishedSessionId,
+                ),
+            ).containsEntry("generation", 1L)
+                .containsEntry("live_record_revision", null)
+                .containsEntry("origin_readable", true)
+            assertV52RevisionBackfill(upgradeJdbc)
+            assertEquals(publicationCountBefore, countRows(upgradeJdbc, "public_session_publications"))
+            assertEquals(5, sessionsWithoutPublication)
+            assertEquals(
+                publicSummaryBefore,
+                upgradeJdbc.queryForObject(
+                    "select public_summary from public_session_publications where session_id = ?",
+                    String::class.java,
+                    fixtures.publishedSessionId,
+                ),
+            )
+            assertEquals(
+                "V51 preserved public summary",
+                publicSummaryBefore,
+            )
+            assertEquals(
+                1,
+                upgradeJdbc.queryForObject(
+                    """
+                    select count(*)
+                    from sessions
+                    where id = ?
+                      and deleted_at is not null
+                      and session_revision = 0
+                    """.trimIndent(),
+                    Int::class.java,
+                    fixtures.trashedSessionId,
+                ),
+            )
+            assertEquals(
+                0,
+                upgradeJdbc.queryForObject(
+                    """
+                    select attendance_revision
+                    from session_participants
+                    where session_id = ?
+                    """.trimIndent(),
+                    Int::class.java,
+                    fixtures.openSessionId,
+                ),
+            )
+        }
+    }
+
+    @Test
+    @Suppress("LongMethod")
+    fun `mysql adds revision domains participant audit and application snapshot identity`() {
+        assertV52RevisionSchema(jdbcTemplate)
+        assertV53IdempotencySchema(jdbcTemplate)
+        assertV54PublicProjectionConvergenceSchema(jdbcTemplate)
+        assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate)
+        val fixture = V52LiveRevisionFixture()
+        try {
+            insertV52RevisionClubGraph(
+                jdbcTemplate,
+                fixture.clubId,
+                "live-revision-${fixture.suffix}",
+                hostUserId = fixture.hostUserId,
+                hostMembershipId = fixture.hostMembershipId,
+                memberUserId = fixture.memberUserId,
+                memberMembershipId = fixture.memberMembershipId,
+            )
+            insertV52RevisionSession(
+                jdbcTemplate,
+                fixture.sessionId,
+                fixture.clubId,
+                number = 1,
+                state = "DRAFT",
+            )
+            insertV52RevisionParticipant(jdbcTemplate, fixture)
+            jdbcTemplate.update(
+                """
+                insert into session_publication_versions (session_id, publication_revision)
+                values (?, 0)
+                """.trimIndent(),
+                fixture.sessionId,
+            )
+            jdbcTemplate.update(
+                """
+                insert into club_host_list_epochs (club_id, meeting_epoch, record_epoch)
+                values (?, 0, 0)
+                """.trimIndent(),
+                fixture.clubId,
+            )
+            assertEquals(
+                "0:0:0:0",
+                jdbcTemplate.queryForObject(
+                    """
+                    select concat(session_revision, ':', exposure_revision, ':',
+                                  participant_set_revision, ':', attendance_revision)
+                    from sessions
+                    join session_participants on session_participants.session_id = sessions.id
+                    where sessions.id = ?
+                    """.trimIndent(),
+                    String::class.java,
+                    fixture.sessionId,
+                ),
+            )
+            assertEquals(
+                0,
+                jdbcTemplate.queryForObject(
+                    "select count(*) from public_session_publications where session_id = ?",
+                    Int::class.java,
+                    fixture.sessionId,
+                ),
+            )
+            assertRevisionConstraintsRejected(fixture)
+            insertParticipantChangeAudit(jdbcTemplate, fixture, before = "REMOVED", after = "ACTIVE")
+            jdbcTemplate.update("delete from session_participants where session_id = ?", fixture.sessionId)
+            jdbcTemplate.update("delete from sessions where id = ?", fixture.sessionId)
+            assertEquals(
+                0,
+                jdbcTemplate.queryForObject(
+                    "select count(*) from session_publication_versions where session_id = ?",
+                    Int::class.java,
+                    fixture.sessionId,
+                ),
+            )
+            assertEquals(
+                1,
+                jdbcTemplate.queryForObject(
+                    """
+                    select count(*)
+                    from session_participant_change_audit
+                    where id = ? and session_id = ? and club_id = ? and membership_id = ?
+                    """.trimIndent(),
+                    Int::class.java,
+                    fixture.auditId,
+                    fixture.sessionId,
+                    fixture.clubId,
+                    fixture.memberMembershipId,
+                ),
+            )
+            val retainedAudit =
+                jdbcTemplate.queryForMap(
+                    """
+                    select actor_membership_id, before_status, after_status, participant_set_revision
+                    from session_participant_change_audit
+                    where id = ?
+                    """.trimIndent(),
+                    fixture.auditId,
+                )
+            assertEquals(fixture.hostMembershipId, retainedAudit["ACTOR_MEMBERSHIP_ID"].toString())
+            assertEquals("REMOVED", retainedAudit["BEFORE_STATUS"].toString())
+            assertEquals("ACTIVE", retainedAudit["AFTER_STATUS"].toString())
+            assertEquals(0L, (retainedAudit["PARTICIPANT_SET_REVISION"] as Number).toLong())
+        } finally {
+            jdbcTemplate.update("delete from session_participant_change_audit where id = ?", fixture.auditId)
+            jdbcTemplate.update("delete from session_participants where session_id = ?", fixture.sessionId)
+            jdbcTemplate.update("delete from session_publication_versions where session_id = ?", fixture.sessionId)
+            jdbcTemplate.update("delete from sessions where id = ?", fixture.sessionId)
+            jdbcTemplate.update("delete from club_host_list_epochs where club_id = ?", fixture.clubId)
+            jdbcTemplate.update(
+                "delete from memberships where id in (?, ?)",
+                fixture.hostMembershipId,
+                fixture.memberMembershipId,
+            )
+            jdbcTemplate.update("delete from users where id in (?, ?)", fixture.hostUserId, fixture.memberUserId)
+            jdbcTemplate.update("delete from clubs where id = ?", fixture.clubId)
+        }
+    }
+
     private fun assertHostNotificationComposerSchema() {
         assertThat(columns("session_record_apply_receipts"))
             .contains(
@@ -2684,6 +2996,10 @@ class MySqlFlywayMigrationTest(
         private const val CHANGE_SNAPSHOT_CLUB_ID = "00000000-0000-0000-0000-000000000001"
         private const val CHANGE_SNAPSHOT_SESSION_ID = "00000000-0000-0000-0000-000000000301"
         private const val CHANGE_SNAPSHOT_ACTOR_ID = "00000000-0000-0000-0000-000000000201"
+        private const val V52_EMPTY_CLUB_ID = "aaaaaaaa-0000-4000-8000-000000052001"
+        private const val V52_EMPTY_SESSION_ID = "aaaaaaaa-0000-4000-8000-000000052010"
+        private const val V52_EMPTY_HOST_USER_ID = "aaaaaaaa-0000-4000-8000-000000052002"
+        private const val V52_EMPTY_HOST_MEMBERSHIP_ID = "aaaaaaaa-0000-4000-8000-000000052003"
     }
 
     private fun assertLifecycleAuditSchema() {
@@ -2986,7 +3302,8 @@ class MySqlFlywayMigrationTest(
     ): Map<String, Any?> =
         jdbcTemplate.queryForMap(
             """
-            select data_type, is_nullable, column_default, character_set_name, collation_name, datetime_precision
+            select data_type, is_nullable, column_default, character_set_name, collation_name,
+                   datetime_precision, character_maximum_length
             from information_schema.columns
             where table_schema = database() and table_name = ? and column_name = ?
             """.trimIndent(),
@@ -3046,6 +3363,726 @@ class MySqlFlywayMigrationTest(
             tableName,
             constraintName,
         ) ?: error("Foreign key $tableName.$constraintName does not exist")
+
+    @Suppress("LongMethod")
+    private fun assertV52RevisionSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "sessions")).contains(
+            "session_revision",
+            "exposure_revision",
+            "participant_set_revision",
+        )
+        assertThat(columns(jdbcTemplate, "active_sessions")).contains(
+            "session_revision",
+            "exposure_revision",
+            "participant_set_revision",
+        )
+        assertThat(columns(jdbcTemplate, "sessions")).doesNotContain(
+            "record_draft_revision",
+            "live_record_revision",
+            "publication_revision",
+            "snapshot_id",
+        )
+        assertThat(columns(jdbcTemplate, "session_participants")).contains("attendance_revision")
+        assertThat(columns(jdbcTemplate, "session_publication_versions")).containsExactlyInAnyOrder(
+            "session_id",
+            "publication_revision",
+        )
+        assertThat(columns(jdbcTemplate, "club_host_list_epochs")).containsExactlyInAnyOrder(
+            "club_id",
+            "meeting_epoch",
+            "record_epoch",
+        )
+        assertThat(columns(jdbcTemplate, "session_participant_change_audit")).containsExactlyInAnyOrder(
+            "id",
+            "actor_membership_id",
+            "club_id",
+            "session_id",
+            "membership_id",
+            "before_status",
+            "after_status",
+            "participant_set_revision",
+            "created_at",
+        )
+        listOf(
+            Triple("sessions", "session_revision", "0"),
+            Triple("sessions", "exposure_revision", "0"),
+            Triple("sessions", "participant_set_revision", "0"),
+            Triple("session_participants", "attendance_revision", "0"),
+            Triple("session_publication_versions", "publication_revision", "0"),
+            Triple("club_host_list_epochs", "meeting_epoch", "0"),
+            Triple("club_host_list_epochs", "record_epoch", "0"),
+        ).forEach { (table, column, defaultValue) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["IS_NULLABLE"]).isEqualTo("NO")
+            assertThat(metadata["DATA_TYPE"].toString()).isEqualTo("bigint")
+            assertThat(metadata["COLUMN_DEFAULT"].toString()).isEqualTo(defaultValue)
+        }
+        listOf(
+            "session_publication_versions" to "session_id",
+            "club_host_list_epochs" to "club_id",
+            "session_participant_change_audit" to "id",
+            "session_participant_change_audit" to "actor_membership_id",
+            "session_participant_change_audit" to "club_id",
+            "session_participant_change_audit" to "session_id",
+            "session_participant_change_audit" to "membership_id",
+        ).forEach { (table, column) ->
+            val metadata = columnMetadata(jdbcTemplate, table, column)
+            assertThat(metadata["DATA_TYPE"]).isEqualTo("char")
+            assertThat(metadata["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("36")
+        }
+        assertThat(checkConstraintClause(jdbcTemplate, "sessions_session_revision_check")).contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "sessions_exposure_revision_check")).contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "sessions_participant_set_revision_check")).contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_participants_attendance_revision_check"))
+            .contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_publication_versions_revision_check"))
+            .contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "club_host_list_epochs_meeting_epoch_check"))
+            .contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "club_host_list_epochs_record_epoch_check"))
+            .contains(">= 0")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_participant_change_audit_status_check"))
+            .contains("ACTIVE", "REMOVED")
+        assertThat(checkConstraintClause(jdbcTemplate, "session_participant_change_audit_revision_check"))
+            .contains(">= 0")
+        assertEquals("session_id", indexColumns(jdbcTemplate, "session_publication_versions", "PRIMARY"))
+        assertEquals("club_id", indexColumns(jdbcTemplate, "club_host_list_epochs", "PRIMARY"))
+        assertThat(indexNonUnique(jdbcTemplate, "session_publication_versions", "PRIMARY")).isZero()
+        assertThat(indexNonUnique(jdbcTemplate, "club_host_list_epochs", "PRIMARY")).isZero()
+        assertEquals(
+            "CASCADE",
+            foreignKeyDeleteRule(
+                jdbcTemplate,
+                "session_publication_versions",
+                "session_publication_versions_session_fk",
+            ),
+        )
+        assertEquals(
+            "sessions:id",
+            foreignKeyReference(
+                jdbcTemplate,
+                "session_publication_versions",
+                "session_publication_versions_session_fk",
+            ),
+        )
+        assertThat(importedKeys(jdbcTemplate, "session_participant_change_audit")).isEmpty()
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from information_schema.columns
+                where table_schema = database()
+                  and table_name in (
+                    'sessions',
+                    'session_participants',
+                    'session_publication_versions',
+                    'club_host_list_epochs',
+                    'session_participant_change_audit'
+                  )
+                  and column_name in ('snapshot_id', 'projection_snapshot_id')
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV53IdempotencySchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "mutation_idempotency_keys")).containsExactlyInAnyOrder(
+            "club_id",
+            "actor_membership_id",
+            "operation",
+            "resource_slot",
+            "idempotency_key",
+            "canonical_schema_version",
+            "digest_key_version",
+            "request_hmac",
+            "status",
+            "receipt_id",
+            "created_at",
+            "updated_at",
+            "expires_at",
+        )
+        assertThat(columns(jdbcTemplate, "mutation_digest_key_state")).containsExactlyInAnyOrder(
+            "digest_key_version",
+            "last_referenced_at",
+            "unreferenced_since",
+        )
+        assertThat(columns(jdbcTemplate, "host_session_mutation_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "club_id",
+            "actor_membership_id",
+            "operation",
+            "resource_id",
+            "session_revision",
+            "exposure_revision",
+            "participant_set_revision",
+            "record_draft_revision",
+            "live_record_revision",
+            "publication_revision",
+            "notification_decision",
+            "dispatch_receipt_id",
+            "created_at",
+        )
+        val hmac = columnMetadata(jdbcTemplate, "mutation_idempotency_keys", "request_hmac")
+        assertThat(hmac["DATA_TYPE"].toString()).isEqualTo("binary")
+        assertThat(hmac["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+        assertThat(hmac["IS_NULLABLE"]).isEqualTo("NO")
+        assertEquals(
+            "club_id,actor_membership_id,operation,resource_slot,idempotency_key",
+            indexColumns(jdbcTemplate, "mutation_idempotency_keys", "PRIMARY"),
+        )
+        assertThat(indexNonUnique(jdbcTemplate, "mutation_idempotency_keys", "PRIMARY")).isZero()
+        assertThat(importedKeys(jdbcTemplate, "mutation_idempotency_keys")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "mutation_digest_key_state")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "host_session_mutation_receipts")).isEmpty()
+        assertThat(columns(jdbcTemplate, "mutation_idempotency_keys"))
+            .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
+        assertThat(columns(jdbcTemplate, "host_session_mutation_receipts"))
+            .doesNotContain("meeting_url", "meeting_passcode", "canonical_payload", "request_sha256")
+        assertThat(checkConstraintClause(jdbcTemplate, "mutation_idempotency_keys_status_check"))
+            .contains("IN_PROGRESS", "COMPLETED")
+        assertThat(checkConstraintClause(jdbcTemplate, "host_session_mutation_receipts_decision_check"))
+            .contains("NOT_SENT", "DISPATCH_REFERENCED")
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV54PublicProjectionConvergenceSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "public_projection_generations")).contains(
+            "publication_id",
+            "club_id",
+            "session_id",
+            "generation",
+            "live_record_revision",
+            "origin_readable",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_receipts")).containsExactlyInAnyOrder(
+            "mutation_receipt_id",
+            "convergence_id",
+            "publication_id_snapshot",
+            "session_id_snapshot",
+            "committed_generation",
+            "origin_readable",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_convergence_work")).containsExactlyInAnyOrder(
+            "convergence_id",
+            "next_attempt_no",
+            "lease_owner",
+            "lease_expires_at",
+            "available_at",
+            "created_at",
+            "updated_at",
+        )
+        assertThat(columns(jdbcTemplate, "public_convergence_events")).containsExactlyInAnyOrder(
+            "convergence_id",
+            "publication_id_snapshot",
+            "session_id_snapshot",
+            "attempt_no",
+            "event_seq",
+            "status",
+            "observed_at",
+            "result_category",
+        )
+        assertThat(importedKeys(jdbcTemplate, "public_mutation_convergence_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "public_convergence_events")).isEmpty()
+        assertThat(columns(jdbcTemplate, "public_mutation_convergence_receipts"))
+            .doesNotContain("provider_response", "provider_error", "private_body", "reason")
+        assertThat(columns(jdbcTemplate, "public_convergence_events"))
+            .doesNotContain("provider_response", "provider_error", "private_body", "reason")
+        assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_status_check"))
+            .contains("PENDING", "SUCCEEDED", "FAILED")
+    }
+
+    private fun assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate: JdbcTemplate) {
+        assertEquals(
+            "created_at,convergence_id,lease_expires_at",
+            indexColumns(jdbcTemplate, "public_convergence_work", "public_convergence_work_retention_idx"),
+        )
+    }
+
+    private fun assertV55PlatformAdminPublicTakedownSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "public_projection_generations")).contains("emergency_denied")
+        assertThat(checkConstraintClause(jdbcTemplate, "public_projection_generations_emergency_deny_check"))
+            .contains("emergency_denied", "origin_readable")
+        assertV55PreviewAndReceiptSchema(jdbcTemplate)
+        assertV55IdempotencyAndPrivacySchema(jdbcTemplate)
+    }
+
+    private fun assertV55PreviewAndReceiptSchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "admin_public_takedown_previews")).containsExactlyInAnyOrder(
+            "id",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "target_generation",
+            "current_surfaces_json",
+            "expires_at",
+            "created_at",
+        )
+        assertThat(columns(jdbcTemplate, "admin_public_takedown_receipts")).containsExactlyInAnyOrder(
+            "id",
+            "convergence_id",
+            "actor_user_id_snapshot",
+            "actor_platform_role_snapshot",
+            "reason_category",
+            "reason_redacted",
+            "club_id_snapshot",
+            "session_id_snapshot",
+            "publication_id_snapshot",
+            "committed_generation",
+            "origin_result",
+            "current_surfaces_json",
+            "remote_copy_limitation_code",
+            "created_at",
+        )
+        assertThat(
+            columnMetadata(jdbcTemplate, "admin_public_takedown_previews", "expires_at")["DATETIME_PRECISION"],
+        ).isEqualTo(6L)
+        assertV55ReasonCategoryConstraint(jdbcTemplate)
+    }
+
+    private fun assertV55ReasonCategoryConstraint(jdbcTemplate: JdbcTemplate) {
+        fun insertReceipt(category: String) {
+            jdbcTemplate.update(
+                """
+                insert into admin_public_takedown_receipts (
+                  id, convergence_id, actor_user_id_snapshot, actor_platform_role_snapshot,
+                  reason_category, reason_redacted, club_id_snapshot, session_id_snapshot,
+                  publication_id_snapshot, committed_generation, origin_result,
+                  current_surfaces_json, remote_copy_limitation_code, created_at
+                ) values (?, ?, ?, 'OWNER', ?, true, ?, ?, ?, 2, 'DENIED', json_array('ORIGIN'),
+                          'REMOTE_STORED_OR_OFFLINE_COPY_NOT_ERASABLE', utc_timestamp(6))
+                """.trimIndent(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                category,
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
+            )
+        }
+        insertReceipt("PRIVATE_DATA")
+        assertConstraintRejected { insertReceipt("MEMBER_EMAIL_EXPOSURE") }
+        jdbcTemplate.update("delete from admin_public_takedown_receipts")
+    }
+
+    private fun assertV55IdempotencyAndPrivacySchema(jdbcTemplate: JdbcTemplate) {
+        assertThat(columns(jdbcTemplate, "admin_public_takedown_idempotency")).containsExactlyInAnyOrder(
+            "actor_user_id",
+            "operation",
+            "club_id",
+            "publication_id",
+            "idempotency_key",
+            "request_hmac",
+            "canonical_schema_version",
+            "digest_key_version",
+            "receipt_id",
+            "created_at",
+            "completed_at",
+            "expires_at",
+        )
+        assertThat(importedKeys(jdbcTemplate, "admin_public_takedown_previews")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "admin_public_takedown_receipts")).isEmpty()
+        assertThat(importedKeys(jdbcTemplate, "admin_public_takedown_idempotency")).isEmpty()
+        assertEquals(
+            "actor_user_id,operation,club_id,publication_id,idempotency_key",
+            indexColumns(jdbcTemplate, "admin_public_takedown_idempotency", "PRIMARY"),
+        )
+        val hmac = columnMetadata(jdbcTemplate, "admin_public_takedown_idempotency", "request_hmac")
+        assertThat(hmac["DATA_TYPE"].toString()).isEqualTo("binary")
+        assertThat(hmac["CHARACTER_MAXIMUM_LENGTH"].toString()).isEqualTo("32")
+        listOf(
+            "admin_public_takedown_previews",
+            "admin_public_takedown_receipts",
+            "admin_public_takedown_idempotency",
+        ).forEach { table ->
+            assertThat(columns(jdbcTemplate, table)).doesNotContain(
+                "reason",
+                "private_body",
+                "provider_error",
+                "provider_response",
+                "canonical_payload",
+                "request_sha256",
+            )
+        }
+    }
+
+    @Suppress("LongMethod")
+    private fun assertV52RevisionBackfill(jdbcTemplate: JdbcTemplate) {
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sessions
+                where session_revision <> 0
+                   or exposure_revision <> 0
+                   or participant_set_revision <> 0
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from session_participants
+                where attendance_revision <> 0
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from sessions
+                left join session_publication_versions
+                  on session_publication_versions.session_id = sessions.id
+                where session_publication_versions.session_id is null
+                   or session_publication_versions.publication_revision <> 0
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from session_publication_versions
+                left join sessions on sessions.id = session_publication_versions.session_id
+                where sessions.id is null
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+        assertEquals(
+            0,
+            jdbcTemplate.queryForObject(
+                """
+                select count(*)
+                from clubs
+                left join club_host_list_epochs on club_host_list_epochs.club_id = clubs.id
+                where club_host_list_epochs.club_id is null
+                   or club_host_list_epochs.meeting_epoch <> 0
+                   or club_host_list_epochs.record_epoch <> 0
+                """.trimIndent(),
+                Int::class.java,
+            ),
+        )
+    }
+
+    private data class V51RevisionUpgradeFixtures(
+        val draftSessionId: String,
+        val openSessionId: String,
+        val closedSessionId: String,
+        val publishedSessionId: String,
+        val openWithoutPublicationSessionId: String,
+        val trashedSessionId: String,
+    )
+
+    @Suppress("LongMethod")
+    private fun insertV51RevisionUpgradeFixtures(jdbcTemplate: JdbcTemplate): V51RevisionUpgradeFixtures {
+        val clubId = "aaaaaaaa-0000-4000-8000-000000052101"
+        val hostUserId = "aaaaaaaa-0000-4000-8000-000000052102"
+        val hostMembershipId = "aaaaaaaa-0000-4000-8000-000000052103"
+        val memberUserId = "aaaaaaaa-0000-4000-8000-000000052104"
+        val memberMembershipId = "aaaaaaaa-0000-4000-8000-000000052105"
+        val fixtures =
+            V51RevisionUpgradeFixtures(
+                draftSessionId = "aaaaaaaa-0000-4000-8000-000000052110",
+                openSessionId = "aaaaaaaa-0000-4000-8000-000000052111",
+                closedSessionId = "aaaaaaaa-0000-4000-8000-000000052112",
+                publishedSessionId = "aaaaaaaa-0000-4000-8000-000000052113",
+                openWithoutPublicationSessionId = "aaaaaaaa-0000-4000-8000-000000052114",
+                trashedSessionId = "aaaaaaaa-0000-4000-8000-000000052115",
+            )
+        insertV52RevisionClubGraph(
+            jdbcTemplate,
+            clubId,
+            "v51-revision",
+            hostUserId = hostUserId,
+            hostMembershipId = hostMembershipId,
+            memberUserId = memberUserId,
+            memberMembershipId = memberMembershipId,
+        )
+        listOf(
+            Triple(fixtures.draftSessionId, 1, "DRAFT"),
+            Triple(fixtures.openSessionId, 2, "OPEN"),
+            Triple(fixtures.closedSessionId, 3, "CLOSED"),
+            Triple(fixtures.publishedSessionId, 4, "PUBLISHED"),
+            Triple(fixtures.openWithoutPublicationSessionId, 5, "OPEN"),
+            Triple(fixtures.trashedSessionId, 6, "DRAFT"),
+        ).forEach { (sessionId, number, state) ->
+            insertV52RevisionSession(jdbcTemplate, sessionId, clubId, number, state)
+        }
+        jdbcTemplate.update(
+            """
+            update sessions
+            set deleted_at = '2026-08-14 00:00:00.000000',
+                deleted_by_membership_id = ?,
+                purge_after = '2026-08-21 00:00:00.000000'
+            where id = ?
+            """.trimIndent(),
+            hostMembershipId,
+            fixtures.trashedSessionId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status
+            ) values (?, ?, ?, ?, 'GOING', 'UNKNOWN', 'ACTIVE')
+            """.trimIndent(),
+            "aaaaaaaa-0000-4000-8000-000000052120",
+            clubId,
+            fixtures.openSessionId,
+            memberMembershipId,
+        )
+        jdbcTemplate.update(
+            """
+            insert into public_session_publications (
+              id, club_id, session_id, public_summary, is_public, visibility, site_visibility, published_at
+            ) values (?, ?, ?, 'V51 preserved public summary', true, 'PUBLIC', 'PUBLIC_RECORD',
+                      '2026-08-21 22:00:00.000000')
+            """.trimIndent(),
+            "aaaaaaaa-0000-4000-8000-000000052130",
+            clubId,
+            fixtures.publishedSessionId,
+        )
+        return fixtures
+    }
+
+    private data class V52LiveRevisionFixture(
+        val suffix: String = UUID.randomUUID().toString().take(8),
+        val clubId: String = UUID.randomUUID().toString(),
+        val hostUserId: String = UUID.randomUUID().toString(),
+        val memberUserId: String = UUID.randomUUID().toString(),
+        val hostMembershipId: String = UUID.randomUUID().toString(),
+        val memberMembershipId: String = UUID.randomUUID().toString(),
+        val sessionId: String = UUID.randomUUID().toString(),
+        val participantId: String = UUID.randomUUID().toString(),
+        val auditId: String = UUID.randomUUID().toString(),
+    )
+
+    private fun insertV52RevisionClubGraph(
+        jdbcTemplate: JdbcTemplate,
+        clubId: String,
+        slug: String,
+        hostUserId: String = V52_EMPTY_HOST_USER_ID,
+        hostMembershipId: String = V52_EMPTY_HOST_MEMBERSHIP_ID,
+        memberUserId: String = "aaaaaaaa-0000-4000-8000-000000052004",
+        memberMembershipId: String = "aaaaaaaa-0000-4000-8000-000000052005",
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into clubs (id, slug, name, tagline, about, status, public_visibility)
+            values (?, ?, 'Revision Fixture Club', 'Revision migration fixture',
+                    'Synthetic revision domain fixture.', 'ACTIVE', 'PRIVATE')
+            """.trimIndent(),
+            clubId,
+            slug,
+        )
+        insertProfileUser(jdbcTemplate, hostUserId, "revision-host-$slug@example.test", "Revision Host", "RevHost$slug")
+        insertProfileUser(
+            jdbcTemplate,
+            memberUserId,
+            "revision-member-$slug@example.test",
+            "Revision Member",
+            "RevMem$slug",
+        )
+        insertMembership(jdbcTemplate, hostMembershipId, clubId, hostUserId, "RevHost$slug", "HOST")
+        insertMembership(jdbcTemplate, memberMembershipId, clubId, memberUserId, "RevMem$slug", "MEMBER")
+    }
+
+    private fun insertV52RevisionSession(
+        jdbcTemplate: JdbcTemplate,
+        sessionId: String,
+        clubId: String,
+        number: Int,
+        state: String,
+    ) {
+        val visibility = if (state == "PUBLISHED") "PUBLIC" else "HOST_ONLY"
+        val accessScope = if (state == "PUBLISHED") "GUEST_READABLE" else "HOST_ONLY"
+        jdbcTemplate.update(
+            """
+            insert into sessions (
+              id, club_id, number, title, book_title, book_author, session_date,
+              start_time, end_time, location_label, question_deadline_at, state, visibility, access_scope
+            ) values (?, ?, ?, 'Revision fixture session', 'Revision fixture book', 'Example Author',
+                      '2026-08-22', '20:00:00', '22:00:00', '온라인', '2026-08-21 12:00:00.000000', ?, ?, ?)
+            """.trimIndent(),
+            sessionId,
+            clubId,
+            number,
+            state,
+            visibility,
+            accessScope,
+        )
+    }
+
+    private fun insertV52RevisionParticipant(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V52LiveRevisionFixture,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into session_participants (
+              id, club_id, session_id, membership_id, rsvp_status, attendance_status, participation_status
+            ) values (?, ?, ?, ?, 'NO_RESPONSE', 'UNKNOWN', 'ACTIVE')
+            """.trimIndent(),
+            fixture.participantId,
+            fixture.clubId,
+            fixture.sessionId,
+            fixture.memberMembershipId,
+        )
+    }
+
+    private fun insertParticipantChangeAudit(
+        jdbcTemplate: JdbcTemplate,
+        fixture: V52LiveRevisionFixture,
+        before: String,
+        after: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into session_participant_change_audit (
+              id, actor_membership_id, club_id, session_id, membership_id,
+              before_status, after_status, participant_set_revision
+            ) values (?, ?, ?, ?, ?, ?, ?, 0)
+            """.trimIndent(),
+            fixture.auditId,
+            fixture.hostMembershipId,
+            fixture.clubId,
+            fixture.sessionId,
+            fixture.memberMembershipId,
+            before,
+            after,
+        )
+    }
+
+    private fun assertRevisionConstraintsRejected(fixture: V52LiveRevisionFixture) {
+        assertConstraintRejected {
+            jdbcTemplate.update("update sessions set session_revision = -1 where id = ?", fixture.sessionId)
+        }
+        assertConstraintRejected {
+            jdbcTemplate.update("update sessions set exposure_revision = -1 where id = ?", fixture.sessionId)
+        }
+        assertConstraintRejected {
+            jdbcTemplate.update(
+                "update sessions set participant_set_revision = -1 where id = ?",
+                fixture.sessionId,
+            )
+        }
+        assertConstraintRejected {
+            jdbcTemplate.update(
+                "update session_participants set attendance_revision = -1 where session_id = ?",
+                fixture.sessionId,
+            )
+        }
+        assertConstraintRejected {
+            jdbcTemplate.update(
+                "update session_publication_versions set publication_revision = -1 where session_id = ?",
+                fixture.sessionId,
+            )
+        }
+        assertUniqueConstraintRejected("PRIMARY") {
+            jdbcTemplate.update(
+                "insert into session_publication_versions (session_id, publication_revision) values (?, 0)",
+                fixture.sessionId,
+            )
+        }
+        assertUniqueConstraintRejected("PRIMARY") {
+            jdbcTemplate.update(
+                "insert into club_host_list_epochs (club_id, meeting_epoch, record_epoch) values (?, 0, 0)",
+                fixture.clubId,
+            )
+        }
+        assertConstraintRejected {
+            insertParticipantChangeAudit(
+                jdbcTemplate,
+                fixture.copy(auditId = UUID.randomUUID().toString()),
+                "PENDING",
+                "ACTIVE",
+            )
+        }
+        assertConstraintRejected {
+            jdbcTemplate.update(
+                "update club_host_list_epochs set meeting_epoch = -1 where club_id = ?",
+                fixture.clubId,
+            )
+        }
+    }
+
+    private fun insertProfileUser(
+        jdbcTemplate: JdbcTemplate,
+        userId: String,
+        email: String,
+        name: String,
+        shortName: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into users (id, google_subject_id, email, name, short_name, auth_provider)
+            values (?, ?, ?, ?, ?, 'GOOGLE')
+            """.trimIndent(),
+            userId,
+            "google-claim-$userId",
+            email,
+            name,
+            shortName,
+        )
+    }
+
+    private fun insertMembership(
+        jdbcTemplate: JdbcTemplate,
+        membershipId: String,
+        clubId: String,
+        userId: String,
+        shortName: String,
+        role: String,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into memberships (id, club_id, user_id, role, status, joined_at, short_name, avatar_key)
+            values (?, ?, ?, ?, 'ACTIVE', utc_timestamp(6), ?, 'mushroom-green-book')
+            """.trimIndent(),
+            membershipId,
+            clubId,
+            userId,
+            role,
+            shortName,
+        )
+    }
+
+    private fun countRows(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+    ): Int = jdbcTemplate.queryForObject("select count(*) from $tableName", Int::class.java) ?: 0
+
+    private fun importedKeys(
+        jdbcTemplate: JdbcTemplate,
+        tableName: String,
+    ): List<String> =
+        jdbcTemplate
+            .queryForList(
+                """
+                select referenced_table_name
+                from information_schema.referential_constraints
+                where constraint_schema = database()
+                  and table_name = ?
+                """.trimIndent(),
+                String::class.java,
+                tableName,
+            ).filterNotNull()
 
     private fun deleteWhereIn(
         tableName: String,

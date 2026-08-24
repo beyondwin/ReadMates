@@ -4,7 +4,9 @@ import com.readmates.session.application.HostSessionDeletionAssessment
 import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionDeletionNotAllowedException
 import com.readmates.session.application.HostSessionNotFoundException
+import com.readmates.session.application.HostSessionRevisionConflictException
 import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
+import com.readmates.session.application.model.HostProjectionSnapshot
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionLifecycleAction
@@ -12,6 +14,7 @@ import com.readmates.session.application.model.HostSessionTrashPage
 import com.readmates.session.application.model.HostSessionTrashPurgeTarget
 import com.readmates.session.application.model.HostSessionTrashRecord
 import com.readmates.session.application.model.HostSessionTrashResponse
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.requireHost
 import com.readmates.shared.db.dbString
@@ -32,6 +35,18 @@ import java.util.UUID
 class HostSessionDeletionQueries(
     private val jdbcTemplate: JdbcTemplate,
 ) {
+    fun loadProjection(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): HostProjectionSnapshot? =
+        jdbcTemplate
+            .query(
+                TRASH_PROJECTION_SQL,
+                { resultSet, _ -> resultSet.toHostProjectionSnapshot() },
+                sessionId.dbString(),
+                host.clubId.dbString(),
+            ).firstOrNull()
+
     fun assess(
         command: HostSessionIdCommand,
         lock: Boolean,
@@ -41,7 +56,7 @@ class HostSessionDeletionQueries(
         requireDeletableTarget(target)
         return HostSessionDeletionAssessment(
             target = target,
-            blockers = countDeletionBlockers(command.host.clubId, command.sessionId),
+            blockers = countDeletionBlockers(command.host.clubId, command.sessionId, lock),
             counts = countSessionDeletionRows(command.host.clubId, command.sessionId),
         )
     }
@@ -79,17 +94,35 @@ class HostSessionDeletionQueries(
                 update sessions
                 set deleted_at = utc_timestamp(6),
                     deleted_by_membership_id = ?,
-                    purge_after = date_add(deleted_at, interval $HOST_SESSION_TRASH_RETENTION_DAYS day)
+                    purge_after = date_add(deleted_at, interval $HOST_SESSION_TRASH_RETENTION_DAYS day),
+                    session_revision = session_revision + 1
                 where id = ?
                   and club_id = ?
                   and deleted_at is null
                   and state in ('OPEN', 'DRAFT')
+                  and session_revision = ?
                 """.trimIndent(),
                 command.host.membershipId.dbString(),
                 command.sessionId.dbString(),
                 command.host.clubId.dbString(),
+                command.expectedSessionRevision?.value ?: -1,
             )
-        check(updated == 1)
+        if (updated == 0) {
+            val deleted =
+                jdbcTemplate
+                    .query(
+                        """
+                        select deleted_at is not null as trashed
+                        from sessions
+                        where id = ? and club_id = ?
+                        """.trimIndent(),
+                        { resultSet, _ -> resultSet.getBoolean("trashed") },
+                        command.sessionId.dbString(),
+                        command.host.clubId.dbString(),
+                    ).firstOrNull()
+            if (deleted == null || deleted) throw HostSessionNotFoundException()
+            staleOrMissing(command)
+        }
         return loadTrashRecord(command, lock = false) ?: error("trashed session was not readable")
     }
 
@@ -167,15 +200,22 @@ class HostSessionDeletionQueries(
                 update sessions
                 set deleted_at = null,
                     deleted_by_membership_id = null,
-                    purge_after = null
+                    purge_after = null,
+                    session_revision = session_revision + 1
                 where id = ?
                   and club_id = ?
                   and deleted_at is not null
                   and purge_after > utc_timestamp(6)
+                  and session_revision = ?
                 """.trimIndent(),
                 command.sessionId.dbString(),
                 command.host.clubId.dbString(),
+                command.expectedSessionRevision?.value ?: -1,
             )
+        if (updated == 0) {
+            val restorable = loadTrashRecord(command, lock = false)
+            if (restorable != null) staleOrMissing(command)
+        }
         return updated > 0
     }
 
@@ -254,6 +294,36 @@ class HostSessionDeletionQueries(
                 sessionId.dbString(),
             ).firstOrNull()
 
+    private fun staleOrMissing(command: HostSessionIdCommand): Nothing {
+        val conflict =
+            jdbcTemplate
+                .query(
+                    """
+                    select session_revision, exposure_revision, participant_set_revision, updated_at
+                    from sessions
+                    where id = ? and club_id = ?
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        HostSessionRevisionConflictException(
+                            current =
+                                SessionVersionVector(
+                                    sessionRevision = resultSet.getLong("session_revision"),
+                                    exposureRevision = resultSet.getLong("exposure_revision"),
+                                    participantSetRevision = resultSet.getLong("participant_set_revision"),
+                                    recordDraftRevision = null,
+                                    liveRecordRevision = null,
+                                    publicationRevision = 0,
+                                ),
+                            changedAt = resultSet.utcOffsetDateTime("updated_at").toInstant(),
+                            changedByDisplay = null,
+                        )
+                    },
+                    command.sessionId.dbString(),
+                    command.host.clubId.dbString(),
+                ).firstOrNull()
+        throw conflict ?: HostSessionNotFoundException()
+    }
+
     private fun loadTrashRecord(
         command: HostSessionIdCommand,
         lock: Boolean,
@@ -314,66 +384,100 @@ class HostSessionDeletionQueries(
     private fun countDeletionBlockers(
         clubId: UUID,
         sessionId: UUID,
+        lock: Boolean,
     ) = hostSessionDeletionBlockers(
         revisionCount =
-            countSessionRows(
+            countBlockerRows(
                 "select count(*) from session_record_revisions where club_id = ? and session_id = ?",
                 clubId,
                 sessionId,
+                lock,
             ),
         decisionCount =
-            countSessionRows(
+            countBlockerRows(
                 "select count(*) from host_action_notification_decisions where club_id = ? and session_id = ?",
                 clubId,
                 sessionId,
+                lock,
             ),
         manualDispatchCount =
-            countSessionRows(
+            countBlockerRows(
                 "select count(*) from notification_manual_dispatches where club_id = ? and session_id = ?",
                 clubId,
                 sessionId,
+                lock,
             ),
-        eventCount =
-            countSessionRows(
-                """
-                select count(*)
-                from notification_event_outbox
-                where club_id = ?
-                  and aggregate_type = 'SESSION'
-                  and aggregate_id = ?
-                """.trimIndent(),
-                clubId,
-                sessionId,
-            ),
-        deliveryCount =
-            countSessionRows(
-                """
-                select count(*)
-                from notification_deliveries d
-                inner join notification_event_outbox e
-                  on e.id = d.event_id and e.club_id = d.club_id
-                where e.club_id = ?
-                  and e.aggregate_type = 'SESSION'
-                  and e.aggregate_id = ?
-                """.trimIndent(),
-                clubId,
-                sessionId,
-            ),
-        memberNotificationCount =
-            countSessionRows(
-                """
-                select count(*)
-                from member_notifications m
-                inner join notification_event_outbox e
-                  on e.id = m.event_id and e.club_id = m.club_id
-                where e.club_id = ?
-                  and e.aggregate_type = 'SESSION'
-                  and e.aggregate_id = ?
-                """.trimIndent(),
-                clubId,
-                sessionId,
-            ),
+        eventCount = countNotificationEventBlockers(clubId, sessionId, lock),
+        deliveryCount = countNotificationDeliveryBlockers(clubId, sessionId, lock),
+        memberNotificationCount = countMemberNotificationBlockers(clubId, sessionId, lock),
     )
+
+    private fun countNotificationEventBlockers(
+        clubId: UUID,
+        sessionId: UUID,
+        lock: Boolean,
+    ) = countBlockerRows(
+        """
+        select count(*)
+        from notification_event_outbox
+        where club_id = ?
+          and aggregate_type = 'SESSION'
+          and aggregate_id = ?
+        """.trimIndent(),
+        clubId,
+        sessionId,
+        lock,
+    )
+
+    private fun countNotificationDeliveryBlockers(
+        clubId: UUID,
+        sessionId: UUID,
+        lock: Boolean,
+    ) = countBlockerRows(
+        """
+        select count(*)
+        from notification_deliveries d
+        inner join notification_event_outbox e
+          on e.id = d.event_id and e.club_id = d.club_id
+        where e.club_id = ?
+          and e.aggregate_type = 'SESSION'
+          and e.aggregate_id = ?
+        """.trimIndent(),
+        clubId,
+        sessionId,
+        lock,
+    )
+
+    private fun countMemberNotificationBlockers(
+        clubId: UUID,
+        sessionId: UUID,
+        lock: Boolean,
+    ) = countBlockerRows(
+        """
+        select count(*)
+        from member_notifications m
+        inner join notification_event_outbox e
+          on e.id = m.event_id and e.club_id = m.club_id
+        where e.club_id = ?
+          and e.aggregate_type = 'SESSION'
+          and e.aggregate_id = ?
+        """.trimIndent(),
+        clubId,
+        sessionId,
+        lock,
+    )
+
+    private fun countBlockerRows(
+        sql: String,
+        clubId: UUID,
+        sessionId: UUID,
+        lock: Boolean,
+    ): Int = countSessionRows(blockerCountSql(sql, lock), clubId, sessionId)
+
+    private fun blockerCountSql(
+        sql: String,
+        lock: Boolean,
+    ): String = if (lock) "$sql for update" else sql
 
     private fun countSessionDeletionRows(
         clubId: UUID,
@@ -532,6 +636,42 @@ class HostSessionDeletionQueries(
             counts = EMPTY_TRASH_COUNTS,
         )
 }
+
+private const val TRASH_PROJECTION_SQL = """
+select sessions.id,
+       sessions.number,
+       sessions.title,
+       sessions.book_title,
+       sessions.book_author,
+       sessions.session_date,
+       sessions.start_time,
+       sessions.end_time,
+       sessions.location_label,
+       sessions.state,
+       sessions.visibility,
+       sessions.access_scope,
+       sessions.session_revision,
+       sessions.exposure_revision,
+       sessions.participant_set_revision,
+       draft.draft_revision,
+       coalesce(revision.live_revision, 0) as live_revision,
+       coalesce(publication.publication_revision, 0) as publication_revision,
+       coalesce(public_session_publications.site_visibility, 'HIDDEN') as site_visibility
+from sessions
+left join session_record_drafts draft
+  on draft.session_id = sessions.id and draft.club_id = sessions.club_id
+left join (
+  select club_id, session_id, max(version) as live_revision
+  from session_record_revisions
+  group by club_id, session_id
+) revision
+  on revision.club_id = sessions.club_id and revision.session_id = sessions.id
+left join session_publication_versions publication on publication.session_id = sessions.id
+left join public_session_publications
+  on public_session_publications.session_id = sessions.id
+ and public_session_publications.club_id = sessions.club_id
+where sessions.id = ? and sessions.club_id = ?
+"""
 
 private val EMPTY_TRASH_COUNTS =
     HostSessionDeletionCounts(

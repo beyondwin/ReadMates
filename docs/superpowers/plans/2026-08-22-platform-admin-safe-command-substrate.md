@@ -4,7 +4,7 @@
 
 **Goal:** 플랫폼 어드민의 위험 명령이 재시도·동시 실행·응답 유실 상황에서도 중복 효과를 만들지 않도록, 도메인별 preview/receipt가 공유할 최소 운영 idempotency와 HMAC 기반을 제공한다.
 
-**Architecture:** Flyway V56의 `platform_admin_command_idempotency`는 claim 상태와 도메인 receipt pointer만 보유하는 mutable operational substrate다. `shared/mutation`의 versioned canonical HMAC primitive를 재사용하되 platform-admin identity는 host membership identity와 분리한다. 각 club/notification/AI/support application service가 자기 transaction 안에서 claim과 자기 immutable receipt를 함께 완료하며, 범용 명령 controller·executor·receipt body는 만들지 않는다.
+**Architecture:** Flyway V57의 `platform_admin_command_idempotency`는 claim 상태와 도메인 receipt pointer만 보유하는 mutable operational substrate다. `shared/mutation`의 versioned canonical HMAC primitive를 재사용하되 platform-admin identity는 host membership identity와 분리한다. 각 club/notification/AI/support application service가 자기 transaction 안에서 claim과 자기 immutable receipt를 함께 완료하며, 범용 명령 controller·executor·receipt body는 만들지 않는다.
 
 **Tech Stack:** Kotlin, Spring Boot, JDBC, MySQL 8, Flyway, JUnit 5, Testcontainers, Micrometer.
 
@@ -14,8 +14,8 @@ ADR impact: implements proposed ADR-0040; constraining reference — ADR-0028, A
 
 ## Global Constraints
 
-- Prerequisite: host server safety plan V52–V53 and public convergence plan V54–V55 must land first. If current main does not contain them, stop and rebase this plan; never edit or renumber an applied migration.
-- V56 stores no raw reason, email, name, URL, request JSON, canonical input, idempotency key, or plaintext digest.
+- Prerequisite: host/public safety migrations V52–V56 must land first. If current main does not contain them, stop and rebase this plan; never edit or renumber an applied migration.
+- V57 stores no raw reason, email, name, URL, request JSON, canonical input, idempotency key, or plaintext digest.
 - Identity is `(platformAdminUserId, commandType, targetType, targetId, idempotencyKeyHmac)`. It never uses club membership IDs.
 - Same key + same canonical request converges to the same domain receipt. Same key + different request is `409 IDEMPOTENCY_CONFLICT`. A live claim is `409 COMMAND_IN_PROGRESS` with bounded retry guidance.
 - Digest and idempotency-key fingerprints use purpose-separated, versioned HMAC and constant-time comparison. Unknown or retired versions fail closed.
@@ -43,7 +43,7 @@ ADR impact: implements proposed ADR-0040; constraining reference — ADR-0028, A
 ### Task 1: Add the operational idempotency table
 
 **Files:**
-- Create: `server/src/main/resources/db/mysql/migration/V56__platform_admin_command_idempotency.sql`
+- Create: `server/src/main/resources/db/mysql/migration/V57__platform_admin_command_idempotency.sql`
 - Modify: `server/src/test/kotlin/com/readmates/support/MySqlFlywayMigrationTest.kt`
 
 **Schema:**
@@ -74,8 +74,8 @@ platform_admin_command_idempotency(
 State check is `IN_PROGRESS|COMPLETED|FAILED`. Completion requires both receipt columns; failure permits only a bounded error code. The actor UUID is a redacted identity snapshot without a destructive foreign key.
 
 - [ ] **Step 1: Write RED migration tests.** Cover clean and legacy database migration, uniqueness, state/receipt checks, HMAC lengths, non-negative key version, expiry index, no cascade/restrict foreign key to deletable resources, and hard deletion of a referenced target.
-- [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest`; expected FAIL because V56 is absent.
-- [ ] **Step 3: Implement V56 only after verifying V52–V55 exist.** Do not modify V1–V55.
+- [ ] **Step 2: Run RED.** Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest`; expected FAIL because V57 is absent.
+- [ ] **Step 3: Implement V57 only after verifying V52–V56 exist.** Do not modify V1–V56.
 - [ ] **Step 4: Run GREEN.** Run the Task 1 command; expected PASS.
 - [ ] **Step 5: Commit.** Commit: `feat(server): add admin command idempotency schema`
 
@@ -199,5 +199,5 @@ The shared security test supplies real Spring Security, BFF secret header, canon
 
   Expected: PASS.
 - [ ] **Step 3: Inspect data/log safety.** Search migration, model, DTO, logs, and captured SQL parameters for raw `reason|email|idempotencyKey|canonicalRequest`; only in-memory names and redacted HMAC columns may remain.
-- [ ] **Step 4: Run hygiene.** Run: `git diff --check` and `python3 scripts/agent-preflight.py --paths server/src/main/kotlin/com/readmates/shared/adminmutation --paths server/src/main/resources/db/mysql/migration/V56__platform_admin_command_idempotency.sql`; expected no errors.
+- [ ] **Step 4: Run hygiene.** Run: `git diff --check` and `python3 scripts/agent-preflight.py --paths server/src/main/kotlin/com/readmates/shared/adminmutation --paths server/src/main/resources/db/mysql/migration/V57__platform_admin_command_idempotency.sql`; expected no errors.
 - [ ] **Step 5: Commit acceptance-only changes if any.** Commit: `test(server): verify admin command substrate`

@@ -131,6 +131,17 @@ class RedisPublicReadCacheAdapterTest(
     }
 
     @Test
+    fun `generation scoped session lookup cannot return an older cached body`() {
+        val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
+        adapter.putSession(BASELINE_CLUB_ID, sessionId, 1, publicSession(sessionId))
+
+        assertNull(adapter.getSession(BASELINE_CLUB_ID, sessionId, 2))
+
+        adapter.putSession(BASELINE_CLUB_ID, sessionId, 2, publicSession(sessionId))
+        assertEquals(publicSession(sessionId), adapter.getSession(BASELINE_CLUB_ID, sessionId, 2))
+    }
+
+    @Test
     fun `non legacy slug overloads do not create slug scoped public cache keys`() {
         val slug = "sample-book-club"
         val sessionId = UUID.fromString("00000000-0000-0000-0000-000000000301")
@@ -271,9 +282,9 @@ class RedisPublicReadCacheAdapterTest(
 
     companion object {
         private val BASELINE_CLUB_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000001")
-        private val CLUB_KEY = "public:club:$BASELINE_CLUB_ID:home:v1"
+        private val CLUB_KEY = "public:club:$BASELINE_CLUB_ID:generation:1:home:v2"
 
-        private fun sessionKey(sessionId: UUID) = "public:club:$BASELINE_CLUB_ID:session:$sessionId:v1"
+        private fun sessionKey(sessionId: UUID) = "public:club:$BASELINE_CLUB_ID:generation:1:session:$sessionId:v2"
     }
 }
 

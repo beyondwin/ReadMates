@@ -119,8 +119,28 @@ readmates:
       secrets: ${READMATES_BFF_SECRETS:}
     host-write-client-contract:
       required: ${READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED:false}
+      mode: ${READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE:}
     ip-hash:
       base-secret: ${READMATES_IP_HASH_BASE_SECRET:}
+      allow-empty-secret: false
+    host-list-cursor:
+      current-key: ${READMATES_HOST_LIST_CURSOR_CURRENT_KEY:}
+      current-key-version: ${READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION:1}
+      previous-key: ${READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY:}
+      previous-key-version: ${READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION:0}
+      ttl: 24h
+      previous-key-rollout-buffer: 24h
+      allow-empty-secret: false
+  mutation:
+    idempotency:
+      current-key: ${READMATES_MUTATION_IDENTITY_CURRENT_KEY:}
+      current-key-version: ${READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION:1}
+      previous-key: ${READMATES_MUTATION_IDENTITY_PREVIOUS_KEY:}
+      previous-key-version: ${READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION:0}
+      retention: 24h
+      previous-key-rollout-buffer: 24h
+      purge-fixed-delay: ${READMATES_MUTATION_IDEMPOTENCY_PURGE_FIXED_DELAY:1h}
+      purge-batch-size: ${READMATES_MUTATION_IDEMPOTENCY_PURGE_BATCH_SIZE:50}
       allow-empty-secret: false
   notifications:
     enabled: ${READMATES_NOTIFICATIONS_ENABLED:false}
@@ -170,6 +190,29 @@ readmates:
     enabled: ${READMATES_PUBLIC_CACHE_ENABLED:false}
     club-ttl: ${READMATES_PUBLIC_CLUB_CACHE_TTL:15m}
     session-ttl: ${READMATES_PUBLIC_SESSION_CACHE_TTL:15m}
+  public-convergence:
+    enabled: ${READMATES_PUBLIC_CONVERGENCE_ENABLED:false}
+    lease-duration: ${READMATES_PUBLIC_CONVERGENCE_LEASE_DURATION:30s}
+    terminal-write-safety-margin: ${READMATES_PUBLIC_CONVERGENCE_TERMINAL_WRITE_SAFETY_MARGIN:5s}
+    max-attempts: ${READMATES_PUBLIC_CONVERGENCE_MAX_ATTEMPTS:5}
+    initial-backoff: ${READMATES_PUBLIC_CONVERGENCE_INITIAL_BACKOFF:15s}
+    max-backoff: ${READMATES_PUBLIC_CONVERGENCE_MAX_BACKOFF:15m}
+    scheduler:
+      enabled: ${READMATES_PUBLIC_CONVERGENCE_SCHEDULER_ENABLED:false}
+      fixed-delay: ${READMATES_PUBLIC_CONVERGENCE_SCHEDULER_FIXED_DELAY:30s}
+      batch-size: ${READMATES_PUBLIC_CONVERGENCE_SCHEDULER_BATCH_SIZE:20}
+      worker-id: ${READMATES_PUBLIC_CONVERGENCE_WORKER_ID:public-convergence-scheduler}
+    maintenance:
+      enabled: ${READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED:true}
+      retention: ${READMATES_PUBLIC_CONVERGENCE_WORK_RETENTION:168h}
+      fixed-delay: ${READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_FIXED_DELAY:1h}
+      batch-size: ${READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_BATCH_SIZE:100}
+    provider:
+      http-enabled: ${READMATES_PUBLIC_CONVERGENCE_PROVIDER_HTTP_ENABLED:false}
+      endpoint: ${READMATES_PUBLIC_CONVERGENCE_PROVIDER_ENDPOINT:}
+      credential: ${READMATES_PUBLIC_CONVERGENCE_PROVIDER_CREDENTIAL:}
+      connect-timeout: ${READMATES_PUBLIC_CONVERGENCE_PROVIDER_CONNECT_TIMEOUT:1s}
+      read-timeout: ${READMATES_PUBLIC_CONVERGENCE_PROVIDER_READ_TIMEOUT:3s}
   notes-cache:
     enabled: ${READMATES_NOTES_CACHE_ENABLED:false}
     feed-ttl: ${READMATES_NOTES_FEED_CACHE_TTL:3m}

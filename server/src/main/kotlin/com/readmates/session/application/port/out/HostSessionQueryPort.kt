@@ -1,14 +1,19 @@
 package com.readmates.session.application.port.out
 
 import com.readmates.session.application.HostSessionDetailResponse
+import com.readmates.session.application.HostSessionListItem
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
+import com.readmates.session.application.HostSessionListSummary
 import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.UpcomingSessionItem
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
+import java.time.Instant
 
 interface HostSessionQueryPort {
     fun list(
@@ -16,6 +21,14 @@ interface HostSessionQueryPort {
         pageRequest: PageRequest,
         query: HostSessionListQuery,
     ): HostSessionListPage
+
+    fun listMode(
+        host: CurrentMember,
+        limit: Int,
+        query: CanonicalHostSessionListQuery,
+        evaluatedAt: Instant,
+        cursor: HostMeetingListTuple?,
+    ): HostMeetingListPageRead
 
     fun detail(command: HostSessionIdCommand): HostSessionDetailResponse
 
@@ -25,3 +38,10 @@ interface HostSessionQueryPort {
 
     fun scheduleDefaults(host: CurrentMember): HostSessionScheduleDefaults
 }
+
+data class HostMeetingListPageRead(
+    val items: List<HostSessionListItem>,
+    val last: HostMeetingListTuple?,
+    val hasMore: Boolean,
+    val summary: HostSessionListSummary,
+)

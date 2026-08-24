@@ -14,11 +14,14 @@ import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
 import org.springframework.test.context.jdbc.Sql
+import org.springframework.test.web.servlet.MockHttpServletRequestDsl
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.patch
 import org.springframework.test.web.servlet.post
 import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.request
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 import java.util.stream.Stream
 
@@ -130,6 +133,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -186,6 +190,8 @@ class HostSessionBffSecurityTest(
             .with(user(username))
             .header("X-Readmates-Bff-Secret", "test-bff-secret")
             .header("Origin", "http://localhost:3000")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""{"expectedSessionRevision":${sessionRevision(sessionId)}}""")
 
         mockMvc.perform(restoreChange("recovery.viewer@example.com")).andExpect(status().isForbidden)
         mockMvc.perform(restoreSession("recovery.viewer@example.com")).andExpect(status().isForbidden)
@@ -207,6 +213,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect { status { isOk() } }
 
         mockMvc
@@ -214,6 +221,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -301,13 +309,24 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
                 jsonPath("$.state") { value("OPEN") }
+                jsonPath("$.accessScope") { value("GUEST_READABLE") }
+                jsonPath("$.siteVisibility") { value("HIDDEN") }
+                jsonPath("$.visibility") { value("MEMBER") }
             }
 
         assertEquals(6, countRows("session_participants", "session_id = '00000000-0000-0000-0000-000000009888'"))
+        assertEquals(
+            "GUEST_READABLE",
+            jdbcTemplate.queryForObject(
+                "select access_scope from sessions where id = '00000000-0000-0000-0000-000000009888'",
+                String::class.java,
+            ),
+        )
     }
 
     @Test
@@ -319,6 +338,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -335,6 +355,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -352,6 +373,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -376,6 +398,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -400,6 +423,7 @@ class HostSessionBffSecurityTest(
                 with(user("host@example.com"))
                 header("X-Readmates-Bff-Secret", "test-bff-secret")
                 header("Origin", "http://localhost:3000")
+                withExpectedRevision(SESSION_ID)
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.sessionId") { value("00000000-0000-0000-0000-000000009888") }
@@ -434,7 +458,8 @@ class HostSessionBffSecurityTest(
                       "bookTitle": "BFF 삭제 테스트 책",
                       "bookAuthor": "BFF 삭제 테스트 저자",
                       "date": "2026-07-01",
-                      "locationLabel": "온라인"
+                      "locationLabel": "온라인",
+                      "expectedSessionRevision": ${sessionRevision(SESSION_ID)}
                     }
                     """.trimIndent()
             }.andExpect { status { isOk() } }
@@ -540,7 +565,7 @@ class HostSessionBffSecurityTest(
     }
 
     private fun createOpenSession() {
-        createSession(state = "OPEN", visibility = "HOST_ONLY", accessScope = "HOST_ONLY")
+        createSession(state = "OPEN", visibility = "MEMBER", accessScope = "GUEST_READABLE")
         jdbcTemplate.update(
             """
             insert into session_participants (id, club_id, session_id, membership_id, rsvp_status, attendance_status)
@@ -667,6 +692,19 @@ class HostSessionBffSecurityTest(
             Int::class.java,
         ) ?: 0
 
+    private fun sessionRevision(sessionId: String): Long =
+        jdbcTemplate
+            .query(
+                "select session_revision from sessions where id = ?",
+                { resultSet, _ -> resultSet.getLong("session_revision") },
+                sessionId,
+            ).firstOrNull() ?: 0
+
+    private fun MockHttpServletRequestDsl.withExpectedRevision(sessionId: String) {
+        contentType = MediaType.APPLICATION_JSON
+        content = """{"expectedSessionRevision":${sessionRevision(sessionId)}}"""
+    }
+
     private companion object {
         private const val SESSION_ID = "00000000-0000-0000-0000-000000009888"
         private const val CLUB_ID = "00000000-0000-0000-0000-000000000001"
@@ -758,7 +796,7 @@ class HostSessionBffSecurityTest(
                 RecordMutationCase(
                     HttpMethod.POST,
                     "/api/host/sessions/00000000-0000-0000-0000-000000009998/restore",
-                    null,
+                    """{"expectedSessionRevision":0}""",
                 ),
             )
     }
@@ -769,3 +807,120 @@ data class RecordMutationCase(
     val path: String,
     val body: String?,
 )
+
+@SpringBootTest(
+    properties = [
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.bff-secret=test-bff-secret",
+        "readmates.allowed-origins=http://localhost:3000",
+        "readmates.security.host-write-client-contract.mode=SUPPORT_V2_V3",
+    ],
+)
+@AutoConfigureMockMvc
+@Tag("integration")
+class HostSessionBffClientContractSupportTest(
+    @param:Autowired private val mockMvc: MockMvc,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `support mode accepts v2 and v3 host mutation and rejects missing unknown before controller`() {
+        mockMvc.perform(hostAccessScopeRequest("v2")).andExpect(status().isNotFound)
+        mockMvc.perform(hostAccessScopeRequest("v3")).andExpect(status().isNotFound)
+        mockMvc
+            .perform(hostAccessScopeRequest(null))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("HOST_CLIENT_UPGRADE_REQUIRED"))
+        mockMvc
+            .perform(hostAccessScopeRequest("v9"))
+            .andExpect(status().isConflict)
+            .andExpect(jsonPath("$.code").value("HOST_CLIENT_UPGRADE_REQUIRED"))
+    }
+
+    @Test
+    fun `support mode keeps host reads available without a client contract`() {
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect { status { isOk() } }
+    }
+}
+
+@SpringBootTest(
+    properties = [
+        "spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev",
+        "readmates.bff-secret=test-bff-secret",
+        "readmates.allowed-origins=http://localhost:3000",
+        "readmates.security.host-write-client-contract.mode=ENFORCE_V3",
+    ],
+)
+@AutoConfigureMockMvc
+@Tag("integration")
+class HostSessionBffClientContractEnforceTest(
+    @param:Autowired private val mockMvc: MockMvc,
+) : ReadmatesMySqlIntegrationTestSupport() {
+    @Test
+    fun `enforce mode accepts v3 and rejects v2 missing unknown with 428 before controller`() {
+        mockMvc.perform(hostAccessScopeRequest("v3")).andExpect(status().isNotFound)
+        mockMvc
+            .perform(hostAccessScopeRequest("v2"))
+            .andExpect(status().isPreconditionRequired)
+            .andExpect(jsonPath("$.code").value("CLIENT_UPDATE_REQUIRED"))
+        mockMvc
+            .perform(hostAccessScopeRequest(null))
+            .andExpect(status().isPreconditionRequired)
+            .andExpect(jsonPath("$.code").value("CLIENT_UPDATE_REQUIRED"))
+        mockMvc
+            .perform(hostAccessScopeRequest("v9"))
+            .andExpect(status().isPreconditionRequired)
+            .andExpect(jsonPath("$.code").value("CLIENT_UPDATE_REQUIRED"))
+    }
+
+    @Test
+    fun `enforce mode rejects invalid secret and origin before client contract`() {
+        mockMvc
+            .perform(
+                request(
+                    HttpMethod.PATCH,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/access-scope",
+                ).with(user("host@example.com"))
+                    .header("X-Readmates-Client-Contract", "v2")
+                    .header("Origin", "http://localhost:3000")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"accessScope":"GUEST_READABLE"}"""),
+            ).andExpect(status().isUnauthorized)
+        mockMvc
+            .perform(
+                request(
+                    HttpMethod.PATCH,
+                    "/api/host/sessions/00000000-0000-0000-0000-000000009998/access-scope",
+                ).with(user("host@example.com"))
+                    .header("X-Readmates-Bff-Secret", "test-bff-secret")
+                    .header("X-Readmates-Client-Contract", "v3")
+                    .header("Origin", "https://evil.example.com")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content("""{"accessScope":"GUEST_READABLE"}"""),
+            ).andExpect(status().isForbidden)
+    }
+
+    @Test
+    fun `enforce mode keeps host reads available without a client contract`() {
+        mockMvc
+            .get("/api/host/sessions") {
+                with(user("host@example.com"))
+                header("X-Readmates-Bff-Secret", "test-bff-secret")
+            }.andExpect { status { isOk() } }
+    }
+}
+
+private fun hostAccessScopeRequest(contract: String?) =
+    request(
+        HttpMethod.PATCH,
+        "/api/host/sessions/00000000-0000-0000-0000-000000009998/access-scope",
+    ).with(user("host@example.com"))
+        .header("X-Readmates-Bff-Secret", "test-bff-secret")
+        .header("Origin", "http://localhost:3000")
+        .contentType(MediaType.APPLICATION_JSON)
+        .content("""{"accessScope":"GUEST_READABLE"}""")
+        .also { builder ->
+            contract?.let { builder.header("X-Readmates-Client-Contract", it) }
+        }

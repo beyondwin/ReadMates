@@ -4,6 +4,10 @@ import { defineConfig } from "vite";
 import { rewriteFrontendObservabilityProxyPath } from "./shared/observability/frontend-observability-paths";
 import { configureOAuthNavigationProxy } from "./shared/auth/oauth-vite-proxy";
 import { normalizedClubSlug } from "./shared/security/club-slug";
+import {
+  applyHostClientContractProxyHeader,
+  hostClientContractViteBypass,
+} from "./shared/security/host-client-contract";
 
 function normalizedClubSlugFromProxyPath(proxyPath: string | undefined) {
   if (!proxyPath) {
@@ -53,16 +57,10 @@ export default defineConfig({
             ? { "X-Readmates-Bff-Secret": process.env.READMATES_BFF_SECRET }
             : {}),
         },
+        bypass: (req, res) => hostClientContractViteBypass(req, res),
         configure: (proxy) => {
           proxy.on("proxyReq", (proxyReq) => {
-            const clientContract = proxyReq.getHeader("X-Readmates-Client-Contract");
-            const isHostMutation =
-              ["POST", "PUT", "PATCH", "DELETE"].includes(proxyReq.method ?? "") &&
-              /^\/(?:api\/bff\/)?api\/host(?:\/|[?])/.test(proxyReq.path);
-            proxyReq.removeHeader("X-Readmates-Client-Contract");
-            if (clientContract === "v2" && isHostMutation) {
-              proxyReq.setHeader("X-Readmates-Client-Contract", "v2");
-            }
+            applyHostClientContractProxyHeader(proxyReq);
             proxyReq.removeHeader("X-Readmates-Club-Slug");
             proxyReq.removeHeader("X-Readmates-Club-Host");
             const clubSlug = normalizedClubSlugFromProxyPath(proxyReq.path);

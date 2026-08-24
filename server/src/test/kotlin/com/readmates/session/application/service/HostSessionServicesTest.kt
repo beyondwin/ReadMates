@@ -29,9 +29,11 @@ import com.readmates.session.application.HostSessionRecordStagingRequiredExcepti
 import com.readmates.session.application.HostSessionScheduleDefaults
 import com.readmates.session.application.UpcomingSessionItem
 import com.readmates.session.application.model.AttendanceEntryCommand
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.ConfirmAttendanceCommand
 import com.readmates.session.application.model.HOST_SESSION_TRASH_RETENTION_DAYS
 import com.readmates.session.application.model.HostDashboardResult
+import com.readmates.session.application.model.HostMeetingListTuple
 import com.readmates.session.application.model.HostSessionChangeKind
 import com.readmates.session.application.model.HostSessionChangeReceipt
 import com.readmates.session.application.model.HostSessionCommand
@@ -56,6 +58,7 @@ import com.readmates.session.application.model.UpdateHostSessionVisibilityComman
 import com.readmates.session.application.model.UpsertPublicationCommand
 import com.readmates.session.application.model.hostSessionDeletionBlockers
 import com.readmates.session.application.model.normalized
+import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionAuditPort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
@@ -68,10 +71,14 @@ import com.readmates.session.application.port.out.HostSessionTransitionResult
 import com.readmates.session.application.port.out.HostSessionVisibilitySnapshot
 import com.readmates.session.application.port.out.HostSessionVisibilityUpdateResult
 import com.readmates.session.config.HostSessionLifecycleProperties
+import com.readmates.session.domain.PublicSiteVisibility
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.sessionrecord.application.model.SessionRecordVisibility
 import com.readmates.sessionrecord.config.HostActionConfirmationProperties
 import com.readmates.shared.cache.ReadCacheInvalidationPort
+import com.readmates.shared.listing.application.model.HostListEpoch
+import com.readmates.shared.listing.application.model.HostListEpochKind
+import com.readmates.shared.listing.application.port.out.HostListEpochPort
 import com.readmates.shared.observability.RequestIdFilter
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.AccessDeniedException
@@ -86,11 +93,24 @@ import org.slf4j.LoggerFactory
 import org.slf4j.MDC
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.transaction.support.TransactionSynchronizationManager
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.util.UUID
+import kotlin.reflect.full.primaryConstructor
 
 @Suppress("LargeClass")
 class HostSessionServicesTest {
+    @Test
+    fun `correction publisher is a mandatory production dependency`() {
+        val dependency =
+            requireNotNull(HostSessionLifecycleService::class.primaryConstructor)
+                .parameters
+                .single { parameter -> parameter.name == "correctionPublisher" }
+
+        assertThat(dependency.type.isMarkedNullable).isFalse()
+        assertThat(dependency.isOptional).isFalse()
+    }
+
     private val host =
         CurrentMember(
             userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
@@ -140,7 +160,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates visibility update`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = UpdateHostSessionVisibilityCommand(host, UUID.randomUUID(), SessionRecordVisibility.MEMBER)
 
         service.updateVisibility(command)
@@ -155,7 +175,7 @@ class HostSessionServicesTest {
                 visibilityState = "CLOSED"
                 currentVisibility = SessionRecordVisibility.MEMBER
             }
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
 
         service.updateVisibility(
             UpdateHostSessionVisibilityCommand(host, sessionId, SessionRecordVisibility.PUBLIC),
@@ -176,6 +196,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
@@ -199,6 +220,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
@@ -221,6 +243,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
             )
 
         val result =
@@ -245,6 +268,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 confirmationProperties = HostActionConfirmationProperties(required = true),
             )
 
@@ -266,7 +290,7 @@ class HostSessionServicesTest {
                 currentVisibility = SessionRecordVisibility.HOST_ONLY
                 currentAccessScope = SessionAccessScope.HOST_ONLY
             }
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
 
         val result =
             service.updateVisibility(
@@ -301,7 +325,7 @@ class HostSessionServicesTest {
                         }
                     this.currentAccessScope = currentAccessScope
                 }
-            val service = HostSessionLifecycleService(port, port, port)
+            val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
 
             val result =
                 service.updateVisibility(
@@ -322,7 +346,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates open transition`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.open(command)
@@ -333,7 +357,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates close transition`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.close(command)
@@ -344,7 +368,7 @@ class HostSessionServicesTest {
     @Test
     fun `service delegates publish transition`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, UUID.randomUUID())
 
         service.publish(command)
@@ -393,7 +417,7 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand("membership-1", "ATTENDED")),
+                entries = listOf(AttendanceEntryCommand("membership-1", "ATTENDED", expectedAttendanceRevision = 0)),
             )
 
         val result = service.confirmAttendance(command)
@@ -505,7 +529,10 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED")),
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                    ),
             )
 
         service.confirmAttendance(command)
@@ -534,9 +561,10 @@ class HostSessionServicesTest {
                 sessionId = sessionId,
                 entries =
                     listOf(
-                        AttendanceEntryCommand(firstId.toString(), "ATTENDED"),
-                        AttendanceEntryCommand(secondId.toString(), "ABSENT"),
+                        AttendanceEntryCommand(firstId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                        AttendanceEntryCommand(secondId.toString(), "ABSENT", expectedAttendanceRevision = 1),
                     ),
+                expectedParticipantSetRevision = 1,
             )
 
         val result = service.confirmAttendance(command)
@@ -559,13 +587,88 @@ class HostSessionServicesTest {
             ConfirmAttendanceCommand(
                 host = host,
                 sessionId = sessionId,
-                entries = listOf(AttendanceEntryCommand(membershipId.toString(), "ATTENDED")),
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                    ),
             )
 
         val result = service.confirmAttendance(command)
 
         assertThat(port.attendanceAuditTransitions).isEmpty()
         assertThat(result.changeReceipt).isNull()
+    }
+
+    @Test
+    fun `unknown attendance is a first-class correction status`() {
+        val port = RecordingHostSessionPorts()
+        val epochs = RecordingAttendanceEpochPort()
+        val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        port.attendanceStates = mapOf(membershipId to "ATTENDED")
+        val service = HostSessionAttendanceService(port, port, epochPort = epochs)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "UNKNOWN", expectedAttendanceRevision = 2),
+                    ),
+            )
+
+        val result = service.confirmAttendance(command)
+
+        assertThat(port.attendanceAuditTransitions)
+            .containsExactly(HostAttendanceAuditTransition(membershipId.toString(), "ATTENDED", "UNKNOWN"))
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.MEETING))
+        assertThat(result.changeReceipt).isNotNull()
+    }
+
+    @Test
+    fun `attendance confirmation bumps meeting epoch once when status changes`() {
+        val port = RecordingHostSessionPorts()
+        val epochs = RecordingAttendanceEpochPort()
+        val firstId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        val secondId = UUID.fromString("00000000-0000-0000-0000-000000000402")
+        port.attendanceStates = mapOf(firstId to "UNKNOWN", secondId to "UNKNOWN")
+        val service = HostSessionAttendanceService(port, port, epochPort = epochs)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(firstId.toString(), "ATTENDED", expectedAttendanceRevision = 0),
+                        AttendanceEntryCommand(secondId.toString(), "ABSENT", expectedAttendanceRevision = 0),
+                    ),
+                expectedParticipantSetRevision = 3,
+            )
+
+        service.confirmAttendance(command)
+
+        assertThat(epochs.bumps).containsExactly(setOf(HostListEpochKind.MEETING))
+    }
+
+    @Test
+    fun `idempotent attendance confirmation does not bump meeting epoch`() {
+        val port = RecordingHostSessionPorts()
+        val epochs = RecordingAttendanceEpochPort()
+        val membershipId = UUID.fromString("00000000-0000-0000-0000-000000000401")
+        port.attendanceStates = mapOf(membershipId to "ATTENDED")
+        val service = HostSessionAttendanceService(port, port, epochPort = epochs)
+        val command =
+            ConfirmAttendanceCommand(
+                host = host,
+                sessionId = sessionId,
+                entries =
+                    listOf(
+                        AttendanceEntryCommand(membershipId.toString(), "ATTENDED", expectedAttendanceRevision = 4),
+                    ),
+            )
+
+        service.confirmAttendance(command)
+
+        assertThat(epochs.bumps).isEmpty()
     }
 
     @Test
@@ -696,7 +799,7 @@ class HostSessionServicesTest {
                 publishChanged = false
             }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub, invalidation)
         val command = HostSessionIdCommand(host, sessionId)
 
         service.open(command)
@@ -715,7 +818,7 @@ class HostSessionServicesTest {
                 publishChanged = false
             }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub, invalidation)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -741,7 +844,7 @@ class HostSessionServicesTest {
                 openFailure = failure
             }
         val invalidation = RecordingReadCacheInvalidationPort()
-        val service = HostSessionLifecycleService(port, port, port, invalidation)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub, invalidation)
 
         captureHostSessionLogs().use { logs ->
             val thrown =
@@ -774,7 +877,7 @@ class HostSessionServicesTest {
     @Test
     fun `changed lifecycle transitions log club session and states only`() {
         val port = RecordingHostSessionPorts()
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -815,7 +918,7 @@ class HostSessionServicesTest {
                 closeChanged = false
                 publishChanged = false
             }
-        val service = HostSessionLifecycleService(port, port, port)
+        val service = HostSessionLifecycleService(port, port, port, TestApplySessionRecordUseCaseStub)
         val command = HostSessionIdCommand(host, sessionId)
 
         captureHostSessionLogs().use { logs ->
@@ -1453,6 +1556,7 @@ class HostSessionServicesTest {
                 port,
                 port,
                 port,
+                TestApplySessionRecordUseCaseStub,
                 invalidation,
                 confirmationProperties,
                 audit,
@@ -1607,6 +1711,14 @@ class HostSessionServicesTest {
             )
         }
 
+        override fun listMode(
+            host: CurrentMember,
+            limit: Int,
+            query: CanonicalHostSessionListQuery,
+            evaluatedAt: Instant,
+            cursor: HostMeetingListTuple?,
+        ) = HostMeetingListPageRead(emptyList(), null, false, HostSessionListSummary(0, 0, 0))
+
         override fun create(command: HostSessionCommand) =
             CreatedSessionResponse(
                 sessionId = "00000000-0000-0000-0000-000000000301",
@@ -1731,7 +1843,13 @@ class HostSessionServicesTest {
                 lifecycleStateWriteCount += 1
             }
             return HostSessionTransitionResult(
-                detail = hostSessionDetail(command.sessionId).copy(state = "OPEN"),
+                detail =
+                    hostSessionDetail(command.sessionId).copy(
+                        state = "OPEN",
+                        accessScope = SessionAccessScope.GUEST_READABLE,
+                        visibility = SessionRecordVisibility.MEMBER,
+                        siteVisibility = PublicSiteVisibility.HIDDEN,
+                    ),
                 changed = openChanged,
             )
         }
@@ -1958,6 +2076,19 @@ class HostSessionServicesTest {
                     ),
                 visibility = SessionRecordVisibility.HOST_ONLY,
             )
+    }
+
+    private class RecordingAttendanceEpochPort : HostListEpochPort {
+        val bumps = mutableListOf<Set<HostListEpochKind>>()
+
+        override fun load(clubId: UUID) = HostListEpoch(clubId, 0, 0)
+
+        override fun bump(
+            clubId: UUID,
+            kinds: Set<HostListEpochKind>,
+        ) {
+            bumps += kinds
+        }
     }
 
     private class RecordingReadCacheInvalidationPort : ReadCacheInvalidationPort {

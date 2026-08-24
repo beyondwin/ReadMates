@@ -4,7 +4,10 @@ import com.readmates.session.application.HostSessionDeletionCounts
 import com.readmates.session.application.HostSessionListPage
 import com.readmates.session.application.HostSessionListQuery
 import com.readmates.session.application.UpcomingSessionItem
+import com.readmates.session.application.model.CanonicalHostSessionListQuery
 import com.readmates.session.application.model.ConfirmAttendanceCommand
+import com.readmates.session.application.model.HostMeetingListTuple
+import com.readmates.session.application.model.HostProjectionSnapshot
 import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.HostSessionDeletionTarget
 import com.readmates.session.application.model.HostSessionIdCommand
@@ -12,13 +15,16 @@ import com.readmates.session.application.model.HostSessionLifecycleAction
 import com.readmates.session.application.model.HostSessionTrashPage
 import com.readmates.session.application.model.HostSessionTrashPurgeTarget
 import com.readmates.session.application.model.HostSessionTrashRecord
+import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.application.model.UpdateHostSessionCommand
 import com.readmates.session.application.model.UpdateHostSessionVisibilityCommand
 import com.readmates.session.application.model.UpsertPublicationCommand
+import com.readmates.session.application.port.out.HostMeetingListPageRead
 import com.readmates.session.application.port.out.HostSessionAttendancePort
 import com.readmates.session.application.port.out.HostSessionDeletionPort
 import com.readmates.session.application.port.out.HostSessionDraftPort
 import com.readmates.session.application.port.out.HostSessionLifecyclePort
+import com.readmates.session.application.port.out.HostSessionProjectionPort
 import com.readmates.session.application.port.out.HostSessionPublicationPort
 import com.readmates.session.application.port.out.HostSessionQueryPort
 import com.readmates.session.application.port.out.HostSessionTransitionResult
@@ -28,6 +34,7 @@ import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentMember
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Repository
+import java.time.Instant
 import java.util.UUID
 
 @Repository
@@ -41,7 +48,8 @@ class JdbcHostSessionWriteAdapter(
     HostSessionLifecyclePort,
     HostSessionDeletionPort,
     HostSessionAttendancePort,
-    HostSessionPublicationPort {
+    HostSessionPublicationPort,
+    HostSessionProjectionPort {
     private val attentionQueries = HostSessionAttentionQueries()
     private val queries = HostSessionQueries(attentionQueries)
     private val scheduleDefaultsQueries = HostSessionScheduleDefaultsQueries()
@@ -51,6 +59,7 @@ class JdbcHostSessionWriteAdapter(
     private val attendance = HostSessionAttendanceWriteOperations(jdbcTemplate, writeQueries, writePolicy)
     private val publication = HostSessionPublicationWriteOperations(jdbcTemplate, writeQueries, writePolicy)
     private val lifecycle = HostSessionLifecycleWriteOperations(jdbcTemplate, writeQueries, writePolicy)
+    private val reverse = HostSessionReverseWriteOperations(jdbcTemplate, writeQueries)
 
     override fun create(command: HostSessionCommand) = draftWrites.create(command)
 
@@ -64,6 +73,14 @@ class JdbcHostSessionWriteAdapter(
         } else {
             queries.list(jdbcTemplate, host, pageRequest, query)
         }
+
+    override fun listMode(
+        host: CurrentMember,
+        limit: Int,
+        query: CanonicalHostSessionListQuery,
+        evaluatedAt: Instant,
+        cursor: HostMeetingListTuple?,
+    ): HostMeetingListPageRead = queries.listMode(jdbcTemplate, host, limit, query, evaluatedAt, cursor)
 
     override fun upcoming(member: CurrentMember): List<UpcomingSessionItem> = queries.upcoming(jdbcTemplate, member)
 
@@ -128,7 +145,7 @@ class JdbcHostSessionWriteAdapter(
     override fun dashboard(host: CurrentMember) = queries.hostDashboard(jdbcTemplate, host)
 
     override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot =
-        writeQueries.lockVisibilitySnapshot(command)
+        writeQueries.locks.lockVisibilitySnapshot(command)
 
     override fun updateVisibility(command: UpdateHostSessionVisibilityCommand) = draftWrites.updateVisibility(command)
 
@@ -138,9 +155,30 @@ class JdbcHostSessionWriteAdapter(
 
     override fun publish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.publish(command)
 
-    override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.reopen(command)
+    override fun reopen(command: HostSessionIdCommand): HostSessionTransitionResult = reverse.reopen(command)
 
-    override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult = lifecycle.unpublish(command)
+    override fun unpublish(command: HostSessionIdCommand): HostSessionTransitionResult = reverse.unpublish(command)
 
-    override fun returnToDraft(command: HostSessionIdCommand) = lifecycle.returnToDraft(command)
+    override fun returnToDraft(command: HostSessionIdCommand) = reverse.returnToDraft(command)
+
+    override fun loadProjection(
+        host: CurrentMember,
+        sessionId: UUID,
+        includeTrashed: Boolean,
+    ): HostProjectionSnapshot? =
+        if (includeTrashed) {
+            deletionQueries.loadProjection(host, sessionId)
+        } else {
+            writeQueries.revisions.loadProjection(host, sessionId)
+        }
+
+    override fun loadVersionVector(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): SessionVersionVector? = writeQueries.revisions.loadVersionVector(host, sessionId)
+
+    override fun attendanceSnapshotId(
+        host: CurrentMember,
+        sessionId: UUID,
+    ): String = writeQueries.revisions.attendanceSnapshotId(host, sessionId)
 }
