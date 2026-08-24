@@ -127,9 +127,9 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    git push origin v1.2.0
    ```
 
-   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push는 GHCR server image scan/promote workflow만 시작합니다. 새 frontend가 구 backend API를 먼저 호출하지 않도록 Cloudflare Pages production 배포는 backend OCI promotion과 health 확인 뒤 같은 release tag를 입력해 수동 실행합니다.
+   `main` push는 CI만 실행하고 production 배포를 시작하지 않습니다. `v*` release tag push는 GHCR server image scan/promote workflow만 시작합니다. 새 frontend가 구 backend API를 먼저 호출하지 않도록 Cloudflare Pages production 배포는 backend OCI promotion과 health 확인 뒤 protected rollout ref의 package/evidence/final-checker gate로 실행합니다.
 
-   새 버전 발행과 운영 배포를 한 번에 진행할 때는 [새 버전 발행과 운영 배포 Runbook](../deploy/release-publish-runbook.md)을 함께 사용합니다. 이 runbook은 tag push 뒤 `Deploy Server Image`, OCI Compose promotion, `Deploy Front(release_tag)`, GitHub Release, smoke 확인이 같은 제품 tag를 바라보는지 점검하는 순서를 정리합니다.
+   새 버전 발행과 운영 배포를 한 번에 진행할 때는 [새 버전 발행과 운영 배포 Runbook](../deploy/release-publish-runbook.md)을 함께 사용합니다. 이 runbook은 tag push 뒤 `Deploy Server Image`, OCI Compose promotion, protected evidence gate와 reusable `Deploy Front`, GitHub Release, smoke 확인이 같은 제품 tag를 바라보는지 점검하는 순서를 정리합니다.
 
    서버 변경이 포함된 release tag는 `Deploy Server Image` workflow가 scan-candidate digest를 Trivy로 검사한 뒤 같은 digest를 release tag로 promote했는지 확인합니다. 수동 실행할 때는 release tag/ref에서 실행하고 workflow input `image_tag`에도 같은 release tag를 넣습니다. OCI backend는 그 release artifact를 같은 제품 버전 image tag로 배포합니다.
 
@@ -145,7 +145,8 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식의 semantic version을 사용합니다.
    Host-client generation release는 [staged rollout runbook](../deploy/release-publish-runbook.md#host-client-v3-staged-rollout)의 R1/R2a/R2b/R3 순서를 사용합니다. `sync-config`가 승인 stage의 `READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE`를 렌더링하는지 확인하며, R1과 R2a에서는 old-browser v2 write를 계속 지원합니다. R2b는 R2a의 실제 backend digest를 유지한 Pages-only stage이고, pre-v3 backend-only rollback은 허용하지 않습니다. 각 live stage는 별도 fresh explicit approval이 없으면 artifact/runbook-ready에서 멈춥니다.
 
    ```bash
-   gh workflow run "Deploy Front" --ref main -f release_tag=v1.2.0
+   git push origin <release-commit>:host-rollout-r2b
+   gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event push --limit 5
    ```
 
 8. GitHub Release를 만듭니다.

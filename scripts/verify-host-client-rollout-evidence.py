@@ -16,7 +16,7 @@ import unittest
 import urllib.error
 import urllib.request
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from unittest import mock
@@ -29,6 +29,7 @@ SIGNER_WORKFLOW = ".github/workflows/host-client-rollout-evidence.yml"
 PREDICATE_TYPE = "https://slsa.dev/provenance/v1"
 MAX_MANIFEST_BYTES = 256 * 1024
 MAX_ATTESTATION_BYTES = 4 * 1024 * 1024
+MAX_SUBJECT_BYTES = 100 * 1024 * 1024
 MAX_GH_ARCHIVE_BYTES = 100 * 1024 * 1024
 MAX_GH_OUTPUT_BYTES = 4 * 1024 * 1024
 GH_TIMEOUT_SECONDS = 90
@@ -507,6 +508,37 @@ def _verification_command(
     ]
 
 
+def _subject_verification_command(
+    gh_binary: Path,
+    subject_path: Path,
+    attestation_path: Path,
+    repository: str,
+    git_sha: str,
+    source_ref: str,
+) -> list[str]:
+    return [
+        str(gh_binary),
+        "attestation",
+        "verify",
+        str(subject_path),
+        "--repo",
+        repository,
+        "--bundle",
+        str(attestation_path),
+        "--signer-workflow",
+        f"{repository}/{SIGNER_WORKFLOW}",
+        "--source-digest",
+        git_sha,
+        "--source-ref",
+        source_ref,
+        "--deny-self-hosted-runners",
+        "--predicate-type",
+        PREDICATE_TYPE,
+        "--format",
+        "json",
+    ]
+
+
 def _run_gh_verification(command: list[str]) -> Any:
     with tempfile.TemporaryDirectory(prefix="readmates-gh-verify-") as directory:
         stdout_path = Path(directory) / "stdout.json"
@@ -533,7 +565,19 @@ def _run_gh_verification(command: list[str]) -> Any:
         )
 
 
-def _validate_verified_output(output: Any, manifest_path: Path) -> None:
+def _verified_timestamp(value: Any) -> datetime:
+    if not isinstance(value, str) or len(value) > 64:
+        raise EvidenceError("GitHub CLI verified output has an invalid trusted timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise EvidenceError("GitHub CLI verified output has an invalid trusted timestamp") from error
+    if parsed.tzinfo is None:
+        raise EvidenceError("GitHub CLI verified output has an invalid trusted timestamp")
+    return parsed.astimezone(timezone.utc)
+
+
+def _validate_verified_output(output: Any, manifest_path: Path) -> datetime:
     if not isinstance(output, list) or len(output) != 1 or not isinstance(output[0], dict):
         raise EvidenceError("GitHub CLI verified output must contain one result")
     result = output[0]
@@ -546,12 +590,13 @@ def _validate_verified_output(output: Any, manifest_path: Path) -> None:
     if not isinstance(signature, dict) or not isinstance(signature.get("certificate"), dict) or not signature["certificate"]:
         raise EvidenceError("GitHub CLI verified output is missing the verified certificate")
     timestamps = verification.get("verifiedTimestamps")
-    if (
-        not isinstance(timestamps, list)
-        or not timestamps
-        or not any(isinstance(timestamp, dict) and any(timestamp.values()) for timestamp in timestamps)
-    ):
+    if not isinstance(timestamps, list) or not timestamps or len(timestamps) > 32:
         raise EvidenceError("GitHub CLI verified output has no trusted timestamp")
+    verified_times: list[datetime] = []
+    for timestamp in timestamps:
+        if not isinstance(timestamp, dict) or set(timestamp) - {"type", "uri", "timestamp"}:
+            raise EvidenceError("GitHub CLI verified output has an invalid trusted timestamp")
+        verified_times.append(_verified_timestamp(timestamp.get("timestamp")))
     statement = verification.get("statement")
     if not isinstance(statement, dict) or statement.get("predicateType") != PREDICATE_TYPE:
         raise EvidenceError("GitHub CLI verified output has the wrong predicate type")
@@ -568,6 +613,7 @@ def _validate_verified_output(output: Any, manifest_path: Path) -> None:
     ]
     if len(matches) != 1:
         raise EvidenceError("GitHub CLI verified output does not bind the manifest digest")
+    return min(verified_times)
 
 
 def verify_evidence(
@@ -577,7 +623,7 @@ def verify_evidence(
     schema_path: Path = DEFAULT_SCHEMA,
     *,
     gh_binary: Path | None = None,
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], datetime]:
     if manifest_path.absolute() == attestation_path.absolute():
         raise EvidenceError("manifest and attestation inputs must be separate files")
     manifest = load_manifest(manifest_path)
@@ -585,8 +631,41 @@ def verify_evidence(
     _read_bounded(attestation_path, "attestation bundle", MAX_ATTESTATION_BYTES)
     binary = gh_binary if gh_binary is not None else ensure_verified_gh()
     output = _run_gh_verification(_verification_command(binary, manifest_path, attestation_path, manifest))
-    _validate_verified_output(output, manifest_path)
-    return manifest
+    verified_at = _validate_verified_output(output, manifest_path)
+    return manifest, verified_at
+
+
+def verify_subject_attestation(
+    subject_path: Path,
+    attestation_path: Path,
+    *,
+    repository: str,
+    git_sha: str,
+    source_ref: str,
+    gh_binary: Path | None = None,
+) -> datetime:
+    if subject_path.absolute() == attestation_path.absolute():
+        raise EvidenceError("subject and attestation inputs must be separate files")
+    if re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository) is None:
+        raise EvidenceError("attestation repository is invalid")
+    if re.fullmatch(r"[0-9a-f]{40}", git_sha) is None:
+        raise EvidenceError("attestation source SHA is invalid")
+    if re.fullmatch(r"refs/(heads/[A-Za-z0-9._/-]+|tags/v[0-9]+\.[0-9]+\.[0-9]+)", source_ref) is None:
+        raise EvidenceError("attestation source ref is invalid")
+    _read_bounded(subject_path, "attested subject", MAX_SUBJECT_BYTES)
+    _read_bounded(attestation_path, "attestation bundle", MAX_ATTESTATION_BYTES)
+    binary = gh_binary if gh_binary is not None else ensure_verified_gh()
+    output = _run_gh_verification(
+        _subject_verification_command(
+            binary,
+            subject_path,
+            attestation_path,
+            repository,
+            git_sha,
+            source_ref,
+        )
+    )
+    return _validate_verified_output(output, subject_path)
 
 
 def schema_only(
@@ -642,6 +721,7 @@ def _sample_manifest(kind: str) -> dict[str, Any]:
             "runId": "1234",
             "runAttempt": 1,
             "job": kind,
+            "startedAt": "2026-08-24T00:59:00Z",
         },
         "commands": [{"id": item, "result": "PASS"} for item in sorted(EXPECTED_COMMANDS[kind])],
         "cases": [{"id": item, "result": "PASS"} for item in sorted(EXPECTED_CASES[kind])],
@@ -746,7 +826,9 @@ class EvidenceVerifierTests(unittest.TestCase):
                     "attestation": {"bundle": {}},
                     "verificationResult": {
                         "signature": {"certificate": {"issuer": "fixture"}},
-                        "verifiedTimestamps": [{"type": "transparency-log"}],
+                        "verifiedTimestamps": [
+                            {"type": "transparency-log", "timestamp": "2026-08-24T01:21:00Z"}
+                        ],
                         "statement": {
                             "predicateType": PREDICATE_TYPE,
                             "subject": [{"name": manifest_path.name, "digest": {"sha256": digest}}],
@@ -754,7 +836,10 @@ class EvidenceVerifierTests(unittest.TestCase):
                     },
                 }
             ]
-            _validate_verified_output(valid, manifest_path)
+            self.assertEqual(
+                _validate_verified_output(valid, manifest_path),
+                datetime.strptime("2026-08-24T01:21:00Z", "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc),
+            )
             for name, mutate in (
                 ("timestamp", lambda value: value[0]["verificationResult"].update({"verifiedTimestamps": []})),
                 ("empty timestamp", lambda value: value[0]["verificationResult"].update({"verifiedTimestamps": [{}]})),
@@ -782,6 +867,70 @@ class EvidenceVerifierTests(unittest.TestCase):
         self.assertIn("--deny-self-hosted-runners", command)
         self.assertEqual(command[command.index("--predicate-type") + 1], PREDICATE_TYPE)
         self.assertEqual(command[-2:], ["--format", "json"])
+
+    def test_verify_evidence_returns_manifest_and_verified_signing_time(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            manifest_path = Path(directory) / "cache-safety.manifest.json"
+            bundle_path = Path(directory) / "cache-safety.intoto.jsonl"
+            manifest = _sample_manifest("cache-safety")
+            manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+            bundle_path.write_text("{}\n", encoding="utf-8")
+            digest = compute_sha256(manifest_path)
+            verified_output = [
+                {
+                    "attestation": {"bundle": {}},
+                    "verificationResult": {
+                        "signature": {"certificate": {"issuer": "fixture"}},
+                        "verifiedTimestamps": [
+                            {"type": "Tlog", "timestamp": "2026-08-24T01:21:00Z"}
+                        ],
+                        "statement": {
+                            "predicateType": PREDICATE_TYPE,
+                            "subject": [{"name": manifest_path.name, "digest": {"sha256": digest}}],
+                        },
+                    },
+                }
+            ]
+            with mock.patch.object(sys.modules[__name__], "_run_gh_verification", return_value=verified_output):
+                actual_manifest, verified_at = verify_evidence(
+                    manifest_path,
+                    bundle_path,
+                    "cache-safety",
+                    gh_binary=Path("/verified/gh"),
+                )
+            self.assertEqual(actual_manifest, manifest)
+            self.assertEqual(verified_at, datetime(2026, 8, 24, 1, 21, tzinfo=timezone.utc))
+
+    def test_verify_subject_attestation_binds_exact_candidate_bytes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            subject = Path(directory) / "readmates-pages-candidate.tar"
+            bundle = Path(directory) / "pages-candidate.intoto.jsonl"
+            subject.write_bytes(b"exact deterministic candidate")
+            bundle.write_text("{}\n", encoding="utf-8")
+            digest = compute_sha256(subject)
+            verified_output = [
+                {
+                    "attestation": {"bundle": {}},
+                    "verificationResult": {
+                        "signature": {"certificate": {"issuer": "fixture"}},
+                        "verifiedTimestamps": [{"type": "Tlog", "timestamp": "2026-08-24T01:21:00Z"}],
+                        "statement": {
+                            "predicateType": PREDICATE_TYPE,
+                            "subject": [{"name": subject.name, "digest": {"sha256": digest}}],
+                        },
+                    },
+                }
+            ]
+            with mock.patch.object(sys.modules[__name__], "_run_gh_verification", return_value=verified_output):
+                verified_at = verify_subject_attestation(
+                    subject,
+                    bundle,
+                    repository="example/readmates",
+                    git_sha="1" * 40,
+                    source_ref="refs/heads/host-rollout-r2b",
+                    gh_binary=Path("/verified/gh"),
+                )
+            self.assertEqual(verified_at, datetime(2026, 8, 24, 1, 21, tzinfo=timezone.utc))
 
     def test_unavailable_network_trust_or_signature_failure_is_redacted_and_closed(self) -> None:
         with self.assertRaisesRegex(EvidenceError, "verification failed"):

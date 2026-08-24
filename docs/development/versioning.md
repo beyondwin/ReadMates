@@ -6,7 +6,7 @@ ReadMates의 제품 릴리즈 버전은 Git tag와 `CHANGELOG.md`, GitHub Releas
 
 | 항목 | 역할 |
 | --- | --- |
-| Git tag `vMAJOR.MINOR.PATCH` | 배포 가능한 제품 버전, GHCR server image trigger, 수동 frontend 배포의 immutable 입력 |
+| Git tag `vMAJOR.MINOR.PATCH` | 배포 가능한 제품 버전, GHCR server image trigger, protected frontend rollout의 immutable source |
 | `CHANGELOG.md` | 저장소에 남는 버전별 릴리즈 노트 |
 | GitHub Release | 공개 사용자와 운영자가 보는 tag별 릴리즈 노트 |
 | OCI compose image tag | 서버 배포 시 운영 VM에서 pull하는 container image 식별자. 제품 tag와 맞춰 `ghcr.io/<owner>/<repo>/readmates-server:vMAJOR.MINOR.PATCH`를 사용 |
@@ -35,11 +35,11 @@ ReadMates는 `vMAJOR.MINOR.PATCH` 형식을 사용합니다.
 6. `git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"`를 만들고 push합니다.
 7. Tag push가 `.github/workflows/deploy-server.yml`을 통해 GHCR scan-candidate image를 만들고, Trivy가 통과한 같은 digest를 release tag로 promote합니다.
 8. 서버 runtime rendering이 바뀌면 `sync-config(restart_api=false, dry_run=false)`를 성공시킨 뒤 OCI backend를 promote된 GHCR release image tag로 배포하고 Flyway/health/BFF smoke를 확인합니다.
-9. Backend가 새 API contract를 제공하는 것을 확인한 뒤 `Deploy Front` workflow를 `release_tag=vX.Y.Z`로 수동 dispatch해 같은 tag의 Cloudflare Pages frontend와 Pages Functions를 배포합니다.
+9. Backend가 새 API contract를 제공하는 것을 확인한 뒤 protected rollout ref를 같은 annotated tag commit으로 승격합니다. Package/evidence/final checker가 성공하면 reusable `Deploy Front`가 exact candidate tar의 Cloudflare Pages frontend와 Pages Functions를 배포합니다.
 10. GitHub Release를 생성하거나 갱신하고, body는 `CHANGELOG.md`의 해당 버전 섹션과 맞춥니다.
 11. `gh release view vX.Y.Z --json tagName,name,url,publishedAt`로 GitHub Release 객체가 실제로 존재하는지 확인합니다. tag만 있고 release가 없으면 GitHub의 릴리즈 노트 화면에는 아무것도 보이지 않습니다.
 
-`main` 또는 tag push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend는 backend promotion 뒤 `Deploy Front` workflow에 검증할 release tag를 명시해 수동 dispatch합니다. 이 순서는 새 frontend가 구 backend의 미지원 API를 먼저 호출하는 배포 window를 막습니다.
+`main` 또는 tag push만으로는 frontend production 배포가 시작되지 않습니다. Production frontend는 backend promotion 뒤 protected `host-rollout-r2b` push에서 attested evidence와 final checker를 통과한 exact candidate만 배포합니다. `Deploy Front`에 manual dispatch나 사람이 입력하는 artifact/digest/tag 경로는 없습니다. 이 순서는 새 frontend가 구 backend의 미지원 API를 먼저 호출하는 배포 window를 막습니다.
 
 Host-client generation 전환은 단일 tag 안의 backend-first window가 아니라 서로 다른 immutable R1, R2a, R2b tag로 진행합니다. R1과 R2a는 `SUPPORT_V2_V3` backend/BFF와 browser v2를 유지하고, R2a의 720초 cache-safety attestation 뒤 R2b가 browser v3 Pages candidate를 배포합니다. Named 24시간 residue-zero 관측을 통과한 뒤에만 R3에서 `ENFORCE_V3`로 바꿉니다. 각 stage의 tag는 이동하지 않으며 상세 preflight/success/abort/rollback은 [release publish runbook](../deploy/release-publish-runbook.md#host-client-v3-staged-rollout)을 따릅니다.
 

@@ -51,7 +51,8 @@
         "sourceRef",
         "runId",
         "runAttempt",
-        "job"
+        "job",
+        "startedAt"
       ],
       "properties": {
         "repository": {
@@ -66,7 +67,7 @@
         },
         "sourceRef": {
           "type": "string",
-          "pattern": "^refs/(heads/main|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$",
+          "pattern": "^refs/(heads/(main|host-rollout-r2[ab])|tags/v[0-9]+\\.[0-9]+\\.[0-9]+)$",
           "maxLength": 96
         },
         "runId": {
@@ -81,6 +82,9 @@
         },
         "job": {
           "enum": ["cache-safety", "compatibility", "security"]
+        },
+        "startedAt": {
+          "$ref": "#/$defs/timestamp"
         }
       }
     },

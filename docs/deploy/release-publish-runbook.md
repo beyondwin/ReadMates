@@ -72,8 +72,8 @@ E2E를 실행하지 못하면 release note와 최종 배포 보고에 스킵 사
 ### 공통 evidence와 신뢰 경계
 
 - 일반 CI와 공개 릴리즈 후보는 `check-host-client-rollout-contract.py --self-test`, `verify-host-client-rollout-evidence.py --self-test`, structural default mode만 실행합니다. Live manifest 검증을 일반 PR이나 untrusted ref에서 실행하지 않습니다.
-- Protected reusable workflow만 `cache-safety.manifest.json`, `compatibility.manifest.json`, `security.manifest.json`과 각각 별도 `.intoto.jsonl` bundle을 처리합니다. Manifest 경로와 bundle 경로는 모두 explicit input이며 서로 추론하지 않습니다.
-- Pages digest는 pinned `actions/upload-artifact`의 trusted job output에서, backend digest는 trusted build/deployment job output에서 가져옵니다. `workflow_dispatch` human input을 digest로 쓰지 않습니다.
+- Protected `host-rollout-r2a`/`host-rollout-r2b` push workflow만 `cache-safety.manifest.json`, `compatibility.manifest.json`, `security.manifest.json`과 각각 별도 `.intoto.jsonl` bundle을 생성합니다. Signer는 다운로드하거나 입력받은 manifest를 서명하지 않고, exact protected job output으로 manifest를 직접 만듭니다.
+- Pages digest는 deterministic candidate tar 자체에 `sha256sum`을 적용한 값이고, backend digest는 trusted build/deployment job output입니다. `upload-artifact`의 artifact-container digest나 `workflow_dispatch` human input을 candidate/backend digest로 쓰지 않습니다.
 - Official GitHub CLI checksum lock과 `gh attestation verify`가 signature, certificate identity, transparency/timestamp, subject, repository, workflow, source ref/SHA를 검증합니다. Python checker는 성공한 JSON의 schema, candidate, digest, time, command/case, provenance policy만 확인합니다.
 - Live verifier에서 GitHub CLI download/checksum, network, trust root, signature, transparency, subject, verified timestamp 중 하나라도 확인할 수 없으면 abort입니다. Code presence나 tracked Markdown은 attested evidence의 대체물이 아닙니다.
 
@@ -101,12 +101,13 @@ E2E를 실행하지 못하면 release note와 최종 배포 보고에 스킵 사
 
 **preflight:** R2a cache attestation이 성공한 뒤 별도 immutable tag와 Pages digest를 사용합니다. `r2bBackendDigest == r2aBackendDigest`, `r2bPagesDigest != r2aPagesDigest`, R2a SHA ancestry, 동일 C1 source-set digest를 확인합니다. Compatibility와 security manifest는 같은 R2b SHA/candidate/backend/Pages digest에 묶고, D3와 B7+C1+D5 provenance 및 exact bounded command/case를 포함합니다. Backend가 달라지면 R2b가 아니라 별도 승인된 backend deploy/health/provenance stage로 되돌아갑니다.
 
-**success:** Compatibility matrix와 모든 non-session family regression, BFF capability probe, B7 authority-loss purge, C1 deterministic cache rerun이 protected producer에서 통과한 뒤에만 v3 Pages candidate를 배포합니다. 이후 named observation window는 24시간입니다. `Host Client Contract Adoption` dashboard의 `readmates_host_client_contract_writes_total` query는 club/resource dimension 없이 generation과 bounded result만 집계합니다.
+**success:** Compatibility matrix와 모든 non-session family regression, BFF capability probe, B7 authority-loss purge, C1 deterministic cache rerun이 protected producer에서 통과하고 final live checker가 성공한 뒤에만, attested deterministic tar의 exact bytes를 v3 Pages candidate로 배포합니다. 이후 named observation window는 24시간입니다. `Host Client Contract Adoption` dashboard는 실제 Micrometer counter `readmates.host.client_contract`의 Prometheus 이름 `readmates_host_client_contract_total`과 low-cardinality label `generation`, `mode`만 사용합니다. R2b 관측 mode는 `support`입니다.
 
 ```promql
-sum by (generation, result) (
-  increase(readmates_host_client_contract_writes_total[24h])
-)
+(sum(increase(readmates_host_client_contract_total{generation="v2",mode="support"}[24h])) or vector(0)) == 0
+(sum(increase(readmates_host_client_contract_total{generation="v3",mode="support"}[24h])) or vector(0)) > 0
+(sum(increase(readmates_host_client_contract_total{generation="missing",mode="support"}[24h])) or vector(0)) == 0
+(sum(increase(readmates_host_client_contract_total{generation="unknown",mode="support"}[24h])) or vector(0)) == 0
 ```
 
 24시간 success threshold는 `v2 writes == 0`, `v3 writes > 0`, `missing/unknown == 0`, BFF capability probe success, 그리고 모든 non-session operation family의 safe pre-production regression 유지입니다.
@@ -139,7 +140,7 @@ git tag -a vX.Y.Z -m "ReadMates vX.Y.Z"
 git push origin vX.Y.Z
 ```
 
-`main` push는 production 배포를 시작하지 않습니다. exact `vMAJOR.MINOR.PATCH` tag push는 GHCR server image publish workflow만 시작합니다. Server workflow는 annotated tag 자체를 checkout하고 tag가 가리키는 commit과 `HEAD`가 일치하는지 build 전에 검증합니다. Cloudflare Pages production은 server image scan/promote와 OCI backend health 확인 뒤 같은 tag를 `release_tag`로 입력해 수동 배포합니다.
+`main` push는 production 배포를 시작하지 않습니다. exact `vMAJOR.MINOR.PATCH` tag push는 GHCR server image publish workflow만 시작합니다. Server workflow는 annotated tag 자체를 checkout하고 tag가 가리키는 commit과 `HEAD`가 일치하는지 build 전에 검증합니다. Host-client rollout의 Cloudflare Pages production은 protected `host-rollout-r2b` ref에서 package → attestation/evidence → final checker 순서를 통과한 exact candidate artifact만 reusable `Deploy Front`에 전달합니다.
 
 Branch protection bypass 정책은 [release-management.md#branch-protection-bypass-policy](../development/release-management.md#branch-protection-bypass-policy)를 참조합니다. `main` direct push (admin bypass) 허용 조건, release PR 강제 조건, emergency bypass ledger 기록 기준이 그 절에 정리되어 있습니다. Release tag push 직전에는 `./scripts/pre-push-check.sh --release`를 실행해 `CHANGELOG Unreleased` 가드를 통과시키고, 통과가 어려운 emergency 상황에서만 `--no-changelog-check`로 우회합니다.
 
@@ -162,15 +163,15 @@ gh workflow run "Deploy Server Image" --ref vX.Y.Z -f image_tag=vX.Y.Z
 
 Workflow는 generic Docker tag, lightweight tag, tag commit과 checkout `HEAD` 불일치를 build 전에 거절합니다. Pushed tag와 manual dispatch는 같은 release-tag concurrency key를 사용하고, Trivy가 검사한 digest와 release tag로 promote하는 digest가 다르면 실패해야 합니다. 실패한 source tag는 이동하거나 덮어쓰지 않고 수정한 commit에서 새 patch tag를 발행합니다.
 
-Backend health와 BFF contract를 확인한 뒤 frontend workflow를 같은 release tag로 수동 실행합니다.
+Backend health와 BFF contract를 확인한 뒤 protected rollout ref가 exact annotated release tag commit을 가리키도록 승격합니다. `Deploy Front`를 수동 실행하거나 artifact ID/digest/SHA/tag를 사람이 입력하는 경로는 없습니다.
 
 ```bash
-gh workflow run "Deploy Front" --ref main -f release_tag=vX.Y.Z
-gh run list --workflow "Deploy Front" --event workflow_dispatch --limit 5
-gh run watch <deploy-front-run-id> --exit-status
+git push origin <r2b-commit>:host-rollout-r2b
+gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event push --limit 5
+gh run watch <host-rollout-run-id> --exit-status
 ```
 
-`Deploy Front`는 입력 tag 형식을 검사하고 checkout commit이 그 tag를 가리키는지 확인한 뒤 `front/dist`와 `front/functions`를 Cloudflare Pages production에 배포합니다. Server image, OCI promotion, frontend 중 하나가 실패하면 다음 단계로 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
+Protected workflow는 ref 보호, annotated tag/checkout commit, exact candidate SHA-256, R2a/R2b evidence와 final checker를 확인한 뒤 reusable `Deploy Front`가 검증한 tar에서 추출한 `dist`와 `functions`만 Cloudflare Pages production에 배포합니다. Server image, OCI promotion, evidence checker, frontend 중 하나가 실패하면 다음 단계로 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
 
 ## GitHub Release 생성
 
