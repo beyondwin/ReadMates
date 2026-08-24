@@ -3,6 +3,7 @@ package com.readmates.admin.audit.application
 enum class AdminAuditError {
     INVALID_FILTER,
     INVALID_CURSOR,
+    SOURCE_UNAVAILABLE,
 }
 
 class AdminAuditException(

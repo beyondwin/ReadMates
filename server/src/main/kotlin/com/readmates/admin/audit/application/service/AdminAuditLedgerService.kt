@@ -7,6 +7,7 @@ import com.readmates.admin.audit.application.AdminAuditException
 import com.readmates.admin.audit.application.model.AdminAuditActionCategory
 import com.readmates.admin.audit.application.model.AdminAuditActor
 import com.readmates.admin.audit.application.model.AdminAuditActorRole
+import com.readmates.admin.audit.application.model.AdminAuditCursorDraft
 import com.readmates.admin.audit.application.model.AdminAuditFilter
 import com.readmates.admin.audit.application.model.AdminAuditLedgerItem
 import com.readmates.admin.audit.application.model.AdminAuditLedgerPage
@@ -14,20 +15,25 @@ import com.readmates.admin.audit.application.model.AdminAuditListQuery
 import com.readmates.admin.audit.application.model.AdminAuditMetadata
 import com.readmates.admin.audit.application.model.AdminAuditMetadataState
 import com.readmates.admin.audit.application.model.AdminAuditOutcome
+import com.readmates.admin.audit.application.model.AdminAuditSourceQuery
 import com.readmates.admin.audit.application.model.AdminAuditSourceRow
 import com.readmates.admin.audit.application.model.AdminAuditSourceSlice
 import com.readmates.admin.audit.application.model.AdminAuditSourceType
 import com.readmates.admin.audit.application.model.AdminAuditSummary
 import com.readmates.admin.audit.application.model.AdminAuditTarget
+import com.readmates.admin.audit.application.model.AdminAuditTuple
 import com.readmates.admin.audit.application.model.utc
 import com.readmates.admin.audit.application.port.`in`.ListAdminAuditLedgerUseCase
 import com.readmates.admin.audit.application.port.out.AdminAuditLedgerReadPort
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.architecture.ReadOnlyApplicationService
-import com.readmates.shared.paging.CursorCodec
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformCapability
+import com.readmates.shared.security.toPlatformActor
 import org.springframework.stereotype.Service
 import tools.jackson.databind.ObjectMapper
+import java.math.BigInteger
+import java.time.Clock
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -36,6 +42,8 @@ import java.util.UUID
 @Service
 class AdminAuditLedgerService(
     private val readPort: AdminAuditLedgerReadPort,
+    private val cursorSigner: AdminAuditCursorSigner,
+    private val clock: Clock,
     private val objectMapper: ObjectMapper = ObjectMapper(),
 ) : ListAdminAuditLedgerUseCase {
     override fun listLedger(
@@ -43,48 +51,70 @@ class AdminAuditLedgerService(
         query: AdminAuditListQuery,
     ): AdminAuditLedgerPage {
         validateFilter(query.filter)
+        val actor = admin.toPlatformActor()
+        if (!actor.can(PlatformCapability.VIEW_AUDIT)) {
+            throw AdminAuditException(AdminAuditError.INVALID_FILTER, "Audit access is not allowed")
+        }
+        if (query.sensitiveTarget != null && !actor.can(PlatformCapability.VIEW_SENSITIVE_AUDIT)) {
+            throw AdminAuditException(AdminAuditError.INVALID_FILTER, "Sensitive audit search is not allowed")
+        }
 
         val requestedLimit = query.pageRequest.limit.coerceIn(1, MAX_LIMIT)
-        val sourcePage = query.pageRequest.copy(limit = requestedLimit + 1)
-        val unavailable = mutableListOf<AdminAuditSourceType>()
+        val fingerprint = cursorSigner.fingerprint(query.filter, query.sensitiveTarget)
+        val cursor =
+            query.rawCursor
+                ?.takeIf(String::isNotBlank)
+                ?.let { cursorSigner.verify(it, query.filter, query.sensitiveTarget) }
+        if (
+            cursor != null &&
+            (cursor.from != query.filter.from.utc() || cursor.snapshotTo.isAfter(query.filter.to.utc()))
+        ) {
+            throw AdminAuditException(AdminAuditError.INVALID_CURSOR, "Invalid audit cursor")
+        }
+        val now = OffsetDateTime.ofInstant(clock.instant(), ZoneOffset.UTC)
+        val snapshotTo = cursor?.snapshotTo ?: minOf(query.filter.to.utc(), now)
+        val after = cursor?.let { AdminAuditTuple(it.occurredAt, it.sourceRank, it.immutableSourceId) }
+        val unavailable = cursor?.excludedSources?.toMutableSet() ?: linkedSetOf()
+        val sourceQuery =
+            AdminAuditSourceQuery(
+                filter = query.filter,
+                snapshotTo = snapshotTo,
+                after = after,
+                limit = requestedLimit + 1,
+                sensitiveTarget = query.sensitiveTarget,
+            )
         val sourceRows =
-            buildList {
-                addAll(
-                    readSource(unavailable, AdminAuditSourceType.PLATFORM) {
-                        readPort.listPlatformEvents(query.filter, sourcePage)
-                    },
-                )
-                addAll(
-                    readSource(unavailable, AdminAuditSourceType.CLUB) {
-                        readPort.listClubEvents(query.filter, sourcePage)
-                    },
-                )
-                addAll(
-                    readSource(unavailable, AdminAuditSourceType.AI_GENERATION) {
-                        readPort.listAiGenerationEvents(query.filter, sourcePage)
-                    },
-                )
-                addAll(
-                    readSource(unavailable, AdminAuditSourceType.NOTIFICATION_REPLAY_PREVIEW) {
-                        readPort.listNotificationReplayPreviews(query.filter, sourcePage)
-                    },
-                )
-            }
+            AdminAuditSourceType.entries
+                .asSequence()
+                .filterNot(unavailable::contains)
+                .flatMap { source ->
+                    readSource(source, sourceQuery, continuation = cursor != null, unavailable).asSequence()
+                }.toList()
 
         val projected =
             sourceRows
                 .map { project(admin, it) }
-                .filter { matchesQueryFilter(query.filter, it) }
-                .sortedWith(
-                    compareByDescending<AdminAuditLedgerItem> { it.occurredAt }
-                        .thenBy { sourceRank(it.sourceTable) }
-                        .thenByDescending { it.id },
-                )
+                .sortedWith(::compareItems)
 
         val visible = projected.take(requestedLimit)
-        val nextCursor = projected.drop(requestedLimit).firstOrNull()?.let(::encodeCursor)
+        val nextCursor =
+            if (projected.size > requestedLimit && visible.isNotEmpty()) {
+                val last = visible.last()
+                val source = sourceType(last)
+                cursorSigner.issue(
+                    AdminAuditCursorDraft(
+                        snapshotTo = snapshotTo,
+                        from = query.filter.from,
+                        filterFingerprint = fingerprint,
+                        excludedSources = unavailable,
+                        after = AdminAuditTuple(last.occurredAt, source.rank, last.nativeSourceId()),
+                    ),
+                )
+            } else {
+                null
+            }
         return AdminAuditLedgerPage(
-            generatedAt = OffsetDateTime.now(ZoneOffset.UTC),
+            generatedAt = now,
             filters = query.filter,
             summary =
                 AdminAuditSummary(
@@ -94,7 +124,7 @@ class AdminAuditLedgerService(
                         visible.count {
                             it.metadataState == AdminAuditMetadataState.UNAVAILABLE
                         },
-                    unavailableSources = unavailable,
+                    unavailableSources = unavailable.sortedBy { it.rank },
                 ),
             items = visible,
             nextCursor = nextCursor,
@@ -111,11 +141,15 @@ class AdminAuditLedgerService(
     }
 
     private fun readSource(
-        unavailable: MutableList<AdminAuditSourceType>,
         source: AdminAuditSourceType,
-        read: () -> List<AdminAuditSourceRow>,
+        query: AdminAuditSourceQuery,
+        continuation: Boolean,
+        unavailable: MutableSet<AdminAuditSourceType>,
     ): List<AdminAuditSourceRow> =
-        runCatching(read).getOrElse {
+        runCatching { readPort.listSource(source, query) }.getOrElse {
+            if (continuation) {
+                throw AdminAuditException(AdminAuditError.SOURCE_UNAVAILABLE, "Audit source temporarily unavailable")
+            }
             unavailable += source
             emptyList()
         }
@@ -129,7 +163,38 @@ class AdminAuditLedgerService(
             AdminAuditSourceType.CLUB -> projectClub(row)
             AdminAuditSourceType.AI_GENERATION -> projectAi(row)
             AdminAuditSourceType.NOTIFICATION_REPLAY_PREVIEW -> projectReplayPreview(row)
+            else -> projectDomainCommand(admin, row)
         }
+
+    private fun projectDomainCommand(
+        admin: CurrentPlatformAdmin,
+        row: AdminAuditSourceRow,
+    ): AdminAuditLedgerItem {
+        val metadata = parseMetadata(row.metadataJson)
+        val unavailable = row.metadataJson != null && metadata == null
+        val targetUser = row.targetUserId.takeUnless { admin.role == PlatformAdminRole.SUPPORT }
+        return AdminAuditLedgerItem(
+            id = "${row.sourceType.tableName}:${row.sourceId}",
+            occurredAt = row.occurredAt.utc(),
+            sourceSlice = row.sourceType.domainSlice(),
+            sourceTable = row.sourceType.tableName,
+            actionCategory = row.sourceType.domainCategory(),
+            actionType = row.actionType,
+            outcome = row.outcomeHint.toOutcome(default = AdminAuditOutcome.UNKNOWN),
+            actor = actor(row.actorUserId, row.actorRole),
+            target =
+                AdminAuditTarget(
+                    clubId = row.clubId,
+                    userId = targetUser,
+                    jobId = metadata?.uuid("jobId"),
+                    eventId = metadata?.string("receiptId") ?: metadata?.string("caseId"),
+                    label = targetLabel(admin.role, row.targetUserId),
+                ),
+            summary = "${row.sourceType.domainCategory().name} 감사 증거가 기록되었습니다.",
+            safeMetadata = metadata?.domainMetadata().orEmpty(),
+            metadataState = metadataState(metadata, unavailable),
+        )
+    }
 
     private fun projectPlatform(
         admin: CurrentPlatformAdmin,
@@ -358,28 +423,47 @@ class AdminAuditLedgerService(
             }.getOrNull()
         }
 
-    private fun matchesQueryFilter(
-        filter: AdminAuditFilter,
-        item: AdminAuditLedgerItem,
-    ): Boolean =
-        (filter.sourceSlice == null || item.sourceSlice == filter.sourceSlice) &&
-            (filter.actionCategory == null || item.actionCategory == filter.actionCategory) &&
-            (filter.outcome == null || item.outcome == filter.outcome) &&
-            (filter.actorRole == null || item.actor.role == filter.actorRole) &&
-            (filter.clubId == null || item.target.clubId == filter.clubId)
-
-    private fun encodeCursor(item: AdminAuditLedgerItem): String? =
-        CursorCodec.encode(
-            mapOf(
-                "occurredAt" to item.occurredAt.toString(),
-                "sourceRank" to sourceRank(item.sourceTable).toString(),
-                "sourceId" to item.id.substringAfter(":"),
-            ),
+    private fun compareItems(
+        left: AdminAuditLedgerItem,
+        right: AdminAuditLedgerItem,
+    ): Int {
+        val occurred = right.occurredAt.compareTo(left.occurredAt)
+        if (occurred != 0) return occurred
+        val leftSource = sourceType(left)
+        val rightSource = sourceType(right)
+        val rank = leftSource.rank.compareTo(rightSource.rank)
+        if (rank != 0) return rank
+        return compareNativeIdDescending(
+            left.nativeSourceId(),
+            right.nativeSourceId(),
+            leftSource,
         )
+    }
 
-    private fun sourceRank(tableName: String): Int =
-        AdminAuditSourceType.entries.firstOrNull { it.tableName == tableName }?.rank ?: UNKNOWN_SOURCE_RANK
+    private fun sourceType(item: AdminAuditLedgerItem): AdminAuditSourceType =
+        AdminAuditSourceType.entries.firstOrNull { it.tableName == item.sourceTable }
+            ?: throw AdminAuditException(AdminAuditError.INVALID_CURSOR, "Unknown audit source")
 }
+
+private fun AdminAuditLedgerItem.nativeSourceId(): String = id.removePrefix("$sourceTable:")
+
+private fun compareNativeIdDescending(
+    left: String,
+    right: String,
+    source: AdminAuditSourceType,
+): Int =
+    when (source.nativeIdType) {
+        com.readmates.admin.audit.application.model.AdminAuditNativeIdType.NUMERIC ->
+            right.toBigIntegerStrict().compareTo(left.toBigIntegerStrict())
+        com.readmates.admin.audit.application.model.AdminAuditNativeIdType.UUID,
+        com.readmates.admin.audit.application.model.AdminAuditNativeIdType.COMPOSITE,
+        -> right.compareTo(left)
+    }
+
+private fun String.toBigIntegerStrict(): BigInteger =
+    runCatching(::BigInteger).getOrElse {
+        throw AdminAuditException(AdminAuditError.INVALID_CURSOR, "Invalid native audit id")
+    }
 
 private fun String?.toActorRole(): AdminAuditActorRole =
     when (this) {
@@ -394,10 +478,10 @@ private fun String?.toActorRole(): AdminAuditActorRole =
 
 private fun String?.toOutcome(default: AdminAuditOutcome): AdminAuditOutcome =
     when (this?.uppercase()) {
-        "SUCCESS", "SUCCEEDED", "CONFIRMED", "CONSUMED" -> AdminAuditOutcome.SUCCESS
-        "FAILED", "FAILURE", "DEAD", "ERROR" -> AdminAuditOutcome.FAILED
+        "SUCCESS", "SUCCEEDED", "ACCEPTED", "CONFIRMED", "CONSUMED", "COMMITTED" -> AdminAuditOutcome.SUCCESS
+        "FAILED", "FAILURE", "PARTIAL", "DEAD", "ERROR", "CANCELLED" -> AdminAuditOutcome.FAILED
         "DENIED", "FORBIDDEN" -> AdminAuditOutcome.DENIED
-        "PREPARED", "OPEN", "PENDING" -> AdminAuditOutcome.PREPARED
+        "PREPARED", "OPEN", "PENDING", "RUNNING", "ACKNOWLEDGED", "SNOOZED" -> AdminAuditOutcome.PREPARED
         "UNKNOWN" -> AdminAuditOutcome.UNKNOWN
         else -> default
     }
@@ -442,9 +526,61 @@ private fun Map<String, Any?>.selectionHashPrefix(): AdminAuditMetadata? =
         ?.take(SELECTION_HASH_PREFIX_LENGTH)
         ?.let { AdminAuditMetadata("selectionHashPrefix", it, "fingerprint") }
 
+private fun Map<String, Any?>.domainMetadata(): List<AdminAuditMetadata> =
+    DOMAIN_METADATA_KEYS.mapNotNull { (key, kind) ->
+        string(key)?.let { AdminAuditMetadata(key, it, kind) }
+    }
+
+private fun AdminAuditSourceType.domainSlice(): AdminAuditSourceSlice =
+    when (this) {
+        AdminAuditSourceType.CLUB_COMMAND_RECEIPT,
+        AdminAuditSourceType.CLUB_CONVERGENCE_ATTEMPT,
+        -> AdminAuditSourceSlice.S3
+        AdminAuditSourceType.SUPPORT_COMMAND_RECEIPT -> AdminAuditSourceSlice.S4
+        AdminAuditSourceType.NOTIFICATION_CONFIRMATION,
+        AdminAuditSourceType.NOTIFICATION_CONVERGENCE_ATTEMPT,
+        -> AdminAuditSourceSlice.S5
+        AdminAuditSourceType.AI_COMMAND_RECEIPT,
+        AdminAuditSourceType.AI_CONVERGENCE_ATTEMPT,
+        -> AdminAuditSourceSlice.S6
+        else -> AdminAuditSourceSlice.PLATFORM
+    }
+
+private fun AdminAuditSourceType.domainCategory(): AdminAuditActionCategory =
+    when (domainSlice()) {
+        AdminAuditSourceSlice.S3 -> AdminAuditActionCategory.CLUB_LIFECYCLE
+        AdminAuditSourceSlice.S4 -> AdminAuditActionCategory.SUPPORT
+        AdminAuditSourceSlice.S5 -> AdminAuditActionCategory.NOTIFICATION
+        AdminAuditSourceSlice.S6 -> AdminAuditActionCategory.AI_OPS
+        else -> AdminAuditActionCategory.PLATFORM_ADMIN
+    }
+
 private fun expiryBucket(value: String): String = if (value.contains("T")) "configured" else "unknown"
 
 private const val MAX_LIMIT = 50
 private const val MAX_WINDOW_DAYS = 90L
-private const val UNKNOWN_SOURCE_RANK = 99
 private const val SELECTION_HASH_PREFIX_LENGTH = 8
+private val DOMAIN_METADATA_KEYS =
+    linkedMapOf(
+        "receiptId" to "id",
+        "caseId" to "id",
+        "commandType" to "code",
+        "effectType" to "code",
+        "attemptNo" to "count",
+        "state" to "code",
+        "safeErrorCode" to "code",
+        "afterAdminRevision" to "count",
+        "outcome" to "code",
+        "jobId" to "id",
+        "action" to "code",
+        "afterStatus" to "code",
+        "grantId" to "id",
+        "scope" to "code",
+        "reasonCategory" to "code",
+        "notePresent" to "boolean",
+        "convergenceId" to "id",
+        "publicationId" to "id",
+        "originResult" to "code",
+        "reasonRedacted" to "boolean",
+        "remoteCopyLimitationCode" to "code",
+    )

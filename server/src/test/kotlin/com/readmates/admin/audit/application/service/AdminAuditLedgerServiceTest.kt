@@ -2,15 +2,21 @@ package com.readmates.admin.audit.application.service
 
 import com.readmates.admin.audit.application.model.AdminAuditFilter
 import com.readmates.admin.audit.application.model.AdminAuditListQuery
+import com.readmates.admin.audit.application.model.AdminAuditSourceQuery
 import com.readmates.admin.audit.application.model.AdminAuditSourceRow
 import com.readmates.admin.audit.application.model.AdminAuditSourceType
 import com.readmates.admin.audit.application.port.out.AdminAuditLedgerReadPort
+import com.readmates.admin.audit.config.AdminAuditCursorProperties
 import com.readmates.club.domain.PlatformAdminRole
+import com.readmates.shared.adminmutation.config.AdminCommandIdentityProperties
 import com.readmates.shared.paging.PageRequest
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
+import java.time.Clock
 import java.time.OffsetDateTime
+import java.time.ZoneOffset
 import java.util.UUID
 
 class AdminAuditLedgerServiceTest {
@@ -23,7 +29,7 @@ class AdminAuditLedgerServiceTest {
                 aiRows = listOf(aiRow("ai-1", "2026-05-27T00:00:00Z")),
                 replayPreviewRows = listOf(replayPreviewRow("preview-1", "2026-05-27T00:03:00Z")),
             )
-        val service = AdminAuditLedgerService(readPort)
+        val service = service(readPort)
 
         val page = service.listLedger(owner(), query(limit = 2))
 
@@ -50,7 +56,7 @@ class AdminAuditLedgerServiceTest {
                         ),
                     ),
             )
-        val service = AdminAuditLedgerService(readPort)
+        val service = service(readPort)
 
         val item = service.listLedger(support(), query()).items.single()
 
@@ -74,7 +80,7 @@ class AdminAuditLedgerServiceTest {
                         ),
                     ),
             )
-        val service = AdminAuditLedgerService(readPort)
+        val service = service(readPort)
 
         val item = service.listLedger(owner(), query()).items.single()
 
@@ -97,7 +103,7 @@ class AdminAuditLedgerServiceTest {
                         ),
                     ),
             )
-        val item = AdminAuditLedgerService(readPort).listLedger(owner(), query()).items.single()
+        val item = service(readPort).listLedger(owner(), query()).items.single()
 
         assertThat(item.target.eventId).isEqualTo("receipt-1")
         assertThat(item.summary).contains("origin")
@@ -120,6 +126,127 @@ class AdminAuditLedgerServiceTest {
                 ),
         )
 
+    @Test
+    fun `continues after the last visible tuple without duplicates`() {
+        val readPort =
+            FakeAdminAuditLedgerReadPort(
+                platformRows =
+                    listOf(
+                        platformRow("00000000-0000-0000-0000-000000000003", "2026-05-27T00:03:00Z"),
+                        platformRow("00000000-0000-0000-0000-000000000002", "2026-05-27T00:02:00Z"),
+                        platformRow("00000000-0000-0000-0000-000000000001", "2026-05-27T00:01:00Z"),
+                    ),
+            )
+        val service = service(readPort)
+        val first = service.listLedger(owner(), query(limit = 2))
+        val second = service.listLedger(owner(), query(limit = 2, cursor = first.nextCursor))
+
+        assertThat(first.items.map { it.id }).doesNotContainAnyElementsOf(second.items.map { it.id })
+        assertThat(second.items.map { it.id }).containsExactly(
+            "platform_audit_events:00000000-0000-0000-0000-000000000001",
+        )
+    }
+
+    @Test
+    fun `notification convergence cursor removes full source prefix`() {
+        assertConvergenceContinuation(AdminAuditSourceType.NOTIFICATION_CONVERGENCE_ATTEMPT)
+    }
+
+    @Test
+    fun `AI convergence cursor removes full source prefix`() {
+        assertConvergenceContinuation(AdminAuditSourceType.AI_CONVERGENCE_ATTEMPT)
+    }
+
+    private fun assertConvergenceContinuation(source: AdminAuditSourceType) {
+        val receiptId = "00000000-0000-0000-0000-000000000801"
+        val readPort =
+            FakeAdminAuditLedgerReadPort(
+                convergenceRows =
+                    mapOf(
+                        source to
+                            listOf(
+                                convergenceRow(source, "$receiptId:0000000002:001"),
+                                convergenceRow(source, "$receiptId:0000000001:001"),
+                            ),
+                    ),
+            )
+        val service = service(readPort)
+
+        val first = service.listLedger(owner(), query(limit = 1))
+        val second = service.listLedger(owner(), query(limit = 1, cursor = first.nextCursor))
+
+        assertThat(first.items.map { it.id }).containsExactly("${source.tableName}:$receiptId:0000000002:001")
+        assertThat(second.items.map { it.id }).containsExactly("${source.tableName}:$receiptId:0000000001:001")
+    }
+
+    @Test
+    fun `pins page one unavailable source and never silently adds it on continuation`() {
+        val failures = mutableSetOf(AdminAuditSourceType.CLUB)
+        val readPort =
+            FakeAdminAuditLedgerReadPort(
+                platformRows =
+                    listOf(
+                        platformRow("00000000-0000-0000-0000-000000000003", "2026-05-27T00:03:00Z"),
+                        platformRow("00000000-0000-0000-0000-000000000002", "2026-05-27T00:02:00Z"),
+                    ),
+                failingSources = failures,
+            )
+        val service = service(readPort)
+        val first = service.listLedger(owner(), query(limit = 1))
+        failures.clear()
+        readPort.calls.clear()
+
+        val second = service.listLedger(owner(), query(limit = 1, cursor = first.nextCursor))
+
+        assertThat(first.summary.unavailableSources).containsExactly(AdminAuditSourceType.CLUB)
+        assertThat(second.summary.unavailableSources).containsExactly(AdminAuditSourceType.CLUB)
+        assertThat(readPort.calls).doesNotContain(AdminAuditSourceType.CLUB)
+    }
+
+    @Test
+    fun `fails continuation retriably when an included source becomes unavailable`() {
+        val failures = mutableSetOf<AdminAuditSourceType>()
+        val readPort =
+            FakeAdminAuditLedgerReadPort(
+                platformRows =
+                    listOf(
+                        platformRow("00000000-0000-0000-0000-000000000003", "2026-05-27T00:03:00Z"),
+                        platformRow("00000000-0000-0000-0000-000000000002", "2026-05-27T00:02:00Z"),
+                    ),
+                failingSources = failures,
+            )
+        val service = service(readPort)
+        val first = service.listLedger(owner(), query(limit = 1))
+        failures += AdminAuditSourceType.PLATFORM
+
+        assertThatThrownBy { service.listLedger(owner(), query(limit = 1, cursor = first.nextCursor)) }
+            .isInstanceOfSatisfying(com.readmates.admin.audit.application.AdminAuditException::class.java) {
+                assertThat(it.error).isEqualTo(com.readmates.admin.audit.application.AdminAuditError.SOURCE_UNAVAILABLE)
+            }
+    }
+
+    private fun query(
+        limit: Int,
+        cursor: String?,
+    ): AdminAuditListQuery =
+        AdminAuditListQuery(
+            filter = AdminAuditFilter.defaultNow(now = NOW),
+            pageRequest = PageRequest.cursor(limit, null, 25, 50),
+            rawCursor = cursor,
+        )
+
+    private fun service(readPort: AdminAuditLedgerReadPort): AdminAuditLedgerService =
+        AdminAuditLedgerService(
+            readPort = readPort,
+            cursorSigner =
+                AdminAuditCursorSigner(
+                    AdminCommandIdentityProperties(currentKey = "audit-test-key", currentKeyVersion = 7),
+                    AdminAuditCursorProperties(),
+                    Clock.fixed(NOW.toInstant(), ZoneOffset.UTC),
+                ),
+            clock = Clock.fixed(NOW.toInstant(), ZoneOffset.UTC),
+        )
+
     @Suppress("ktlint:standard:function-expression-body")
     private fun owner(): CurrentPlatformAdmin {
         return CurrentPlatformAdmin(ADMIN_USER_ID, "owner@example.com", PlatformAdminRole.OWNER)
@@ -136,26 +263,61 @@ private class FakeAdminAuditLedgerReadPort(
     private val clubRows: List<AdminAuditSourceRow> = emptyList(),
     private val aiRows: List<AdminAuditSourceRow> = emptyList(),
     private val replayPreviewRows: List<AdminAuditSourceRow> = emptyList(),
+    private val convergenceRows: Map<AdminAuditSourceType, List<AdminAuditSourceRow>> = emptyMap(),
+    private val failingSources: MutableSet<AdminAuditSourceType> = mutableSetOf(),
 ) : AdminAuditLedgerReadPort {
-    override fun listPlatformEvents(
-        filter: AdminAuditFilter,
-        pageRequest: PageRequest,
-    ): List<AdminAuditSourceRow> = platformRows
+    val calls = mutableListOf<AdminAuditSourceType>()
 
-    override fun listClubEvents(
-        filter: AdminAuditFilter,
-        pageRequest: PageRequest,
-    ): List<AdminAuditSourceRow> = clubRows
+    override fun listSource(
+        source: AdminAuditSourceType,
+        query: AdminAuditSourceQuery,
+    ): List<AdminAuditSourceRow> =
+        when {
+            source in failingSources -> throw IllegalStateException("source unavailable")
+            else -> {
+                calls += source
+                rows(source)
+            }
+        }.filter { row -> row.isAfter(query) }
+            .take(query.limit)
 
-    override fun listAiGenerationEvents(
-        filter: AdminAuditFilter,
-        pageRequest: PageRequest,
-    ): List<AdminAuditSourceRow> = aiRows
+    private fun rows(source: AdminAuditSourceType): List<AdminAuditSourceRow> =
+        convergenceRows[source] ?: when (source) {
+            AdminAuditSourceType.PLATFORM -> platformRows
+            AdminAuditSourceType.CLUB -> clubRows
+            AdminAuditSourceType.AI_GENERATION -> aiRows
+            AdminAuditSourceType.NOTIFICATION_REPLAY_PREVIEW -> replayPreviewRows
+            else -> emptyList()
+        }
+}
 
-    override fun listNotificationReplayPreviews(
-        filter: AdminAuditFilter,
-        pageRequest: PageRequest,
-    ): List<AdminAuditSourceRow> = replayPreviewRows
+private fun convergenceRow(
+    source: AdminAuditSourceType,
+    id: String,
+): AdminAuditSourceRow =
+    AdminAuditSourceRow(
+        sourceType = source,
+        sourceId = id,
+        occurredAt = OffsetDateTime.parse("2026-05-27T00:02:00Z"),
+        actorUserId = ADMIN_USER_ID,
+        actorRole = "OWNER",
+        clubId = CLUB_ID,
+        targetUserId = null,
+        actionType = "SERVICE_CONVERGENCE_REPLAY",
+        outcomeHint = "SUCCEEDED",
+        metadataJson = "{}",
+    )
+
+private fun AdminAuditSourceRow.isAfter(query: AdminAuditSourceQuery): Boolean {
+    val after = query.after ?: return occurredAt >= query.filter.from && occurredAt < query.snapshotTo
+    return occurredAt.isBefore(after.occurredAt) ||
+        (
+            occurredAt == after.occurredAt &&
+                (
+                    sourceType.rank > after.sourceRank ||
+                        (sourceType.rank == after.sourceRank && sourceId < after.immutableSourceId)
+                )
+        )
 }
 
 private fun platformRow(

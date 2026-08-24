@@ -19,5 +19,6 @@ class AdminAuditErrorHandler {
         when (this) {
             AdminAuditError.INVALID_FILTER -> HttpStatus.BAD_REQUEST
             AdminAuditError.INVALID_CURSOR -> HttpStatus.BAD_REQUEST
+            AdminAuditError.SOURCE_UNAVAILABLE -> HttpStatus.SERVICE_UNAVAILABLE
         }
 }

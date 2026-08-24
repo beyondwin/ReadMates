@@ -147,6 +147,16 @@ class PlatformAdminAuditControllerTest(
     }
 
     @Test
+    fun `share safe GET rejects sensitive target filters`() {
+        mockMvc
+            .get("/api/admin/audit/events?email=member%40example.com") {
+                cookie(sessionCookieForUser(OWNER_USER_ID))
+            }.andExpect {
+                status { isBadRequest() }
+            }
+    }
+
+    @Test
     fun `operator reads scoped replay preparation and sole confirmation with bounded metadata`() {
         seedReplayProjectionRows()
 
