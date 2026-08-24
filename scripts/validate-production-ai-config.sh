@@ -5,6 +5,7 @@ repo_root="${1:-.}"
 workflow="$repo_root/.github/workflows/sync-config.yml"
 env_example="$repo_root/.env.example"
 import_script="$repo_root/scripts/sync-config/import-from-prod-env.sh"
+secrets_runbook="$repo_root/docs/operations/runbooks/secrets-management.md"
 application_config="$repo_root/server/src/main/resources/application.yml"
 app_compose="$repo_root/deploy/oci/compose.yml"
 infra_compose="$repo_root/deploy/oci/compose.infra.yml"
@@ -14,9 +15,25 @@ fail() {
   exit 1
 }
 
-for file in "$workflow" "$env_example" "$import_script" "$application_config" "$app_compose" "$infra_compose"; do
+for file in \
+  "$workflow" "$env_example" "$import_script" "$secrets_runbook" \
+  "$application_config" "$app_compose" "$infra_compose"; do
   [ -f "$file" ] || fail "missing ${file#"$repo_root"/}"
 done
+
+if grep -Eq 'gh[[:space:]]+secret[[:space:]]+delete' "$import_script"; then
+  fail "bulk config import must never delete GitHub Secrets"
+fi
+grep -Fq 'Empty values are skipped; this importer never deletes existing GitHub Secrets.' "$import_script" ||
+  fail "bulk config import must state that empty values never delete GitHub Secrets"
+for previous_key in \
+  READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY \
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY; do
+  grep -Fq "gh secret delete $previous_key --repo <owner>/<repo>" "$secrets_runbook" ||
+    fail "runbook must document exact deletion for $previous_key"
+done
+grep -Fq 'sync-config(restart_api=false, dry_run=false)' "$secrets_runbook" ||
+  fail "runbook must sync configuration after explicit previous-secret deletion"
 
 legacy_env='READMATES_AIGEN_''PIPELINE_MODE'
 legacy_property='readmates.aigen.pipeline''-mode'

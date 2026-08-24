@@ -55,6 +55,11 @@ data class MutationIdempotencyProperties(
         if (retention < Duration.ofHours(MINIMUM_RETENTION_HOURS)) {
             throw IllegalStateException("readmates.mutation.idempotency.retention must be at least 24h")
         }
+        if (previousKeyRolloutBuffer < Duration.ofHours(MINIMUM_RETENTION_HOURS)) {
+            throw IllegalStateException(
+                "readmates.mutation.idempotency.previous-key-rollout-buffer must be at least 24h",
+            )
+        }
         if (purgeBatchSize !in MIN_PURGE_BATCH_SIZE..MAX_PURGE_BATCH_SIZE) {
             throw IllegalStateException(
                 "readmates.mutation.idempotency.purge-batch-size must be between " +

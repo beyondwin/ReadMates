@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(13)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(14)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,12 +94,13 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("55")
+            assertThat(latestVersion).isEqualTo("56")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
             assertThat(
@@ -376,7 +377,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(11)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(12)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -388,12 +389,13 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("55")
+            assertThat(latestVersion).isEqualTo("56")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertAtomicAdminReplaySchema(upgradeJdbc)
             assertLegacyAdminReplayPreviewFixtures(upgradeJdbc, legacyReplayFixtures)
 
@@ -1655,11 +1657,12 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("55")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("56")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54PublicProjectionConvergenceSchema(jdbc)
             assertV55PlatformAdminPublicTakedownSchema(jdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(jdbc)
             assertThat(countRows(jdbc, "sessions")).isZero()
             assertThat(countRows(jdbc, "session_publication_versions")).isZero()
             assertThat(countRows(jdbc, "club_host_list_epochs")).isZero()
@@ -1758,12 +1761,13 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("55")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(5)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("56")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54PublicProjectionConvergenceSchema(upgradeJdbc)
             assertV55PlatformAdminPublicTakedownSchema(upgradeJdbc)
+            assertV56PublicConvergenceWorkRetentionIndex(upgradeJdbc)
             assertThat(
                 upgradeJdbc.queryForMap(
                     """
@@ -1826,6 +1830,7 @@ class MySqlFlywayMigrationTest(
         assertV52RevisionSchema(jdbcTemplate)
         assertV53IdempotencySchema(jdbcTemplate)
         assertV54PublicProjectionConvergenceSchema(jdbcTemplate)
+        assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate)
         val fixture = V52LiveRevisionFixture()
         try {
             insertV52RevisionClubGraph(
@@ -3589,6 +3594,9 @@ class MySqlFlywayMigrationTest(
             .doesNotContain("provider_response", "provider_error", "private_body", "reason")
         assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_status_check"))
             .contains("PENDING", "SUCCEEDED", "FAILED")
+    }
+
+    private fun assertV56PublicConvergenceWorkRetentionIndex(jdbcTemplate: JdbcTemplate) {
         assertEquals(
             "created_at,convergence_id,lease_expires_at",
             indexColumns(jdbcTemplate, "public_convergence_work", "public_convergence_work_retention_idx"),

@@ -233,10 +233,11 @@ class JdbcMutationIdempotencyAdapter(
     ): Instant? {
         jdbcTemplate.update(
             """
-            update mutation_digest_key_state
-            set unreferenced_since = coalesce(unreferenced_since, ?)
-            where digest_key_version = ?
-              and not exists (
+            insert into mutation_digest_key_state (
+              digest_key_version, last_referenced_at, unreferenced_since
+            )
+            select ?, ?, ?
+            where not exists (
                 select 1
                 from mutation_idempotency_keys
                 where digest_key_version = ?
@@ -246,9 +247,12 @@ class JdbcMutationIdempotencyAdapter(
                 from admin_public_takedown_idempotency
                 where digest_key_version = ?
               )
+            on duplicate key update
+              unreferenced_since = coalesce(unreferenced_since, values(unreferenced_since))
             """.trimIndent(),
-            at.toDbTimestamp(),
             digestKeyVersion,
+            at.toDbTimestamp(),
+            at.toDbTimestamp(),
             digestKeyVersion,
             digestKeyVersion,
         )

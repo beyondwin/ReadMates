@@ -245,8 +245,11 @@ bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/c
 
 Production config validator는 host list cursor와 mutation identity의 current/previous key 및 version이
 `.env.example`, `sync-config` source/required/render, bulk importer classification에 모두 연결됐는지도
-검사합니다. Fixture는 외부 temp env와 mock `gh`로 dry-run importer를 실행해 secret 값은 출력하지 않고
-key 이름과 version Variable만 분류하는지 확인합니다. 실제 GitHub Secret이나 운영 env는 변경하지 않습니다.
+검사합니다. Previous key 삭제는 safety gate 뒤 runbook의 exact GitHub UI 또는
+`gh secret delete ... --repo ...` 절차로만 수행하며 bulk importer의 빈 값은 기존 Secret을 삭제하지
+않습니다. Fixture는 외부 temp env와 mock `gh`로 dry-run importer를 실행해 secret 값은 출력하지 않고
+key 이름과 version Variable만 분류하는지, 삭제 절차 계약이 유지되는지 확인합니다. 실제 GitHub
+Secret이나 운영 env는 변경하지 않습니다.
 
 ## `observability-local-smoke.sh`
 

@@ -44,6 +44,7 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Sql(statements = [CLEANUP_MUTATION_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
@@ -214,6 +215,93 @@ class JdbcMutationIdempotencyAdapterDbTest(
             .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
         clock.instant = clock.instant.plus(Duration.ofHours(24))
         rotated.retirePreviousKey()
+    }
+
+    @Test
+    fun `never used digest version receives a durable conservative retirement state`() {
+        val markedAt = clock.instant
+
+        assertThat(adapter.markUnreferencedIfEmpty(NEVER_USED_KEY_VERSION, markedAt)).isEqualTo(markedAt)
+        val state = adapter.digestKeyStates().single { it.digestKeyVersion == NEVER_USED_KEY_VERSION }
+        assertThat(state.lastReferencedAt).isEqualTo(markedAt)
+        assertThat(state.unreferencedSince).isEqualTo(markedAt)
+
+        clock.instant = clock.instant.plusSeconds(30)
+        assertThat(adapter.markUnreferencedIfEmpty(NEVER_USED_KEY_VERSION, clock.instant)).isEqualTo(markedAt)
+    }
+
+    @Test
+    fun `retirement state is not created while either idempotency namespace references the version`() {
+        val hostIdentity = identity("missing-host-state-key")
+        service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION))
+            .claim(hostIdentity, payload())
+        jdbcTemplate.update(
+            "delete from mutation_digest_key_state where digest_key_version = ?",
+            KEY_V1_VERSION,
+        )
+
+        assertThat(adapter.markUnreferencedIfEmpty(KEY_V1_VERSION, clock.instant)).isNull()
+        assertThat(adapter.digestKeyStates()).noneMatch { state -> state.digestKeyVersion == KEY_V1_VERSION }
+
+        jdbcTemplate.update(
+            "delete from mutation_idempotency_keys where idempotency_key = ?",
+            hostIdentity.idempotencyKey,
+        )
+        insertAdminTakedownOperationalRows()
+
+        assertThat(adapter.markUnreferencedIfEmpty(KEY_V1_VERSION, clock.instant)).isNull()
+        assertThat(adapter.digestKeyStates()).noneMatch { state -> state.digestKeyVersion == KEY_V1_VERSION }
+    }
+
+    @Test
+    @Timeout(30)
+    fun `concurrent claim waits for retirement marker and clears it before owning a reference`() {
+        val markedAt = clock.instant
+        val claimAt = markedAt.plusSeconds(1)
+        val retirementMarked = CountDownLatch(1)
+        val releaseRetirement = CountDownLatch(1)
+        val claimAttempted = CountDownLatch(1)
+        val executor = Executors.newFixedThreadPool(2)
+        try {
+            val retirement =
+                executor.submit<Instant?> {
+                    transactionTemplate.execute {
+                        val result = adapter.markUnreferencedIfEmpty(CONCURRENT_KEY_VERSION, markedAt)
+                        retirementMarked.countDown()
+                        check(releaseRetirement.await(10, TimeUnit.SECONDS))
+                        result
+                    }
+                }
+            check(retirementMarked.await(10, TimeUnit.SECONDS))
+            clock.instant = claimAt
+            val claimIdentity = identity("retirement-race-claim-key")
+            val claim =
+                executor.submit<MutationClaimResult> {
+                    claimAttempted.countDown()
+                    transactionTemplate.execute {
+                        service(
+                            properties =
+                                keyPair(
+                                    current = KEY_V2,
+                                    currentVersion = CONCURRENT_KEY_VERSION,
+                                ),
+                        ).claim(claimIdentity, payload())
+                    }
+                }
+            check(claimAttempted.await(10, TimeUnit.SECONDS))
+
+            assertThatThrownBy { claim.get(250, TimeUnit.MILLISECONDS) }
+                .isInstanceOf(TimeoutException::class.java)
+
+            releaseRetirement.countDown()
+            assertThat(retirement.get(10, TimeUnit.SECONDS)).isEqualTo(markedAt)
+            assertThat(claim.get(10, TimeUnit.SECONDS)).isInstanceOf(MutationClaimResult.Claimed::class.java)
+            assertThat(rowCount(claimIdentity)).isOne()
+            assertThat(adapter.unreferencedSince(CONCURRENT_KEY_VERSION)).isNull()
+        } finally {
+            releaseRetirement.countDown()
+            executor.shutdownNow()
+        }
     }
 
     private fun insertAdminTakedownOperationalRows() {
@@ -645,6 +733,8 @@ class JdbcMutationIdempotencyAdapterDbTest(
         const val KEY_V1_VERSION = 5_301
         const val KEY_V2_VERSION = 5_302
         const val ORPHAN_KEY_VERSION = 5_309
+        const val NEVER_USED_KEY_VERSION = 5_310
+        const val CONCURRENT_KEY_VERSION = 5_311
         const val SENSITIVE_URL = "https://meet.example.com/private-room"
         const val SENSITIVE_PASSCODE = "room-passcode-value"
 
@@ -675,5 +765,5 @@ where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from host_session_mutation_receipts
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from mutation_digest_key_state
-where digest_key_version in (5301, 5302, 5309);
+where digest_key_version in (5301, 5302, 5309, 5310, 5311);
 """

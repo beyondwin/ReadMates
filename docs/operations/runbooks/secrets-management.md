@@ -53,10 +53,23 @@ Host cursor와 mutation identity HMAC key는 각자 versioned current/previous �
 3. Cursor는 이전 TTL + 24시간 rollout buffer, mutation identity는 참조 row가 0이 된 뒤 durable
    `unreferenced_since` + 24시간 rollout buffer가 모두 지난 것을 public-safe preflight로 확인합니다.
 4. 그 전에는 previous key를 제거하지 않습니다. 안전 경계 전에 제거한 mutation key는 다음 startup에서
-   fail closed합니다. 경계를 지난 뒤 previous Secret을 비우고 version은 retired version을 유지해 sync 후
-   재시작합니다.
+   fail closed합니다.
+5. 안전 경계를 확인한 뒤에만 previous Secret을 명시적으로 삭제합니다. GitHub UI에서는
+   **Settings → Secrets and variables → Actions → Repository secrets**에서 정확한 previous key를 열어
+   **Delete secret**을 실행합니다. CLI를 쓰면 대상 repository를 명시하고 필요한 key만 삭제합니다.
 
-첫 V52–V55 배포는 두 current key를 backend startup/Flyway보다 먼저 provision해야 합니다. Previous
+   ```bash
+   gh secret delete READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY --repo <owner>/<repo>
+   gh secret delete READMATES_MUTATION_IDENTITY_PREVIOUS_KEY --repo <owner>/<repo>
+   ```
+
+   회전하지 않은 key의 명령은 실행하지 않습니다. Bulk importer에서 빈 값을 읽는 것은 기존 GitHub
+   Secret 삭제가 아니며 importer는 secret 삭제를 수행하지 않습니다. Previous version Variable은 retired
+   version으로 유지합니다.
+6. 삭제 뒤 `sync-config(restart_api=false, dry_run=false)`를 실행해 빈 previous 값이 env에 렌더링되는지
+   확인한 다음 backend를 재시작합니다.
+
+첫 V52–V56 배포는 두 current key를 backend startup/Flyway보다 먼저 provision해야 합니다. Previous
 version `0`과 빈 previous key는 history가 없는 첫 배포에서만 안전한 기본값입니다.
 
 #### 시크릿 인벤토리 (현재)

@@ -150,7 +150,7 @@ Registered club host를 같이 확인할 때는 실제 host를 Git 밖에서 `RE
 
 Production runtime rendering이 바뀐 릴리즈는 container를 먼저 재시작하지 않고 현재 `main`의 `sync-config`를 성공시킨 뒤 image promotion을 실행합니다.
 
-V52–V55가 포함된 release에서는 `READMATES_HOST_LIST_CURSOR_CURRENT_KEY`와
+V52–V56이 포함된 release에서는 `READMATES_HOST_LIST_CURSOR_CURRENT_KEY`와
 `READMATES_MUTATION_IDENTITY_CURRENT_KEY`를 GitHub Secrets에 먼저 provision하고 각 current version
 Variable을 확인합니다. Previous key/version은 rotation 중에만 설정합니다. 이 provisioning과 아래
 `restart_api=false` sync가 backend startup, Flyway, health보다 반드시 먼저입니다.

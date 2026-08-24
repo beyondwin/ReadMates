@@ -252,7 +252,7 @@ class PublicProjectionGenerationIntegrationTest(
     }
 
     @Test
-    fun `retention query uses the bounded V54 work index`() {
+    fun `retention query uses the bounded V56 work index`() {
         val plan =
             jdbcTemplate.queryForMap(
                 """

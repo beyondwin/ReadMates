@@ -24,14 +24,14 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Database
 
-- **Flyway V52–V54:** V52는 독립 host session/exposure/participant/record/publication revision domain을, V53은 HMAC 기반 host mutation idempotency와 immutable receipt·durable digest-key retirement state를, V54는 public generation과 immutable receipt/event 및 mutable convergence work를 additive하게 추가합니다. V54의 work retention index는 provider-disabled backlog도 bounded batch로 정리합니다.
+- **Flyway V52–V56:** V52는 독립 host session/exposure/participant/record/publication revision domain을, V53은 HMAC 기반 host mutation idempotency와 immutable receipt·durable digest-key retirement state를, V54는 public generation과 immutable receipt/event 및 mutable convergence work를 additive하게 추가합니다. V55는 긴급 공개 회수 substrate를 추가하고, V56은 이미 적용 가능한 V54를 수정하지 않은 채 work retention index를 forward-only로 추가해 provider-disabled backlog도 bounded batch로 정리합니다.
 - **Flyway V55:** `public_projection_generations`에 monotonic `emergency_denied` marker와 `emergency_denied => origin_readable=false` CHECK를 더하고, 긴급 공개 회수 preview, admin-scoped idempotency, immutable redacted receipt를 additive table로 저장하며 reason category를 `PRIVATE_DATA|LEGAL_REQUEST|SECURITY_INCIDENT|PUBLIC_SAFETY`로 제한합니다. Rollback은 V55를 삭제하거나 수정하지 않고 schema를 보존하는 compatible image 또는 새 forward-fix migration을 사용합니다.
 
 ### Deployment Notes
 
-- Backend startup보다 먼저 GitHub Secrets에 두 current HMAC key를 provision하고 version Variables를 확인한 뒤 `sync-config(restart_api=false, dry_run=false)`로 env를 렌더링합니다. 그 다음 같은 tag의 backend를 배포해 additive Flyway V52–V55와 health를 확인하고, 마지막에 호환되는 Pages BFF/frontend를 배포합니다. 이 순서를 지킬 수 없으면 backend promotion을 시작하지 않습니다.
+- Backend startup보다 먼저 GitHub Secrets에 두 current HMAC key를 provision하고 version Variables를 확인한 뒤 `sync-config(restart_api=false, dry_run=false)`로 env를 렌더링합니다. 그 다음 같은 tag의 backend를 배포해 additive Flyway V52–V56과 health를 확인하고, 마지막에 호환되는 Pages BFF/frontend를 배포합니다. 이 순서를 지킬 수 없으면 backend promotion을 시작하지 않습니다.
 - Public convergence feature, scheduler와 HTTP provider는 모두 기본 off이고 세 토글을 명시적으로 켠 경우에만 외부 provider 호출을 시작합니다. Provider와 feature가 off여도 operational work maintenance는 기본 on입니다. V55 backend를 먼저 적용해도 preview/confirm route는 production confirm을 열지 않으며 protected Step 8 cache-safety evidence와 active runbook이 연결될 때까지 fail closed입니다.
-- V52–V55는 additive forward-only migration입니다. 회귀 시 적용 migration을 수정·삭제하거나 tag를 이동하지 않고 schema와 immutable evidence를 보존한 compatible image 또는 더 높은 version의 forward-fix migration을 사용합니다.
+- V52–V56은 additive forward-only migration입니다. 회귀 시 적용 migration을 수정·삭제하거나 tag를 이동하지 않고 schema와 immutable evidence를 보존한 compatible image 또는 더 높은 version의 forward-fix migration을 사용합니다.
 
 ## v2.4.1 - 2026-08-17
 

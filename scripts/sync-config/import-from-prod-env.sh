@@ -12,6 +12,8 @@
 #   - The env file MUST be outside the repository (so it can't be committed).
 #   - Values are passed to `gh` via stdin (), never on the command
 #     line, so they don't leak to process listings or shell history.
+#   - Empty values are skipped and never delete existing GitHub Secrets. Follow the
+#     secrets-management runbook for an explicit, safety-gated deletion.
 #   - This script and its classification list are safe to commit; they hold
 #     no secret values.
 
@@ -213,6 +215,7 @@ done < <(parse_env "$ENV_FILE_ABS")
 
 echo "---"
 echo "Summary: secrets=$n_secret variables=$n_var skipped-placeholder/empty=$((n_skip+n_empty))"
+echo "Empty values are skipped; this importer never deletes existing GitHub Secrets."
 
 if [ ${#UNCLASSIFIED[@]} -gt 0 ]; then
   echo ""

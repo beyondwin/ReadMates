@@ -18,6 +18,7 @@ mkdir -p \
   "$fixture_root/.github/workflows" \
   "$fixture_root/deploy/oci" \
   "$fixture_root/docs/case-studies" \
+  "$fixture_root/docs/operations/runbooks" \
   "$fixture_root/server/src/main/resources" \
   "$fixture_root/bin" \
   "$fixture_root/scripts/sync-config"
@@ -30,6 +31,7 @@ reset_fixture() {
   cp "$repo_root/server/src/main/resources/application.yml" "$fixture_root/server/src/main/resources/"
   cp "$repo_root/scripts/sync-config/import-from-prod-env.sh" "$fixture_root/scripts/sync-config/"
   cp "$repo_root/docs/case-studies/04-pii-safe-ai-session-generation.md" "$fixture_root/docs/case-studies/"
+  cp "$repo_root/docs/operations/runbooks/secrets-management.md" "$fixture_root/docs/operations/runbooks/"
 }
 
 replace_exact_line() {
@@ -117,6 +119,40 @@ if grep -Fq 'fixture-' "$fixture_root/import-dry-run.out"; then
   echo "production config import fixture leaked secret material" >&2
   exit 1
 fi
+grep -Fq 'Empty values are skipped; this importer never deletes existing GitHub Secrets.' \
+  "$fixture_root/import-dry-run.out" || {
+  echo "production config import fixture did not disclose non-deleting empty-value behavior" >&2
+  exit 1
+}
+
+printf '%s\n' \
+  'READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY=' \
+  'READMATES_MUTATION_IDENTITY_PREVIOUS_KEY=' \
+  > "$import_env_fixture"
+PATH="$fixture_root/bin:$PATH" \
+  bash "$repo_root/scripts/sync-config/import-from-prod-env.sh" "$import_env_fixture" --apply \
+  > "$fixture_root/import-empty-previous.out"
+for key in \
+  READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY \
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY; do
+  grep -Eq "^SKIP  \(empty\)[[:space:]]+$key$" "$fixture_root/import-empty-previous.out" || {
+    echo "production config import fixture did not preserve previous secret on empty input: $key" >&2
+    exit 1
+  }
+done
+
+reset_fixture
+
+awk '
+  index($0, "gh secret delete READMATES_MUTATION_IDENTITY_PREVIOUS_KEY --repo") == 0 { print }
+' "$fixture_root/docs/operations/runbooks/secrets-management.md" \
+  > "$fixture_root/docs/operations/runbooks/secrets-management.md.next"
+mv \
+  "$fixture_root/docs/operations/runbooks/secrets-management.md.next" \
+  "$fixture_root/docs/operations/runbooks/secrets-management.md"
+expect_contract_failure \
+  "missing-exact-previous-secret-deletion" \
+  "runbook must document exact deletion for READMATES_MUTATION_IDENTITY_PREVIOUS_KEY"
 
 reset_fixture
 remove_exact_line "$fixture_root/.env.example" "READMATES_AIGEN_PROCESSING_DEADLINE=20m"
