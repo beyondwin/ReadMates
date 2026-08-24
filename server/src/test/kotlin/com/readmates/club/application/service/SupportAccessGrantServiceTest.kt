@@ -3,7 +3,10 @@ package com.readmates.club.application.service
 import com.readmates.club.application.PlatformAdminError
 import com.readmates.club.application.PlatformAdminException
 import com.readmates.club.application.model.CreateSupportAccessGrantCommand
+import com.readmates.club.application.model.PreviewSupportGrantCreateCommand
 import com.readmates.club.application.model.SupportAccessGrant
+import com.readmates.club.application.model.SupportGrantReasonCategory
+import com.readmates.club.application.model.normalizeSupportGrantNote
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
 import com.readmates.club.application.port.out.AdminSupportGrantLedgerPort
 import com.readmates.club.application.port.out.CreateSupportAccessGrantPort
@@ -14,6 +17,8 @@ import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.club.domain.SupportAccessGrantScope
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -23,6 +28,36 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 class SupportAccessGrantServiceTest {
+    @Test
+    fun `canonical preview requires the exact current manage support capability`() {
+        val operator =
+            PlatformActor(
+                OWNER_ID,
+                PlatformAdminRole.OPERATOR,
+                setOf(PlatformCapability.VIEW_SUPPORT),
+            )
+
+        assertThatThrownBy {
+            service().previewCreate(
+                operator,
+                PreviewSupportGrantCreateCommand(
+                    CLUB_ID,
+                    GRANTEE_ID,
+                    SupportAccessGrantScope.HOST_SUPPORT_READ,
+                    OffsetDateTime.now(ZoneOffset.UTC).plusHours(2),
+                    SupportGrantReasonCategory.MEMBER_ASSISTANCE,
+                    "private note",
+                ),
+            )
+        }.isInstanceOf(AccessDeniedException::class.java)
+    }
+
+    @Test
+    fun `support note is normalized in memory and blank notes are absent`() {
+        assertThat(normalizeSupportGrantNote("  e\u0301  ")).isEqualTo("é")
+        assertThat(normalizeSupportGrantNote(" \n\t ")).isNull()
+    }
+
     @Test
     fun `active grant synthesizes only the support member identity projection`() {
         val grant =
@@ -153,7 +188,8 @@ private class FakeLedgerPort(
 ) : AdminSupportGrantLedgerPort {
     override fun listLedger(
         clubId: UUID?,
-        granteeUserId: UUID?,
+        status: String?,
+        cursor: com.readmates.club.application.model.AdminSupportGrantLedgerCursor?,
         limit: Int,
     ) = emptyList<com.readmates.club.application.model.AdminSupportGrantLedgerItem>()
 
@@ -199,6 +235,8 @@ private class FakeRevokeGrantPort : RevokeSupportAccessGrantPort {
 private class FakeLoadGrantPort(
     private val activeGrant: SupportAccessGrant? = null,
 ) : LoadSupportAccessGrantPort {
+    override fun loadActiveGrantById(grantId: UUID): SupportAccessGrant? = activeGrant?.takeIf { it.id == grantId }
+
     override fun loadActiveGrantsByClub(clubId: UUID) = emptyList<SupportAccessGrant>()
 
     override fun loadActiveGrantsByGrantee(granteeUserId: UUID) = emptyList<SupportAccessGrant>()

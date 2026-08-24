@@ -4,7 +4,6 @@ import com.readmates.auth.application.service.AuthSessionService
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import jakarta.servlet.http.Cookie
 import org.assertj.core.api.Assertions.assertThat
-import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
@@ -17,6 +16,7 @@ import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.delete
 import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
+import org.springframework.transaction.annotation.Transactional
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
@@ -24,30 +24,28 @@ import java.util.UUID
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @AutoConfigureMockMvc
 @Tag("integration")
+@Transactional
 class PlatformAdminSupportWorkbenchControllerTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val authSessionService: AuthSessionService,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
 ) : ReadmatesMySqlIntegrationTestSupport() {
-    private val createdSessionTokenHashes = linkedSetOf<String>()
-    private val createdGrantIds = linkedSetOf<String>()
-
-    @AfterEach
-    fun cleanup() {
-        deleteWhereIn("support_access_grants", "id", createdGrantIds)
-        deleteWhereIn("auth_sessions", "session_token_hash", createdSessionTokenHashes)
-        createdSessionTokenHashes.clear()
-        createdGrantIds.clear()
-    }
-
     @Test
-    fun `owner can search masked support subject and manage grant`() {
+    fun `owner uses no-store body search and canonical create revoke`() {
+        mockMvc
+            .get("/api/admin/support/search?query=admin-support") {
+                cookie(sessionCookieForUser(OWNER_USER_ID))
+            }.andExpect { status { isMethodNotAllowed() } }
+
         val searchBody =
             mockMvc
-                .get("/api/admin/support/search?query=admin-support") {
+                .post("/api/admin/support/search") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"query":"admin-support","clubId":"$TEST_CLUB_ID"}"""
                     cookie(sessionCookieForUser(OWNER_USER_ID))
                 }.andExpect {
                     status { isOk() }
+                    header { string("Cache-Control", "no-store") }
                     jsonPath("$[0].maskedEmail") { value("a***@example.com") }
                     jsonPath("$[0].grantEligible") { value(true) }
                 }.andReturn()
@@ -55,9 +53,10 @@ class PlatformAdminSupportWorkbenchControllerTest(
                 .contentAsString
         assertThat(searchBody).doesNotContain("admin-support@example.com")
 
-        val result =
+        val expiry = OffsetDateTime.now(ZoneOffset.UTC).plusHours(2)
+        val preview =
             mockMvc
-                .post("/api/admin/support/grants") {
+                .post("/api/admin/support/grants/preview") {
                     contentType = MediaType.APPLICATION_JSON
                     content =
                         """
@@ -65,43 +64,97 @@ class PlatformAdminSupportWorkbenchControllerTest(
                           "clubId": "$TEST_CLUB_ID",
                           "granteeSubjectId": "$SUPPORT_USER_ID",
                           "scope": "HOST_SUPPORT_READ",
-                          "reason": "Customer escalation ticket #1234",
-                          "expiresAt": "${OffsetDateTime.now(ZoneOffset.UTC).plusHours(2)}"
+                          "reasonCategory": "MEMBER_ASSISTANCE",
+                          "note": "Customer escalation ticket #1234",
+                          "expiresAt": "$expiry"
                         }
                         """.trimIndent()
                     cookie(sessionCookieForUser(OWNER_USER_ID))
                 }.andExpect {
                     status { isOk() }
-                    jsonPath("$.granteeUserId") { value(SUPPORT_USER_ID) }
+                    jsonPath("$.reasonCategory") { value("MEMBER_ASSISTANCE") }
+                    jsonPath("$.notePresent") { value(true) }
                 }.andReturn()
-        val grantId = checkNotNull(result.response.jsonPathValue<String>("$.id"))
-        createdGrantIds += grantId
+        val previewId = checkNotNull(preview.response.jsonPathValue<String>("$.previewId"))
+
+        val result =
+            mockMvc
+                .post("/api/admin/support/grants/confirm") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        """
+                        {
+                          "previewId": "$previewId",
+                          "idempotencyKey": "support-web-key-0001",
+                          "clubId": "$TEST_CLUB_ID",
+                          "granteeSubjectId": "$SUPPORT_USER_ID",
+                          "scope": "HOST_SUPPORT_READ",
+                          "reasonCategory": "MEMBER_ASSISTANCE",
+                          "note": "Customer escalation ticket #1234",
+                          "expiresAt": "$expiry",
+                          "confirmed": true
+                        }
+                        """.trimIndent()
+                    cookie(sessionCookieForUser(OWNER_USER_ID))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.notePresent") { value(true) }
+                    jsonPath("$.outcome") { value("SUCCEEDED") }
+                }.andReturn()
+        val grantId = checkNotNull(result.response.jsonPathValue<String>("$.grantId"))
 
         mockMvc
             .get("/api/admin/support/grants?clubId=$TEST_CLUB_ID") {
                 cookie(sessionCookieForUser(OWNER_USER_ID))
             }.andExpect {
                 status { isOk() }
-                jsonPath("$[0].granteeMaskedEmail") { value("a***@example.com") }
+                jsonPath("$.items[0].granteeMaskedEmail") { value("a***@example.com") }
+                jsonPath("$.items[0].granteeUserId") { doesNotExist() }
+                jsonPath("$.items[0].reason") { doesNotExist() }
             }
 
+        val revokePreview =
+            mockMvc
+                .post("/api/admin/support/grants/$grantId/revoke/preview") {
+                    contentType = MediaType.APPLICATION_JSON
+                    content = """{"reasonCategory":"SECURITY_REVIEW","note":null}"""
+                    cookie(sessionCookieForUser(OWNER_USER_ID))
+                }.andExpect { status { isOk() } }
+                .andReturn()
+                .response
+                .jsonPathValue<String>("$.previewId")
         mockMvc
-            .delete("/api/admin/support/grants/$grantId") {
+            .post("/api/admin/support/grants/$grantId/revoke/confirm") {
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    """
+                    {
+                      "previewId": "$revokePreview",
+                      "idempotencyKey": "support-web-key-0002",
+                      "clubId": "$TEST_CLUB_ID",
+                      "scope": "HOST_SUPPORT_READ",
+                      "expiresAt": "$expiry",
+                      "reasonCategory": "SECURITY_REVIEW",
+                      "note": null,
+                      "confirmed": true
+                    }
+                    """.trimIndent()
                 cookie(sessionCookieForUser(OWNER_USER_ID))
             }.andExpect {
-                status { isNoContent() }
+                status { isOk() }
+                jsonPath("$.afterStatus") { value("REVOKED") }
             }
     }
 
     @Test
-    fun `support search returns empty context`() {
+    fun `operator cannot search sensitive support subjects`() {
         mockMvc
-            .get("/api/admin/support/search?query=admin-support") {
-                cookie(sessionCookieForUser(SUPPORT_USER_ID))
+            .post("/api/admin/support/search") {
+                contentType = MediaType.APPLICATION_JSON
+                content = """{"query":"admin-support","clubId":null}"""
+                cookie(sessionCookieForUser(OPERATOR_USER_ID))
             }.andExpect {
-                status { isOk() }
-                jsonPath("$") { isArray() }
-                jsonPath("$.length()") { value(0) }
+                status { isForbidden() }
             }
     }
 
@@ -112,23 +165,13 @@ class PlatformAdminSupportWorkbenchControllerTest(
                 userAgent = "PlatformAdminSupportWorkbenchControllerTest",
                 ipAddress = "127.0.0.1",
             )
-        createdSessionTokenHashes += issuedSession.storedTokenHash
         return Cookie(AuthSessionService.COOKIE_NAME, issuedSession.rawToken)
-    }
-
-    private fun deleteWhereIn(
-        tableName: String,
-        columnName: String,
-        values: Set<String>,
-    ) {
-        if (values.isEmpty()) return
-        val placeholders = values.joinToString(",") { "?" }
-        jdbcTemplate.update("delete from $tableName where $columnName in ($placeholders)", *values.toTypedArray())
     }
 
     private companion object {
         private const val OWNER_USER_ID = "00000000-0000-0000-0000-000000000901"
         private const val SUPPORT_USER_ID = "00000000-0000-0000-0000-000000000903"
+        private const val OPERATOR_USER_ID = "00000000-0000-0000-0000-000000000902"
         private const val TEST_CLUB_ID = "00000000-0000-0000-0000-000000000001"
     }
 }

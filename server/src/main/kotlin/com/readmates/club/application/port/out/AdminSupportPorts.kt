@@ -1,5 +1,6 @@
 package com.readmates.club.application.port.out
 
+import com.readmates.club.application.model.AdminSupportGrantLedgerCursor
 import com.readmates.club.application.model.AdminSupportGrantLedgerItem
 import com.readmates.club.application.model.AdminSupportSearchResult
 import java.util.UUID
@@ -15,7 +16,8 @@ interface AdminSupportSearchPort {
 interface AdminSupportGrantLedgerPort {
     fun listLedger(
         clubId: UUID?,
-        granteeUserId: UUID?,
+        status: String?,
+        cursor: AdminSupportGrantLedgerCursor?,
         limit: Int,
     ): List<AdminSupportGrantLedgerItem>
 

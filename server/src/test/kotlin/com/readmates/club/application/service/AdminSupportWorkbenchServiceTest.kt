@@ -7,25 +7,37 @@ import com.readmates.club.application.port.out.AdminSupportSearchPort
 import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.shared.security.CurrentPlatformAdmin
 import org.assertj.core.api.Assertions.assertThat
+import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
 import java.util.UUID
 
 class AdminSupportWorkbenchServiceTest {
     @Test
-    fun `operator search returns masked results`() {
+    fun `owner search returns masked results`() {
         val service = AdminSupportWorkbenchService(FakeSearchPort(), FakeLedgerPort())
 
-        val results = service.search(admin(PlatformAdminRole.OPERATOR), "support", null)
+        val results = service.search(admin(PlatformAdminRole.OWNER), "support", null)
 
         assertThat(results).hasSize(1)
         assertThat(results.single().maskedEmail).isEqualTo("s***@example.com")
     }
 
     @Test
-    fun `support search returns empty result`() {
+    fun `operator cannot search sensitive subjects`() {
         val service = AdminSupportWorkbenchService(FakeSearchPort(), FakeLedgerPort())
 
-        assertThat(service.search(admin(PlatformAdminRole.SUPPORT), "support", null)).isEmpty()
+        assertThatThrownBy { service.search(admin(PlatformAdminRole.OPERATOR), "support", null) }
+            .isInstanceOf(com.readmates.shared.security.AccessDeniedException::class.java)
+    }
+
+    @Test
+    fun `wildcard and oversized searches fail closed`() {
+        val service = AdminSupportWorkbenchService(FakeSearchPort(), FakeLedgerPort())
+
+        listOf("%", "_", "\\", "x".repeat(121)).forEach { query ->
+            assertThatThrownBy { service.search(admin(PlatformAdminRole.OWNER), query, null) }
+                .isInstanceOf(com.readmates.club.application.PlatformAdminException::class.java)
+        }
     }
 
     private class FakeSearchPort : AdminSupportSearchPort {
@@ -52,7 +64,8 @@ class AdminSupportWorkbenchServiceTest {
     private class FakeLedgerPort : AdminSupportGrantLedgerPort {
         override fun listLedger(
             clubId: UUID?,
-            granteeUserId: UUID?,
+            status: String?,
+            cursor: com.readmates.club.application.model.AdminSupportGrantLedgerCursor?,
             limit: Int,
         ): List<AdminSupportGrantLedgerItem> = emptyList()
 

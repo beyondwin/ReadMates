@@ -28,14 +28,24 @@ data class AdminSupportGrantLedgerItem(
     val grantId: UUID,
     val clubId: UUID,
     val clubName: String,
-    val granteeUserId: UUID,
     val granteeDisplayName: String,
     val granteeMaskedEmail: String,
     val scope: SupportAccessGrantScope,
-    val reason: String,
+    val reasonCategory: String,
+    val notePresent: Boolean,
     val expiresAt: OffsetDateTime,
     val createdAt: OffsetDateTime,
     val revokedAt: OffsetDateTime?,
     val status: String,
     val createdByRole: String,
+)
+
+data class AdminSupportGrantLedgerPage(
+    val items: List<AdminSupportGrantLedgerItem>,
+    val nextCursor: String?,
+)
+
+data class AdminSupportGrantLedgerCursor(
+    val createdAt: OffsetDateTime,
+    val grantId: UUID,
 )
