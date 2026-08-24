@@ -24,6 +24,7 @@ ADR impact: implements proposed ADR-0040; constraining reference — ADR-0028, A
 - The operational row is not business audit. Domain-owned immutable receipts and audit events remain the only user-visible proof.
 - Application services own transaction boundaries. Controller and adapter must not orchestrate multi-port business transactions.
 - Purge removes only expired `COMPLETED` claims after at least 24 hours and cascades only to their operational aliases, never to immutable receipts. Key retirement also requires no remaining alias plus a 24-hour unreferenced buffer.
+- The existing `AdminCommandIdentityStartupValidator` checks configuration syntax and secret presence only; it is not retirement evidence. A separate DB-backed startup validator runs after Flyway, locks key-state rows, and fails application startup when configured keys cannot replay every alias or removed versions lack locked zero-alias retirement evidence.
 - Metrics have bounded tags only: command type, claim result, outcome. Never tag actor, target, idempotency key, digest, receipt ID, or error text.
 
 ## Requirement Handoff
@@ -238,26 +239,37 @@ interface AdminCommandIdempotencyPort {
 - Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/adapter/out/observability/AdminCommandMetrics.kt`
 - Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/model/AdminCommandDigestKeyRetirement.kt`
 - Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/service/AdminCommandDigestKeyRetirementService.kt`
+- Create: `server/src/main/kotlin/com/readmates/shared/adminmutation/config/AdminCommandDigestKeyStartupValidator.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/adapter/in/scheduling/AdminCommandIdempotencyPurgeSchedulerTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/adapter/out/observability/AdminCommandMetricsTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/application/service/AdminCommandDigestKeyRetirementServiceTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/adapter/out/persistence/AdminCommandDigestKeyRetirementConcurrencyTest.kt`
+- Create: `server/src/test/kotlin/com/readmates/shared/adminmutation/config/AdminCommandDigestKeyStartupIntegrationTest.kt`
 - Create: `server/src/test/kotlin/com/readmates/auth/api/PlatformAdminBffSecurityTest.kt`
 - Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/application/port/out/AdminCommandIdempotencyPort.kt`
 - Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/adapter/out/persistence/JdbcAdminCommandIdempotencyAdapter.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/config/AdminCommandIdentityProperties.kt`
+- Modify: `server/src/main/kotlin/com/readmates/shared/adminmutation/config/AdminCommandIdempotencyProperties.kt`
 - Modify: `server/src/test/kotlin/com/readmates/architecture/ServerArchitectureInventoryTest.kt`
 
 The shared security test supplies real Spring Security, BFF secret header, canonical Origin/Referer, session principal, `CurrentPlatformAdmin` resolution, and method/path cases. Domain plans extend its parameter matrix; they do not replace it with standalone matcher tests.
 
+`AdminCommandIdentityStartupValidator` remains the configuration syntax/secret guard. It cannot prove that persisted aliases are replayable or that a removed key is safely retired. `AdminCommandDigestKeyStartupValidator` is a separate DB-backed startup gate. Mark it with Spring Boot's `@DependsOnDatabaseInitialization` and run its check from `SmartInitializingSingleton` (or an equivalently ordered fail-fast lifecycle) so Flyway has created V57 before any query and a failure aborts context startup before readiness.
+
+The DB-backed check runs in one transaction. It locks `platform_admin_command_digest_key_state` rows in globally sorted version order, then re-reads distinct alias versions and alias counts while those locks are held. Every referenced alias version must have a state row and a configured current or non-blank previous key; any unknown or unconfigured referenced version fails. A historical version removed from config, including a non-zero `previousKeyVersion` whose key is now blank, must retain its state row and may pass only when the locked alias count is zero, `unreferenced_since` is non-null and not before `last_referenced_at`, and the configured buffer of at least 24 hours has elapsed. A current-only first deployment with no persisted alias/state is valid. Missing rows, inconsistent snapshots, query/transaction errors, and unavailable DB all propagate as startup failure; a timestamp-only or configuration-only check is insufficient.
+
 - [ ] **Step 1: Write RED purge/key-retirement/metric tests.** Keep every `IN_PROGRESS` row and non-expired `COMPLETED` row; purge a bounded batch of expired `COMPLETED` claims and their aliases; prove receipt fixture survives. Retirement locks digest-key-state rows in the same global version order as claim reservation, returns `REFERENCED` while any alias exists, starts/retains `unreferenced_since` only at zero aliases, returns `BUFFER_PENDING` before 24 hours, and returns `REMOVABLE` only after a fresh locked zero-alias check at or beyond 24 hours. Assert only bounded metric tags.
 - [ ] **Step 2: Write RED two-connection claim-vs-retirement tests.** Cover both lock orders. If claim reservation wins, retirement waits and then observes the alias as `REFERENCED`. If retirement starts the unreferenced buffer first, a concurrent still-authorized overlap claim waits, then inserts its alias and clears `unreferenced_since`, invalidating removal eligibility. After old writers drain and `writePreviousAlias=false`, previous remains lookup-capable but no claim path may create a new previous alias; only then may a fresh 24-hour zero-reference result authorize config key removal.
-- [ ] **Step 3: Write the initial RED security harness.** Prove a representative admin POST rejects missing/wrong BFF secret, cross-site origin, inactive/non-admin actor, and insufficient capability; accepts the exact same-origin BFF request.
-- [ ] **Step 4: Run RED.** Run: `./server/gradlew -p server unitTest --tests com.readmates.shared.adminmutation.adapter.in.scheduling.AdminCommandIdempotencyPurgeSchedulerTest --tests com.readmates.shared.adminmutation.adapter.out.observability.AdminCommandMetricsTest --tests com.readmates.shared.adminmutation.application.service.AdminCommandDigestKeyRetirementServiceTest --tests com.readmates.auth.api.PlatformAdminBffSecurityTest`.
+- [ ] **Step 3: Write RED Spring startup integration tests.** Start real Spring contexts against a Flyway-migrated MySQL fixture rather than invoking only the validator method. Assert startup rejects premature previous-key removal with live aliases, an unknown referenced alias version, a referenced or declared removed version with missing key-state row, zero aliases with a pending `<24h` buffer, and any DB/reference query failure. Assert startup succeeds with current·previous configured and referenced, with an empty first-deployment database and configured current key, and with a removed previous version whose locked zero-alias `unreferenced_since` evidence has aged by the full configured `>=24h` buffer. Assert the validator query occurs only after Flyway created all V57 tables.
+- [ ] **Step 4: Write the initial RED security harness.** Prove a representative admin POST rejects missing/wrong BFF secret, cross-site origin, inactive/non-admin actor, and insufficient capability; accepts the exact same-origin BFF request.
+- [ ] **Step 5: Run RED.** Run: `./server/gradlew -p server unitTest --tests com.readmates.shared.adminmutation.adapter.in.scheduling.AdminCommandIdempotencyPurgeSchedulerTest --tests com.readmates.shared.adminmutation.adapter.out.observability.AdminCommandMetricsTest --tests com.readmates.shared.adminmutation.application.service.AdminCommandDigestKeyRetirementServiceTest --tests com.readmates.auth.api.PlatformAdminBffSecurityTest`.
 
   Run: `./server/gradlew -p server integrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandDigestKeyRetirementConcurrencyTest`; expected FAIL.
-- [ ] **Step 5: Implement completed-only bounded purge, serialized fail-closed key retirement, metrics, and reusable test fixture.** Retirement reports eligibility; key removal is a later configuration rollout step after writer drain and the locked 24-hour gate. Do not add a generic production controller or purge/take over committed `IN_PROGRESS` claims.
-- [ ] **Step 6: Run GREEN.** Run both Task 4 commands; expected PASS.
-- [ ] **Step 7: Commit.** Commit: `feat(server): operate admin command claims safely`
+
+  Run: `./server/gradlew -p server integrationTest --tests com.readmates.shared.adminmutation.config.AdminCommandDigestKeyStartupIntegrationTest`; expected FAIL.
+- [ ] **Step 6: Implement completed-only bounded purge, serialized fail-closed key retirement and startup validation, metrics, and reusable test fixture.** The adapter must provide one atomic locked startup inspection rather than separate unlocked reference/state snapshots. Retirement reports eligibility; key removal is a later configuration rollout step after writer drain and the locked 24-hour gate. Do not add a generic production controller or purge/take over committed `IN_PROGRESS` claims.
+- [ ] **Step 7: Run GREEN.** Run all three Task 4 commands; expected PASS.
+- [ ] **Step 8: Commit.** Commit: `feat(server): operate admin command claims safely`
 
 ### Task 5: Verify substrate acceptance before domain adoption
 
@@ -267,7 +279,7 @@ The shared security test supplies real Spring Security, BFF secret header, canon
 - [ ] **Step 1: Run focused tests repeatedly.** Run the Task 2–4 unit and integration commands three times; expected deterministic PASS with no flaky concurrency result.
 - [ ] **Step 2: Run MySQL and server gates.**
 
-  Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandIdempotencyConcurrencyTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandDigestKeyRetirementConcurrencyTest`
+  Run: `./server/gradlew -p server integrationTest --tests com.readmates.support.MySqlFlywayMigrationTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandIdempotencyConcurrencyTest --tests com.readmates.shared.adminmutation.adapter.out.persistence.AdminCommandDigestKeyRetirementConcurrencyTest --tests com.readmates.shared.adminmutation.config.AdminCommandDigestKeyStartupIntegrationTest`
 
   Run: `./scripts/server-ci-check.sh`
 

@@ -101,6 +101,16 @@ savepoint와 outer transaction에 들어가 duplicate reconciliation rollback �
 시작·유지하고, fresh locked zero-reference가 24시간 이상 지속된 뒤에만 key 제거 가능 상태를 반환한다.
 따라서 claim과 retirement가 교차해 reference를 잃거나 premature key removal을 허용하지 않는다.
 
+Secret 존재, version 범위, current·previous 조합만 검사하는 configuration syntax validator는 durable
+rotation safety를 증명하지 못한다. 별도 database-backed startup validator는 Flyway가 V57 schema를 준비한
+뒤 application readiness 전에 실행한다. Validator는 한 transaction에서 digest key state row를 global
+version 순서로 lock하고 alias reference를 다시 조회한다. Referenced alias version에 대응하는 configured
+key나 state row가 없거나, current·previous 어느 쪽으로도 알 수 없는 referenced version이 있으면 startup을
+실패시킨다. 설정에서 제거된 historical version은 lock을 보유한 상태에서 alias가 0이고
+`unreferenced_since`가 존재하며 그 시점부터 최소 24시간이 지난 경우에만 safely retired로 인정한다.
+State timestamp만 읽거나 configuration-only validation으로 대체할 수 없고, reference/state query 또는
+transaction이 실패해도 startup을 fail closed한다.
+
 Response-loss 재호출에서는 같은 actor·command·target·key·request의 completed receipt lookup을
 preview expired/consumed rejection보다 먼저 수행한다. Receipt lookup도 현재 active platform admin과
 해당 receipt의 read capability를 다시 검사한다. Capability를 잃은 actor에게 sensitive receipt metadata를
@@ -191,6 +201,7 @@ L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로
 - Origin claim의 rollback, committed `IN_PROGRESS` fail-closed, sorted dual-alias reservation과 savepoint rollback을 확인한다.
 - Rotation overlap dual-write, writer drain 뒤 current-only alias write/previous lookup, alias purge, locked zero-reference 24시간 buffer, key removal 순서를 확인한다.
 - Claim과 key retirement 두 connection이 같은 key-state row lock으로 serialize되고 새 alias가 `unreferenced_since`를 지우는지 확인한다.
+- Flyway 이후 Spring startup에서 current·previous valid config와 safely retired removed version만 허용하고, premature key removal, unknown referenced version, missing state, pending buffer, database failure를 모두 fail closed하는지 확인한다.
 - Initial expiry를 넘긴 long-running claim completion이 성공하고 completion 시점부터 최소 24시간 retention을 다시 확보하는지 확인한다.
 - External provider failure/resume가 origin claim takeover 없이 같은 convergence ID와 append-only attempt lease를 사용하는지 확인한다.
 - Trusted BFF without Spring CSRF token 성공, missing/invalid secret·origin·active actor·capability 거절,
