@@ -312,11 +312,13 @@ for required_workspace_file in \
   "scripts/check-flyway-migration-immutability.py" \
   "scripts/host-rollout-evidence-reporter.py" \
   "scripts/host-rollout-test-contract.json" \
+  "scripts/host-rollout-workflow-contract.json" \
   "scripts/test-host-rollout-evidence-reporter.py" \
   "scripts/validate-host-rollout-candidate.py" \
   "scripts/verify-host-client-rollout-evidence.py" \
   "scripts/schemas/host-client-rollout-evidence-v1.schema.json" \
   "scripts/schemas/host-rollout-test-report-v1.schema.json" \
+  "scripts/schemas/host-rollout-workflow-contract-v1.schema.json" \
   "scripts/tooling/gh-attestation-lock.json" \
   "scripts/fixtures/public-release-candidate-coverage.txt"
 do

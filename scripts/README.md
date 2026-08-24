@@ -48,6 +48,14 @@ python3 -B scripts/check-host-client-rollout-contract.py
 
 `host-rollout-evidence-reporter.py`와 `host-rollout-test-contract.json`은 test command, substantive spec/config path, case set, reporter source를 함께 고정합니다. `check-config --artifact-ready`는 아직 후속 D3/D5/C1 task가 소유한 spec이 없더라도 계약 구조만 검사합니다. Live `run-command`는 해당 stage의 모든 prerequisite가 실제 tracked non-empty file이고 각 test가 bounded structured JSON을 생성할 때만 통과합니다. 따라서 repository-only structural PASS는 live evidence PASS가 아닙니다.
 
+`host-rollout-workflow-contract.json`은 `ci.yml`, rollout orchestrator, config sync, front/server deploy workflow의 supported parsed YAML AST 전체를 고정합니다. 따라서 trigger, permissions, concurrency, job/step 순서와 identity, environment, exact action/reusable-workflow pin, 모든 `run` script 변경은 review된 digest와 다르면 fail closed입니다. Workflow를 의도적으로 바꿀 때는 executable diff를 먼저 review하고 아래 read-only 명령의 출력을 확인한 뒤 해당 workflow의 digest만 수동으로 contract에 반영합니다. Schema를 의도적으로 바꿀 때도 schema diff를 별도로 review하고 platform checksum 명령으로 확인한 값을 `WORKFLOW_CONTRACT_SCHEMA_DIGEST`에 수동 반영합니다. Checker는 contract나 schema를 자동 생성하거나 수정하지 않습니다.
+
+```bash
+python3 -B scripts/check-host-client-rollout-contract.py --print-workflow-digests
+python3 -B scripts/check-host-client-rollout-contract.py --self-test
+python3 -B scripts/check-host-client-rollout-contract.py
+```
+
 `verify-host-client-rollout-evidence.py`는 별도로 전달된 manifest와 attestation bundle만 받습니다. JSON Schema와 exact command/case/provenance allowlist를 먼저 검사하고, GitHub 공식 release checksum으로 고정한 `gh` binary가 `gh attestation verify`에 성공한 JSON만 추가 policy input으로 사용합니다. Python은 signature, certificate chain, transparency log, timestamp authority를 재구현하지 않습니다. GitHub CLI download/checksum/trust root/network/verified timestamp 중 하나라도 사용할 수 없으면 실패합니다.
 
 세 artifact를 결합하는 live-evidence mode는 protected `host-client-rollout-evidence` no-input manual workflow가 직접 생성·attest한 manifest/bundle, structured reporter artifact, protected SHA와 exact job digest만 내려받은 뒤 실행합니다. `workflow_dispatch` evidence input은 없고 manifest/digest/SHA/tag/time을 받지 않습니다. Pages identity는 upload container digest가 아니라 deterministic candidate tar 자체의 SHA-256이며 final checker가 그 tar의 별도 attestation까지 검증합니다. R2a cache manifest, R2b compatibility manifest, R2b security manifest의 실제 호출 형식은 [release publish runbook](../docs/deploy/release-publish-runbook.md#host-client-v3-staged-rollout)을 따릅니다. 구조 checker 통과는 live evidence, 배포, 720초 대기, 24시간 adoption 관측을 수행했다는 뜻이 아닙니다.

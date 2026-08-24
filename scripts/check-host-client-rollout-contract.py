@@ -8,6 +8,7 @@ import os
 import re
 import subprocess
 import sys
+import tempfile
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -40,11 +41,13 @@ REQUIRED_SOURCES = (
     "scripts/check-host-client-rollout-contract.py",
     "scripts/host-rollout-evidence-reporter.py",
     "scripts/host-rollout-test-contract.json",
+    "scripts/host-rollout-workflow-contract.json",
     "scripts/test-host-rollout-evidence-reporter.py",
     "scripts/validate-host-rollout-candidate.py",
     "scripts/verify-host-client-rollout-evidence.py",
     "scripts/schemas/host-client-rollout-evidence-v1.schema.json",
     "scripts/schemas/host-rollout-test-report-v1.schema.json",
+    "scripts/schemas/host-rollout-workflow-contract-v1.schema.json",
     "scripts/tooling/gh-attestation-lock.json",
     "scripts/README.md",
     "scripts/build-public-release-candidate.sh",
@@ -57,6 +60,19 @@ REQUIRED_SOURCES = (
     ".gitignore",
     "deploy/oci/05-deploy-compose-stack.sh",
     "deploy/oci/watch-compose-post-deploy.sh",
+)
+
+WORKFLOW_CONTRACT_PATH = "scripts/host-rollout-workflow-contract.json"
+WORKFLOW_CONTRACT_SCHEMA_PATH = "scripts/schemas/host-rollout-workflow-contract-v1.schema.json"
+WORKFLOW_CONTRACT_SCHEMA_VERSION = "readmates.host-rollout.workflow-contract.v1"
+WORKFLOW_CONTRACT_CANONICALIZATION = "supported-yaml-parsed-ast-json-order-v1"
+WORKFLOW_CONTRACT_SCHEMA_DIGEST = "sha256:c7c1160d64208c5b6a03e8ee5b5cda10dc6c6529918f666d69ced198f7ec271e"
+WORKFLOW_CONTRACT_WORKFLOWS = (
+    ".github/workflows/ci.yml",
+    ".github/workflows/deploy-front.yml",
+    ".github/workflows/deploy-server.yml",
+    ".github/workflows/host-client-rollout-evidence.yml",
+    ".github/workflows/sync-config.yml",
 )
 
 ATTEST_PIN = "actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1"
@@ -395,6 +411,97 @@ def _workflow_ast(path: str, sources: dict[str, str], errors: list[str]) -> dict
         return {}
 
 
+def _external_sha256(payload: bytes) -> str:
+    temporary_path: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(prefix="readmates-workflow-ast-", suffix=".json", delete=False) as handle:
+            handle.write(payload)
+            temporary_path = Path(handle.name)
+        return f"sha256:{verifier.compute_sha256(temporary_path)}"
+    except (OSError, EvidenceError) as error:
+        raise ContractError("canonical workflow checksum verification failed") from error
+    finally:
+        if temporary_path is not None:
+            try:
+                temporary_path.unlink()
+            except FileNotFoundError:
+                pass
+
+
+def _canonical_workflow_digest(ast: dict[str, Any]) -> str:
+    payload = json.dumps(ast, ensure_ascii=True, separators=(",", ":"), sort_keys=False).encode("utf-8")
+    return _external_sha256(payload)
+
+
+def _workflow_contract_document(workflow_asts: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    return {
+        "schemaVersion": WORKFLOW_CONTRACT_SCHEMA_VERSION,
+        "canonicalization": WORKFLOW_CONTRACT_CANONICALIZATION,
+        "workflows": {
+            path: _canonical_workflow_digest(workflow_asts[path])
+            for path in WORKFLOW_CONTRACT_WORKFLOWS
+        },
+    }
+
+
+def _validate_workflow_contract(
+    sources: dict[str, str],
+    workflow_asts: dict[str, dict[str, Any]],
+    errors: list[str],
+) -> None:
+    contract_source = sources[WORKFLOW_CONTRACT_PATH]
+    schema_source = sources[WORKFLOW_CONTRACT_SCHEMA_PATH]
+    if len(contract_source.encode("utf-8")) > 65_536 or len(schema_source.encode("utf-8")) > 65_536:
+        errors.append("canonical workflow contract or schema exceeds the structural size limit")
+        return
+    try:
+        if _external_sha256(schema_source.encode("utf-8")) != WORKFLOW_CONTRACT_SCHEMA_DIGEST:
+            errors.append("canonical workflow contract schema does not match the reviewed digest")
+            return
+    except ContractError as error:
+        errors.append(str(error))
+        return
+    try:
+        contract = json.loads(contract_source)
+        schema = json.loads(schema_source)
+    except json.JSONDecodeError:
+        errors.append("canonical workflow contract and schema must be valid JSON")
+        return
+    if not isinstance(contract, dict) or not isinstance(schema, dict):
+        errors.append("canonical workflow contract and schema must be JSON objects")
+        return
+
+    schema_errors: list[str] = []
+    try:
+        verifier._validate_schema(contract, schema, schema, "$", schema_errors)
+    except EvidenceError:
+        errors.append("canonical workflow contract schema cannot be resolved")
+        return
+    if schema_errors:
+        errors.append(f"canonical workflow contract does not match its schema: {schema_errors[0]}")
+
+    if set(contract) != {"schemaVersion", "canonicalization", "workflows"}:
+        errors.append("canonical workflow contract fields do not match the exact allowlist")
+        return
+    if contract.get("schemaVersion") != WORKFLOW_CONTRACT_SCHEMA_VERSION:
+        errors.append("canonical workflow contract schema version is not supported")
+    if contract.get("canonicalization") != WORKFLOW_CONTRACT_CANONICALIZATION:
+        errors.append("canonical workflow contract algorithm is not supported")
+    expected_digests = contract.get("workflows")
+    if not isinstance(expected_digests, dict) or set(expected_digests) != set(WORKFLOW_CONTRACT_WORKFLOWS):
+        errors.append("canonical workflow contract paths do not match the exact allowlist")
+        return
+
+    try:
+        actual = _workflow_contract_document(workflow_asts)["workflows"]
+    except ContractError as error:
+        errors.append(str(error))
+        return
+    for path in WORKFLOW_CONTRACT_WORKFLOWS:
+        if expected_digests.get(path) != actual[path]:
+            errors.append(f"{path} executable AST does not match the reviewed canonical workflow contract")
+
+
 def _is_full_action_pin(value: Any) -> bool:
     return isinstance(value, str) and (
         value.startswith("./.github/workflows/")
@@ -498,7 +605,13 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     if errors:
         return errors
 
-    ci_ast = _workflow_ast(".github/workflows/ci.yml", sources, errors)
+    workflow_asts = {
+        path: _workflow_ast(path, sources, errors)
+        for path in WORKFLOW_CONTRACT_WORKFLOWS
+    }
+    _validate_workflow_contract(sources, workflow_asts, errors)
+
+    ci_ast = workflow_asts[".github/workflows/ci.yml"]
     ci_runs = "\n".join(str(item.get("run", "")) for job in _mapping(ci_ast.get("jobs")).values() for item in _steps(_mapping(job)))
     _require(ci_runs, "python3 -B scripts/check-host-client-rollout-contract.py --self-test", "CI omits rollout contract self-test", errors)
     _require(ci_runs, "python3 -B scripts/check-host-client-rollout-contract.py", "CI omits rollout structural mode", errors)
@@ -511,7 +624,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
 
     workflow_path = ".github/workflows/host-client-rollout-evidence.yml"
     workflow = sources[workflow_path]
-    workflow_ast = _workflow_ast(workflow_path, sources, errors)
+    workflow_ast = workflow_asts[workflow_path]
     _validate_production_workflow_ast(workflow_path, workflow_ast, errors)
     trigger = _mapping(workflow_ast.get("on"))
     if set(trigger) != {"workflow_dispatch"} or trigger.get("workflow_dispatch") is not None:
@@ -777,7 +890,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         errors,
     )
 
-    deploy_server_ast = _workflow_ast(".github/workflows/deploy-server.yml", sources, errors)
+    deploy_server_ast = workflow_asts[".github/workflows/deploy-server.yml"]
     _validate_production_workflow_ast(".github/workflows/deploy-server.yml", deploy_server_ast, errors)
     server_call = _mapping(_mapping(deploy_server_ast.get("on")).get("workflow_call"))
     if _mapping(_mapping(server_call.get("outputs")).get("backend-digest")).get("value") != "${{ jobs.build-and-push.outputs.backend-digest }}":
@@ -786,7 +899,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
 
     deploy_front_path = ".github/workflows/deploy-front.yml"
     deploy_front = sources[deploy_front_path]
-    deploy_front_ast = _workflow_ast(deploy_front_path, sources, errors)
+    deploy_front_ast = workflow_asts[deploy_front_path]
     _validate_production_workflow_ast(deploy_front_path, deploy_front_ast, errors)
     front_trigger = _mapping(deploy_front_ast.get("on"))
     if set(front_trigger) != {"workflow_call"} or "workflow_dispatch" in front_trigger:
@@ -856,6 +969,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     _require(scripts_readme, "verify-host-client-rollout-evidence.py", "scripts index omits evidence verifier", errors)
     _require(scripts_readme, "host-rollout-evidence-reporter.py", "scripts index omits structured reporter", errors)
     _require(scripts_readme, "artifact-ready", "scripts index confuses structural and live reporter readiness", errors)
+    _require(scripts_readme, "--print-workflow-digests", "scripts index omits the deliberate workflow contract update procedure", errors)
 
     builder = sources["scripts/build-public-release-candidate.sh"]
     for relative in (
@@ -863,11 +977,13 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         "scripts/check-host-client-rollout-contract.py",
         "scripts/host-rollout-evidence-reporter.py",
         "scripts/host-rollout-test-contract.json",
+        "scripts/host-rollout-workflow-contract.json",
         "scripts/test-host-rollout-evidence-reporter.py",
         "scripts/validate-host-rollout-candidate.py",
         "scripts/verify-host-client-rollout-evidence.py",
         "scripts/schemas/host-client-rollout-evidence-v1.schema.json",
         "scripts/schemas/host-rollout-test-report-v1.schema.json",
+        "scripts/schemas/host-rollout-workflow-contract-v1.schema.json",
         "scripts/tooling/gh-attestation-lock.json",
     ):
         _require(builder, f'copy_required_file "{relative}"', f"public release candidate omits {relative}", errors)
@@ -1338,6 +1454,103 @@ class RolloutContractTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue(validate_structural_sources(sources))
 
+    def test_canonical_workflow_contract_rejects_every_executable_ast_change(self) -> None:
+        rollout_path = ".github/workflows/host-client-rollout-evidence.yml"
+        front_path = ".github/workflows/deploy-front.yml"
+        cases: list[tuple[str, dict[str, str]]] = []
+
+        sources = _read_sources(REPO_ROOT)
+        old = "            printf 'stage=%s\\n' \"$stage\""
+        self.assertIn(old, sources[rollout_path])
+        sources[rollout_path] = sources[rollout_path].replace(
+            old,
+            "            package=wrangler@4.84.1\n"
+            "            npx --yes \"$package\" pages deploy dist\n"
+            + old,
+            1,
+        )
+        cases.append(("variable-indirected wrangler package", sources))
+
+        sources = _read_sources(REPO_ROOT)
+        self.assertIn(old, sources[rollout_path])
+        sources[rollout_path] = sources[rollout_path].replace(
+            old,
+            "            npx --yes wrangler@4.84.1 pages deplo\"y\" dist\n" + old,
+            1,
+        )
+        cases.append(("quoted deploy token", sources))
+
+        sources = _read_sources(REPO_ROOT)
+        self.assertIn(old, sources[rollout_path])
+        sources[rollout_path] = sources[rollout_path].replace(
+            old,
+            "            docker buildx build --push --tag ghcr.io/example/readmates:bypass .\n" + old,
+            1,
+        )
+        cases.append(("docker buildx push", sources))
+
+        sources = _read_sources(REPO_ROOT)
+        old_deploy = "          printf 'deployed-at=%s\\n' \"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\" >> \"$GITHUB_OUTPUT\""
+        self.assertIn(old_deploy, sources[front_path])
+        sources[front_path] = sources[front_path].replace(
+            old_deploy,
+            old_deploy
+            + "\n          package=wrangler@4.84.1\n"
+            + "          npx --yes \"$package\" pages deplo\"y\" bypass --project-name bypass",
+            1,
+        )
+        cases.append(("second obfuscated deploy in authorized step", sources))
+
+        sources = _read_sources(REPO_ROOT)
+        health_name = "      - name: Require deployed Pages runtime health\n"
+        self.assertIn(health_name, sources[front_path])
+        sources[front_path] = sources[front_path].replace(
+            health_name,
+            "      - name: Record harmless local audit\n"
+            "        shell: bash\n"
+            "        run: echo harmless\n"
+            + health_name,
+            1,
+        )
+        cases.append(("new benign-looking step", sources))
+
+        sources = _read_sources(REPO_ROOT)
+        self.assertIn("--max-time 20", sources[front_path])
+        sources[front_path] = sources[front_path].replace("--max-time 20", "--max-time 21", 1)
+        cases.append(("changed existing run line", sources))
+
+        sources = _read_sources(REPO_ROOT)
+        deploy_start = sources[front_path].index("      - name: Deploy only the verified extracted bytes\n")
+        health_start = sources[front_path].index(health_name, deploy_start)
+        deploy_block = sources[front_path][deploy_start:health_start]
+        health_block = sources[front_path][health_start:]
+        sources[front_path] = sources[front_path][:deploy_start] + health_block + deploy_block
+        cases.append(("reordered steps", sources))
+
+        sources = _read_sources(REPO_ROOT)
+        self.assertIn(CHECKOUT_USE, sources[rollout_path])
+        sources[rollout_path] = sources[rollout_path].replace(CHECKOUT_USE, SETUP_NODE_USE, 1)
+        cases.append(("alternate approved pinned external action", sources))
+
+        for name, mutated_sources in cases:
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(mutated_sources))
+
+        sources = _read_sources(REPO_ROOT)
+        sources["scripts/host-rollout-workflow-contract.json"] = '{"unexpected":true}'
+        sources["scripts/schemas/host-rollout-workflow-contract-v1.schema.json"] = "{}"
+        self.assertTrue(validate_structural_sources(sources))
+
+        sources = _read_sources(REPO_ROOT)
+        sources["scripts/schemas/host-rollout-workflow-contract-v1.schema.json"] = "{}"
+        self.assertTrue(validate_structural_sources(sources))
+
+        sources = _read_sources(REPO_ROOT)
+        contract = json.loads(sources["scripts/host-rollout-workflow-contract.json"])
+        contract["workflows"][front_path] = "not-a-digest"
+        sources["scripts/host-rollout-workflow-contract.json"] = json.dumps(contract)
+        self.assertTrue(validate_structural_sources(sources))
+
     def test_reporter_contract_rejects_empty_duplicate_unknown_and_skipped_cases(self) -> None:
         path = "scripts/host-rollout-test-contract.json"
         mutations = (
@@ -1493,6 +1706,18 @@ def run_self_tests() -> int:
     return 0 if result.wasSuccessful() else 1
 
 
+def print_workflow_digests(root: Path = REPO_ROOT) -> None:
+    sources = _read_sources(root)
+    errors: list[str] = []
+    workflow_asts = {
+        path: _workflow_ast(path, sources, errors)
+        for path in WORKFLOW_CONTRACT_WORKFLOWS
+    }
+    if errors:
+        raise ContractError(errors[0])
+    print(json.dumps(_workflow_contract_document(workflow_asts), indent=2, ensure_ascii=True))
+
+
 def _live_argument_names() -> tuple[str, ...]:
     return (
         "cache_manifest",
@@ -1516,6 +1741,7 @@ def _live_argument_names() -> tuple[str, ...]:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Validate the staged host-client rollout and evidence contract")
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--print-workflow-digests", action="store_true")
     parser.add_argument("--cache-manifest", type=Path)
     parser.add_argument("--cache-attestation", type=Path)
     parser.add_argument("--compat-manifest", type=Path)
@@ -1537,6 +1763,11 @@ def main(argv: list[str] | None = None) -> int:
         return run_self_tests()
     gh_binary: Path | None = None
     try:
+        if args.print_workflow_digests:
+            if any(getattr(args, name) is not None for name in _live_argument_names()):
+                raise ContractError("workflow digest review mode cannot be combined with live evidence inputs")
+            print_workflow_digests()
+            return 0
         validate_structural_contract()
         live_values = [getattr(args, name) for name in _live_argument_names()]
         if not any(value is not None for value in live_values):
