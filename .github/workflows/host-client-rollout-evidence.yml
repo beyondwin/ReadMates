@@ -1,10 +1,7 @@
 name: Host Client Rollout Evidence
 
 on:
-  push:
-    branches:
-      - host-rollout-r2a
-      - host-rollout-r2b
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -17,7 +14,7 @@ concurrency:
 jobs:
   source:
     name: Bind protected rollout source
-    if: ${{ github.ref_protected && github.event_name == 'push' && github.event.repository.fork == false }}
+    if: ${{ github.ref_protected && github.event_name == 'workflow_dispatch' && github.event.repository.fork == false }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     environment:
@@ -65,6 +62,31 @@ jobs:
             printf 'release-tag=%s\n' "$tag"
             printf 'started-at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } >> "$GITHUB_OUTPUT"
+      - name: Fail closed unless protected environments have fresh external authority
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          for environment in host-client-rollout-source host-client-rollout-r2a host-client-rollout-evidence production; do
+            response="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/environments/${environment}")"
+            jq -e '
+              any(.protection_rules[]?;
+                .type == "required_reviewers" and
+                .prevent_self_review == true and
+                ((.reviewers // []) | length) > 0) and
+              .deployment_branch_policy.protected_branches == false and
+              .deployment_branch_policy.custom_branch_policies == true
+            ' <<< "$response" >/dev/null
+          done
+          source_policies="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/environments/host-client-rollout-source/deployment-branch-policies" -f per_page=100)"
+          r2a_policies="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/environments/host-client-rollout-r2a/deployment-branch-policies" -f per_page=100)"
+          evidence_policies="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/environments/host-client-rollout-evidence/deployment-branch-policies" -f per_page=100)"
+          production_policies="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/environments/production/deployment-branch-policies" -f per_page=100)"
+          jq -e '[.branch_policies[].name] | sort == ["host-rollout-r2a", "host-rollout-r2b"]' <<< "$source_policies" >/dev/null
+          jq -e '[.branch_policies[].name] == ["host-rollout-r2a"]' <<< "$r2a_policies" >/dev/null
+          jq -e '[.branch_policies[].name] | sort == ["host-rollout-r2a", "host-rollout-r2b"]' <<< "$evidence_policies" >/dev/null
+          jq -e '[.branch_policies[].name] | sort == ["host-rollout-r2a", "host-rollout-r2b"]' <<< "$production_policies" >/dev/null
       - name: Resolve exact checkpoint provenance and C1 source set
         id: provenance
         shell: bash
@@ -95,9 +117,13 @@ jobs:
           for path in "${c1_paths[@]}"; do
             [[ "$path" =~ ^(front|server|scripts)/[A-Za-z0-9._/-]+$ ]]
           done
-          digest="$(git archive --format=tar "$c1_sha" -- "${c1_paths[@]}" | sha256sum | cut -d ' ' -f 1)"
-          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
-          printf 'cache-source-set-digest=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+          source_args=()
+          for path in "${c1_paths[@]}"; do source_args+=(--path "$path"); done
+          python3 -B scripts/host-rollout-evidence-reporter.py source-set \
+            --checkpoint "$c1_sha" \
+            --candidate "$(git rev-parse --verify 'HEAD^{commit}')" \
+            "${source_args[@]}" \
+            --github-output "$GITHUB_OUTPUT"
       - name: Enforce stage provenance ancestry
         shell: bash
         env:
@@ -180,21 +206,58 @@ jobs:
       deployment: false
     outputs:
       pre-change-cached-at: ${{ steps.prime.outputs.pre-change-cached-at }}
+      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
+      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
     steps:
       - name: Check out exact protected SHA
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ needs.source.outputs.git-sha }}
           persist-credentials: false
+      - name: Set up exact Node and pnpm
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+      - name: Install frozen browser prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').packageManager")" = "pnpm@11.13.1"
+          corepack enable
+          corepack prepare pnpm@11.13.1 --activate
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm --dir front exec playwright install --with-deps chromium
       - name: Prime real previous-policy browser cache
         id: prime
         env:
           READMATES_ROLLOUT_CACHE_PHASE: pre-change
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
         shell: bash
         run: |
           set -euo pipefail
-          corepack pnpm --dir front exec playwright test tests/e2e/public-projection-cache-safety.spec.ts --grep '@prechange'
+          mkdir -p front/output/host-rollout/reports
+          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
+            --group cache-safety \
+            --command seed-r2a-prechange-cache \
+            --output front/output/host-rollout/reports/cache-seed.report.json
           printf 'pre-change-cached-at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Hash structured pre-change report
+        id: report-digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum front/output/host-rollout/reports/cache-seed.report.json | cut -d ' ' -f 1)"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload structured pre-change report without repackaging
+        id: upload-report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: front/output/host-rollout/reports/cache-seed.report.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
 
   build-r2a-policy:
     name: Build and publish exact R2a backend policy
@@ -225,7 +288,7 @@ jobs:
       contents: read
     outputs:
       backend-digest: ${{ needs.build-r2a-policy.outputs.backend-digest }}
-      deployed-at: ${{ steps.deploy.outputs.deployed-at }}
+      backend-deployed-at: ${{ steps.deploy.outputs.backend-deployed-at }}
     steps:
       - name: Check out exact protected SHA
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -238,6 +301,7 @@ jobs:
           VM_PUBLIC_IP: ${{ secrets.VM_PUBLIC_IP }}
           CADDY_SITE: ${{ secrets.CADDY_SITE }}
           OCI_SSH_PRIVATE_KEY: ${{ secrets.OCI_SSH_PRIVATE_KEY }}
+          OCI_SSH_KNOWN_HOSTS: ${{ secrets.OCI_SSH_KNOWN_HOSTS }}
           BACKEND_DIGEST: ${{ needs.build-r2a-policy.outputs.backend-digest }}
         shell: bash
         run: |
@@ -246,21 +310,130 @@ jobs:
           test -n "$VM_PUBLIC_IP"
           test -n "$CADDY_SITE"
           test -n "$OCI_SSH_PRIVATE_KEY"
+          test -n "$OCI_SSH_KNOWN_HOSTS"
           ssh_key="$RUNNER_TEMP/readmates-rollout-ssh-key"
+          known_hosts="$RUNNER_TEMP/readmates-rollout-known-hosts"
           umask 077
           printf '%s\n' "$OCI_SSH_PRIVATE_KEY" > "$ssh_key"
+          printf '%s\n' "$OCI_SSH_KNOWN_HOSTS" > "$known_hosts"
           export SSH_KEY="$ssh_key"
+          export SSH_KNOWN_HOSTS="$known_hosts"
+          export SSH_STRICT_HOST_KEY_CHECKING=yes
           export READMATES_SERVER_IMAGE="ghcr.io/${GITHUB_REPOSITORY,,}/readmates-server@${BACKEND_DIGEST}"
           ./deploy/oci/05-deploy-compose-stack.sh
-          printf 'deployed-at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+          printf 'backend-deployed-at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+  deploy-r2a-pages:
+    name: Deploy exact R2a Pages policy bytes
+    needs:
+      - source
+      - pages-candidate
+      - deploy-r2a-policy
+    if: ${{ needs.source.outputs.stage == 'r2a' && needs.deploy-r2a-policy.result == 'success' }}
+    permissions:
+      actions: read
+      contents: read
+      deployments: write
+    uses: ./.github/workflows/deploy-front.yml
+    with:
+      candidate_artifact_id: ${{ needs.pages-candidate.outputs.artifact-id }}
+      candidate_sha256: ${{ needs.pages-candidate.outputs.pages-digest }}
+    secrets: inherit
+
+  bind-r2a-runtime-pair:
+    name: Bind deployed R2a backend and Pages runtime pair
+    needs:
+      - source
+      - pages-candidate
+      - deploy-r2a-policy
+      - deploy-r2a-pages
+    if: ${{ needs.source.outputs.stage == 'r2a' && needs.deploy-r2a-pages.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: host-client-rollout-r2a
+      deployment: false
+    outputs:
+      backend-digest: ${{ steps.bind.outputs.backend-digest }}
+      pages-digest: ${{ steps.bind.outputs.pages-digest }}
+      policy-deployed-at: ${{ steps.bind.outputs.policy-deployed-at }}
+      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
+      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
+    steps:
+      - name: Check out exact protected SHA
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.source.outputs.git-sha }}
+          persist-credentials: false
+      - name: Set up exact Node and pnpm
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+      - name: Install frozen browser prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./package.json').packageManager")" = "pnpm@11.13.1"
+          corepack enable
+          corepack prepare pnpm@11.13.1 --activate
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm --dir front exec playwright install --with-deps chromium
+      - name: Bind exact deployed digests after both runtime health proofs
+        id: bind
+        env:
+          EXPECTED_PAGES_DIGEST: ${{ needs.pages-candidate.outputs.pages-digest }}
+          DEPLOYED_PAGES_DIGEST: ${{ needs.deploy-r2a-pages.outputs.pages-digest }}
+          BACKEND_DIGEST: ${{ needs.deploy-r2a-policy.outputs.backend-digest }}
+          BACKEND_DEPLOYED_AT: ${{ needs.deploy-r2a-policy.outputs.backend-deployed-at }}
+          PAGES_DEPLOYED_AT: ${{ needs.deploy-r2a-pages.outputs.deployed-at }}
+          PAGES_RUNTIME_HEALTH_AT: ${{ needs.deploy-r2a-pages.outputs.runtime-health-at }}
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$BACKEND_DIGEST" =~ ^sha256:[0-9a-f]{64}$ ]]
+          test "$DEPLOYED_PAGES_DIGEST" = "$EXPECTED_PAGES_DIGEST"
+          for timestamp in "$BACKEND_DEPLOYED_AT" "$PAGES_DEPLOYED_AT" "$PAGES_RUNTIME_HEALTH_AT"; do
+            date -u -d "$timestamp" +%s >/dev/null
+          done
+          curl --fail --silent --show-error --location --max-time 20 --retry 5 --retry-all-errors \
+            --output /dev/null https://readmates.pages.dev/app
+          mkdir -p front/output/host-rollout/reports
+          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
+            --group cache-safety \
+            --command deploy-r2a-cache-policy \
+            --output front/output/host-rollout/reports/cache-deploy.report.json
+          paired_at="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          test "$(date -u -d "$paired_at" +%s)" -ge "$(date -u -d "$PAGES_RUNTIME_HEALTH_AT" +%s)"
+          {
+            printf 'backend-digest=%s\n' "$BACKEND_DIGEST"
+            printf 'pages-digest=%s\n' "$DEPLOYED_PAGES_DIGEST"
+            printf 'policy-deployed-at=%s\n' "$paired_at"
+          } >> "$GITHUB_OUTPUT"
+      - name: Hash structured deployed-pair report
+        id: report-digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum front/output/host-rollout/reports/cache-deploy.report.json | cut -d ' ' -f 1)"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload structured deployed-pair report without repackaging
+        id: upload-report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: front/output/host-rollout/reports/cache-deploy.report.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
 
   wait-r2a-cache-lifetime:
     name: Wait out the real previous browser lifetime
     needs:
       - source
       - prime-r2a-cache
-      - deploy-r2a-policy
-    if: ${{ needs.source.outputs.stage == 'r2a' && needs.deploy-r2a-policy.result == 'success' }}
+      - bind-r2a-runtime-pair
+    if: ${{ needs.source.outputs.stage == 'r2a' && needs.bind-r2a-runtime-pair.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     outputs:
@@ -270,7 +443,7 @@ jobs:
         id: wait
         env:
           PRE_CHANGE_CACHED_AT: ${{ needs.prime-r2a-cache.outputs.pre-change-cached-at }}
-          POLICY_DEPLOYED_AT: ${{ needs.deploy-r2a-policy.outputs.deployed-at }}
+          POLICY_DEPLOYED_AT: ${{ needs.bind-r2a-runtime-pair.outputs.policy-deployed-at }}
         shell: bash
         run: |
           set -euo pipefail
@@ -297,19 +470,134 @@ jobs:
       deployment: false
     outputs:
       browser-proof-completed-at: ${{ steps.proof.outputs.browser-proof-completed-at }}
+      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
+      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
     steps:
       - name: Check out exact protected SHA
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ needs.source.outputs.git-sha }}
           persist-credentials: false
-      - name: Run the bounded C1 cache proof
-        id: proof
+      - name: Set up exact Node and pnpm
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+      - name: Install frozen browser prerequisites
         shell: bash
         run: |
           set -euo pipefail
-          corepack pnpm --dir front exec playwright test tests/e2e/public-projection-cache-safety.spec.ts
+          test "$(node -p "require('./package.json').packageManager")" = "pnpm@11.13.1"
+          corepack enable
+          corepack prepare pnpm@11.13.1 --activate
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm --dir front exec playwright install --with-deps chromium
+      - name: Run the bounded C1 cache proof
+        id: proof
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p front/output/host-rollout/reports
+          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
+            --group cache-safety \
+            --command playwright-r2a-cache-safety \
+            --output front/output/host-rollout/reports/cache-browser.report.json
           printf 'browser-proof-completed-at=%s\n' "$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Hash structured browser report
+        id: report-digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum front/output/host-rollout/reports/cache-browser.report.json | cut -d ' ' -f 1)"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload structured browser report without repackaging
+        id: upload-report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: front/output/host-rollout/reports/cache-browser.report.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+  cache-report-r2a:
+    name: Validate exact R2a structured report set
+    needs:
+      - source
+      - prime-r2a-cache
+      - bind-r2a-runtime-pair
+      - browser-r2a-proof
+    if: ${{ needs.source.outputs.stage == 'r2a' && needs.browser-r2a-proof.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
+      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
+    steps:
+      - name: Check out exact protected SHA
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ needs.source.outputs.git-sha }}
+          persist-credentials: false
+      - name: Download pre-change structured report
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.prime-r2a-cache.outputs.report-artifact-id }}
+          path: front/output/host-rollout/reports
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Download runtime structured report
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.bind-r2a-runtime-pair.outputs.report-artifact-id }}
+          path: front/output/host-rollout/reports
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Download browser structured report
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.browser-r2a-proof.outputs.report-artifact-id }}
+          path: front/output/host-rollout/reports
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Bind and combine exact report bytes
+        env:
+          SEED_SHA256: ${{ needs.prime-r2a-cache.outputs.report-sha256 }}
+          DEPLOY_SHA256: ${{ needs.bind-r2a-runtime-pair.outputs.report-sha256 }}
+          BROWSER_SHA256: ${{ needs.browser-r2a-proof.outputs.report-sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "sha256:$(sha256sum front/output/host-rollout/reports/cache-seed.report.json | cut -d ' ' -f 1)" = "$SEED_SHA256"
+          test "sha256:$(sha256sum front/output/host-rollout/reports/cache-deploy.report.json | cut -d ' ' -f 1)" = "$DEPLOY_SHA256"
+          test "sha256:$(sha256sum front/output/host-rollout/reports/cache-browser.report.json | cut -d ' ' -f 1)" = "$BROWSER_SHA256"
+          python3 -B scripts/host-rollout-evidence-reporter.py combine \
+            --group cache-safety \
+            --input front/output/host-rollout/reports/cache-seed.report.json \
+            --input front/output/host-rollout/reports/cache-deploy.report.json \
+            --input front/output/host-rollout/reports/cache-browser.report.json \
+            --output front/output/host-rollout/reports/cache-safety.report.json
+      - name: Hash exact combined cache report
+        id: report-digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum front/output/host-rollout/reports/cache-safety.report.json | cut -d ' ' -f 1)"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload exact combined cache report without repackaging
+        id: upload-report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: front/output/host-rollout/reports/cache-safety.report.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
 
   compatibility-r2b:
     name: Produce exact D3 compatibility results
@@ -319,6 +607,9 @@ jobs:
     if: ${{ needs.source.outputs.stage == 'r2b' }}
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    outputs:
+      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
+      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
     steps:
       - name: Check out exact protected SHA
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -326,15 +617,63 @@ jobs:
           ref: ${{ needs.source.outputs.git-sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Run exact compatibility command set
+      - name: Set up exact Node and pnpm
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+      - name: Install frozen browser prerequisites
         shell: bash
         run: |
           set -euo pipefail
-          corepack pnpm --dir front exec vitest run tests/unit/cloudflare-bff.test.ts tests/unit/proxy-bff-secret.test.ts tests/unit/cloudflare-bff-client-contract-status.test.ts
-          ./server/gradlew -p server unitTest --tests com.readmates.auth.infrastructure.security.BffSecretFilterUnitTest
-          ./server/gradlew -p server integrationTest --tests com.readmates.session.api.HostSessionBffSecurityTest
-          corepack pnpm --dir front exec playwright test --config playwright-rollout.config.ts tests/e2e/host-client-contract-rollout.spec.ts
-          corepack pnpm --dir front exec playwright test tests/e2e/host-feedback-notification-composer.spec.ts tests/e2e/host-next-book-notification-composer.spec.ts tests/e2e/manual-notifications.spec.ts
+          test "$(node -p "require('./package.json').packageManager")" = "pnpm@11.13.1"
+          corepack enable
+          corepack prepare pnpm@11.13.1 --activate
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm --dir front exec playwright install --with-deps chromium
+      - name: Run exact compatibility command set
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p front/output/host-rollout/reports
+          for command in \
+            bff-unit-contract-matrix \
+            server-unit-contract-policy \
+            server-integration-host-security \
+            playwright-contract-rollout \
+            playwright-non-session-regressions
+          do
+            python3 -B scripts/host-rollout-evidence-reporter.py run-command \
+              --group compatibility \
+              --command "$command" \
+              --output "front/output/host-rollout/reports/${command}.report.json"
+          done
+          python3 -B scripts/host-rollout-evidence-reporter.py combine \
+            --group compatibility \
+            --input front/output/host-rollout/reports/bff-unit-contract-matrix.report.json \
+            --input front/output/host-rollout/reports/server-unit-contract-policy.report.json \
+            --input front/output/host-rollout/reports/server-integration-host-security.report.json \
+            --input front/output/host-rollout/reports/playwright-contract-rollout.report.json \
+            --input front/output/host-rollout/reports/playwright-non-session-regressions.report.json \
+            --output front/output/host-rollout/reports/compatibility.report.json
+      - name: Hash exact compatibility report
+        id: report-digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum front/output/host-rollout/reports/compatibility.report.json | cut -d ' ' -f 1)"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload exact compatibility report without repackaging
+        id: upload-report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: front/output/host-rollout/reports/compatibility.report.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
 
   security-r2b:
     name: Produce exact B7 C1 D5 security results
@@ -344,6 +683,9 @@ jobs:
     if: ${{ needs.source.outputs.stage == 'r2b' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
+    outputs:
+      report-artifact-id: ${{ steps.upload-report.outputs.artifact-id }}
+      report-sha256: ${{ steps.report-digest.outputs.report-sha256 }}
     steps:
       - name: Check out exact protected SHA
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -351,11 +693,47 @@ jobs:
           ref: ${{ needs.source.outputs.git-sha }}
           fetch-depth: 0
           persist-credentials: false
-      - name: Run exact security and cache command set
+      - name: Set up exact Node and pnpm
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+      - name: Install frozen browser prerequisites
         shell: bash
         run: |
           set -euo pipefail
-          corepack pnpm --dir front exec playwright test tests/e2e/host-authority-loss.spec.ts tests/e2e/public-projection-cache-safety.spec.ts
+          test "$(node -p "require('./package.json').packageManager")" = "pnpm@11.13.1"
+          corepack enable
+          corepack prepare pnpm@11.13.1 --activate
+          corepack pnpm install --frozen-lockfile
+          corepack pnpm --dir front exec playwright install --with-deps chromium
+      - name: Run exact security and cache command set
+        env:
+          GITHUB_ACTIONS: "true"
+          READMATES_HOST_ROLLOUT_LIVE_EVIDENCE: protected
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p front/output/host-rollout/reports
+          python3 -B scripts/host-rollout-evidence-reporter.py run-command \
+            --group security \
+            --command playwright-authority-cache-regressions \
+            --output front/output/host-rollout/reports/security.report.json
+      - name: Hash exact security report
+        id: report-digest
+        shell: bash
+        run: |
+          set -euo pipefail
+          digest="$(sha256sum front/output/host-rollout/reports/security.report.json | cut -d ' ' -f 1)"
+          [[ "$digest" =~ ^[0-9a-f]{64}$ ]]
+          printf 'report-sha256=sha256:%s\n' "$digest" >> "$GITHUB_OUTPUT"
+      - name: Upload exact security report without repackaging
+        id: upload-report
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          path: front/output/host-rollout/reports/security.report.json
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
 
   resolve-r2a:
     name: Resolve and verify immutable R2a evidence
@@ -390,7 +768,7 @@ jobs:
           r2a_tag="$(git describe --tags --abbrev=0 "${current_tag}^" --match 'v[0-9]*.[0-9]*.[0-9]*')"
           r2a_sha="$(git rev-list -n 1 "$r2a_tag")"
           [[ "$r2a_sha" =~ ^[0-9a-f]{40}$ ]]
-          response="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/host-client-rollout-evidence.yml/runs" -f event=push -f branch=host-rollout-r2a -f head_sha="$r2a_sha" -f status=success -f per_page=2)"
+          response="$(gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/workflows/host-client-rollout-evidence.yml/runs" -f event=workflow_dispatch -f branch=host-rollout-r2a -f head_sha="$r2a_sha" -f status=success -f per_page=2)"
           run_id="$(jq -er 'if (.workflow_runs | length) == 1 then .workflow_runs[0].id else error("ambiguous R2a run") end' <<< "$response")"
           [[ "$run_id" =~ ^[1-9][0-9]*$ ]]
           printf 'run-id=%s\n' "$run_id" >> "$GITHUB_OUTPUT"
@@ -452,8 +830,10 @@ jobs:
       - pages-candidate
       - prime-r2a-cache
       - deploy-r2a-policy
+      - bind-r2a-runtime-pair
       - wait-r2a-cache-lifetime
       - browser-r2a-proof
+      - cache-report-r2a
       - compatibility-r2b
       - security-r2b
       - resolve-r2a
@@ -461,7 +841,8 @@ jobs:
       ${{ always() && needs.source.result == 'success' && needs.pages-candidate.result == 'success' &&
           ((needs.source.outputs.stage == 'r2a' && needs.prime-r2a-cache.result == 'success' &&
             needs.deploy-r2a-policy.result == 'success' && needs.wait-r2a-cache-lifetime.result == 'success' &&
-            needs.browser-r2a-proof.result == 'success') ||
+            needs.bind-r2a-runtime-pair.result == 'success' && needs.browser-r2a-proof.result == 'success' &&
+            needs.cache-report-r2a.result == 'success') ||
            (needs.source.outputs.stage == 'r2b' && needs.compatibility-r2b.result == 'success' &&
             needs.security-r2b.result == 'success' && needs.resolve-r2a.result == 'success')) }}
     runs-on: ubuntu-latest
@@ -498,6 +879,48 @@ jobs:
         run: |
           set -euo pipefail
           test "sha256:$(sha256sum front/output/host-rollout/candidate/readmates-pages-candidate.tar | cut -d ' ' -f 1)" = "$EXPECTED_PAGES_DIGEST"
+      - name: Download exact R2a validated structured report
+        if: ${{ needs.source.outputs.stage == 'r2a' }}
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.cache-report-r2a.outputs.report-artifact-id }}
+          path: front/output/host-rollout/reports
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Download exact R2b compatibility report
+        if: ${{ needs.source.outputs.stage == 'r2b' }}
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.compatibility-r2b.outputs.report-artifact-id }}
+          path: front/output/host-rollout/reports
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Download exact R2b security report
+        if: ${{ needs.source.outputs.stage == 'r2b' }}
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
+        with:
+          artifact-ids: ${{ needs.security-r2b.outputs.report-artifact-id }}
+          path: front/output/host-rollout/reports
+          skip-decompress: true
+          digest-mismatch: error
+      - name: Verify exact structured report bytes and contract
+        env:
+          STAGE: ${{ needs.source.outputs.stage }}
+          CACHE_REPORT_SHA256: ${{ needs.cache-report-r2a.outputs.report-sha256 }}
+          COMPATIBILITY_REPORT_SHA256: ${{ needs.compatibility-r2b.outputs.report-sha256 }}
+          SECURITY_REPORT_SHA256: ${{ needs.security-r2b.outputs.report-sha256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$STAGE" == "r2a" ]]; then
+            test "sha256:$(sha256sum front/output/host-rollout/reports/cache-safety.report.json | cut -d ' ' -f 1)" = "$CACHE_REPORT_SHA256"
+            python3 -B scripts/host-rollout-evidence-reporter.py validate-report --group cache-safety --report front/output/host-rollout/reports/cache-safety.report.json
+          else
+            test "sha256:$(sha256sum front/output/host-rollout/reports/compatibility.report.json | cut -d ' ' -f 1)" = "$COMPATIBILITY_REPORT_SHA256"
+            test "sha256:$(sha256sum front/output/host-rollout/reports/security.report.json | cut -d ' ' -f 1)" = "$SECURITY_REPORT_SHA256"
+            python3 -B scripts/host-rollout-evidence-reporter.py validate-report --group compatibility --report front/output/host-rollout/reports/compatibility.report.json
+            python3 -B scripts/host-rollout-evidence-reporter.py validate-report --group security --report front/output/host-rollout/reports/security.report.json
+          fi
       - name: Construct bounded manifests from protected job outputs
         id: manifest
         env:
@@ -507,12 +930,13 @@ jobs:
           RELEASE_TAG: ${{ needs.source.outputs.release-tag }}
           PRODUCER_STARTED_AT: ${{ needs.source.outputs.started-at }}
           PAGES_DIGEST: ${{ needs.pages-candidate.outputs.pages-digest }}
-          R2A_BACKEND_DIGEST: ${{ needs.deploy-r2a-policy.outputs.backend-digest }}
+          R2A_BACKEND_DIGEST: ${{ needs.bind-r2a-runtime-pair.outputs.backend-digest }}
+          R2A_PAGES_DIGEST: ${{ needs.bind-r2a-runtime-pair.outputs.pages-digest }}
           IMPORTED_BACKEND_DIGEST: ${{ needs.resolve-r2a.outputs.backend-digest }}
           CACHE_SOURCE_SET_DIGEST: ${{ needs.source.outputs.cache-source-set-digest }}
           IMPORTED_CACHE_SOURCE_SET_DIGEST: ${{ needs.resolve-r2a.outputs.cache-source-set-digest }}
           PRE_CHANGE_CACHED_AT: ${{ needs.prime-r2a-cache.outputs.pre-change-cached-at }}
-          POLICY_DEPLOYED_AT: ${{ needs.deploy-r2a-policy.outputs.deployed-at }}
+          POLICY_DEPLOYED_AT: ${{ needs.bind-r2a-runtime-pair.outputs.policy-deployed-at }}
           WAIT_COMPLETED_AT: ${{ needs.wait-r2a-cache-lifetime.outputs.wait-completed-at }}
           BROWSER_PROOF_COMPLETED_AT: ${{ needs.browser-r2a-proof.outputs.browser-proof-completed-at }}
           A7_SHA: ${{ needs.source.outputs.a7-sha }}
@@ -531,19 +955,10 @@ jobs:
           import os
           import pathlib
 
-          commands = {
-              "cache-safety": ["deploy-r2a-cache-policy", "playwright-r2a-cache-safety", "seed-r2a-prechange-cache"],
-              "compatibility": ["bff-unit-contract-matrix", "playwright-contract-rollout", "playwright-non-session-regressions", "server-integration-host-security", "server-unit-contract-policy"],
-              "security": ["playwright-authority-cache-regressions"],
-          }
-          cases = {
-              "cache-safety": ["bff-generation-deny", "browser-emergency-60s", "browser-general-120s", "browser-previous-policy-720s", "browser-proof-after-wait", "cdn-old-generation-not-served", "origin-immediate-deny"],
-              "compatibility": ["browser-v2-bff-v2v3-backend-enforce", "browser-v2-bff-v2v3-backend-support", "browser-v3-bff-v2only-blocked", "browser-v3-bff-v2v3-backend-enforce", "browser-v3-bff-v2v3-backend-support", "browser-v3-bff-v2v3-backend-v2only-forbidden", "capability-probe-no-store", "invite", "manual-resend-confirmation", "member-approval", "notification-confirm", "notification-dispatch", "notification-policy", "notification-preview", "reads-unaffected", "test-mail"],
-              "security": ["authorized-response-loss-preserves-draft", "back-reload-new-tab-offline-no-resurrection", "browser-emergency-60s-rerun", "browser-general-120s-rerun", "cross-club-scope", "exact-club-state-purged", "host-authority-revoked", "inflight-request-cancelled", "membership-suspended", "old-generation-not-reserved-rerun", "origin-immediate-deny-rerun", "other-club-state-preserved", "revision-conflict-preserves-draft"],
-          }
           stage = os.environ["STAGE"]
           kinds = ["cache-safety"] if stage == "r2a" else ["compatibility", "security"]
           backend_digest = os.environ["R2A_BACKEND_DIGEST"] if stage == "r2a" else os.environ["IMPORTED_BACKEND_DIGEST"]
+          pages_digest = os.environ["R2A_PAGES_DIGEST"] if stage == "r2a" else os.environ["PAGES_DIGEST"]
           source_digest = os.environ["CACHE_SOURCE_SET_DIGEST"]
           if stage == "r2b" and source_digest != os.environ["IMPORTED_CACHE_SOURCE_SET_DIGEST"]:
               raise SystemExit("C1 source-set digest changed between protected stages.")
@@ -553,6 +968,8 @@ jobs:
               "security": [("B7", os.environ["B7_SHA"]), ("C1", os.environ["C1_SHA"]), ("D5", os.environ["D5_SHA"])],
           }
           for kind in kinds:
+              report_path = pathlib.Path(f"front/output/host-rollout/reports/{kind}.report.json")
+              report = json.loads(report_path.read_text(encoding="utf-8"))
               stage_value = {
                   "name": "R2a" if stage == "r2a" else "R2b",
                   "releaseTag": os.environ["RELEASE_TAG"],
@@ -572,7 +989,7 @@ jobs:
                   "gitSha": os.environ["GIT_SHA"],
                   "candidateId": os.environ["CANDIDATE_ID"],
                   "backendDigest": backend_digest,
-                  "pagesDigest": os.environ["PAGES_DIGEST"],
+                  "pagesDigest": pages_digest,
                   "cacheSafetySourceSetDigest": source_digest,
                   "producer": {
                       "repository": os.environ["GITHUB_REPOSITORY"],
@@ -583,8 +1000,8 @@ jobs:
                       "job": kind,
                       "startedAt": os.environ["PRODUCER_STARTED_AT"],
                   },
-                  "commands": [{"id": item, "result": "PASS"} for item in commands[kind]],
-                  "cases": [{"id": item, "result": "PASS"} for item in cases[kind]],
+                  "commands": [{"id": item["id"], "result": item["result"]} for item in report["commands"]],
+                  "cases": [{"id": item["id"], "result": item["result"]} for item in report["cases"]],
                   "provenance": [{"id": item, "gitSha": sha} for item, sha in provenance[kind]],
                   "stage": stage_value,
               }
@@ -715,7 +1132,7 @@ jobs:
             --r2b-pages-digest '${{ needs.pages-candidate.outputs.pages-digest }}' \
             --attestation-repository "$GITHUB_REPOSITORY"
 
-  deploy-pages:
+  deploy-r2b-pages:
     name: Deploy the exact gated R2b Pages candidate
     needs:
       - source
@@ -730,6 +1147,4 @@ jobs:
     with:
       candidate_artifact_id: ${{ needs.pages-candidate.outputs.artifact-id }}
       candidate_sha256: ${{ needs.pages-candidate.outputs.pages-digest }}
-      candidate_git_sha: ${{ needs.source.outputs.git-sha }}
-      release_tag: ${{ needs.source.outputs.release-tag }}
     secrets: inherit

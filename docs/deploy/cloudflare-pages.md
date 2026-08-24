@@ -77,10 +77,10 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 3. Server/API 변경이 있으면 OCI backend를 같은 image tag로 올리고 Flyway/health/BFF smoke를 확인합니다.
 4. Host-client rollout이면 protected `host-rollout-r2b` ref가 exact annotated tag commit을 가리키게 push하고, `.github/workflows/host-client-rollout-evidence.yml`의 package/evidence/final-checker gate를 실행합니다.
 5. Workflow가 deterministic Pages tar를 직접 SHA-256으로 검증하고 attestation과 final live checker를 통과시킵니다.
-6. Reusable `.github/workflows/deploy-front.yml`이 같은 artifact ID와 digest를 다시 검증한 뒤 tar에서 추출한 `dist`와 `functions`를 Cloudflare Pages production으로 함께 배포합니다.
+6. Reusable `.github/workflows/deploy-front.yml`이 caller ref/SHA/stage/tag를 자체 derivation하고 같은 artifact ID와 digest를 다시 검증합니다. Tar의 absolute/`..` path, symlink, hardlink, device, FIFO, privileged mode를 거부한 뒤 `dist`와 `functions`를 Cloudflare Pages production으로 함께 배포합니다.
 7. [README.md](../../README.md)의 smoke check를 실행합니다.
 
-`main` 또는 tag push만으로는 frontend production 배포가 실행되지 않습니다. `Deploy Front`에는 manual dispatch가 없으며 protected host rollout의 final checker가 성공한 뒤 exact job output으로만 호출됩니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
+`main`, rollout branch, tag push만으로는 frontend production 배포가 실행되지 않습니다. `Deploy Front`에는 manual dispatch가 없으며 no-input protected host rollout orchestrator가 R2a runtime pair gate 또는 R2b final evidence checker를 통과한 뒤 exact job output으로만 호출합니다. Reusable caller는 stage/ref/tag/SHA input을 받지 않습니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
 
 Major host-write contract release에서는 backend promotion 직후부터 frontend 배포 완료까지 구 Pages BFF의 host mutation이 409로 동결되는 것이 정상입니다. 같은 tag의 SPA와 Functions가 함께 배포되면 새 browser + 새 BFF handshake에서 쓰기가 재개됩니다. Frontend만 이전 tag로 rollback하면 읽기와 멤버 기능은 유지되지만 host write는 계속 동결되며, 복구하려면 호환 frontend 재배포 또는 backend image rollback/forward-fix가 필요합니다.
 

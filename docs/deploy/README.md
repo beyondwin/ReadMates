@@ -174,7 +174,7 @@ OCI backend Compose stack:
 ```bash
 ./scripts/server-ci-check.sh
 ./server/gradlew -p server integrationTest
-READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
+SSH_KNOWN_HOSTS='/path/to/pinned_known_hosts' READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' VM_PUBLIC_IP='<vm-public-ip>' CADDY_SITE=api.example.com ./deploy/oci/05-deploy-compose-stack.sh
 ```
 
 자세한 절차와 rollback은 [compose-stack.md](compose-stack.md)를 기준으로 합니다.
@@ -188,7 +188,7 @@ VM_PUBLIC_IP='<vm-public-ip>' ./deploy/oci/03-deploy.sh
 
 OCI helper script는 placeholder 기반이며 운영자가 값을 주입하는 전제를 둡니다. script와 문서에는 실제 tenancy ID, API key, database password, private IP, 배포 상태 값을 넣지 않습니다.
 
-백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 일반 release의 OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차입니다. 단, 별도 승인된 host-client R2a protected workflow는 `host-client-rollout-r2a` environment에 VM credential이 구성된 경우에만 같은 script로 digest-immutable image를 배포하고 health 성공 뒤 `policyDeployedAt`을 생성합니다. Credential/environment가 없으면 이 live job은 fail closed하며 artifact/runbook-ready 경계를 넘지 않습니다.
+백엔드 release image 생성은 GitHub Actions `Deploy Server Image` workflow가 담당합니다. 일반 release의 OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`를 실행하는 수동 절차입니다. Script는 pinned `SSH_KNOWN_HOSTS`, `StrictHostKeyChecking=yes`, `UserKnownHostsFile`을 요구하고 `accept-new` 같은 TOFU를 거부합니다. 별도 승인된 no-input host-client R2a protected workflow는 `host-client-rollout-r2a` environment에 VM credential과 `OCI_SSH_KNOWN_HOSTS`가 구성된 경우만 같은 script로 digest-immutable image와 exact Pages candidate를 배포합니다. 두 runtime health가 성공한 뒤에만 `policyDeployedAt`을 생성합니다. Credential/environment가 없으면 live job은 fail closed하며 artifact/runbook-ready 경계를 넘지 않습니다.
 
 DB migration이 포함된 릴리즈는 같은 tag의 backend를 먼저 올리고 Spring startup Flyway와 health를 확인한 뒤에만 frontend를 배포합니다. 현재 `v2.4.1` 릴리즈는 V47 schema 위에 V48의 versioned admin notification replay target/confirmation ledger를 additive하게 적용합니다. Notification·AI recovery runtime rendering도 바뀌므로 backend promotion 전에 `sync-config(restart_api=false, dry_run=false)`를 성공시킵니다. 실패 시 migration을 되돌리거나 이미 발행한 tag를 이동하지 않고 schema를 보존한 호환 image 또는 새 forward-fix tag로 복구합니다.
 

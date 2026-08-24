@@ -71,11 +71,13 @@ E2E를 실행하지 못하면 release note와 최종 배포 보고에 스킵 사
 
 ### 공통 evidence와 신뢰 경계
 
-- 일반 CI와 공개 릴리즈 후보는 `check-host-client-rollout-contract.py --self-test`, `verify-host-client-rollout-evidence.py --self-test`, structural default mode만 실행합니다. Live manifest 검증을 일반 PR이나 untrusted ref에서 실행하지 않습니다.
-- Protected `host-rollout-r2a`/`host-rollout-r2b` push workflow만 `cache-safety.manifest.json`, `compatibility.manifest.json`, `security.manifest.json`과 각각 별도 `.intoto.jsonl` bundle을 생성합니다. Signer는 다운로드하거나 입력받은 manifest를 서명하지 않고, exact protected job output으로 manifest를 직접 만듭니다.
-- Pages digest는 deterministic candidate tar 자체에 `sha256sum`을 적용한 값이고, backend digest는 trusted build/deployment job output입니다. `upload-artifact`의 artifact-container digest나 `workflow_dispatch` human input을 candidate/backend digest로 쓰지 않습니다.
+- 일반 CI와 공개 릴리즈 후보는 `check-host-client-rollout-contract.py --self-test`, `verify-host-client-rollout-evidence.py --self-test`, reporter self-test, `check-config --artifact-ready`, structural default mode만 실행합니다. `artifact-ready`는 후속 C1/D3/D5 task 소유 spec이 아직 없을 수 있음을 정직하게 허용하지만 live gate는 missing/empty/skip/no-op spec과 structured report 누락을 fail closed합니다. Live manifest 검증을 일반 PR이나 untrusted ref에서 실행하지 않습니다.
+- Protected exact `host-rollout-r2a`/`host-rollout-r2b` ref에서 운영자가 no-input `workflow_dispatch`를 실행한 경우만 `cache-safety.manifest.json`, `compatibility.manifest.json`, `security.manifest.json`과 각각 별도 `.intoto.jsonl` bundle을 생성합니다. Push/tag/PR은 live mutation을 자동 시작하지 않으며 dispatch에는 evidence data input이 없습니다. Signer는 다운로드한 report를 exact producer artifact ID와 report SHA-256으로 재검증하지만, 다운로드하거나 입력받은 manifest를 서명하지 않고 exact protected job output으로 manifest를 직접 만듭니다.
+- Pages digest는 deterministic candidate tar 자체에 `sha256sum`을 적용한 값이고, backend digest는 trusted build/deployment job output입니다. `upload-artifact`의 artifact-container digest나 human input을 candidate/backend digest로 쓰지 않습니다. C1 source set은 checkpoint tree의 path/mode/blob object tuple을 canonical digest로 만들고 R2a/R2b candidate의 같은 entry가 수정·삭제·추가되지 않았는지 확인합니다.
 - Official GitHub CLI checksum lock과 `gh attestation verify`가 signature, certificate identity, transparency/timestamp, subject, repository, workflow, source ref/SHA를 검증합니다. Python checker는 성공한 JSON의 schema, candidate, digest, time, command/case, provenance policy만 확인합니다.
 - Live verifier에서 GitHub CLI download/checksum, network, trust root, signature, transparency, subject, verified timestamp 중 하나라도 확인할 수 없으면 abort입니다. Code presence나 tracked Markdown은 attested evidence의 대체물이 아닙니다.
+
+Live preflight 전에 `host-rollout-r2a`, `host-rollout-r2b` branch protection과 `host-client-rollout-source`, `host-client-rollout-r2a`, `host-client-rollout-evidence`, `production` environment를 GitHub에 별도로 구성합니다. 각 environment는 required reviewer가 한 명 이상이고 `prevent self-review`가 켜져 있어야 하며 custom deployment branch policy가 exact rollout branch만 허용해야 합니다. R2a environment는 `host-rollout-r2a`, production은 두 rollout branch만 허용합니다. Workflow는 GitHub API로 이 설정을 read-only 재검증하고 누락 시 abort합니다. 저장소 파일이나 structural checker만으로 GitHub branch/environment 설정의 현재 존재·활성 상태를 증명할 수 없으며, 아직 branch/environment가 준비되지 않은 checkout은 artifact-ready 경계에 머뭅니다.
 
 ### R1 — support window
 
@@ -89,9 +91,9 @@ E2E를 실행하지 못하면 release note와 최종 배포 보고에 스킵 사
 
 ### R2a — A7+C1 safety와 720초 cache gate
 
-**preflight:** R1 support가 유지된 별도 immutable tag를 사용합니다. A7 public-effect와 C1 origin/cache generation이 같은 backend candidate에 있고, Pages public cache/BFF policy를 포함하되 browser contract는 여전히 v2인지 확인합니다. R2a 배포 직전 old-policy response를 synthetic public fixture로 seed하고 `preChangeCachedAt`을 protected producer가 기록합니다.
+**preflight:** R1 support가 유지된 별도 immutable tag를 사용합니다. A7 public-effect와 C1 origin/cache generation이 같은 backend candidate에 있고, deterministic Pages candidate가 v2 browser bundle과 C1 public cache/BFF policy를 함께 포함하는지 확인합니다. R2a 배포 직전 old-policy response를 synthetic public fixture로 seed하고 `preChangeCachedAt`을 protected producer가 기록합니다. OCI SSH는 `OCI_SSH_KNOWN_HOSTS`의 pinned known-host material, `StrictHostKeyChecking=yes`, 전용 `UserKnownHostsFile`만 사용하며 TOFU/`accept-new`는 abort입니다.
 
-**success:** R2a policy 배포 뒤 `waitCompletedAt - max(preChangeCachedAt, policyDeployedAt) >= 720초`를 만족하고, 그 뒤 C1 browser proof가 origin immediate deny, BFF/CDN old generation non-serve, 일반 120초, emergency 60초 경계를 통과합니다. A7+C1 provenance와 C1 source-set digest를 `cache-safety.manifest.json`에 묶습니다. CDN purge 성공만으로 720초 wait를 대체하지 않습니다.
+**success:** Exact backend digest와 exact deterministic Pages tar를 모두 실제 배포하고 backend health, Pages runtime health, public app retry proof가 끝난 뒤에만 둘을 하나의 deployed pair로 묶어 `policyDeployedAt`을 기록합니다. 그 뒤 `waitCompletedAt - max(preChangeCachedAt, policyDeployedAt) >= 720초`를 만족하고 C1 browser proof가 origin immediate deny, BFF/CDN old generation non-serve, 일반 120초, emergency 60초 경계를 통과합니다. A7+C1 provenance와 candidate tree로 재검증한 C1 source-set digest를 `cache-safety.manifest.json`에 묶습니다. CDN purge 성공만으로 720초 wait를 대체하지 않습니다.
 
 **abort:** wait가 720초보다 짧거나 browser proof가 wait보다 이르거나 origin/BFF/CDN/browser case 하나라도 실패하거나 cache source-set이 불명확하면 R2b candidate를 배포하지 않습니다.
 

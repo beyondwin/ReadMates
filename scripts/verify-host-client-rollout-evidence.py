@@ -472,10 +472,29 @@ def ensure_verified_gh(lock_path: Path = DEFAULT_LOCK) -> Path:
     archive = install_dir / asset
     binary = install_dir / "gh"
     url = f"https://github.com/cli/cli/releases/download/v{version}/{asset}"
-    _download_bounded(url, archive)
-    verify_expected_checksum(archive, expected_digest)
-    _extract_binary(archive, binary_path, binary)
+    try:
+        _download_bounded(url, archive)
+        verify_expected_checksum(archive, expected_digest)
+        _extract_binary(archive, binary_path, binary)
+    except Exception:
+        cleanup_verified_gh(binary)
+        raise
     return binary
+
+
+def cleanup_verified_gh(binary: Path) -> None:
+    install_parent = REPO_ROOT / ".tmp/host-rollout-gh"
+    try:
+        parent = binary.parent
+        if (
+            binary.name == "gh"
+            and parent.parent.resolve(strict=True) == install_parent.resolve(strict=True)
+            and parent.name.startswith("gh-")
+            and not parent.is_symlink()
+        ):
+            shutil.rmtree(parent)
+    except OSError:
+        return
 
 
 def _verification_command(
@@ -629,10 +648,15 @@ def verify_evidence(
     manifest = load_manifest(manifest_path)
     validate_manifest_policy(manifest, load_schema(schema_path), expected_kind)
     _read_bounded(attestation_path, "attestation bundle", MAX_ATTESTATION_BYTES)
+    owned_binary = gh_binary is None
     binary = gh_binary if gh_binary is not None else ensure_verified_gh()
-    output = _run_gh_verification(_verification_command(binary, manifest_path, attestation_path, manifest))
-    verified_at = _validate_verified_output(output, manifest_path)
-    return manifest, verified_at
+    try:
+        output = _run_gh_verification(_verification_command(binary, manifest_path, attestation_path, manifest))
+        verified_at = _validate_verified_output(output, manifest_path)
+        return manifest, verified_at
+    finally:
+        if owned_binary:
+            cleanup_verified_gh(binary)
 
 
 def verify_subject_attestation(
@@ -654,18 +678,23 @@ def verify_subject_attestation(
         raise EvidenceError("attestation source ref is invalid")
     _read_bounded(subject_path, "attested subject", MAX_SUBJECT_BYTES)
     _read_bounded(attestation_path, "attestation bundle", MAX_ATTESTATION_BYTES)
+    owned_binary = gh_binary is None
     binary = gh_binary if gh_binary is not None else ensure_verified_gh()
-    output = _run_gh_verification(
-        _subject_verification_command(
-            binary,
-            subject_path,
-            attestation_path,
-            repository,
-            git_sha,
-            source_ref,
+    try:
+        output = _run_gh_verification(
+            _subject_verification_command(
+                binary,
+                subject_path,
+                attestation_path,
+                repository,
+                git_sha,
+                source_ref,
+            )
         )
-    )
-    return _validate_verified_output(output, subject_path)
+        return _validate_verified_output(output, subject_path)
+    finally:
+        if owned_binary:
+            cleanup_verified_gh(binary)
 
 
 def schema_only(
@@ -815,6 +844,33 @@ class EvidenceVerifierTests(unittest.TestCase):
             {key: entry["binaryPath"] for key, entry in lock["platforms"].items()},
             expected,
         )
+
+    def test_verified_gh_temporary_install_is_removed_and_bounded(self) -> None:
+        install_parent = REPO_ROOT / ".tmp/host-rollout-gh"
+        install_parent.mkdir(parents=True, exist_ok=True)
+        install_dir = Path(tempfile.mkdtemp(prefix="gh-fixture-", dir=install_parent))
+        binary = install_dir / "gh"
+        binary.write_bytes(b"fixture")
+        cleanup_verified_gh(binary)
+        self.assertFalse(install_dir.exists())
+        with tempfile.TemporaryDirectory() as directory:
+            outside = Path(directory) / "gh"
+            outside.write_bytes(b"fixture")
+            cleanup_verified_gh(outside)
+            self.assertTrue(outside.exists())
+
+    def test_verified_gh_failed_install_is_cleaned_in_finally_path(self) -> None:
+        install_parent = REPO_ROOT / ".tmp/host-rollout-gh"
+        install_parent.mkdir(parents=True, exist_ok=True)
+        before = {item.name for item in install_parent.iterdir()}
+        with (
+            mock.patch.object(platform, "system", return_value="Linux"),
+            mock.patch.object(platform, "machine", return_value="x86_64"),
+            mock.patch.object(sys.modules[__name__], "_download_bounded", side_effect=EvidenceError("fixture")),
+            self.assertRaises(EvidenceError),
+        ):
+            ensure_verified_gh()
+        self.assertEqual({item.name for item in install_parent.iterdir()}, before)
 
     def test_verified_output_requires_subject_predicate_and_timestamp(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

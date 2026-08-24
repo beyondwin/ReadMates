@@ -38,8 +38,13 @@ REQUIRED_SOURCES = (
     ".github/workflows/deploy-front.yml",
     "server/src/main/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilter.kt",
     "scripts/check-host-client-rollout-contract.py",
+    "scripts/host-rollout-evidence-reporter.py",
+    "scripts/host-rollout-test-contract.json",
+    "scripts/test-host-rollout-evidence-reporter.py",
+    "scripts/validate-host-rollout-candidate.py",
     "scripts/verify-host-client-rollout-evidence.py",
     "scripts/schemas/host-client-rollout-evidence-v1.schema.json",
+    "scripts/schemas/host-rollout-test-report-v1.schema.json",
     "scripts/tooling/gh-attestation-lock.json",
     "scripts/README.md",
     "scripts/build-public-release-candidate.sh",
@@ -50,12 +55,25 @@ REQUIRED_SOURCES = (
     "docs/development/versioning.md",
     ".env.example",
     ".gitignore",
+    "deploy/oci/05-deploy-compose-stack.sh",
+    "deploy/oci/watch-compose-post-deploy.sh",
 )
 
 ATTEST_PIN = "actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1"
 UPLOAD_PIN = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"
 DOWNLOAD_PIN = "actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0"
 MAX_ATTESTATION_SKEW_SECONDS = 300
+EXPECTED_REPORTER_ARGV = {
+    "seed-r2a-prechange-cache": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts", "--grep", "@prechange"],
+    "deploy-r2a-cache-policy": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts", "--grep", "@policy-deployed"],
+    "playwright-r2a-cache-safety": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts"],
+    "bff-unit-contract-matrix": ["corepack", "pnpm", "--dir", "front", "exec", "vitest", "run", "tests/unit/cloudflare-bff.test.ts", "tests/unit/proxy-bff-secret.test.ts", "tests/unit/cloudflare-bff-client-contract-status.test.ts"],
+    "server-unit-contract-policy": ["./server/gradlew", "-p", "server", "unitTest", "--tests", "com.readmates.auth.infrastructure.security.BffSecretFilterUnitTest"],
+    "server-integration-host-security": ["./server/gradlew", "-p", "server", "integrationTest", "--tests", "com.readmates.session.api.HostSessionBffSecurityTest"],
+    "playwright-contract-rollout": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "--config", "playwright-rollout.config.ts", "tests/e2e/host-client-contract-rollout.spec.ts"],
+    "playwright-non-session-regressions": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/host-feedback-notification-composer.spec.ts", "tests/e2e/host-next-book-notification-composer.spec.ts", "tests/e2e/manual-notifications.spec.ts"],
+    "playwright-authority-cache-regressions": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/host-authority-loss.spec.ts", "tests/e2e/public-projection-cache-safety.spec.ts"],
+}
 
 
 class ContractError(ValueError):
@@ -323,6 +341,9 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     _require(ci_runs, "python3 -B scripts/check-host-client-rollout-contract.py --self-test", "CI omits rollout contract self-test", errors)
     _require(ci_runs, "python3 -B scripts/check-host-client-rollout-contract.py", "CI omits rollout structural mode", errors)
     _require(ci_runs, "python3 -B scripts/verify-host-client-rollout-evidence.py --self-test", "CI omits evidence verifier self-test", errors)
+    _require(ci_runs, "python3 -B scripts/test-host-rollout-evidence-reporter.py", "CI omits structured reporter self-test", errors)
+    _require(ci_runs, "python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready", "CI omits artifact-ready reporter contract check", errors)
+    _require(ci_runs, "python3 -B scripts/validate-host-rollout-candidate.py --self-test", "CI omits candidate archive adversarial self-test", errors)
     if "--cache-manifest" in ci_runs or "READMATES_HOST_ROLLOUT_LIVE_EVIDENCE" in ci_runs:
         errors.append("normal CI must not invoke live rollout evidence")
 
@@ -330,11 +351,10 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     workflow = sources[workflow_path]
     workflow_ast = _workflow_ast(workflow_path, sources, errors)
     trigger = _mapping(workflow_ast.get("on"))
-    push = _mapping(trigger.get("push"))
-    if set(trigger) != {"push"} or set(_sequence(push.get("branches"))) != {"host-rollout-r2a", "host-rollout-r2b"}:
-        errors.append("live evidence trigger must be protected R2a/R2b push only")
-    if any(item in trigger for item in ("workflow_dispatch", "pull_request", "pull_request_target", "workflow_call")):
-        errors.append("live evidence must not have manual, PR, or caller-authored triggers")
+    if set(trigger) != {"workflow_dispatch"} or trigger.get("workflow_dispatch") is not None:
+        errors.append("live evidence trigger must be no-input workflow_dispatch only")
+    if any(item in trigger for item in ("push", "pull_request", "pull_request_target", "workflow_call", "schedule")):
+        errors.append("live evidence must not have automatic, PR, scheduled, or caller-authored triggers")
     if "inputs." in workflow:
         errors.append("protected evidence subject or predicate must not depend on workflow inputs")
     if _mapping(workflow_ast.get("permissions")) != {"contents": "read", "actions": "read"}:
@@ -347,14 +367,17 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         "prime-r2a-cache",
         "build-r2a-policy",
         "deploy-r2a-policy",
+        "deploy-r2a-pages",
+        "bind-r2a-runtime-pair",
         "wait-r2a-cache-lifetime",
         "browser-r2a-proof",
+        "cache-report-r2a",
         "compatibility-r2b",
         "security-r2b",
         "resolve-r2a",
         "attest-evidence",
         "final-evidence-gate",
-        "deploy-pages",
+        "deploy-r2b-pages",
     }
     if not required_jobs.issubset(jobs):
         errors.append("protected rollout orchestrator jobs are incomplete")
@@ -365,8 +388,8 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
 
     source_job = _mapping(jobs.get("source"))
     source_if = str(source_job.get("if", ""))
-    if not all(term in source_if for term in ("github.ref_protected", "github.event_name == 'push'", "github.event.repository.fork == false")):
-        errors.append("source job does not deny unprotected, non-push, or fork execution")
+    if not all(term in source_if for term in ("github.ref_protected", "github.event_name == 'workflow_dispatch'", "github.event.repository.fork == false")):
+        errors.append("source job does not deny unprotected, non-dispatch, or fork execution")
     if _mapping(source_job.get("environment")).get("name") != "host-client-rollout-source":
         errors.append("protected source environment is missing")
     source_runs = "\n".join(str(item.get("run", "")) for item in _steps(source_job))
@@ -378,9 +401,75 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         ("feat(front): purge host state on authority loss", "B7 checkpoint provenance is not derived from history"),
         ("test(host): prove client contract v3 compatibility", "D3 checkpoint provenance is not derived from history"),
         ("test(host): verify authority and public cache recovery", "D5 checkpoint provenance is not derived from history"),
-        ("git archive --format=tar", "C1 source-set digest is not derived from checked-out history"),
+        ("host-rollout-evidence-reporter.py source-set", "C1 source-set digest is not derived from canonical candidate tree entries"),
+        ("prevent_self_review == true", "source preflight does not require external environment review"),
+        ("deployment-branch-policies", "source preflight does not verify exact environment branch policies"),
     ):
         _require(source_runs, needle, message, errors)
+
+    try:
+        reporter_contract = json.loads(sources["scripts/host-rollout-test-contract.json"])
+    except json.JSONDecodeError:
+        reporter_contract = {}
+        errors.append("structured reporter contract is not valid JSON")
+    configured_commands: dict[str, dict[str, Any]] = {}
+    configured_cases: dict[str, set[str]] = {}
+    groups = reporter_contract.get("groups") if isinstance(reporter_contract, dict) else None
+    if reporter_contract.get("schemaVersion") != "readmates.host-rollout.test-contract.v1" or not isinstance(groups, dict):
+        errors.append("structured reporter contract envelope is invalid")
+    else:
+        for group, value in groups.items():
+            commands = value.get("commands") if isinstance(value, dict) else None
+            if group not in verifier.EXPECTED_COMMANDS or not isinstance(commands, list):
+                errors.append("structured reporter group is invalid")
+                continue
+            configured_cases[group] = set()
+            for command in commands:
+                if not isinstance(command, dict) or set(command) != {"id", "argv", "timeoutSeconds", "requiredPaths", "cases"}:
+                    errors.append("structured reporter command fields are invalid")
+                    continue
+                command_id = command.get("id")
+                if not isinstance(command_id, str) or command_id in configured_commands:
+                    errors.append("structured reporter command id is invalid or duplicated")
+                    continue
+                configured_commands[command_id] = command
+                argv = command.get("argv")
+                if argv != EXPECTED_REPORTER_ARGV.get(command_id):
+                    errors.append("structured reporter substantive command was replaced, skipped, or changed")
+                paths = command.get("requiredPaths")
+                if not isinstance(paths, list) or not paths or any(not isinstance(path, str) or not path for path in paths):
+                    errors.append("structured reporter substantive spec/config path set is empty or invalid")
+                cases = command.get("cases")
+                if not isinstance(cases, list) or not cases or any(not isinstance(case, str) for case in cases):
+                    errors.append("structured reporter case set is empty or invalid")
+                else:
+                    if len(set(cases)) != len(cases):
+                        errors.append("structured reporter case set is duplicated")
+                    configured_cases[group].update(cases)
+        if set(configured_commands) != set(EXPECTED_REPORTER_ARGV):
+            errors.append("structured reporter exact command set is incomplete or unknown")
+        for group in verifier.EXPECTED_COMMANDS:
+            actual_ids = {
+                command_id
+                for command_id, command in configured_commands.items()
+                if command_id in verifier.EXPECTED_COMMANDS[group]
+            }
+            if actual_ids != verifier.EXPECTED_COMMANDS[group] or configured_cases.get(group) != verifier.EXPECTED_CASES[group]:
+                errors.append(f"structured reporter {group} command/case set is incomplete or unknown")
+
+    reporter_source = sources["scripts/host-rollout-evidence-reporter.py"]
+    for needle, message in (
+        ("subprocess.run(", "structured reporter does not execute commands with subprocess argument arrays"),
+        ("READMATES_HOST_ROLLOUT_CASE_REPORT", "structured reporter does not require per-test structured output"),
+        ("require_paths=True", "structured reporter live mode does not fail closed on missing prerequisites"),
+        ("timeout=command[\"timeoutSeconds\"]", "structured reporter command timeout is not bounded"),
+        ("structured test report timestamp is outside the actual command window", "structured reporter time is not bound to the actual command window"),
+        ("source-set path is ambiguous", "C1 source-set reporter does not fail closed on tree entry drift"),
+        ("candidate added a source entry inside a checkpoint-owned path scope", "C1 source-set reporter does not reject relevant descendant additions"),
+    ):
+        _require(reporter_source, needle, message, errors)
+    if "hashlib" in reporter_source or "cryptography" in reporter_source:
+        errors.append("structured reporter must not implement cryptography in Python")
 
     pages_job = _mapping(jobs.get("pages-candidate"))
     if _needs(pages_job) != {"source"}:
@@ -403,17 +492,79 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         errors.append("R2a runtime policy deployment must follow its exact image build")
     if _mapping(deploy_policy_job.get("environment")).get("name") != "host-client-rollout-r2a":
         errors.append("R2a runtime policy deployment lacks its protected environment")
-    if "./deploy/oci/05-deploy-compose-stack.sh" not in deploy_policy_run or "deployed-at=" not in deploy_policy_run:
-        errors.append("policyDeployedAt is not generated after the real OCI deploy and health action")
+    if "./deploy/oci/05-deploy-compose-stack.sh" not in deploy_policy_run or "backend-deployed-at=" not in deploy_policy_run:
+        errors.append("R2a backend runtime identity is not generated after the real OCI deploy and health action")
+    for needle in ("OCI_SSH_KNOWN_HOSTS", "SSH_KNOWN_HOSTS", "SSH_STRICT_HOST_KEY_CHECKING=yes"):
+        _require(deploy_policy_run + workflow, needle, "R2a OCI deploy does not require pinned strict SSH host identity", errors)
+
+    deploy_r2a_pages = _mapping(jobs.get("deploy-r2a-pages"))
+    if _needs(deploy_r2a_pages) != {"source", "pages-candidate", "deploy-r2a-policy"} or deploy_r2a_pages.get("uses") != "./.github/workflows/deploy-front.yml":
+        errors.append("R2a Pages deployment is not gated by the exact backend and candidate jobs")
+    r2a_pages_with = _mapping(deploy_r2a_pages.get("with"))
+    if r2a_pages_with != {
+        "candidate_artifact_id": "${{ needs.pages-candidate.outputs.artifact-id }}",
+        "candidate_sha256": "${{ needs.pages-candidate.outputs.pages-digest }}",
+    }:
+        errors.append("R2a Pages deploy does not consume only trusted package job outputs")
+    pair_job = _mapping(jobs.get("bind-r2a-runtime-pair"))
+    pair_run = str(_step(pair_job, step_id="bind").get("run", ""))
+    if _needs(pair_job) != {"source", "pages-candidate", "deploy-r2a-policy", "deploy-r2a-pages"}:
+        errors.append("R2a backend and Pages deployed pair binding is incomplete")
+    if not all(needle in pair_run for needle in ("DEPLOYED_PAGES_DIGEST", "BACKEND_DIGEST", "PAGES_RUNTIME_HEALTH_AT", "policy-deployed-at=")):
+        errors.append("policyDeployedAt is not generated after exact pair digest and runtime health binding")
     wait_job = _mapping(jobs.get("wait-r2a-cache-lifetime"))
     wait_run = str(_step(wait_job, step_id="wait").get("run", ""))
-    if _needs(wait_job) != {"source", "prime-r2a-cache", "deploy-r2a-policy"} or "base_epoch + 720" not in wait_run or "sleep" not in wait_run:
+    if _needs(wait_job) != {"source", "prime-r2a-cache", "bind-r2a-runtime-pair"} or "base_epoch + 720" not in wait_run or "sleep" not in wait_run:
         errors.append("R2a wait job does not enforce a real max-timestamp plus 720-second wait")
     if _needs(_mapping(jobs.get("browser-r2a-proof"))) != {"source", "wait-r2a-cache-lifetime"}:
         errors.append("R2a browser proof must run only after the real wait")
 
+    for job_name in ("prime-r2a-cache", "bind-r2a-runtime-pair", "browser-r2a-proof", "compatibility-r2b", "security-r2b"):
+        live_job = _mapping(jobs.get(job_name))
+        uses = {str(item.get("uses", "")) for item in _steps(live_job)}
+        runs = "\n".join(str(item.get("run", "")) for item in _steps(live_job))
+        if "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e" not in uses:
+            errors.append(f"{job_name} omits pinned Node setup")
+        for needle in ("pnpm@11.13.1", "pnpm install --frozen-lockfile", "playwright install --with-deps chromium"):
+            _require(runs, needle, f"{job_name} omits exact frozen browser setup", errors)
+    producer_commands = {
+        "prime-r2a-cache": {"seed-r2a-prechange-cache"},
+        "bind-r2a-runtime-pair": {"deploy-r2a-cache-policy"},
+        "browser-r2a-proof": {"playwright-r2a-cache-safety"},
+        "compatibility-r2b": verifier.EXPECTED_COMMANDS["compatibility"],
+        "security-r2b": verifier.EXPECTED_COMMANDS["security"],
+    }
+    for job_name, command_ids in producer_commands.items():
+        runs = "\n".join(str(item.get("run", "")) for item in _steps(_mapping(jobs.get(job_name))))
+        _require(runs, "host-rollout-evidence-reporter.py", f"{job_name} omits structured reporter", errors)
+        for command_id in command_ids:
+            _require(runs, command_id, f"{job_name} omits exact reporter command {command_id}", errors)
+
+    cache_report_job = _mapping(jobs.get("cache-report-r2a"))
+    cache_report_runs = "\n".join(str(item.get("run", "")) for item in _steps(cache_report_job))
+    if _needs(cache_report_job) != {"source", "prime-r2a-cache", "bind-r2a-runtime-pair", "browser-r2a-proof"}:
+        errors.append("R2a structured report combiner is not bound to all exact producer jobs")
+    for needle in ("report-sha256", "sha256sum", "host-rollout-evidence-reporter.py combine", "cache-safety.report.json"):
+        _require(workflow + cache_report_runs, needle, "R2a structured report artifact is not exactly bound and validated", errors)
+
+    allowed_deploy_jobs = {
+        "deploy-r2a-policy": {"./deploy/oci/05-deploy-compose-stack.sh"},
+        "deploy-r2a-pages": {"./.github/workflows/deploy-front.yml"},
+        "deploy-r2b-pages": {"./.github/workflows/deploy-front.yml"},
+        "build-r2a-policy": {"./.github/workflows/deploy-server.yml"},
+    }
+    deploy_markers = ("wrangler pages deploy", "docker push", "build-push-action", "./deploy/oci/05-deploy-compose-stack.sh", "./.github/workflows/deploy-front.yml", "./.github/workflows/deploy-server.yml")
+    for job_name, job_value in jobs.items():
+        job = _mapping(job_value)
+        material = str(job.get("uses", "")) + "\n" + "\n".join(str(item.get("uses", "")) + "\n" + str(item.get("run", "")) for item in _steps(job))
+        for marker in deploy_markers:
+            if marker in material and marker not in allowed_deploy_jobs.get(job_name, set()):
+                errors.append(f"job {job_name} contains a direct deployment or publish bypass: {marker}")
+        if re.search(r"gh api[^\n]*(--method[ =](POST|PUT|PATCH|DELETE)|-X (POST|PUT|PATCH|DELETE))", material, re.IGNORECASE):
+            errors.append(f"job {job_name} contains a mutable GitHub API bypass")
+
     attest_job = _mapping(jobs.get("attest-evidence"))
-    if not {"pages-candidate", "browser-r2a-proof", "compatibility-r2b", "security-r2b", "resolve-r2a"}.issubset(_needs(attest_job)):
+    if not {"pages-candidate", "bind-r2a-runtime-pair", "cache-report-r2a", "browser-r2a-proof", "compatibility-r2b", "security-r2b", "resolve-r2a"}.issubset(_needs(attest_job)):
         errors.append("attestation producer is not bound to all exact result jobs")
     if _mapping(attest_job.get("environment")).get("name") != "host-client-rollout-evidence":
         errors.append("protected evidence environment is missing")
@@ -426,10 +577,11 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         "GIT_SHA": "${{ needs.source.outputs.git-sha }}",
         "CANDIDATE_ID": "${{ needs.source.outputs.candidate-id }}",
         "PAGES_DIGEST": "${{ needs.pages-candidate.outputs.pages-digest }}",
-        "R2A_BACKEND_DIGEST": "${{ needs.deploy-r2a-policy.outputs.backend-digest }}",
+        "R2A_BACKEND_DIGEST": "${{ needs.bind-r2a-runtime-pair.outputs.backend-digest }}",
+        "R2A_PAGES_DIGEST": "${{ needs.bind-r2a-runtime-pair.outputs.pages-digest }}",
         "IMPORTED_BACKEND_DIGEST": "${{ needs.resolve-r2a.outputs.backend-digest }}",
         "PRE_CHANGE_CACHED_AT": "${{ needs.prime-r2a-cache.outputs.pre-change-cached-at }}",
-        "POLICY_DEPLOYED_AT": "${{ needs.deploy-r2a-policy.outputs.deployed-at }}",
+        "POLICY_DEPLOYED_AT": "${{ needs.bind-r2a-runtime-pair.outputs.policy-deployed-at }}",
         "WAIT_COMPLETED_AT": "${{ needs.wait-r2a-cache-lifetime.outputs.wait-completed-at }}",
         "BROWSER_PROOF_COMPLETED_AT": "${{ needs.browser-r2a-proof.outputs.browser-proof-completed-at }}",
     }
@@ -440,6 +592,19 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         errors.append("signer does not construct and schema-check its own bounded manifest")
     if "download" in str(manifest_step.get("name", "")).lower() or "incoming" in manifest_run:
         errors.append("signer must not attest a downloaded caller-authored manifest")
+    attest_runs = "\n".join(str(item.get("run", "")) for item in _steps(attest_job))
+    for needle in (
+        "needs.cache-report-r2a.outputs.report-sha256",
+        "needs.compatibility-r2b.outputs.report-sha256",
+        "needs.security-r2b.outputs.report-sha256",
+        "host-rollout-evidence-reporter.py validate-report",
+        'report["commands"]',
+        'report["cases"]',
+    ):
+        _require(workflow + attest_runs, needle, "signer does not consume exact validated structured report artifacts", errors)
+    for forbidden in ("commands = {", "cases = {", '"result": "PASS"} for item in commands', '"result": "PASS"} for item in cases'):
+        if forbidden in manifest_run:
+            errors.append("signer contains a fabricated static PASS command/case array")
     attested_subjects = {
         _mapping(item.get("with")).get("subject-path")
         for item in _steps(attest_job)
@@ -459,12 +624,14 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     gate_runs = "\n".join(str(item.get("run", "")) for item in _steps(gate_job))
     for needle in ("--cache-manifest", "--compat-manifest", "--security-manifest", "--pages-candidate", "--pages-attestation"):
         _require(gate_runs, needle, "final live checker invocation is incomplete", errors)
-    deploy_job = _mapping(jobs.get("deploy-pages"))
+    deploy_job = _mapping(jobs.get("deploy-r2b-pages"))
     if "final-evidence-gate" not in _needs(deploy_job) or deploy_job.get("uses") != "./.github/workflows/deploy-front.yml":
         errors.append("Pages deploy does not depend on the final live checker")
     deploy_with = _mapping(deploy_job.get("with"))
     if deploy_with.get("candidate_artifact_id") != "${{ needs.pages-candidate.outputs.artifact-id }}" or deploy_with.get("candidate_sha256") != "${{ needs.pages-candidate.outputs.pages-digest }}":
         errors.append("Pages deploy inputs are not exact protected package job outputs")
+    if set(deploy_with) != {"candidate_artifact_id", "candidate_sha256"}:
+        errors.append("Pages deploy caller must not supply ref, stage, SHA, tag, or timestamp identity")
 
     sync_config = sources[".github/workflows/sync-config.yml"]
     _require(sync_config, "READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE:", "typed host contract mode is not rendered", errors)
@@ -490,18 +657,42 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         errors.append("front deploy must be reusable-only with no manual bypass")
     front_job = _mapping(_mapping(deploy_front_ast.get("jobs")).get("deploy"))
     front_if = str(front_job.get("if", ""))
-    if not all(term in front_if for term in ("github.ref_protected", "github.event_name == 'push'", "refs/heads/host-rollout-r2b", "fork == false")):
+    if not all(term in front_if for term in ("github.ref_protected", "github.event_name == 'workflow_dispatch'", "refs/heads/host-rollout-r2a", "refs/heads/host-rollout-r2b", "fork == false")):
         errors.append("front deploy does not restrict the protected caller event and ref")
-    if _mapping(front_job.get("environment")).get("name") != "production":
-        errors.append("front deploy production environment is missing")
+    front_inputs = _mapping(_mapping(front_trigger.get("workflow_call")).get("inputs"))
+    if set(front_inputs) != {"candidate_artifact_id", "candidate_sha256"}:
+        errors.append("front deploy reusable contract accepts caller-authored ref, stage, SHA, tag, or time")
+    environment_name = str(_mapping(front_job.get("environment")).get("name", ""))
+    if "host-client-rollout-r2a" not in environment_name or "production" not in environment_name:
+        errors.append("front deploy does not derive its protected environment from exact caller ref")
     front_runs = "\n".join(str(item.get("run", "")) for item in _steps(front_job))
     for needle, message in (
         ("$GITHUB_WORKFLOW_REF", "front deploy does not bind its protected caller workflow identity"),
+        ("$GITHUB_SHA", "front deploy does not derive exact caller SHA"),
+        ("$GITHUB_REF", "front deploy does not derive protected stage/ref"),
+        ("git tag --points-at", "front deploy does not derive its immutable release tag"),
         ("sha256sum", "front deploy does not verify exact candidate bytes"),
         ("readmates-pages-candidate.tar", "front deploy does not use the deterministic candidate"),
         ("wrangler@4.84.1 pages deploy dist", "front deploy does not deploy verified extracted bytes"),
+        ("validate-host-rollout-candidate.py --candidate", "front deploy does not invoke candidate archive validator"),
+        ("--no-same-owner --no-same-permissions", "front deploy extraction does not suppress archive ownership and permissions"),
+        ("runtime-health-at=", "front deploy does not produce post-deploy runtime health evidence"),
     ):
         _require(front_runs, needle, message, errors)
+    for forbidden in ("inputs.candidate_git_sha", "inputs.release_tag", "accept-new"):
+        if forbidden in deploy_front:
+            errors.append("front deploy accepts or trusts caller-authored identity or TOFU state")
+    candidate_validator = sources["scripts/validate-host-rollout-candidate.py"]
+    for needle, message in (
+        ("member.issym()", "candidate validator does not reject archive symlinks"),
+        ("member.islnk()", "candidate validator does not reject archive hardlinks"),
+        ("member.isdev()", "candidate validator does not reject archive devices"),
+        ("member.isfifo()", "candidate validator does not reject archive FIFOs"),
+        ("pure.is_absolute()", "candidate validator does not reject absolute archive paths"),
+        ('".." in pure.parts', "candidate validator does not reject parent archive paths"),
+        ("CandidateValidationTests", "candidate validator lacks adversarial archive fixtures"),
+    ):
+        _require(candidate_validator, needle, message, errors)
     front_download = _step(front_job, uses=DOWNLOAD_PIN.split(" #", 1)[0])
     front_download_with = _mapping(front_download.get("with"))
     if front_download_with.get("artifact-ids") != "${{ inputs.candidate_artifact_id }}" or front_download_with.get("skip-decompress") is not True:
@@ -512,6 +703,12 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     for forbidden in ("secret", "hostname", "actorId", "memberId", "resourceId", "tracePath", "notes"):
         if f'"{forbidden}"' in schema:
             errors.append("evidence schema contains a forbidden sensitive/deployment field")
+    report_schema = sources["scripts/schemas/host-rollout-test-report-v1.schema.json"]
+    for needle, message in (
+        ('"additionalProperties": false', "structured report schema does not deny unknown fields"),
+        ('"structured-test-reporter"', "structured report schema does not identify substantive test reporters"),
+    ):
+        _require(report_schema, needle, message, errors)
 
     lock = sources["scripts/tooling/gh-attestation-lock.json"]
     _require(lock, '"version": "2.98.0"', "GitHub CLI version is not pinned", errors)
@@ -521,13 +718,20 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     scripts_readme = sources["scripts/README.md"]
     _require(scripts_readme, "check-host-client-rollout-contract.py", "scripts index omits rollout contract checker", errors)
     _require(scripts_readme, "verify-host-client-rollout-evidence.py", "scripts index omits evidence verifier", errors)
+    _require(scripts_readme, "host-rollout-evidence-reporter.py", "scripts index omits structured reporter", errors)
+    _require(scripts_readme, "artifact-ready", "scripts index confuses structural and live reporter readiness", errors)
 
     builder = sources["scripts/build-public-release-candidate.sh"]
     for relative in (
         ".github/workflows/host-client-rollout-evidence.yml",
         "scripts/check-host-client-rollout-contract.py",
+        "scripts/host-rollout-evidence-reporter.py",
+        "scripts/host-rollout-test-contract.json",
+        "scripts/test-host-rollout-evidence-reporter.py",
+        "scripts/validate-host-rollout-candidate.py",
         "scripts/verify-host-client-rollout-evidence.py",
         "scripts/schemas/host-client-rollout-evidence-v1.schema.json",
+        "scripts/schemas/host-rollout-test-report-v1.schema.json",
         "scripts/tooling/gh-attestation-lock.json",
     ):
         _require(builder, f'copy_required_file "{relative}"', f"public release candidate omits {relative}", errors)
@@ -536,6 +740,9 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     _require(fixtures, "python3 -B scripts/check-host-client-rollout-contract.py --self-test", "public fixtures omit rollout self-test", errors)
     _require(fixtures, "python3 -B scripts/check-host-client-rollout-contract.py", "public fixtures omit structural mode", errors)
     _require(fixtures, "python3 -B scripts/verify-host-client-rollout-evidence.py --self-test", "public fixtures omit verifier self-test", errors)
+    _require(fixtures, "python3 -B scripts/test-host-rollout-evidence-reporter.py", "public fixtures omit structured reporter self-test", errors)
+    _require(fixtures, "python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready", "public fixtures omit artifact-ready reporter contract check", errors)
+    _require(fixtures, "python3 -B scripts/validate-host-rollout-candidate.py --self-test", "public fixtures omit candidate archive adversarial self-test", errors)
 
     docs = "\n".join(
         sources[path]
@@ -566,6 +773,11 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         ("billable", "billable smoke authority boundary is undocumented"),
         ("readmates_host_client_contract_total", "adoption metric query is unnamed"),
         ("Host Client Contract Adoption", "adoption dashboard is unnamed"),
+        ("no-input", "no-input protected rollout dispatch authority is undocumented"),
+        ("prevent self-review", "protected environment external review requirement is undocumented"),
+        ("artifact-ready", "repository-only readiness boundary is undocumented"),
+        ("OCI_SSH_KNOWN_HOSTS", "pinned OCI host identity secret contract is undocumented"),
+        ("StrictHostKeyChecking=yes", "strict OCI host identity verification is undocumented"),
     ):
         _require(docs, needle, message, errors)
     if re.search(r"sha256:[0-9a-f]{64}|[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z", docs):
@@ -590,6 +802,12 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     env_example = sources[".env.example"]
     _require(env_example, "READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=", "typed host contract example is missing", errors)
     _require(sources[".gitignore"], "front/output/host-rollout/", "rollout evidence artifacts are not explicitly ignored", errors)
+    oci_deploy = sources["deploy/oci/05-deploy-compose-stack.sh"]
+    oci_watch = sources["deploy/oci/watch-compose-post-deploy.sh"]
+    for source, label in ((oci_deploy, "OCI deploy"), (oci_watch, "OCI watch")):
+        for needle in ("StrictHostKeyChecking=yes", "UserKnownHostsFile=${SSH_KNOWN_HOSTS}", "TOFU modes are forbidden"):
+            _require(source, needle, f"{label} does not pin strict SSH host identity", errors)
+        _forbid(source, "accept-new", f"{label} permits TOFU SSH host identity", errors)
     return errors
 
 
@@ -852,13 +1070,13 @@ class RolloutContractTests(unittest.TestCase):
         mutations = []
         sources = _read_sources(REPO_ROOT)
         sources[workflow_path] = sources[workflow_path].replace(
-            "  push:\n",
-            "  workflow_dispatch:\n    inputs:\n      pages_digest:\n        required: true\n        type: string\n  push:\n",
+            "  workflow_dispatch:\n",
+            "  workflow_dispatch:\n    inputs:\n      pages_digest:\n        required: true\n        type: string\n",
             1,
         )
         mutations.append(("human digest input", sources))
         sources = _read_sources(REPO_ROOT)
-        sources[workflow_path] = sources[workflow_path].replace("  push:\n", "  pull_request:\n  push:\n", 1)
+        sources[workflow_path] = sources[workflow_path].replace("  workflow_dispatch:\n", "  pull_request:\n  workflow_dispatch:\n", 1)
         mutations.append(("untrusted trigger", sources))
         sources = _read_sources(REPO_ROOT)
         sources[workflow_path] = "name: broken\njobs:\n   missing-colon\n"
@@ -866,6 +1084,95 @@ class RolloutContractTests(unittest.TestCase):
         for name, sources in mutations:
             with self.subTest(name=name):
                 self.assertTrue(validate_structural_sources(sources))
+
+    def test_production_ast_rejects_deploy_bypass_noop_and_reporter_omission(self) -> None:
+        workflow_path = ".github/workflows/host-client-rollout-evidence.yml"
+        cases = (
+            (
+                "substantive command replaced with true",
+                "scripts/host-rollout-test-contract.json",
+                '["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts", "--grep", "@prechange"]',
+                '["true"]',
+            ),
+            (
+                "direct wrangler bypass",
+                workflow_path,
+                "printf 'pre-change-cached-at=%s\\n'",
+                "npx wrangler pages deploy dist\\n          printf 'pre-change-cached-at=%s\\n'",
+            ),
+            (
+                "direct OCI bypass",
+                workflow_path,
+                "printf 'pre-change-cached-at=%s\\n'",
+                "./deploy/oci/05-deploy-compose-stack.sh\\n          printf 'pre-change-cached-at=%s\\n'",
+            ),
+            (
+                "direct ghcr bypass",
+                workflow_path,
+                "--command playwright-authority-cache-regressions",
+                "docker push ghcr.io/example/bypass:latest",
+            ),
+            (
+                "reporter validator omitted",
+                workflow_path,
+                "host-rollout-evidence-reporter.py",
+                "omitted-rollout-reporter.py",
+            ),
+            (
+                "unsafe archive extraction",
+                ".github/workflows/deploy-front.yml",
+                "--no-same-owner --no-same-permissions",
+                "",
+            ),
+            (
+                "candidate validator omitted",
+                ".github/workflows/deploy-front.yml",
+                "python3 -B scripts/validate-host-rollout-candidate.py --candidate \"$candidate\"",
+                "true",
+            ),
+            (
+                "TOFU SSH host key",
+                "deploy/oci/05-deploy-compose-stack.sh",
+                'StrictHostKeyChecking=yes',
+                'StrictHostKeyChecking=accept-new',
+            ),
+        )
+        for name, path, old, new in cases:
+            sources = _read_sources(REPO_ROOT)
+            sources[path] = sources[path].replace(old, new, 1)
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(sources))
+
+    def test_reporter_contract_rejects_empty_duplicate_unknown_and_skipped_cases(self) -> None:
+        path = "scripts/host-rollout-test-contract.json"
+        mutations = (
+            ('"cases": ["browser-previous-policy-720s"]', '"cases": []'),
+            ('"cases": ["browser-previous-policy-720s"]', '"cases": ["browser-previous-policy-720s", "browser-previous-policy-720s"]'),
+            ('"cases": ["browser-previous-policy-720s"]', '"cases": ["unknown-case"]'),
+            ('"requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts"]', '"requiredPaths": []'),
+            ('"@prechange"]', '"@prechange", "--skip"]'),
+        )
+        for old, new in mutations:
+            sources = _read_sources(REPO_ROOT)
+            sources[path] = sources[path].replace(old, new, 1)
+            with self.subTest(mutation=new):
+                self.assertTrue(validate_structural_sources(sources))
+
+    def test_live_browser_jobs_require_fresh_setup_and_manual_protected_authority(self) -> None:
+        errors = validate_structural_sources(_read_sources(REPO_ROOT))
+        self.assertEqual(errors, [])
+        workflow = _parse_workflow_yaml(_read_sources(REPO_ROOT)[".github/workflows/host-client-rollout-evidence.yml"])
+        self.assertEqual(set(_mapping(workflow.get("on"))), {"workflow_dispatch"})
+        self.assertIsNone(_mapping(workflow.get("on")).get("workflow_dispatch"))
+        jobs = _mapping(workflow.get("jobs"))
+        for job_name in ("prime-r2a-cache", "bind-r2a-runtime-pair", "browser-r2a-proof", "compatibility-r2b", "security-r2b"):
+            job = _mapping(jobs.get(job_name))
+            uses = {str(step.get("uses", "")) for step in _steps(job)}
+            runs = "\n".join(str(step.get("run", "")) for step in _steps(job))
+            with self.subTest(job=job_name):
+                self.assertIn("actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e", uses)
+                self.assertIn("pnpm install --frozen-lockfile", runs)
+                self.assertIn("playwright install --with-deps chromium", runs)
 
     def test_pages_only_digest_candidate_source_set_and_repository_bindings_fail_closed(self) -> None:
         mutations = []
@@ -1033,6 +1340,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.self_test:
         return run_self_tests()
+    gh_binary: Path | None = None
     try:
         validate_structural_contract()
         live_values = [getattr(args, name) for name in _live_argument_names()]
@@ -1083,6 +1391,9 @@ def main(argv: list[str] | None = None) -> int:
     except (ContractError, EvidenceError) as error:
         print(f"host rollout contract: {error}", file=sys.stderr)
         return 1
+    finally:
+        if gh_binary is not None:
+            verifier.cleanup_verified_gh(gh_binary)
     print("Host client rollout attested evidence contract passed.")
     return 0
 

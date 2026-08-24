@@ -310,8 +310,13 @@ for required_workspace_file in \
   "scripts/check-deploy-workflow-contract.py" \
   "scripts/check-host-client-rollout-contract.py" \
   "scripts/check-flyway-migration-immutability.py" \
+  "scripts/host-rollout-evidence-reporter.py" \
+  "scripts/host-rollout-test-contract.json" \
+  "scripts/test-host-rollout-evidence-reporter.py" \
+  "scripts/validate-host-rollout-candidate.py" \
   "scripts/verify-host-client-rollout-evidence.py" \
   "scripts/schemas/host-client-rollout-evidence-v1.schema.json" \
+  "scripts/schemas/host-rollout-test-report-v1.schema.json" \
   "scripts/tooling/gh-attestation-lock.json" \
   "scripts/fixtures/public-release-candidate-coverage.txt"
 do
@@ -355,6 +360,9 @@ if ! (
   cd "$candidate_dir"
   python3 -B scripts/check-host-client-rollout-contract.py --self-test
   python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
+  python3 -B scripts/test-host-rollout-evidence-reporter.py
+  python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready
+  python3 -B scripts/validate-host-rollout-candidate.py --self-test
   python3 -B scripts/check-host-client-rollout-contract.py
 ) > "$fixture_root/host-rollout-checkers.out" 2> "$fixture_root/host-rollout-checkers.err"
 then

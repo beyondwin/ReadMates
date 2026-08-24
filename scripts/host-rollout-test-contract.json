@@ -1,0 +1,80 @@
+{
+  "schemaVersion": "readmates.host-rollout.test-contract.v1",
+  "groups": {
+    "cache-safety": {
+      "commands": [
+        {
+          "id": "seed-r2a-prechange-cache",
+          "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts", "--grep", "@prechange"],
+          "timeoutSeconds": 600,
+          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts"],
+          "cases": ["browser-previous-policy-720s"]
+        },
+        {
+          "id": "deploy-r2a-cache-policy",
+          "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts", "--grep", "@policy-deployed"],
+          "timeoutSeconds": 1200,
+          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts", "front/functions/api/[[path]].ts"],
+          "cases": ["origin-immediate-deny", "bff-generation-deny", "cdn-old-generation-not-served"]
+        },
+        {
+          "id": "playwright-r2a-cache-safety",
+          "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts"],
+          "timeoutSeconds": 1200,
+          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts"],
+          "cases": ["browser-general-120s", "browser-emergency-60s", "browser-proof-after-wait"]
+        }
+      ]
+    },
+    "compatibility": {
+      "commands": [
+        {
+          "id": "bff-unit-contract-matrix",
+          "argv": ["corepack", "pnpm", "--dir", "front", "exec", "vitest", "run", "tests/unit/cloudflare-bff.test.ts", "tests/unit/proxy-bff-secret.test.ts", "tests/unit/cloudflare-bff-client-contract-status.test.ts"],
+          "timeoutSeconds": 900,
+          "requiredPaths": ["front/tests/unit/cloudflare-bff.test.ts", "front/tests/unit/proxy-bff-secret.test.ts", "front/tests/unit/cloudflare-bff-client-contract-status.test.ts"],
+          "cases": ["browser-v2-bff-v2v3-backend-support", "browser-v2-bff-v2v3-backend-enforce", "browser-v3-bff-v2only-blocked", "browser-v3-bff-v2v3-backend-v2only-forbidden", "browser-v3-bff-v2v3-backend-support", "browser-v3-bff-v2v3-backend-enforce", "capability-probe-no-store"]
+        },
+        {
+          "id": "server-unit-contract-policy",
+          "argv": ["./server/gradlew", "-p", "server", "unitTest", "--tests", "com.readmates.auth.infrastructure.security.BffSecretFilterUnitTest"],
+          "timeoutSeconds": 1200,
+          "requiredPaths": ["server/src/test/kotlin/com/readmates/auth/infrastructure/security/BffSecretFilterUnitTest.kt"],
+          "cases": ["reads-unaffected"]
+        },
+        {
+          "id": "server-integration-host-security",
+          "argv": ["./server/gradlew", "-p", "server", "integrationTest", "--tests", "com.readmates.session.api.HostSessionBffSecurityTest"],
+          "timeoutSeconds": 1800,
+          "requiredPaths": ["server/src/test/kotlin/com/readmates/session/api/HostSessionBffSecurityTest.kt"],
+          "cases": ["member-approval", "invite"]
+        },
+        {
+          "id": "playwright-contract-rollout",
+          "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "--config", "playwright-rollout.config.ts", "tests/e2e/host-client-contract-rollout.spec.ts"],
+          "timeoutSeconds": 1800,
+          "requiredPaths": ["front/playwright-rollout.config.ts", "front/tests/e2e/host-client-contract-rollout.spec.ts"],
+          "cases": ["notification-policy", "notification-preview", "notification-confirm", "notification-dispatch"]
+        },
+        {
+          "id": "playwright-non-session-regressions",
+          "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/host-feedback-notification-composer.spec.ts", "tests/e2e/host-next-book-notification-composer.spec.ts", "tests/e2e/manual-notifications.spec.ts"],
+          "timeoutSeconds": 1800,
+          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/host-feedback-notification-composer.spec.ts", "front/tests/e2e/host-next-book-notification-composer.spec.ts", "front/tests/e2e/manual-notifications.spec.ts"],
+          "cases": ["manual-resend-confirmation", "test-mail"]
+        }
+      ]
+    },
+    "security": {
+      "commands": [
+        {
+          "id": "playwright-authority-cache-regressions",
+          "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/host-authority-loss.spec.ts", "tests/e2e/public-projection-cache-safety.spec.ts"],
+          "timeoutSeconds": 2400,
+          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/host-authority-loss.spec.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts"],
+          "cases": ["host-authority-revoked", "membership-suspended", "cross-club-scope", "inflight-request-cancelled", "exact-club-state-purged", "other-club-state-preserved", "back-reload-new-tab-offline-no-resurrection", "revision-conflict-preserves-draft", "authorized-response-loss-preserves-draft", "origin-immediate-deny-rerun", "old-generation-not-reserved-rerun", "browser-general-120s-rerun", "browser-emergency-60s-rerun"]
+        }
+      ]
+    }
+  }
+}

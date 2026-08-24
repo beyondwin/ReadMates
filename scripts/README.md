@@ -40,12 +40,17 @@ python3 -B scripts/check-deploy-workflow-contract.py
 ```bash
 python3 -B scripts/check-host-client-rollout-contract.py --self-test
 python3 -B scripts/verify-host-client-rollout-evidence.py --self-test
+python3 -B scripts/test-host-rollout-evidence-reporter.py
+python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready
+python3 -B scripts/validate-host-rollout-candidate.py --self-test
 python3 -B scripts/check-host-client-rollout-contract.py
 ```
 
+`host-rollout-evidence-reporter.py`와 `host-rollout-test-contract.json`은 test command, substantive spec/config path, case set, reporter source를 함께 고정합니다. `check-config --artifact-ready`는 아직 후속 D3/D5/C1 task가 소유한 spec이 없더라도 계약 구조만 검사합니다. Live `run-command`는 해당 stage의 모든 prerequisite가 실제 tracked non-empty file이고 각 test가 bounded structured JSON을 생성할 때만 통과합니다. 따라서 repository-only structural PASS는 live evidence PASS가 아닙니다.
+
 `verify-host-client-rollout-evidence.py`는 별도로 전달된 manifest와 attestation bundle만 받습니다. JSON Schema와 exact command/case/provenance allowlist를 먼저 검사하고, GitHub 공식 release checksum으로 고정한 `gh` binary가 `gh attestation verify`에 성공한 JSON만 추가 policy input으로 사용합니다. Python은 signature, certificate chain, transparency log, timestamp authority를 재구현하지 않습니다. GitHub CLI download/checksum/trust root/network/verified timestamp 중 하나라도 사용할 수 없으면 실패합니다.
 
-세 artifact를 결합하는 live-evidence mode는 protected `host-client-rollout-evidence` push workflow가 직접 생성·attest한 manifest/bundle, protected SHA와 exact job digest만 내려받은 뒤 실행합니다. Workflow input이나 `workflow_dispatch`로 manifest/digest/SHA/tag/time을 받지 않습니다. Pages identity는 upload container digest가 아니라 deterministic candidate tar 자체의 SHA-256이며 final checker가 그 tar의 별도 attestation까지 검증합니다. R2a cache manifest, R2b compatibility manifest, R2b security manifest의 실제 호출 형식은 [release publish runbook](../docs/deploy/release-publish-runbook.md#host-client-v3-staged-rollout)을 따릅니다. 구조 checker 통과는 live evidence, 배포, 720초 대기, 24시간 adoption 관측을 수행했다는 뜻이 아닙니다.
+세 artifact를 결합하는 live-evidence mode는 protected `host-client-rollout-evidence` no-input manual workflow가 직접 생성·attest한 manifest/bundle, structured reporter artifact, protected SHA와 exact job digest만 내려받은 뒤 실행합니다. `workflow_dispatch` evidence input은 없고 manifest/digest/SHA/tag/time을 받지 않습니다. Pages identity는 upload container digest가 아니라 deterministic candidate tar 자체의 SHA-256이며 final checker가 그 tar의 별도 attestation까지 검증합니다. R2a cache manifest, R2b compatibility manifest, R2b security manifest의 실제 호출 형식은 [release publish runbook](../docs/deploy/release-publish-runbook.md#host-client-v3-staged-rollout)을 따릅니다. 구조 checker 통과는 live evidence, 배포, 720초 대기, 24시간 adoption 관측을 수행했다는 뜻이 아닙니다.
 
 ## `check-flyway-migration-immutability.py`
 
