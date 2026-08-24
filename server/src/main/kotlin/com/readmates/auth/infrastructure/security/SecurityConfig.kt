@@ -147,6 +147,12 @@ class SecurityConfig(
                         "POST",
                         Regex("^/api/admin/operations/cases/[^/]+/(acknowledge|snooze|resolve)$"),
                     ),
+                    methodAndPath("POST", Regex("^/api/admin/support/search$")),
+                    methodAndPath("POST", Regex("^/api/admin/support/grants/(preview|confirm)$")),
+                    methodAndPath(
+                        "POST",
+                        Regex("^/api/admin/support/grants/[^/]+/revoke/(preview|confirm)$"),
+                    ),
                     methodAndPath("POST", Regex("^/api/admin/support/grants$")),
                     methodAndPath("DELETE", Regex("^/api/admin/support/grants/[^/]+$")),
                     methodAndPath("POST", Regex("^/api/admin/support-access-grants$")),

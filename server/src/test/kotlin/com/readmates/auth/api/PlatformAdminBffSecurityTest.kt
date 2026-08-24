@@ -47,8 +47,13 @@ import com.readmates.auth.infrastructure.security.SessionCookieAuthenticationFil
 import com.readmates.club.adapter.`in`.web.PlatformAdminClubController
 import com.readmates.club.adapter.`in`.web.PlatformAdminController
 import com.readmates.club.adapter.`in`.web.PlatformAdminErrorHandler
+import com.readmates.club.adapter.`in`.web.PlatformAdminSupportWorkbenchController
+import com.readmates.club.application.model.AdminSupportGrantLedgerPage
+import com.readmates.club.application.model.AdminSupportSearchResult
 import com.readmates.club.application.model.ConfirmCreateClubDomainCommand
 import com.readmates.club.application.model.ConfirmPlatformAdminClubVisibilityCommand
+import com.readmates.club.application.model.ConfirmSupportGrantCreateCommand
+import com.readmates.club.application.model.ConfirmSupportGrantRevokeCommand
 import com.readmates.club.application.model.FirstHostOnboardingState
 import com.readmates.club.application.model.PlatformAdminClubCommandPreview
 import com.readmates.club.application.model.PlatformAdminClubCommandReceipt
@@ -56,21 +61,32 @@ import com.readmates.club.application.model.PlatformAdminClubDetail
 import com.readmates.club.application.model.PlatformAdminDomainCommandPreview
 import com.readmates.club.application.model.PreviewCreateClubDomainCommand
 import com.readmates.club.application.model.PreviewPlatformAdminClubVisibilityCommand
+import com.readmates.club.application.model.PreviewSupportGrantCreateCommand
+import com.readmates.club.application.model.PreviewSupportGrantRevokeCommand
 import com.readmates.club.application.model.RecheckClubDomainCommand
 import com.readmates.club.application.model.ResolvedClubContext
+import com.readmates.club.application.model.SupportGrantCommandPreview
+import com.readmates.club.application.model.SupportGrantCommandReceipt
+import com.readmates.club.application.model.SupportGrantCommandType
+import com.readmates.club.application.model.SupportGrantReasonCategory
 import com.readmates.club.application.model.UpdatePlatformAdminClubCommand
+import com.readmates.club.application.port.`in`.AdminSupportWorkbenchUseCase
 import com.readmates.club.application.port.`in`.CheckClubDomainProvisioningUseCase
 import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.CommitPlatformAdminClubOnboardingUseCase
 import com.readmates.club.application.port.`in`.ConfirmPlatformAdminClubVisibilityUseCase
+import com.readmates.club.application.port.`in`.ConfirmSupportGrantCommandUseCase
 import com.readmates.club.application.port.`in`.CreateClubDomainUseCase
+import com.readmates.club.application.port.`in`.CreateSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.GetPlatformAdminClubUseCase
 import com.readmates.club.application.port.`in`.ListPlatformAdminClubsUseCase
 import com.readmates.club.application.port.`in`.PlatformAdminSummaryUseCase
 import com.readmates.club.application.port.`in`.PreviewClubDomainUseCase
 import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubOnboardingUseCase
 import com.readmates.club.application.port.`in`.PreviewPlatformAdminClubVisibilityUseCase
+import com.readmates.club.application.port.`in`.PreviewSupportGrantCommandUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
+import com.readmates.club.application.port.`in`.RevokeSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.SupportMemberSynthesis
 import com.readmates.club.application.port.`in`.UpdatePlatformAdminClubUseCase
 import com.readmates.club.domain.ClubDomainKind
@@ -129,11 +145,13 @@ class PlatformAdminBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val identities: PlatformAdminSecurityIdentities,
     @param:Autowired private val aiCommandInvocations: PlatformAdminAiCommandInvocations,
+    @param:Autowired private val supportCommandInvocations: PlatformAdminSupportCommandInvocations,
 ) {
     @BeforeEach
     fun resetIdentities() {
         identities.reset()
         aiCommandInvocations.reset()
+        supportCommandInvocations.reset()
     }
 
     @Test
@@ -309,6 +327,39 @@ class PlatformAdminBffSecurityTest(
         assertThat(aiCommandInvocations.total()).isZero()
     }
 
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("supportCommandRoutes")
+    fun `exact support command routes require trusted bff same origin active owner capability`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OWNER)
+        commandRequest(route).andExpect(status().isOk)
+
+        listOf<String?>(null, "wrong-secret").forEach { secret ->
+            commandRequest(route, secret = secret).andExpect(status().isUnauthorized)
+        }
+        commandRequest(route, origin = "https://attacker.example").andExpect(status().isForbidden)
+        commandRequest(route, origin = null, referer = "https://attacker.example/path")
+            .andExpect(status().isForbidden)
+
+        identities.inactiveSession()
+        commandRequest(route).andExpect(status().isUnauthorized)
+        identities.nonAdmin()
+        commandRequest(route).andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.OPERATOR)
+        commandRequest(route).andExpect(status().isForbidden)
+        identities.admin(PlatformAdminRole.SUPPORT)
+        commandRequest(route).andExpect(status().isForbidden)
+    }
+
+    @ParameterizedTest(name = "{0}")
+    @MethodSource("supportCommandRoutes")
+    fun `support command wrong method suffix and encoded slash near misses stay protected`(route: ClubCommandRoute) {
+        identities.admin(PlatformAdminRole.OWNER)
+
+        commandRequest(route, method = HttpMethod.PUT).andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}/near-miss").andExpect(status().isForbidden)
+        commandRequest(route, path = "${route.path}%2Fnear-miss").andExpect(status().isBadRequest)
+    }
+
     private fun commandRequest(
         route: ClubCommandRoute,
         method: HttpMethod = route.method,
@@ -450,6 +501,81 @@ class PlatformAdminBffSecurityTest(
             ).map(Arguments::of)
         }
 
+        @JvmStatic
+        fun supportCommandRoutes(): List<Arguments> {
+            val grantId = "dddddddd-0000-4000-8000-000000060012"
+            val previewId = "dddddddd-0000-4000-8000-000000060013"
+            val expiry = "2026-08-25T12:00:00Z"
+            return listOf(
+                ClubCommandRoute(
+                    "support body search",
+                    HttpMethod.POST,
+                    "/api/admin/support/search",
+                    """{"query":"masked subject","clubId":"$CLUB_ID"}""",
+                ),
+                ClubCommandRoute(
+                    "support create preview",
+                    HttpMethod.POST,
+                    "/api/admin/support/grants/preview",
+                    supportCreateBody(expiry),
+                ),
+                ClubCommandRoute(
+                    "support create confirm",
+                    HttpMethod.POST,
+                    "/api/admin/support/grants/confirm",
+                    supportCreateConfirmBody(previewId, expiry),
+                ),
+                ClubCommandRoute(
+                    "support revoke preview",
+                    HttpMethod.POST,
+                    "/api/admin/support/grants/$grantId/revoke/preview",
+                    """{"reasonCategory":"SECURITY_REVIEW","note":null}""",
+                ),
+                ClubCommandRoute(
+                    "support revoke confirm",
+                    HttpMethod.POST,
+                    "/api/admin/support/grants/$grantId/revoke/confirm",
+                    supportRevokeConfirmBody(previewId, expiry),
+                ),
+            ).map(Arguments::of)
+        }
+
+        private fun supportCreateBody(expiry: String): String =
+            """
+            {
+              "clubId":"$CLUB_ID",
+              "granteeSubjectId":"$USER_ID",
+              "scope":"HOST_SUPPORT_READ",
+              "expiresAt":"$expiry",
+              "reasonCategory":"MEMBER_ASSISTANCE",
+              "note":null
+            }
+            """.trimIndent()
+
+        private fun supportCreateConfirmBody(
+            previewId: String,
+            expiry: String,
+        ): String =
+            supportCreateBody(expiry).dropLast(1) +
+                ",\"previewId\":\"$previewId\",\"idempotencyKey\":\"support-key-0001\",\"confirmed\":true}"
+
+        private fun supportRevokeConfirmBody(
+            previewId: String,
+            expiry: String,
+        ): String =
+            """
+            {
+              "previewId":"$previewId",
+              "idempotencyKey":"support-key-0002",
+              "clubId":"$CLUB_ID",
+              "scope":"HOST_SUPPORT_READ",
+              "expiresAt":"$expiry",
+              "reasonCategory":"SECURITY_REVIEW",
+              "note":null,
+              "confirmed":true
+            }
+            """.trimIndent()
+
         private fun safeAiConfirmBody(previewId: String): String =
             """
             {
@@ -487,6 +613,14 @@ class PlatformAdminAiCommandInvocations {
     fun total(): Int = forceCancel + retryCommit + preview + confirm
 }
 
+class PlatformAdminSupportCommandInvocations {
+    var calls: Int = 0
+
+    fun reset() {
+        calls = 0
+    }
+}
+
 @TestConfiguration(proxyBeanMethods = false)
 @EnableAutoConfiguration(exclude = [DataSourceAutoConfiguration::class, FlywayAutoConfiguration::class])
 @Import(
@@ -496,6 +630,7 @@ class PlatformAdminAiCommandInvocations {
     PlatformAdminPublicTakedownErrorHandler::class,
     PlatformAdminController::class,
     PlatformAdminClubController::class,
+    PlatformAdminSupportWorkbenchController::class,
     AiGenerationOpsController::class,
     AiGenerationErrorHandler::class,
     PlatformAdminErrorHandler::class,
@@ -504,6 +639,9 @@ class PlatformAdminAiCommandInvocations {
 class PlatformAdminBffSecurityHarnessConfiguration {
     @Bean
     fun aiCommandInvocations() = PlatformAdminAiCommandInvocations()
+
+    @Bean
+    fun supportCommandInvocations() = PlatformAdminSupportCommandInvocations()
 
     @Bean
     fun identities() = PlatformAdminSecurityIdentities()
@@ -584,6 +722,74 @@ class PlatformAdminBffSecurityHarnessConfiguration {
                 clubSlug: String,
                 clubName: String,
             ): SupportMemberSynthesis? = null
+        }
+
+    @Bean
+    fun adminSupportWorkbench(invocations: PlatformAdminSupportCommandInvocations): AdminSupportWorkbenchUseCase =
+        object : AdminSupportWorkbenchUseCase {
+            override fun search(
+                admin: CurrentPlatformAdmin,
+                query: String,
+                clubId: UUID?,
+            ) = requireSupportOwner(admin) {
+                invocations.calls += 1
+                emptyList<AdminSupportSearchResult>()
+            }
+
+            override fun listGrantLedger(
+                admin: CurrentPlatformAdmin,
+                clubId: UUID?,
+                status: String?,
+                cursor: String?,
+            ) = requireSupportOwner(admin) { AdminSupportGrantLedgerPage(emptyList(), null) }
+        }
+
+    @Bean
+    fun legacyCreateSupportGrant(): CreateSupportAccessGrantUseCase = mock(CreateSupportAccessGrantUseCase::class.java)
+
+    @Bean
+    fun legacyRevokeSupportGrant(): RevokeSupportAccessGrantUseCase = mock(RevokeSupportAccessGrantUseCase::class.java)
+
+    @Bean
+    fun previewSupportCommand(invocations: PlatformAdminSupportCommandInvocations): PreviewSupportGrantCommandUseCase =
+        object : PreviewSupportGrantCommandUseCase {
+            override fun previewCreate(
+                admin: PlatformActor,
+                command: PreviewSupportGrantCreateCommand,
+            ) = admin.withCapability(PlatformCapability.MANAGE_SUPPORT_ACCESS) {
+                invocations.calls += 1
+                supportPreview(SupportGrantCommandType.CREATE, null, command.clubId, command.expiresAt)
+            }
+
+            override fun previewRevoke(
+                admin: PlatformActor,
+                grantId: UUID,
+                command: PreviewSupportGrantRevokeCommand,
+            ) = admin.withCapability(PlatformCapability.MANAGE_SUPPORT_ACCESS) {
+                invocations.calls += 1
+                supportPreview(SupportGrantCommandType.REVOKE, grantId, SECURITY_CLUB_ID, SUPPORT_EXPIRY)
+            }
+        }
+
+    @Bean
+    fun confirmSupportCommand(invocations: PlatformAdminSupportCommandInvocations): ConfirmSupportGrantCommandUseCase =
+        object : ConfirmSupportGrantCommandUseCase {
+            override fun confirmCreate(
+                admin: PlatformActor,
+                command: ConfirmSupportGrantCreateCommand,
+            ) = admin.withCapability(PlatformCapability.MANAGE_SUPPORT_ACCESS) {
+                invocations.calls += 1
+                supportReceipt(SupportGrantCommandType.CREATE, command.previewId, SUPPORT_GRANT_ID, command.clubId, command.expiresAt)
+            }
+
+            override fun confirmRevoke(
+                admin: PlatformActor,
+                grantId: UUID,
+                command: ConfirmSupportGrantRevokeCommand,
+            ) = admin.withCapability(PlatformCapability.MANAGE_SUPPORT_ACCESS) {
+                invocations.calls += 1
+                supportReceipt(SupportGrantCommandType.REVOKE, command.previewId, grantId, command.clubId, command.expiresAt)
+            }
         }
 
     @Bean
@@ -878,6 +1084,60 @@ class PlatformAdminBffSecurityHarnessConfiguration {
         val SECURITY_CLUB_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060002")
         val SECURITY_PREVIEW_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060005")
         val SECURITY_DOMAIN_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060007")
+        val SUPPORT_GRANT_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060012")
+        val SUPPORT_PREVIEW_ID: UUID = UUID.fromString("dddddddd-0000-4000-8000-000000060013")
+        val SUPPORT_EXPIRY: OffsetDateTime = OffsetDateTime.parse("2026-08-25T12:00:00Z")
+
+        inline fun <T> requireSupportOwner(
+            admin: CurrentPlatformAdmin,
+            block: () -> T,
+        ): T {
+            if (!admin.canManageSupportAccess) {
+                throw AccessDeniedException("Platform admin role cannot manage support access")
+            }
+            return block()
+        }
+
+        fun supportPreview(
+            commandType: SupportGrantCommandType,
+            grantId: UUID?,
+            clubId: UUID,
+            grantExpiresAt: OffsetDateTime,
+        ) = SupportGrantCommandPreview(
+            previewId = SUPPORT_PREVIEW_ID,
+            commandType = commandType,
+            grantId = grantId,
+            clubId = clubId,
+            scope = com.readmates.club.domain.SupportAccessGrantScope.HOST_SUPPORT_READ,
+            grantExpiresAt = grantExpiresAt,
+            reasonCategory = SupportGrantReasonCategory.MEMBER_ASSISTANCE,
+            notePresent = false,
+            impactCodes = listOf("SAFE_SUPPORT_EFFECT"),
+            expiresAt = Instant.parse("2026-08-25T01:00:00Z"),
+            fingerprintPrefix = "00112233",
+        )
+
+        fun supportReceipt(
+            commandType: SupportGrantCommandType,
+            previewId: UUID,
+            grantId: UUID,
+            clubId: UUID,
+            grantExpiresAt: OffsetDateTime,
+        ) = SupportGrantCommandReceipt(
+            receiptId = UUID.fromString("dddddddd-0000-4000-8000-000000060014"),
+            previewId = previewId,
+            commandType = commandType,
+            grantId = grantId,
+            clubId = clubId,
+            scope = com.readmates.club.domain.SupportAccessGrantScope.HOST_SUPPORT_READ,
+            grantExpiresAt = grantExpiresAt,
+            reasonCategory = SupportGrantReasonCategory.MEMBER_ASSISTANCE,
+            notePresent = false,
+            beforeStatus = if (commandType == SupportGrantCommandType.CREATE) "ABSENT" else "ACTIVE",
+            afterStatus = if (commandType == SupportGrantCommandType.CREATE) "ACTIVE" else "REVOKED",
+            outcome = "SUCCEEDED",
+            createdAt = Instant.parse("2026-08-25T00:00:00Z"),
+        )
 
         fun securityClubDetail(
             clubId: UUID,
