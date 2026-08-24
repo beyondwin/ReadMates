@@ -3,6 +3,7 @@ package com.readmates.shared.adminmutation.adapter.out.persistence
 import com.readmates.shared.adminmutation.application.model.AdminCommandClaimAttempt
 import com.readmates.shared.adminmutation.application.model.AdminCommandClaimResult
 import com.readmates.shared.adminmutation.application.model.AdminCommandDigest
+import com.readmates.shared.adminmutation.application.model.AdminCommandDigestKeyReferenceState
 import com.readmates.shared.adminmutation.application.model.AdminCommandDigestSet
 import com.readmates.shared.adminmutation.application.model.AdminCommandScope
 import com.readmates.shared.adminmutation.application.model.CorruptAdminCommandClaimException
@@ -76,6 +77,164 @@ class JdbcAdminCommandIdempotencyAdapter(
         ) == 1
     }
 
+    override fun purgeExpiredCompleted(
+        now: Instant,
+        limit: Int,
+    ): Int {
+        requireExistingTransaction()
+        if (limit <= 0) return 0
+        require(limit <= MAXIMUM_PURGE_BATCH_SIZE) { "purge limit exceeds maximum" }
+        return jdbcTemplate.update(
+            """
+            delete from platform_admin_command_idempotency
+            where state = 'COMPLETED'
+              and expires_at <= ?
+            order by expires_at, id
+            limit ?
+            """.trimIndent(),
+            now.toDbTime(),
+            limit,
+        )
+    }
+
+    override fun lockDigestKeyStatesForMaintenance() {
+        requireExistingTransaction()
+        lockDigestKeyStates(null)
+    }
+
+    override fun invalidateDigestKeyRetirement(
+        digestKeyVersion: Int,
+        now: Instant,
+    ) {
+        requireExistingTransaction()
+        require(digestKeyVersion >= 0) { "digestKeyVersion must be non-negative" }
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_command_digest_key_state (
+              digest_key_version, last_referenced_at, unreferenced_since
+            ) values (?, ?, null)
+            on duplicate key update unreferenced_since = null
+            """.trimIndent(),
+            digestKeyVersion,
+            now.toDbTime(),
+        )
+        val locked = lockDigestKeyStates(listOf(digestKeyVersion)).singleOrNull()
+        if (locked?.digestKeyVersion != digestKeyVersion) {
+            throw CorruptAdminCommandClaimException()
+        }
+    }
+
+    override fun lockDigestKeyForRetirement(
+        digestKeyVersion: Int,
+        now: Instant,
+    ): AdminCommandDigestKeyReferenceState {
+        requireExistingTransaction()
+        require(digestKeyVersion >= 0) { "digestKeyVersion must be non-negative" }
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_command_digest_key_state (
+              digest_key_version, last_referenced_at, unreferenced_since
+            ) values (?, ?, null)
+            on duplicate key update digest_key_version = values(digest_key_version)
+            """.trimIndent(),
+            digestKeyVersion,
+            now.toDbTime(),
+        )
+        val locked =
+            lockDigestKeyStates(listOf(digestKeyVersion)).singleOrNull()
+                ?: throw CorruptAdminCommandClaimException()
+        val aliasCount = countAliases(digestKeyVersion)
+        val unreferencedSince =
+            if (aliasCount > 0) {
+                jdbcTemplate.update(
+                    """
+                    update platform_admin_command_digest_key_state
+                    set unreferenced_since = null
+                    where digest_key_version = ?
+                    """.trimIndent(),
+                    digestKeyVersion,
+                )
+                null
+            } else {
+                val startedAt = locked.lastReferencedAt?.let { maxOf(now, it) } ?: now
+                jdbcTemplate.update(
+                    """
+                    update platform_admin_command_digest_key_state
+                    set unreferenced_since = coalesce(unreferenced_since, ?)
+                    where digest_key_version = ?
+                    """.trimIndent(),
+                    startedAt.toDbTime(),
+                    digestKeyVersion,
+                )
+                locked.unreferencedSince ?: startedAt
+            }
+        return locked.copy(aliasCount = aliasCount, unreferencedSince = unreferencedSince)
+    }
+
+    override fun lockDigestKeySnapshot(): List<AdminCommandDigestKeyReferenceState> {
+        requireExistingTransaction()
+        val states = lockDigestKeyStates(null).associateBy { it.digestKeyVersion }
+        val aliasCounts =
+            jdbcTemplate
+                .query(
+                    """
+                    select digest_key_version, count(*) as alias_count
+                    from platform_admin_command_idempotency_keys
+                    group by digest_key_version
+                    order by digest_key_version
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.getInt("digest_key_version") to resultSet.getLong("alias_count") },
+                ).toMap()
+        return (states.keys + aliasCounts.keys).sorted().map { version ->
+            states[version]?.copy(aliasCount = aliasCounts[version] ?: 0L)
+                ?: AdminCommandDigestKeyReferenceState(
+                    digestKeyVersion = version,
+                    aliasCount = aliasCounts.getValue(version),
+                    lastReferencedAt = null,
+                    unreferencedSince = null,
+                )
+        }
+    }
+
+    private fun lockDigestKeyStates(versions: List<Int>?): List<AdminCommandDigestKeyReferenceState> {
+        val where =
+            if (versions == null) {
+                ""
+            } else {
+                "where digest_key_version in (${versions.joinToString(",") { "?" }})"
+            }
+        val arguments = versions?.toTypedArray() ?: emptyArray()
+        return jdbcTemplate.query(
+            """
+            select digest_key_version, last_referenced_at, unreferenced_since
+            from platform_admin_command_digest_key_state
+            $where
+            order by digest_key_version
+            for update
+            """.trimIndent(),
+            { resultSet, _ ->
+                AdminCommandDigestKeyReferenceState(
+                    digestKeyVersion = resultSet.getInt("digest_key_version"),
+                    aliasCount = 0,
+                    lastReferencedAt = resultSet.getTimestamp("last_referenced_at").toInstant(),
+                    unreferencedSince = resultSet.getTimestamp("unreferenced_since")?.toInstant(),
+                )
+            },
+            *arguments,
+        )
+    }
+
+    private fun countAliases(digestKeyVersion: Int): Long =
+        jdbcTemplate.queryForObject(
+            """
+            select count(*)
+            from platform_admin_command_idempotency_keys
+            where digest_key_version = ?
+            """.trimIndent(),
+            Long::class.java,
+            digestKeyVersion,
+        ) ?: 0L
+
     private fun reserveAbsent(
         scope: AdminCommandScope,
         attempt: AdminCommandClaimAttempt,
@@ -83,8 +242,9 @@ class JdbcAdminCommandIdempotencyAdapter(
     ): AdminCommandClaimResult =
         try {
             withSavepoint {
+                prepareFreshReservationKeyStates(digests, attempt.claimedAt)
                 insertClaim(scope, attempt)
-                reserveAliases(scope, attempt.claimId, digests.aliasCandidates, attempt.claimedAt)
+                insertReservedAliases(scope, attempt.claimId, digests.aliasCandidates, attempt.claimedAt)
                 AdminCommandClaimResult.Claimed(
                     claimId = attempt.claimId,
                     claimToken = attempt.claimToken,
@@ -92,6 +252,7 @@ class JdbcAdminCommandIdempotencyAdapter(
                 )
             }
         } catch (_: AliasReservationLostException) {
+            lockDigestKeyStateSlots(digests.lookupCandidates, attempt.claimedAt)
             val aliases = findAliases(scope, digests.lookupCandidates, lock = true)
             if (aliases.isEmpty()) {
                 throw CorruptAdminCommandClaimException()
@@ -105,13 +266,13 @@ class JdbcAdminCommandIdempotencyAdapter(
         digests: AdminCommandDigestSet,
         observedAliases: List<AdminCommandAliasRow>,
     ): AdminCommandClaimResult {
-        val observedOwner = singleOwner(observedAliases)
-        findClaimForUpdate(scope, observedOwner) ?: throw CorruptAdminCommandClaimException()
+        singleOwner(observedAliases)
+        lockDigestKeyStateSlots(digests.lookupCandidates, attempt.claimedAt)
         val lockedAliases = findAliases(scope, digests.lookupCandidates, lock = true)
-        val lockedOwner = singleOwner(lockedAliases)
-        if (lockedOwner != observedOwner) {
-            throw CorruptAdminCommandClaimException()
+        if (lockedAliases.isEmpty()) {
+            return reserveAbsent(scope, attempt, digests)
         }
+        val lockedOwner = singleOwner(lockedAliases)
         val claim = findClaimForUpdate(scope, lockedOwner) ?: throw CorruptAdminCommandClaimException()
         if (claim.canonicalSchemaVersion != digests.current.schemaVersion) {
             return AdminCommandClaimResult.Conflict
@@ -142,6 +303,15 @@ class JdbcAdminCommandIdempotencyAdapter(
         return claim.toResult()
     }
 
+    private fun lockDigestKeyStateSlots(
+        digests: List<AdminCommandDigest>,
+        at: Instant,
+    ) {
+        digests.sortedWith(DIGEST_ORDER).forEach { digest ->
+            ensureAndLockLookupKeyState(digest.digestKeyVersion, at)
+        }
+    }
+
     private fun requestsMatch(
         aliases: List<AdminCommandAliasRow>,
         candidates: List<AdminCommandDigest>,
@@ -163,11 +333,65 @@ class JdbcAdminCommandIdempotencyAdapter(
     ) {
         aliases.sortedWith(DIGEST_ORDER).forEach { digest ->
             markAndLockKeyState(digest.digestKeyVersion, at)
-            try {
-                insertAlias(scope, claimId, digest, at)
-            } catch (_: DuplicateKeyException) {
-                throw AliasReservationLostException()
+            insertReservedAlias(scope, claimId, digest, at)
+        }
+    }
+
+    private fun prepareFreshReservationKeyStates(
+        digests: AdminCommandDigestSet,
+        at: Instant,
+    ) {
+        val aliasVersions = digests.aliasCandidates.mapTo(mutableSetOf(), AdminCommandDigest::digestKeyVersion)
+        digests.lookupCandidates.sortedWith(DIGEST_ORDER).forEach { digest ->
+            if (digest.digestKeyVersion in aliasVersions) {
+                markAndLockKeyState(digest.digestKeyVersion, at)
+            } else {
+                ensureAndLockLookupKeyState(digest.digestKeyVersion, at)
             }
+        }
+    }
+
+    private fun ensureAndLockLookupKeyState(
+        digestKeyVersion: Int,
+        at: Instant,
+    ) {
+        jdbcTemplate.update(
+            """
+            insert into platform_admin_command_digest_key_state (
+              digest_key_version, last_referenced_at, unreferenced_since
+            ) values (?, ?, null)
+            on duplicate key update digest_key_version = values(digest_key_version)
+            """.trimIndent(),
+            digestKeyVersion,
+            at.toDbTime(),
+        )
+        val locked = lockDigestKeyStates(listOf(digestKeyVersion)).singleOrNull()
+        if (locked?.digestKeyVersion != digestKeyVersion) {
+            throw CorruptAdminCommandClaimException()
+        }
+    }
+
+    private fun insertReservedAliases(
+        scope: AdminCommandScope,
+        claimId: UUID,
+        aliases: List<AdminCommandDigest>,
+        at: Instant,
+    ) {
+        aliases.sortedWith(DIGEST_ORDER).forEach { digest ->
+            insertReservedAlias(scope, claimId, digest, at)
+        }
+    }
+
+    private fun insertReservedAlias(
+        scope: AdminCommandScope,
+        claimId: UUID,
+        digest: AdminCommandDigest,
+        at: Instant,
+    ) {
+        try {
+            insertAlias(scope, claimId, digest, at)
+        } catch (_: DuplicateKeyException) {
+            throw AliasReservationLostException()
         }
     }
 
@@ -361,6 +585,7 @@ class JdbcAdminCommandIdempotencyAdapter(
 
     private companion object {
         val MINIMUM_RETENTION: Duration = Duration.ofHours(24)
+        const val MAXIMUM_PURGE_BATCH_SIZE = 500
         val RECEIPT_TYPE = Regex("^[A-Za-z0-9._:-]{1,96}$")
         val RECEIPT_ID = Regex("^[A-Za-z0-9._:-]{1,128}$")
         val DIGEST_ORDER =

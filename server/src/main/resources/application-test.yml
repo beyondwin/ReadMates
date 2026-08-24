@@ -10,6 +10,9 @@ readmates:
     command-idempotency:
       retention: 168h
       initial-claim-ttl: 15m
+      purge-batch-size: 100
+      purge-interval: 1h
+      previous-key-rollout-buffer: 24h
   security:
     ip-hash:
       base-secret: test-ip-hash-base-secret

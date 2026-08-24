@@ -238,6 +238,23 @@ class ServerArchitectureInventoryTest {
             )
         assertThat(adapter).contains(
             "select claim_id, digest_key_version, idempotency_key_hmac, request_hmac",
+            "lockDigestKeyStateSlots(digests.lookupCandidates, attempt.claimedAt)",
+        )
+        val absentReservation =
+            adapter
+                .substringAfter("private fun reserveAbsent(")
+                .substringBefore("private fun reconcileExisting(")
+        assertThat(absentReservation.indexOf("prepareFreshReservationKeyStates(digests, attempt.claimedAt)"))
+            .isLessThan(absentReservation.indexOf("insertClaim(scope, attempt)"))
+        assertThat(absentReservation.indexOf("lockDigestKeyStateSlots(digests.lookupCandidates, attempt.claimedAt)"))
+            .isLessThan(absentReservation.indexOf("findAliases(scope, digests.lookupCandidates, lock = true)"))
+        val existingClaimReconciliation = adapter.substringAfter("private fun reconcileExisting(")
+        val stateLock =
+            existingClaimReconciliation.indexOf(
+                "lockDigestKeyStateSlots(digests.lookupCandidates, attempt.claimedAt)",
+            )
+        assertThat(stateLock).isLessThan(
+            existingClaimReconciliation.indexOf("findAliases(scope, digests.lookupCandidates, lock = true)"),
         )
 
         val service =
@@ -251,6 +268,54 @@ class ServerArchitectureInventoryTest {
                 "identityService.resolve(identity, request)",
                 "scope = envelope.scope",
             ).doesNotContain("@Transactional", "import com.readmates.shared.adminmutation.adapter")
+
+        val maintenanceService =
+            Files.readString(
+                adminMutationRoot.resolve(
+                    "application/service/AdminCommandIdempotencyMaintenanceService.kt",
+                ),
+            )
+        val retirementService =
+            Files.readString(
+                adminMutationRoot.resolve(
+                    "application/service/AdminCommandDigestKeyRetirementService.kt",
+                ),
+            )
+        assertThat(maintenanceService)
+            .contains(
+                "@Transactional",
+                "port.lockDigestKeyStatesForMaintenance()",
+                "port.purgeExpiredCompleted(clock.instant(), bounded)",
+                "retirementService.invalidateDuringOverlap(identityProperties.previousKeyVersion)",
+                "retirementService.assess(identityProperties.previousKeyVersion)",
+            ).doesNotContain("import com.readmates.shared.adminmutation.adapter")
+        assertThat(maintenanceService.indexOf("port.lockDigestKeyStatesForMaintenance()"))
+            .isLessThan(maintenanceService.indexOf("port.purgeExpiredCompleted(clock.instant(), bounded)"))
+        assertThat(retirementService)
+            .contains("@Transactional", "lockDigestKeyForRetirement")
+            .doesNotContain("import com.readmates.shared.adminmutation.adapter")
+
+        val scheduler =
+            Files.readString(
+                adminMutationRoot.resolve(
+                    "adapter/in/scheduling/AdminCommandIdempotencyPurgeScheduler.kt",
+                ),
+            )
+        assertThat(scheduler)
+            .contains("application.port.`in`.PurgeExpiredAdminCommandClaimsUseCase")
+            .doesNotContain("application.service")
+
+        val startupValidator =
+            Files.readString(
+                adminMutationRoot.resolve("config/AdminCommandDigestKeyStartupValidator.kt"),
+            )
+        assertThat(startupValidator).contains(
+            "@DependsOnDatabaseInitialization",
+            "SmartInitializingSingleton",
+            "transactionTemplate.executeWithoutResult",
+            "port.lockDigestKeySnapshot()",
+            "identityProperties.currentKey.isNotBlank()",
+        )
     }
 
     @Test
@@ -276,6 +341,7 @@ class ServerArchitectureInventoryTest {
             "server/src/test/kotlin/com/readmates/archive/api/ArchiveControllerTest.kt",
             "server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentMemberArgumentResolverTest.kt",
             "server/src/test/kotlin/com/readmates/auth/adapter/in/security/CurrentPlatformAdminArgumentResolverTest.kt",
+            "server/src/test/kotlin/com/readmates/auth/api/PlatformAdminBffSecurityTest.kt",
             "server/src/test/kotlin/com/readmates/notification/api/MemberNotificationControllerTest.kt",
             "server/src/test/kotlin/com/readmates/sessionclosing/adapter/in/web/HostSessionClosingControllerTest.kt",
         )

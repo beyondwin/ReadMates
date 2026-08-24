@@ -103,6 +103,9 @@ readmates:
     command-idempotency:
       retention: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION:168h}
       initial-claim-ttl: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL:15m}
+      purge-batch-size: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE:100}
+      purge-interval: ${READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL:1h}
+      previous-key-rollout-buffer: ${READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER:24h}
   host-action-confirmation:
     required: false
   session:

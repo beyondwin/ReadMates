@@ -1,5 +1,6 @@
 package com.readmates.shared.adminmutation.adapter.out.persistence
 
+import com.readmates.shared.adminmutation.adapter.out.observability.AdminCommandMetrics
 import com.readmates.shared.adminmutation.application.model.AdminCommandClaimAttempt
 import com.readmates.shared.adminmutation.application.model.AdminCommandClaimResult
 import com.readmates.shared.adminmutation.application.model.AdminCommandDigest
@@ -14,6 +15,7 @@ import com.readmates.shared.adminmutation.application.service.AdminCommandIdenti
 import com.readmates.shared.adminmutation.config.AdminCommandIdempotencyProperties
 import com.readmates.shared.adminmutation.config.AdminCommandIdentityProperties
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Tag
@@ -384,6 +386,7 @@ class AdminCommandIdempotencyConcurrencyTest(
         port = adapter,
         properties = AdminCommandIdempotencyProperties(),
         clock = clock,
+        observability = AdminCommandMetrics(SimpleMeterRegistry()),
     )
 
     private fun identityService(

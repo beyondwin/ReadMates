@@ -1,5 +1,6 @@
 package com.readmates.shared.adminmutation.application.service
 
+import com.readmates.shared.adminmutation.adapter.out.observability.AdminCommandMetrics
 import com.readmates.shared.adminmutation.application.model.AdminCommandClaimAttempt
 import com.readmates.shared.adminmutation.application.model.AdminCommandClaimResult
 import com.readmates.shared.adminmutation.application.model.AdminCommandDigestSet
@@ -10,6 +11,7 @@ import com.readmates.shared.adminmutation.application.model.RequiredAdminCommand
 import com.readmates.shared.adminmutation.application.port.out.AdminCommandIdempotencyPort
 import com.readmates.shared.adminmutation.config.AdminCommandIdempotencyProperties
 import com.readmates.shared.adminmutation.config.AdminCommandIdentityProperties
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.AfterEach
@@ -159,6 +161,7 @@ class AdminCommandIdempotencyServiceTest {
             port = port,
             properties = AdminCommandIdempotencyProperties(),
             clock = Clock.fixed(NOW, ZoneOffset.UTC),
+            observability = AdminCommandMetrics(SimpleMeterRegistry()),
         )
 
     private fun identity(targetId: String = TARGET_ID.toString()) =
@@ -233,4 +236,23 @@ private class RecordingAdminCommandIdempotencyPort : AdminCommandIdempotencyPort
         this.retention = retention
         return true
     }
+
+    override fun purgeExpiredCompleted(
+        now: Instant,
+        limit: Int,
+    ): Int = error("unused")
+
+    override fun lockDigestKeyStatesForMaintenance() = error("unused")
+
+    override fun invalidateDigestKeyRetirement(
+        digestKeyVersion: Int,
+        now: Instant,
+    ) = error("unused")
+
+    override fun lockDigestKeyForRetirement(
+        digestKeyVersion: Int,
+        now: Instant,
+    ) = error("unused")
+
+    override fun lockDigestKeySnapshot() = error("unused")
 }

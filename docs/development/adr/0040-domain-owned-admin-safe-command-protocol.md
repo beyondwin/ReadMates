@@ -75,8 +75,9 @@ canonical schema version, `IN_PROGRESS|COMPLETED`, CAS claim token과 domain rec
 같은 scope, digest key version, idempotency-key HMAC, request HMAC과 claim ID를 가진다. Rotation overlap 동안
 lookup과 새 alias write 모두 current·previous version을 사용해 같은 claim에 연결하며, `(scope, key version,
 idempotency-key HMAC)` unique와 `(claim, key version)` unique를 함께 강제한다. Old-version writer drain을
-확인한 뒤에는 새 alias는 current로만 쓰되 previous는 response-loss lookup에 유지한다. 이후 expired
-completed claim purge가 previous alias를 제거하고, zero-reference 24시간 buffer가 끝난 뒤 previous key를
+확인한 뒤에는 새 alias는 current로만 쓰되 previous는 response-loss lookup에 유지한다. Dual-write가 켜진
+동안에는 zero-reference retirement timestamp를 무효화하고, current-only drain 전환 이후 expired completed
+claim purge가 previous alias를 제거한 시점부터 새 zero-reference 24시간 buffer가 끝난 뒤 previous key를
 설정에서 제거한다. 따라서 rotation 전·후 key로 동시에 들어온 요청도 별도 claim을 만들 수 없고 lookup
 호환성을 alias write 기간보다 먼저 끊지 않는다.
 
@@ -97,8 +98,9 @@ convergence work에만 둔다.
 Alias reservation은 쓰려는 모든 digest key state row를 global version 순서로 upsert·lock하고
 `last_referenced_at`을 갱신하며 `unreferenced_since`를 지운다. 이 key-state 변경, claim, 모든 alias는 같은
 savepoint와 outer transaction에 들어가 duplicate reconciliation rollback 때 함께 되돌아간다. Retirement도
-같은 row와 순서를 lock한 뒤 alias 존재 여부를 다시 확인한다. Alias가 0일 때만 `unreferenced_since`를
-시작·유지하고, fresh locked zero-reference가 24시간 이상 지속된 뒤에만 key 제거 가능 상태를 반환한다.
+같은 row와 순서를 lock한 뒤 alias 존재 여부를 다시 확인한다. Dual-write overlap에서는 기존
+`unreferenced_since`를 지우며, writer drain과 current-only 전환이 끝난 뒤 alias가 0일 때만 새 timestamp를
+시작·유지한다. 이 fresh locked zero-reference가 24시간 이상 지속된 뒤에만 key 제거 가능 상태를 반환한다.
 따라서 claim과 retirement가 교차해 reference를 잃거나 premature key removal을 허용하지 않는다.
 
 Secret 존재, version 범위, current·previous 조합만 검사하는 configuration syntax validator는 durable
@@ -199,7 +201,7 @@ L3 convergence로 연결하고 response loss나 부분 실패도 그 identity로
 - Partial failure가 대상별 outcome·skipped count·retry eligibility를 보존하는지 확인한다.
 - MySQL write와 receipt/audit/outbox 중 하나가 실패하면 전체 origin transaction이 rollback되는지 확인한다.
 - Origin claim의 rollback, committed `IN_PROGRESS` fail-closed, sorted dual-alias reservation과 savepoint rollback을 확인한다.
-- Rotation overlap dual-write, writer drain 뒤 current-only alias write/previous lookup, alias purge, locked zero-reference 24시간 buffer, key removal 순서를 확인한다.
+- Rotation overlap dual-write가 zero-reference timestamp를 무효화하고, writer drain 뒤 current-only alias write/previous lookup, alias purge, fresh locked zero-reference 24시간 buffer, key removal 순서를 확인한다.
 - Claim과 key retirement 두 connection이 같은 key-state row lock으로 serialize되고 새 alias가 `unreferenced_since`를 지우는지 확인한다.
 - Flyway 이후 Spring startup에서 current·previous valid config와 safely retired removed version만 허용하고, premature key removal, unknown referenced version, missing state, pending buffer, database failure를 모두 fail closed하는지 확인한다.
 - Initial expiry를 넘긴 long-running claim completion이 성공하고 completion 시점부터 최소 24시간 retention을 다시 확보하는지 확인한다.

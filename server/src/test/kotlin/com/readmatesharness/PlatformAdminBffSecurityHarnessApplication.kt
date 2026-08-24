@@ -1,0 +1,13 @@
+package com.readmatesharness
+
+import com.readmates.auth.api.PlatformAdminBffSecurityHarnessConfiguration
+import org.springframework.boot.SpringBootConfiguration
+import org.springframework.boot.autoconfigure.EnableAutoConfiguration
+import org.springframework.boot.flyway.autoconfigure.FlywayAutoConfiguration
+import org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+import org.springframework.context.annotation.Import
+
+@SpringBootConfiguration
+@EnableAutoConfiguration(exclude = [DataSourceAutoConfiguration::class, FlywayAutoConfiguration::class])
+@Import(PlatformAdminBffSecurityHarnessConfiguration::class)
+class PlatformAdminBffSecurityHarnessApplication

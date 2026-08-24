@@ -7,6 +7,7 @@ import com.readmates.shared.adminmutation.application.model.CorruptAdminCommandC
 import com.readmates.shared.adminmutation.application.model.PlatformAdminCommandIdentity
 import com.readmates.shared.adminmutation.application.model.RequiredAdminCommandTransactionException
 import com.readmates.shared.adminmutation.application.port.out.AdminCommandIdempotencyPort
+import com.readmates.shared.adminmutation.application.port.out.AdminCommandObservability
 import com.readmates.shared.adminmutation.config.AdminCommandIdempotencyProperties
 import org.springframework.stereotype.Service
 import org.springframework.transaction.support.TransactionSynchronizationManager
@@ -19,6 +20,7 @@ class AdminCommandIdempotencyService(
     private val port: AdminCommandIdempotencyPort,
     private val properties: AdminCommandIdempotencyProperties,
     private val clock: Clock,
+    private val observability: AdminCommandObservability,
 ) {
     fun claim(
         identity: PlatformAdminCommandIdentity,
@@ -46,6 +48,7 @@ class AdminCommandIdempotencyService(
         if (result is AdminCommandClaimResult.Claimed && result.currentDigest != digests.current) {
             throw CorruptAdminCommandClaimException()
         }
+        observability.claim(envelope.scope.commandType, result)
         return result
     }
 
@@ -59,14 +62,17 @@ class AdminCommandIdempotencyService(
         properties.validate()
         require(RECEIPT_TYPE.matches(receiptType)) { "invalid receiptType" }
         require(RECEIPT_ID.matches(receiptId)) { "invalid receiptId" }
-        return port.complete(
-            claimId = claimId,
-            claimToken = claimToken,
-            receiptType = receiptType,
-            receiptId = receiptId,
-            completedAt = clock.instant(),
-            retention = properties.retention,
-        )
+        val completed =
+            port.complete(
+                claimId = claimId,
+                claimToken = claimToken,
+                receiptType = receiptType,
+                receiptId = receiptId,
+                completedAt = clock.instant(),
+                retention = properties.retention,
+            )
+        observability.complete(completed)
+        return completed
     }
 
     private fun requireExistingTransaction() {
