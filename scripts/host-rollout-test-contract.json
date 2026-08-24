@@ -14,7 +14,7 @@
           "id": "deploy-r2a-cache-policy",
           "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts", "--grep", "@policy-deployed"],
           "timeoutSeconds": 1200,
-          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts", "front/functions/api/[[path]].ts"],
+          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts", "front/functions/api/bff/[[path]].ts"],
           "cases": ["origin-immediate-deny", "bff-generation-deny", "cdn-old-generation-not-served"]
         },
         {

@@ -62,6 +62,80 @@ REQUIRED_SOURCES = (
 ATTEST_PIN = "actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d # v4.2.1"
 UPLOAD_PIN = "actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1"
 DOWNLOAD_PIN = "actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0"
+CHECKOUT_USE = "actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd"
+SETUP_NODE_USE = "actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e"
+ATTEST_USE = ATTEST_PIN.split(" #", 1)[0]
+UPLOAD_USE = UPLOAD_PIN.split(" #", 1)[0]
+DOWNLOAD_USE = DOWNLOAD_PIN.split(" #", 1)[0]
+DEPLOY_FRONT_USE = "./.github/workflows/deploy-front.yml"
+DEPLOY_SERVER_USE = "./.github/workflows/deploy-server.yml"
+ROLLOUT_JOBS = {
+    "source",
+    "pages-candidate",
+    "prime-r2a-cache",
+    "build-r2a-policy",
+    "deploy-r2a-policy",
+    "deploy-r2a-pages",
+    "bind-r2a-runtime-pair",
+    "wait-r2a-cache-lifetime",
+    "browser-r2a-proof",
+    "cache-report-r2a",
+    "compatibility-r2b",
+    "security-r2b",
+    "resolve-r2a",
+    "attest-evidence",
+    "final-evidence-gate",
+    "deploy-r2b-pages",
+}
+PRODUCTION_WORKFLOW_USES = {
+    ".github/workflows/host-client-rollout-evidence.yml": {
+        CHECKOUT_USE,
+        SETUP_NODE_USE,
+        ATTEST_USE,
+        UPLOAD_USE,
+        DOWNLOAD_USE,
+        DEPLOY_FRONT_USE,
+        DEPLOY_SERVER_USE,
+    },
+    ".github/workflows/deploy-front.yml": {CHECKOUT_USE, DOWNLOAD_USE},
+    ".github/workflows/deploy-server.yml": {
+        CHECKOUT_USE,
+        "actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654",
+        "gradle/actions/setup-gradle@50e97c2cd7a37755bbfafc9c5b7cafaece252f6e",
+        "docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a",
+        "docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd",
+        "docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121",
+        "docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f",
+        "aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25",
+        UPLOAD_USE,
+    },
+}
+PRODUCTION_WORKFLOW_JOBS = {
+    ".github/workflows/host-client-rollout-evidence.yml": ROLLOUT_JOBS,
+    ".github/workflows/deploy-front.yml": {"deploy"},
+    ".github/workflows/deploy-server.yml": {"build-and-push"},
+}
+AUTHORIZED_DEPLOY_USES = {
+    (".github/workflows/host-client-rollout-evidence.yml", "build-r2a-policy", "job", DEPLOY_SERVER_USE),
+    (".github/workflows/host-client-rollout-evidence.yml", "deploy-r2a-pages", "job", DEPLOY_FRONT_USE),
+    (".github/workflows/host-client-rollout-evidence.yml", "deploy-r2b-pages", "job", DEPLOY_FRONT_USE),
+    (
+        ".github/workflows/deploy-server.yml",
+        "build-and-push",
+        "id:build",
+        "docker/build-push-action@bcafcacb16a39f128d818304e6c9c0c18556b85f",
+    ),
+}
+AUTHORIZED_RUN_DEPLOYS = {
+    (".github/workflows/host-client-rollout-evidence.yml", "deploy-r2a-policy", "id:deploy", "oci"),
+    (".github/workflows/deploy-front.yml", "deploy", "id:deploy", "pages"),
+    (
+        ".github/workflows/deploy-server.yml",
+        "build-and-push",
+        "name:Promote scanned digest to release tag",
+        "registry-publish",
+    ),
+}
 MAX_ATTESTATION_SKEW_SECONDS = 300
 EXPECTED_REPORTER_ARGV = {
     "seed-r2a-prechange-cache": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/public-projection-cache-safety.spec.ts", "--grep", "@prechange"],
@@ -328,6 +402,94 @@ def _is_full_action_pin(value: Any) -> bool:
     )
 
 
+def _step_identity(step: dict[str, Any]) -> str:
+    if isinstance(step.get("id"), str) and step["id"]:
+        return f"id:{step['id']}"
+    if isinstance(step.get("name"), str) and step["name"]:
+        return f"name:{step['name']}"
+    return "anonymous"
+
+
+def _ordered_tokens(tokens: list[str], expected: tuple[str, ...]) -> bool:
+    position = 0
+    for token in tokens:
+        if token == expected[position]:
+            position += 1
+            if position == len(expected):
+                return True
+    return False
+
+
+def _run_deploy_primitives(run: Any) -> list[str]:
+    if not isinstance(run, str) or not run:
+        return []
+    tokens = [item.lower() for item in re.findall(r"[A-Za-z0-9_./:@${},+=-]+", run)]
+    primitives: list[str] = []
+    for index, token in enumerate(tokens):
+        executable = token.rsplit("/", 1)[-1]
+        if re.fullmatch(r"wrangler(?:@[a-z0-9_.-]+)?", executable) and _ordered_tokens(tokens[index + 1 :], ("pages", "deploy")):
+            primitives.append("pages")
+        if executable == "docker":
+            tail = tokens[index + 1 :]
+            if _ordered_tokens(tail, ("buildx", "imagetools", "create")) or _ordered_tokens(tail, ("push",)):
+                primitives.append("registry-publish")
+    if any(token.endswith("deploy/oci/05-deploy-compose-stack.sh") for token in tokens):
+        primitives.append("oci")
+    return primitives
+
+
+def _deploy_use_kind(value: str) -> str | None:
+    if value == DEPLOY_FRONT_USE:
+        return "pages"
+    if value == DEPLOY_SERVER_USE or value.startswith("docker/build-push-action@"):
+        return "registry-publish"
+    return None
+
+
+def _validate_production_workflow_ast(path: str, ast: dict[str, Any], errors: list[str]) -> None:
+    jobs = _mapping(ast.get("jobs"))
+    if set(jobs) != PRODUCTION_WORKFLOW_JOBS[path]:
+        errors.append(f"{path} job IDs do not match the exact production allowlist")
+    approved_uses = PRODUCTION_WORKFLOW_USES[path]
+    for job_name, job_value in jobs.items():
+        job = _mapping(job_value)
+        job_use = job.get("uses")
+        if job_use is not None:
+            if job_use not in approved_uses:
+                errors.append(f"{path} job {job_name} uses an unapproved action or reusable workflow")
+            deploy_kind = _deploy_use_kind(str(job_use))
+            if deploy_kind is not None and (path, job_name, "job", job_use) not in AUTHORIZED_DEPLOY_USES:
+                errors.append(f"{path} job {job_name} contains an unauthorized {deploy_kind} workflow call")
+
+        step_names: set[str] = set()
+        step_ids: set[str] = set()
+        for step in _steps(job):
+            name = step.get("name")
+            step_id = step.get("id")
+            if isinstance(name, str):
+                if name in step_names:
+                    errors.append(f"{path} job {job_name} has a duplicate production step name")
+                step_names.add(name)
+            if isinstance(step_id, str):
+                if step_id in step_ids:
+                    errors.append(f"{path} job {job_name} has a duplicate production step id")
+                step_ids.add(step_id)
+            identity = _step_identity(step)
+            step_use = step.get("uses")
+            if step_use is not None:
+                if step_use not in approved_uses:
+                    errors.append(f"{path} job {job_name} uses an unapproved action or reusable workflow")
+                deploy_kind = _deploy_use_kind(str(step_use))
+                if deploy_kind is not None and (path, job_name, identity, step_use) not in AUTHORIZED_DEPLOY_USES:
+                    errors.append(f"{path} job {job_name} step {identity} contains an unauthorized {deploy_kind} action")
+            run_deploys = _run_deploy_primitives(step.get("run"))
+            if len(run_deploys) > 1:
+                errors.append(f"{path} job {job_name} step {identity} contains multiple deployment commands")
+            for deploy_kind in run_deploys:
+                if (path, job_name, identity, deploy_kind) not in AUTHORIZED_RUN_DEPLOYS:
+                    errors.append(f"{path} job {job_name} step {identity} contains an unauthorized {deploy_kind} command")
+
+
 def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     errors: list[str] = []
     for relative in REQUIRED_SOURCES:
@@ -350,6 +512,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     workflow_path = ".github/workflows/host-client-rollout-evidence.yml"
     workflow = sources[workflow_path]
     workflow_ast = _workflow_ast(workflow_path, sources, errors)
+    _validate_production_workflow_ast(workflow_path, workflow_ast, errors)
     trigger = _mapping(workflow_ast.get("on"))
     if set(trigger) != {"workflow_dispatch"} or trigger.get("workflow_dispatch") is not None:
         errors.append("live evidence trigger must be no-input workflow_dispatch only")
@@ -361,25 +524,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         errors.append("orchestrator top-level permissions are not least privilege")
 
     jobs = _mapping(workflow_ast.get("jobs"))
-    required_jobs = {
-        "source",
-        "pages-candidate",
-        "prime-r2a-cache",
-        "build-r2a-policy",
-        "deploy-r2a-policy",
-        "deploy-r2a-pages",
-        "bind-r2a-runtime-pair",
-        "wait-r2a-cache-lifetime",
-        "browser-r2a-proof",
-        "cache-report-r2a",
-        "compatibility-r2b",
-        "security-r2b",
-        "resolve-r2a",
-        "attest-evidence",
-        "final-evidence-gate",
-        "deploy-r2b-pages",
-    }
-    if not required_jobs.issubset(jobs):
+    if set(jobs) != ROLLOUT_JOBS:
         errors.append("protected rollout orchestrator jobs are incomplete")
     for job in jobs.values():
         for item in _steps(_mapping(job)):
@@ -465,7 +610,6 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
         ("timeout=command[\"timeoutSeconds\"]", "structured reporter command timeout is not bounded"),
         ("structured test report timestamp is outside the actual command window", "structured reporter time is not bound to the actual command window"),
         ("source-set path is ambiguous", "C1 source-set reporter does not fail closed on tree entry drift"),
-        ("candidate added a source entry inside a checkpoint-owned path scope", "C1 source-set reporter does not reject relevant descendant additions"),
     ):
         _require(reporter_source, needle, message, errors)
     if "hashlib" in reporter_source or "cryptography" in reporter_source:
@@ -547,19 +691,9 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     for needle in ("report-sha256", "sha256sum", "host-rollout-evidence-reporter.py combine", "cache-safety.report.json"):
         _require(workflow + cache_report_runs, needle, "R2a structured report artifact is not exactly bound and validated", errors)
 
-    allowed_deploy_jobs = {
-        "deploy-r2a-policy": {"./deploy/oci/05-deploy-compose-stack.sh"},
-        "deploy-r2a-pages": {"./.github/workflows/deploy-front.yml"},
-        "deploy-r2b-pages": {"./.github/workflows/deploy-front.yml"},
-        "build-r2a-policy": {"./.github/workflows/deploy-server.yml"},
-    }
-    deploy_markers = ("wrangler pages deploy", "docker push", "build-push-action", "./deploy/oci/05-deploy-compose-stack.sh", "./.github/workflows/deploy-front.yml", "./.github/workflows/deploy-server.yml")
     for job_name, job_value in jobs.items():
         job = _mapping(job_value)
         material = str(job.get("uses", "")) + "\n" + "\n".join(str(item.get("uses", "")) + "\n" + str(item.get("run", "")) for item in _steps(job))
-        for marker in deploy_markers:
-            if marker in material and marker not in allowed_deploy_jobs.get(job_name, set()):
-                errors.append(f"job {job_name} contains a direct deployment or publish bypass: {marker}")
         if re.search(r"gh api[^\n]*(--method[ =](POST|PUT|PATCH|DELETE)|-X (POST|PUT|PATCH|DELETE))", material, re.IGNORECASE):
             errors.append(f"job {job_name} contains a mutable GitHub API bypass")
 
@@ -644,6 +778,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     )
 
     deploy_server_ast = _workflow_ast(".github/workflows/deploy-server.yml", sources, errors)
+    _validate_production_workflow_ast(".github/workflows/deploy-server.yml", deploy_server_ast, errors)
     server_call = _mapping(_mapping(deploy_server_ast.get("on")).get("workflow_call"))
     if _mapping(_mapping(server_call.get("outputs")).get("backend-digest")).get("value") != "${{ jobs.build-and-push.outputs.backend-digest }}":
         errors.append("server reusable workflow does not expose its trusted build digest")
@@ -652,6 +787,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     deploy_front_path = ".github/workflows/deploy-front.yml"
     deploy_front = sources[deploy_front_path]
     deploy_front_ast = _workflow_ast(deploy_front_path, sources, errors)
+    _validate_production_workflow_ast(deploy_front_path, deploy_front_ast, errors)
     front_trigger = _mapping(deploy_front_ast.get("on"))
     if set(front_trigger) != {"workflow_call"} or "workflow_dispatch" in front_trigger:
         errors.append("front deploy must be reusable-only with no manual bypass")
@@ -1139,6 +1275,65 @@ class RolloutContractTests(unittest.TestCase):
         )
         for name, path, old, new in cases:
             sources = _read_sources(REPO_ROOT)
+            sources[path] = sources[path].replace(old, new, 1)
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(sources))
+
+    def test_production_ast_rejects_versioned_optioned_and_pinned_deploy_bypasses(self) -> None:
+        workflow_path = ".github/workflows/host-client-rollout-evidence.yml"
+        cases = (
+            (
+                "versioned wrangler in source job",
+                workflow_path,
+                "printf 'stage=%s\\n' \"$stage\"",
+                "npx --yes wrangler@4.84.1 pages deploy dist --project-name bypass\n            printf 'stage=%s\\n' \"$stage\"",
+            ),
+            (
+                "docker imagetools GHCR publish in source job",
+                workflow_path,
+                "printf 'stage=%s\\n' \"$stage\"",
+                "docker buildx imagetools create --tag ghcr.io/example/readmates:bypass source@example\n            printf 'stage=%s\\n' \"$stage\"",
+            ),
+            (
+                "unknown pinned wrangler action",
+                workflow_path,
+                "      - name: Check out the protected candidate and full history\n",
+                "      - name: Unknown pinned deploy action\n        uses: cloudflare/wrangler-action@1111111111111111111111111111111111111111\n      - name: Check out the protected candidate and full history\n",
+            ),
+            (
+                "unknown rollout job",
+                workflow_path,
+                "\n  pages-candidate:\n",
+                "\n  bypass-job:\n    runs-on: ubuntu-latest\n    steps:\n      - run: echo structural-bypass\n\n  pages-candidate:\n",
+            ),
+            (
+                "extra OCI deploy step in authorized job",
+                workflow_path,
+                "      - name: Check out exact protected SHA\n        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2\n        with:\n          ref: ${{ needs.source.outputs.git-sha }}\n          persist-credentials: false\n      - name: Deploy digest-immutable policy and pass runtime health\n",
+                "      - name: Check out exact protected SHA\n        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2\n        with:\n          ref: ${{ needs.source.outputs.git-sha }}\n          persist-credentials: false\n      - name: Extra OCI bypass\n        run: ./deploy/oci/05-deploy-compose-stack.sh\n      - name: Deploy digest-immutable policy and pass runtime health\n",
+            ),
+            (
+                "extra wrangler step in authorized front job",
+                ".github/workflows/deploy-front.yml",
+                "      - name: Require deployed Pages runtime health\n",
+                "      - name: Extra Pages bypass\n        run: npx --yes wrangler@4.84.1 pages deploy dist --project-name bypass\n      - name: Require deployed Pages runtime health\n",
+            ),
+            (
+                "second wrangler command in authorized front step",
+                ".github/workflows/deploy-front.yml",
+                "          npx --yes wrangler@4.84.1 pages deploy dist \\\n",
+                "          npx --yes wrangler@4.84.1 pages deploy bypass --project-name bypass\n          npx --yes wrangler@4.84.1 pages deploy dist \\\n",
+            ),
+            (
+                "extra GHCR publish step in authorized server job",
+                ".github/workflows/deploy-server.yml",
+                "      - name: Record promoted digest\n",
+                "      - name: Extra GHCR bypass\n        run: docker buildx imagetools create --tag ghcr.io/example/readmates:bypass source@example\n      - name: Record promoted digest\n",
+            ),
+        )
+        for name, path, old, new in cases:
+            sources = _read_sources(REPO_ROOT)
+            self.assertIn(old, sources[path], name)
             sources[path] = sources[path].replace(old, new, 1)
             with self.subTest(name=name):
                 self.assertTrue(validate_structural_sources(sources))

@@ -70,6 +70,33 @@ class HostRolloutEvidenceReporterTests(unittest.TestCase):
                 with self.subTest(name=name), self.assertRaises(self.reporter.ReporterError):
                     self.reporter.validate_contract(mutation, root, require_paths=True)
 
+    def test_default_contract_uses_the_real_bff_path_in_artifact_and_live_modes(self) -> None:
+        config = self.reporter.load_config()
+        deploy_command = next(
+            command
+            for command in config["groups"]["cache-safety"]["commands"]
+            if command["id"] == "deploy-r2a-cache-policy"
+        )
+        actual_path = "front/functions/api/bff/[[path]].ts"
+        self.assertIn(actual_path, deploy_command["requiredPaths"])
+        self.assertNotIn("front/functions/api/[[path]].ts", deploy_command["requiredPaths"])
+        self.assertTrue((REPO_ROOT / actual_path).is_file())
+        self.reporter.validate_contract(config, REPO_ROOT, require_paths=False)
+
+        live_fixture = json.loads(json.dumps(config))
+        live_fixture["groups"] = {
+            "cache-safety": {
+                "commands": [deploy_command],
+            }
+        }
+        live_fixture["groups"]["cache-safety"]["commands"][0]["requiredPaths"] = [actual_path]
+        self.reporter.validate_contract(live_fixture, REPO_ROOT, require_paths=True)
+        self.assertEqual(self.reporter.main(["check-config", "--artifact-ready"]), 0)
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_path = Path(directory) / "live-contract.json"
+            fixture_path.write_text(json.dumps(live_fixture), encoding="utf-8")
+            self.assertEqual(self.reporter.main(["--config", str(fixture_path), "check-config"]), 0)
+
     def test_report_rejects_missing_duplicate_unknown_and_fabricated_results(self) -> None:
         valid = {
             "schemaVersion": "readmates.host-rollout.test-report.v1",
@@ -107,7 +134,7 @@ class HostRolloutEvidenceReporterTests(unittest.TestCase):
             with self.subTest(timestamp=timestamp), self.assertRaises(self.reporter.ReporterError):
                 self.reporter.validate_command_window({"completedAt": timestamp}, started, completed)
 
-    def test_canonical_source_set_detects_content_mode_delete_and_relevant_addition(self) -> None:
+    def test_canonical_source_set_detects_exact_path_content_mode_and_delete_but_allows_siblings(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             subprocess.run(["git", "init", "-q", str(root)], check=True)
@@ -128,24 +155,24 @@ class HostRolloutEvidenceReporterTests(unittest.TestCase):
             baseline = self.reporter.canonical_source_set(root, checkpoint, checkpoint, ["front/owned.ts"])
             self.assertEqual(baseline, self.reporter.canonical_source_set(root, checkpoint, unchanged, ["front/owned.ts"]))
 
-            candidates = []
+            drifted_candidates = []
             owned.write_text("export const value = 2\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(root), "add", "front/owned.ts"], check=True)
             subprocess.run(["git", "-C", str(root), "commit", "-qm", "modified"], check=True)
-            candidates.append(("modified", subprocess.run(
+            drifted_candidates.append(("modified", subprocess.run(
                 ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, text=True, capture_output=True
             ).stdout.strip(), ["front/owned.ts"]))
             subprocess.run(["git", "-C", str(root), "checkout", "-q", unchanged], check=True)
             os.chmod(owned, os.stat(owned).st_mode | stat.S_IXUSR)
             subprocess.run(["git", "-C", str(root), "add", "front/owned.ts"], check=True)
             subprocess.run(["git", "-C", str(root), "commit", "-qm", "mode"], check=True)
-            candidates.append(("mode", subprocess.run(
+            drifted_candidates.append(("mode", subprocess.run(
                 ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, text=True, capture_output=True
             ).stdout.strip(), ["front/owned.ts"]))
             subprocess.run(["git", "-C", str(root), "checkout", "-q", unchanged], check=True)
             subprocess.run(["git", "-C", str(root), "rm", "-q", "front/owned.ts"], check=True)
             subprocess.run(["git", "-C", str(root), "commit", "-qm", "deleted"], check=True)
-            candidates.append(("deleted", subprocess.run(
+            drifted_candidates.append(("deleted", subprocess.run(
                 ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, text=True, capture_output=True
             ).stdout.strip(), ["front/owned.ts"]))
             subprocess.run(["git", "-C", str(root), "checkout", "-q", unchanged], check=True)
@@ -153,11 +180,15 @@ class HostRolloutEvidenceReporterTests(unittest.TestCase):
             added.write_text("export const added = true\n", encoding="utf-8")
             subprocess.run(["git", "-C", str(root), "add", "front/added.ts"], check=True)
             subprocess.run(["git", "-C", str(root), "commit", "-qm", "added"], check=True)
-            candidates.append(("added", subprocess.run(
+            sibling_candidate = subprocess.run(
                 ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, text=True, capture_output=True
-            ).stdout.strip(), ["front/owned.ts"]))
+            ).stdout.strip()
+            self.assertEqual(
+                baseline,
+                self.reporter.canonical_source_set(root, checkpoint, sibling_candidate, ["front/owned.ts"]),
+            )
 
-            for name, candidate, relevant_paths in candidates:
+            for name, candidate, relevant_paths in drifted_candidates:
                 with self.subTest(name=name), self.assertRaises(self.reporter.ReporterError):
                     self.reporter.canonical_source_set(root, checkpoint, candidate, relevant_paths)
 

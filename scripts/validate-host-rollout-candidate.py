@@ -9,6 +9,7 @@ import sys
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 
 MAX_ARCHIVE_BYTES = 100 * 1024 * 1024
@@ -33,7 +34,7 @@ def validate_candidate(path: pathlib.Path) -> None:
         raise CandidateError("candidate archive is invalid") from error
     if not 1 <= len(members) <= MAX_MEMBERS:
         raise CandidateError("candidate archive member count is invalid")
-    names: set[str] = set()
+    canonical_names: set[str] = set()
     roots: set[str] = set()
     total = 0
     for member in members:
@@ -41,12 +42,13 @@ def validate_candidate(path: pathlib.Path) -> None:
         pure = pathlib.PurePosixPath(name)
         if not name or "\\" in name or pure.is_absolute() or ".." in pure.parts:
             raise CandidateError("candidate archive contains an escaping path")
-        if pure.parts[0] not in {"dist", "functions"}:
+        if not pure.parts or pure.parts[0] not in {"dist", "functions"}:
             raise CandidateError("candidate archive contains an unexpected root")
         roots.add(pure.parts[0])
-        if name in names:
+        canonical_name = "/".join(pure.parts)
+        if canonical_name in canonical_names:
             raise CandidateError("candidate archive contains a duplicate path")
-        names.add(name)
+        canonical_names.add(canonical_name)
         if member.issym() or member.islnk() or member.isdev() or member.isfifo():
             raise CandidateError("candidate archive contains a link or special file")
         if not (member.isfile() or member.isdir()):
@@ -64,7 +66,7 @@ def validate_candidate(path: pathlib.Path) -> None:
 def _write_fixture(path: pathlib.Path, evil: tarfile.TarInfo | None = None) -> None:
     with tarfile.open(path, mode="w:") as bundle:
         for directory in ("dist", "functions"):
-            member = tarfile.TarInfo(directory)
+            member = tarfile.TarInfo(f"{directory}/")
             member.type = tarfile.DIRTYPE
             member.mode = 0o755
             bundle.addfile(member)
@@ -107,6 +109,29 @@ class CandidateValidationTests(unittest.TestCase):
                 _write_fixture(path, member)
                 with self.subTest(label=label), self.assertRaises(CandidateError):
                     validate_candidate(path)
+
+    def test_canonical_duplicates_unexpected_roots_and_oversized_archives_fail_closed(self) -> None:
+        cases = []
+        for name in ("dist/fixture.txt", "dist//fixture.txt", "dist/./fixture.txt"):
+            member = tarfile.TarInfo(name)
+            member.type = tarfile.REGTYPE
+            cases.append((name, member))
+        unexpected = tarfile.TarInfo("unexpected/file.txt")
+        unexpected.type = tarfile.REGTYPE
+        cases.append(("unexpected-root", unexpected))
+        with tempfile.TemporaryDirectory() as directory:
+            root = pathlib.Path(directory)
+            for index, (label, member) in enumerate(cases):
+                path = root / f"candidate-{index}.tar"
+                _write_fixture(path, member)
+                with self.subTest(label=label), self.assertRaises(CandidateError):
+                    validate_candidate(path)
+
+            oversized = root / "oversized.tar"
+            _write_fixture(oversized)
+            with mock.patch.object(sys.modules[__name__], "MAX_ARCHIVE_BYTES", oversized.stat().st_size - 1):
+                with self.assertRaises(CandidateError):
+                    validate_candidate(oversized)
 
 
 def main(argv: list[str] | None = None) -> int:

@@ -254,15 +254,6 @@ def _tree_payload(root: Path, commit: str, paths: list[str]) -> bytes:
     return b"".join(lines)
 
 
-def _tree_names(root: Path, commit: str, roots: list[str]) -> set[str]:
-    raw = _run_git(root, ["ls-tree", "-r", "-z", "--name-only", commit, "--", *roots])
-    try:
-        names = {item.decode("utf-8") for item in raw.split(b"\0") if item}
-    except UnicodeDecodeError as error:
-        raise ReporterError("source-set tree contains a non-UTF-8 path") from error
-    return {_safe_relative_path(name) for name in names}
-
-
 def _sha256_external(payload: bytes) -> str:
     with tempfile.NamedTemporaryFile(prefix="readmates-source-set-", delete=True) as fixture:
         fixture.write(payload)
@@ -283,10 +274,6 @@ def canonical_source_set(root: Path, checkpoint: str, candidate: str, paths: lis
     candidate_payload = _tree_payload(root, candidate, normalized_paths)
     if checkpoint_payload != candidate_payload:
         raise ReporterError("candidate changed a checkpoint-owned source-set tree entry")
-    relevant_roots = sorted({str(Path(path).parent) for path in normalized_paths})
-    additions = _tree_names(root, candidate, relevant_roots) - _tree_names(root, checkpoint, relevant_roots)
-    if additions:
-        raise ReporterError("candidate added a source entry inside a checkpoint-owned path scope")
     return _sha256_external(checkpoint_payload)
 
 
