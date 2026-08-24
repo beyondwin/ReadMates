@@ -70,7 +70,7 @@ describe("host session record API", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     const envelope = {
-      idempotencyKey: "b6-record-apply-0001",
+      idempotencyKey: "test-apply",
       expected: { draftRevision: 3, liveRevision: 2 },
       command: { applyRequestId: "apply-request-1", expectedDraftHash: "a".repeat(64) },
     };
@@ -142,7 +142,7 @@ describe("host session record API", () => {
       snapshot: snapshot(),
     }, context);
     await applyHostSessionRecord("session-28", {
-      idempotencyKey: "b6-record-apply-0002",
+      idempotencyKey: "test-apply",
       expected: { draftRevision: 3, liveRevision: 2 },
       command: {
         applyRequestId: "apply-request-1",
@@ -172,7 +172,7 @@ describe("host session record API", () => {
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({
-          idempotencyKey: "b6-record-apply-0002",
+          idempotencyKey: "test-apply",
           expected: { draftRevision: 3, liveRevision: 2 },
           command: {
             applyRequestId: "apply-request-1",

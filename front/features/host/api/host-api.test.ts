@@ -446,7 +446,7 @@ describe("host api wrappers", () => {
     const fetchMock = stubFetch();
     const context = { clubSlug: "reading-sai" };
     const validEnvelope = {
-      idempotencyKey: "b6-correction-publish-0001",
+      idempotencyKey: "test-value",
       expected: {
         sessionRevision: 5,
         recordDraftRevision: 7,
@@ -470,7 +470,7 @@ describe("host api wrappers", () => {
     const invalidEnvelopes = [
       {
         ...validEnvelope,
-        idempotencyKey: "b6-correction-missing-0001",
+        idempotencyKey: "test-missing",
         expected: {
           sessionRevision: 5,
           liveRecordRevision: 3,
@@ -480,12 +480,12 @@ describe("host api wrappers", () => {
       },
       {
         ...validEnvelope,
-        idempotencyKey: "b6-correction-extra-0001",
+        idempotencyKey: "test-extra",
         expected: { ...validEnvelope.expected, participantSetRevision: 9 },
       },
       {
         ...validEnvelope,
-        idempotencyKey: "b6-correction-wrong-domain-0001",
+        idempotencyKey: "test-domain",
         expected: {
           sessionRevision: 5,
           recordDraftRevision: 7,
