@@ -80,6 +80,16 @@ READMATES_MUTATION_IDENTITY_CURRENT_KEY=<mutation-identity-current-key>
 READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION=1
 READMATES_MUTATION_IDENTITY_PREVIOUS_KEY=
 READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION=0
+READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY=<admin-command-digest-current-key>
+READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY_VERSION=1
+READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY=
+READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_VERSION=0
+READMATES_ADMIN_COMMAND_DIGEST_WRITE_PREVIOUS_ALIAS=false
+READMATES_ADMIN_COMMAND_IDEMPOTENCY_RETENTION=168h
+READMATES_ADMIN_COMMAND_IDEMPOTENCY_INITIAL_CLAIM_TTL=15m
+READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_BATCH_SIZE=100
+READMATES_ADMIN_COMMAND_IDEMPOTENCY_PURGE_INTERVAL=1h
+READMATES_ADMIN_COMMAND_DIGEST_PREVIOUS_KEY_ROLLOUT_BUFFER=24h
 READMATES_PUBLIC_CONVERGENCE_ENABLED=false
 READMATES_PUBLIC_CONVERGENCE_SCHEDULER_ENABLED=false
 READMATES_PUBLIC_CONVERGENCE_PROVIDER_HTTP_ENABLED=false
@@ -128,7 +138,7 @@ READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성, 1Password�
 
 Git에는 변수 이름과 placeholder만 둡니다. 프로덕션 secret 실제 값은 VM, Cloudflare, Google Cloud, OCI 콘솔, 또는 운영자가 관리하는 ignored 파일에만 둡니다. Compose stack은 `READMATES_REDIS_URL=redis://redis:6379`, `READMATES_KAFKA_BOOTSTRAP_SERVERS=redpanda:9092`, `READMATES_MANAGEMENT_ADDRESS=0.0.0.0`을 container 환경으로 주입합니다.
 
-두 current HMAC key는 backend startup 전에 반드시 provision하고 `sync-config(restart_api=false)`로 렌더링합니다. Public convergence feature, scheduler와 HTTP provider는 기본 off이며 세 토글이 모두 켜져야 외부 호출을 시작합니다. Operational work maintenance는 provider/feature와 독립적으로 기본 on입니다.
+Host cursor, mutation identity, admin command digest의 세 current HMAC key는 backend startup 전에 반드시 provision하고 `sync-config(restart_api=false)`로 렌더링합니다. Public convergence feature, scheduler와 HTTP provider는 기본 off이며 세 토글이 모두 켜져야 외부 호출을 시작합니다. Operational work maintenance는 provider/feature와 독립적으로 기본 on입니다.
 
 ## Legacy Host VM 설정
 
@@ -232,73 +242,32 @@ Registered club host를 새로 추가한 뒤에는 Cloudflare Pages custom domai
 
 ## Emergency support access flow
 
-플랫폼 관리자가 특정 클럽에 일시적으로 HOST 권한을 부여해야 할 때(고객 에스컬레이션 등) 아래 절차를 따릅니다.
+플랫폼 관리자가 특정 클럽의 host read path를 일시적으로 확인해야 할 때 아래 절차를 따릅니다. Support access는 membership을 만들지 않고 active grant가 있는 요청에만 `HOST_SUPPORT_READ` authority를 합성합니다.
 
 ### 권한 생성
 
-플랫폼 관리자 대시보드(`/app/admin`) → "긴급 지원 접근 권한" 섹션에서 생성합니다.
+1. OWNER 계정으로 `/admin/support`를 열고 body-only 검색에서 masked 결과와 대상 클럽을 확인합니다.
+2. `HOST_SUPPORT_READ`, 24시간 이내 만료 시각, allowlist reason category를 선택합니다. Optional note는 request identity에만 결속되고 DB, receipt, audit, DTO에 원문이나 별도 digest로 저장되지 않습니다.
+3. Preview의 대상·만료·impact를 확인한 뒤 confirm합니다. 응답이 불명확하면 새 명령을 만들지 말고 workbench의 recovery로 같은 idempotency identity를 조회합니다.
 
-필수 입력:
-- **Club ID**: 대상 클럽의 UUID
-- **Grantee User ID**: 접근 권한을 받을 플랫폼 관리자 UUID
-- **사유(reason)**: 접근 이유 (예: "고객 에스컬레이션 티켓 #1234")
-- **만료 시각(expiresAt)**: datetime-local 형식, 기본값 현재 시각+1시간
-
-또는 API 직접 호출:
-
-```bash
-curl -X POST https://<api-origin>/api/admin/support-access-grants \
-  -H 'Content-Type: application/json' \
-  -b '<session-cookie>' \
-  -d '{
-    "clubId": "<club-uuid>",
-    "granteeUserId": "<grantee-user-uuid>",
-    "scope": "HOST_SUPPORT_READ",
-    "reason": "고객 에스컬레이션 티켓 #1234",
-    "expiresAt": "2026-05-09T13:00:00Z"
-  }'
-```
+Legacy `POST /api/admin/support-access-grants`와 직접 category를 추정하는 요청은 사용하지 않습니다. V60 application은 legacy create/revoke를 `410 SAFE_CONFIRM_REQUIRED`로 거절합니다.
 
 ### 권한 취소
 
-만료 전에 수동으로 취소하려면:
+`/admin/support`의 active grant ledger에서 exact grant를 선택하고 revoke preview의 대상·scope·만료·reason category를 검토한 뒤 confirm합니다. Legacy direct DELETE는 사용하지 않습니다.
 
-```bash
-curl -X DELETE https://<api-origin>/api/admin/support-access-grants/<grant-uuid> \
-  -b '<session-cookie>'
-```
+### 증거 확인
 
-또는 대시보드 → "권한 취소" 버튼 클릭.
+Active/expired/revoked 상태는 `/admin/support` ledger에서 확인하고, immutable command 결과와 redacted reason evidence는 `/admin/audit`에서 확인합니다. Audit에는 allowlist category와 `notePresent`만 남으며 note, email, display name을 reason evidence로 복제하지 않습니다.
 
-### 활성 권한 조회
+### V60 배포 경계
 
-```bash
-# club 기준
-curl https://<api-origin>/api/admin/support-access-grants?clubId=<club-uuid> \
-  -b '<session-cookie>'
-
-# grantee 기준
-curl https://<api-origin>/api/admin/support-access-grants?granteeUserId=<user-uuid> \
-  -b '<session-cookie>'
-```
-
-### 감사 로그 확인
-
-모든 CREATE와 REVOKE 이벤트는 `platform_audit_events` 테이블에 기록됩니다.
-
-```sql
--- 최근 지원 접근 이벤트 확인
-SELECT actor_user_id, actor_platform_role, target_user_id, event_type, metadata_json, created_at
-FROM platform_audit_events
-WHERE event_type IN ('SUPPORT_ACCESS_GRANT_CREATED', 'SUPPORT_ACCESS_GRANT_REVOKED')
-ORDER BY created_at DESC
-LIMIT 20;
-```
+V60 적용 전 support write를 drain하고, backend Flyway/startup/health 직후 같은 tag의 Pages BFF/frontend를 배포한 다음 write traffic을 복구합니다. Migration은 기존 free-text reason을 복구 불가능한 `LEGACY_UNCLASSIFIED + notePresent`로 redaction합니다. 같은 club·grantee·scope의 active 중복은 `(created_at, id)` 역순의 최신 한 건만 authoritative slot으로 유지하고 나머지를 migration 시각에 revoke하며, 두 처리 건수만 migration evidence에 남깁니다. 이 redaction을 되돌리는 rollback은 없으며 V60 schema를 보존한 compatible image 또는 새 forward-fix migration으로 복구합니다.
 
 ### 주의사항
 
 - 권한은 만료(`expires_at`) 또는 취소(`revoked_at`) 시 자동으로 비활성화됩니다.
-- 권한이 활성 상태인 동안 grantee 플랫폼 관리자는 해당 클럽의 HOST 역할 권한이 추가됩니다.
+- 권한이 활성 상태인 동안에만 grantee 플랫폼 관리자의 exact club request에 transient host-read authority가 합성되며 membership row나 host write capability는 추가되지 않습니다.
 - 불필요한 권한은 즉시 취소하고, 활성 권한 목록을 정기적으로 확인합니다.
 
 ## Legacy JAR Rollback

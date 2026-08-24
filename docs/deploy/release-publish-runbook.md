@@ -13,7 +13,7 @@
 - `CHANGELOG.md`에 `vMAJOR.MINOR.PATCH - YYYY-MM-DD` 섹션, deployment notes, 실행한 verification이 있습니다.
 - `main`이 release commit을 포함하고, `vMAJOR.MINOR.PATCH` annotated tag가 같은 commit을 가리킵니다.
 - GitHub Release가 존재하고 body가 `CHANGELOG.md`의 같은 버전 섹션과 일치합니다.
-- `Deploy Front` workflow가 backend promotion 뒤 같은 `release_tag` 입력으로 성공해 Cloudflare Pages production을 배포했습니다.
+- Protected `host-rollout-r2b`에서 no-input `Host Client Rollout Evidence` dispatch가 성공했고, 그 workflow가 reusable `Deploy Front`에 exact candidate artifact를 전달해 Cloudflare Pages production을 배포했습니다.
 - `Deploy Server Image` workflow가 같은 tag에서 성공해 GHCR `readmates-server:vMAJOR.MINOR.PATCH` 이미지를 scan/promote했습니다.
 - Release에서 production runtime rendering이 바뀌면 `sync-config` workflow가 `restart_api=false`, `dry_run=false`로 성공해 다음 container start가 새 설정을 읽도록 준비했습니다.
 - Host-client generation release이면 stage에 맞는 `READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE`와 서로 다른 immutable tag를 확인하고, protected evidence gate를 통과했습니다.
@@ -171,7 +171,8 @@ Backend health와 BFF contract를 확인한 뒤 protected rollout ref가 exact a
 
 ```bash
 git push origin <r2b-commit>:host-rollout-r2b
-gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event push --limit 5
+gh workflow run "Host Client Rollout Evidence" --ref host-rollout-r2b
+gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b --event workflow_dispatch --limit 5
 gh run watch <host-rollout-run-id> --exit-status
 ```
 
@@ -220,7 +221,7 @@ Registered club host를 같이 확인할 때는 실제 host를 Git 밖에서 `RE
 
 Production runtime rendering이 바뀐 릴리즈는 container를 먼저 재시작하지 않고 현재 `main`의 `sync-config`를 성공시킨 뒤 image promotion을 실행합니다.
 
-V52–V57이 포함된 release에서는 `READMATES_HOST_LIST_CURSOR_CURRENT_KEY`,
+V52–V60이 포함된 release에서는 `READMATES_HOST_LIST_CURSOR_CURRENT_KEY`,
 `READMATES_MUTATION_IDENTITY_CURRENT_KEY`, `READMATES_ADMIN_COMMAND_DIGEST_CURRENT_KEY`를 GitHub Secrets에
 먼저 provision하고 각 current version
 Variable을 확인합니다. Previous key/version은 rotation 중에만 설정합니다. 이 provisioning과 아래
@@ -236,6 +237,8 @@ gh run watch <sync-config-run-id> --exit-status
 ```
 
 `restart_api=false`는 구 image를 새 설정으로 먼저 재시작하지 않기 위한 값입니다. `dry_run=false`는 검증만 하는 것이 아니라 운영 env 파일을 실제 동기화합니다. Host-client rollout에서는 repository variable의 typed mode가 `DISABLED|V2_ONLY|SUPPORT_V2_V3|ENFORCE_V3` 중 현재 승인 stage와 일치해야 합니다. Workflow가 실패하면 OCI promotion을 시작하지 않습니다.
+
+V60이 포함되면 image promotion 전에 support write traffic을 drain합니다. Backend Flyway/startup/health 직후 protected `host-rollout-r2b` dispatch로 같은 tag의 Pages BFF/frontend를 배포하고, canonical `/admin/support` preview/confirm이 준비된 뒤 traffic을 복구합니다. Legacy support writer를 임시 fallback으로 열거나 redacted reason을 복원하지 않습니다.
 
 ```bash
 READMATES_SERVER_IMAGE='ghcr.io/<owner>/<repo>/readmates-server:vX.Y.Z' \
