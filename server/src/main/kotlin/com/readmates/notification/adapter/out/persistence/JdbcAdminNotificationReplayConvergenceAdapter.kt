@@ -46,18 +46,28 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
         val rows =
             jdbcTemplate.query(
                 """
-                select target.delivery_id_snapshot, delivery.status
-                from admin_notification_replay_confirmation_targets target
+                select receipt.replayed_count, target.delivery_id_snapshot, delivery.status
+                from admin_notification_replay_confirmations receipt
+                left join admin_notification_replay_confirmation_targets target
+                  on target.confirmation_id = receipt.id
                 left join notification_deliveries delivery on delivery.id = target.delivery_id_snapshot
-                where target.confirmation_id = ?
+                where receipt.id = ?
                 order by target.delivery_id_snapshot
                 """.trimIndent(),
-                { resultSet, _ -> resultSet.getString("status") },
+                { resultSet, _ ->
+                    TargetObservationRow(
+                        expectedTargetCount = resultSet.getInt("replayed_count"),
+                        status = resultSet.getString("status"),
+                    )
+                },
                 receiptId.dbString(),
             )
+        check(rows.isNotEmpty()) { "Notification replay receipt is missing" }
+        val expectedTargetCounts = rows.map { it.expectedTargetCount }.toSet()
+        check(expectedTargetCounts.size == 1) { "Notification replay receipt denominator changed" }
         return AdminNotificationReplayConvergenceObservation(
-            expectedTargetCount = rows.size,
-            statuses = rows.filterNotNull(),
+            expectedTargetCount = expectedTargetCounts.single(),
+            statuses = rows.mapNotNull { it.status },
         )
     }
 
@@ -69,7 +79,7 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
         completedAt: Instant,
         retryAt: Instant?,
     ): Boolean {
-        if (!lockOwnedLease(lease, leaseOwner)) return false
+        if (!lockOwnedLease(lease, leaseOwner, completedAt)) return false
         val updated = updateOutcome(lease, leaseOwner, outcome, safeErrorCode, completedAt, retryAt)
         if (!updated) return false
         insertOutcomeEvent(lease, outcome, safeErrorCode, completedAt)
@@ -169,6 +179,7 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
     private fun lockOwnedLease(
         lease: AdminNotificationReplayConvergenceLease,
         leaseOwner: String,
+        completedAt: Instant,
     ): Boolean =
         jdbcTemplate
             .query(
@@ -177,7 +188,7 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
                 where id = ? and notification_receipt_id_snapshot = ?
                   and binary effect_type = binary 'NOTIFICATION_REPLAY'
                   and effect_target_id_snapshot = ? and binary state = binary 'PENDING'
-                  and lease_owner = ? and next_attempt_no = ?
+                  and lease_owner = ? and next_attempt_no = ? and lease_expires_at > ?
                 for update
                 """.trimIndent(),
                 { _, _ -> true },
@@ -186,6 +197,7 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
                 lease.effectTargetId.dbString(),
                 leaseOwner,
                 lease.attemptNo,
+                completedAt.dbTime(),
             ).firstOrNull() == true
 
     private fun updateOutcome(
@@ -202,7 +214,7 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
             set state = ?, attempt_count = ?, next_attempt_no = ?, lease_owner = null,
                 lease_expires_at = null, last_safe_error_code = ?, available_at = ?, updated_at = ?
             where id = ? and notification_receipt_id_snapshot = ? and lease_owner = ?
-              and binary state = binary 'PENDING' and next_attempt_no = ?
+              and binary state = binary 'PENDING' and next_attempt_no = ? and lease_expires_at > ?
             """.trimIndent(),
             outcome.name,
             lease.attemptNo,
@@ -214,6 +226,7 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
             lease.receiptId.dbString(),
             leaseOwner,
             lease.attemptNo,
+            completedAt.dbTime(),
         ) == 1
 
     private fun insertOutcomeEvent(
@@ -245,6 +258,11 @@ class JdbcAdminNotificationReplayConvergenceAdapter(
         val receiptId: UUID,
         val attemptNo: Int,
         val lastSafeErrorCode: String?,
+    )
+
+    private data class TargetObservationRow(
+        val expectedTargetCount: Int,
+        val status: String?,
     )
 }
 

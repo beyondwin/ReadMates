@@ -24,6 +24,7 @@ import org.assertj.core.api.Assertions.catchThrowable
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.ResourceLock
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.EnumSource
 import org.junit.jupiter.params.provider.ValueSource
@@ -56,6 +57,7 @@ private typealias ReplayConfirmation = AdminNotificationReplayConfirmation
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Import(AdminNotificationReplayTransactionIntegrationTest.TestConfig::class)
 @Tag("integration")
+@ResourceLock("AdminNotificationReplayIntegrationDatabase")
 internal class AdminNotificationReplayTransactionIntegrationTest(
     @param:Autowired private val useCase: ManageAdminNotificationOperationsUseCase,
     @param:Autowired private val replayPort: SwitchableReplayPort,
@@ -82,7 +84,17 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
                 )
             receiptIds.forEach { receiptId ->
                 jdbcTemplate.update(
-                    "delete from admin_service_command_convergence_events where notification_receipt_id_snapshot = ?",
+                    """
+                    delete from admin_service_command_convergence_events
+                    where notification_receipt_id_snapshot = ? and event_seq = 1
+                    """.trimIndent(),
+                    receiptId,
+                )
+                jdbcTemplate.update(
+                    """
+                    delete from admin_service_command_convergence_events
+                    where notification_receipt_id_snapshot = ? and event_seq = 0
+                    """.trimIndent(),
                     receiptId,
                 )
                 jdbcTemplate.update(
@@ -173,7 +185,7 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
                         {
                             ready.countDown()
                             check(start.await(10, TimeUnit.SECONDS))
-                            confirm(preview.previewId, preview.selectionHash)
+                            runCatching { confirm(preview.previewId, preview.selectionHash) }
                         },
                         executor,
                     )
@@ -181,8 +193,22 @@ internal class AdminNotificationReplayTransactionIntegrationTest(
             check(ready.await(10, TimeUnit.SECONDS))
             start.countDown()
 
-            assertThat(results.map { it.get(10, TimeUnit.SECONDS).replayedCount }.sorted()).containsExactly(0, 1)
-            previews.forEach { assertReplayCardinality(it.previewId, receipts = 1, audits = 1) }
+            val outcomes = results.map { it.get(10, TimeUnit.SECONDS) }
+            assertThat(outcomes.count { it.isSuccess }).isEqualTo(1)
+            assertThat(outcomes.single { it.isSuccess }.getOrThrow().replayedCount).isEqualTo(1)
+            assertThat(outcomes.count { it.isFailure }).isEqualTo(1)
+            assertThat(outcomes.single { it.isFailure }.exceptionOrNull())
+                .isInstanceOfSatisfying(NotificationApplicationException::class.java) {
+                    assertThat(it.error)
+                        .isEqualTo(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_NO_ELIGIBLE_TARGETS)
+                }
+            previews.zip(outcomes).forEach { (preview, outcome) ->
+                assertReplayCardinality(
+                    preview.previewId,
+                    receipts = if (outcome.isSuccess) 1 else 0,
+                    audits = if (outcome.isSuccess) 1 else 0,
+                )
+            }
         } finally {
             executor.shutdownNow()
         }

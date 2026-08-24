@@ -58,6 +58,7 @@ class NotificationErrorHandler {
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_REQUIRED -> HttpStatus.BAD_REQUEST
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_REASON_TOO_LONG -> HttpStatus.BAD_REQUEST
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_TOO_MANY_TARGETS -> HttpStatus.UNPROCESSABLE_CONTENT
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_NO_ELIGIBLE_TARGETS -> HttpStatus.CONFLICT
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED -> HttpStatus.CONFLICT
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_NOT_FOUND -> HttpStatus.NOT_FOUND
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_SELECTION_MISMATCH -> HttpStatus.CONFLICT
@@ -104,6 +105,8 @@ class NotificationErrorHandler {
                 "재처리 사유가 허용된 길이를 초과했습니다."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_TOO_MANY_TARGETS ->
                 "재처리 대상이 너무 많습니다. 클럽이나 상태 범위를 좁혀 주세요."
+            NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_NO_ELIGIBLE_TARGETS ->
+                "재처리할 수 있는 대상이 남아 있지 않습니다. 새 미리보기를 생성해 주세요."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_EXPIRED ->
                 "재처리 미리보기가 만료되었습니다."
             NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_PREVIEW_NOT_FOUND ->

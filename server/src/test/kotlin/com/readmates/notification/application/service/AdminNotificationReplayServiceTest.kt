@@ -26,6 +26,7 @@ import com.readmates.shared.adminmutation.application.model.PlatformAdminCommand
 import com.readmates.shared.adminmutation.application.service.AdminCommandIdempotencyService
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
 import org.junit.jupiter.api.Test
@@ -99,6 +100,20 @@ class AdminNotificationReplayServiceTest {
         assertThatThrownBy { service(confirmPort).confirm(admin(PlatformAdminRole.SUPPORT), confirmCommand()) }
             .isInstanceOf(AccessDeniedException::class.java)
         assertThat(confirmPort.calls).isEmpty()
+    }
+
+    @Test
+    fun `replay authorization requires the exact capability rather than an elevated role`() {
+        val elevatedWithoutReplay =
+            PlatformActor(
+                adminId = ADMIN_USER_ID,
+                role = PlatformAdminRole.OWNER,
+                capabilities = emptySet(),
+            )
+
+        assertThatThrownBy {
+            AdminNotificationReplayPolicy.requireReplayCapability(elevatedWithoutReplay)
+        }.isInstanceOf(AccessDeniedException::class.java)
     }
 
     @Test
@@ -176,6 +191,22 @@ class AdminNotificationReplayServiceTest {
     }
 
     @Test
+    fun `confirm rejects zero replay effect before audit receipt and convergence`() {
+        val replayPort = ReplayPortFake(preview = openV2Preview(), replayedCount = 0)
+        val auditPort = ReplayAuditFake()
+
+        assertThatThrownBy { service(replayPort, auditPort = auditPort).confirm(admin(), confirmCommand()) }
+            .isInstanceOfSatisfying(NotificationApplicationException::class.java) {
+                assertThat(it.error.name).isEqualTo("ADMIN_NOTIFICATION_REPLAY_NO_ELIGIBLE_TARGETS")
+            }
+
+        assertThat(replayPort.calls).containsExactly("lock", "replay")
+        assertThat(auditPort.calls).isZero()
+        assertThat(replayPort.confirmationInsert).isNull()
+        assertThat(replayPort.consumedAt).isNull()
+    }
+
+    @Test
     fun `confirm trims reason before writing audit metadata`() {
         val replayPort = ReplayPortFake(preview = openV2Preview(), replayedCount = 1)
         val auditPort = ReplayAuditFake()
@@ -218,7 +249,7 @@ class AdminNotificationReplayServiceTest {
     @Test
     fun `confirm accepts exact code point and UTF-8 reason bounds`() {
         listOf("a".repeat(500), "🙂".repeat(250)).forEach { reason ->
-            val replayPort = ReplayPortFake(preview = openV2Preview())
+            val replayPort = ReplayPortFake(preview = openV2Preview(), replayedCount = 1)
 
             service(replayPort).confirm(admin(), confirmCommand(reason = reason))
 
@@ -228,7 +259,7 @@ class AdminNotificationReplayServiceTest {
 
     @Test
     fun `consume conflict is reported after replay audit and receipt attempt`() {
-        val replayPort = ReplayPortFake(preview = openV2Preview(), consumeResult = false)
+        val replayPort = ReplayPortFake(preview = openV2Preview(), replayedCount = 1, consumeResult = false)
         val auditPort = ReplayAuditFake()
 
         assertThatThrownBy { service(replayPort, auditPort = auditPort).confirm(admin(), confirmCommand()) }

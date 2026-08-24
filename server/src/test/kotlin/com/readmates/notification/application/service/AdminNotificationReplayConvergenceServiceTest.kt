@@ -80,6 +80,19 @@ class AdminNotificationReplayConvergenceServiceTest {
     }
 
     @Test
+    fun `empty immutable target set fails closed instead of vacuous success`() {
+        val port =
+            RecordingConvergencePort(
+                observation = AdminNotificationReplayConvergenceObservation(expectedTargetCount = 0, statuses = emptyList()),
+            )
+
+        service(port).processOne()
+
+        assertThat(port.finished?.outcome).isEqualTo(AdminNotificationReplayConvergenceOutcome.FAILED)
+        assertThat(port.finished?.safeErrorCode).isEqualTo("REPLAY_TARGET_SET_EMPTY")
+    }
+
+    @Test
     fun `ambiguous observer failure preserves prior safe code and schedules retry`() {
         val port =
             RecordingConvergencePort(

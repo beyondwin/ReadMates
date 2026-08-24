@@ -5,6 +5,8 @@ import com.readmates.notification.application.model.AdminNotificationReplaySnaps
 import com.readmates.notification.application.model.AdminNotificationReplayTarget
 import com.readmates.notification.application.model.adminNotificationReplaySelectionHash
 import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmationInsert
+import com.readmates.notification.application.port.out.AdminNotificationReplayConvergenceAcquisition
+import com.readmates.notification.application.port.out.AdminNotificationReplayConvergenceOutcome
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewInsert
 import com.readmates.notification.domain.NotificationChannel
 import com.readmates.notification.domain.NotificationDeliveryStatus
@@ -13,27 +15,40 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.ResourceLock
 import org.junit.jupiter.params.ParameterizedTest
 import org.junit.jupiter.params.provider.CsvSource
 import org.junit.jupiter.params.provider.EnumSource
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.transaction.PlatformTransactionManager
+import org.springframework.transaction.support.TransactionTemplate
+import java.time.Instant
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import java.util.UUID
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Tag("integration")
+@ResourceLock("AdminNotificationReplayIntegrationDatabase")
 internal class JdbcAdminNotificationReplayAdapterTest(
     @param:Autowired private val adapter: JdbcAdminNotificationReplayAdapter,
+    @param:Autowired private val convergenceAdapter: JdbcAdminNotificationReplayConvergenceAdapter,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
+    @param:Autowired private val transactionManager: PlatformTransactionManager,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val createdPreviewIds = linkedSetOf<UUID>()
 
     @AfterEach
     fun cleanup() {
         createdPreviewIds.forEach { previewId ->
+            val receiptIds =
+                jdbcTemplate.queryForList(
+                    "select id from admin_notification_replay_confirmations where preview_id = ?",
+                    String::class.java,
+                    previewId.toString(),
+                )
             jdbcTemplate.update(
                 """
                 update admin_notification_replay_previews
@@ -42,6 +57,30 @@ internal class JdbcAdminNotificationReplayAdapterTest(
                 """.trimIndent(),
                 previewId.toString(),
             )
+            receiptIds.forEach { receiptId ->
+                jdbcTemplate.update(
+                    """
+                    delete from admin_service_command_convergence_events
+                    where notification_receipt_id_snapshot = ? and event_seq = 1
+                    """.trimIndent(),
+                    receiptId,
+                )
+                jdbcTemplate.update(
+                    """
+                    delete from admin_service_command_convergence_events
+                    where notification_receipt_id_snapshot = ? and event_seq = 0
+                    """.trimIndent(),
+                    receiptId,
+                )
+                jdbcTemplate.update(
+                    "delete from admin_service_command_convergence where notification_receipt_id_snapshot = ?",
+                    receiptId,
+                )
+                jdbcTemplate.update(
+                    "delete from admin_notification_replay_confirmation_targets where confirmation_id = ?",
+                    receiptId,
+                )
+            }
             jdbcTemplate.update(
                 "delete from admin_notification_replay_confirmations where preview_id = ?",
                 previewId.toString(),
@@ -118,7 +157,7 @@ internal class JdbcAdminNotificationReplayAdapterTest(
                 "STATUS_NONCANONICAL",
                 "FAILURE_CODE_NONCANONICAL",
             )
-            assertThat(adapter.replayPreviewTargets(previewId, at)).isEqualTo(1)
+            assertThat(adapter.replayPreviewTargets(previewId, at).replayedTargetIds).containsExactly(TARGET_ID)
             assertThat(deliveryState(TARGET_ID).first()).isEqualTo("PENDING")
             assertThat(deliveryState(LOWER_CHANNEL_ID).first()).isEqualTo("FAILED")
             assertThat(deliveryState(PADDED_CHANNEL_ID).first()).isEqualTo("FAILED")
@@ -267,7 +306,10 @@ internal class JdbcAdminNotificationReplayAdapterTest(
 
         val replayed = adapter.replayPreviewTargets(previewId, createdAt.plusMinutes(1))
 
-        assertThat(replayed).isEqualTo(1)
+        assertThat(replayed.replayedTargetIds).containsExactly(TARGET_ID)
+        assertThat(replayed.skippedReasonCounts).containsExactlyInAnyOrderEntriesOf(
+            mapOf("TARGET_LOCKED" to 1, "TARGET_STATE_CHANGED" to 1),
+        )
         assertThat(deliveryState(TARGET_ID)).containsExactly(
             "PENDING",
             "0",
@@ -325,6 +367,93 @@ internal class JdbcAdminNotificationReplayAdapterTest(
         assertThat(adapter.findConfirmation(previewId)?.confirmationId).isEqualTo(confirmationId)
         assertThat(adapter.findConfirmation(previewId)?.replayedCount).isEqualTo(1)
         assertThat(adapter.lockPreview(previewId)?.consumedAt).isEqualTo(at)
+    }
+
+    @Test
+    fun `convergence denominator comes from immutable receipt and exposes a missing target row`() {
+        val fixture = createConvergenceFixture(replayedCount = 2, replayedTargetIds = listOf(TARGET_ID))
+
+        val observation = convergenceAdapter.observeTargets(fixture.receiptId)
+
+        assertThat(observation.expectedTargetCount).isEqualTo(2)
+        assertThat(observation.statuses).containsExactly("FAILED")
+    }
+
+    @Test
+    fun `expired lease owner cannot finish convergence`() {
+        val fixture = createConvergenceFixture(replayedCount = 1, replayedTargetIds = listOf(TARGET_ID))
+        val startedAt = Instant.parse("2026-05-27T01:03:03.123456Z")
+        val leaseExpiresAt = startedAt.plusSeconds(30)
+        val leaseOwner = UUID.randomUUID().toString()
+        val transactions = TransactionTemplate(transactionManager)
+        val acquisition =
+            requireNotNull(
+                transactions.execute {
+                    convergenceAdapter.acquireNext(leaseOwner, startedAt, leaseExpiresAt, maxAttempts = 5)
+                },
+            )
+        val lease = (acquisition as AdminNotificationReplayConvergenceAcquisition.Acquired).lease
+
+        val finished =
+            requireNotNull(
+                transactions.execute {
+                    convergenceAdapter.finish(
+                        lease = lease,
+                        leaseOwner = leaseOwner,
+                        outcome = AdminNotificationReplayConvergenceOutcome.SUCCEEDED,
+                        safeErrorCode = null,
+                        completedAt = leaseExpiresAt,
+                        retryAt = null,
+                    )
+                },
+            )
+
+        assertThat(finished).isFalse()
+        assertThat(
+            jdbcTemplate.queryForObject(
+                "select state from admin_service_command_convergence where id = ?",
+                String::class.java,
+                fixture.convergenceId.toString(),
+            ),
+        ).isEqualTo("PENDING")
+    }
+
+    private fun createConvergenceFixture(
+        replayedCount: Int,
+        replayedTargetIds: List<UUID>,
+    ): ConvergenceFixture {
+        seedEvent()
+        insertDelivery(TARGET_ID, "FAILED", "MAIL_RETRYABLE")
+        val snapshot = adapter.loadSnapshot(AdminNotificationFilter(clubId = CLUB_ID), 2)
+        val at = OffsetDateTime.parse("2026-05-27T01:02:03.123456Z")
+        val selectionHash = adminNotificationReplaySelectionHash(AdminNotificationFilter(clubId = CLUB_ID), snapshot.targets)
+        val previewId = adapter.createPreview(previewInsert(snapshot.targets, selectionHash, at))
+        createdPreviewIds += previewId
+        insertAudit(at)
+        val convergenceId = UUID.randomUUID()
+        val receiptId = UUID.randomUUID()
+        adapter.createConfirmation(
+            AdminNotificationReplayConfirmationInsert(
+                confirmationId = receiptId,
+                previewId = previewId,
+                actorUserId = ADMIN_USER_ID,
+                actorPlatformRole = "OWNER",
+                clubId = CLUB_ID,
+                selectionHash = null,
+                replayedCount = replayedCount,
+                skippedCount = 0,
+                platformAuditEventId = AUDIT_ID,
+                confirmedAt = at,
+                actorCapabilitiesJson = "[\"REPLAY_NOTIFICATIONS\"]",
+                canonicalSchemaVersion = "notification-replay:v1",
+                digestKeyVersion = 1,
+                requestHmac = ByteArray(32) { 1 },
+                skippedReasonCountsJson = "{}",
+                replayedTargetIds = replayedTargetIds,
+                convergenceId = convergenceId,
+            ),
+        )
+        return ConvergenceFixture(receiptId, convergenceId)
     }
 
     private fun previewInsert(
@@ -470,6 +599,11 @@ internal class JdbcAdminNotificationReplayAdapterTest(
             id.toString(),
         )
 }
+
+private data class ConvergenceFixture(
+    val receiptId: UUID,
+    val convergenceId: UUID,
+)
 
 internal enum class ReplayCasMutation {
     CHANNEL,

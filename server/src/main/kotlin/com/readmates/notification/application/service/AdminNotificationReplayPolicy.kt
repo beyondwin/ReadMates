@@ -1,19 +1,20 @@
 package com.readmates.notification.application.service
 
-import com.readmates.club.domain.PlatformAdminRole
 import com.readmates.notification.application.NotificationApplicationError
 import com.readmates.notification.application.NotificationApplicationException
 import com.readmates.notification.application.port.out.AdminNotificationReplayConfirmation
 import com.readmates.notification.application.port.out.AdminNotificationReplayPreviewRecord
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentPlatformAdmin
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import java.nio.charset.StandardCharsets
 import java.time.OffsetDateTime
 
 internal object AdminNotificationReplayPolicy {
-    fun requireReplayRole(admin: CurrentPlatformAdmin) {
-        if (admin.role !in setOf(PlatformAdminRole.OWNER, PlatformAdminRole.OPERATOR)) {
-            throw AccessDeniedException("Platform admin role cannot replay notifications")
+    fun requireReplayCapability(actor: PlatformActor) {
+        if (!actor.can(PlatformCapability.REPLAY_NOTIFICATIONS)) {
+            throw AccessDeniedException("Platform admin capability cannot replay notifications")
         }
     }
 

@@ -45,7 +45,7 @@ class AdminNotificationReplayService(
         admin: CurrentPlatformAdmin,
         request: AdminNotificationReplayPreviewRequest,
     ): AdminNotificationReplayPreview {
-        AdminNotificationReplayPolicy.requireReplayRole(admin)
+        AdminNotificationReplayPolicy.requireReplayCapability(admin.toPlatformActor())
         val createdAt = normalizedNow()
         val filterJson = jsonCodec.filterJson(request.filter)
         val snapshot = replayPort.loadSnapshot(request.filter, replayProperties.maxTargets + 1)
@@ -88,7 +88,7 @@ class AdminNotificationReplayService(
         admin: CurrentPlatformAdmin,
         command: AdminNotificationReplayConfirmCommand,
     ): AdminNotificationReplayConfirmResult {
-        AdminNotificationReplayPolicy.requireReplayRole(admin)
+        AdminNotificationReplayPolicy.requireReplayCapability(admin.toPlatformActor())
         val reason = AdminNotificationReplayPolicy.normalizeReason(command.reason)
         requireIdempotencyKey(command.idempotencyKey)
         val claim =
@@ -124,6 +124,9 @@ class AdminNotificationReplayService(
         val replayed = execution.replayedTargetIds.size
         val skipped = execution.skippedReasonCounts.values.sum()
         check(replayed + skipped == preview.matchedCount) { "Replay target accounting changed" }
+        if (replayed == 0) {
+            fail(NotificationApplicationError.ADMIN_NOTIFICATION_REPLAY_NO_ELIGIBLE_TARGETS)
+        }
         val auditEventId = writeAudit(admin, preview, reason, replayed, skipped, confirmedAt)
         val receiptId = UUID.randomUUID()
         val convergenceId = UUID.randomUUID()

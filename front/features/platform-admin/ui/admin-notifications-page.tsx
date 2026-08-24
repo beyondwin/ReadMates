@@ -135,7 +135,12 @@ export function AdminNotificationsPage({
             />
           </label>
           <div className="admin-notifications__actions">
-            <button type="button" className="btn btn-quiet btn-sm" disabled={!canReplay || busy} onClick={() => void onPreviewReplay()}>
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm"
+              disabled={!canReplay || busy || reasonLocked}
+              onClick={() => void onPreviewReplay()}
+            >
               대상 확인
             </button>
             <button type="button" className="btn btn-primary btn-sm" disabled={confirmDisabled} onClick={() => void onConfirmReplay()}>

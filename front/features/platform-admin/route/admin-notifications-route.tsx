@@ -49,6 +49,10 @@ export function AdminNotificationsRoute() {
   );
 
   async function previewReplay() {
+    if (commandSubmitted) {
+      setError("기존 재처리 결과를 같은 요청으로 먼저 확인해 주세요.");
+      return;
+    }
     if (!canReplay) {
       setError("현재 역할은 재처리를 실행할 수 없습니다.");
       return;

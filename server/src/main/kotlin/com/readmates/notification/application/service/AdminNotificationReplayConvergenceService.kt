@@ -86,6 +86,9 @@ class AdminNotificationReplayConvergenceService(
         }
 
     private fun evaluate(observation: AdminNotificationReplayConvergenceObservation): Evaluation {
+        if (observation.expectedTargetCount <= 0) {
+            return Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, TARGET_SET_EMPTY)
+        }
         if (observation.expectedTargetCount != observation.statuses.size) {
             return Evaluation(AdminNotificationReplayConvergenceOutcome.FAILED, TARGET_MISSING)
         }
@@ -115,6 +118,7 @@ class AdminNotificationReplayConvergenceService(
     private companion object {
         const val OBSERVER_UNAVAILABLE = "REPLAY_OBSERVER_UNAVAILABLE"
         const val TARGET_MISSING = "REPLAY_TARGET_MISSING"
+        const val TARGET_SET_EMPTY = "REPLAY_TARGET_SET_EMPTY"
         const val DELIVERY_STATE_UNKNOWN = "REPLAY_DELIVERY_STATE_UNKNOWN"
         const val DELIVERIES_STILL_PENDING = "DELIVERIES_STILL_PENDING"
         const val DELIVERY_DEAD = "REPLAY_DELIVERY_DEAD"
