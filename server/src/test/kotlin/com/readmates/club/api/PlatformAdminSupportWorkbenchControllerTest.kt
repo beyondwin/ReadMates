@@ -42,7 +42,7 @@ class PlatformAdminSupportWorkbenchControllerTest(
             mockMvc
                 .post("/api/admin/support/search") {
                     contentType = MediaType.APPLICATION_JSON
-                    content = """{"query":"admin-support","clubId":"$TEST_CLUB_ID"}"""
+                    content = """{"query":"admin-support","clubId":null}"""
                     cookie(sessionCookieForUser(OWNER_USER_ID))
                 }.andExpect {
                     status { isOk() }

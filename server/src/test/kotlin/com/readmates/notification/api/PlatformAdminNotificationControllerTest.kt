@@ -36,6 +36,7 @@ class PlatformAdminNotificationControllerTest(
     fun cleanup() {
         if (createdReplayPreviewIds.isNotEmpty()) {
             val placeholders = createdReplayPreviewIds.joinToString(",") { "?" }
+            cleanupReplayConfirmations(placeholders)
             jdbcTemplate.update(
                 """
                 update admin_notification_replay_previews
@@ -74,6 +75,36 @@ class PlatformAdminNotificationControllerTest(
             )
         }
         createdSessionTokenHashes.clear()
+    }
+
+    private fun cleanupReplayConfirmations(placeholders: String) {
+        val previewIds = createdReplayPreviewIds.toTypedArray()
+        val receiptIds =
+            jdbcTemplate.queryForList(
+                "select id from admin_notification_replay_confirmations where preview_id in ($placeholders)",
+                String::class.java,
+                *previewIds,
+            )
+        receiptIds.forEach { receiptId ->
+            jdbcTemplate.update(
+                "delete from admin_service_command_convergence_events " +
+                    "where notification_receipt_id_snapshot = ? and event_seq = 1",
+                receiptId,
+            )
+            jdbcTemplate.update(
+                "delete from admin_service_command_convergence_events " +
+                    "where notification_receipt_id_snapshot = ? and event_seq = 0",
+                receiptId,
+            )
+            jdbcTemplate.update(
+                "delete from admin_service_command_convergence where notification_receipt_id_snapshot = ?",
+                receiptId,
+            )
+            jdbcTemplate.update(
+                "delete from admin_notification_replay_confirmation_targets where confirmation_id = ?",
+                receiptId,
+            )
+        }
     }
 
     @Test
@@ -152,7 +183,8 @@ class PlatformAdminNotificationControllerTest(
                     {
                       "previewId": "${replay.previewId}",
                       "selectionHash": "${replay.selectionHash}",
-                      "reason": "Retry failed delivery after provider recovery"
+                      "reason": "Retry failed delivery after provider recovery",
+                      "idempotencyKey": "notification-replay-controller-0001"
                     }
                     """.trimIndent()
                 cookie(sessionCookieForUser(OWNER_USER_ID))

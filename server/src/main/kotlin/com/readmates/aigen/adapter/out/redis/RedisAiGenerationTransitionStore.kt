@@ -116,7 +116,7 @@ internal class RedisAiGenerationTransitionStore(
             val result =
                 checkNotNull(
                     redisTemplate.execute(
-                        AiGenerationJobMutationRedisScripts.cancelForAdmin,
+                        AiGenerationAdminCommandRedisScripts.cancelForAdmin,
                         listOf(
                             keyspace.hash(jobId),
                             keyspace.transcript(jobId),

@@ -154,6 +154,10 @@ class PublicProjectionLockCapabilityIntegrationTest(
                 )
             val lock = clubProjection.lockForExposure(clubId)
             jdbcTemplate.update(
+                "delete from public_projection_generations where session_id = ?",
+                sessionId,
+            )
+            jdbcTemplate.update(
                 "update public_session_publications set id = ? where session_id = ?",
                 UUID.randomUUID().toString(),
                 sessionId,

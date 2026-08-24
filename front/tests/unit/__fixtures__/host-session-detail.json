@@ -15,6 +15,15 @@
   "meetingPasscode": null,
   "publication": null,
   "state": "PUBLISHED",
+  "versions": {
+    "sessionRevision": 3,
+    "exposureRevision": 2,
+    "participantSetRevision": 4,
+    "recordDraftRevision": null,
+    "liveRecordRevision": 1,
+    "publicationRevision": 1
+  },
+  "attendanceSnapshotId": "att:membership-host:6",
   "attendees": [],
   "feedbackDocument": {
     "uploaded": false,

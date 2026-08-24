@@ -222,8 +222,9 @@ class PlatformAdminAuditControllerTest(
                 .contentAsString
 
         assertThat(body).containsOnlyOnce(
-            "\"id\":\"platform_audit_events:$GLOBAL_PLATFORM_EVENT_ID\"",
+            "\"id\":\"admin_notification_replay_confirmations:$GLOBAL_CONFIRMATION_ID\"",
         )
+        assertThat(body).doesNotContain("\"id\":\"platform_audit_events:$GLOBAL_PLATFORM_EVENT_ID\"")
         assertThat(body).doesNotContain("ADMIN_NOTIFICATION_REPLAY_PREVIEW_CONFIRMED")
     }
 
@@ -382,8 +383,12 @@ class PlatformAdminAuditControllerTest(
             """
             insert into admin_notification_replay_confirmations (
               id, preview_id, actor_user_id, actor_platform_role, club_id, selection_hash,
-              replayed_count, skipped_count, platform_audit_event_id, confirmed_at
-            ) values (?, ?, ?, ?, ?, ?, 1, 1, ?, timestampadd(SECOND, -30, utc_timestamp(6)))
+              replayed_count, skipped_count, platform_audit_event_id, confirmed_at,
+              command_type, target_kind, target_id_snapshot, identity_mode,
+              skipped_reason_counts_json, origin_outcome
+            ) values (?, ?, ?, ?, ?, ?, 1, 1, ?, timestampadd(SECOND, -30, utc_timestamp(6)),
+                      'notification.replay', 'NOTIFICATION_REPLAY_TARGET_SET', ?,
+                      'LEGACY_SELECTION_SHA', json_object(), 'SUCCEEDED')
             """.trimIndent(),
             confirmationId,
             previewId,
@@ -392,6 +397,7 @@ class PlatformAdminAuditControllerTest(
             clubId,
             selectionHash,
             platformEventId,
+            confirmationId,
         )
         jdbcTemplate.update(
             """

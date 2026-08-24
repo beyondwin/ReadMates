@@ -1735,6 +1735,80 @@ where sessions.state = 'PUBLISHED'
   and sessions.access_scope = 'GUEST_READABLE'
   and publication.site_visibility = 'PUBLIC_RECORD';
 
+insert into public_club_projection_generations (
+  club_id,
+  generation,
+  origin_readable,
+  convergence_id,
+  updated_at
+)
+select
+  clubs.id,
+  case when exists (
+    select 1 from public_session_publications publications where publications.club_id = clubs.id
+  ) then 1 else 0 end,
+  (
+    binary clubs.status = binary 'ACTIVE'
+    and binary clubs.public_visibility = binary 'PUBLIC'
+  ),
+  null,
+  utc_timestamp(6)
+from clubs
+on duplicate key update
+  generation = values(generation),
+  origin_readable = values(origin_readable),
+  convergence_id = values(convergence_id),
+  updated_at = values(updated_at);
+
+insert into public_projection_current (
+  session_id,
+  club_id,
+  publication_id_snapshot,
+  generation,
+  club_generation,
+  live_record_revision,
+  origin_readable,
+  emergency_denied,
+  convergence_id,
+  updated_at
+)
+select
+  publications.session_id,
+  publications.club_id,
+  publications.id,
+  1,
+  1,
+  coalesce((
+    select max(revisions.version)
+    from session_record_revisions revisions
+    where revisions.session_id = publications.session_id
+      and revisions.club_id = publications.club_id
+  ), 0),
+  (
+    sessions.deleted_at is null
+    and binary clubs.status = binary 'ACTIVE'
+    and binary clubs.public_visibility = binary 'PUBLIC'
+    and binary sessions.state = binary 'PUBLISHED'
+    and binary sessions.access_scope = binary 'GUEST_READABLE'
+    and binary publications.site_visibility = binary 'PUBLIC_RECORD'
+  ),
+  false,
+  null,
+  utc_timestamp(6)
+from public_session_publications publications
+join sessions on sessions.id = publications.session_id and sessions.club_id = publications.club_id
+join clubs on clubs.id = sessions.club_id
+on duplicate key update
+  club_id = values(club_id),
+  publication_id_snapshot = values(publication_id_snapshot),
+  generation = values(generation),
+  club_generation = values(club_generation),
+  live_record_revision = values(live_record_revision),
+  origin_readable = values(origin_readable),
+  emergency_denied = values(emergency_denied),
+  convergence_id = values(convergence_id),
+  updated_at = values(updated_at);
+
 insert into highlights (id, club_id, session_id, membership_id, text, sort_order)
 with seed as (
   select 5101 as id_suffix, 1 as session_number, 'host@example.com' as email, '소득 4단계 프레임은 세계를 단순화하지만, 대화를 시작하게 만드는 기준이 되었다.' as text, 0 as sort_order

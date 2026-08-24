@@ -628,6 +628,15 @@ class PublicControllerDbTest(
         """
 
         private const val CLEANUP_PUBLIC_PUBLICATION_MATRIX_SQL = """
+            delete from public_projection_current
+            where session_id in (
+              '00000000-0000-0000-0000-000000000990',
+              '00000000-0000-0000-0000-000000000991',
+              '00000000-0000-0000-0000-000000000992',
+              '00000000-0000-0000-0000-000000000993',
+              '00000000-0000-0000-0000-000000000994',
+              '00000000-0000-0000-0000-000000000995'
+            );
             delete from public_projection_generations
             where session_id in (
               '00000000-0000-0000-0000-000000000990',
@@ -781,6 +790,19 @@ class PublicControllerDbTest(
               1,
               null,
               true
+            );
+            insert into public_projection_current (
+              session_id, club_id, publication_id_snapshot, generation, club_generation,
+              live_record_revision, origin_readable, emergency_denied
+            ) values (
+              '00000000-0000-0000-0000-000000000991',
+              '00000000-0000-0000-0000-000000000001',
+              '00000000-0000-0000-0000-000000001991',
+              1,
+              1,
+              0,
+              true,
+              false
             );
         """
 

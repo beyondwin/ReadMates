@@ -442,7 +442,26 @@ class HostSessionAttendanceConcurrencyDbTest(
             .post("/api/host/sessions/$sessionId/attendance") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content = """[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED"}]"""
+                content =
+                    """
+                    {
+                      "idempotencyKey": "host-attendance-missing-revision",
+                      "expected": {
+                        "rows": [
+                          { "membershipId": "$HOST_MEMBERSHIP_ID" }
+                        ]
+                      },
+                      "command": {
+                        "entries": [
+                          {
+                            "membershipId": "$HOST_MEMBERSHIP_ID",
+                            "attendanceStatus": "ATTENDED",
+                            "expectedAttendanceRevision": 0
+                          }
+                        ]
+                      }
+                    }
+                    """.trimIndent()
             }.andExpect { status { isBadRequest() } }
 
         assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")

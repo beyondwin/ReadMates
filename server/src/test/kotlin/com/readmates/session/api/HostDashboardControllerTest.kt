@@ -1064,7 +1064,14 @@ class HostDashboardControllerTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = "[]"
+                content =
+                    """
+                    {
+                      "idempotencyKey": "host-dashboard-empty-attendance",
+                      "expected": { "rows": [] },
+                      "command": { "entries": [] }
+                    }
+                    """.trimIndent()
             }.andExpect {
                 status { isBadRequest() }
             }
@@ -1072,16 +1079,28 @@ class HostDashboardControllerTest(
 
     @Test
     fun `rejects attendance with an invalid status`() {
+        val sessionId = createSessionSeven()
+
         mockMvc
-            .post("/api/host/sessions/$SEEDED_SESSION_ID/attendance") {
+            .post("/api/host/sessions/$sessionId/attendance") {
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     """
-                    [
-                      { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceStatus": "LATE", "expectedAttendanceRevision": 0 }
-                    ]
+                    {
+                      "idempotencyKey": "host-dashboard-invalid-attendance-status",
+                      "expected": {
+                        "rows": [
+                          { "membershipId": "00000000-0000-0000-0000-000000000201", "attendanceRevision": 0 }
+                        ]
+                      },
+                      "command": {
+                        "entries": [
+                          { "membershipId": "00000000-0000-0000-0000-000000000201", "attendanceStatus": "LATE", "expectedAttendanceRevision": 0 }
+                        ]
+                      }
+                    }
                     """.trimIndent()
             }.andExpect {
                 status { isBadRequest() }
@@ -1097,9 +1116,19 @@ class HostDashboardControllerTest(
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     """
-                    [
-                      { "membershipId": " ", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
-                    ]
+                    {
+                      "idempotencyKey": "host-dashboard-blank-attendance-membership",
+                      "expected": {
+                        "rows": [
+                          { "membershipId": "00000000-0000-0000-0000-000000000001", "attendanceRevision": 0 }
+                        ]
+                      },
+                      "command": {
+                        "entries": [
+                          { "membershipId": " ", "attendanceStatus": "ATTENDED", "expectedAttendanceRevision": 0 }
+                        ]
+                      }
+                    }
                     """.trimIndent()
             }.andExpect {
                 status { isBadRequest() }

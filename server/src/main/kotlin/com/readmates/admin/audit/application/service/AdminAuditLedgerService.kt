@@ -584,6 +584,9 @@ private const val SELECTION_HASH_PREFIX_LENGTH = 8
 private val DOMAIN_METADATA_KEYS =
     linkedMapOf(
         "receiptId" to "id",
+        "replayedCount" to "count",
+        "skippedCount" to "count",
+        "originOutcome" to "code",
         "caseId" to "id",
         "commandType" to "code",
         "effectType" to "code",

@@ -109,10 +109,6 @@ class PublicProjectionConvergenceIntegrationTest(
             deleteOwnedRows = {
                 createdConvergenceIds.forEach { convergenceId ->
                     jdbcTemplate.update(
-                        "delete from public_convergence_events where convergence_id = ?",
-                        convergenceId.toString(),
-                    )
-                    jdbcTemplate.update(
                         "delete from public_convergence_work where convergence_id = ?",
                         convergenceId.toString(),
                     )

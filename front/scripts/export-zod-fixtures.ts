@@ -102,6 +102,15 @@ const hostSessionDetail = {
   siteVisibility: "PUBLIC_RECORD",
   publication: null,
   state: "PUBLISHED",
+  versions: {
+    sessionRevision: 3,
+    exposureRevision: 2,
+    participantSetRevision: 4,
+    recordDraftRevision: null,
+    liveRecordRevision: 1,
+    publicationRevision: 1,
+  },
+  attendanceSnapshotId: "att:membership-host:6",
   attendees: [],
   feedbackDocument: {
     uploaded: false,
@@ -161,10 +170,13 @@ const adminAnalyticsOverview = {
   kpis: [
     {
       key: "SESSION_COMPLETION",
+      label: "모임 완료율",
+      definition: "선택 기간의 전체 모임 중 완료 또는 공개된 모임 비율",
       unit: "PERCENT",
       availability: "AVAILABLE",
       current: 80,
       prior: 60,
+      delta: 20,
       deltaDirection: "UP",
     },
   ],
