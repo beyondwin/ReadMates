@@ -39,6 +39,7 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.context.bean.override.mockito.MockitoBean
 import org.springframework.test.web.servlet.MockMvc
 import org.springframework.test.web.servlet.post
+import java.sql.Timestamp
 import java.time.Clock
 import java.time.Duration
 import java.util.UUID
@@ -345,9 +346,10 @@ class PlatformAdminPublicTakedownIntegrationTest(
         jdbcTemplate.update(
             """
             update public_convergence_work
-            set available_at = date_sub(utc_timestamp(6), interval 1 second)
+            set available_at = ?
             where convergence_id = ?
             """.trimIndent(),
+            Timestamp.from(clock.instant().minusSeconds(1)),
             convergenceId,
         )
         assertThat(processConvergence.processOne("takedown-test-worker"))
@@ -414,14 +416,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
             SESSION_ID,
         )
         hostSessionTrashScheduler.purgeExpired()
-        jdbcTemplate.update(
-            "update admin_public_takedown_previews " +
-                "set expires_at = date_sub(utc_timestamp(6), interval 1 second)",
-        )
-        jdbcTemplate.update(
-            "update admin_public_takedown_idempotency " +
-                "set expires_at = date_sub(utc_timestamp(6), interval 1 second)",
-        )
+        expireOperationalTakedownRows()
         assertThat(purgeExpiredMutationIdempotency.purgeExpired(50)).isGreaterThanOrEqualTo(2)
 
         assertThat(count("public_projection_generations", "publication_id", PUBLICATION_ID)).isZero()
@@ -431,6 +426,12 @@ class PlatformAdminPublicTakedownIntegrationTest(
         assertThat(count("admin_public_takedown_receipts")).isOne()
         assertThat(count("public_mutation_convergence_receipts", "convergence_id", convergenceId)).isOne()
         assertThat(count("public_convergence_work", "convergence_id", convergenceId)).isOne()
+    }
+
+    private fun expireOperationalTakedownRows() {
+        val expiredAt = Timestamp.from(clock.instant().minusSeconds(1))
+        jdbcTemplate.update("update admin_public_takedown_previews set expires_at = ?", expiredAt)
+        jdbcTemplate.update("update admin_public_takedown_idempotency set expires_at = ?", expiredAt)
     }
 
     private fun createPreview(userId: String): String =
