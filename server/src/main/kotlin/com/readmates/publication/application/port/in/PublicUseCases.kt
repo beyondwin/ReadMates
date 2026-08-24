@@ -34,3 +34,7 @@ interface GetHostPublicConvergenceUseCase {
 interface ProcessPublicConvergenceUseCase {
     fun processOne(workerId: String): PublicConvergenceProcessResult
 }
+
+interface MaintainPublicConvergenceWorkUseCase {
+    fun purgeExpiredWork(): Int
+}

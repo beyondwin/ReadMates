@@ -195,6 +195,21 @@ class JdbcMutationIdempotencyAdapter(
             ).filterNotNull()
             .toSet()
 
+    override fun digestKeyStates(): List<MutationIdempotencyPort.DigestKeyState> =
+        jdbcTemplate.query(
+            """
+            select digest_key_version, last_referenced_at, unreferenced_since
+            from mutation_digest_key_state
+            order by digest_key_version
+            """.trimIndent(),
+        ) { resultSet, _ ->
+            MutationIdempotencyPort.DigestKeyState(
+                digestKeyVersion = resultSet.getInt("digest_key_version"),
+                lastReferencedAt = resultSet.utcOffsetDateTime("last_referenced_at").toInstant(),
+                unreferencedSince = resultSet.utcOffsetDateTimeOrNull("unreferenced_since")?.toInstant(),
+            )
+        }
+
     override fun markReferenced(
         digestKeyVersion: Int,
         at: Instant,
@@ -252,35 +267,35 @@ class JdbcMutationIdempotencyAdapter(
                 digestKeyVersion,
             ).firstOrNull()
 
-    private fun ResultSet.toStoredRow(): MutationIdempotencyPort.StoredRow {
-        val hmac = getBytes("request_hmac")
-        return MutationIdempotencyPort.StoredRow(
-            identity =
-                MutationIdentity(
-                    clubId = uuid("club_id"),
-                    actorMembershipId = uuid("actor_membership_id"),
-                    operation = getString("operation"),
-                    resourceSlot = getString("resource_slot"),
-                    idempotencyKey = getString("idempotency_key"),
-                ),
-            digest =
-                CanonicalRequestDigest(
-                    canonicalSchemaVersion = getInt("canonical_schema_version"),
-                    digestKeyVersion = getInt("digest_key_version"),
-                    hmac = hmac,
-                ),
-            status = MutationIdempotencyStatus.valueOf(getString("status")),
-            receiptId = uuidOrNull("receipt_id"),
-            createdAt = utcOffsetDateTime("created_at").toInstant(),
-            expiresAt = utcOffsetDateTime("expires_at").toInstant(),
-        )
-    }
-
     private companion object {
         const val ADMIN_NAMESPACE = 0
         const val PREVIEW_NAMESPACE = 1
         const val HOST_NAMESPACE = 2
     }
+}
+
+private fun ResultSet.toStoredRow(): MutationIdempotencyPort.StoredRow {
+    val hmac = getBytes("request_hmac")
+    return MutationIdempotencyPort.StoredRow(
+        identity =
+            MutationIdentity(
+                clubId = uuid("club_id"),
+                actorMembershipId = uuid("actor_membership_id"),
+                operation = getString("operation"),
+                resourceSlot = getString("resource_slot"),
+                idempotencyKey = getString("idempotency_key"),
+            ),
+        digest =
+            CanonicalRequestDigest(
+                canonicalSchemaVersion = getInt("canonical_schema_version"),
+                digestKeyVersion = getInt("digest_key_version"),
+                hmac = hmac,
+            ),
+        status = MutationIdempotencyStatus.valueOf(getString("status")),
+        receiptId = uuidOrNull("receipt_id"),
+        createdAt = utcOffsetDateTime("created_at").toInstant(),
+        expiresAt = utcOffsetDateTime("expires_at").toInstant(),
+    )
 }
 
 private fun fairMutationNamespaceBudgets(limit: Int): IntArray {

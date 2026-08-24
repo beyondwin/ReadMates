@@ -5,6 +5,7 @@ package com.readmates.publication.adapter.`in`.scheduling
 import com.readmates.publication.adapter.out.HttpPublicCachePurgeAdapter
 import com.readmates.publication.adapter.out.NoopPublicCachePurgeAdapter
 import com.readmates.publication.application.model.PublicConvergenceProcessResult
+import com.readmates.publication.application.port.`in`.MaintainPublicConvergenceWorkUseCase
 import com.readmates.publication.application.port.`in`.ProcessPublicConvergenceUseCase
 import com.readmates.publication.application.port.out.PublicCachePurgePort
 import com.readmates.publication.config.PublicConvergenceConfiguration
@@ -18,6 +19,12 @@ class PublicConvergenceSchedulerTest {
     @Test
     fun `all disabled uses noop provider and no scheduler without invoking work`() {
         assertRuntime(emptyArray(), NoopPublicCachePurgeAdapter::class.java, schedulerExpected = false)
+        contextRunner.run { context ->
+            assertThat(context).hasNotFailed()
+            assertThat(context.containsBean("publicConvergenceMaintenanceScheduler")).isTrue()
+            context.getBean(PublicConvergenceMaintenanceScheduler::class.java).purgeExpired()
+            assertThat(context.getBean(RecordingMaintenance::class.java).invocations).isOne()
+        }
     }
 
     @Test
@@ -108,6 +115,7 @@ class PublicConvergenceSchedulerTest {
                 HttpPublicCachePurgeAdapter::class.java,
                 NoopPublicCachePurgeAdapter::class.java,
                 PublicConvergenceScheduler::class.java,
+                PublicConvergenceMaintenanceScheduler::class.java,
                 TestConfig::class.java,
             )
 
@@ -115,6 +123,9 @@ class PublicConvergenceSchedulerTest {
     class TestConfig {
         @Bean
         fun processor(): RecordingProcessor = RecordingProcessor()
+
+        @Bean
+        fun maintenance(): RecordingMaintenance = RecordingMaintenance()
 
         @Bean
         fun providerConsumer(provider: PublicCachePurgePort): ProviderConsumer = ProviderConsumer(provider)
@@ -130,6 +141,15 @@ class PublicConvergenceSchedulerTest {
         override fun processOne(workerId: String): PublicConvergenceProcessResult {
             invocations += 1
             return PublicConvergenceProcessResult.PROCESSED
+        }
+    }
+
+    class RecordingMaintenance : MaintainPublicConvergenceWorkUseCase {
+        var invocations = 0
+
+        override fun purgeExpiredWork(): Int {
+            invocations += 1
+            return 0
         }
     }
 }

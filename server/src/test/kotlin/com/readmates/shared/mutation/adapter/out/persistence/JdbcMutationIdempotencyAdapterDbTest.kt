@@ -14,9 +14,11 @@ import com.readmates.shared.mutation.application.model.HostMutationOperation
 import com.readmates.shared.mutation.application.model.IdempotencyKeyReusedException
 import com.readmates.shared.mutation.application.model.MutationClaimResult
 import com.readmates.shared.mutation.application.model.MutationIdentity
+import com.readmates.shared.mutation.application.port.out.MutationIdempotencyPort
 import com.readmates.shared.mutation.application.service.MutationIdempotencyMetrics
 import com.readmates.shared.mutation.application.service.MutationIdempotencyService
 import com.readmates.shared.mutation.config.MutationIdempotencyProperties
+import com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -30,6 +32,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.mock.env.MockEnvironment
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
@@ -475,15 +478,72 @@ class JdbcMutationIdempotencyAdapterDbTest(
         val identity = identity("orphan-key")
         service(properties = keyPair(current = KEY_V1, currentVersion = ORPHAN_KEY_VERSION)).claim(identity, payload())
         val validator =
-            com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator(
+            MutationIdempotencyStartupValidator(
                 keyPair(current = KEY_V2, currentVersion = KEY_V2_VERSION),
-                adapter,
-                org.springframework.mock.env
-                    .MockEnvironment(),
+                isolatedRestartPort(ORPHAN_KEY_VERSION),
+                MockEnvironment(),
             )
         assertThatThrownBy { validator.validate() }
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("digest key")
+    }
+
+    @Test
+    fun `startup validator rejects config removal before durable retirement state is safe`() {
+        val identity = identity("restart-retirement-key")
+        service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION)).claim(identity, payload())
+        jdbcTemplate.update(
+            "delete from mutation_idempotency_keys where idempotency_key = ?",
+            identity.idempotencyKey,
+        )
+        val validator =
+            MutationIdempotencyStartupValidator(
+                keyPair(
+                    current = KEY_V2,
+                    currentVersion = KEY_V2_VERSION,
+                    previousVersion = KEY_V1_VERSION,
+                ),
+                isolatedRestartPort(KEY_V1_VERSION),
+                MockEnvironment(),
+            )
+
+        assertThatThrownBy { validator.validate() }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("digest key")
+        assertThat(logAppender.list.joinToString { it.formattedMessage })
+            .doesNotContain(KEY_V1, KEY_V2)
+
+        jdbcTemplate.update(
+            """
+            update mutation_digest_key_state
+            set unreferenced_since = '2026-08-22 01:00:00.000000'
+            where digest_key_version = ?
+            """.trimIndent(),
+            KEY_V1_VERSION,
+        )
+        MutationIdempotencyStartupValidator(
+            keyPair(
+                current = KEY_V2,
+                currentVersion = KEY_V2_VERSION,
+                previousVersion = KEY_V1_VERSION,
+            ),
+            isolatedRestartPort(KEY_V1_VERSION),
+            MockEnvironment(),
+            Clock.fixed(Instant.parse("2026-08-23T01:00:00Z"), ZoneOffset.UTC),
+        ).validate()
+    }
+
+    private fun isolatedRestartPort(vararg versions: Int): MutationIdempotencyPort {
+        val includedVersions = versions.toSet()
+        return object : MutationIdempotencyPort by adapter {
+            override fun referencedDigestKeyVersions(): Set<Int> =
+                adapter.referencedDigestKeyVersions().filterTo(mutableSetOf()) { version ->
+                    version in includedVersions
+                }
+
+            override fun digestKeyStates(): List<MutationIdempotencyPort.DigestKeyState> =
+                adapter.digestKeyStates().filter { state -> state.digestKeyVersion in includedVersions }
+        }
     }
 
     private fun service(): MutationIdempotencyService = service(defaultProperties())

@@ -9,6 +9,7 @@ import com.readmates.publication.application.model.PublicConvergenceHostSnapshot
 import com.readmates.publication.application.model.PublicConvergenceWork
 import com.readmates.publication.application.model.PublicMutationConvergenceReceipt
 import com.readmates.publication.application.model.PublicProjectionGeneration
+import java.time.Instant
 import java.util.UUID
 
 interface PublicConvergencePort {
@@ -25,6 +26,14 @@ interface PublicConvergencePort {
     fun claimNext(command: ClaimPublicConvergenceWorkCommand): ClaimedPublicConvergenceWork?
 
     fun completeAttempt(command: CompletePublicConvergenceAttemptCommand): PublicConvergenceEvent
+
+    fun purgeExpiredWork(
+        createdBefore: Instant,
+        now: Instant,
+        limit: Int,
+    ): Int
+
+    fun countWorkBacklog(): Long
 
     fun loadHostSnapshot(
         clubId: UUID,

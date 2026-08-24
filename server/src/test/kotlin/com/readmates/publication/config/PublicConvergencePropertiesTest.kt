@@ -6,6 +6,17 @@ import org.springframework.boot.test.context.runner.ApplicationContextRunner
 
 class PublicConvergencePropertiesTest {
     @Test
+    fun `maintenance retention shorter than operational window fails startup`() {
+        contextRunner
+            .withPropertyValues("readmates.public-convergence.maintenance.retention=59m")
+            .run { context ->
+                assertThat(context).hasFailed()
+                assertThat(context.startupFailure)
+                    .hasRootCauseMessage("Public convergence work retention must be between 1h and 30d")
+            }
+    }
+
+    @Test
     fun `http provider rejects lease shorter than full call budget plus terminal margin`() {
         assertInvalidLease("9s")
     }

@@ -26,6 +26,8 @@ interface MutationIdempotencyPort {
 
     fun referencedDigestKeyVersions(): Set<Int>
 
+    fun digestKeyStates(): List<DigestKeyState>
+
     fun markReferenced(
         digestKeyVersion: Int,
         at: Instant,
@@ -37,6 +39,12 @@ interface MutationIdempotencyPort {
     ): Instant?
 
     fun unreferencedSince(digestKeyVersion: Int): Instant?
+
+    data class DigestKeyState(
+        val digestKeyVersion: Int,
+        val lastReferencedAt: Instant,
+        val unreferencedSince: Instant?,
+    )
 
     data class ClaimRow(
         val identity: MutationIdentity,

@@ -3589,6 +3589,10 @@ class MySqlFlywayMigrationTest(
             .doesNotContain("provider_response", "provider_error", "private_body", "reason")
         assertThat(checkConstraintClause(jdbcTemplate, "public_convergence_events_status_check"))
             .contains("PENDING", "SUCCEEDED", "FAILED")
+        assertEquals(
+            "created_at,convergence_id,lease_expires_at",
+            indexColumns(jdbcTemplate, "public_convergence_work", "public_convergence_work_retention_idx"),
+        )
     }
 
     private fun assertV55PlatformAdminPublicTakedownSchema(jdbcTemplate: JdbcTemplate) {

@@ -233,8 +233,8 @@ Branch protection bypass 정책 전반은 [release-management.md#branch-protecti
 ./scripts/validate-prometheus-rules.sh    # ops/prometheus/alerts/*.yml rule 검사
 ./scripts/validate-prometheus-config.sh   # deploy/oci/prometheus/prometheus.yml 검사
 bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/config 검사
-./scripts/validate-production-ai-config.sh # OCI internal OTLP, legacy 제거, Google retention sync 검사
-./scripts/verify-production-ai-config-fixtures.sh # active case study의 legacy selector 회귀 fixture 검사
+./scripts/validate-production-ai-config.sh # AI runtime과 필수 host HMAC sync-config surface 검사
+./scripts/verify-production-ai-config-fixtures.sh # config 누락과 importer 분류/secret 비노출 fixture 검사
 ./scripts/lint-grafana-dashboards.sh      # JSON, AI panels, Tempo datasource/exemplar contract
 ./scripts/validate-alertmanager-config.sh # deploy/oci/alertmanager/alertmanager.yml 구조 검사
 ```
@@ -242,6 +242,11 @@ bash ./scripts/validate-tempo-config.sh   # Tempo 7일 retention/internal-port/c
 배포 전후 어떤 증거로 해석해야 하는지는 [Deploy observability check runbook](../docs/operations/runbooks/deploy-observability-check.md)을 기준으로 기록합니다.
 
 `validate-alertmanager-config.sh`는 `${READMATES_ALERT_*}` 환경 placeholder를 dummy 값으로 치환한 임시 파일을 lint하므로 실제 SMTP credential 없이 구조만 검증합니다. 치환 결과는 `.tmp` 아래 임시 디렉터리에 만들고 종료 시 삭제합니다.
+
+Production config validator는 host list cursor와 mutation identity의 current/previous key 및 version이
+`.env.example`, `sync-config` source/required/render, bulk importer classification에 모두 연결됐는지도
+검사합니다. Fixture는 외부 temp env와 mock `gh`로 dry-run importer를 실행해 secret 값은 출력하지 않고
+key 이름과 version Variable만 분류하는지 확인합니다. 실제 GitHub Secret이나 운영 env는 변경하지 않습니다.
 
 ## `observability-local-smoke.sh`
 

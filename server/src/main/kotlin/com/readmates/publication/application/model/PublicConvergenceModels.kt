@@ -87,7 +87,7 @@ data class CompletePublicConvergenceAttemptCommand(
 data class PublicConvergenceHostSnapshot(
     val receipt: PublicMutationConvergenceReceipt,
     val currentEvent: PublicConvergenceEvent?,
-    val nextAttemptNo: Int,
+    val nextAttemptNo: Int?,
 )
 
 data class PublicConvergenceView(

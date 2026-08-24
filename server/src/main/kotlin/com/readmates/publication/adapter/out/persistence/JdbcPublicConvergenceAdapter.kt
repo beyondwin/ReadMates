@@ -117,6 +117,32 @@ class JdbcPublicConvergenceAdapter(
     @Transactional
     override fun completeAttempt(command: CompleteAttemptCommand): PublicConvergenceEvent = work.complete(command)
 
+    override fun purgeExpiredWork(
+        createdBefore: java.time.Instant,
+        now: java.time.Instant,
+        limit: Int,
+    ): Int {
+        if (limit <= 0) return 0
+        return jdbcTemplate.update(
+            """
+            delete from public_convergence_work
+            where created_at <= ?
+              and (lease_expires_at is null or lease_expires_at <= ?)
+            order by created_at, convergence_id
+            limit ?
+            """.trimIndent(),
+            createdBefore.atOffset(java.time.ZoneOffset.UTC).toLocalDateTime(),
+            now.atOffset(java.time.ZoneOffset.UTC).toLocalDateTime(),
+            limit,
+        )
+    }
+
+    override fun countWorkBacklog(): Long =
+        jdbcTemplate.queryForObject(
+            "select count(*) from public_convergence_work",
+            Long::class.java,
+        ) ?: 0L
+
     override fun loadHostSnapshot(
         clubId: UUID,
         sessionId: UUID,

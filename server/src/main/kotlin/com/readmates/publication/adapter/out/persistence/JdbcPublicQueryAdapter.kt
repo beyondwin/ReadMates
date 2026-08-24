@@ -138,7 +138,6 @@ class JdbcPublicQueryAdapter(
                 sessionId.dbString(),
             ).firstOrNull()
 
-    // for_next_tasks: task_3 will rewrite publicSessions() — do not touch lines 125-188
     private fun publicStats(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,

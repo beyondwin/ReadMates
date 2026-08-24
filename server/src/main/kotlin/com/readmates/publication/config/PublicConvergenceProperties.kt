@@ -15,6 +15,7 @@ data class PublicConvergenceProperties(
     val initialBackoff: Duration = Duration.ofSeconds(DEFAULT_INITIAL_BACKOFF_SECONDS),
     val maxBackoff: Duration = Duration.ofMinutes(DEFAULT_MAX_BACKOFF_MINUTES),
     val scheduler: Scheduler = Scheduler(),
+    val maintenance: Maintenance = Maintenance(),
     val provider: Provider = Provider(),
 ) {
     init {
@@ -68,6 +69,29 @@ data class PublicConvergenceProperties(
             }
             require(Regex("^[A-Za-z0-9._-]{1,128}$").matches(workerId)) {
                 "Public convergence scheduler worker id is invalid"
+            }
+        }
+    }
+
+    data class Maintenance(
+        val enabled: Boolean = true,
+        val retention: Duration = Duration.ofHours(DEFAULT_WORK_RETENTION_HOURS),
+        val fixedDelay: Duration = Duration.ofHours(DEFAULT_MAINTENANCE_DELAY_HOURS),
+        val batchSize: Int = DEFAULT_MAINTENANCE_BATCH_SIZE,
+    ) {
+        init {
+            require(retention in Duration.ofHours(MIN_WORK_RETENTION_HOURS)..Duration.ofDays(MAX_WORK_RETENTION_DAYS)) {
+                "Public convergence work retention must be between 1h and 30d"
+            }
+            require(
+                !fixedDelay.isNegative &&
+                    !fixedDelay.isZero &&
+                    fixedDelay <= Duration.ofHours(MAX_MAINTENANCE_DELAY_HOURS),
+            ) {
+                "Public convergence maintenance delay must be between 1ns and 24h"
+            }
+            require(batchSize in MIN_MAINTENANCE_BATCH_SIZE..MAX_MAINTENANCE_BATCH_SIZE) {
+                "Public convergence maintenance batch size must be between 1 and 500"
             }
         }
     }
@@ -130,3 +154,11 @@ private const val DEFAULT_READ_TIMEOUT_SECONDS = 3L
 private const val MAX_CONNECT_TIMEOUT_SECONDS = 10L
 private const val MAX_READ_TIMEOUT_SECONDS = 30L
 private const val MAX_CREDENTIAL_LENGTH = 4096
+private const val DEFAULT_WORK_RETENTION_HOURS = 168L
+private const val MIN_WORK_RETENTION_HOURS = 1L
+private const val MAX_WORK_RETENTION_DAYS = 30L
+private const val DEFAULT_MAINTENANCE_DELAY_HOURS = 1L
+private const val MAX_MAINTENANCE_DELAY_HOURS = 24L
+private const val DEFAULT_MAINTENANCE_BATCH_SIZE = 100
+private const val MIN_MAINTENANCE_BATCH_SIZE = 1
+private const val MAX_MAINTENANCE_BATCH_SIZE = 500

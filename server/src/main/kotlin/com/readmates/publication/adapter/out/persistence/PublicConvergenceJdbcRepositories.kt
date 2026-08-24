@@ -325,7 +325,7 @@ internal class PublicConvergenceHostQueryRepository(
                        current.attempt_no, current.event_seq, current.status,
                        current.observed_at, current.result_category
                 from public_mutation_convergence_receipts receipt
-                join public_convergence_work work on work.convergence_id = receipt.convergence_id
+                left join public_convergence_work work on work.convergence_id = receipt.convergence_id
                 join active_sessions sessions on sessions.id = receipt.session_id_snapshot
                 left join public_convergence_current current on current.convergence_id = receipt.convergence_id
                 where receipt.mutation_receipt_id = ? and receipt.session_id_snapshot = ?
@@ -355,7 +355,7 @@ internal class PublicConvergenceHostQueryRepository(
                                     resultCategory = resultSet.getString("result_category"),
                                 )
                             },
-                        nextAttemptNo = resultSet.getInt("next_attempt_no"),
+                        nextAttemptNo = resultSet.getIntOrNull("next_attempt_no"),
                     )
                 },
                 mutationReceiptId.dbString(),
@@ -410,6 +410,11 @@ private fun java.sql.ResultSet.utcOffsetDateTimeOrNull(column: String): java.tim
     getObject(column)?.let {
         utcOffsetDateTime(column)
     }
+
+private fun java.sql.ResultSet.getIntOrNull(column: String): Int? {
+    val value = getInt(column)
+    return if (wasNull()) null else value
+}
 
 private const val PENDING_EVENT_SEQ = 0
 private const val TERMINAL_EVENT_SEQ = 1

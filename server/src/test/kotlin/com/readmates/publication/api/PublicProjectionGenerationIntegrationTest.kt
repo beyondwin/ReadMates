@@ -198,7 +198,7 @@ class PublicProjectionGenerationIntegrationTest(
     }
 
     @Test
-    fun `hard delete removes operational projection rows while redacted immutable evidence remains`() {
+    fun `hard delete plus operational purge removes work while redacted immutable evidence remains`() {
         val sessionId = UUID.randomUUID()
         val publicationId = UUID.randomUUID()
         val receiptId = UUID.randomUUID()
@@ -218,13 +218,24 @@ class PublicProjectionGenerationIntegrationTest(
         insertWork(convergenceId)
         insertEvent(convergenceId, publicationId, sessionId, 1, 0, "PENDING", null)
         insertEvent(convergenceId, publicationId, sessionId, 1, 1, "SUCCEEDED", "PURGED")
+        jdbcTemplate.update(
+            "update public_convergence_work set created_at = '2000-01-01 00:00:00.000000' where convergence_id = ?",
+            convergenceId.toString(),
+        )
 
         jdbcTemplate.update("delete from public_session_publications where id = ?", publicationId.toString())
         jdbcTemplate.update("delete from session_publication_versions where session_id = ?", sessionId.toString())
         jdbcTemplate.update("delete from sessions where id = ?", sessionId.toString())
+        assertThat(
+            convergencePort.purgeExpiredWork(
+                createdBefore = Instant.parse("2001-01-01T00:00:00Z"),
+                now = Instant.parse("2001-01-01T00:00:00Z"),
+                limit = 1,
+            ),
+        ).isEqualTo(1)
 
         assertThat(count("public_projection_generations", "publication_id", publicationId)).isZero()
-        assertThat(count("public_convergence_work", "convergence_id", convergenceId)).isOne()
+        assertThat(count("public_convergence_work", "convergence_id", convergenceId)).isZero()
         assertThat(count("public_mutation_convergence_receipts", "mutation_receipt_id", receiptId)).isOne()
         assertThat(count("public_convergence_events", "convergence_id", convergenceId)).isEqualTo(2)
         assertThat(
@@ -238,6 +249,26 @@ class PublicProjectionGenerationIntegrationTest(
                 receiptId.toString(),
             ),
         ).isEqualTo(publicationId.toString())
+    }
+
+    @Test
+    fun `retention query uses the bounded V54 work index`() {
+        val plan =
+            jdbcTemplate.queryForMap(
+                """
+                explain select convergence_id
+                from public_convergence_work
+                where created_at <= utc_timestamp(6)
+                  and (lease_expires_at is null or lease_expires_at <= utc_timestamp(6))
+                order by created_at, convergence_id
+                limit 100
+                """.trimIndent(),
+            )
+
+        assertThat(plan["key"]).isEqualTo("public_convergence_work_retention_idx")
+        assertThat(plan["type"]).isIn("range", "index")
+        assertThat((plan["rows"] as Number).toLong()).isLessThanOrEqualTo(100L)
+        assertThat(plan["Extra"].toString()).doesNotContain("filesort")
     }
 
     private fun publicationId(sessionId: UUID): UUID =

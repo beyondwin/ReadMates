@@ -28,15 +28,22 @@ class HostPublicConvergenceQueryService(
             convergencePort.loadHostSnapshot(actor.clubId, sessionId, mutationReceiptId)
                 ?: throw PublicConvergenceNotFoundException()
         val current = snapshot.currentEvent
+        val retainedWork = snapshot.nextAttemptNo != null
         return PublicConvergenceView(
             convergenceId = snapshot.receipt.convergenceId,
             originResult = if (snapshot.receipt.originReadable) "READABLE" else "DENIED",
             committedGeneration = snapshot.receipt.committedGeneration,
-            status = current?.status?.name ?: "QUEUED",
+            status =
+                if (!retainedWork && (current == null || current.status == ConvergenceAttemptStatus.PENDING)) {
+                    "EXPIRED"
+                } else {
+                    current?.status?.name ?: "QUEUED"
+                },
             lastAttemptAt = current?.observedAt,
             retryable =
-                current?.status == ConvergenceAttemptStatus.FAILED &&
-                    snapshot.nextAttemptNo <= properties.maxAttempts,
+                retainedWork &&
+                    current?.status == ConvergenceAttemptStatus.FAILED &&
+                    requireNotNull(snapshot.nextAttemptNo) <= properties.maxAttempts,
         )
     }
 }

@@ -44,6 +44,21 @@ curl -fsS https://api.<domain>/actuator/health
   2. Cloudflare Pages 측 secret 도 동기화
   3. 일정 시간 후 `READMATES_BFF_SECRETS=new` 로 단축 → sync → restart
 
+Host cursor와 mutation identity HMAC key는 각자 versioned current/previous 쌍으로 회전합니다. 실제 값은
+로그, 명령 인자, evidence에 남기지 않습니다.
+
+1. 새 key를 current Secret으로 provision하고 새 version Variable을 설정합니다. 기존 key/version은
+   previous Secret/Variable로 함께 둡니다.
+2. `sync-config(restart_api=false, dry_run=false)`로 env를 먼저 렌더링한 뒤 backend를 재시작합니다.
+3. Cursor는 이전 TTL + 24시간 rollout buffer, mutation identity는 참조 row가 0이 된 뒤 durable
+   `unreferenced_since` + 24시간 rollout buffer가 모두 지난 것을 public-safe preflight로 확인합니다.
+4. 그 전에는 previous key를 제거하지 않습니다. 안전 경계 전에 제거한 mutation key는 다음 startup에서
+   fail closed합니다. 경계를 지난 뒤 previous Secret을 비우고 version은 retired version을 유지해 sync 후
+   재시작합니다.
+
+첫 V52–V55 배포는 두 current key를 backend startup/Flyway보다 먼저 provision해야 합니다. Previous
+version `0`과 빈 previous key는 history가 없는 첫 배포에서만 안전한 기본값입니다.
+
 #### 시크릿 인벤토리 (현재)
 
 | 키 | 타입 | 소유 | 회전 주기 권장 |
@@ -57,6 +72,10 @@ curl -fsS https://api.<domain>/actuator/health
 | `READMATES_BFF_SECRET` | Secret | auth | 분기 1회 (Cloudflare Pages 측 동기화 필요) |
 | `READMATES_BFF_SECRETS` | Secret | auth | 회전 시에만 |
 | `READMATES_IP_HASH_BASE_SECRET` | Secret | audit | 거의 변경 안 함 (변경 시 기존 해시 무효) |
+| `READMATES_HOST_LIST_CURSOR_CURRENT_KEY` | Secret | host cursor | versioned rotation |
+| `READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY` | Secret | host cursor | rotation window에만 |
+| `READMATES_MUTATION_IDENTITY_CURRENT_KEY` | Secret | host mutation | versioned rotation |
+| `READMATES_MUTATION_IDENTITY_PREVIOUS_KEY` | Secret | host mutation | durable retirement 뒤 제거 |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_ID` | Secret | OAuth | 신청 시 |
 | `SPRING_SECURITY_OAUTH2_CLIENT_REGISTRATION_GOOGLE_CLIENT_SECRET` | Secret | OAuth | 분기 1회 (Google Cloud Console) |
 | `READMATES_AIGEN_OPENAI_API_KEY` | Secret | AI | 분기 1회 또는 사고 시 |
@@ -75,6 +94,12 @@ GitHub Variables 로 관리하는 것 — 환경 의존적인 값:
 | `READMATES_APP_BASE_URL` | `https://readmates.pages.dev` |
 | `READMATES_AUTH_BASE_URL` | 보통 APP_BASE_URL과 동일 |
 | `READMATES_ALLOWED_ORIGINS` | CORS 허용 origin (콤마 구분) |
+| `READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION` / `PREVIOUS_KEY_VERSION` | current/previous cursor key version (`1` / `0` first-deploy default) |
+| `READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION` / `PREVIOUS_KEY_VERSION` | current/previous mutation digest key version (`1` / `0` first-deploy default) |
+| `READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED` | provider/feature와 독립인 operational purge (`true` 기본) |
+| `READMATES_PUBLIC_CONVERGENCE_WORK_RETENTION` | work 보존 기간 (`168h` 기본, startup 범위 `1h..30d`) |
+| `READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_FIXED_DELAY` | purge 간격 (`1h` 기본, 최대 `24h`) |
+| `READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_BATCH_SIZE` | pass당 삭제 상한 (`100` 기본, 범위 `1..500`) |
 | `SPRING_MAIL_HOST` | SMTP host, 예: `smtp.gmail.com` |
 | `READMATES_NOTIFICATION_SENDER_EMAIL` | 발신자 주소 |
 | `READMATES_NOTIFICATION_SENDER_NAME` | 발신자 표시 이름 |

@@ -3,9 +3,13 @@ set -euo pipefail
 
 repo_root="$(git rev-parse --show-toplevel)"
 fixture_root="$repo_root/.tmp/production-ai-config-fixtures"
+import_env_fixture=""
 
 cleanup() {
   rm -rf -- "$fixture_root"
+  if [ -n "$import_env_fixture" ]; then
+    rm -f -- "$import_env_fixture"
+  fi
 }
 trap cleanup EXIT
 
@@ -15,6 +19,7 @@ mkdir -p \
   "$fixture_root/deploy/oci" \
   "$fixture_root/docs/case-studies" \
   "$fixture_root/server/src/main/resources" \
+  "$fixture_root/bin" \
   "$fixture_root/scripts/sync-config"
 
 reset_fixture() {
@@ -68,6 +73,51 @@ reset_fixture
 
 bash "$repo_root/scripts/validate-production-ai-config.sh" "$fixture_root" >/dev/null
 
+import_env_fixture="$(mktemp -t readmates-config-import-XXXXXX.env)"
+printf '%s\n' \
+  'READMATES_HOST_LIST_CURSOR_CURRENT_KEY=fixture-cursor-current-material' \
+  'READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION=7' \
+  'READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY=fixture-cursor-previous-material' \
+  'READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION=6' \
+  'READMATES_MUTATION_IDENTITY_CURRENT_KEY=fixture-mutation-current-material' \
+  'READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION=9' \
+  'READMATES_MUTATION_IDENTITY_PREVIOUS_KEY=fixture-mutation-previous-material' \
+  'READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION=8' \
+  > "$import_env_fixture"
+printf '%s\n' \
+  '#!/usr/bin/env bash' \
+  'if [ "$1 $2" = "auth status" ]; then exit 0; fi' \
+  'exit 97' \
+  > "$fixture_root/bin/gh"
+chmod +x "$fixture_root/bin/gh"
+PATH="$fixture_root/bin:$PATH" \
+  bash "$repo_root/scripts/sync-config/import-from-prod-env.sh" "$import_env_fixture" \
+  > "$fixture_root/import-dry-run.out"
+for key in \
+  READMATES_HOST_LIST_CURSOR_CURRENT_KEY \
+  READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY \
+  READMATES_MUTATION_IDENTITY_CURRENT_KEY \
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY; do
+  grep -Eq "^DRY   secret[[:space:]]+$key  \(len=[0-9]+\)$" "$fixture_root/import-dry-run.out" || {
+    echo "production config import fixture failed to classify secret: $key" >&2
+    exit 1
+  }
+done
+for key in \
+  READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION \
+  READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION \
+  READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION \
+  READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION; do
+  grep -Eq "^DRY   variable[[:space:]]+$key  = [0-9]+$" "$fixture_root/import-dry-run.out" || {
+    echo "production config import fixture failed to classify variable: $key" >&2
+    exit 1
+  }
+done
+if grep -Fq 'fixture-' "$fixture_root/import-dry-run.out"; then
+  echo "production config import fixture leaked secret material" >&2
+  exit 1
+fi
+
 reset_fixture
 remove_exact_line "$fixture_root/.env.example" "READMATES_AIGEN_PROCESSING_DEADLINE=20m"
 expect_contract_failure "missing-processing-deadline" "missing READMATES_AIGEN_PROCESSING_DEADLINE"
@@ -83,6 +133,22 @@ remove_exact_line \
   "$fixture_root/scripts/sync-config/import-from-prod-env.sh" \
   "  READMATES_AIGEN_RECOVERY_BATCH_SIZE"
 expect_contract_failure "missing-import-classification" "bulk config import must classify READMATES_AIGEN_RECOVERY_BATCH_SIZE"
+
+reset_fixture
+remove_exact_line \
+  "$fixture_root/scripts/sync-config/import-from-prod-env.sh" \
+  "  READMATES_MUTATION_IDENTITY_CURRENT_KEY"
+expect_contract_failure \
+  "missing-mutation-identity-import" \
+  "bulk config import must classify READMATES_MUTATION_IDENTITY_CURRENT_KEY"
+
+reset_fixture
+remove_exact_line \
+  "$fixture_root/.github/workflows/sync-config.yml" \
+  '      READMATES_HOST_LIST_CURSOR_CURRENT_KEY: ${{ secrets.READMATES_HOST_LIST_CURSOR_CURRENT_KEY }}'
+expect_contract_failure \
+  "missing-host-list-current-key-workflow" \
+  "sync-config must source READMATES_HOST_LIST_CURSOR_CURRENT_KEY as a secret"
 
 reset_fixture
 replace_exact_line \
@@ -125,4 +191,4 @@ grep -Fq "legacy pipeline selector remains in an active path" "$fixture_root/leg
   exit 1
 }
 
-echo "Production AI config fixture checks passed"
+echo "Production runtime config fixture checks passed"

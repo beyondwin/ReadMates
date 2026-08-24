@@ -5,6 +5,7 @@ repo_root="${1:-.}"
 workflow="$repo_root/.github/workflows/sync-config.yml"
 env_example="$repo_root/.env.example"
 import_script="$repo_root/scripts/sync-config/import-from-prod-env.sh"
+application_config="$repo_root/server/src/main/resources/application.yml"
 app_compose="$repo_root/deploy/oci/compose.yml"
 infra_compose="$repo_root/deploy/oci/compose.infra.yml"
 
@@ -13,7 +14,7 @@ fail() {
   exit 1
 }
 
-for file in "$workflow" "$env_example" "$import_script" "$app_compose" "$infra_compose"; do
+for file in "$workflow" "$env_example" "$import_script" "$application_config" "$app_compose" "$infra_compose"; do
   [ -f "$file" ] || fail "missing ${file#"$repo_root"/}"
 done
 
@@ -190,4 +191,58 @@ require_config_surface \
   READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY 30s \
   "queue-probe-fixed-delay: \${READMATES_AIGEN_QUEUE_PROBE_FIXED_DELAY:30s}"
 
-echo "Production AI config contract OK"
+require_secret_config_surface() {
+  local key="$1"
+  local required="$2"
+  grep -Fq "$key: \${{ secrets.$key }}" "$workflow" ||
+    fail "sync-config must source $key as a secret"
+  grep -Fq "printf '$key=%s\\n' \"\$$key\"" "$workflow" ||
+    fail "sync-config must render $key"
+  grep -Eq "^[[:space:]]{2}$key$" "$import_script" ||
+    fail "bulk config import must classify $key"
+  grep -Fq "\${$key:}" "$application_config" ||
+    fail "application.yml must bind $key without a secret default"
+  read_env_example_value "$key" >/dev/null
+  if [ "$required" = "true" ]; then
+    grep -Fxq "            $key" "$workflow" ||
+      fail "sync-config must require $key"
+  fi
+}
+
+require_version_config_surface() {
+  local key="$1"
+  local expected="$2"
+  [ "$(read_env_example_value "$key")" = "$expected" ] ||
+    fail "$key must use the approved default $expected"
+  grep -Fq "$key: \${{ vars.$key || '$expected' }}" "$workflow" ||
+    fail "sync-config must source $key with default $expected"
+  grep -Fq "printf '$key=%s\\n' \"\$$key\"" "$workflow" ||
+    fail "sync-config must render $key"
+  grep -Eq "^[[:space:]]{2}$key$" "$import_script" ||
+    fail "bulk config import must classify $key"
+  grep -Fq "\${$key:$expected}" "$application_config" ||
+    fail "application.yml must bind $key with default $expected"
+}
+
+require_secret_config_surface READMATES_HOST_LIST_CURSOR_CURRENT_KEY true
+require_secret_config_surface READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY false
+require_secret_config_surface READMATES_MUTATION_IDENTITY_CURRENT_KEY true
+require_secret_config_surface READMATES_MUTATION_IDENTITY_PREVIOUS_KEY false
+require_version_config_surface READMATES_HOST_LIST_CURSOR_CURRENT_KEY_VERSION 1
+require_version_config_surface READMATES_HOST_LIST_CURSOR_PREVIOUS_KEY_VERSION 0
+require_version_config_surface READMATES_MUTATION_IDENTITY_CURRENT_KEY_VERSION 1
+require_version_config_surface READMATES_MUTATION_IDENTITY_PREVIOUS_KEY_VERSION 0
+require_config_surface \
+  READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED true \
+  "enabled: \${READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_ENABLED:true}"
+require_config_surface \
+  READMATES_PUBLIC_CONVERGENCE_WORK_RETENTION 168h \
+  "retention: \${READMATES_PUBLIC_CONVERGENCE_WORK_RETENTION:168h}"
+require_config_surface \
+  READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_FIXED_DELAY 1h \
+  "fixed-delay: \${READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_FIXED_DELAY:1h}"
+require_config_surface \
+  READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_BATCH_SIZE 100 \
+  "batch-size: \${READMATES_PUBLIC_CONVERGENCE_MAINTENANCE_BATCH_SIZE:100}"
+
+echo "Production runtime config contract OK"

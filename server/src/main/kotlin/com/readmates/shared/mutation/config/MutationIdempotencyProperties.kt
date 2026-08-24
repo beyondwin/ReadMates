@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Configuration
 import org.springframework.core.env.Environment
 import org.springframework.stereotype.Component
 import java.nio.charset.StandardCharsets
+import java.time.Clock
 import java.time.Duration
 
 private const val DEFAULT_PURGE_BATCH_SIZE = 50
@@ -97,6 +98,7 @@ class MutationIdempotencyStartupValidator(
     private val properties: MutationIdempotencyProperties,
     private val port: MutationIdempotencyPort,
     private val environment: Environment,
+    private val clock: Clock = Clock.systemUTC(),
 ) {
     @PostConstruct
     fun validate() {
@@ -104,10 +106,37 @@ class MutationIdempotencyStartupValidator(
         val referenced = port.referencedDigestKeyVersions()
         val missing =
             referenced.filter { version -> properties.keyBytes(version) == null }
-        if (missing.isNotEmpty()) {
+        val configuredVersions =
+            buildSet {
+                add(properties.currentKeyVersion)
+                if (properties.previousKey.isNotBlank()) {
+                    add(properties.previousKeyVersion)
+                }
+            }
+        val keyStates = port.digestKeyStates()
+        val unsafeHistoricalState =
+            keyStates.any { state ->
+                state.digestKeyVersion !in configuredVersions && !state.isSafelyRetired(clock, properties)
+            }
+        val missingPreviousRetirementState =
+            properties.previousKey.isBlank() &&
+                properties.previousKeyVersion > 0 &&
+                properties.previousKeyVersion !in configuredVersions &&
+                keyStates.none { state -> state.digestKeyVersion == properties.previousKeyVersion }
+        if (missing.isNotEmpty() || unsafeHistoricalState || missingPreviousRetirementState) {
             throw IllegalStateException(
-                "Configured mutation digest keys cannot replay referenced digest key versions",
+                "Configured mutation digest keys cannot safely replay or retire historical digest key versions",
             )
         }
     }
+}
+
+private fun MutationIdempotencyPort.DigestKeyState.isSafelyRetired(
+    clock: Clock,
+    properties: MutationIdempotencyProperties,
+): Boolean {
+    val retiredAt = unreferencedSince
+    return retiredAt != null &&
+        !retiredAt.isBefore(lastReferencedAt) &&
+        !clock.instant().isBefore(retiredAt.plus(properties.previousKeyRolloutBuffer))
 }

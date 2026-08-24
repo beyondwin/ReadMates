@@ -14,6 +14,7 @@ import com.readmates.shared.mutation.application.model.UnsupportedCanonicalSchem
 import com.readmates.shared.mutation.application.port.`in`.PurgeExpiredMutationIdempotencyUseCase
 import com.readmates.shared.mutation.application.port.out.MutationIdempotencyPort
 import com.readmates.shared.mutation.config.MutationIdempotencyProperties
+import com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatThrownBy
@@ -27,6 +28,7 @@ import java.security.MessageDigest
 import java.text.Normalizer
 import java.time.Clock
 import java.time.Duration
+import java.time.Instant
 import java.util.UUID
 
 class MutationCanonicalizationTest {
@@ -270,6 +272,62 @@ class MutationCanonicalizationTest {
     }
 
     @Test
+    fun `startup validator preserves first deployment with only the current key`() {
+        MutationIdempotencyStartupValidator(
+            properties =
+                MutationIdempotencyProperties(
+                    currentKey = CURRENT_KEY,
+                    currentKeyVersion = 1,
+                    previousKey = "",
+                    previousKeyVersion = 0,
+                ),
+            port = RecordingPort(),
+            environment = MockEnvironment(),
+            clock = Clock.fixed(Instant.parse("2026-08-24T00:00:00Z"), java.time.ZoneOffset.UTC),
+        ).validate()
+    }
+
+    @Test
+    fun `startup validator requires the full durable retirement buffer at restart`() {
+        val unreferencedSince = Instant.parse("2026-08-22T01:00:00Z")
+        val port =
+            RecordingPort(
+                keyStates =
+                    listOf(
+                        MutationIdempotencyPort.DigestKeyState(
+                            digestKeyVersion = 1,
+                            lastReferencedAt = Instant.parse("2026-08-22T00:00:00Z"),
+                            unreferencedSince = unreferencedSince,
+                        ),
+                    ),
+            )
+        val properties =
+            MutationIdempotencyProperties(
+                currentKey = CURRENT_KEY,
+                currentKeyVersion = 2,
+                previousKey = "",
+                previousKeyVersion = 1,
+                previousKeyRolloutBuffer = Duration.ofHours(24),
+            )
+
+        assertThatThrownBy {
+            MutationIdempotencyStartupValidator(
+                properties,
+                port,
+                MockEnvironment(),
+                Clock.fixed(unreferencedSince.plus(Duration.ofHours(24)).minusMillis(1), java.time.ZoneOffset.UTC),
+            ).validate()
+        }.isInstanceOf(IllegalStateException::class.java)
+
+        MutationIdempotencyStartupValidator(
+            properties,
+            port,
+            MockEnvironment(),
+            Clock.fixed(unreferencedSince.plus(Duration.ofHours(24)), java.time.ZoneOffset.UTC),
+        ).validate()
+    }
+
+    @Test
     fun `purge batch sizes one and two fail startup validation`() {
         listOf(1, 2).forEach { batchSize ->
             val properties = TEST_PROPERTIES.copy(purgeBatchSize = batchSize)
@@ -366,7 +424,9 @@ class MutationCanonicalizationTest {
             idempotencyKey = key,
         )
 
-    private class RecordingPort : MutationIdempotencyPort {
+    private class RecordingPort(
+        private val keyStates: List<MutationIdempotencyPort.DigestKeyState> = emptyList(),
+    ) : MutationIdempotencyPort {
         override fun claim(row: MutationIdempotencyPort.ClaimRow) = MutationIdempotencyPort.ClaimOutcome.Claimed
 
         override fun complete(
@@ -385,6 +445,8 @@ class MutationCanonicalizationTest {
         override fun countByDigestKeyVersion(digestKeyVersion: Int) = 0L
 
         override fun referencedDigestKeyVersions(): Set<Int> = emptySet()
+
+        override fun digestKeyStates(): List<MutationIdempotencyPort.DigestKeyState> = keyStates
 
         override fun markReferenced(
             digestKeyVersion: Int,

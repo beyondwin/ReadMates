@@ -73,6 +73,7 @@ create table public_convergence_work (
   updated_at datetime(6) not null default (utc_timestamp(6)),
   primary key (convergence_id),
   key public_convergence_work_available_idx (available_at, lease_expires_at, convergence_id),
+  key public_convergence_work_retention_idx (created_at, convergence_id, lease_expires_at),
   constraint public_convergence_work_receipt_fk
     foreign key (convergence_id) references public_mutation_convergence_receipts(convergence_id),
   constraint public_convergence_work_attempt_check check (next_attempt_no > 0),
