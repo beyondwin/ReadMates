@@ -37,6 +37,15 @@ async function routeAdminShell(page: Page, role: "OWNER" | "SUPPORT") {
     domains: [],
     domainsRequiringAction: [],
   }));
+  await page.route("**/api/bff/api/admin/capabilities", (route) => json(route, 200, {
+    schemaVersion: 1,
+    role,
+    status: "ACTIVE",
+    capabilities: role === "OWNER"
+      ? ["VIEW_TODAY", "VIEW_CLUBS", "EMERGENCY_PUBLIC_TAKEDOWN"]
+      : ["VIEW_TODAY", "VIEW_CLUBS"],
+    generatedAt: "2026-08-26T04:00:00Z",
+  }));
   await page.route("**/api/bff/api/admin/clubs", (route) => json(route, 200, { items: [] }));
 }
 

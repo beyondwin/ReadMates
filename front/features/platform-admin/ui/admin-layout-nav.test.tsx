@@ -15,6 +15,7 @@ const ownerCapabilities: PlatformAdminCapabilities = {
     "VIEW_SERVICE_HEALTH",
     "VIEW_NOTIFICATION_OPERATIONS",
     "VIEW_AI_OPERATIONS",
+    "EMERGENCY_PUBLIC_TAKEDOWN",
     "VIEW_SUPPORT",
     "VIEW_AUDIT",
     "VIEW_ANALYTICS",
@@ -75,6 +76,10 @@ describe("AdminLayoutNav", () => {
     expect(screen.getByRole("link", { name: "서비스 건강" })).toHaveAttribute("href", "/admin/health");
     expect(screen.getByRole("link", { name: "알림" })).toHaveAttribute("href", "/admin/notifications");
     expect(screen.getByRole("link", { name: "AI 작업" })).toHaveAttribute("href", "/admin/ai-ops");
+    expect(screen.getByRole("link", { name: "긴급 공개 회수" })).toHaveAttribute(
+      "href",
+      "/admin/public-takedown",
+    );
     expect(screen.getByRole("link", { name: "지원" })).toHaveAttribute("href", "/admin/support");
     expect(screen.getByRole("link", { name: "감사" })).toHaveAttribute("href", "/admin/audit");
     expect(screen.getByRole("link", { name: "분석" })).toHaveAttribute("href", "/admin/analytics");

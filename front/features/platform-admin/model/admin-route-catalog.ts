@@ -89,6 +89,15 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     requiredCapability: "VIEW_AI_OPERATIONS",
   },
   {
+    path: "public-takedown",
+    label: "긴급 공개 회수",
+    group: "services",
+    groupLabel: "서비스",
+    slice: "C4",
+    status: "ready",
+    requiredCapability: "EMERGENCY_PUBLIC_TAKEDOWN",
+  },
+  {
     path: "support",
     label: "지원",
     group: "review",
@@ -96,15 +105,6 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_SUPPORT",
-  },
-  {
-    path: "public-takedown",
-    label: "긴급 공개 회수",
-    group: "operations",
-    groupLabel: "Operations",
-    slice: "C4",
-    status: "ready",
-    requiredCapability: "emergency_public_takedown",
   },
   {
     path: "audit",

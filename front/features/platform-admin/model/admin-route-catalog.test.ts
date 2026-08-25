@@ -22,7 +22,7 @@ function projection(
 }
 
 describe("ADMIN_ROUTES catalog", () => {
-  it("contains exactly the 8 nav-visible routes", () => {
+  it("contains exactly the 9 nav-visible routes", () => {
     const paths = ADMIN_ROUTES.map((route) => route.path).sort();
     expect(paths).toEqual([
       "ai-ops",
@@ -31,6 +31,7 @@ describe("ADMIN_ROUTES catalog", () => {
       "clubs",
       "health",
       "notifications",
+      "public-takedown",
       "support",
       "today",
     ]);
@@ -102,6 +103,13 @@ describe("ADMIN_ROUTES catalog", () => {
         requiredCapability: "VIEW_AI_OPERATIONS",
       },
       {
+        path: "public-takedown",
+        label: "긴급 공개 회수",
+        group: "services",
+        groupLabel: "서비스",
+        requiredCapability: "EMERGENCY_PUBLIC_TAKEDOWN",
+      },
+      {
         path: "support",
         label: "지원",
         group: "review",
@@ -162,6 +170,7 @@ describe("ADMIN_ROUTES catalog", () => {
       "clubs",
       "health",
       "notifications",
+      "public-takedown",
       "support",
       "today",
     ]);
@@ -194,6 +203,7 @@ describe("ADMIN_ROUTES catalog", () => {
       "VIEW_SUPPORT",
       "VIEW_AUDIT",
       "VIEW_ANALYTICS",
+      "EMERGENCY_PUBLIC_TAKEDOWN",
     ]);
     const all: AdminRouteDescriptor[] = [...ADMIN_ROUTES, ADMIN_CLUB_DETAIL_ROUTE];
     for (const route of all) {
@@ -211,6 +221,7 @@ describe("visibleAdminNav", () => {
         "VIEW_SERVICE_HEALTH",
         "VIEW_NOTIFICATION_OPERATIONS",
         "VIEW_AI_OPERATIONS",
+        "EMERGENCY_PUBLIC_TAKEDOWN",
         "VIEW_SUPPORT",
         "VIEW_AUDIT",
         "VIEW_ANALYTICS",
@@ -227,6 +238,7 @@ describe("visibleAdminNav", () => {
       "health",
       "notifications",
       "ai-ops",
+      "public-takedown",
     ]);
     expect(areas.find((area) => area.id === "review")?.children.map((route) => route.path)).toEqual([
       "support",

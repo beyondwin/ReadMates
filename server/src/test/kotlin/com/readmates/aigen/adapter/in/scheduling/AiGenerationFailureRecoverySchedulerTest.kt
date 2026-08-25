@@ -12,6 +12,7 @@ import com.readmates.aigen.config.AiGenerationProperties
 import org.assertj.core.api.Assertions.assertThat
 import org.assertj.core.api.Assertions.assertThatCode
 import org.junit.jupiter.api.Test
+import org.junit.jupiter.api.parallel.Isolated
 import org.slf4j.LoggerFactory
 import org.springframework.boot.context.properties.EnableConfigurationProperties
 import org.springframework.boot.test.context.TestConfiguration
@@ -24,6 +25,7 @@ import org.springframework.scheduling.annotation.ScheduledAnnotationBeanPostProc
 import org.springframework.scheduling.config.FixedDelayTask
 import java.time.Duration
 
+@Isolated
 class AiGenerationFailureRecoverySchedulerTest {
     @Test
     fun `scheduled recovery calls only the recovery input port once`() {
