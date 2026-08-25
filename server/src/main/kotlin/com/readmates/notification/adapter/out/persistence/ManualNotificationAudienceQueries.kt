@@ -214,7 +214,7 @@ internal class ManualNotificationAudienceQueries(
         jdbcTemplate.queryForObject(
             """
             select participant_set_revision
-            from sessions
+            from active_sessions
             where id = ? and club_id = ?
             """.trimIndent(),
             Long::class.java,

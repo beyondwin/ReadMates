@@ -14,28 +14,27 @@ import java.util.UUID
 private const val SESSION_ID_PARAMETER = 3
 private const val MEMBERSHIP_ID_PARAMETER = 4
 
-@Suppress("TooManyFunctions")
 internal class HostSessionLifecycleWriteOperations(
     private val jdbcTemplate: JdbcTemplate,
     private val queries: HostSessionWriteQueries,
     private val policy: HostSessionWritePolicy,
     private val publicProjection: HostPublicProjectionWriteOperations,
 ) {
-    @Suppress("ReturnCount", "ThrowsCount")
+    @Suppress("ReturnCount")
     fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
         queries.lockClub(command.host.clubId)
-        val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+        val state = queries.requireState(command)
         if (policy.openDecision(state) == HostSessionTransitionDecision.UNCHANGED) {
-            verifyRevision(command)
+            queries.verifyRevision(command)
             return result(command, false)
         }
         val openSessionId = queries.findOpenSessionId(command.host.clubId)
-        if (openSessionId != null) throw OpenSessionAlreadyExistsException(openSessionId)
+        requireNoOpenSession(openSessionId)
         queries.requireActiveClubAndMembership(command.host.clubId, command.host.membershipId, hostRequired = true)
-        val locked = queries.lockSession(command.host.clubId, command.sessionId) ?: throw HostSessionNotFoundException()
+        val locked = queries.requireLockedSession(command)
         if (locked.state != "DRAFT") {
-            verifyRevision(command)
+            queries.verifyRevision(command)
             policy.openDecision(locked.state)
             return result(command, false)
         }
@@ -70,9 +69,9 @@ internal class HostSessionLifecycleWriteOperations(
         requireHost(command.host)
         queries.requireActiveClubAndMembership(command.host.clubId, command.host.membershipId, hostRequired = true)
         val locked = queries.lockSession(command.host.clubId, command.sessionId) ?: throw HostSessionNotFoundException()
-        verifyCloseExpected(command)
+        queries.verifyCloseExpected(command)
         if (locked.state != "OPEN") {
-            verifyRevision(command)
+            queries.verifyRevision(command)
             policy.closeDecision(locked.state)
             return result(command, false)
         }
@@ -126,7 +125,7 @@ internal class HostSessionLifecycleWriteOperations(
                 queries.expectedRevision(command.expectedSessionRevision),
             )
         if (publishedRows == 0) {
-            verifyRevision(command)
+            queries.verifyRevision(command)
             val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
             policy.publishDecision(state)
             return result(command, false)
@@ -140,7 +139,7 @@ internal class HostSessionLifecycleWriteOperations(
         queries.lockClub(command.host.clubId)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         if (reopenDecision(state) == HostSessionTransitionDecision.UNCHANGED) {
-            verifyRevision(command)
+            queries.verifyRevision(command)
             return result(command, false)
         }
         return result(command, reopenClosedSession(command), rotatePublicProjection = true)
@@ -166,7 +165,7 @@ internal class HostSessionLifecycleWriteOperations(
                 queries.expectedRevision(command.expectedSessionRevision),
             )
         if (unpublishedRows > 0) return result(command, true, rotatePublicProjection = true)
-        verifyRevision(command)
+        queries.verifyRevision(command)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         unpublishDecision(state)
         return result(command, false)
@@ -193,7 +192,7 @@ internal class HostSessionLifecycleWriteOperations(
                 queries.expectedRevision(command.expectedSessionRevision),
             )
         if (returnedRows > 0) return result(command, true)
-        verifyRevision(command)
+        queries.verifyRevision(command)
         val state = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         returnToDraftDecision(state)
         return result(command, false)
@@ -229,30 +228,6 @@ internal class HostSessionLifecycleWriteOperations(
         val latest = queries.state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
         reopenDecision(latest)
         return false
-    }
-
-    private fun verifyCloseExpected(command: HostSessionIdCommand) {
-        command.expectedParticipantSetRevision?.let { expected ->
-            val current =
-                queries.lockParticipantSetRevision(command.host, command.sessionId)
-                    ?: throw HostSessionNotFoundException()
-            if (current != expected) {
-                queries.throwIfStale(0, command.host, command.sessionId)
-            }
-        }
-        command.expectedAttendanceSnapshotId?.let { expected ->
-            if (queries.attendanceSnapshotId(command.host, command.sessionId) != expected) {
-                queries.throwIfStale(0, command.host, command.sessionId)
-            }
-        }
-    }
-
-    private fun verifyRevision(command: HostSessionIdCommand) {
-        val expected = queries.expectedRevision(command.expectedSessionRevision)
-        val current = queries.sessionRevision(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
-        if (current != expected) {
-            queries.throwIfStale(0, command.host, command.sessionId)
-        }
     }
 
     private fun hidePublicPlacement(command: HostSessionIdCommand) {
@@ -348,4 +323,38 @@ internal class HostSessionLifecycleWriteOperations(
                 null
             },
     )
+}
+
+private fun requireNoOpenSession(openSessionId: UUID?) {
+    if (openSessionId != null) throw OpenSessionAlreadyExistsException(openSessionId)
+}
+
+private fun HostSessionWriteQueries.requireState(command: HostSessionIdCommand): String =
+    state(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+
+private fun HostSessionWriteQueries.requireLockedSession(command: HostSessionIdCommand): LockedSessionRow =
+    lockSession(command.host.clubId, command.sessionId) ?: throw HostSessionNotFoundException()
+
+private fun HostSessionWriteQueries.verifyCloseExpected(command: HostSessionIdCommand) {
+    command.expectedParticipantSetRevision?.let { expected ->
+        val current =
+            lockParticipantSetRevision(command.host, command.sessionId)
+                ?: throw HostSessionNotFoundException()
+        if (current != expected) {
+            throwIfStale(0, command.host, command.sessionId)
+        }
+    }
+    command.expectedAttendanceSnapshotId?.let { expected ->
+        if (attendanceSnapshotId(command.host, command.sessionId) != expected) {
+            throwIfStale(0, command.host, command.sessionId)
+        }
+    }
+}
+
+private fun HostSessionWriteQueries.verifyRevision(command: HostSessionIdCommand) {
+    val expected = expectedRevision(command.expectedSessionRevision)
+    val current = sessionRevision(command.host, command.sessionId) ?: throw HostSessionNotFoundException()
+    if (current != expected) {
+        throwIfStale(0, command.host, command.sessionId)
+    }
 }

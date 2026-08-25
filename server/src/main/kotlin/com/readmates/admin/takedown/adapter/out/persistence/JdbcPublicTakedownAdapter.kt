@@ -37,7 +37,7 @@ class JdbcPublicTakedownAdapter(
                        current_projection.publication_id_snapshot, current_projection.generation,
                        current_projection.origin_readable
                 from public_projection_current current_projection
-                join sessions on sessions.id = current_projection.session_id
+                join active_sessions sessions on sessions.id = current_projection.session_id
                   and sessions.club_id = current_projection.club_id
                 join public_session_publications publications
                   on publications.id = current_projection.publication_id_snapshot
@@ -193,7 +193,7 @@ class JdbcPublicTakedownAdapter(
         val found =
             jdbcTemplate
                 .query(
-                    "select id from sessions where club_id = ? and id = ? for update",
+                    "select id from active_sessions where club_id = ? and id = ? for update",
                     { rs, _ -> rs.getString("id") },
                     clubId.dbString(),
                     sessionId.dbString(),

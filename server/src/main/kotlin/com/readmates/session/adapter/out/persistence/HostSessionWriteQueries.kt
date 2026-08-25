@@ -36,10 +36,9 @@ internal data class LockedAttendanceRow(
     val participationStatus: String,
 )
 
-@Suppress("TooManyFunctions")
-internal class HostSessionWriteQueries(
-    private val jdbcTemplate: JdbcTemplate,
-    private val hostSessionQueries: HostSessionQueries,
+internal open class HostSessionWriteLockQueries(
+    protected val jdbcTemplate: JdbcTemplate,
+    protected val hostSessionQueries: HostSessionQueries,
 ) {
     fun lockClub(clubId: UUID) {
         jdbcTemplate.queryForObject(
@@ -57,7 +56,7 @@ internal class HostSessionWriteQueries(
             .query(
                 """
                 select participant_set_revision
-                from sessions
+                from active_sessions
                 where id = ?
                   and club_id = ?
                   and deleted_at is null
@@ -109,7 +108,7 @@ internal class HostSessionWriteQueries(
             .query(
                 """
                 select session_revision
-                from sessions
+                from active_sessions
                 where id = ? and club_id = ? and deleted_at is null
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.getLong("session_revision") },
@@ -125,7 +124,7 @@ internal class HostSessionWriteQueries(
             .query(
                 """
                 select id, state
-                from sessions
+                from active_sessions
                 where id = ?
                   and club_id = ?
                   and deleted_at is null
@@ -146,7 +145,7 @@ internal class HostSessionWriteQueries(
             .query(
                 """
                 select id, state
-                from sessions
+                from active_sessions
                 where club_id = ?
                   and deleted_at is null
                   and state = 'OPEN'
@@ -163,7 +162,6 @@ internal class HostSessionWriteQueries(
                 clubId.dbString(),
             ).firstOrNull()
 
-    @Suppress("ThrowsCount")
     fun requireActiveClubAndMembership(
         clubId: UUID,
         membershipId: UUID,
@@ -189,15 +187,20 @@ internal class HostSessionWriteQueries(
                     clubId.dbString(),
                     membershipId.dbString(),
                 ).firstOrNull()
-                ?: throw AccessDeniedException("Approved active membership is required")
+                ?: deniedActiveMembership()
         if (row.first != "ACTIVE" || row.third != "ACTIVE") {
-            throw AccessDeniedException("Approved active membership is required")
+            deniedActiveMembership()
         }
         if (hostRequired && row.second != "HOST") {
             throw AccessDeniedException("Host role required")
         }
     }
+}
 
+internal open class HostSessionWriteReadQueries(
+    jdbcTemplate: JdbcTemplate,
+    hostSessionQueries: HostSessionQueries,
+) : HostSessionWriteLockQueries(jdbcTemplate, hostSessionQueries) {
     fun nextSessionNumber(clubId: UUID): Int =
         jdbcTemplate.queryForObject(
             """
@@ -307,7 +310,12 @@ internal class HostSessionWriteQueries(
                 sessionId.dbString(),
                 host.clubId.dbString(),
             ).firstOrNull() ?: throw HostSessionNotFoundException()
+}
 
+internal class HostSessionWriteQueries(
+    jdbcTemplate: JdbcTemplate,
+    hostSessionQueries: HostSessionQueries,
+) : HostSessionWriteReadQueries(jdbcTemplate, hostSessionQueries) {
     fun requireLegacyPublicationWriteAllowed(
         host: CurrentMember,
         sessionId: UUID,
@@ -416,7 +424,6 @@ internal class HostSessionWriteQueries(
             host.clubId.dbString(),
         )
 
-    @Suppress("LongMethod")
     fun loadProjection(
         host: CurrentMember,
         sessionId: UUID,
@@ -424,45 +431,7 @@ internal class HostSessionWriteQueries(
     ): HostProjectionSnapshot? =
         jdbcTemplate
             .query(
-                """
-                select sessions.id,
-                       sessions.number,
-                       sessions.title,
-                       sessions.book_title,
-                       sessions.book_author,
-                       sessions.session_date,
-                       sessions.start_time,
-                       sessions.end_time,
-                       sessions.location_label,
-                       sessions.state,
-                       sessions.visibility,
-                       sessions.access_scope,
-                       sessions.session_revision,
-                       sessions.exposure_revision,
-                       sessions.participant_set_revision,
-                       draft.draft_revision,
-                       coalesce(revision.live_revision, 0) as live_revision,
-                       coalesce(publication.publication_revision, 0) as publication_revision,
-                       coalesce(public_session_publications.site_visibility, 'HIDDEN') as site_visibility
-                from sessions
-                left join session_record_drafts draft
-                  on draft.session_id = sessions.id and draft.club_id = sessions.club_id
-                left join (
-                  select club_id, session_id, max(version) as live_revision
-                  from session_record_revisions
-                  group by club_id, session_id
-                ) revision
-                  on revision.club_id = sessions.club_id
-                 and revision.session_id = sessions.id
-                left join session_publication_versions publication
-                  on publication.session_id = sessions.id
-                left join public_session_publications
-                  on public_session_publications.session_id = sessions.id
-                 and public_session_publications.club_id = sessions.club_id
-                where sessions.id = ?
-                  and sessions.club_id = ?
-                  and (? or sessions.deleted_at is null)
-                """.trimIndent(),
+                LOAD_PROJECTION_SQL,
                 { resultSet, _ ->
                     val versions = resultSet.toVersionVector()
                     val resourceId = resultSet.uuid("id")
@@ -515,7 +484,7 @@ internal class HostSessionWriteQueries(
                            draft.draft_revision,
                            coalesce(revision.live_revision, 0) as live_revision,
                            coalesce(publication.publication_revision, 0) as publication_revision
-                    from sessions
+                    from active_sessions sessions
                     left join session_record_drafts draft
                       on draft.session_id = sessions.id and draft.club_id = sessions.club_id
                     left join (
@@ -583,6 +552,48 @@ internal class HostSessionWriteQueries(
             ?.takeIf { name -> name.isNotBlank() && '@' !in name }
 }
 
+private fun deniedActiveMembership(): Nothing = throw AccessDeniedException("Approved active membership is required")
+
+private const val LOAD_PROJECTION_SQL = """
+select sessions.id,
+       sessions.number,
+       sessions.title,
+       sessions.book_title,
+       sessions.book_author,
+       sessions.session_date,
+       sessions.start_time,
+       sessions.end_time,
+       sessions.location_label,
+       sessions.state,
+       sessions.visibility,
+       sessions.access_scope,
+       sessions.session_revision,
+       sessions.exposure_revision,
+       sessions.participant_set_revision,
+       draft.draft_revision,
+       coalesce(revision.live_revision, 0) as live_revision,
+       coalesce(publication.publication_revision, 0) as publication_revision,
+       coalesce(public_session_publications.site_visibility, 'HIDDEN') as site_visibility
+from sessions
+left join session_record_drafts draft
+  on draft.session_id = sessions.id and draft.club_id = sessions.club_id
+left join (
+  select club_id, session_id, max(version) as live_revision
+  from session_record_revisions
+  group by club_id, session_id
+) revision
+  on revision.club_id = sessions.club_id
+ and revision.session_id = sessions.id
+left join session_publication_versions publication
+  on publication.session_id = sessions.id
+left join public_session_publications
+  on public_session_publications.session_id = sessions.id
+ and public_session_publications.club_id = sessions.club_id
+where sessions.id = ?
+  and sessions.club_id = ?
+  and (? or sessions.deleted_at is null)
+"""
+
 private const val VERSION_VECTOR_SQL = """
 select sessions.session_revision,
        sessions.exposure_revision,
@@ -590,7 +601,7 @@ select sessions.session_revision,
        draft.draft_revision,
        coalesce(revision.live_revision, 0) as live_revision,
        coalesce(publication.publication_revision, 0) as publication_revision
-from sessions
+from active_sessions sessions
 left join session_record_drafts draft
   on draft.session_id = sessions.id and draft.club_id = sessions.club_id
 left join (

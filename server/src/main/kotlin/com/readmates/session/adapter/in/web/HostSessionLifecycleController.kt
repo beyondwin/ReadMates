@@ -23,7 +23,6 @@ import tools.jackson.databind.JsonNode
 
 @RestController
 @RequestMapping("/api/host/sessions")
-@Suppress("TooManyFunctions")
 class HostSessionLifecycleController(
     private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
     private val envelopes: HostMutationEnvelopeReader,
@@ -131,22 +130,29 @@ class HostSessionLifecycleController(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.reopen(reverseCommand(member, sessionId, body))
+    ) = hostSessionLifecycleUseCase.reopen(envelopes.reverseCommand(member, sessionId, body))
 
     @PostMapping("/{sessionId}/unpublish")
     fun unpublish(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.unpublish(reverseCommand(member, sessionId, body))
+    ) = hostSessionLifecycleUseCase.unpublish(envelopes.reverseCommand(member, sessionId, body))
 
     @PostMapping("/{sessionId}/return-to-draft")
     fun returnToDraft(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.returnToDraft(reverseCommand(member, sessionId, body))
+    ) = hostSessionLifecycleUseCase.returnToDraft(envelopes.reverseCommand(member, sessionId, body))
+}
 
+@RestController
+@RequestMapping("/api/host/sessions")
+class HostSessionDeletionController(
+    private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
+) {
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,
@@ -159,40 +165,40 @@ class HostSessionLifecycleController(
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
     ) = hostSessionLifecycleUseCase.delete(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
+}
 
-    private fun sessionCommand(
-        member: CurrentMember,
-        sessionId: String,
-        envelope: com.readmates.session.application.model.HostMutationEnvelope<Unit, ExpectedSessionOnlyBody>,
-    ) = HostSessionIdCommand(
+private fun sessionCommand(
+    member: CurrentMember,
+    sessionId: String,
+    envelope: com.readmates.session.application.model.HostMutationEnvelope<Unit, ExpectedSessionOnlyBody>,
+) = HostSessionIdCommand(
+    host = member,
+    sessionId = parseHostSessionId(sessionId),
+    expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+    idempotencyKey = envelope.idempotencyKey,
+)
+
+private fun HostMutationEnvelopeReader.reverseCommand(
+    member: CurrentMember,
+    sessionId: String,
+    body: JsonNode,
+): HostSessionReverseCommand {
+    val envelope = reverse(body)
+    val parsed =
+        envelope.command.reasonCode?.let { raw ->
+            runCatching { HostSessionLifecycleReasonCode.valueOf(raw) }
+                .getOrElse { throw InvalidHostSessionLifecycleReasonException() }
+                .takeIf(USER_SELECTABLE_LIFECYCLE_REASONS::contains)
+                ?: throw InvalidHostSessionLifecycleReasonException()
+        }
+    return HostSessionReverseCommand(
         host = member,
         sessionId = parseHostSessionId(sessionId),
+        reasonCode = parsed,
+        reasonNote = envelope.command.reasonNote,
         expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
         idempotencyKey = envelope.idempotencyKey,
     )
-
-    private fun reverseCommand(
-        member: CurrentMember,
-        sessionId: String,
-        body: JsonNode,
-    ): HostSessionReverseCommand {
-        val envelope = envelopes.reverse(body)
-        val parsed =
-            envelope.command.reasonCode?.let { raw ->
-                runCatching { HostSessionLifecycleReasonCode.valueOf(raw) }
-                    .getOrElse { throw InvalidHostSessionLifecycleReasonException() }
-                    .takeIf(USER_SELECTABLE_LIFECYCLE_REASONS::contains)
-                    ?: throw InvalidHostSessionLifecycleReasonException()
-            }
-        return HostSessionReverseCommand(
-            host = member,
-            sessionId = parseHostSessionId(sessionId),
-            reasonCode = parsed,
-            reasonNote = envelope.command.reasonNote,
-            expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
-            idempotencyKey = envelope.idempotencyKey,
-        )
-    }
 }
 
 data class HostSessionReverseRequest(

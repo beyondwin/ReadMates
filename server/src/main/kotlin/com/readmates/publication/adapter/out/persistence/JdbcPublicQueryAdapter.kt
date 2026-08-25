@@ -87,7 +87,7 @@ class JdbcPublicQueryAdapter(
                            and binary sessions.access_scope = binary 'GUEST_READABLE'
                            and binary publications.site_visibility = binary 'PUBLIC_RECORD'
                        end as origin_readable
-                from sessions
+                from active_sessions sessions
                 join clubs on clubs.id = sessions.club_id
                 left join public_session_publications publications
                   on publications.club_id = sessions.club_id and publications.session_id = sessions.id

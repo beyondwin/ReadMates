@@ -37,8 +37,8 @@ class ActiveSessionProjectionArchitectureTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Normal session SQL must read active_sessions; only HostSessionDeletionQueries " +
-                "and the HostSessionWriteQueries max-number allocation query may use sessions:\n" +
+            "Normal session SQL must read active_sessions; only deletion, explicit trash projection, " +
+                "and max-number allocation queries may use sessions:\n" +
                 violations.joinToString("\n"),
         )
     }
@@ -77,12 +77,25 @@ class ActiveSessionProjectionArchitectureTest {
         val inMaxNumberWindow =
             MAX_NUMBER_ALLOCATION_COLLAPSED in window
         val inProjectionLockWindow = PUBLIC_PROJECTION_LOCK_COLLAPSED in window
+        val inTrashProjectionQuery =
+            sourceFile.name == "HostSessionWriteQueries.kt" &&
+                match.range.first in namedConstantRange(source, "LOAD_PROJECTION_SQL", "VERSION_VECTOR_SQL")
         return when {
             sourceFile.name == "HostSessionDeletionQueries.kt" -> true
             sourceFile.name in PUBLIC_PROJECTION_LOCK_FILES -> inProjectionLockWindow
             sourceFile.name != "HostSessionWriteQueries.kt" -> false
-            else -> inMaxNumberWindow
+            else -> inMaxNumberWindow || inTrashProjectionQuery
         }
+    }
+
+    private fun namedConstantRange(
+        source: String,
+        startName: String,
+        endName: String,
+    ): IntRange {
+        val start = source.indexOf("private const val $startName")
+        val end = source.indexOf("private const val $endName").takeIf { it >= 0 } ?: source.length
+        return start..end
     }
 
     private fun isGuardedSessionUpdate(
