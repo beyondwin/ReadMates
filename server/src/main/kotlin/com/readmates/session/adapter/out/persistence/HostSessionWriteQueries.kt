@@ -56,7 +56,7 @@ internal open class HostSessionWriteLockQueries(
             .query(
                 """
                 select participant_set_revision
-                from active_sessions
+                from sessions
                 where id = ?
                   and club_id = ?
                   and deleted_at is null
@@ -108,7 +108,7 @@ internal open class HostSessionWriteLockQueries(
             .query(
                 """
                 select session_revision
-                from active_sessions
+                from sessions
                 where id = ? and club_id = ? and deleted_at is null
                 """.trimIndent(),
                 { resultSet, _ -> resultSet.getLong("session_revision") },
@@ -124,7 +124,7 @@ internal open class HostSessionWriteLockQueries(
             .query(
                 """
                 select id, state
-                from active_sessions
+                from sessions
                 where id = ?
                   and club_id = ?
                   and deleted_at is null
@@ -145,7 +145,7 @@ internal open class HostSessionWriteLockQueries(
             .query(
                 """
                 select id, state
-                from active_sessions
+                from sessions
                 where club_id = ?
                   and deleted_at is null
                   and state = 'OPEN'
@@ -484,7 +484,7 @@ internal class HostSessionWriteQueries(
                            draft.draft_revision,
                            coalesce(revision.live_revision, 0) as live_revision,
                            coalesce(publication.publication_revision, 0) as publication_revision
-                    from active_sessions sessions
+                    from sessions
                     left join session_record_drafts draft
                       on draft.session_id = sessions.id and draft.club_id = sessions.club_id
                     left join (
@@ -601,7 +601,7 @@ select sessions.session_revision,
        draft.draft_revision,
        coalesce(revision.live_revision, 0) as live_revision,
        coalesce(publication.publication_revision, 0) as publication_revision
-from active_sessions sessions
+from sessions
 left join session_record_drafts draft
   on draft.session_id = sessions.id and draft.club_id = sessions.club_id
 left join (

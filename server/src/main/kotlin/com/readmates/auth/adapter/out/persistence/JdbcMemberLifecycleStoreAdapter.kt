@@ -233,7 +233,7 @@ class JdbcMemberLifecycleStoreAdapter(
             .query(
                 """
                 select id
-                from active_sessions
+                from sessions
                 where club_id = ?
                   and deleted_at is null
                   and state = 'OPEN'
@@ -349,7 +349,7 @@ class JdbcMemberLifecycleStoreAdapter(
 
     private fun currentParticipantSetRevision(sessionId: UUID): Long =
         jdbcTemplate.queryForObject(
-            "select participant_set_revision from active_sessions where id = ?",
+            "select participant_set_revision from sessions where id = ?",
             Long::class.java,
             sessionId.dbString(),
         ) ?: 0

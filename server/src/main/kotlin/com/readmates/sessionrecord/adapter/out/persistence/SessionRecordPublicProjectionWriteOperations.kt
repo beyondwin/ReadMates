@@ -28,7 +28,7 @@ internal class SessionRecordPublicProjectionWriteOperations(
         sessionId: UUID,
     ) {
         jdbcTemplate.queryForObject(
-            "select id from active_sessions where club_id = ? and id = ? for update",
+            "select id from sessions where club_id = ? and id = ? for update",
             String::class.java,
             clubId.dbString(),
             sessionId.dbString(),
@@ -58,7 +58,7 @@ internal class SessionRecordPublicProjectionWriteOperations(
                          and binary sessions.access_scope = binary 'GUEST_READABLE'
                          and binary publications.site_visibility = binary 'PUBLIC_RECORD'
                        ) as origin_readable
-                from active_sessions
+                from sessions
                 join clubs on clubs.id = sessions.club_id
                 join public_session_publications publications
                   on publications.club_id = sessions.club_id

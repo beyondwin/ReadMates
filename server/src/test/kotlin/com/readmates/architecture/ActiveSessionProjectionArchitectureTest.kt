@@ -80,22 +80,45 @@ class ActiveSessionProjectionArchitectureTest {
         val inTrashProjectionQuery =
             sourceFile.name == "HostSessionWriteQueries.kt" &&
                 match.range.first in namedConstantRange(source, "LOAD_PROJECTION_SQL", "VERSION_VECTOR_SQL")
+        val inVersionVectorQuery =
+            sourceFile.name == "HostSessionWriteQueries.kt" &&
+                match.range.first in namedConstantRange(source, "VERSION_VECTOR_SQL", null)
+        val inOwnedWriteFunction =
+            RAW_SESSION_WRITE_FUNCTIONS[sourceFile.name]
+                .orEmpty()
+                .any { functionName -> match.range.first in namedFunctionRange(source, functionName) }
         return when {
             sourceFile.name == "HostSessionDeletionQueries.kt" -> true
             sourceFile.name in PUBLIC_PROJECTION_LOCK_FILES -> inProjectionLockWindow
-            sourceFile.name != "HostSessionWriteQueries.kt" -> false
-            else -> inMaxNumberWindow || inTrashProjectionQuery
+            sourceFile.name == "HostSessionWriteQueries.kt" ->
+                inMaxNumberWindow || inTrashProjectionQuery || inVersionVectorQuery || inOwnedWriteFunction
+            else -> inOwnedWriteFunction
         }
     }
 
     private fun namedConstantRange(
         source: String,
         startName: String,
-        endName: String,
+        endName: String?,
     ): IntRange {
         val start = source.indexOf("private const val $startName")
-        val end = source.indexOf("private const val $endName").takeIf { it >= 0 } ?: source.length
+        val end = endName?.let { source.indexOf("private const val $it") }?.takeIf { it >= 0 } ?: source.length
         return start..end
+    }
+
+    private fun namedFunctionRange(
+        source: String,
+        functionName: String,
+    ): IntRange {
+        val declarations = Regex("""(?m)^[ \t]*(?:override\s+)?(?:private\s+)?fun\s+\w+\s*\(""")
+        val start =
+            Regex("""(?m)^[ \t]*(?:override\s+)?(?:private\s+)?fun\s+$functionName\s*\(""")
+                .find(source)
+                ?.range
+                ?.first
+                ?: return IntRange.EMPTY
+        val end = declarations.find(source, start + 1)?.range?.first ?: source.length
+        return start until end
     }
 
     private fun isGuardedSessionUpdate(
@@ -153,6 +176,27 @@ class ActiveSessionProjectionArchitectureTest {
             setOf(
                 "JdbcAuthPublicProjectionMutationAdapter.kt",
                 "JdbcClubPublicProjectionMutationAdapter.kt",
+            )
+        val RAW_SESSION_WRITE_FUNCTIONS =
+            mapOf(
+                "JdbcPublicTakedownAdapter.kt" to setOf("loadTarget", "lockSession"),
+                "JdbcMemberLifecycleStoreAdapter.kt" to
+                    setOf("lockOpenSessionForUpdate", "currentParticipantSetRevision"),
+                "SessionScopedNotificationGuard.kt" to setOf("lockExisting"),
+                "SessionRecordPublicProjectionWriteOperations.kt" to
+                    setOf("lockSession", "loadAffectedOrigin"),
+                "JdbcSessionParticipationWriteAdapter.kt" to setOf("lockOpenSession"),
+                "HostPublicProjectionWriteOperations.kt" to
+                    setOf("rotateAffectedContent", "lockSession", "loadOrigin"),
+                "JdbcHostSessionRecoveryAdapter.kt" to setOf("lockForRestore"),
+                "HostSessionWriteQueries.kt" to
+                    setOf(
+                        "lockParticipantSetRevision",
+                        "sessionRevision",
+                        "lockSession",
+                        "lockCurrentOpenSession",
+                        "revisionConflict",
+                    ),
             )
 
         fun collapseWhitespace(value: String): String = value.replace(Regex("""\s+"""), " ")
