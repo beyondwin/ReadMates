@@ -1368,16 +1368,6 @@ export function parseHostSessionListPage(value: unknown, mode: HostListMode): Ho
   return page as HostSessionListPage;
 }
 
-export const HostSessionTrashItemSchema = z.object({
-  sessionId: z.string(),
-  sessionNumber: z.number(),
-  title: z.string(),
-  state: sessionStateSchema,
-  deletedAt: z.string(),
-  purgeAfter: z.string(),
-  sessionRevision: nonNegativeRevision,
-}).strict();
-
 const HostSessionDeletionCountsSchema = z.object({
   participants: z.number(),
   rsvpResponses: z.number(),
@@ -1390,6 +1380,18 @@ const HostSessionDeletionCountsSchema = z.object({
   feedbackReports: z.number(),
   feedbackDocuments: z.number(),
 });
+
+export const HostSessionTrashItemSchema = z.object({
+  sessionId: z.string(),
+  sessionNumber: z.number(),
+  title: z.string(),
+  state: sessionStateSchema,
+  deletedAt: z.string(),
+  purgeAfter: z.string(),
+  sessionRevision: nonNegativeRevision,
+  trashed: z.literal(true).optional(),
+  counts: HostSessionDeletionCountsSchema.optional(),
+}).strict();
 
 export const HostSessionDeletionResponseSchema = HostSessionTrashItemSchema.extend({
   trashed: z.literal(true),

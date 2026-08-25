@@ -10,6 +10,7 @@ import type { ManualNotificationDispatchListResponse } from "@/features/host/api
 import type { HostSessionHistoryPage, HostSessionRecordEditor, HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import {
   hostSessionDetailQuery,
+  hostSessionTrashDetailQuery,
   invalidateHostSessionRecordSurfaces,
   isHostSessionNotFoundError,
 } from "@/features/host/queries/host-session-queries";
@@ -152,6 +153,7 @@ export function HostMeetingWorkspaceRoute({
     () => parseHostMeetingLocation(routerLocation.search),
     [routerLocation.search],
   );
+  const pendingSheetFocusRef = useRef<"basic" | "history" | null>(null);
   useEffect(() => {
     const canonicalHref = canonicalizeLegacyHostMeetingUrl(currentUrl);
     if (canonicalHref && canonicalHref !== currentUrl) {
@@ -165,9 +167,33 @@ export function HostMeetingWorkspaceRoute({
   const navigation = useMemo(() => ({
     location: compatibilityLocation(meetingLocation),
     onChange: (next: ReturnType<typeof compatibilityLocation>) => {
+      const currentPanel = compatibilityLocation(meetingLocation).panel;
+      if (next.panel === "focus" && (currentPanel === "basic" || currentPanel === "history")) {
+        pendingSheetFocusRef.current = currentPanel;
+      }
       changeMeetingLocation(meetingLocationFromCompatibility(meetingLocation, next));
     },
   }), [changeMeetingLocation, meetingLocation]);
+  useEffect(() => {
+    const pendingPanel = pendingSheetFocusRef.current;
+    if (!pendingPanel || meetingLocation.overviewEditOpen || meetingLocation.task === "history") return;
+    let remainingFrames = 10;
+    let frame = 0;
+    const focusTrigger = () => {
+      const trigger = document.querySelector<HTMLElement>(
+        `[aria-controls="workspace-panel-${pendingPanel}"]`,
+      );
+      if (trigger) {
+        trigger.focus();
+        pendingSheetFocusRef.current = null;
+        return;
+      }
+      remainingFrames -= 1;
+      if (remainingFrames > 0) frame = requestAnimationFrame(focusTrigger);
+    };
+    frame = requestAnimationFrame(focusTrigger);
+    return () => cancelAnimationFrame(frame);
+  }, [meetingLocation.overviewEditOpen, meetingLocation.task]);
 
   const handleSessionRecordsChanged = useCallback(async (changedSessionId: string) => {
     await Promise.all([
@@ -180,6 +206,9 @@ export function HostMeetingWorkspaceRoute({
     ...hostSessionDetailQuery(sessionId, context),
     enabled: loaderData.mode === "active",
   });
+  const cachedTrash = queryClient.getQueryData(
+    hostSessionTrashDetailQuery(sessionId, context).queryKey,
+  );
   const convergenceQuery = useQuery({
     ...hostPublicConvergenceQuery(sessionId, context),
     enabled: loaderData.mode === "active",
@@ -263,7 +292,7 @@ export function HostMeetingWorkspaceRoute({
   }
 
   if (!baseQuery.data) {
-    if (isHostSessionNotFoundError(baseQuery.error)) {
+    if (cachedTrash || isHostSessionNotFoundError(baseQuery.error)) {
       return (
         <DeferredHostWorkspace>
           <EditHostSessionRoute

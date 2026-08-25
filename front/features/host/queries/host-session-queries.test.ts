@@ -28,6 +28,7 @@ import {
 } from "@/features/host/api/host-api";
 import {
   parseHostSessionDeletionResponse,
+  parseHostSessionTrashItem,
   parseHostSessionTrashPage,
 } from "@/features/host/api/host-contracts";
 import { ReadmatesApiError } from "@/shared/api/errors";
@@ -292,6 +293,18 @@ describe("host session query keys", () => {
       deleted: true,
       counts: emptyCounts(),
     })).toThrow();
+  });
+
+  it("accepts the authoritative trash detail response as a trash item", () => {
+    expect(parseHostSessionTrashItem({
+      ...trashItem(),
+      trashed: true,
+      counts: emptyCounts(),
+    })).toMatchObject({
+      sessionId: "session-7",
+      trashed: true,
+      counts: emptyCounts(),
+    });
   });
 
   it("parses trash list pages with cursor metadata", () => {

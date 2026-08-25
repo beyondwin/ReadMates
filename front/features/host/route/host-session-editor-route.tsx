@@ -368,7 +368,9 @@ function HostSessionTrashTombstoneRoute({
       await restoreSession(sessionId);
       onRestored();
       queueMicrotask(() => {
-        document.querySelector<HTMLElement>(".rm-host-session-workspace__title")?.focus();
+        document.querySelector<HTMLElement>(
+          ".rm-meeting-folio__title, .rm-host-session-workspace__title",
+        )?.focus();
       });
     } catch (error) {
       if (isHostSessionTrashExpiredError(error)) {
