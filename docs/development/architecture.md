@@ -226,7 +226,7 @@ ReadMates 서버는 도메인 패키지를 다음 두 형태로 운영합니다.
 - 트랜잭션 mutation을 수행
 
 ### Read-side (domain/ 없음)
-- `note`, `publication`, `archive`, `sessionclosing`, `admin.audit`
+- `note`, `archive`, `sessionclosing`, `admin.audit`
 - `application/model/` 의 read DTO + `JdbcXxxAdapter` 직접 query
 - 도메인 엔티티 없이 query result 모델만 정의
 - `@ReadOnlyApplicationService` 마커로 식별 (`shared/architecture/`)
@@ -244,6 +244,7 @@ lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight fut
 `GET /api/admin/health/snapshot`의 기존 `schema`, `generatedAt`, `cards`는 유지되고 `lastSuccessfulAt`(첫 성공 전 `null`), `refreshState`(`FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE`), `staleAgeSeconds`가 additive metadata로 제공됩니다. platform-admin authorization, database schema, migration, live AI-provider invocation과 email-send behavior는 변경하지 않습니다. frontend는 server-supplied state와 age를 표시하며 TanStack Query의 fetching 상태는 새로고침 버튼의 transport hint일 뿐 server freshness를 대체하지 않습니다.
 
 ### Mixed / Workflow-side
+- `publication` — 공개 projection query와 cache generation을 읽고, 별도 append-only convergence ledger의 lease/retry를 조정합니다. Provider HTTP와 JDBC detail은 outbound port/adapter 뒤에 두며 mutation receipt는 convergence 상태 갱신에 사용하지 않습니다.
 - `admin.operations` — 네 운영 source의 allowlist signal을 case/event/source-freshness ledger로 조정하고, 낙관적 version을 가진 lifecycle mutation과 exact-source resolve 검증을 수행합니다. Application layer는 source adapter, JDBC, Micrometer, Spring Web detail이 아니라 outbound port에 의존합니다.
 - `feedback` — 문서 업로드 mutation + 조회를 함께 보유합니다.
 - `sessionrecord` — `/app/host/sessions` 장부와 editor/history API가 기본 정보·출석의 복구 가능한 before/after snapshot, 공개 기록 공통 draft, immutable applied revision, restore-to-draft를 소유합니다. 적용 전 member/public live projection은 변경하지 않습니다. 세션 행의 활성 조회는 `active_sessions` projection을 사용합니다.

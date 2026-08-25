@@ -5,6 +5,7 @@ vi.mock("@/features/host/api/host-api", () => ({
   fetchHostSessions: vi.fn(),
   fetchHostSessionDetail: vi.fn(),
   fetchHostSessionDeletionPreview: vi.fn(),
+  fetchHostPublicConvergence: vi.fn(),
   fetchHostSessionScheduleDefaults: vi.fn(),
   fetchManualNotificationDispatches: vi.fn(),
   fetchHostSessionTrashList: vi.fn(),
@@ -18,6 +19,7 @@ import {
   fetchHostSessions,
   fetchHostSessionDetail,
   fetchHostSessionDeletionPreview,
+  fetchHostPublicConvergence,
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
   fetchHostSessionTrashList,
@@ -33,6 +35,7 @@ import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-d
 import {
   classifyScheduleDefaultsError,
   hostCurrentSessionQuery,
+  hostPublicConvergenceQuery,
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
   hostSessionKeys,
@@ -88,6 +91,24 @@ describe("host session query keys", () => {
       "sessions",
       "scheduleDefaults",
     ]);
+    expect(hostSessionKeys.convergence("session-7", { clubSlug: "reading-sai" })).toEqual([
+      "host",
+      "reading-sai",
+      "sessions",
+      "convergence",
+      "session-7",
+    ]);
+  });
+
+  it("polls only while convergence remains pending", async () => {
+    vi.mocked(fetchHostPublicConvergence).mockResolvedValue(null);
+    const query = hostPublicConvergenceQuery("session-7", { clubSlug: "reading-sai" });
+
+    await runQuery(query);
+    expect(fetchHostPublicConvergence).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
+    expect(query.retry).toBe(false);
+    expect(query.refetchInterval?.({ state: { data: { status: "PENDING" } } } as never)).toBe(5_000);
+    expect(query.refetchInterval?.({ state: { data: { status: "FAILED" } } } as never)).toBe(false);
   });
 
   it("rejects an unscoped host query key at runtime", () => {

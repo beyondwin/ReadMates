@@ -16,6 +16,7 @@ import {
   fetchHostNotificationPolicy,
   fetchHostNotificationSummary,
   fetchHostNotificationTestMailAudit,
+  fetchHostPublicConvergence,
   fetchHostSessions,
   fetchHostSessionList,
   fetchHostSessionScheduleDefaults,
@@ -26,6 +27,7 @@ import {
   parseHostInvitationListResponse,
   parseHostInvitationResponse,
   publishHostSession,
+  retryHostPublicConvergence,
   reopenHostSession,
   restoreHostSession,
   saveHostSessionAttendance,
@@ -586,6 +588,57 @@ describe("host api wrappers", () => {
       "/api/bff/api/host/sessions/schedule-defaults?clubSlug=reading-sai",
       "/api/bff/api/host/members?limit=25&cursor=m2&clubSlug=reading-sai",
     ]);
+  });
+
+  it("parses the bounded convergence view and treats no linked work as absent", async () => {
+    const view = {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED",
+      committedGeneration: 7,
+      status: "PENDING",
+      lastAttemptAt: null,
+      retryable: false,
+    };
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(jsonResponse(view))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(fetchHostPublicConvergence("session 7", { clubSlug: "reading-sai" })).resolves.toEqual(view);
+    await expect(fetchHostPublicConvergence("session 8", { clubSlug: "reading-sai" })).resolves.toBeNull();
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "/api/bff/api/host/sessions/session%207/publication/convergence?clubSlug=reading-sai",
+      "/api/bff/api/host/sessions/session%208/publication/convergence?clubSlug=reading-sai",
+    ]);
+  });
+
+  it("retries one exact convergence id without accepting provider detail", async () => {
+    const view = {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED",
+      committedGeneration: 7,
+      status: "PENDING",
+      lastAttemptAt: "2026-08-26T04:30:00Z",
+      retryable: false,
+    };
+    const fetchMock = vi.fn().mockImplementation((url: string) => Promise.resolve(
+      url.includes("/__internal/client-contract-status")
+        ? new Response(JSON.stringify({ schemaVersion: 1, supportedHostClientContracts: ["v3"] }), {
+            headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
+          })
+        : jsonResponse(view),
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await expect(retryHostPublicConvergence(
+      "session 7",
+      view.convergenceId,
+      { clubSlug: "reading-sai" },
+    )).resolves.toEqual(view);
+    expect(fetchMock).toHaveBeenNthCalledWith(2,
+      "/api/bff/api/host/sessions/session%207/publication/convergence/10000000-0000-4000-8000-000000000001/retry?clubSlug=reading-sai",
+      expect.objectContaining({ method: "POST" }),
+    );
   });
 
   it("sends one exact server-owned list mode and preserves opaque cursors", async () => {

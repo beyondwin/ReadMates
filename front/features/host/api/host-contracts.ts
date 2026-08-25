@@ -99,6 +99,24 @@ export type HostMutationReconciliation = {
   attendanceSnapshotId: string | null;
 };
 
+export type HostPublicConvergenceView = {
+  convergenceId: string;
+  originResult: "APPLIED";
+  committedGeneration: number;
+  status: "PENDING" | "SUCCEEDED" | "FAILED";
+  lastAttemptAt: string | null;
+  retryable: boolean;
+};
+
+export const HostPublicConvergenceViewSchema = z.object({
+  convergenceId: z.string().uuid(),
+  originResult: z.literal("APPLIED"),
+  committedGeneration: z.number().int().nonnegative(),
+  status: z.enum(["PENDING", "SUCCEEDED", "FAILED"]),
+  lastAttemptAt: z.string().datetime({ offset: true }).nullable(),
+  retryable: z.boolean(),
+}).strict();
+
 export type HostMutationOperation =
   | "SESSION_CREATE"
   | "SESSION_BASIC_SAVE"

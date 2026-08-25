@@ -29,6 +29,7 @@ export type HostMeetingWorkspaceProps = {
   onTaskLinkActivated: (task: HostMeetingTask) => void;
   onPrimaryAction: () => void;
   onRetryPanel: () => void;
+  onRetryConvergence?: () => void;
 };
 
 const panelCopy: Record<HostMeetingTask, { label: string; empty: string }> = {
@@ -82,6 +83,7 @@ export function HostMeetingWorkspace({
   onTaskLinkActivated,
   onPrimaryAction,
   onRetryPanel,
+  onRetryConvergence,
 }: HostMeetingWorkspaceProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const selectedTaskRef = useRef<HostMeetingTask | null>(null);
@@ -119,7 +121,12 @@ export function HostMeetingWorkspace({
         <main className="rm-meeting-folio__work" aria-label="현재 모임 작업">
           <MeetingPanel panel={panel} onRetry={onRetryPanel} />
         </main>
-        <MeetingJudgmentRail judgment={judgment} primaryAction={primaryAction} onPrimaryAction={onPrimaryAction} />
+        <MeetingJudgmentRail
+          judgment={judgment}
+          primaryAction={primaryAction}
+          onPrimaryAction={onPrimaryAction}
+          onRetryConvergence={onRetryConvergence}
+        />
       </div>
     </div>
   );

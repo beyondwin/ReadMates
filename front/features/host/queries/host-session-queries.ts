@@ -9,6 +9,7 @@ import {
   deleteHostSession,
   fetchHostCurrentSession,
   fetchHostMutationReconciliation,
+  fetchHostPublicConvergence,
   fetchHostSessionClosingStatus,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
@@ -22,6 +23,7 @@ import {
   openHostSession,
   publishHostSession,
   reopenHostSession,
+  retryHostPublicConvergence,
   returnHostSessionToDraft,
   saveHostSessionAttendance,
   saveHostSessionAccessScope,
@@ -51,6 +53,7 @@ import type {
   HostMutationEnvelope,
   HostMutationOperation,
   HostMutationReconciliation,
+  HostPublicConvergenceView,
 } from "@/features/host/api/host-contracts";
 import type { HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
@@ -200,6 +203,8 @@ export const hostSessionKeys = {
     [...hostSessionKeys.manualDispatchesRoot(context), normalizeManualDispatchesRequest(request)] as const,
   scheduleDefaults: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "scheduleDefaults"] as const,
+  convergence: (sessionId: string, context: ExplicitReadmatesApiContext) =>
+    [...hostSessionKeys.scope(context), "convergence", sessionId] as const,
   trashRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "trash"] as const,
   trashList: (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
@@ -294,6 +299,15 @@ export function hostSessionDetailQuery(sessionId: string, context: ExplicitReadm
   return queryOptions<HostSessionDetailResponse>({
     queryKey: hostSessionKeys.detail(sessionId, context),
     queryFn: () => fetchHostSessionDetail(sessionId, context),
+  });
+}
+
+export function hostPublicConvergenceQuery(sessionId: string, context: ExplicitReadmatesApiContext) {
+  return queryOptions<HostPublicConvergenceView | null>({
+    queryKey: hostSessionKeys.convergence(sessionId, context),
+    queryFn: () => fetchHostPublicConvergence(sessionId, context),
+    retry: false,
+    refetchInterval: (query) => query.state.data?.status === "PENDING" ? 5_000 : false,
   });
 }
 
@@ -434,6 +448,7 @@ async function invalidateSessionMutationSurfaces(
     invalidateHostSessionLists(client, context),
     invalidateHostSessionDashboard(client, context),
     invalidateHostCurrentSession(client, context),
+    client.invalidateQueries({ queryKey: hostSessionKeys.convergence(sessionId, context), exact: true }),
     invalidateHostSessionRecordCaches(client, sessionId, context, {
       editor: true,
       history: true,
@@ -449,6 +464,18 @@ export function invalidateHostSessionRecordSurfaces(
   context: ExplicitReadmatesApiContext,
 ) {
   return invalidateSessionMutationSurfaces(client, sessionId, context);
+}
+
+export function useRetryHostPublicConvergenceMutation(context: ExplicitReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, convergenceId }: { sessionId: string; convergenceId: string }) =>
+      retryHostPublicConvergence(sessionId, convergenceId, context),
+    onSuccess: (_result, { sessionId }) => client.invalidateQueries({
+      queryKey: hostSessionKeys.convergence(sessionId, context),
+      exact: true,
+    }),
+  });
 }
 
 export function useCreateHostSessionMutation(

@@ -9,6 +9,11 @@ import { buildHostMeetingUrl, canonicalizeLegacyHostMeetingUrl, parseHostMeeting
 import type { ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
 import type { HostSessionHistoryPage, HostSessionRecordEditor, HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import { hostSessionDetailQuery, invalidateHostSessionRecordSurfaces } from "@/features/host/queries/host-session-queries";
+import {
+  hostPublicConvergenceQuery,
+  useRetryHostPublicConvergenceMutation,
+} from "@/features/host/queries/host-session-queries";
+import { buildPublicConvergenceStatus } from "@/features/host/model/public-convergence-model";
 import { hostSessionRecordEditorQuery, hostSessionRecordHistoryQuery, useRestoreHostSessionRevisionToDraftMutation } from "@/features/host/queries/host-session-record-queries";
 import { hostSessionRestorePreviewQuery, useRestoreHostSessionChangeMutation } from "@/features/host/queries/host-session-recovery-queries";
 import { useHostMeetingPanelQueries, type PanelLoadState } from "@/features/host/queries/host-meeting-panel-queries";
@@ -155,6 +160,11 @@ export function HostMeetingWorkspaceRoute({
     ...hostSessionDetailQuery(sessionId, context),
     enabled: loaderData.mode === "active",
   });
+  const convergenceQuery = useQuery({
+    ...hostPublicConvergenceQuery(sessionId, context),
+    enabled: loaderData.mode === "active",
+  });
+  const retryConvergence = useRetryHostPublicConvergenceMutation(context);
   const panelStates = useHostMeetingPanelQueries({
     task: meetingLocation.task,
     sessionId,
@@ -555,6 +565,7 @@ export function HostMeetingWorkspaceRoute({
           { audience: "게스트·멤버", result: guestMemberProjection },
           { audience: "공개 기록", result: publicProjection },
         ],
+        convergence: buildPublicConvergenceStatus(convergenceQuery.data),
       }}
       announcements={[]}
       onTaskLinkActivated={() => undefined}
@@ -567,6 +578,10 @@ export function HostMeetingWorkspaceRoute({
       }}
       onRetryPanel={() => {
         if (panel?.kind === "unavailable" || panel?.kind === "stale-cached") panel.retry();
+      }}
+      onRetryConvergence={() => {
+        const convergenceId = convergenceQuery.data?.convergenceId;
+        if (convergenceId) void retryConvergence.mutateAsync({ sessionId, convergenceId });
       }}
     />
   );

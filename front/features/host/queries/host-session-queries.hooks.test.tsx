@@ -27,6 +27,7 @@ vi.mock("@/features/host/api/host-api", () => ({
   fetchHostSessionTrash: vi.fn(),
   fetchHostSessionTrashList: vi.fn(),
   fetchHostMutationReconciliation: vi.fn(),
+  retryHostPublicConvergence: vi.fn(),
   restoreHostSession: vi.fn(),
 }));
 
@@ -37,6 +38,7 @@ import {
   createHostSession,
   deleteHostSession,
   fetchHostMutationReconciliation,
+  retryHostPublicConvergence,
   fetchHostSessionDetail,
   fetchHostSessionClosingStatus,
   fetchHostSessionTrash,
@@ -63,6 +65,7 @@ import {
   usePublishHostSessionMutation,
   useReopenHostSessionMutation,
   useReturnHostSessionToDraftMutation,
+  useRetryHostPublicConvergenceMutation,
   useRestoreHostSessionMutation,
   useSaveHostSessionPublicationMutation,
   useSaveHostSessionAccessScopeMutation,
@@ -294,6 +297,7 @@ beforeEach(() => {
     sessionRevision: 4,
   });
   vi.mocked(fetchHostMutationReconciliation).mockReset();
+  vi.mocked(retryHostPublicConvergence).mockReset();
 });
 
 afterEach(() => {
@@ -301,6 +305,32 @@ afterEach(() => {
 });
 
 describe("host session mutation hooks", () => {
+  it("invalidates only the exact scoped convergence view after a bounded retry", async () => {
+    const response = {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED" as const,
+      committedGeneration: 7,
+      status: "PENDING" as const,
+      lastAttemptAt: "2026-08-26T04:30:00Z",
+      retryable: false,
+    };
+    vi.mocked(retryHostPublicConvergence).mockResolvedValue(response);
+    const { client, Wrapper } = createWrapper();
+    const exactKey = hostSessionKeys.convergence("session-7", context);
+    const otherKey = hostSessionKeys.convergence("session-7", { clubSlug: "other-club" });
+    client.setQueryData(exactKey, { ...response, status: "FAILED", retryable: true });
+    client.setQueryData(otherKey, { ...response, status: "FAILED", retryable: true });
+    const { result } = renderHook(() => useRetryHostPublicConvergenceMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "session-7", convergenceId: response.convergenceId });
+    });
+
+    expect(retryHostPublicConvergence).toHaveBeenCalledWith("session-7", response.convergenceId, context);
+    expect(client.getQueryState(exactKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+
   it("reconciles correction publication with its exact operation, resource, key, and envelope", async () => {
     vi.mocked(correctionPublishHostSession)
       .mockRejectedValueOnce(new ReadmatesTransportError())
@@ -770,13 +800,33 @@ describe("host session mutation hooks", () => {
   });
 
   it.each([
-    ["open", useOpenHostSessionMutation, openHostSession, false],
-    ["close", useCloseHostSessionMutation, closeHostSession, true],
-    ["publish", usePublishHostSessionMutation, publishHostSession, true],
-  ] as const)("invalidates session surfaces after %s", async (_name, hook, apiFn, expectsManualDispatches) => {
+    ["open", useOpenHostSessionMutation, openHostSession, false, undefined],
+    ["close", useCloseHostSessionMutation, closeHostSession, true, undefined],
+    ["publish", usePublishHostSessionMutation, publishHostSession, true, null],
+    ["correction-publish", useCorrectionPublishHostSessionMutation, correctionPublishHostSession, true, {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED",
+      committedGeneration: 6,
+      status: "SUCCEEDED",
+      lastAttemptAt: "2026-08-26T04:20:00Z",
+      retryable: false,
+    }],
+  ] as const)("invalidates session surfaces after %s", async (
+    _name,
+    hook,
+    apiFn,
+    expectsManualDispatches,
+    staleConvergence,
+  ) => {
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
+    const convergenceKey = hostSessionKeys.convergence("session-7", context);
+    const otherConvergenceKey = hostSessionKeys.convergence("session-7", { clubSlug: "other-club" });
+    if (staleConvergence !== undefined) {
+      client.setQueryData(convergenceKey, staleConvergence);
+      client.setQueryData(otherConvergenceKey, staleConvergence);
+    }
     const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -812,17 +862,35 @@ describe("host session mutation hooks", () => {
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
+    if (staleConvergence !== undefined) {
+      expect(client.getQueryState(convergenceKey)?.isInvalidated).toBe(true);
+      expect(client.getQueryData(convergenceKey)).toEqual(staleConvergence);
+      expect(client.getQueryState(otherConvergenceKey)?.isInvalidated).toBe(false);
+    }
   });
 
   it.each([
-    ["reopen", useReopenHostSessionMutation, reopenHostSession],
-    ["unpublish", useUnpublishHostSessionMutation, unpublishHostSession],
-    ["return-to-draft", useReturnHostSessionToDraftMutation, returnHostSessionToDraft],
-  ] as const)("invalidates session surfaces after reverse %s", async (_name, hook, apiFn) => {
+    ["reopen", useReopenHostSessionMutation, reopenHostSession, {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED",
+      committedGeneration: 6,
+      status: "FAILED",
+      lastAttemptAt: "2026-08-26T04:20:00Z",
+      retryable: true,
+    }],
+    ["unpublish", useUnpublishHostSessionMutation, unpublishHostSession, null],
+    ["return-to-draft", useReturnHostSessionToDraftMutation, returnHostSessionToDraft, undefined],
+  ] as const)("invalidates session surfaces after reverse %s", async (_name, hook, apiFn, staleConvergence) => {
     const request = { reasonCode: "ACCIDENTAL_TRANSITION" as const };
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
+    const convergenceKey = hostSessionKeys.convergence("session-7", context);
+    const otherConvergenceKey = hostSessionKeys.convergence("session-7", { clubSlug: "other-club" });
+    if (staleConvergence !== undefined) {
+      client.setQueryData(convergenceKey, staleConvergence);
+      client.setQueryData(otherConvergenceKey, staleConvergence);
+    }
     const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -850,6 +918,11 @@ describe("host session mutation hooks", () => {
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
+    if (staleConvergence !== undefined) {
+      expect(client.getQueryState(convergenceKey)?.isInvalidated).toBe(true);
+      expect(client.getQueryData(convergenceKey)).toEqual(staleConvergence);
+      expect(client.getQueryState(otherConvergenceKey)?.isInvalidated).toBe(false);
+    }
   });
 
   it("returns the visibility composer result and caches the updated session", async () => {
@@ -1001,7 +1074,7 @@ describe("host session mutation hooks", () => {
       await result.current.mutateAsync({ sessionId: "session-7", request: importRequest });
     });
 
-    expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest);
+    expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", importRequest, context);
     expectInvalidated(client, [
       entries.detail,
       entries.list,

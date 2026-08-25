@@ -5,7 +5,10 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { HostMeetingWorkspaceRoute } from "./host-meeting-workspace-route";
 import { hostMeetingWorkspaceLoaderFactory } from "./host-meeting-workspace-data";
-import { hostSessionDetailQuery } from "@/features/host/queries/host-session-queries";
+import {
+  hostPublicConvergenceQuery,
+  hostSessionDetailQuery,
+} from "@/features/host/queries/host-session-queries";
 import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
 
 const routeMocks = vi.hoisted(() => ({
@@ -68,7 +71,10 @@ function loaderArgs(search = "") {
   };
 }
 
-function renderRoute(search: string) {
+function renderRoute(search: string, convergence?: {
+  status: "PENDING" | "SUCCEEDED" | "FAILED";
+  retryable: boolean;
+}) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
@@ -93,6 +99,19 @@ function renderRoute(search: string) {
       feedbackDocument: { uploaded: false },
     },
   );
+  if (convergence) {
+    client.setQueryData(
+      hostPublicConvergenceQuery(SESSION_ID, { clubSlug: "reading-sai" }).queryKey,
+      {
+        convergenceId: "10000000-0000-4000-8000-000000000001",
+        originResult: "APPLIED",
+        committedGeneration: 7,
+        status: convergence.status,
+        lastAttemptAt: "2026-08-26T04:30:00Z",
+        retryable: convergence.retryable,
+      },
+    );
+  }
   const router = createMemoryRouter([
     {
       path: "/clubs/:clubSlug/app/host/sessions/:sessionId",
@@ -122,6 +141,13 @@ describe("host meeting workspace route", () => {
     routeMocks.reopenSession.mockReset().mockResolvedValue({ ok: true });
     routeMocks.unpublishSession.mockReset().mockResolvedValue({ ok: true });
     routeMocks.returnSessionToDraft.mockReset().mockResolvedValue({ ok: true });
+  });
+
+  it("shows origin commit and pending public convergence as separate route-owned facts", async () => {
+    renderRoute("?task=overview", { status: "PENDING", retryable: false });
+
+    expect(await screen.findByText("origin 반영 완료")).toBeInTheDocument();
+    expect(screen.getByText("회수 진행 중")).toBeInTheDocument();
   });
 
   it("keeps the base loader limited to auth, scope, and base detail", async () => {

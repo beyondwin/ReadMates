@@ -4026,6 +4026,21 @@ a.rm-recent-record__destination:hover {
   font-size: var(--type-size-supporting);
 }
 
+.rm-meeting-judgment__convergence {
+  display: grid;
+  gap: 0.35rem;
+  padding-block: 0.9rem;
+  border-block: 1px solid var(--line);
+}
+
+.rm-meeting-judgment__convergence p {
+  margin: 0;
+}
+
+.rm-meeting-judgment__convergence-origin {
+  font-weight: 700;
+}
+
 .rm-meeting-judgment__primary {
   width: 100%;
   min-height: 46px;

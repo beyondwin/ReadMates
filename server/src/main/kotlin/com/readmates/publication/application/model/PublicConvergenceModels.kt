@@ -38,6 +38,16 @@ data class PublicConvergenceWork(
     val leaseExpiresAt: Instant?,
 )
 
+data class PublicConvergenceClaim(
+    val convergenceId: UUID,
+    val attemptNo: Int,
+    val leaseOwner: String,
+    val leaseExpiresAt: Instant,
+    val clubIdSnapshot: UUID,
+    val sessionIdSnapshot: UUID?,
+    val publicationIdSnapshot: UUID?,
+)
+
 data class PublicConvergenceEvent(
     val convergenceId: UUID,
     val attemptNo: Int,
@@ -45,4 +55,36 @@ data class PublicConvergenceEvent(
     val status: ConvergenceAttemptStatus,
     val observedAt: Instant,
     val resultCategory: String?,
+)
+
+enum class ProviderAttemptStatus {
+    SUCCEEDED,
+    FAILED,
+}
+
+enum class ProviderResultCategory {
+    PURGED,
+    TEMPORARY_FAILURE,
+    PERMANENT_FAILURE,
+    NOT_CONFIGURED,
+}
+
+data class ProviderAttemptResult(
+    val status: ProviderAttemptStatus,
+    val category: ProviderResultCategory,
+    val retryable: Boolean,
+) {
+    init {
+        require((status == ProviderAttemptStatus.SUCCEEDED) == (category == ProviderResultCategory.PURGED))
+        require(status == ProviderAttemptStatus.FAILED || !retryable)
+    }
+}
+
+data class PublicConvergenceView(
+    val convergenceId: UUID,
+    val originResult: String,
+    val committedGeneration: Long,
+    val status: String,
+    val lastAttemptAt: Instant?,
+    val retryable: Boolean,
 )
