@@ -196,6 +196,7 @@ PUBLIC_SCAN_SUPPORT_PATHS = (
     "deploy/oci/compose.yml",
     "deploy/oci/compose.infra.yml",
     "deploy/oci/grafana/provisioning/datasources/tempo.yml",
+    "docs/operations/runbooks/secrets-management.md",
     "ops/tempo/tempo.yml",
     "ops/observability/local/compose.yml",
     "ops/observability/local/grafana/provisioning/datasources/tempo.yml",
