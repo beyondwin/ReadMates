@@ -28,7 +28,26 @@ class JdbcAdminAuditLedgerAdapter(
             """
             select id, actor_user_id, actor_platform_role, target_user_id, event_type,
                    cast(metadata_json as char) as metadata_json, created_at
-            from platform_audit_events
+            from (
+              select id, actor_user_id, actor_platform_role, target_user_id, event_type,
+                     metadata_json, created_at
+              from platform_audit_events
+              union all
+              select id, actor_admin_id, actor_role_snapshot, null,
+                     'EMERGENCY_PUBLIC_TAKEDOWN_CONFIRMED',
+                     json_object(
+                       'clubId', club_id_snapshot,
+                       'sessionId', session_id_snapshot,
+                       'publicationId', publication_id_snapshot,
+                       'reasonCategory', reason_category,
+                       'reasonSummary', reason_summary,
+                       'originResult', origin_result,
+                       'committedGeneration', committed_generation,
+                       'convergenceId', convergence_id
+                     ),
+                     created_at
+              from admin_public_takedown_receipts
+            ) platform_rows
             where created_at >= ? and created_at < ?
               and (? is null or json_unquote(json_extract(metadata_json, '$.clubId')) = ?)
             order by created_at desc, id desc

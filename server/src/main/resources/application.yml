@@ -95,6 +95,10 @@ readmates:
         read-timeout: ${READMATES_ADMIN_HEALTH_PROMETHEUS_READ_TIMEOUT:2000ms}
   host-action-confirmation:
     required: false
+  public-takedown:
+    enabled: ${READMATES_PUBLIC_TAKEDOWN_ENABLED:false}
+    r2a-cache-safety-evidence-verified: ${READMATES_PUBLIC_TAKEDOWN_R2A_EVIDENCE_VERIFIED:false}
+    elapsed-browser-cache-window-seconds: ${READMATES_PUBLIC_TAKEDOWN_CACHE_WINDOW_SECONDS:0}
   session:
     lifecycle:
       require-reverse-reason: false

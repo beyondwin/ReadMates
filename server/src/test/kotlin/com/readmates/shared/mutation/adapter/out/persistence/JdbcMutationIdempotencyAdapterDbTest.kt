@@ -284,6 +284,37 @@ class JdbcMutationIdempotencyAdapterDbTest(
             .hasMessageContaining("digest key")
     }
 
+    @Test
+    fun `immutable public takedown receipt blocks digest key retirement and startup without that key`() {
+        insertPublicTakedownReceipt(digestKeyVersion = 1)
+        assertThat(adapter.countByDigestKeyVersion(1)).isEqualTo(1)
+        assertThat(adapter.referencedDigestKeyVersions()).contains(1)
+
+        val rotated =
+            service(
+                properties =
+                    keyPair(
+                        current = KEY_V2,
+                        currentVersion = 2,
+                        previous = KEY_V1,
+                        previousVersion = 1,
+                    ),
+            )
+        assertThatThrownBy { rotated.retirePreviousKey() }
+            .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
+
+        val validator =
+            com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator(
+                keyPair(current = KEY_V2, currentVersion = 2),
+                adapter,
+                org.springframework.mock.env
+                    .MockEnvironment(),
+            )
+        assertThatThrownBy { validator.validate() }
+            .isInstanceOf(IllegalStateException::class.java)
+            .hasMessageContaining("digest key")
+    }
+
     private fun service(properties: MutationIdempotencyProperties = keyPair(current = KEY_V1, currentVersion = 1)) =
         MutationIdempotencyService(adapter, properties, clock, MutationIdempotencyMetrics(registry))
 
@@ -310,6 +341,32 @@ class JdbcMutationIdempotencyAdapterDbTest(
         )
 
     private fun insertReceipt(): UUID = UUID.fromString("cccccccc-0000-4000-8000-000000000099")
+
+    private fun insertPublicTakedownReceipt(digestKeyVersion: Int) {
+        jdbcTemplate.update(
+            """
+            insert into admin_public_takedown_receipts (
+              id, actor_admin_id, actor_role_snapshot, capability_snapshot,
+              club_id_snapshot, session_id_snapshot, publication_id_snapshot, preview_id_snapshot,
+              idempotency_key_hmac, canonical_schema_version, digest_key_version, request_hmac,
+              reason_category, reason_summary, origin_result, committed_generation,
+              committed_club_generation, convergence_id, created_at
+            ) values (
+              ?, ?, 'OWNER', 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, ?, ?,
+              unhex(repeat('01', 32)), 1, ?, unhex(repeat('02', 32)),
+              'PRIVACY', 'REDACTED_NON_EMPTY', 'DENIED', 2, 2, ?, utc_timestamp(6)
+            )
+            """.trimIndent(),
+            TAKEDOWN_RECEIPT_ID,
+            ACTOR_ID.toString(),
+            CLUB_ID.toString(),
+            TAKEDOWN_SESSION_ID,
+            TAKEDOWN_PUBLICATION_ID,
+            TAKEDOWN_PREVIEW_ID,
+            digestKeyVersion,
+            TAKEDOWN_CONVERGENCE_ID,
+        )
+    }
 
     private fun rowCount(identity: MutationIdentity): Int =
         jdbcTemplate.queryForObject(
@@ -364,6 +421,11 @@ class JdbcMutationIdempotencyAdapterDbTest(
         const val KEY_V2 = "test-mutation-identity-v2-key"
         const val SENSITIVE_URL = "https://meet.example.com/private-room"
         const val SENSITIVE_PASSCODE = "room-passcode-value"
+        const val TAKEDOWN_RECEIPT_ID = "aaaaaaaa-0000-4000-8000-000000053091"
+        const val TAKEDOWN_SESSION_ID = "aaaaaaaa-0000-4000-8000-000000053092"
+        const val TAKEDOWN_PUBLICATION_ID = "aaaaaaaa-0000-4000-8000-000000053093"
+        const val TAKEDOWN_PREVIEW_ID = "aaaaaaaa-0000-4000-8000-000000053094"
+        const val TAKEDOWN_CONVERGENCE_ID = "aaaaaaaa-0000-4000-8000-000000053095"
 
         fun keyPair(
             current: String,
@@ -383,6 +445,8 @@ class JdbcMutationIdempotencyAdapterDbTest(
 }
 
 private const val CLEANUP_MUTATION_IDEMPOTENCY_SQL = """
+delete from admin_public_takedown_receipts
+where id = 'aaaaaaaa-0000-4000-8000-000000053091';
 delete from mutation_idempotency_keys
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from host_session_mutation_receipts

@@ -193,6 +193,27 @@ class PlatformAdminOperationsApiIntegrationTest(
                 status { isForbidden() }
             }
 
+        val takedownPreviewBody =
+            """{"clubId":"00000000-0000-0000-0000-000000000001","sessionId":"00000000-0000-0000-0000-000000000301","publicationId":"00000000-0000-0000-0000-000000000501"}"""
+        mockMvc
+            .post("/api/admin/public-takedowns/preview") {
+                contentType = MediaType.APPLICATION_JSON
+                content = takedownPreviewBody
+                header("Origin", ALLOWED_ORIGIN)
+                cookie(ownerCookie)
+            }.andExpect {
+                status { isUnauthorized() }
+            }
+        mockMvc
+            .post("/api/admin/public-takedowns/preview") {
+                contentType = MediaType.APPLICATION_JSON
+                content = takedownPreviewBody
+                header(BFF_SECRET_HEADER, BFF_SECRET)
+                cookie(ownerCookie)
+            }.andExpect {
+                status { isForbidden() }
+            }
+
         assertThat(caseVersion(BFF_CASE_ID)).isZero()
         assertThat(eventCount(BFF_CASE_ID)).isZero()
     }
@@ -205,6 +226,7 @@ class PlatformAdminOperationsApiIntegrationTest(
         listOf(
             "/api/admin/operations/cases/$CSRF_CASE_ID/execute",
             "/api/admin/operations/cases/$CSRF_CASE_ID/acknowledge/trailing",
+            "/api/admin/public-takedowns/preview/trailing",
         ).forEach { path ->
             mockMvc
                 .post(path) {
