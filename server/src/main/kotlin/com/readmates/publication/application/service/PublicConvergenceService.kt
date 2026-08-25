@@ -6,6 +6,7 @@ import com.readmates.publication.application.model.ProviderResultCategory
 import com.readmates.publication.application.model.PublicConvergenceView
 import com.readmates.publication.application.port.`in`.HostPublicConvergenceUseCase
 import com.readmates.publication.application.port.`in`.PlatformAdminPublicConvergenceUseCase
+import com.readmates.publication.application.port.`in`.ProcessPublicConvergenceUseCase
 import com.readmates.publication.application.port.out.PublicCachePurgeCommand
 import com.readmates.publication.application.port.out.PublicCachePurgePort
 import com.readmates.publication.application.port.out.PublicConvergencePort
@@ -27,8 +28,9 @@ class PublicConvergenceService(
     private val clock: Clock,
     private val metrics: PublicConvergenceMetrics,
 ) : HostPublicConvergenceUseCase,
-    PlatformAdminPublicConvergenceUseCase {
-    fun processBatch(leaseOwner: String): Int {
+    PlatformAdminPublicConvergenceUseCase,
+    ProcessPublicConvergenceUseCase {
+    override fun processBatch(leaseOwner: String): Int {
         if (!properties.enabled) return 0
         var processed = 0
         repeat(properties.batchSize) {

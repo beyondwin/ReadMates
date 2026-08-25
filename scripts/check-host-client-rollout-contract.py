@@ -18,6 +18,11 @@ from typing import Any, Callable
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERIFIER_PATH = REPO_ROOT / "scripts/verify-host-client-rollout-evidence.py"
 
+D7_ADR_SOURCES = tuple(
+    str(next((REPO_ROOT / "docs/development/adr").glob(f"{number:04d}-*.md")).relative_to(REPO_ROOT))
+    for number in range(18, 39)
+)
+
 
 def _load_verifier() -> Any:
     spec = importlib.util.spec_from_file_location("readmates_host_rollout_verifier", VERIFIER_PATH)
@@ -60,11 +65,18 @@ REQUIRED_SOURCES = (
     "docs/deploy/cloudflare-pages.md",
     "docs/development/release-management.md",
     "docs/development/versioning.md",
+    "docs/development/architecture.md",
+    "docs/development/acceptance-matrix.md",
+    "docs/development/test-guide.md",
+    "docs/development/performance-budget.md",
+    "docs/development/technical-decisions.md",
+    "docs/development/adr/README.md",
+    "CHANGELOG.md",
     ".env.example",
     ".gitignore",
     "deploy/oci/05-deploy-compose-stack.sh",
     "deploy/oci/watch-compose-post-deploy.sh",
-)
+) + D7_ADR_SOURCES
 
 WORKFLOW_CONTRACT_PATH = "scripts/host-rollout-workflow-contract.json"
 WORKFLOW_CONTRACT_SCHEMA_PATH = "scripts/schemas/host-rollout-workflow-contract-v1.schema.json"
@@ -1323,6 +1335,76 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
     _require(fixtures, "python3 -B scripts/host-rollout-evidence-reporter.py check-config --artifact-ready", "public fixtures omit artifact-ready reporter contract check", errors)
     _require(fixtures, "python3 -B scripts/validate-host-rollout-candidate.py --self-test", "public fixtures omit candidate archive adversarial self-test", errors)
 
+    architecture = sources["docs/development/architecture.md"]
+    for needle, message in (
+        ("READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=DISABLED|V2_ONLY|SUPPORT_V2_V3|ENFORCE_V3", "active architecture omits the typed global host-client generation"),
+        ("R1 `SUPPORT_V2_V3`", "active architecture omits the R1 support stage"),
+        ("R2a safety/cache policy", "active architecture omits the R2a safety/cache stage"),
+        ("R2b v3 browser", "active architecture omits the R2b browser stage"),
+        ("named 24-hour residue-zero", "active architecture omits the named 24-hour observation"),
+        ("R3 `ENFORCE_V3`", "active architecture omits the R3 enforcement stage"),
+        ("ProcessPublicConvergenceUseCase", "active architecture omits the publication scheduler inbound port"),
+        ("admin.takedown", "active architecture omits the emergency takedown slice"),
+    ):
+        _require(architecture, needle, message, errors)
+    _forbid(architecture, "READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true", "active architecture still describes the v2-only host-write flag", errors)
+    _forbid(architecture, "X-Readmates-Client-Contract: v2`를 선언", "active architecture still declares a v2-only browser contract", errors)
+    for needle, message in (
+        ("authoritative GET endpoint는 `Cache-Control: public, max-age=60, must-revalidate`", "active architecture omits the authoritative 60-second Spring cache contract"),
+        ("public cache prefix allowlist는 현재 빈 배열", "active architecture does not keep the BFF public cache prefix empty"),
+        ("`CDN-Cache-Control: no-store`와 `Cloudflare-CDN-Cache-Control: no-store`", "active architecture omits authoritative projection CDN no-store"),
+        ("historical activation context", "active architecture presents the previous 120+600 policy as current"),
+    ):
+        _require(architecture, needle, message, errors)
+    _forbid(
+        architecture,
+        "GET endpoint는 `Cache-Control: public, max-age=120, stale-while-revalidate=600`",
+        "active architecture still describes the historical 120+600 policy as current",
+        errors,
+    )
+
+    cloudflare_pages = sources["docs/deploy/cloudflare-pages.md"]
+    for needle, message in (
+        ("R1에서 backend mode를 `SUPPORT_V2_V3`", "Cloudflare guide omits the R1 support window"),
+        ("R2a는 같은 support mode", "Cloudflare guide omits the R2a cache window"),
+        ("R2b가 v3 SPA+Functions candidate", "Cloudflare guide omits the R2b v3 stage"),
+        ("named 24시간", "Cloudflare guide omits the named residue observation"),
+        ("R3가 backend를 `ENFORCE_V3`", "Cloudflare guide omits enforcement sequencing"),
+        ("R3 rollback은 Pages v3를 유지한 채 backend mode만 `SUPPORT_V2_V3`", "Cloudflare guide omits the precise R3 rollback"),
+    ):
+        _require(cloudflare_pages, needle, message, errors)
+    _forbid(cloudflare_pages, "`X-Readmates-Client-Contract: v2`를 선언해야", "Cloudflare guide still requires a v2-only browser contract", errors)
+    _forbid(cloudflare_pages, "host mutation이 409로 동결되는 것이 정상", "Cloudflare guide still claims an immediate host-write freeze", errors)
+    _forbid(cloudflare_pages, "READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=V2_ONLY", "Cloudflare guide still presents V2_ONLY as current", errors)
+
+    adr_index = sources["docs/development/adr/README.md"]
+    technical_decisions = sources["docs/development/technical-decisions.md"]
+    for path in D7_ADR_SOURCES:
+        source = sources[path]
+        number = Path(path).name[:4]
+        status_match = re.search(r"^- 상태: (Accepted|Proposed)$", source, re.MULTILINE)
+        if status_match is None:
+            errors.append(f"ADR-{number} has no supported status")
+            continue
+        status = status_match.group(1)
+        index_pattern = rf"^\| \[{number}\]\([^\n]+\) \|[^\n]+\| {status} \|"
+        decision_pattern = rf"^\| \[ADR-{number}\]\([^\n]+\) \|[^\n]+\| {status} \|$"
+        if re.search(index_pattern, adr_index, re.MULTILINE) is None:
+            errors.append(f"ADR-{number} status drifts from the ADR index")
+        if re.search(decision_pattern, technical_decisions, re.MULTILINE) is None:
+            errors.append(f"ADR-{number} status drifts from technical decisions")
+        if status == "Proposed" and "## 미충족 증거" not in source:
+            errors.append(f"ADR-{number} Proposed status omits exact missing evidence")
+
+    for path, needles in (
+        ("docs/development/acceptance-matrix.md", ("Public projection convergence", "Emergency public takedown", "Host-client rollout")),
+        ("docs/development/test-guide.md", ("artifact/runbook readiness", "not measured")),
+        ("docs/development/performance-budget.md", ("VoiceOver/Safari", "NVDA/Chrome", "not measured")),
+        ("CHANGELOG.md", ("Host-client v3 release gate", "공개 투영 수렴과 긴급 철회")),
+    ):
+        for needle in needles:
+            _require(sources[path], needle, f"{path} omits D7 active evidence boundary: {needle}", errors)
+
     docs = "\n".join(
         sources[path]
         for path in (
@@ -1649,12 +1731,94 @@ class RolloutContractTests(unittest.TestCase):
         )
         for name, path, old, new in cases:
             sources = _read_sources(REPO_ROOT)
-            sources[path] = sources[path].replace(old, new)
+            if name == "residue gate omission":
+                for active_path in (
+                    "docs/deploy/release-publish-runbook.md",
+                    "docs/deploy/cloudflare-pages.md",
+                    "docs/development/release-management.md",
+                    "docs/development/versioning.md",
+                ):
+                    sources[active_path] = sources[active_path].replace(old, new)
+            else:
+                sources[path] = sources[path].replace(old, new)
             with self.subTest(name=name):
                 self.assertTrue(validate_structural_sources(sources))
         sources = _read_sources(REPO_ROOT)
         sources[".github/workflows/sync-config.yml"] += '\nREADMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED: "true"'
         self.assertTrue(validate_structural_sources(sources))
+
+    def test_active_architecture_and_adr_status_cannot_drift_from_rollout_evidence(self) -> None:
+        architecture_path = "docs/development/architecture.md"
+        adr_index_path = "docs/development/adr/README.md"
+        adr_path = "docs/development/adr/0034-global-host-client-contract-generation.md"
+        sources = _read_sources(REPO_ROOT)
+        for path in (architecture_path, adr_index_path, adr_path):
+            sources[path] = (REPO_ROOT / path).read_text(encoding="utf-8")
+
+        architecture = sources[architecture_path]
+        self.assertIn("R1 `SUPPORT_V2_V3`", architecture)
+        sources[architecture_path] = architecture.replace(
+            "R1 `SUPPORT_V2_V3`",
+            "R1 `V2_ONLY`",
+            1,
+        )
+        self.assertTrue(validate_structural_sources(sources))
+
+        sources = _read_sources(REPO_ROOT)
+        for path in (architecture_path, adr_index_path, adr_path):
+            sources[path] = (REPO_ROOT / path).read_text(encoding="utf-8")
+        self.assertIn("| [0034]", sources[adr_index_path])
+        sources[adr_index_path] = sources[adr_index_path].replace(
+            "| [0034](0034-global-host-client-contract-generation.md) | Client contract generation을 모든 host mutation에 적용 | Proposed |",
+            "| [0034](0034-global-host-client-contract-generation.md) | Client contract generation을 모든 host mutation에 적용 | Accepted |",
+            1,
+        )
+        self.assertTrue(validate_structural_sources(sources))
+
+        sources = _read_sources(REPO_ROOT)
+        self.assertIn("## 미충족 증거", sources[adr_path])
+        sources[adr_path] = sources[adr_path].replace("## 미충족 증거", "## 확인된 증거", 1)
+        self.assertTrue(validate_structural_sources(sources))
+
+    def test_active_cloudflare_rollout_and_public_cache_docs_reject_stale_contracts(self) -> None:
+        cases = (
+            (
+                "v2-only Pages generation",
+                "docs/deploy/cloudflare-pages.md",
+                "R1에서 backend mode를 `SUPPORT_V2_V3`",
+                "browser bundle이 `X-Readmates-Client-Contract: v2`를 선언해야",
+            ),
+            (
+                "immediate freeze rollback",
+                "docs/deploy/cloudflare-pages.md",
+                "R3 rollback은 Pages v3를 유지한 채 backend mode만 `SUPPORT_V2_V3`",
+                "Frontend만 이전 tag로 rollback하면 host write는 계속 동결",
+            ),
+            (
+                "historical Spring cache policy",
+                "docs/development/architecture.md",
+                "authoritative GET endpoint는 `Cache-Control: public, max-age=60, must-revalidate`",
+                "authoritative GET endpoint는 `Cache-Control: public, max-age=120, stale-while-revalidate=600`",
+            ),
+            (
+                "BFF public cache prefix enabled",
+                "docs/development/architecture.md",
+                "public cache prefix allowlist는 현재 빈 배열",
+                "public cache prefix allowlist는 현재 public route 배열",
+            ),
+            (
+                "CDN storage enabled",
+                "docs/development/architecture.md",
+                "`CDN-Cache-Control: no-store`와 `Cloudflare-CDN-Cache-Control: no-store`",
+                "`CDN-Cache-Control: public`과 `Cloudflare-CDN-Cache-Control: public`",
+            ),
+        )
+        for name, path, current, stale in cases:
+            sources = _read_sources(REPO_ROOT)
+            self.assertIn(current, sources[path], name)
+            sources[path] = sources[path].replace(current, stale, 1)
+            with self.subTest(name=name):
+                self.assertTrue(validate_structural_sources(sources))
 
     def test_active_rollout_docs_require_explicit_no_input_dispatch(self) -> None:
         sources = _read_sources(REPO_ROOT)

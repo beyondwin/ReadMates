@@ -40,3 +40,7 @@ Member와 host workspace는 brand, current club, 이름이 보이는 workspace s
 ## 후속 작업
 
 - 코드·visual evidence·design guide가 일치하면 `Accepted`로 승격한다.
+
+## 미충족 증거
+
+- 공통 shell의 automated 320–1440px/keyboard evidence는 있으나 VoiceOver/Safari와 NVDA/Chrome 수동 role-switch 검증은 아직 `not measured`다.

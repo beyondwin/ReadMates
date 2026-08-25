@@ -1,6 +1,6 @@
 # ADR-0023: Domain revision으로 host mutation을 조건부 실행
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 서버·프런트엔드·제품
 - 관련: ADR-0002, ADR-0009, ADR-0022,

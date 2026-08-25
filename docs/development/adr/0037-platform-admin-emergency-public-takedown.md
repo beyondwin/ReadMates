@@ -48,3 +48,8 @@ Immutable admin audit은 actor ID/role, reason category와 redacted reason, targ
 ## 후속 작업
 
 - Code, migration, tests, incident runbook, active architecture가 일치하면 `Accepted`로 승격한다.
+
+## 미충족 증거
+
+- Confirm activation에 필요한 R2a 720초 cache-safety evidence와 fresh live approval이 없다. Production default는 이 증거 없이는 fail closed한다.
+- Live operator rehearsal/provider convergence는 `not measured`다. Repository integration evidence는 activation authority가 아니다.

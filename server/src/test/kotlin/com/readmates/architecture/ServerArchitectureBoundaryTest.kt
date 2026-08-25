@@ -155,6 +155,12 @@ private val serverSlices =
             applicationPackages = listOf("com.readmates.admin.operations.application.."),
         ),
         ServerSlice(
+            name = "admin.takedown",
+            type = ServerSliceType.WORKFLOW,
+            inboundAdapterPackages = listOf("com.readmates.admin.takedown.adapter.in.web.."),
+            applicationPackages = listOf("com.readmates.admin.takedown.application.."),
+        ),
+        ServerSlice(
             name = "observability",
             type = ServerSliceType.OPS_READ,
             inboundAdapterPackages = listOf("com.readmates.observability.adapter.in.web.."),
@@ -401,6 +407,7 @@ class ServerArchitectureBoundaryTest {
                     "admin.audit",
                     "admin.health",
                     "admin.analytics",
+                    "admin.takedown",
                     "aigen",
                     "browse",
                     "sessionclosing",
@@ -424,6 +431,7 @@ class ServerArchitectureBoundaryTest {
         assertTrue(inboundPackages.contains("com.readmates.admin.health.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.session.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.shared.mutation.adapter.in.scheduling.."))
+        assertTrue(inboundPackages.contains("com.readmates.publication.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.adapter.in.security.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.infrastructure.security.."))
     }
@@ -733,6 +741,19 @@ class ServerArchitectureBoundaryTest {
             .resideInAnyPackage(
                 "com.readmates.aigen.application.service..",
                 "com.readmates.aigen.adapter.out..",
+            ).check(importedClasses)
+    }
+
+    @Test
+    fun `publication scheduling inbound adapter depends on application ports instead of services or outbound adapters`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.publication.adapter.in.scheduling..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "com.readmates.publication.application.service..",
+                "com.readmates.publication.adapter.out..",
             ).check(importedClasses)
     }
 

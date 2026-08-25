@@ -40,3 +40,7 @@
 ## 후속 작업
 
 - 코드·tests·active architecture가 일치하면 `Accepted`로 승격한다.
+
+## 미충족 증거
+
+- Route, focus, mobile sheet automated evidence는 있으나 VoiceOver/Safari와 NVDA/Chrome의 전체 navigation/form/conflict 수동 검증은 아직 `not measured`다.

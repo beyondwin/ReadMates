@@ -20,26 +20,26 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0015](adr/0015-notification-outbox-dedupe-policy.md) | Notification Outbox dedupeKey 정책 | Accepted |
 | [ADR-0016](adr/0016-deploy-ledger-event-schema.md) | Deploy ledger NDJSON event schema + dual-format writer | Accepted |
 | [ADR-0017](adr/0017-separate-web-and-notification-worker-processes.md) | Web과 notification worker process를 분리 운영 | Proposed |
-| [ADR-0018](adr/0018-canonical-meeting-product-language.md) | 사용자 핵심 객체를 `모임`과 `기록`으로 통일 | Proposed |
-| [ADR-0019](adr/0019-url-authoritative-club-workspaces.md) | URL이 소유하는 club-scoped workspace identity | Proposed |
+| [ADR-0018](adr/0018-canonical-meeting-product-language.md) | 사용자 핵심 객체를 `모임`과 `기록`으로 통일 | Accepted |
+| [ADR-0019](adr/0019-url-authoritative-club-workspaces.md) | URL이 소유하는 club-scoped workspace identity | Accepted |
 | [ADR-0020](adr/0020-shared-brand-role-composition.md) | 하나의 브랜드 시스템과 역할별 composition grammar | Proposed |
 | [ADR-0021](adr/0021-response-and-attendance-as-separate-facts.md) | 참석 응답과 실제 출석을 별도 사실로 유지 | Accepted |
 | [ADR-0022](adr/0022-lifecycle-audience-and-public-placement.md) | 모임 lifecycle, app audience, 공개 사이트 배치를 독립 축으로 유지 | Accepted |
-| [ADR-0023](adr/0023-revision-guarded-host-mutations.md) | Domain revision으로 host mutation을 조건부 실행 | Proposed |
-| [ADR-0024](adr/0024-explicit-unknown-actual-attendance.md) | 실제 출석에 명시적 `UNKNOWN` correction 상태 제공 | Proposed |
-| [ADR-0025](adr/0025-session-participant-snapshot-owns-response-denominator.md) | 모임 참여자 snapshot이 응답 분모를 소유 | Proposed |
+| [ADR-0023](adr/0023-revision-guarded-host-mutations.md) | Domain revision으로 host mutation을 조건부 실행 | Accepted |
+| [ADR-0024](adr/0024-explicit-unknown-actual-attendance.md) | 실제 출석에 명시적 `UNKNOWN` correction 상태 제공 | Accepted |
+| [ADR-0025](adr/0025-session-participant-snapshot-owns-response-denominator.md) | 모임 참여자 snapshot이 응답 분모를 소유 | Accepted |
 | [ADR-0026](adr/0026-common-global-club-shell.md) | Member와 host가 공통 global club shell을 사용 | Proposed |
 | [ADR-0027](adr/0027-current-meeting-local-task-navigation.md) | 현재 모임 작업은 local task navigation으로 분리 | Proposed |
-| [ADR-0028](adr/0028-idempotent-host-mutation-receipts.md) | Host mutation을 idempotency receipt로 재조정 | Proposed |
+| [ADR-0028](adr/0028-idempotent-host-mutation-receipts.md) | Host mutation을 idempotency receipt로 재조정 | Accepted |
 | [ADR-0029](adr/0029-bff-secret-and-origin-validation.md) | Mutating API에 BFF secret과 Origin/Referer를 함께 검증 | Accepted |
 | [ADR-0030](adr/0030-role-and-sensitive-document-access.md) | 역할 권한과 민감 문서 접근 권한을 분리 | Accepted |
 | [ADR-0031](adr/0031-low-cardinality-metric-tags.md) | Notification 운영 metric tag를 low-cardinality 값으로 제한 | Accepted |
 | [ADR-0032](adr/0032-weekly-client-ip-hash-salt.md) | Client IP hash salt를 ISO 주 단위로 회전 | Accepted |
 | [ADR-0033](adr/0033-application-service-transaction-boundaries.md) | Business orchestration owner가 transaction boundary를 소유 | Accepted |
 | [ADR-0034](adr/0034-global-host-client-contract-generation.md) | Client contract generation을 모든 host mutation에 적용 | Proposed |
-| [ADR-0035](adr/0035-purge-host-state-on-authority-loss.md) | Host authority 상실 시 client의 host-sensitive state를 폐기 | Proposed |
+| [ADR-0035](adr/0035-purge-host-state-on-authority-loss.md) | Host authority 상실 시 client의 host-sensitive state를 폐기 | Accepted |
 | [ADR-0036](adr/0036-public-projection-cache-convergence.md) | Public projection 원자성과 cache convergence를 분리 | Proposed |
 | [ADR-0037](adr/0037-platform-admin-emergency-public-takedown.md) | 긴급 public takedown을 platform-admin 전용 command로 실행 | Proposed |
-| [ADR-0038](adr/0038-server-owned-host-list-cursor-epochs.md) | Host 모임·기록 목록을 server-owned cursor epoch로 제공 | Proposed |
+| [ADR-0038](adr/0038-server-owned-host-list-cursor-epochs.md) | Host 모임·기록 목록을 server-owned cursor epoch로 제공 | Accepted |
 
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.

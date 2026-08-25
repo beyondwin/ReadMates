@@ -494,6 +494,19 @@ pnpm --dir front test:ct
   --tests com.readmates.notification.application.model.NotificationEmailTemplatePreviewTest
 ```
 
+## Host workspace와 rollout 증거
+
+Host workspace 변경은 변경 surface에 맞는 model/route/UI test와 focused browser spec을 먼저 실행합니다. Release closeout에서는 `scripts/check-host-client-rollout-contract.py`의 self-test와 structural mode가 active architecture, ADR status, R1/R2a/R2b/R3 ordering, 720-second cache gate, same-candidate evidence binding을 함께 확인합니다.
+
+```bash
+python3 scripts/check-agent-guidance.py --self-test
+python3 scripts/check-agent-guidance.py
+python3 -B scripts/check-host-client-rollout-contract.py --self-test
+python3 -B scripts/check-host-client-rollout-contract.py
+```
+
+이 normal mode는 repository와 artifact/runbook readiness만 증명합니다. R1/R2a/R2b/R3, 720초 old-browser window, 24시간 residue-zero, public cache 120/60초, VoiceOver/Safari와 NVDA/Chrome 결과는 protected runtime artifact가 없으면 `not measured`로 기록합니다. 같은 tag나 tracked Markdown의 수기 digest/timestamp는 live evidence를 대신하지 않습니다.
+
 ## 공개 릴리즈 후보 점검
 
 공개 저장소로 낼 수 있는 후보 tree를 만들고 검사합니다.

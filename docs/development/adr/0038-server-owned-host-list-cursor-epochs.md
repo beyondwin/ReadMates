@@ -1,6 +1,6 @@
 # ADR-0038: Host 모임·기록 목록을 server-owned cursor epoch로 제공
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 서버·프런트엔드·제품
 - 관련: ADR-0009, ADR-0022, ADR-0033,

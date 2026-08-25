@@ -1,6 +1,6 @@
 # ADR-0025: 모임 참여자 snapshot이 응답 분모를 소유
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 제품·서버
 - 관련: ADR-0021, `docs/superpowers/specs/2026-08-22-host-meeting-workspace-redesign-design.md`

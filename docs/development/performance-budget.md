@@ -63,6 +63,8 @@ The production-build harness fails closed when a mark is missing, a value is non
 
 The harness uses a fresh browser context, disabled cache, fixed network conditions, fixed 4x CPU throttling, and forced garbage collection for each run. These synthetic results are regression budgets, not production RUM or device-lab claims.
 
+The current automated host-workspace evidence covers Chromium, Firefox desktop, and WebKit mobile smoke. Manual VoiceOver/Safari and NVDA/Chrome evidence is not measured and must not be inferred from these budgets or automated semantic checks.
+
 ## Budget Meaning
 
 Hard-gated JavaScript and CSS buckets fail the command when a chunk exceeds its limit. JavaScript budgets use raw bytes to keep parse and execution cost visible. Global CSS uses gzip transfer bytes because bundled font-face unicode ranges are repetitive on disk but compress substantially over the network.

@@ -1,6 +1,6 @@
 # ADR-0019: URL이 소유하는 club-scoped workspace identity
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 제품·프런트엔드
 - 관련: ADR-0003, ADR-0008,

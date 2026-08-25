@@ -35,7 +35,17 @@ class ServerArchitectureInventoryTest {
             ),
         ).contains("PublicConvergencePort")
         assertThat(PublicConvergencePort::class.java.declaredMethods.map { it.name })
-            .containsExactlyInAnyOrder("loadReceipt", "loadWork", "loadCurrentEvent")
+            .containsExactlyInAnyOrder(
+                "loadReceipt",
+                "loadWork",
+                "loadCurrentEvent",
+                "loadAdminTakedownView",
+                "requestAdminTakedownRetry",
+                "claimNext",
+                "completeAttempt",
+                "loadLatestView",
+                "requestRetry",
+            )
     }
 
     @Test

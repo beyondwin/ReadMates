@@ -43,3 +43,8 @@ Operational lease/work row는 retention에 따라 제거할 수 있다. Immutabl
 ## 후속 작업
 
 - Cache strategy, incident runbook, metrics, tests가 일치하면 `Accepted`로 승격한다.
+
+## 미충족 증거
+
+- R2a의 이전 720초 browser cache lifetime 소진과 attested cache-safety manifest가 없다.
+- 실제 origin/CDN/browser 경계의 일반 120초·긴급 60초 window는 `not measured`이며 local deterministic browser evidence만 있다.
