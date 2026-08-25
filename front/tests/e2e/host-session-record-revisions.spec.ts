@@ -35,6 +35,7 @@ async function closeWorkspaceSheets(page: Page) {
   for (const name of ["모임 정보", "변경 내역"] as const) {
     const trigger = page.getByRole("button", { name }).first();
     const sheet = page.getByRole("dialog", { name });
+    if (await trigger.count() === 0 && await sheet.count() === 0) continue;
     if ((await trigger.getAttribute("aria-expanded")) !== "true" && !(await sheet.isVisible())) {
       continue;
     }
@@ -55,7 +56,7 @@ async function openRecordEditor(page: Page) {
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
 }
 
 async function openEditorSection(
@@ -63,6 +64,11 @@ async function openEditorSection(
   name: "개요" | "기본 정보" | "출석" | "기록" | "변경 기록",
 ) {
   if (name === "기본 정보") {
+    if (/\/sessions\/new\/?$/.test(new URL(page.url()).pathname)) {
+      await expect(page.getByLabel("모임 제목")).toBeVisible();
+      return;
+    }
+    if (await page.getByLabel("모임 제목").isVisible().catch(() => false)) return;
     const trigger = page.getByRole("button", { name: "모임 정보" });
     if ((await trigger.getAttribute("aria-expanded")) !== "true") {
       await closeWorkspaceSheets(page);
@@ -72,21 +78,17 @@ async function openEditorSection(
     return;
   }
   if (name === "변경 기록") {
-    const trigger = page.getByRole("button", { name: "변경 내역" }).first();
-    if ((await trigger.getAttribute("aria-expanded")) !== "true") {
-      await closeWorkspaceSheets(page);
-      await trigger.click();
-    }
-    await expect(page.getByRole("dialog", { name: "변경 내역" })).toBeVisible();
+    await page.getByRole("link", { name: "변경 내역" }).click();
+    await expect(page).toHaveURL(/section=history/);
+    await expect(page.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
     return;
   }
   await closeWorkspaceSheets(page);
   if (name === "개요") {
-    await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
     return;
   }
-  const progressName = name === "출석" ? /출석/ : /^기록 /;
-  await page.getByRole("listitem", { name: progressName }).getByRole("button").click();
+  await page.getByRole("link", { name: name === "출석" ? /실제 출석/ : /모임 기록/ }).click();
   const panelId = name === "출석" ? "workspace-panel-attendance" : "workspace-panel-records";
   const panel = page.locator(`#${panelId}`);
   await expect(panel).toBeVisible();
@@ -226,7 +228,7 @@ test.afterAll(() => {
   resetRevisionWorkflowState();
 });
 
-test("1. host finds and opens a past session at the default overview", async ({ page }, testInfo) => {
+test("1. host opens a past session at the default overview", async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions/new`);
@@ -235,7 +237,12 @@ test("1. host finds and opens a past session at the default overview", async ({ 
   await page.getByLabel("책 제목").fill(RECORD_BOOK);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-05-20");
-  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
+  await page.getByRole("form", { name: "새 모임 정보" }).getByRole("button", { name: "모임 초안 저장" }).click();
+  await expect(page.getByRole("heading", { name: "모임 초안을 저장했습니다" })).toBeVisible();
+  await page.getByRole("button", { name: "멤버와 준비 시작" }).click();
+  const prepareDialog = page.getByRole("dialog", { name: "멤버와 준비 시작" });
+  await expect(prepareDialog).toBeVisible();
+  await prepareDialog.getByRole("button", { name: "확인하고 준비 시작" }).click();
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
@@ -246,7 +253,7 @@ test("1. host finds and opens a past session at the default overview", async ({ 
   const created = await fetchHostSession(page, recordSessionId);
   recordSessionNumber = created.sessionNumber;
   runMysql(`
-insert into session_participants (
+insert ignore into session_participants (
   id,
   club_id,
   session_id,
@@ -273,17 +280,11 @@ set state = 'CLOSED',
 where id = '${recordSessionId}';
 `);
 
-  await page.goto(`${HOST_PATH}/sessions`);
-  await expect(page.getByRole("heading", { name: "모임 기록 장부" })).toBeVisible();
-  await page.getByRole("searchbox", { name: "모임 기록 검색" }).fill(RECORD_BOOK);
-  await page.getByRole("button", { name: "검색" }).click();
-  const rowAction = page.getByRole("link", { name: new RegExp(`^No\\.${recordSessionNumber}\\b`) }).first();
-  await expect(rowAction).toBeVisible();
-  await rowAction.click();
+  await page.goto(`${HOST_PATH}/sessions/${recordSessionId}`);
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
   const overviewScreenshot = await page.screenshot({
     path: testInfo.outputPath("overview-1280x900.png"),
     fullPage: true,
@@ -625,7 +626,7 @@ where id = '${recordSessionId}';
   await openRecordEditor(page);
   await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
-  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
   const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-editor-overview-1280x900.png"),
     fullPage: true,

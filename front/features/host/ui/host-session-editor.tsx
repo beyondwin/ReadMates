@@ -78,8 +78,8 @@ import {
   type ReadmatesReturnTarget,
 } from "@/shared/routing/readmates-route-state";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
-import { rsvpLabel } from "@/shared/ui/readmates-display";
 import { HostSessionDeletionPreviewDialog } from "./host-session-deletion-preview";
+import { MeetingResponseLedger } from "./meeting-workspace/meeting-response-ledger";
 import { AttendancePanel } from "./session-editor/attendance-panel";
 import { BasicSessionPanel } from "./session-editor/basic-session-panel";
 import {
@@ -240,6 +240,7 @@ export default function HostSessionEditor({
   undoConfirm = null,
   restoreNotice = null,
   meetingTask,
+  embeddedInMeetingFolio = false,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -262,6 +263,7 @@ export default function HostSessionEditor({
   undoConfirm?: WorkspaceUndoConfirm | null;
   restoreNotice?: WorkspaceRestoreNotice | null;
   meetingTask?: HostMeetingTask;
+  embeddedInMeetingFolio?: boolean;
 }) {
   const resolvedScheduleDefaults = scheduleDefaultsLoadState?.defaults ?? scheduleDefaults ?? null;
 
@@ -966,6 +968,41 @@ export default function HostSessionEditor({
     [session, actions, flash],
   );
 
+  const updateBulkAttendance = useCallback(async (
+    membershipIds: ReadonlyArray<string>,
+    attendanceStatus: AttendanceStatus,
+  ) => {
+    if (!session || membershipIds.length === 0) return;
+    if (membershipIds.some((membershipId) => attendanceWriteStatesRef.current[membershipId]?.inFlight)) {
+      flash("개별 출석 저장이 끝난 뒤 일괄 변경을 다시 시도해 주세요");
+      return;
+    }
+
+    const previous = new Map(membershipIds.map((membershipId) => [
+      membershipId,
+      committedAttendanceStatusesRef.current[membershipId] ?? "UNKNOWN",
+    ] as const));
+    membershipIds.forEach((membershipId) => {
+      dispatch({ type: "UPDATE_ATTENDANCE", membershipId, status: attendanceStatus });
+    });
+
+    try {
+      await actions.updateAttendance(session.sessionId, membershipIds.map((membershipId) => ({
+        membershipId,
+        attendanceStatus,
+      })));
+      membershipIds.forEach((membershipId) => {
+        committedAttendanceStatusesRef.current[membershipId] = attendanceStatus;
+      });
+      flash(`${membershipIds.length}명의 실제 출석을 저장했습니다`);
+    } catch {
+      previous.forEach((status, membershipId) => {
+        dispatch({ type: "UPDATE_ATTENDANCE", membershipId, status });
+      });
+      flash("일괄 출석 저장에 실패했습니다. 최신 상태를 확인한 뒤 다시 시도해 주세요");
+    }
+  }, [actions, flash, session]);
+
   const previewSessionImport = useCallback(
     async (event: ChangeEvent<HTMLInputElement>) => {
       const input = event.currentTarget;
@@ -1190,9 +1227,11 @@ export default function HostSessionEditor({
     }
   }, [confirmLifecycle, displayedWorkspaceView.primaryAction.kind, lifecycleConfirm, requestLifecycleConfirm]);
 
+  const EditorRoot = embeddedInMeetingFolio ? "div" : "main";
+
   if (trashedSession) {
     return (
-      <main className="rm-host-session-editor">
+      <EditorRoot className="rm-host-session-editor">
         <WorkspaceTrashTombstone
           sessionId={trashedSession.sessionId}
           sessionNumber={trashedSession.sessionNumber}
@@ -1215,13 +1254,14 @@ export default function HostSessionEditor({
           listHref={scopedHostRedirectHref("/app/host/sessions?view=trash")}
           LinkComponent={LinkComponent}
         />
-      </main>
+      </EditorRoot>
     );
   }
 
   return (
-    <main className="rm-host-session-editor">
+    <EditorRoot className="rm-host-session-editor">
       <HostSessionWorkspace
+        embeddedInMeetingFolio={embeddedInMeetingFolio}
         view={displayedWorkspaceView}
         header={{
           returnHref: showReturnLink ? returnTarget.href : null,
@@ -1269,7 +1309,27 @@ export default function HostSessionEditor({
         focusContent={
           <>
             {(meetingTask === "responses" || displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT") && session ? (
-              <MemberResponseSummary attendees={session.attendees} />
+              <div id="workspace-member-responses" tabIndex={-1}>
+                <MeetingResponseLedger
+                  rows={session.attendees
+                    .filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE")
+                    .map((attendee, index) => ({
+                      membershipId: attendee.membershipId,
+                      displayName: attendee.displayName,
+                      secondaryLabel: `참여자 ${index + 1}`,
+                      response: attendee.rsvpStatus === "DECLINED"
+                        ? "NOT_GOING"
+                        : attendee.rsvpStatus === "MAYBE"
+                          ? "UNSURE"
+                          : attendee.rsvpStatus,
+                      attendance: attendanceStatuses[attendee.membershipId] ?? attendee.attendanceStatus,
+                      questionCount: null,
+                      recentResponseLabel: null,
+                    }))}
+                  onAttendanceChange={(membershipId, attendance) => void updateAttendance(membershipId, attendance)}
+                  onBulkAttendanceChange={(membershipIds, attendance) => void updateBulkAttendance(membershipIds, attendance)}
+                />
+              </div>
             ) : null}
             {displaySession ? (
               <HostSessionNotificationActions
@@ -1535,39 +1595,7 @@ export default function HostSessionEditor({
           ✓ {toast}
         </div>
       ) : null}
-    </main>
-  );
-}
-
-function MemberResponseSummary({
-  attendees,
-}: {
-  attendees: HostSessionDetailResponse["attendees"];
-}) {
-  const active = attendees.filter((attendee) => (attendee.participationStatus ?? "ACTIVE") === "ACTIVE");
-  return (
-    <section
-      id="workspace-member-responses"
-      tabIndex={-1}
-      aria-labelledby="workspace-member-responses-title"
-    >
-      <h3 id="workspace-member-responses-title" className="h4 editorial" style={{ margin: "0 0 10px" }}>
-        참석 응답
-      </h3>
-      {active.length === 0 ? (
-        <p className="small" style={{ margin: 0, color: "var(--text-2)" }}>
-          아직 참석 대상자가 없습니다.
-        </p>
-      ) : (
-        <ul className="stack" style={{ "--stack": "8px", margin: 0, padding: 0, listStyle: "none" } as CSSProperties}>
-          {active.map((attendee) => (
-            <li key={attendee.membershipId} className="small">
-              {attendee.displayName} · 참석 응답 {rsvpLabel(attendee.rsvpStatus)}
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+    </EditorRoot>
   );
 }
 

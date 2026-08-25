@@ -49,6 +49,7 @@ export type HostSessionWorkspaceProps = {
   recordsPanel?: ReactNode;
   historyPanel: ReactNode;
   LinkComponent?: HostSessionEditorLinkComponent;
+  embeddedInMeetingFolio?: boolean;
 };
 
 function focusLocation(): HostSessionWorkspaceLocation {
@@ -88,6 +89,7 @@ export function HostSessionWorkspace({
   recordsPanel,
   historyPanel,
   LinkComponent = DefaultLinkComponent,
+  embeddedInMeetingFolio = false,
 }: HostSessionWorkspaceProps) {
   const basicOpen = location.panel === "basic";
   const historyOpen = location.panel === "history";
@@ -166,15 +168,38 @@ export function HostSessionWorkspace({
     <div className="rm-host-session-workspace">
       <div className="rm-host-session-workspace__chrome" inert={sheetOpen || undefined}>
       <div className="rm-host-session-workspace__frame">
-        <WorkspaceHeader
-          header={header}
-          statusLabel={statusLabel}
-          basicOpen={basicOpen}
-          historyOpen={historyOpen}
-          onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
-          onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
-          LinkComponent={LinkComponent}
-        />
+        {!embeddedInMeetingFolio ? (
+          <WorkspaceHeader
+            header={header}
+            statusLabel={statusLabel}
+            basicOpen={basicOpen}
+            historyOpen={historyOpen}
+            onOpenBasic={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+            onOpenHistory={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
+            LinkComponent={LinkComponent}
+          />
+        ) : (
+          <nav className="rm-host-session-workspace__secondary" aria-label="모임 문서 도구">
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm"
+              aria-expanded={basicOpen}
+              aria-controls="workspace-panel-basic"
+              onClick={() => changePanel(basicOpen ? focusLocation() : panelLocation("basic"))}
+            >
+              모임 정보
+            </button>
+            <button
+              type="button"
+              className="btn btn-quiet btn-sm"
+              aria-expanded={historyOpen}
+              aria-controls="workspace-panel-history"
+              onClick={() => changePanel(historyOpen ? focusLocation() : panelLocation("history"))}
+            >
+              변경 내역
+            </button>
+          </nav>
+        )}
 
         <div className="rm-host-session-workspace__layout">
           <div className="rm-host-session-workspace__main">
@@ -218,7 +243,7 @@ export function HostSessionWorkspace({
             ) : null}
           </div>
 
-          <aside className="rm-host-session-workspace__rail">
+          {!embeddedInMeetingFolio ? <aside className="rm-host-session-workspace__rail">
             <WorkspaceProgressList
               progress={view.progress}
               onSelect={(panel) => changePanel(panelLocation(panel, panel === "records" ? location.source : "manual"))}
@@ -227,7 +252,7 @@ export function HostSessionWorkspace({
               <p className="small rm-host-session-workspace__save-state">{draftSaveLabel}</p>
             ) : null}
             {relatedWork}
-          </aside>
+          </aside> : relatedWork ? <aside className="rm-host-session-workspace__related">{relatedWork}</aside> : null}
         </div>
 
         <WorkspaceUndoBar
@@ -237,7 +262,7 @@ export function HostSessionWorkspace({
         />
       </div>
 
-      <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">
+      {!embeddedInMeetingFolio ? <div className="rm-host-session-workspace__sticky-cta rm-host-session-workspace__footer-cta">
         {showPublicLink && publicRecordHref ? (
           <LinkComponent
             to={publicRecordHref}
@@ -255,7 +280,7 @@ export function HostSessionWorkspace({
             {primaryLabel}
           </button>
         )}
-      </div>
+      </div> : null}
       </div>
 
       <div

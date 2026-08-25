@@ -38,6 +38,7 @@ async function closeWorkspaceSheets(page: Page) {
   for (const name of ["모임 정보", "변경 내역"] as const) {
     const trigger = page.getByRole("button", { name }).first();
     const sheet = page.getByRole("dialog", { name });
+    if (await trigger.count() === 0 && await sheet.count() === 0) continue;
     if ((await trigger.getAttribute("aria-expanded")) !== "true" && !(await sheet.isVisible())) {
       continue;
     }
@@ -55,7 +56,7 @@ async function closeWorkspaceSheets(page: Page) {
 async function expectFocusWorkspace(page: Page) {
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
 }
 
 async function openWorkspacePanel(
@@ -63,6 +64,11 @@ async function openWorkspacePanel(
   name: "기본 정보" | "출석" | "기록" | "변경 기록",
 ) {
   if (name === "기본 정보") {
+    if (/\/sessions\/new\/?$/.test(new URL(page.url()).pathname)) {
+      await expect(page.getByLabel("모임 제목")).toBeVisible();
+      return;
+    }
+    if (await page.getByLabel("모임 제목").isVisible().catch(() => false)) return;
     const trigger = page.getByRole("button", { name: "모임 정보" });
     if ((await trigger.getAttribute("aria-expanded")) !== "true") {
       await closeWorkspaceSheets(page);
@@ -72,17 +78,13 @@ async function openWorkspacePanel(
     return;
   }
   if (name === "변경 기록") {
-    const trigger = page.getByRole("button", { name: "변경 내역" }).first();
-    if ((await trigger.getAttribute("aria-expanded")) !== "true") {
-      await closeWorkspaceSheets(page);
-      await trigger.click();
-    }
-    await expect(page.getByRole("dialog", { name: "변경 내역" })).toBeVisible();
+    await page.getByRole("link", { name: "변경 내역" }).click();
+    await expect(page).toHaveURL(/section=history/);
+    await expect(page.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
     return;
   }
   await closeWorkspaceSheets(page);
-  const progressName = name === "출석" ? /출석/ : /^기록 /;
-  await page.getByRole("listitem", { name: progressName }).getByRole("button").click();
+  await page.getByRole("link", { name: name === "출석" ? /실제 출석/ : /모임 기록/ }).click();
   const panelId = name === "출석" ? "workspace-panel-attendance" : "workspace-panel-records";
   const panel = page.locator(`#${panelId}`);
   await expect(panel).toBeVisible();
@@ -538,7 +540,7 @@ where session_id = ${sqlString(sessionId)}
   await page.reload();
   await expectFocusWorkspace(page);
   await openWorkspacePanel(page, "변경 기록");
-  await expect(page.getByRole("dialog", { name: "변경 내역" })).toContainText(reasonLabel);
+  await expect(page.getByRole("main", { name: "현재 모임 작업" })).toContainText(reasonLabel);
 }
 
 async function confirmReverse(page: Page, name: string, reasonCode: string) {
@@ -987,7 +989,7 @@ order by version;
   expect(revisionOutput).not.toContain("BASELINE");
 
   await openWorkspacePanel(page, "변경 기록");
-  await expect(page.getByRole("dialog", { name: "변경 내역" }).getByText("버전 1")).toBeVisible();
+  await expect(page.getByRole("main", { name: "현재 모임 작업" }).getByText("버전 1")).toBeVisible();
 });
 
 test("reverse request IDs correlate to lifecycle audit without secrets", async ({ page }) => {

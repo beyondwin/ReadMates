@@ -646,6 +646,7 @@ export function EditHostSessionRecordWorkflow({
     onChange: () => undefined,
   },
   recordFreshness,
+  embeddedInMeetingFolio = false,
 }: {
   session: HostSessionDetailResponse;
   recordEditor: HostSessionRecordEditor;
@@ -671,6 +672,7 @@ export function EditHostSessionRecordWorkflow({
     observedAt: string;
     onRetry: () => void;
   };
+  embeddedInMeetingFolio?: boolean;
 }) {
   const queryClient = useQueryClient();
   const saveMutation = useSaveHostSessionRecordDraftMutation(context);
@@ -1187,6 +1189,7 @@ export function EditHostSessionRecordWorkflow({
   return (
     <>
       <HostSessionEditor
+        embeddedInMeetingFolio={embeddedInMeetingFolio}
         session={session}
         notificationDispatches={notificationDispatches}
         returnTarget={returnStatePurged ? undefined : returnTarget}

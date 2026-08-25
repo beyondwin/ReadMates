@@ -373,6 +373,13 @@ afterEach(() => {
 });
 
 describe("HostSessionEditor", () => {
+  it("does not create a nested main landmark when embedded in Meeting Folio", () => {
+    render(<HostSessionEditorForTest session={openSession} embeddedInMeetingFolio />);
+
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    expect(document.querySelector(".rm-host-session-editor")).toBeInTheDocument();
+  });
+
   it("requires restore workflows to expose completion as a promise", () => {
     expect(restoreReturnsPromise).toBe(true);
   });

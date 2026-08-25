@@ -7,6 +7,8 @@ type HostSessionEditorLinkProps = {
   to: string;
   state?: ReadmatesReturnState;
   className?: string;
+  onClick?: () => void;
+  "aria-current"?: "page";
   children: ReactNode;
   style?: CSSProperties;
 };

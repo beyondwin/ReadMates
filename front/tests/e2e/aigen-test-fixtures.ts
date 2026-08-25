@@ -291,6 +291,15 @@ export function hostSessionDetailResponse(sessionId: string): HostSessionDetailR
     visibility: "HOST_ONLY",
     publication: null,
     state: "OPEN",
+    versions: {
+      sessionRevision: 1,
+      exposureRevision: 0,
+      participantSetRevision: 0,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-1",
     attendees: [],
     feedbackDocument: {
       uploaded: false,

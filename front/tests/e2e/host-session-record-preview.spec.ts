@@ -35,6 +35,7 @@ function sessionResponse(): HostSessionDetailResponse {
         rsvpStatus: "GOING",
         attendanceStatus: "ATTENDED",
         participationStatus: "ACTIVE",
+        attendanceRevision: 1,
       },
       {
         membershipId: "member-b",
@@ -44,6 +45,7 @@ function sessionResponse(): HostSessionDetailResponse {
         rsvpStatus: "GOING",
         attendanceStatus: "ATTENDED",
         participationStatus: "ACTIVE",
+        attendanceRevision: 1,
       },
     ],
     feedbackDocument: {
@@ -293,11 +295,10 @@ async function expectMobileEditorChrome(page: Page): Promise<void> {
   await expect(page.getByRole("tab", { name: "개요" })).toHaveCount(0);
   await expect(page.locator(".rm-host-session-editor__aside")).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
-  await expect(page.getByRole("button", { name: "모임 정보" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "변경 내역" }).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "모임 작업 목차" })).toBeVisible();
   await expectRecordsPanelOpen(page);
 
-  const appNav = page.getByRole("navigation", { name: "앱 탭" });
+  const appNav = page.getByRole("navigation", { name: "호스트 주 메뉴 모바일" });
   await expect(appNav).toBeVisible();
   await expectNoHorizontalOverflow(page);
 }
