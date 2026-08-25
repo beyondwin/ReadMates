@@ -133,6 +133,17 @@ function readyChild(route: AdminRouteDescriptor, queryClient: QueryClient): Rout
           };
         },
       };
+    case "public-takedown":
+      return {
+        path: "public-takedown",
+        hydrateFallbackElement: adminChildHydrateFallback,
+        lazy: async () => {
+          const { AdminPublicTakedownRoute } = await import(
+            "@/features/platform-admin/route/admin-public-takedown-route"
+          );
+          return { Component: AdminPublicTakedownRoute };
+        },
+      };
     case "audit":
       return {
         path: "audit",

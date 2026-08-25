@@ -1,5 +1,6 @@
 package com.readmates.publication.application.port.out
 
+import com.readmates.publication.application.model.PlatformAdminPublicConvergenceView
 import com.readmates.publication.application.model.ProviderAttemptResult
 import com.readmates.publication.application.model.PublicConvergenceClaim
 import com.readmates.publication.application.model.PublicConvergenceEvent
@@ -45,4 +46,15 @@ interface PublicConvergencePort {
         now: Instant,
         maxAttempts: Int,
     ): PublicConvergenceView?
+
+    fun loadAdminTakedownView(
+        receiptId: UUID,
+        maxAttempts: Int,
+    ): PlatformAdminPublicConvergenceView?
+
+    fun requestAdminTakedownRetry(
+        receiptId: UUID,
+        now: Instant,
+        maxAttempts: Int,
+    ): PlatformAdminPublicConvergenceView?
 }

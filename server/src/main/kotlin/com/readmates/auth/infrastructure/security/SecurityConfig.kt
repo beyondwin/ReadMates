@@ -130,6 +130,10 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/admin/public-takedowns/(preview|confirm)$")),
                     methodAndPath(
                         "POST",
+                        Regex("^/api/admin/public-takedowns/[^/]+/convergence/retry$"),
+                    ),
+                    methodAndPath(
+                        "POST",
                         Regex("^/api/admin/operations/cases/[^/]+/(acknowledge|snooze|resolve)$"),
                     ),
                     methodAndPath("POST", Regex("^/api/admin/support/grants$")),

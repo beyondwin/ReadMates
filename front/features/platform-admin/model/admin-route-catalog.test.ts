@@ -6,7 +6,7 @@ import {
 } from "./admin-route-catalog";
 
 describe("ADMIN_ROUTES catalog", () => {
-  it("contains exactly the 8 nav-visible routes", () => {
+  it("contains exactly the 9 nav-visible routes", () => {
     const paths = ADMIN_ROUTES.map((route) => route.path).sort();
     expect(paths).toEqual([
       "ai-ops",
@@ -15,6 +15,7 @@ describe("ADMIN_ROUTES catalog", () => {
       "clubs",
       "health",
       "notifications",
+      "public-takedown",
       "support",
       "today",
     ]);
@@ -49,6 +50,7 @@ describe("ADMIN_ROUTES catalog", () => {
       { path: "notifications", label: "알림", group: "operations", groupLabel: "Operations" },
       { path: "ai-ops", label: "AI 작업", group: "operations", groupLabel: "Operations" },
       { path: "support", label: "지원", group: "operations", groupLabel: "Operations" },
+      { path: "public-takedown", label: "긴급 공개 회수", group: "operations", groupLabel: "Operations" },
       { path: "audit", label: "감사", group: "review", groupLabel: "Review" },
       { path: "analytics", label: "분석", group: "review", groupLabel: "Review" },
     ]);
@@ -79,6 +81,7 @@ describe("ADMIN_ROUTES catalog", () => {
       "clubs",
       "health",
       "notifications",
+      "public-takedown",
       "support",
       "today",
     ]);
@@ -96,6 +99,7 @@ describe("ADMIN_ROUTES catalog", () => {
       "view_today", "view_clubs", "view_club_detail",
       "view_ai_ops", "view_support", "view_health",
       "view_notifications", "view_audit", "view_analytics",
+      "emergency_public_takedown",
     ]);
     const all: AdminRouteDescriptor[] = [...ADMIN_ROUTES, ADMIN_CLUB_DETAIL_ROUTE];
     for (const route of all) {

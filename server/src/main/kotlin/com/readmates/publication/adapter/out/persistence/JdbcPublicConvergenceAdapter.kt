@@ -1,6 +1,8 @@
 package com.readmates.publication.adapter.out.persistence
 
 import com.readmates.publication.application.model.ConvergenceAttemptStatus
+import com.readmates.publication.application.model.PlatformAdminConvergenceAttempt
+import com.readmates.publication.application.model.PlatformAdminPublicConvergenceView
 import com.readmates.publication.application.model.ProviderAttemptResult
 import com.readmates.publication.application.model.ProviderAttemptStatus
 import com.readmates.publication.application.model.ProviderResultCategory
@@ -279,13 +281,111 @@ class JdbcPublicConvergenceAdapter(
                     clubId.dbString(),
                     sessionId.dbString(),
                 ).firstOrNull() ?: return null
-        val current = loadCurrentEvent(convergenceId) ?: return null
+        if (!appendRetry(work, now, maxAttempts)) return null
+        return loadLatestViewInternal(clubId, sessionId, maxAttempts)
+    }
+
+    override fun loadAdminTakedownView(
+        receiptId: UUID,
+        maxAttempts: Int,
+    ): PlatformAdminPublicConvergenceView? {
+        val scope = loadAdminTakedownScope(receiptId) ?: return null
+        return loadAdminTakedownView(scope, maxAttempts)
+    }
+
+    @Transactional
+    override fun requestAdminTakedownRetry(
+        receiptId: UUID,
+        now: Instant,
+        maxAttempts: Int,
+    ): PlatformAdminPublicConvergenceView? {
+        val scope = loadAdminTakedownScope(receiptId) ?: return null
+        val work = loadAdminRetryRow(scope) ?: return null
+        if (!appendRetry(work, now, maxAttempts)) return null
+        return loadAdminTakedownView(scope, maxAttempts)
+    }
+
+    private fun loadAdminTakedownScope(receiptId: UUID): AdminTakedownScope? =
+        jdbcTemplate
+            .query(
+                """
+                select receipts.id, receipts.convergence_id, receipts.club_id_snapshot,
+                       receipts.session_id_snapshot, receipts.publication_id_snapshot,
+                       receipts.origin_result, receipts.committed_generation
+                from admin_public_takedown_receipts receipts
+                join public_mutation_convergence_links links
+                  on links.mutation_receipt_id = receipts.id
+                  and links.convergence_id = receipts.convergence_id
+                  and links.club_id_snapshot = receipts.club_id_snapshot
+                  and links.session_id_snapshot = receipts.session_id_snapshot
+                  and links.publication_id_snapshot = receipts.publication_id_snapshot
+                  and links.committed_generation = receipts.committed_generation
+                  and links.origin_readable = false
+                where receipts.id = ?
+                """.trimIndent(),
+                { rs, _ ->
+                    AdminTakedownScope(
+                        receiptId = UUID.fromString(rs.getString("id")),
+                        convergenceId = UUID.fromString(rs.getString("convergence_id")),
+                        clubId = UUID.fromString(rs.getString("club_id_snapshot")),
+                        sessionId = UUID.fromString(rs.getString("session_id_snapshot")),
+                        publicationId = UUID.fromString(rs.getString("publication_id_snapshot")),
+                        originResult = rs.getString("origin_result"),
+                        committedGeneration = rs.getLong("committed_generation"),
+                    )
+                },
+                receiptId.dbString(),
+            ).firstOrNull()
+
+    private fun loadAdminRetryRow(scope: AdminTakedownScope): RetryRow? =
+        jdbcTemplate
+            .query(
+                """
+                select work.convergence_id, work.next_attempt_no,
+                       work.club_id_snapshot, work.session_id_snapshot,
+                       work.publication_id_snapshot
+                from public_convergence_work work
+                join public_mutation_convergence_links links
+                  on links.convergence_id = work.convergence_id
+                where links.mutation_receipt_id = ?
+                  and work.convergence_id = ?
+                  and links.club_id_snapshot = ? and work.club_id_snapshot = ?
+                  and links.session_id_snapshot = ? and work.session_id_snapshot = ?
+                  and links.publication_id_snapshot = ? and work.publication_id_snapshot = ?
+                  and work.lease_owner is null
+                for update
+                """.trimIndent(),
+                { rs, _ ->
+                    RetryRow(
+                        convergenceId = UUID.fromString(rs.getString("convergence_id")),
+                        attemptNo = rs.getInt("next_attempt_no"),
+                        clubId = UUID.fromString(rs.getString("club_id_snapshot")),
+                        sessionId = rs.getString("session_id_snapshot")?.let(UUID::fromString),
+                        publicationId = rs.getString("publication_id_snapshot")?.let(UUID::fromString),
+                    )
+                },
+                scope.receiptId.dbString(),
+                scope.convergenceId.dbString(),
+                scope.clubId.dbString(),
+                scope.clubId.dbString(),
+                scope.sessionId.dbString(),
+                scope.sessionId.dbString(),
+                scope.publicationId.dbString(),
+                scope.publicationId.dbString(),
+            ).firstOrNull()
+
+    private fun appendRetry(
+        work: RetryRow,
+        now: Instant,
+        maxAttempts: Int,
+    ): Boolean {
+        val current = loadCurrentEvent(work.convergenceId) ?: return false
         if (current.status != ConvergenceAttemptStatus.FAILED ||
             current.attemptNo >= maxAttempts ||
             current.resultCategory != ProviderResultCategory.TEMPORARY_FAILURE.name ||
             work.attemptNo != current.attemptNo + 1
         ) {
-            return null
+            return false
         }
         val inserted =
             jdbcTemplate.update(
@@ -304,7 +404,7 @@ class JdbcPublicConvergenceAdapter(
                 work.publicationId?.dbString(),
                 now.utc(),
             )
-        if (inserted == 0) return null
+        if (inserted == 0) return false
         jdbcTemplate.update(
             """
             update public_convergence_work
@@ -313,9 +413,66 @@ class JdbcPublicConvergenceAdapter(
             """.trimIndent(),
             now.utc(),
             now.utc(),
-            convergenceId.dbString(),
+            work.convergenceId.dbString(),
         )
-        return loadLatestViewInternal(clubId, sessionId, maxAttempts)
+        return true
+    }
+
+    private fun loadAdminTakedownView(
+        scope: AdminTakedownScope,
+        maxAttempts: Int,
+    ): PlatformAdminPublicConvergenceView {
+        val attempts =
+            jdbcTemplate.query(
+                """
+                select attempt_no, status, observed_at, result_category
+                from (
+                  select events.attempt_no, events.status, events.observed_at,
+                         events.result_category,
+                         row_number() over (
+                           partition by events.attempt_no order by events.event_seq desc
+                         ) event_rank
+                  from public_convergence_events events
+                  where events.convergence_id = ?
+                    and events.club_id_snapshot = ?
+                    and events.session_id_snapshot = ?
+                    and events.publication_id_snapshot = ?
+                ) latest_attempts
+                where event_rank = 1
+                order by attempt_no
+                """.trimIndent(),
+                { rs, _ ->
+                    PlatformAdminConvergenceAttempt(
+                        attemptNo = rs.getInt("attempt_no"),
+                        status = ConvergenceAttemptStatus.valueOf(rs.getString("status")),
+                        observedAt = rs.getTimestamp("observed_at").toLocalDateTime().toInstant(ZoneOffset.UTC),
+                        resultCategory =
+                            rs.getString("result_category")?.let { category ->
+                                runCatching { ProviderResultCategory.valueOf(category) }.getOrNull()
+                            },
+                    )
+                },
+                scope.convergenceId.dbString(),
+                scope.clubId.dbString(),
+                scope.sessionId.dbString(),
+                scope.publicationId.dbString(),
+            )
+        val current = attempts.lastOrNull()
+        val status = current?.status ?: ConvergenceAttemptStatus.PENDING
+        return PlatformAdminPublicConvergenceView(
+            convergenceId = scope.convergenceId,
+            originResult = scope.originResult,
+            committedGeneration = scope.committedGeneration,
+            status = status,
+            lastAttemptAt = current?.observedAt,
+            retryable =
+                current?.let { attempt ->
+                    status == ConvergenceAttemptStatus.FAILED &&
+                        attempt.attemptNo < maxAttempts &&
+                        attempt.resultCategory == ProviderResultCategory.TEMPORARY_FAILURE
+                } == true,
+            attempts = attempts,
+        )
     }
 
     private fun loadLatestViewInternal(
@@ -379,5 +536,15 @@ class JdbcPublicConvergenceAdapter(
         val clubId: UUID,
         val sessionId: UUID?,
         val publicationId: UUID?,
+    )
+
+    private data class AdminTakedownScope(
+        val receiptId: UUID,
+        val convergenceId: UUID,
+        val clubId: UUID,
+        val sessionId: UUID,
+        val publicationId: UUID,
+        val originResult: String,
+        val committedGeneration: Long,
     )
 }

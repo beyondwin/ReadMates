@@ -9,7 +9,9 @@ import com.readmates.admin.takedown.application.port.`in`.PreviewPublicTakedownU
 import com.readmates.admin.takedown.application.port.out.PublicTakedownPort
 import com.readmates.admin.takedown.application.service.PublicTakedownService
 import com.readmates.auth.application.service.AuthSessionService
+import com.readmates.publication.application.port.`in`.PlatformAdminPublicConvergenceUseCase
 import com.readmates.shared.mutation.config.MutationIdempotencyProperties
+import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.PlatformActor
 import com.readmates.shared.security.PlatformCapability
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
@@ -26,6 +28,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.test.web.servlet.MockMvc
+import org.springframework.test.web.servlet.get
 import org.springframework.test.web.servlet.post
 import java.time.Clock
 import java.util.UUID
@@ -40,6 +43,7 @@ import java.util.UUID
         "readmates.public-takedown.enabled=true",
         "readmates.public-takedown.r2a-cache-safety-evidence-verified=true",
         "readmates.public-takedown.elapsed-browser-cache-window-seconds=720",
+        "readmates.public-convergence.enabled=true",
     ],
 )
 @AutoConfigureMockMvc
@@ -52,6 +56,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
     @param:Autowired private val takedownPort: PublicTakedownPort,
     @param:Autowired private val mutationProperties: MutationIdempotencyProperties,
     @param:Autowired private val clock: Clock,
+    @param:Autowired private val adminConvergence: PlatformAdminPublicConvergenceUseCase,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val tokenHashes = linkedSetOf<String>()
 
@@ -240,6 +245,120 @@ class PlatformAdminPublicTakedownIntegrationTest(
     }
 
     @Test
+    fun `admin convergence view is bounded and retry appends a higher attempt without repeating origin deny`() {
+        val receipt = createReceipt(OWNER_USER_ID, "operator-convergence-key")
+        val receiptId = JsonPath.read<String>(receipt, "$.receiptId")
+        val convergenceId = JsonPath.read<String>(receipt, "$.convergenceId")
+        seedTemporaryFailure(convergenceId)
+        val receiptBefore = receiptSnapshot(receiptId)
+        val projectionBefore = projectionSnapshot()
+
+        val failedBody =
+            mockMvc
+                .get("/api/admin/public-takedowns/$receiptId/convergence") {
+                    header(BFF_SECRET_HEADER, BFF_SECRET)
+                    cookie(sessionCookieForUser(OWNER_USER_ID))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.schema") { value("admin.public_takedown.convergence.v1") }
+                    jsonPath("$.convergenceId") { value(convergenceId) }
+                    jsonPath("$.originResult") { value("DENIED") }
+                    jsonPath("$.committedGeneration") { value(2) }
+                    jsonPath("$.status") { value("FAILED") }
+                    jsonPath("$.retryable") { value(true) }
+                    jsonPath("$.attempts.length()") { value(1) }
+                    jsonPath("$.attempts[0].attemptNo") { value(1) }
+                    jsonPath("$.attempts[0].status") { value("FAILED") }
+                    jsonPath("$.attempts[0].resultCategory") { value("TEMPORARY_FAILURE") }
+                }.andReturn()
+                .response
+                .contentAsString
+        val topLevel: Map<String, Any?> = JsonPath.read(failedBody, "$")
+        assertThat(topLevel.keys)
+            .containsExactlyInAnyOrder(
+                "schema",
+                "convergenceId",
+                "originResult",
+                "committedGeneration",
+                "status",
+                "lastAttemptAt",
+                "retryable",
+                "attempts",
+            )
+
+        val retryBody =
+            mockMvc
+                .post("/api/admin/public-takedowns/$receiptId/convergence/retry") {
+                    header(BFF_SECRET_HEADER, BFF_SECRET)
+                    header("Origin", ALLOWED_ORIGIN)
+                    cookie(sessionCookieForUser(OWNER_USER_ID))
+                }.andExpect {
+                    status { isOk() }
+                    jsonPath("$.convergenceId") { value(convergenceId) }
+                    jsonPath("$.originResult") { value("DENIED") }
+                    jsonPath("$.committedGeneration") { value(2) }
+                    jsonPath("$.status") { value("PENDING") }
+                    jsonPath("$.retryable") { value(false) }
+                    jsonPath("$.attempts.length()") { value(2) }
+                    jsonPath("$.attempts[0].attemptNo") { value(1) }
+                    jsonPath("$.attempts[1].attemptNo") { value(2) }
+                    jsonPath("$.attempts[1].status") { value("PENDING") }
+                    jsonPath("$.attempts[1].resultCategory") { doesNotExist() }
+                }.andReturn()
+                .response
+                .contentAsString
+
+        assertThat(retryBody).doesNotContain("provider", "private", "reason")
+        assertThat(receiptSnapshot(receiptId)).isEqualTo(receiptBefore)
+        assertThat(projectionSnapshot()).isEqualTo(projectionBefore)
+        assertThat(rowCount("admin_public_takedown_receipts")).isEqualTo(1)
+        assertThat(rowCount("public_convergence_work")).isEqualTo(1)
+        assertThat(convergenceEventCount(convergenceId)).isEqualTo(3)
+    }
+
+    @Test
+    fun `admin convergence requires emergency capability and rejects another receipt scope`() {
+        val receipt = createReceipt(OWNER_USER_ID, "operator-authority-key")
+        val receiptId = JsonPath.read<String>(receipt, "$.receiptId")
+        val convergenceId = JsonPath.read<String>(receipt, "$.convergenceId")
+        val otherReceiptId = UUID.randomUUID().toString()
+        listOf(SUPPORT_USER_ID, HOST_USER_ID).forEach { actorId ->
+            mockMvc
+                .get("/api/admin/public-takedowns/$receiptId/convergence") {
+                    header(BFF_SECRET_HEADER, BFF_SECRET)
+                    cookie(sessionCookieForUser(actorId))
+                }.andExpect {
+                    status { isForbidden() }
+                }
+        }
+        seedInactiveAdmin()
+        mockMvc
+            .post("/api/admin/public-takedowns/$receiptId/convergence/retry") {
+                header(BFF_SECRET_HEADER, BFF_SECRET)
+                header("Origin", ALLOWED_ORIGIN)
+                cookie(sessionCookieForUser(INACTIVE_ADMIN_ID))
+            }.andExpect {
+                status { isForbidden() }
+            }
+        mockMvc
+            .get("/api/admin/public-takedowns/$otherReceiptId/convergence") {
+                header(BFF_SECRET_HEADER, BFF_SECRET)
+                cookie(sessionCookieForUser(OWNER_USER_ID))
+            }.andExpect {
+                status { isNotFound() }
+            }
+
+        assertThatThrownBy {
+            adminConvergence.view(
+                PlatformActor(UUID.fromString(OPERATOR_USER_ID), emptySet()),
+                UUID.fromString(receiptId),
+            )
+        }.isInstanceOf(AccessDeniedException::class.java)
+        assertThat(convergenceEventCount(convergenceId)).isZero()
+        assertThat(rowCount("admin_public_takedown_receipts")).isEqualTo(1)
+    }
+
+    @Test
     fun `preview bound v1 key reconciles after v2 rotation and retired key fails closed`() {
         val previewId = UUID.fromString(JsonPath.read<String>(preview(OWNER_USER_ID), "$.previewId"))
         assertThat(
@@ -355,6 +474,78 @@ class PlatformAdminPublicTakedownIntegrationTest(
             }.andReturn()
             .response
             .contentAsString
+
+    private fun createReceipt(
+        actorId: String,
+        idempotencyKey: String,
+    ): String {
+        val previewId = JsonPath.read<String>(preview(actorId), "$.previewId")
+        return confirm(
+            actorId,
+            """{"previewId":"$previewId","reasonCategory":"PRIVACY","reason":"긴급 공개 회수","idempotencyKey":"$idempotencyKey"}""",
+        )
+    }
+
+    private fun seedTemporaryFailure(convergenceId: String) {
+        jdbcTemplate.update(
+            """
+            insert into public_convergence_events (
+              convergence_id, attempt_no, event_seq, pending_event_seq, status,
+              observed_at, result_category, club_id_snapshot, session_id_snapshot,
+              publication_id_snapshot, created_at
+            ) values
+              (?, 1, 0, 0, 'PENDING', timestampadd(second, -2, utc_timestamp(6)), null, ?, ?, ?, utc_timestamp(6)),
+              (?, 1, 1, 0, 'FAILED', timestampadd(second, -1, utc_timestamp(6)), 'TEMPORARY_FAILURE', ?, ?, ?, utc_timestamp(6))
+            """.trimIndent(),
+            convergenceId,
+            CLUB_ID,
+            SESSION_ID,
+            PUBLICATION_ID,
+            convergenceId,
+            CLUB_ID,
+            SESSION_ID,
+            PUBLICATION_ID,
+        )
+        jdbcTemplate.update(
+            """
+            update public_convergence_work
+            set next_attempt_no = 2, lease_owner = null, lease_expires_at = null,
+                available_at = timestampadd(hour, 1, utc_timestamp(6))
+            where convergence_id = ?
+            """.trimIndent(),
+            convergenceId,
+        )
+    }
+
+    private fun receiptSnapshot(receiptId: String): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select id, actor_admin_id, club_id_snapshot, session_id_snapshot,
+                   publication_id_snapshot, preview_id_snapshot,
+                   hex(idempotency_key_hmac) idempotency_key_hmac,
+                   canonical_schema_version, digest_key_version, hex(request_hmac) request_hmac,
+                   reason_category, reason_summary, origin_result, committed_generation,
+                   committed_club_generation, convergence_id, created_at
+            from admin_public_takedown_receipts where id = ?
+            """.trimIndent(),
+            receiptId,
+        )
+
+    private fun projectionSnapshot(): Map<String, Any?> =
+        jdbcTemplate.queryForMap(
+            """
+            select generation, club_generation, origin_readable, convergence_id
+            from public_projection_current where session_id = ?
+            """.trimIndent(),
+            SESSION_ID,
+        )
+
+    private fun convergenceEventCount(convergenceId: String): Int =
+        jdbcTemplate.queryForObject(
+            "select count(*) from public_convergence_events where convergence_id = ?",
+            Int::class.java,
+            convergenceId,
+        ) ?: -1
 
     private fun confirmExpectingConflictOrBadRequest(
         previewId: String,

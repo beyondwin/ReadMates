@@ -88,3 +88,20 @@ data class PublicConvergenceView(
     val lastAttemptAt: Instant?,
     val retryable: Boolean,
 )
+
+data class PlatformAdminConvergenceAttempt(
+    val attemptNo: Int,
+    val status: ConvergenceAttemptStatus,
+    val observedAt: Instant,
+    val resultCategory: ProviderResultCategory?,
+)
+
+data class PlatformAdminPublicConvergenceView(
+    val convergenceId: UUID,
+    val originResult: String,
+    val committedGeneration: Long,
+    val status: ConvergenceAttemptStatus,
+    val lastAttemptAt: Instant?,
+    val retryable: Boolean,
+    val attempts: List<PlatformAdminConvergenceAttempt>,
+)

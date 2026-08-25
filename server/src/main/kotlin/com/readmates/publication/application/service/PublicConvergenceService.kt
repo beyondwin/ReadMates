@@ -5,12 +5,15 @@ import com.readmates.publication.application.model.ProviderAttemptStatus
 import com.readmates.publication.application.model.ProviderResultCategory
 import com.readmates.publication.application.model.PublicConvergenceView
 import com.readmates.publication.application.port.`in`.HostPublicConvergenceUseCase
+import com.readmates.publication.application.port.`in`.PlatformAdminPublicConvergenceUseCase
 import com.readmates.publication.application.port.out.PublicCachePurgeCommand
 import com.readmates.publication.application.port.out.PublicCachePurgePort
 import com.readmates.publication.application.port.out.PublicConvergencePort
 import com.readmates.publication.config.PublicConvergenceProperties
 import com.readmates.shared.security.AccessDeniedException
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.security.PlatformActor
+import com.readmates.shared.security.PlatformCapability
 import org.springframework.stereotype.Service
 import java.time.Clock
 import java.time.Duration
@@ -23,7 +26,8 @@ class PublicConvergenceService(
     private val properties: PublicConvergenceProperties,
     private val clock: Clock,
     private val metrics: PublicConvergenceMetrics,
-) : HostPublicConvergenceUseCase {
+) : HostPublicConvergenceUseCase,
+    PlatformAdminPublicConvergenceUseCase {
     fun processBatch(leaseOwner: String): Int {
         if (!properties.enabled) return 0
         var processed = 0
@@ -92,6 +96,24 @@ class PublicConvergenceService(
         )
     }
 
+    override fun view(
+        actor: PlatformActor,
+        receiptId: UUID,
+    ) = requireEmergencyTakedown(actor) {
+        if (!properties.enabled) null else convergencePort.loadAdminTakedownView(receiptId, properties.maxAttempts)
+    }
+
+    override fun retry(
+        actor: PlatformActor,
+        receiptId: UUID,
+    ) = requireEmergencyTakedown(actor) {
+        if (!properties.enabled) {
+            null
+        } else {
+            convergencePort.requestAdminTakedownRetry(receiptId, clock.instant(), properties.maxAttempts)
+        }
+    }
+
     private fun backoffFor(attemptNo: Int): Duration {
         val multiplier = 1L shl (attemptNo - 1).coerceIn(0, 30)
         val candidate = properties.initialBackoff.multipliedBy(multiplier)
@@ -100,5 +122,15 @@ class PublicConvergenceService(
 
     private fun requireHost(member: CurrentMember) {
         if (!member.isHost) throw AccessDeniedException("Host role required")
+    }
+
+    private fun <T> requireEmergencyTakedown(
+        actor: PlatformActor,
+        block: () -> T,
+    ): T {
+        if (!actor.can(PlatformCapability.EMERGENCY_PUBLIC_TAKEDOWN)) {
+            throw AccessDeniedException("Emergency public takedown capability required")
+        }
+        return block()
     }
 }
