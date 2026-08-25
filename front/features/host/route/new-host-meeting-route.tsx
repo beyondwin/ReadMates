@@ -17,6 +17,7 @@ import {
 import { requireHostClubContext } from "../model/host-authority-loss";
 import {
   HostMutationPendingError,
+  classifyScheduleDefaultsError,
   hostSessionScheduleDefaultsQuery,
   useCreateHostSessionMutation,
   useOpenHostSessionMutation,
@@ -24,6 +25,7 @@ import {
 import { registerHostSensitiveState } from "../storage/host-sensitive-storage";
 import { NewHostMeetingPage, type SavedNewMeeting } from "../ui/new-meeting/new-host-meeting-page";
 import { hostApiErrorFromResponse, readHostResponseJson } from "@/shared/api/host-authority-event";
+import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
 
 export type NewHostMeetingRouteProps = {
   onSessionRecordsChanged?: (event: { sessionId: string; clubSlug: string }) => void | Promise<void>;
@@ -60,6 +62,7 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   const clubSlug = context.clubSlug;
   const navigate = useNavigate();
   const defaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
+  const defaultsTelemetryRecordedRef = useRef(false);
   const createMutation = useCreateHostSessionMutation(context, { retainUntilResolved: true });
   const openMutation = useOpenHostSessionMutation(context);
   const createMeeting = createMutation.mutateAsync;
@@ -79,6 +82,23 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
   const [prepareConfirmationOpen, setPrepareConfirmationOpen] = useState(false);
   const [prepareError, setPrepareError] = useState<string | null>(null);
   const [focusTarget, setFocusTarget] = useState<NewMeetingField | "summary" | null>(null);
+
+  useEffect(() => {
+    if (
+      defaultsTelemetryRecordedRef.current
+      || defaultsQuery.isPending
+      || defaultsQuery.isFetching
+      || (!defaultsQuery.isSuccess && !defaultsQuery.isError)
+    ) return;
+    defaultsTelemetryRecordedRef.current = true;
+    recordHostScheduleDefaults({
+      outcome: defaultsQuery.isSuccess
+        ? "success"
+        : classifyScheduleDefaultsError(defaultsQuery.error).kind === "legacy-404"
+          ? "legacy_404"
+          : "error",
+    });
+  }, [defaultsQuery.error, defaultsQuery.isError, defaultsQuery.isFetching, defaultsQuery.isPending, defaultsQuery.isSuccess]);
 
   useEffect(() => {
     draftRef.current = draft;
@@ -167,7 +187,7 @@ export function NewHostMeetingRoute({ onSessionRecordsChanged }: NewHostMeetingR
 
   const acceptCreateResponse = useCallback(async (response: Response) => {
     if (!response.ok) {
-      const body = await response.clone().json().catch(() => null);
+      const body = await readHostResponseJson(response.clone()).catch(() => null);
       const fieldFailure = classifyNewMeetingServerFailure(response.status, body);
       resolvePendingCreate();
       const apiError = await hostApiErrorFromResponse(response, {

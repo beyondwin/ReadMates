@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router";
 import {
+  hostSessionKeys,
   useCloseHostSessionMutation,
   useDeleteHostSessionMutation,
   useOpenHostSessionMutation,
@@ -15,6 +16,7 @@ import {
   type AuthState,
 } from "@/src/app/auth-state";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
 import { GuestNavigationProvider } from "@/features/guest-browse/ui/guest-navigation-dialog";
 import { Link } from "@/src/app/router-link";
 import { AppRouteLayout } from "./app-route-layout";
@@ -65,9 +67,10 @@ function jsonResponse(body: unknown, status = 200) {
 type SessionMutationOperation = "open" | "close" | "delete";
 
 function SessionMutationHarness({ operation }: { operation: SessionMutationOperation }) {
-  const openMutation = useOpenHostSessionMutation();
-  const closeMutation = useCloseHostSessionMutation();
-  const deleteMutation = useDeleteHostSessionMutation();
+  const mutationContext = { clubSlug: "reading-sai" };
+  const openMutation = useOpenHostSessionMutation(mutationContext);
+  const closeMutation = useCloseHostSessionMutation(mutationContext);
+  const deleteMutation = useDeleteHostSessionMutation(mutationContext);
 
   const mutate = {
     open: openMutation.mutateAsync,
@@ -206,6 +209,7 @@ function renderScopedExpiryLayout({
 
 afterEach(() => {
   cleanup();
+  __resetHostClientContractCapabilityForTest();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -214,17 +218,17 @@ describe("AppRouteLayout host session navigation", () => {
   it.each([
     {
       operation: "open" as const,
-      mutationPath: "/api/bff/api/host/sessions/session-7/open",
+      mutationPath: "/api/bff/api/host/sessions/session-7/open?clubSlug=reading-sai",
       mutationMethod: "POST",
     },
     {
       operation: "close" as const,
-      mutationPath: "/api/bff/api/host/sessions/session-7/close",
+      mutationPath: "/api/bff/api/host/sessions/session-7/close?clubSlug=reading-sai",
       mutationMethod: "POST",
     },
     {
       operation: "delete" as const,
-      mutationPath: "/api/bff/api/host/sessions/session-7",
+      mutationPath: "/api/bff/api/host/sessions/session-7?clubSlug=reading-sai",
       mutationMethod: "DELETE",
     },
   ])(
@@ -236,6 +240,18 @@ describe("AppRouteLayout host session navigation", () => {
     }) => {
       const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
         const path = input.toString();
+        if (path === "/api/bff/__internal/client-contract-status") {
+          return Promise.resolve(new Response(JSON.stringify({
+            schemaVersion: 1,
+            supportedHostClientContracts: ["v3"],
+          }), {
+            status: 200,
+            headers: {
+              "Content-Type": "application/json",
+              "Cache-Control": "no-store",
+            },
+          }));
+        }
         if (path === "/api/bff/api/sessions/current") {
           return Promise.resolve(jsonResponse({ currentSession: null }));
         }
@@ -249,6 +265,7 @@ describe("AppRouteLayout host session navigation", () => {
               deletedAt: "2026-08-01T00:00:00Z",
               purgeAfter: "2026-08-08T00:00:00Z",
               trashed: true,
+              sessionRevision: 4,
               counts: {
                 participants: 0,
                 rsvpResponses: 0,
@@ -270,8 +287,23 @@ describe("AppRouteLayout host session navigation", () => {
       vi.stubGlobal("fetch", fetchMock);
       const queryClient = new QueryClient({
         defaultOptions: {
-          queries: { retry: false, staleTime: 0, gcTime: 0 },
+          queries: {
+            retry: false,
+            staleTime: Number.POSITIVE_INFINITY,
+            gcTime: Number.POSITIVE_INFINITY,
+          },
           mutations: { retry: false },
+        },
+      });
+      const mutationContext = { clubSlug: "reading-sai" };
+      queryClient.setQueryData(hostSessionKeys.detail("session-7", mutationContext), {
+        versions: { sessionRevision: 3 },
+      });
+      queryClient.setQueryData(hostSessionKeys.closingStatus("session-7", mutationContext), {
+        session: {
+          sessionRevision: 3,
+          participantSetRevision: 4,
+          attendanceSnapshotId: "attendance-snapshot-4",
         },
       });
       const user = userEvent.setup();

@@ -34,6 +34,7 @@ export type HostSessionEditorActions = {
   unpublishSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   returnSessionToDraft: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
+  readCreatedSessionId: (response: Response) => Promise<string>;
   updateAttendance: (
     sessionId: string,
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,
@@ -45,6 +46,14 @@ export type HostSessionEditorActions = {
     request: { accessScope: SessionAccessScope },
   ) => Promise<unknown>;
 };
+
+export async function readCreatedHostSessionId(response: Response): Promise<string> {
+  const body = await readHostResponseJson<{ sessionId?: unknown }>(response);
+  if (typeof body.sessionId !== "string" || !body.sessionId) {
+    throw new Error("HOST_SESSION_ID_REQUIRED");
+  }
+  return body.sessionId;
+}
 
 export type HostSessionChangeReceiptListener = (
   receipt: HostSessionChangeReceipt,

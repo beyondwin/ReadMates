@@ -470,6 +470,7 @@ export function invalidateHostSessionRecordSurfaces(
 export function useRetryHostPublicConvergenceMutation(context: ExplicitReadmatesApiContext) {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "public-convergence", "retry"),
     mutationFn: ({ sessionId, convergenceId }: { sessionId: string; convergenceId: string }) =>
       retryHostPublicConvergence(sessionId, convergenceId, context),
     onSuccess: (_result, { sessionId }) => client.invalidateQueries({

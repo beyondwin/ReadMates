@@ -13,7 +13,7 @@ import {
 } from "@/features/archive/model/session-detail-read-view";
 import {
   enrichSessionDetailHighlightAuthors,
-  memberSessionDetailLoaderFactory,
+  memberSessionDetailLoaderFactory as createMemberSessionDetailLoader,
 } from "@/features/archive/route/member-session-detail-data";
 import { archiveKeys } from "@/features/archive/queries/archive-queries";
 import MemberSessionDetailPage from "@/features/archive/ui/member-session-detail-page";
@@ -24,6 +24,15 @@ import {
   MEMBER_READ_SURFACE_CAPABILITIES,
   VIEWER_READ_SURFACE_CAPABILITIES,
 } from "@/shared/model/read-surface-capabilities";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
+import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
+
+function memberSessionDetailLoaderFactory(queryClient: QueryClient) {
+  return createMemberSessionDetailLoader(queryClient, (pathname) => resolveUnavailableDetailTarget({
+    pathname,
+    lastSafeTarget: readLastSafeWorkspaceTarget("member"),
+  }));
+}
 
 afterEach(() => {
   cleanup();

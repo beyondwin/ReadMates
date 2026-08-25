@@ -35,5 +35,5 @@ test("app chrome logout prevents re-entry through the public top navigation", as
   await expect(page.getByRole("link", { name: "멤버 화면" })).toHaveCount(0);
 
   await page.goto("/app");
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login\?returnTo=%2Fapp$/);
 });

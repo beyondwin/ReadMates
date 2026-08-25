@@ -25,6 +25,7 @@ import {
   archiveSessionsReturnTarget,
   publicRecordsReturnTarget,
   readPublicReadmatesReturnTarget,
+  readReadmatesReturnTarget,
   readmatesReturnState,
   resetReadmatesNavigationScroll,
 } from "@/src/app/route-continuity";
@@ -68,6 +69,7 @@ const readmatesNavigationContinuity = {
   archiveSessionsReturnTarget,
   publicRecordsReturnTarget,
   readPublicReadmatesReturnTarget,
+  readReadmatesReturnTarget,
   readmatesReturnState,
 };
 

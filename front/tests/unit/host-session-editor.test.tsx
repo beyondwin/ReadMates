@@ -117,6 +117,10 @@ const hostSessionEditorTestActions = {
         cache: "no-store",
       },
     ),
+  readCreatedSessionId: async (response) => {
+    const body = await response.json() as { sessionId: string };
+    return body.sessionId;
+  },
   updateAttendance: async (sessionId, attendance) => {
     const response = await fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
       method: "POST",
@@ -1652,8 +1656,9 @@ describe("HostSessionEditor", () => {
     };
     render(<HostSessionEditorForTest session={upcomingOpen} />);
 
-    expect(screen.getByRole("heading", { name: "참석 응답" })).toBeVisible();
-    expect(screen.getAllByText(/참석 응답 참석/).length).toBeGreaterThan(0);
+    const ledger = screen.getByRole("region", { name: "참여자 기록" });
+    expect(within(ledger).getByRole("heading", { name: "참여자 기록" })).toBeVisible();
+    expect(within(ledger).getAllByText("참석", { selector: "dd" }).length).toBeGreaterThan(0);
     await user.click(screen.getAllByRole("button", { name: "멤버 응답 확인하기" })[0]!);
     expect(document.getElementById("workspace-member-responses")).toHaveFocus();
   });
@@ -1951,7 +1956,7 @@ describe("HostSessionEditor", () => {
 
     expect(publishSession).toHaveBeenCalledWith(closedSession.sessionId);
     expect(await screen.findByText("게스트·멤버 노트 게시 완료")).toBeVisible();
-    expect(await screen.findByRole("status")).toHaveTextContent("기록을 공개했습니다.");
+    expect(await screen.findByRole("status")).toHaveTextContent("게스트·멤버 노트에 기록을 게시했습니다.");
   });
 
   it("disables publication actions for unsaved new sessions and explains why", () => {

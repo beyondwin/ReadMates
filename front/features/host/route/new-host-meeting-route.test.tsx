@@ -11,6 +11,7 @@ const routeMocks = vi.hoisted(() => ({
   resolveCreate: vi.fn(),
   openReset: vi.fn(),
   refetchDefaults: vi.fn(),
+  recordScheduleDefaults: vi.fn(),
   defaults: {
     automatic: {
       startTime: "19:30",
@@ -27,6 +28,10 @@ const routeMocks = vi.hoisted(() => ({
     hints: ["최근 4개 모임에서 가장 자주 사용한 시간입니다."],
   },
   defaultsState: "success" as "success" | "loading" | "error",
+}));
+
+vi.mock("@/shared/observability/frontend-observability", () => ({
+  recordHostScheduleDefaults: routeMocks.recordScheduleDefaults,
 }));
 
 vi.mock("@tanstack/react-query", () => ({
@@ -99,6 +104,7 @@ beforeEach(() => {
   routeMocks.resolveCreate.mockReset();
   routeMocks.openReset.mockReset();
   routeMocks.refetchDefaults.mockReset();
+  routeMocks.recordScheduleDefaults.mockReset();
   routeMocks.defaultsState = "success";
   routeMocks.create.mockResolvedValue(new Response(JSON.stringify({
     sessionId: "meeting-8",
@@ -120,6 +126,22 @@ beforeEach(() => {
 });
 
 describe("NewHostMeetingRoute", () => {
+  it("records the schedule-defaults result after an in-flight request settles", async () => {
+    routeMocks.defaultsState = "loading";
+    const view = renderRoute();
+
+    routeMocks.defaultsState = "success";
+    view.rerender(
+      <MemoryRouter initialEntries={["/clubs/reading-sai/app/host/sessions/new"]}>
+        <Routes>
+          <Route path="/clubs/:clubSlug/app/host/sessions/new" element={<NewHostMeetingRoute />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => expect(routeMocks.recordScheduleDefaults).toHaveBeenCalledWith({ outcome: "success" }));
+  });
+
   it("applies safe per-field suggestions and creates one host-only hidden draft", async () => {
     const user = userEvent.setup();
     renderRoute();

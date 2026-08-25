@@ -7,7 +7,7 @@ import { RouterProvider } from "react-router/dom";
 import { AppRouteSecurityController } from "@/src/app/app-route-security-controller";
 import { signalHostAuthorityLoss } from "@/shared/api/host-authority-event";
 import { HOST_AUTHORITY_LOSS_HANDOFF_STATE_KEY } from "@/features/host/model/host-authority-navigation";
-import { useDraftRouteNavigationGuard } from "./host-draft-route-navigation-guard";
+import { useDraftRouteNavigationGuard } from "@/features/host/route/host-draft-route-navigation-guard";
 
 let queryClient: QueryClient;
 

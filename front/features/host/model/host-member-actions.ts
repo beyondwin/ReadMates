@@ -1,5 +1,6 @@
 import type {
   HostMemberProfileResponse,
+  HostMemberProfileErrorCode,
   HostMemberListPage,
   MemberLifecycleRequest,
   MemberLifecycleResponse,
@@ -11,7 +12,15 @@ export type HostMemberLifecyclePath =
   "/suspend" | "/deactivate" | "/restore" | "/current-session/add" | "/current-session/remove";
 export type HostViewerAction = "activate" | "deactivate-viewer";
 
-export type JsonResponse<T> = Response & { json(): Promise<T> };
+export class HostMemberProfileActionError extends Error {
+  constructor(
+    readonly status: number,
+    readonly code: HostMemberProfileErrorCode | null,
+  ) {
+    super("HOST_MEMBER_PROFILE_ACTION_FAILED");
+    this.name = "HostMemberProfileActionError";
+  }
+}
 
 export type HostMembersActions = {
   loadMembers: (page?: PageRequest) => Promise<HostMemberListPage>;
@@ -20,7 +29,7 @@ export type HostMembersActions = {
     membershipId: string,
     path: HostMemberLifecyclePath,
     body?: MemberLifecycleRequest,
-  ) => Promise<JsonResponse<MemberLifecycleResponse>>;
-  submitProfile: (membershipId: string, displayName: string) => Promise<JsonResponse<HostMemberProfileResponse>>;
+  ) => Promise<MemberLifecycleResponse>;
+  submitProfile: (membershipId: string, displayName: string) => Promise<HostMemberProfileResponse>;
   submitViewerAction: (membershipId: string, action: HostViewerAction) => Promise<ViewerMember>;
 };

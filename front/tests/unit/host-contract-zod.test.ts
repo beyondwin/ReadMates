@@ -324,6 +324,19 @@ describe("host-contract zod validators (DEV mode)", () => {
       items: [{ ...validHostSessionListItem, state: "PUBLISHED" }],
     }, "meeting")).toThrow();
   });
+
+  it("rejects provider detail from the public convergence browser contract", async () => {
+    const { HostPublicConvergenceViewSchema } = await import("@/features/host/api/host-contracts");
+    expect(() => HostPublicConvergenceViewSchema.parse({
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED",
+      committedGeneration: 7,
+      lastAttemptAt: "2026-08-26T04:30:00Z",
+      status: "FAILED",
+      retryable: true,
+      providerError: "upstream response body",
+    })).toThrow();
+  });
 });
 
 // ---- Production mode tests ---------------------------------------------------

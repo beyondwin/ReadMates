@@ -1,12 +1,15 @@
 import { apiErrorFromResponse, type ReadmatesApiError } from "./errors";
+import {
+  HOST_SECURITY_PURGE_CODES,
+  isHostSecurityPurgeCode,
+  type HostSecurityPurgeCode,
+} from "@/shared/model/host-authority";
 
-export const HOST_SECURITY_PURGE_CODES = [
-  "HOST_AUTHORITY_REVOKED",
-  "MEMBERSHIP_SUSPENDED",
-  "CROSS_CLUB_SCOPE",
-] as const;
-
-export type HostSecurityPurgeCode = (typeof HOST_SECURITY_PURGE_CODES)[number];
+export {
+  HOST_SECURITY_PURGE_CODES,
+  isHostSecurityPurgeCode,
+  type HostSecurityPurgeCode,
+};
 
 export type HostAuthorityLossEvent = {
   code: HostSecurityPurgeCode;
@@ -37,10 +40,6 @@ export class HostRequestPurgedError extends Error {
     super("호스트 권한 변경으로 진행 중인 요청을 중단했습니다.");
     this.name = "HostRequestPurgedError";
   }
-}
-
-export function isHostSecurityPurgeCode(code: string): code is HostSecurityPurgeCode {
-  return (HOST_SECURITY_PURGE_CODES as readonly string[]).includes(code);
 }
 
 export function subscribeHostAuthorityLoss(listener: HostAuthorityLossListener): () => void {

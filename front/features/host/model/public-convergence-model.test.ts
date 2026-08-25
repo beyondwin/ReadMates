@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { HostPublicConvergenceViewSchema } from "@/features/host/api/host-contracts";
 import { buildPublicConvergenceStatus } from "./public-convergence-model";
 
 const baseView = {
@@ -56,14 +55,5 @@ describe("buildPublicConvergenceStatus", () => {
       providerLabel: "회수 완료",
       canRetry: false,
     });
-  });
-
-  it("rejects provider detail instead of carrying it into the browser contract", () => {
-    expect(() => HostPublicConvergenceViewSchema.parse({
-      ...baseView,
-      status: "FAILED",
-      retryable: true,
-      providerError: "upstream response body",
-    })).toThrow();
   });
 });

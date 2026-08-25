@@ -5,11 +5,9 @@ import {
   normalizeTakedownReason,
   remoteCopyLimitationLabel,
   type AdminTakedownState,
+  type TakedownPreviewRequest,
+  type TakedownReasonCategory,
 } from "../model/platform-admin-takedown-model";
-import type {
-  TakedownPreviewRequest,
-  TakedownReasonCategory,
-} from "../api/platform-admin-takedown-contracts";
 
 type ConfirmInput = { reasonCategory: TakedownReasonCategory; reason: string };
 

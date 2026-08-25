@@ -30,11 +30,17 @@ import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireAuth, RequireMemberApp } from "@/src/app/route-guards";
 import { Link } from "@/src/app/router-link";
 import { loadMemberAppAuth } from "@/shared/auth/member-app-loader";
-import { canonicalizeCompatibilityEntry } from "@/src/app/workspace-route-model";
+import { canonicalizeCompatibilityEntry, resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { clubSelectionLoader } from "@/features/club-selection/route/club-selection-data";
 import { GuestCurrentSessionContent } from "@/src/pages/guest-current-session";
 import { GuestHomeContent } from "@/src/pages/guest-home";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
+
+const resolveMemberUnavailableTarget = (pathname: string) => resolveUnavailableDetailTarget({
+  pathname,
+  lastSafeTarget: readLastSafeWorkspaceTarget("member"),
+});
 
 // This route-only boundary is intentionally colocated with the router configuration.
 // eslint-disable-next-line react-refresh/only-export-components
@@ -329,7 +335,7 @@ function scopedMemberAppRoutes(queryClient: QueryClient): RouteObject[] {
           import("@/src/pages/member-session"),
           import("@/features/archive/route/member-session-detail-data"),
         ]);
-        return { Component, loader: memberSessionDetailLoaderFactory(queryClient) };
+        return { Component, loader: memberSessionDetailLoaderFactory(queryClient, resolveMemberUnavailableTarget) };
       },
     }),
     scopedMemberRoute({
@@ -524,7 +530,7 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
       errorElement: <ArchiveRouteError />,
       hydrateFallbackElement: <ArchiveRouteLoading label="지난 모임 기록을 불러오는 중" />,
       loader: scoped
-        ? scopedGuestRouteLoader(async () => (await import("@/features/archive/route/member-session-detail-data")).memberSessionDetailLoaderFactory(queryClient))
+        ? scopedGuestRouteLoader(async () => (await import("@/features/archive/route/member-session-detail-data")).memberSessionDetailLoaderFactory(queryClient, resolveMemberUnavailableTarget))
         : undefined,
       lazy: async () => {
         const [{ default: MemberSessionDetailRoutePage }, { memberSessionDetailLoaderFactory }] = await Promise.all([
@@ -533,7 +539,7 @@ function memberAppRoutes(queryClient: QueryClient, options: { includeIndex?: boo
         ]);
         return {
           Component: componentForScopedAudience(MemberSessionDetailRoutePage, scoped),
-          ...(scoped ? {} : { loader: memberSessionDetailLoaderFactory(queryClient) }),
+          ...(scoped ? {} : { loader: memberSessionDetailLoaderFactory(queryClient, resolveMemberUnavailableTarget) }),
         };
       },
     },

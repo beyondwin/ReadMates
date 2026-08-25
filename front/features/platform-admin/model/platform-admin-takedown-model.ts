@@ -6,6 +6,13 @@ import type {
   TakedownReceipt,
 } from "../api/platform-admin-takedown-contracts";
 
+export type TakedownReasonCategory = "PRIVACY" | "SECURITY" | "LEGAL" | "CONTENT_POLICY";
+export type TakedownPreviewRequest = {
+  clubId: string;
+  sessionId: string;
+  publicationId: string;
+};
+
 export type AdminTakedownState =
   | { kind: "idle" }
   | { kind: "preview"; preview: TakedownPreview }

@@ -109,6 +109,15 @@ const hostSessionDetail = {
     uploadedAt: null,
   },
   changeReceipt: null,
+  versions: {
+    sessionRevision: 0,
+    exposureRevision: 0,
+    participantSetRevision: 0,
+    recordDraftRevision: null,
+    liveRecordRevision: null,
+    publicationRevision: 0,
+  },
+  attendanceSnapshotId: "att:",
 };
 
 const hostSessionRecordEditor = {

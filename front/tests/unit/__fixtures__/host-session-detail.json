@@ -24,5 +24,14 @@
   "visibility": "PUBLIC",
   "accessScope": "GUEST_READABLE",
   "siteVisibility": "PUBLIC_RECORD",
-  "changeReceipt": null
+  "changeReceipt": null,
+  "versions": {
+    "sessionRevision": 0,
+    "exposureRevision": 0,
+    "participantSetRevision": 0,
+    "recordDraftRevision": null,
+    "liveRecordRevision": null,
+    "publicationRevision": 0
+  },
+  "attendanceSnapshotId": "att:"
 }

@@ -34,6 +34,7 @@ export type HostSessionEditorActions = {
   unpublishSession: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   returnSessionToDraft: (sessionId: string, request: HostSessionReverseRequest) => Promise<HostSessionLifecycleResult>;
   saveSession: (sessionId: string | null, request: HostSessionRequest) => Promise<Response>;
+  readCreatedSessionId: (response: Response) => Promise<string>;
   updateAttendance: (
     sessionId: string,
     attendance: Array<{ membershipId: string; attendanceStatus: AttendanceStatus }>,

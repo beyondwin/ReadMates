@@ -1,7 +1,10 @@
 import { useCallback, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
-import type { HostSessionEditorActions } from "./host-session-editor-actions";
+import {
+  readCreatedHostSessionId,
+  type HostSessionEditorActions,
+} from "./host-session-editor-actions";
 import { hostSessionLifecycleResultFromResponse } from "./host-session-lifecycle-result";
 import { hostSessionEditorPreviewActions } from "./host-session-editor-data";
 import {
@@ -72,6 +75,7 @@ export function useHostMeetingWorkspaceActions(
       sessionId === null
         ? createSession(request)
         : updateSession({ sessionId, request }),
+    readCreatedSessionId: readCreatedHostSessionId,
     updateAttendance: (sessionId, attendance) =>
       updateAttendance({ sessionId, attendance }),
     previewSessionImport: hostSessionEditorPreviewActions(context).previewSessionImport,

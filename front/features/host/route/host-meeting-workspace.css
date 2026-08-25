@@ -123,7 +123,7 @@
   padding: 2px 7px;
   border-radius: 999px;
   background: color-mix(in oklch, currentColor 10%, transparent);
-  font-size: var(--type-size-caption);
+  font-size: var(--type-size-label);
   overflow-wrap: anywhere;
 }
 
@@ -409,7 +409,7 @@
 .rm-meeting-response-ledger__facts dt,
 .rm-meeting-response-ledger__attendance > span {
   color: var(--text-3);
-  font-size: var(--type-size-caption);
+  font-size: var(--type-size-label);
 }
 
 .rm-meeting-response-ledger__facts dd {

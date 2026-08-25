@@ -34,7 +34,6 @@ import type {
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
 } from "@/features/host/model/host-session-workspace-navigation";
-import { readHostResponseJson } from "@/shared/api/host-authority-event";
 import { registerHostSensitiveState } from "@/features/host/storage/host-sensitive-storage";
 import { hostMeetingHref } from "@/features/host/model/host-meeting-ledger-model";
 import {
@@ -790,8 +789,8 @@ export default function HostSessionEditor({
         if (response.ok) {
           setSaveState("saved");
           if (isNewSession) {
-            const created = await readHostResponseJson<{ sessionId: string }>(response);
-            globalThis.location.href = scopedHostSessionEditHref(created.sessionId, clubSlug);
+            const createdSessionId = await actions.readCreatedSessionId(response);
+            globalThis.location.href = scopedHostSessionEditHref(createdSessionId, clubSlug);
             return;
           }
 

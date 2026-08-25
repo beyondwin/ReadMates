@@ -321,14 +321,22 @@ test("active members edit their profile from member space and refresh the accoun
   let refreshedDisplayName: string | null = null;
   let authPayload: Record<string, unknown> | null = null;
 
-  await page.route("**/api/bff/api/auth/me", async (route) => {
+  await page.route("**/api/bff/api/auth/me**", async (route) => {
     if (!authPayload) {
       const upstream = await route.fetch();
       authPayload = await upstream.json() as Record<string, unknown>;
     }
 
+    const displayName = refreshedDisplayName ?? authPayload.displayName;
+    const currentMembership = authPayload.currentMembership as Record<string, unknown> | undefined;
     await route.fulfill({
-      json: { ...authPayload, displayName: refreshedDisplayName ?? authPayload.displayName },
+      json: {
+        ...authPayload,
+        displayName,
+        currentMembership: currentMembership
+          ? { ...currentMembership, displayName }
+          : currentMembership,
+      },
     });
   });
   await page.route("**/api/bff/api/me/profile**", async (route) => {

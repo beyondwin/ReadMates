@@ -2,15 +2,14 @@ import { type CSSProperties, useMemo, useRef, useState } from "react";
 import { useInRouterContext, useLocation } from "react-router";
 import type {
   CurrentSessionPolicy,
-  HostMemberProfileErrorCode,
-  HostMemberProfileResponse,
   HostMemberListPage,
   HostMemberListItem,
   MemberLifecycleRequest,
-  MemberLifecycleResponse,
 } from "@/features/host/model/host-view-types";
-import type { HostMembersActions } from "@/features/host/model/host-member-actions";
-import { readHostResponseJson } from "@/shared/api/host-authority-event";
+import {
+  HostMemberProfileActionError,
+  type HostMembersActions,
+} from "@/features/host/model/host-member-actions";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
@@ -69,21 +68,6 @@ type MemberRowsState = {
   nextCursor: HostMemberListPage["nextCursor"];
 };
 type MemberRowsUpdate = HostMemberListItem[] | ((current: HostMemberListItem[]) => HostMemberListItem[]);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-async function hostProfileErrorCodeFromResponse(response: Response): Promise<HostMemberProfileErrorCode | null> {
-  try {
-    const body: unknown = await readHostResponseJson(response);
-    const code = isRecord(body) ? body.code : null;
-
-    return typeof code === "string" ? (code as HostMemberProfileErrorCode) : null;
-  } catch {
-    return null;
-  }
-}
 
 export default function HostMembers({ initialMembers, actions, LinkComponent = DefaultLinkComponent }: HostMembersProps) {
   const initialPage = useMemo(() => normalizeMemberPage(initialMembers), [initialMembers]);
@@ -227,12 +211,7 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     setMessage(null);
 
     try {
-      const response = await actions.submitLifecycle(member.membershipId, path, body);
-      if (!response.ok) {
-        throw new Error("Member lifecycle update failed");
-      }
-
-      const result = await readHostResponseJson<MemberLifecycleResponse>(response);
+      const result = await actions.submitLifecycle(member.membershipId, path, body);
       setMembers((current) =>
         current.map((item) => (item.membershipId === result.member.membershipId ? result.member : item)),
       );
@@ -290,18 +269,16 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     setMessage(null);
 
     try {
-      const response = await actions.submitProfile(member.membershipId, displayName);
-      if (!response.ok) {
-        throw new Error(hostProfileErrorMessage(response.status, await hostProfileErrorCodeFromResponse(response)));
-      }
-
-      const updatedMember = await readHostResponseJson<HostMemberProfileResponse>(response);
+      const updatedMember = await actions.submitProfile(member.membershipId, displayName);
       setMembers((current) =>
         current.map((item) => (item.membershipId === updatedMember.membershipId ? updatedMember : item)),
       );
       setMessage({ kind: "status", text: "이름을 저장했습니다." });
     } catch (error) {
-      throw new Error(profileFailureMessage(error), { cause: error });
+      const failure = error instanceof HostMemberProfileActionError
+        ? new Error(hostProfileErrorMessage(error.status, error.code), { cause: error })
+        : error;
+      throw new Error(profileFailureMessage(failure), { cause: error });
     } finally {
       setActionPending(key, false);
     }

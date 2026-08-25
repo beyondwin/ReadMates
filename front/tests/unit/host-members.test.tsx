@@ -10,6 +10,9 @@ import { createHostMembersActions, hostMembersLoaderFactory } from "@/features/h
 import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
+import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
+
+const hostContext = { clubSlug: "reading-sai" };
 
 function createTestQueryClient() {
   return new QueryClient({
@@ -133,9 +136,9 @@ const activeHostAuth: AuthMeResponse = {
 const noopHostMembersActions = {
   loadMembers: vi.fn(async () => []),
   refreshMembers: vi.fn(async () => ({ items: [], nextCursor: null })),
-  submitLifecycle: vi.fn(async () => lifecycleResponse(members[0])),
+  submitLifecycle: vi.fn(async () => ({ member: members[0], currentSessionPolicyResult: "APPLIED" as const })),
   submitViewerAction: vi.fn(async () => members[0]),
-  submitProfile: vi.fn(async () => memberListItemResponse(members[0])),
+  submitProfile: vi.fn(async () => members[0]),
 } satisfies HostMembersActions;
 
 type HostMembersProps = Parameters<typeof HostMembers>[0];
@@ -217,18 +220,32 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
     fetchMock.mockResolvedValueOnce(response);
   }
 
-  vi.stubGlobal("fetch", fetchMock);
+  vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    if (input.toString() === "/api/bff/__internal/client-contract-status") {
+      return Promise.resolve(new Response(JSON.stringify({
+        schemaVersion: 1,
+        supportedHostClientContracts: ["v3"],
+      }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      }));
+    }
+    return fetchMock(input, init);
+  }));
   const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
     [
       {
-        path: "/app/host/members",
+        path: "/clubs/:clubSlug/app/host/members",
         element: <HostMembersPage />,
         loader: hostMembersLoaderFactory(queryClient),
         hydrateFallbackElement: <div>멤버 목록을 불러오는 중</div>,
       },
     ],
-    { initialEntries: ["/app/host/members"] },
+    { initialEntries: ["/clubs/reading-sai/app/host/members"] },
   );
 
   render(
@@ -241,6 +258,7 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
 
 afterEach(() => {
   cleanup();
+  __resetHostClientContractCapabilityForTest();
   vi.clearAllMocks();
   vi.unstubAllGlobals();
 });
@@ -261,7 +279,7 @@ describe("HostMembersPage", () => {
     expect(screen.getByLabelText("멤버 운영 요약")).toHaveTextContent("이번 모임");
     expect(within(screen.getByText("멤버1").closest("article") as HTMLElement).getByText("이번 모임 참여")).toBeInTheDocument();
     expect(within(screen.getByText("새").closest("article") as HTMLElement).getByText("이번 모임 미포함")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members?limit=50", expect.objectContaining({ cache: "no-store" }));
+    expect(fetchMock).toHaveBeenCalledWith("/api/bff/api/host/members?limit=50&clubSlug=reading-sai", expect.objectContaining({ cache: "no-store" }));
   });
 
   it("renders each member row with identity, status, and current-session state", async () => {
@@ -356,7 +374,7 @@ describe("HostMembersPage", () => {
 
     await waitFor(() => {
       expect(fetchMock).toHaveBeenLastCalledWith(
-        "/api/bff/api/host/members/membership-active/profile",
+        "/api/bff/api/host/members/membership-active/profile?clubSlug=reading-sai",
         expect.objectContaining({
           method: "PATCH",
           body: JSON.stringify({ displayName: "새이름" }),
@@ -639,10 +657,10 @@ describe("HostMembersPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     const client = createTestQueryClient();
 
-    await createHostMembersActions(client).loadMembers({ limit: 50, cursor: "cursor-1" });
+    await createHostMembersActions(client, hostContext).loadMembers({ limit: 50, cursor: "cursor-1" });
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/host/members?limit=50&cursor=cursor-1",
+      "/api/bff/api/host/members?limit=50&cursor=cursor-1&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
@@ -770,12 +788,12 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("정식 멤버로 전환했습니다.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "/api/bff/api/host/members/membership-pending/activate",
+      "/api/bff/api/host/members/membership-pending/activate?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members?limit=50",
+      "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
 
@@ -860,12 +878,12 @@ describe("HostMembersPage", () => {
     expect(screen.getByText("둘러보기 멤버를 해제했습니다.")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "/api/bff/api/host/members/membership-pending/deactivate-viewer",
+      "/api/bff/api/host/members/membership-pending/deactivate-viewer?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members?limit=50",
+      "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
 
@@ -892,7 +910,7 @@ describe("HostMembersPage", () => {
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members?limit=50",
+      "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
@@ -982,7 +1000,7 @@ describe("HostMembersPage", () => {
     await user.click(within(screen.getByRole("dialog", { name: "멤버1님을 정지할까요?" })).getByRole("button", { name: "정지" }));
 
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/bff/api/host/members/membership-active/suspend",
+      "/api/bff/api/host/members/membership-active/suspend?clubSlug=reading-sai",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ currentSessionPolicy: "APPLY_NOW" }),
@@ -1001,7 +1019,7 @@ describe("HostMembersPage", () => {
     await user.click(suspendedRow.getByRole("button", { name: "복구" }));
 
     expect(fetchMock).toHaveBeenLastCalledWith(
-      "/api/bff/api/host/members/membership-suspended/restore",
+      "/api/bff/api/host/members/membership-suspended/restore?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(suspendedRow.getByRole("button", { name: "복구" })).toBeDisabled();
@@ -1029,12 +1047,12 @@ describe("HostMembersPage", () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(
       3,
-      "/api/bff/api/host/members/membership-active/current-session/remove",
+      "/api/bff/api/host/members/membership-active/current-session/remove?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
     expect(fetchMock).toHaveBeenNthCalledWith(
       4,
-      "/api/bff/api/host/members/membership-not-session/current-session/add",
+      "/api/bff/api/host/members/membership-not-session/current-session/add?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
   });
@@ -1101,7 +1119,7 @@ describe("HostMembersPage", () => {
 
     expect(await screen.findByText("멤버1")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/host/members?limit=50",
+      "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
   });
@@ -1123,7 +1141,7 @@ describe("HostMembersPage", () => {
 
     expect(await screen.findByText("갱신된 이름")).toBeInTheDocument();
     expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/api/host/members/membership-active/profile",
+      "/api/bff/api/host/members/membership-active/profile?clubSlug=reading-sai",
       expect.objectContaining({ method: "PATCH" }),
     );
   });

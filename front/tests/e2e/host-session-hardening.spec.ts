@@ -721,6 +721,12 @@ test("previous online meeting secrets stay out of create until explicit adoption
   });
 
   await loginWithGoogleFixture(page, "host@example.com");
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: () => false,
+    });
+  });
   const creates = collectCreateBodies(page);
   const telemetry = collectTelemetryPayloads(page);
   await page.route(`**${FRONTEND_OBSERVABILITY_BROWSER_PATH}`, async (route) => {
@@ -744,17 +750,16 @@ test("previous online meeting secrets stay out of create until explicit adoption
     await page.getByLabel("책 제목").fill("명시적 채택 책");
     await page.getByLabel("저자").fill("테스트 저자");
     await page.getByLabel("모임 날짜").fill("2026-07-01");
-    await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
+    await page.getByRole("form", { name: "새 모임 정보" }).getByRole("button", { name: "모임 초안 저장" }).click();
     await expect.poll(() => creates.bodies.length).toBe(1);
     expect(creates.bodies).not.toContainEqual(expect.objectContaining({ meetingPasscode: FIXTURE_PASSCODE }));
     expect(JSON.stringify(creates.bodies)).not.toContain(FIXTURE_PASSCODE);
-    await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
+    await expect(page.getByRole("button", { name: "멤버와 준비 시작" })).toBeVisible();
 
     await page.goto(`${HOST_PATH}/sessions/new`);
     await expect(page).toHaveURL(/\/sessions\/new/);
     await expect(page.getByLabel("모임 제목")).toBeVisible();
     await page.getByRole("button", { name: "이전 온라인 모임 정보 사용" }).click();
-    await page.getByRole("button", { name: "현재 모임에 적용" }).click();
     await expect(page.getByLabel("Passcode · 선택")).toHaveValue(FIXTURE_PASSCODE);
     await expect(page.getByLabel("미팅 URL")).toHaveValue(FIXTURE_MEETING_URL);
 

@@ -443,7 +443,7 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me/settings$`));
   await expect(page.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
   const appNavigation = page.getByRole("navigation", {
-    name: "앱 내비게이션",
+    name: "멤버 주 메뉴",
   });
   await expect(appNavigation.getByRole("link", {
     name: "내 공간",
