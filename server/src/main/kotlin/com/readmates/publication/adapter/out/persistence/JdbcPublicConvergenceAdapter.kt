@@ -24,6 +24,7 @@ import java.time.ZoneOffset
 import java.util.UUID
 
 @Component
+@Suppress("TooManyFunctions")
 class JdbcPublicConvergenceAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : PublicConvergencePort {
@@ -90,13 +91,14 @@ class JdbcPublicConvergenceAdapter(
             ).firstOrNull()
 
     @Transactional(isolation = Isolation.READ_COMMITTED)
+    @Suppress("LongMethod")
     override fun claimNext(
         leaseOwner: String,
         now: Instant,
         leaseDuration: Duration,
         maxAttempts: Int,
     ): PublicConvergenceClaim? {
-        require(leaseOwner.isNotBlank() && leaseOwner.length <= 128)
+        require(leaseOwner.isNotBlank() && leaseOwner.length <= MAX_LEASE_OWNER_LENGTH)
         val nowUtc = now.utc()
         val row =
             jdbcTemplate
@@ -169,6 +171,7 @@ class JdbcPublicConvergenceAdapter(
     }
 
     @Transactional
+    @Suppress("LongMethod", "ReturnCount")
     override fun completeAttempt(
         claim: PublicConvergenceClaim,
         result: ProviderAttemptResult,
@@ -245,6 +248,7 @@ class JdbcPublicConvergenceAdapter(
     ): PublicConvergenceView? = loadLatestViewInternal(clubId, sessionId, maxAttempts)
 
     @Transactional
+    @Suppress("ReturnCount")
     override fun requestRetry(
         clubId: UUID,
         sessionId: UUID,
@@ -294,6 +298,7 @@ class JdbcPublicConvergenceAdapter(
     }
 
     @Transactional
+    @Suppress("ReturnCount")
     override fun requestAdminTakedownRetry(
         receiptId: UUID,
         now: Instant,
@@ -374,6 +379,7 @@ class JdbcPublicConvergenceAdapter(
                 scope.publicationId.dbString(),
             ).firstOrNull()
 
+    @Suppress("ReturnCount")
     private fun appendRetry(
         work: RetryRow,
         now: Instant,
@@ -515,6 +521,10 @@ class JdbcPublicConvergenceAdapter(
             ).firstOrNull()
 
     private fun Instant.utc(): LocalDateTime = atOffset(ZoneOffset.UTC).toLocalDateTime()
+
+    private companion object {
+        const val MAX_LEASE_OWNER_LENGTH = 128
+    }
 
     private data class ClaimRow(
         val convergenceId: UUID,

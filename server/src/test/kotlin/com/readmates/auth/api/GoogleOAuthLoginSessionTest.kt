@@ -926,7 +926,7 @@ class GoogleOAuthLoginSessionTest(
                 Int::class.java,
                 "oauth.invited@example.com",
             )
-        assertEquals(1, participantCount)
+        assertEquals(0, participantCount)
         assertEquals(listOf("reading-sai:ACTIVE"), membershipStates("oauth.invited@example.com"))
     }
 

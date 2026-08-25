@@ -368,25 +368,31 @@ class HostSessionDeletionQueries(
         }
     }
 
+    @Suppress("LongMethod")
     private fun countDeletionBlockers(
         clubId: UUID,
         sessionId: UUID,
     ) = hostSessionDeletionBlockers(
         revisionCount =
             countSessionRows(
-                "select count(*) from session_record_revisions where club_id = ? and session_id = ?",
+                "select count(*) from session_record_revisions where club_id = ? and session_id = ? for update",
                 clubId,
                 sessionId,
             ),
         decisionCount =
             countSessionRows(
-                "select count(*) from host_action_notification_decisions where club_id = ? and session_id = ?",
+                """
+                select count(*)
+                from host_action_notification_decisions
+                where club_id = ? and session_id = ?
+                for update
+                """.trimIndent(),
                 clubId,
                 sessionId,
             ),
         manualDispatchCount =
             countSessionRows(
-                "select count(*) from notification_manual_dispatches where club_id = ? and session_id = ?",
+                "select count(*) from notification_manual_dispatches where club_id = ? and session_id = ? for update",
                 clubId,
                 sessionId,
             ),
@@ -398,6 +404,7 @@ class HostSessionDeletionQueries(
                 where club_id = ?
                   and aggregate_type = 'SESSION'
                   and aggregate_id = ?
+                for update
                 """.trimIndent(),
                 clubId,
                 sessionId,
@@ -412,6 +419,7 @@ class HostSessionDeletionQueries(
                 where e.club_id = ?
                   and e.aggregate_type = 'SESSION'
                   and e.aggregate_id = ?
+                for update
                 """.trimIndent(),
                 clubId,
                 sessionId,
@@ -426,6 +434,7 @@ class HostSessionDeletionQueries(
                 where e.club_id = ?
                   and e.aggregate_type = 'SESSION'
                   and e.aggregate_id = ?
+                for update
                 """.trimIndent(),
                 clubId,
                 sessionId,

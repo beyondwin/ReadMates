@@ -19,10 +19,7 @@ import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
-import org.springframework.boot.test.context.TestConfiguration
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
-import org.springframework.context.annotation.Bean
-import org.springframework.context.annotation.Primary
 import org.springframework.http.MediaType
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
@@ -39,6 +36,7 @@ import java.time.LocalDate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
@@ -317,6 +315,7 @@ class HostSessionControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val hostSessionDraftPort: HostSessionDraftPort,
+    @param:Autowired private val dataSource: DataSource,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val jsonMapper = tools.jackson.databind.ObjectMapper()
 
@@ -1304,7 +1303,13 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]"""
+                content =
+                    """
+                    [{
+                      "membershipId":"$membershipId","attendanceStatus":"ABSENT",
+                      "expectedAttendanceRevision":0
+                    }]
+                    """.trimIndent()
             }.andExpect {
                 status { isOk() }
             }
@@ -2136,6 +2141,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host cannot publish open draft host only or unpublished sessions`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
@@ -2209,19 +2215,40 @@ class HostSessionControllerDbTest(
     fun `host close does not overwrite session state changed before close update`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
-
-        HostSessionCloseRaceProbe.publishBeforeNextCloseUpdate(sessionId)
-        try {
-            mockMvc
-                .post("/api/host/sessions/$sessionId/close") {
-                    with(user("host@example.com"))
-                    with(csrf())
-                    withExpectedRevision(sessionId)
-                }.andExpect {
-                    status { isConflict() }
+        val executor = Executors.newSingleThreadExecutor()
+        dataSource.connection.use { contender ->
+            contender.autoCommit = false
+            contender
+                .prepareStatement(
+                    """
+                    update sessions
+                    set state = 'PUBLISHED', visibility = 'MEMBER'
+                    where id = ?
+                      and club_id = '00000000-0000-0000-0000-000000000001'
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, sessionId)
+                    assertEquals(1, statement.executeUpdate())
                 }
-        } finally {
-            HostSessionCloseRaceProbe.clear()
+            try {
+                val close =
+                    executor.submit<org.springframework.test.web.servlet.MvcResult> {
+                        mockMvc
+                            .post("/api/host/sessions/$sessionId/close") {
+                                with(user("host@example.com"))
+                                with(csrf())
+                                withExpectedRevision(sessionId)
+                            }.andReturn()
+                    }
+                assertThrows<TimeoutException> { close.get(250, TimeUnit.MILLISECONDS) }
+                contender.commit()
+                assertEquals(409, close.get(10, TimeUnit.SECONDS).response.status)
+            } finally {
+                if (!contender.autoCommit) {
+                    contender.rollback()
+                }
+                executor.shutdownNow()
+            }
         }
 
         assertEquals("PUBLISHED", findSessionState(sessionId))
@@ -2503,6 +2530,7 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `host unpublishes a published session`() {
         val sessionId = createDraftSessionSeven()
         mockMvc
@@ -2926,7 +2954,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"LEGACY_UNSPECIFIED"}"""
+                content = reverseBody(sessionId, "LEGACY_UNSPECIFIED")
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2937,7 +2965,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"EMPTY_SESSION_DELETED"}"""
+                content = reverseBody(sessionId, "EMPTY_SESSION_DELETED")
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -3006,7 +3034,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"ACCIDENTAL_TRANSITION"}"""
+                content = reverseBody(sessionId, "ACCIDENTAL_TRANSITION")
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
@@ -3051,7 +3079,7 @@ class HostSessionControllerDbTest(
                 with(csrf())
                 header(RequestIdFilter.HEADER, requestId)
                 contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision": ${sessionRevision(sessionId)}, "reasonCode":"OPERATIONAL_RECOVERY"}"""
+                content = reverseBody(sessionId, "OPERATIONAL_RECOVERY")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -3902,6 +3930,17 @@ class HostSessionControllerDbTest(
                 expectedSessionRevision?.let { put("expectedSessionRevision", it) }
             },
         )
+
+    private fun reverseBody(
+        sessionId: String,
+        reasonCode: String,
+    ): String =
+        """
+        {
+          "expectedSessionRevision": ${sessionRevision(sessionId)},
+          "reasonCode":"$reasonCode"
+        }
+        """.trimIndent()
 
     private fun sessionRevision(sessionId: String): Long =
         jdbcTemplate
@@ -5211,69 +5250,4 @@ class HostSessionControllerDbTest(
             """.trimIndent(),
             sessionId,
         )
-
-    @TestConfiguration
-    class CloseRaceJdbcTemplateConfig {
-        @Bean
-        @Primary
-        fun closeRaceJdbcTemplate(dataSource: DataSource): JdbcTemplate = CloseRaceJdbcTemplate(dataSource)
-    }
-}
-
-private object HostSessionCloseRaceProbe {
-    private val targetSessionId = ThreadLocal<String>()
-
-    fun publishBeforeNextCloseUpdate(sessionId: String) {
-        targetSessionId.set(sessionId)
-    }
-
-    fun clear() {
-        targetSessionId.remove()
-    }
-
-    fun consumeIfMatches(
-        sql: String,
-        args: Array<out Any?>,
-    ): String? {
-        val sessionId = targetSessionId.get() ?: return null
-        val normalizedSql = sql.trimIndent().replace(Regex("\\s+"), " ")
-        val isHostSessionCloseUpdate =
-            normalizedSql.startsWith("update sessions set state = 'CLOSED'") &&
-                normalizedSql.contains("session_revision = session_revision + 1")
-        if (!isHostSessionCloseUpdate || args.firstOrNull() != sessionId) {
-            return null
-        }
-
-        targetSessionId.remove()
-        return sessionId
-    }
-}
-
-private class CloseRaceJdbcTemplate(
-    private val rawDataSource: DataSource,
-) : JdbcTemplate(rawDataSource) {
-    override fun update(
-        sql: String,
-        vararg args: Any?,
-    ): Int {
-        val sessionId = HostSessionCloseRaceProbe.consumeIfMatches(sql, args)
-        if (sessionId != null) {
-            rawDataSource.connection.use { connection ->
-                connection.autoCommit = true
-                connection
-                    .prepareStatement(
-                        """
-                        update sessions
-                        set state = 'PUBLISHED', visibility = 'MEMBER'
-                        where id = ?
-                          and club_id = '00000000-0000-0000-0000-000000000001'
-                        """.trimIndent(),
-                    ).use { statement ->
-                        statement.setString(1, sessionId)
-                        statement.executeUpdate()
-                    }
-            }
-        }
-        return super.update(sql, *args)
-    }
 }

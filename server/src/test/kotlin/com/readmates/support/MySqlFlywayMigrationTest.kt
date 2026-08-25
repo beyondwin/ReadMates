@@ -82,7 +82,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(12)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(13)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -94,7 +94,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("54")
+            assertThat(latestVersion).isEqualTo("55")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -375,7 +375,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(10)
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(11)
             val latestVersion =
                 upgradeJdbc.queryForObject(
                     """
@@ -387,7 +387,7 @@ class MySqlFlywayMigrationTest(
                     """.trimIndent(),
                     String::class.java,
                 )
-            assertThat(latestVersion).isEqualTo("54")
+            assertThat(latestVersion).isEqualTo("55")
             assertV52RevisionSchema(upgradeJdbc)
             assertV52RevisionBackfill(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
@@ -1653,7 +1653,7 @@ class MySqlFlywayMigrationTest(
                     .migrate()
             val jdbc = JdbcTemplate(dataSource)
 
-            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("54")
+            assertThat(migrateResult.targetSchemaVersion.toString()).isEqualTo("55")
             assertV52RevisionSchema(jdbc)
             assertV53IdempotencySchema(jdbc)
             assertV54ProjectionConvergenceSchema(jdbc)
@@ -1769,7 +1769,7 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgrade.migrationsExecuted).isEqualTo(2)
+            assertThat(upgrade.migrationsExecuted).isEqualTo(3)
             assertThat(
                 jdbc.queryForMap(
                     """
@@ -1846,8 +1846,8 @@ class MySqlFlywayMigrationTest(
                     .load()
                     .migrate()
 
-            assertThat(upgradeResult.migrationsExecuted).isEqualTo(3)
-            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("54")
+            assertThat(upgradeResult.migrationsExecuted).isEqualTo(4)
+            assertThat(upgradeResult.targetSchemaVersion.toString()).isEqualTo("55")
             assertV52RevisionSchema(upgradeJdbc)
             assertV53IdempotencySchema(upgradeJdbc)
             assertV54ProjectionConvergenceSchema(upgradeJdbc)

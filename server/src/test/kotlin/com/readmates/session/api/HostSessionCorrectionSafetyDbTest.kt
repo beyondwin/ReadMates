@@ -319,7 +319,7 @@ class HostSessionCorrectionSafetyDbTest(
             .post("/api/host/sessions/$sessionId/publish") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content = envelope("key-initial-publish-01", publishVectorJson(sessionId), "{}")
+                content = envelope("key-initial-publish-${UUID.randomUUID()}", publishVectorJson(sessionId), "{}")
             }.andExpect { status { isOk() } }
         return sessionId
     }
@@ -425,6 +425,7 @@ class HostSessionCorrectionSafetyDbTest(
     }
 
     private fun applyRecord(sessionId: String) {
+        val applyRequestId = UUID.randomUUID()
         val hash =
             mockMvc
                 .post("/api/host/sessions/$sessionId/record-apply-preview") {
@@ -443,9 +444,9 @@ class HostSessionCorrectionSafetyDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     envelope(
-                        "key-initial-apply-01",
+                        "key-initial-apply-$applyRequestId",
                         """{"draftRevision":1,"liveRevision":0}""",
-                        """{"applyRequestId":"00000000-0000-4000-8000-000000000701","expectedDraftHash":"$hash"}""",
+                        """{"applyRequestId":"$applyRequestId","expectedDraftHash":"$hash"}""",
                     )
             }.andExpect { status { isOk() } }
     }
@@ -457,7 +458,7 @@ class HostSessionCorrectionSafetyDbTest(
                 contentType = MediaType.APPLICATION_JSON
                 content =
                     envelope(
-                        "key-initial-placement-01",
+                        "key-initial-placement-${UUID.randomUUID()}",
                         """{"publicationRevision":${publicationRevision(sessionId)}}""",
                         """{"publicSummary":"initial summary","siteVisibility":"PUBLIC_RECORD"}""",
                     )

@@ -828,13 +828,14 @@ class HostSessionExposurePublicationDbTest(
     private fun publishedSessionWithInitialRecord(): String {
         val sessionId = closedGuestReadableSession("correction publish")
         saveRecordDraft(sessionId, "initial", "MEMBER")
-        applyRecord(sessionId, "00000000-0000-4000-8000-000000000701", "key-initial-apply-01")
-        placePublicRecord(sessionId, "initial summary", "key-initial-placement-01")
+        val applyRequestId = UUID.randomUUID().toString()
+        applyRecord(sessionId, applyRequestId, "key-initial-apply-$applyRequestId")
+        placePublicRecord(sessionId, "initial summary", "key-initial-placement-${UUID.randomUUID()}")
         mockMvc
             .post("/api/host/sessions/$sessionId/publish") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content = envelope("key-initial-publish-01", publishVectorJson(sessionId), "{}")
+                content = envelope("key-initial-publish-${UUID.randomUUID()}", publishVectorJson(sessionId), "{}")
             }.andExpect { status { isOk() } }
         return sessionId
     }

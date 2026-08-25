@@ -68,7 +68,9 @@ class ApiErrorResponseTest {
             )
         val validation =
             jsonMapper.readTree(
-                jsonMapper.writeValueAsString(ApiErrorResponse("INVALID_REQUEST", "invalid", 400, field = "meetingTime")),
+                jsonMapper.writeValueAsString(
+                    ApiErrorResponse("INVALID_REQUEST", "invalid", 400, field = "meetingTime"),
+                ),
             )
 
         assertThat(existing.has("field")).isFalse()

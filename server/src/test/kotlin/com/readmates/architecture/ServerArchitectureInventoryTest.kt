@@ -106,6 +106,7 @@ class ServerArchitectureInventoryTest {
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `mutation idempotency substrate stays shared and session receipts stay session owned`() {
         val productionSourceRoot = projectRoot().resolve("server/src/main/kotlin")
         val mutationRoot = productionSourceRoot.resolve("com/readmates/shared/mutation")
@@ -164,7 +165,8 @@ class ServerArchitectureInventoryTest {
         val confirmTest =
             Files.readString(
                 projectRoot().resolve(
-                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/JdbcManualNotificationDispatchAdapterTest.kt",
+                    "server/src/test/kotlin/com/readmates/notification/adapter/out/persistence/" +
+                        "JdbcManualNotificationDispatchAdapterTest.kt",
                 ),
             )
         assertThat(confirmTest).doesNotContain("HostMutationReceipt")

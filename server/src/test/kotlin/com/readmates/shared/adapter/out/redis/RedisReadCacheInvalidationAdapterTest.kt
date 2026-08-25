@@ -12,6 +12,7 @@ import com.readmates.note.application.service.NotesFeedService
 import com.readmates.publication.adapter.out.redis.RedisPublicReadCacheAdapter
 import com.readmates.publication.application.model.PublicClubResult
 import com.readmates.publication.application.model.PublicClubStatsResult
+import com.readmates.publication.application.model.PublicProjectionGeneration
 import com.readmates.publication.application.model.PublicSessionDetailResult
 import com.readmates.publication.application.port.out.LoadPublishedPublicDataPort
 import com.readmates.publication.application.service.PublicQueryService
@@ -108,7 +109,13 @@ class RedisReadCacheInvalidationAdapterTest(
 
             assertEquals(
                 "Target cached summary",
-                publicCache.getSession(TARGET_CLUB_ID, SESSION_ID)?.summary,
+                publicCache
+                    .getSession(
+                        TARGET_CLUB_ID,
+                        TARGET_CLUB_GENERATION,
+                        TARGET_SESSION_GENERATION,
+                        SESSION_ID,
+                    )?.summary,
             )
             assertEquals(
                 "Target cached note",
@@ -128,11 +135,19 @@ class RedisReadCacheInvalidationAdapterTest(
         assertEquals("Refetched source note", notesResult.items.single().text)
         assertEquals(
             "Refetched source summary",
-            publicCache.getSession(TARGET_CLUB_ID, SESSION_ID)?.summary,
+            publicCache
+                .getSession(TARGET_CLUB_ID, TARGET_CLUB_GENERATION, TARGET_SESSION_GENERATION, SESSION_ID)
+                ?.summary,
         )
         assertEquals(
             "Unrelated cached summary",
-            publicCache.getSession(UNRELATED_CLUB_ID, OTHER_SESSION_ID)?.summary,
+            publicCache
+                .getSession(
+                    UNRELATED_CLUB_ID,
+                    UNRELATED_CLUB_GENERATION,
+                    UNRELATED_SESSION_GENERATION,
+                    OTHER_SESSION_ID,
+                )?.summary,
         )
         assertEquals(
             "Unrelated cached note",
@@ -145,6 +160,8 @@ class RedisReadCacheInvalidationAdapterTest(
         redisTemplate.delete(cleanupKeys)
         publicCache.putSession(
             TARGET_CLUB_ID,
+            TARGET_CLUB_GENERATION,
+            TARGET_SESSION_GENERATION,
             SESSION_ID,
             publicSession(SESSION_ID, "Stale cached summary"),
         )
@@ -326,14 +343,18 @@ class RedisReadCacheInvalidationAdapterTest(
     private fun seedRealReadCaches() {
         redisTemplate.delete(cleanupKeys)
 
-        publicCache.putClub(TARGET_CLUB_ID, publicClub("Target cached club"))
+        publicCache.putClub(TARGET_CLUB_ID, TARGET_CLUB_GENERATION, publicClub("Target cached club"))
         publicCache.putSession(
             TARGET_CLUB_ID,
+            TARGET_CLUB_GENERATION,
+            TARGET_SESSION_GENERATION,
             SESSION_ID,
             publicSession(SESSION_ID, "Target cached summary"),
         )
         publicCache.putSession(
             TARGET_CLUB_ID,
+            TARGET_CLUB_GENERATION,
+            TARGET_OTHER_SESSION_GENERATION,
             OTHER_SESSION_ID,
             publicSession(OTHER_SESSION_ID, "Target second cached summary"),
         )
@@ -345,14 +366,18 @@ class RedisReadCacheInvalidationAdapterTest(
             listOf(noteFeedItem("Target cached session note")),
         )
 
-        publicCache.putClub(UNRELATED_CLUB_ID, publicClub("Unrelated cached club"))
+        publicCache.putClub(UNRELATED_CLUB_ID, UNRELATED_CLUB_GENERATION, publicClub("Unrelated cached club"))
         publicCache.putSession(
             UNRELATED_CLUB_ID,
+            UNRELATED_CLUB_GENERATION,
+            UNRELATED_FIRST_SESSION_GENERATION,
             SESSION_ID,
             publicSession(SESSION_ID, "Unrelated first cached summary"),
         )
         publicCache.putSession(
             UNRELATED_CLUB_ID,
+            UNRELATED_CLUB_GENERATION,
+            UNRELATED_SESSION_GENERATION,
             OTHER_SESSION_ID,
             publicSession(OTHER_SESSION_ID, "Unrelated cached summary"),
         )
@@ -396,6 +421,16 @@ class RedisReadCacheInvalidationAdapterTest(
             loadPublishedPublicDataPort =
                 SourcePublicLoader(
                     session = publicSession(SESSION_ID, summary),
+                    marker =
+                        PublicProjectionGeneration(
+                            publicationId = null,
+                            clubId = TARGET_CLUB_ID,
+                            sessionId = SESSION_ID,
+                            generation = TARGET_SESSION_GENERATION,
+                            clubGeneration = TARGET_CLUB_GENERATION,
+                            liveRecordRevision = 0,
+                            originReadable = true,
+                        ),
                 ),
             cache = publicCache,
             resolveClubContextUseCase = StaticClubContextResolver(TARGET_CLUB_ID),
@@ -483,14 +518,27 @@ class RedisReadCacheInvalidationAdapterTest(
         private val SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000803")
         private val OTHER_SESSION_ID: UUID = UUID.fromString("00000000-0000-0000-0000-000000000804")
         private const val TARGET_CLUB_SLUG = "target-reading-club"
+        private const val TARGET_CLUB_GENERATION = 7L
+        private const val TARGET_SESSION_GENERATION = 11L
+        private const val TARGET_OTHER_SESSION_GENERATION = 12L
+        private const val UNRELATED_CLUB_GENERATION = 8L
+        private const val UNRELATED_FIRST_SESSION_GENERATION = 13L
+        private const val UNRELATED_SESSION_GENERATION = 14L
         private val NOTES_FIRST_PAGE = PageRequest.cursor(null, null, defaultLimit = 60, maxLimit = 120)
 
-        private val PUBLIC_CLUB_KEY = "public:club:$TARGET_CLUB_ID:home:v1"
-        private val UNRELATED_PUBLIC_CLUB_KEY = "public:club:$UNRELATED_CLUB_ID:home:v1"
+        private val PUBLIC_CLUB_KEY = "public:club:$TARGET_CLUB_ID:g:$TARGET_CLUB_GENERATION:home:v2"
+        private val UNRELATED_PUBLIC_CLUB_KEY =
+            "public:club:$UNRELATED_CLUB_ID:g:$UNRELATED_CLUB_GENERATION:home:v2"
 
-        private fun publicSessionKey(sessionId: UUID) = "public:club:$TARGET_CLUB_ID:session:$sessionId:v1"
+        private fun publicSessionKey(
+            sessionId: UUID,
+            generation: Long,
+        ) = "public:club:$TARGET_CLUB_ID:g:$TARGET_CLUB_GENERATION:session:$sessionId:g:$generation:v2"
 
-        private fun unrelatedPublicSessionKey(sessionId: UUID) = "public:club:$UNRELATED_CLUB_ID:session:$sessionId:v1"
+        private fun unrelatedPublicSessionKey(
+            sessionId: UUID,
+            generation: Long,
+        ) = "public:club:$UNRELATED_CLUB_ID:g:$UNRELATED_CLUB_GENERATION:session:$sessionId:g:$generation:v2"
 
         private fun notesFeedKey(clubId: UUID) = "notes:club:$clubId:feed:v1"
 
@@ -504,8 +552,8 @@ class RedisReadCacheInvalidationAdapterTest(
         private val targetKeys =
             setOf(
                 PUBLIC_CLUB_KEY,
-                publicSessionKey(SESSION_ID),
-                publicSessionKey(OTHER_SESSION_ID),
+                publicSessionKey(SESSION_ID, TARGET_SESSION_GENERATION),
+                publicSessionKey(OTHER_SESSION_ID, TARGET_OTHER_SESSION_GENERATION),
                 notesFeedKey(TARGET_CLUB_ID),
                 notesSessionsKey(TARGET_CLUB_ID),
                 notesSessionFeedKey(TARGET_CLUB_ID, SESSION_ID),
@@ -513,8 +561,8 @@ class RedisReadCacheInvalidationAdapterTest(
         private val unrelatedClubKeys =
             setOf(
                 UNRELATED_PUBLIC_CLUB_KEY,
-                unrelatedPublicSessionKey(SESSION_ID),
-                unrelatedPublicSessionKey(OTHER_SESSION_ID),
+                unrelatedPublicSessionKey(SESSION_ID, UNRELATED_FIRST_SESSION_GENERATION),
+                unrelatedPublicSessionKey(OTHER_SESSION_ID, UNRELATED_SESSION_GENERATION),
                 notesFeedKey(UNRELATED_CLUB_ID),
                 notesSessionsKey(UNRELATED_CLUB_ID),
                 notesSessionFeedKey(UNRELATED_CLUB_ID, OTHER_SESSION_ID),
@@ -568,6 +616,7 @@ private class StaticClubContextResolver(
 
 private class SourcePublicLoader(
     private val session: PublicSessionDetailResult,
+    private val marker: PublicProjectionGeneration,
 ) : LoadPublishedPublicDataPort {
     override fun loadClub(): PublicClubResult? = null
 
@@ -579,6 +628,11 @@ private class SourcePublicLoader(
         clubSlug: String,
         sessionId: UUID,
     ): PublicSessionDetailResult = session
+
+    override fun loadSessionProjectionGeneration(
+        clubSlug: String,
+        sessionId: UUID,
+    ): PublicProjectionGeneration = marker
 }
 
 private class SourceNotesLoader(

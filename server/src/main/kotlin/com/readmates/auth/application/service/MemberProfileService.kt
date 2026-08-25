@@ -186,6 +186,7 @@ class MemberProfileService(
         return member
     }
 
+    @Suppress("ThrowsCount")
     private fun updateHostDisplayName(
         clubId: UUID,
         membershipId: UUID,
@@ -223,6 +224,7 @@ class MemberProfileService(
         )
     }
 
+    @Suppress("ThrowsCount")
     private fun updateOwnDisplayName(
         clubId: UUID,
         membershipId: UUID,

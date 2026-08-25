@@ -86,7 +86,14 @@ class HostListCursorSignerTest {
         val unknownVersion = "99.${parts[1]}.${parts[2]}"
         val wrongKey = signWith("other-host-list-cursor-key", CURRENT_VERSION, PAYLOAD)
 
-        listOf("${parts[0]}.${parts[1]}.$mutatedMac", retired, unknownVersion, wrongKey, "not-a-cursor", "").forEach { raw ->
+        listOf(
+            "${parts[0]}.${parts[1]}.$mutatedMac",
+            retired,
+            unknownVersion,
+            wrongKey,
+            "not-a-cursor",
+            "",
+        ).forEach { raw ->
             assertThrows<InvalidHostListCursorException> { signer.verify(raw) }
         }
         assertNoSensitiveLogs()
@@ -117,7 +124,11 @@ class HostListCursorSignerTest {
             "meetingDate" to PAYLOAD.replace("2026-08-01", "2026-08-02"),
             "stateRank" to PAYLOAD.replace("\"stateRank\":0", "\"stateRank\":1"),
             "sessionNumber" to PAYLOAD.replace("\"sessionNumber\":8", "\"sessionNumber\":7"),
-            "sessionId" to PAYLOAD.replace("00000000-0000-4000-8000-0000000000aa", "00000000-0000-4000-8000-0000000000ab"),
+            "sessionId" to
+                PAYLOAD.replace(
+                    "00000000-0000-4000-8000-0000000000aa",
+                    "00000000-0000-4000-8000-0000000000ab",
+                ),
         )
 
     private fun reencode(
@@ -179,7 +190,8 @@ class HostListCursorSignerTest {
         const val PAYLOAD =
             """{"clubId":"00000000-0000-4000-8000-000000000001","epoch":3,"evaluatedAt":"2026-08-22T00:00:00Z",""" +
                 """"expiry":"2026-08-23T00:00:00Z","fingerprint":"abc123","keyVersion":1,""" +
-                """"last":{"attentionRank":0,"meetingDate":"2026-08-01","sessionId":"00000000-0000-4000-8000-0000000000aa",""" +
+                """"last":{"attentionRank":0,"meetingDate":"2026-08-01",""" +
+                """"sessionId":"00000000-0000-4000-8000-0000000000aa",""" +
                 """"sessionNumber":8,"stateRank":0},"mode":"meeting","orderingVersion":"host-list-v1",""" +
                 """"states":["DRAFT","OPEN"]}"""
     }

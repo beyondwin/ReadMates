@@ -362,6 +362,7 @@ private fun jacksonImportsIn(serviceRoot: Path): List<String> =
     }
 
 @Tag("architecture")
+@Suppress("LargeClass")
 class ServerArchitectureBoundaryTest {
     @Test
     fun `notification decomposition boundaries remain focused`() = assertNotificationAndAiRedisBoundaries()
@@ -745,7 +746,7 @@ class ServerArchitectureBoundaryTest {
     }
 
     @Test
-    fun `publication scheduling inbound adapter depends on application ports instead of services or outbound adapters`() {
+    fun `publication scheduling adapter depends on application ports rather than concrete services`() {
         noClasses()
             .that()
             .resideInAnyPackage("com.readmates.publication.adapter.in.scheduling..")

@@ -158,16 +158,16 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `referenced digest key retirement is fail closed until purge and buffer elapse`() {
         val identity = identity("retire-key")
-        val v1 = service(properties = keyPair(current = KEY_V1, currentVersion = 1))
+        val v1 = service(properties = keyPair(current = KEY_V1, currentVersion = RETIREMENT_KEY_V1))
         v1.claim(identity, payload())
         val rotated =
             service(
                 properties =
                     keyPair(
                         current = KEY_V2,
-                        currentVersion = 2,
+                        currentVersion = RETIREMENT_KEY_V2,
                         previous = KEY_V1,
-                        previousVersion = 1,
+                        previousVersion = RETIREMENT_KEY_V1,
                     ),
             )
         assertThatThrownBy { rotated.retirePreviousKey() }
@@ -178,8 +178,9 @@ class JdbcMutationIdempotencyAdapterDbTest(
             .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
         clock.instant = clock.instant.plus(Duration.ofHours(24))
         rotated.retirePreviousKey()
-        val retired = service(properties = keyPair(current = KEY_V2, currentVersion = 2))
-        assertThat(retired.claim(identity("post-retire-key"), payload())).isInstanceOf(MutationClaimResult.Claimed::class.java)
+        val retired = service(properties = keyPair(current = KEY_V2, currentVersion = RETIREMENT_KEY_V2))
+        assertThat(retired.claim(identity("post-retire-key"), payload()))
+            .isInstanceOf(MutationClaimResult.Claimed::class.java)
     }
 
     @Test
@@ -215,7 +216,11 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `tables logs and receipt dto never persist raw canonical url passcode sha or hmac secret`() {
         val identity = identity("secret-key")
-        val claimed = service().claim(identity, payload(meetingUrl = SENSITIVE_URL, meetingPasscode = SENSITIVE_PASSCODE))
+        val claimed =
+            service().claim(
+                identity,
+                payload(meetingUrl = SENSITIVE_URL, meetingPasscode = SENSITIVE_PASSCODE),
+            )
         assertThat(claimed).isInstanceOf(MutationClaimResult.Claimed::class.java)
         val receiptId = insertReceipt()
         receipts.insert(
@@ -286,18 +291,18 @@ class JdbcMutationIdempotencyAdapterDbTest(
 
     @Test
     fun `immutable public takedown receipt blocks digest key retirement and startup without that key`() {
-        insertPublicTakedownReceipt(digestKeyVersion = 1)
-        assertThat(adapter.countByDigestKeyVersion(1)).isEqualTo(1)
-        assertThat(adapter.referencedDigestKeyVersions()).contains(1)
+        insertPublicTakedownReceipt(digestKeyVersion = TAKEDOWN_KEY_V1)
+        assertThat(adapter.countByDigestKeyVersion(TAKEDOWN_KEY_V1)).isEqualTo(1)
+        assertThat(adapter.referencedDigestKeyVersions()).contains(TAKEDOWN_KEY_V1)
 
         val rotated =
             service(
                 properties =
                     keyPair(
                         current = KEY_V2,
-                        currentVersion = 2,
+                        currentVersion = TAKEDOWN_KEY_V2,
                         previous = KEY_V1,
-                        previousVersion = 1,
+                        previousVersion = TAKEDOWN_KEY_V1,
                     ),
             )
         assertThatThrownBy { rotated.retirePreviousKey() }
@@ -305,7 +310,7 @@ class JdbcMutationIdempotencyAdapterDbTest(
 
         val validator =
             com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator(
-                keyPair(current = KEY_V2, currentVersion = 2),
+                keyPair(current = KEY_V2, currentVersion = TAKEDOWN_KEY_V2),
                 adapter,
                 org.springframework.mock.env
                     .MockEnvironment(),
@@ -419,6 +424,10 @@ class JdbcMutationIdempotencyAdapterDbTest(
         val RESOURCE_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053010")
         const val KEY_V1 = "test-mutation-identity-v1-key"
         const val KEY_V2 = "test-mutation-identity-v2-key"
+        const val RETIREMENT_KEY_V1 = 501
+        const val RETIREMENT_KEY_V2 = 502
+        const val TAKEDOWN_KEY_V1 = 511
+        const val TAKEDOWN_KEY_V2 = 512
         const val SENSITIVE_URL = "https://meet.example.com/private-room"
         const val SENSITIVE_PASSCODE = "room-passcode-value"
         const val TAKEDOWN_RECEIPT_ID = "aaaaaaaa-0000-4000-8000-000000053091"
@@ -452,5 +461,5 @@ where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from host_session_mutation_receipts
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from mutation_digest_key_state
-where digest_key_version in (1, 2, 9);
+where digest_key_version in (1, 2, 9, 501, 502, 511, 512);
 """

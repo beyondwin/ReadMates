@@ -14,12 +14,14 @@ import java.util.UUID
 private const val SESSION_ID_PARAMETER = 3
 private const val MEMBERSHIP_ID_PARAMETER = 4
 
+@Suppress("TooManyFunctions")
 internal class HostSessionLifecycleWriteOperations(
     private val jdbcTemplate: JdbcTemplate,
     private val queries: HostSessionWriteQueries,
     private val policy: HostSessionWritePolicy,
     private val publicProjection: HostPublicProjectionWriteOperations,
 ) {
+    @Suppress("ReturnCount", "ThrowsCount")
     fun open(command: HostSessionIdCommand): HostSessionTransitionResult {
         requireHost(command.host)
         queries.lockClub(command.host.clubId)

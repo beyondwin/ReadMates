@@ -30,6 +30,7 @@ class PublicConvergenceService(
 ) : HostPublicConvergenceUseCase,
     PlatformAdminPublicConvergenceUseCase,
     ProcessPublicConvergenceUseCase {
+    @Suppress("ReturnCount")
     override fun processBatch(leaseOwner: String): Int {
         if (!properties.enabled) return 0
         var processed = 0
@@ -40,6 +41,7 @@ class PublicConvergenceService(
         return processed
     }
 
+    @Suppress("ReturnCount")
     fun processNext(leaseOwner: String): Boolean {
         if (!properties.enabled) return false
         val now = clock.instant()
@@ -117,7 +119,7 @@ class PublicConvergenceService(
     }
 
     private fun backoffFor(attemptNo: Int): Duration {
-        val multiplier = 1L shl (attemptNo - 1).coerceIn(0, 30)
+        val multiplier = 1L shl (attemptNo - 1).coerceIn(0, MAX_BACKOFF_SHIFT)
         val candidate = properties.initialBackoff.multipliedBy(multiplier)
         return if (candidate > properties.maxBackoff) properties.maxBackoff else candidate
     }
@@ -134,5 +136,9 @@ class PublicConvergenceService(
             throw AccessDeniedException("Emergency public takedown capability required")
         }
         return block()
+    }
+
+    private companion object {
+        const val MAX_BACKOFF_SHIFT = 30
     }
 }

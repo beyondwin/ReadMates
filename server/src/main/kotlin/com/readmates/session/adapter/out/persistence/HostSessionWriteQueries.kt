@@ -36,6 +36,7 @@ internal data class LockedAttendanceRow(
     val participationStatus: String,
 )
 
+@Suppress("TooManyFunctions")
 internal class HostSessionWriteQueries(
     private val jdbcTemplate: JdbcTemplate,
     private val hostSessionQueries: HostSessionQueries,
@@ -162,6 +163,7 @@ internal class HostSessionWriteQueries(
                 clubId.dbString(),
             ).firstOrNull()
 
+    @Suppress("ThrowsCount")
     fun requireActiveClubAndMembership(
         clubId: UUID,
         membershipId: UUID,
@@ -414,6 +416,7 @@ internal class HostSessionWriteQueries(
             host.clubId.dbString(),
         )
 
+    @Suppress("LongMethod")
     fun loadProjection(
         host: CurrentMember,
         sessionId: UUID,
@@ -535,7 +538,10 @@ internal class HostSessionWriteQueries(
                                     sessionRevision = resultSet.getLong("session_revision"),
                                     exposureRevision = resultSet.getLong("exposure_revision"),
                                     participantSetRevision = resultSet.getLong("participant_set_revision"),
-                                    recordDraftRevision = resultSet.getLong("draft_revision").takeUnless { resultSet.wasNull() },
+                                    recordDraftRevision =
+                                        resultSet.getLong("draft_revision").takeUnless {
+                                            resultSet.wasNull()
+                                        },
                                     liveRecordRevision =
                                         resultSet.getLong("live_revision").takeIf { value -> value > 0 },
                                     publicationRevision = resultSet.getLong("publication_revision"),

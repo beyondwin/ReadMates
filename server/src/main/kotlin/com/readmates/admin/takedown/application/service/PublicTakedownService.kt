@@ -66,6 +66,7 @@ class PublicTakedownService(
         )
     }
 
+    @Suppress("ComplexCondition", "ThrowsCount")
     override fun confirm(
         actor: PublicTakedownActor,
         command: ConfirmPublicTakedownCommand,
@@ -75,7 +76,10 @@ class PublicTakedownService(
         val category = command.reasonCategory.trim().uppercase()
         val reason = command.reason.trim()
         val key = command.idempotencyKey.trim()
-        if (category !in ALLOWED_REASON_CATEGORIES || reason.isEmpty() || reason.codePointLength() > MAX_REASON_CODE_POINTS ||
+        if (
+            category !in ALLOWED_REASON_CATEGORIES ||
+            reason.isEmpty() ||
+            reason.codePointLength() > MAX_REASON_CODE_POINTS ||
             key.isEmpty() || key.length > MAX_IDEMPOTENCY_KEY_LENGTH
         ) {
             throw PublicTakedownException(PublicTakedownError.INVALID_REQUEST)
@@ -124,7 +128,11 @@ class PublicTakedownService(
     }
 
     private fun requireActivation() {
-        if (!enabled || !cacheSafetyEvidenceVerified || elapsedBrowserCacheWindowSeconds < REQUIRED_CACHE_WINDOW_SECONDS) {
+        if (
+            !enabled ||
+            !cacheSafetyEvidenceVerified ||
+            elapsedBrowserCacheWindowSeconds < REQUIRED_CACHE_WINDOW_SECONDS
+        ) {
             throw PublicTakedownException(PublicTakedownError.ACTIVATION_NOT_VERIFIED)
         }
     }

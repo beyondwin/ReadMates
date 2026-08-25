@@ -21,6 +21,7 @@ import java.time.Instant
 import java.util.UUID
 
 @Repository
+@Suppress("TooManyFunctions")
 class JdbcPublicTakedownAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : PublicTakedownPort {
@@ -119,6 +120,7 @@ class JdbcPublicTakedownAdapter(
             ).firstOrNull()
 
     @Transactional
+    @Suppress("ThrowsCount")
     override fun confirm(
         actor: PublicTakedownActor,
         prepared: PreparedPublicTakedownConfirm,
@@ -166,6 +168,7 @@ class JdbcPublicTakedownAdapter(
         )
     }
 
+    @Suppress("ComplexCondition")
     private fun validateLockedPreview(
         actor: PublicTakedownActor,
         prepared: PreparedPublicTakedownConfirm,

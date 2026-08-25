@@ -39,8 +39,12 @@ class HttpPublicCachePurgeAdapter(
         return try {
             val status = client.send(requestBuilder.build(), HttpResponse.BodyHandlers.discarding()).statusCode()
             when (status) {
-                in 200..299 -> success()
-                408, 425, 429, in 500..599 -> temporary()
+                in SUCCESS_STATUS_RANGE -> success()
+                REQUEST_TIMEOUT_STATUS,
+                TOO_EARLY_STATUS,
+                TOO_MANY_REQUESTS_STATUS,
+                in SERVER_ERROR_STATUS_RANGE,
+                -> temporary()
                 else -> permanent(ProviderResultCategory.PERMANENT_FAILURE)
             }
         } catch (_: InterruptedException) {
@@ -61,11 +65,24 @@ class HttpPublicCachePurgeAdapter(
 
     private fun Any?.jsonString(): String = this?.let { "\"$it\"" } ?: "null"
 
-    private fun success() = ProviderAttemptResult(ProviderAttemptStatus.SUCCEEDED, ProviderResultCategory.PURGED, retryable = false)
+    private fun success() =
+        ProviderAttemptResult(
+            ProviderAttemptStatus.SUCCEEDED,
+            ProviderResultCategory.PURGED,
+            retryable = false,
+        )
 
     private fun temporary() =
         ProviderAttemptResult(ProviderAttemptStatus.FAILED, ProviderResultCategory.TEMPORARY_FAILURE, retryable = true)
 
     private fun permanent(category: ProviderResultCategory) =
         ProviderAttemptResult(ProviderAttemptStatus.FAILED, category, retryable = false)
+
+    private companion object {
+        const val REQUEST_TIMEOUT_STATUS = 408
+        const val TOO_EARLY_STATUS = 425
+        const val TOO_MANY_REQUESTS_STATUS = 429
+        val SUCCESS_STATUS_RANGE = 200..299
+        val SERVER_ERROR_STATUS_RANGE = 500..599
+    }
 }

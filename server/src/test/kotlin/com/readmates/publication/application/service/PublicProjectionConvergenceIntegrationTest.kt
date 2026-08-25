@@ -47,8 +47,14 @@ class PublicProjectionConvergenceIntegrationTest(
     @AfterEach
     fun cleanUp() {
         convergenceIds.forEach { convergenceId ->
-            jdbcTemplate.update("delete from public_convergence_work where convergence_id = ?", convergenceId.toString())
-            jdbcTemplate.update("delete from public_mutation_convergence_links where convergence_id = ?", convergenceId.toString())
+            jdbcTemplate.update(
+                "delete from public_convergence_work where convergence_id = ?",
+                convergenceId.toString(),
+            )
+            jdbcTemplate.update(
+                "delete from public_mutation_convergence_links where convergence_id = ?",
+                convergenceId.toString(),
+            )
         }
         receiptIds.forEach { receiptId ->
             jdbcTemplate.update("delete from host_session_mutation_receipts where id = ?", receiptId.toString())
@@ -155,7 +161,10 @@ class PublicProjectionConvergenceIntegrationTest(
         val service = service(clock = clock, provider = provider)
         val host = member(fixture.clubId, isHost = true)
 
-        assertThat(service(provider = RecordingProvider(success()), enabled = false).view(host, fixture.sessionId)).isNull()
+        assertThat(
+            service(provider = RecordingProvider(success()), enabled = false)
+                .view(host, fixture.sessionId),
+        ).isNull()
         assertThat(
             service(provider = RecordingProvider(success()), enabled = false)
                 .retry(host, fixture.sessionId, fixture.convergenceId),
@@ -270,7 +279,12 @@ class PublicProjectionConvergenceIntegrationTest(
             order by attempt_no, event_seq
             """.trimIndent(),
             { rs, _ ->
-                "${rs.getInt("attempt_no")}:${rs.getInt("event_seq")}:${rs.getString("status")}:${rs.getString("result_category")}"
+                listOf(
+                    rs.getInt("attempt_no"),
+                    rs.getInt("event_seq"),
+                    rs.getString("status"),
+                    rs.getString("result_category"),
+                ).joinToString(":")
             },
             convergenceId.toString(),
         )
@@ -344,11 +358,20 @@ class PublicProjectionConvergenceIntegrationTest(
     }
 
     companion object {
-        private val NOW: Instant = Instant.parse("2026-08-26T04:30:00Z")
+        private val NOW: Instant = Instant.parse("2000-01-01T00:00:00Z")
 
-        private fun success() = ProviderAttemptResult(ProviderAttemptStatus.SUCCEEDED, ProviderResultCategory.PURGED, retryable = false)
+        private fun success() =
+            ProviderAttemptResult(
+                ProviderAttemptStatus.SUCCEEDED,
+                ProviderResultCategory.PURGED,
+                retryable = false,
+            )
 
         private fun temporaryFailure() =
-            ProviderAttemptResult(ProviderAttemptStatus.FAILED, ProviderResultCategory.TEMPORARY_FAILURE, retryable = true)
+            ProviderAttemptResult(
+                ProviderAttemptStatus.FAILED,
+                ProviderResultCategory.TEMPORARY_FAILURE,
+                retryable = true,
+            )
     }
 }

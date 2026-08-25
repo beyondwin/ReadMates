@@ -30,6 +30,7 @@ import org.springframework.test.web.servlet.put
 @Sql(statements = [CLEANUP_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
 @Sql(statements = [CLEANUP_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD)
 @Tag("integration")
+@Suppress("LargeClass")
 class HostSessionIdempotencyDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
@@ -42,6 +43,7 @@ class HostSessionIdempotencyDbTest(
             .build()
 
     @Test
+    @Suppress("LongMethod", "MaxLineLength")
     fun `envelope rejects missing extra and wrong-domain expected revisions`() {
         val created = createDraft("envelope-validate", "key-create-valid-01")
         val sessionId = created.first
@@ -233,6 +235,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("LongMethod", "MaxLineLength")
     fun `duplicate basic save attendance and close keep one side effect`() {
         val created = createDraft("중복 저장", "key-basic-orig-0001")
         val sessionId = created.first
@@ -309,6 +312,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("MaxLineLength")
     fun `envelope rejects reverse restore bulk attendance access publication and publish vector fields`() {
         val sessionId = createDraft("vector-validate", "key-create-vector-01").first
         mockMvc
@@ -371,6 +375,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("MaxLineLength")
     fun `attendance expected rows disagreeing with command entries are rejected`() {
         val sessionId = createDraft("출석 불일치", "key-att-mis-orig-01").first
         open(sessionId, 0, "key-att-mis-open-01")
@@ -389,6 +394,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("LongMethod", "MaxLineLength")
     fun `history restore replay returns the audit change id and kind`() {
         val sessionId = createDraft("복원 원본", "key-hist-create-01").first
         val first =
@@ -457,6 +463,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `access and publication envelope cas increments revisions`() {
         val sessionId = createDraft("노출 개정", "key-exp-create-01").first
         mockMvc
@@ -564,6 +571,7 @@ class HostSessionIdempotencyDbTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `reverse trash restore bulk attendance and publish replay once`() {
         val sessionId = createDraft("범위 재시도", "key-scope-create-01").first
         open(sessionId, 0, "key-scope-open-01")
@@ -575,8 +583,8 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-dup-01",
-                        """{"participantSetRevision":$setRevision,"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        expectedAttendanceRows(setRevision),
+                        attendanceEntries(),
                     )
             }.andExpect { status { isOk() } }
         mockMvc
@@ -586,8 +594,8 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-dup-01",
-                        """{"participantSetRevision":$setRevision,"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        expectedAttendanceRows(setRevision),
+                        attendanceEntries(),
                     )
             }.andExpect { status { isOk() } }
         assertThat(attendanceAuditCount(sessionId)).isEqualTo(1)
@@ -780,6 +788,31 @@ class HostSessionIdempotencyDbTest(
         command: String,
     ) = """{"idempotencyKey":"$key","expected":$expected,"command":$command}"""
 
+    private fun expectedAttendanceRows(setRevision: Long): String =
+        """
+        {
+          "participantSetRevision":$setRevision,
+          "rows":[
+            {"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},
+            {"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}
+          ]
+        }
+        """.trimIndent()
+
+    private fun attendanceEntries(): String =
+        """
+        {"entries":[
+          {
+            "membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED",
+            "expectedAttendanceRevision":0
+          },
+          {
+            "membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT",
+            "expectedAttendanceRevision":0
+          }
+        ]}
+        """.trimIndent()
+
     private fun sessionCommand(
         title: String,
         meetingUrl: String? = null,
@@ -802,6 +835,7 @@ class HostSessionIdempotencyDbTest(
             """.trimIndent()
     }
 
+    @Suppress("MaxLineLength")
     private fun close(
         sessionId: String,
         sessionRev: Long,

@@ -18,13 +18,19 @@ import org.springframework.web.bind.annotation.RestController
 import tools.jackson.databind.JsonNode
 
 data class AttendanceEntry(
-    @field:NotBlank val membershipId: String,
-    @field:Pattern(regexp = "ATTENDED|ABSENT|UNKNOWN") val attendanceStatus: String,
-    @field:NotNull @field:Min(0) val expectedAttendanceRevision: Long,
+    @field:NotBlank val membershipId: String? = null,
+    @field:NotBlank @field:Pattern(regexp = "ATTENDED|ABSENT|UNKNOWN") val attendanceStatus: String? = null,
+    @field:NotNull @field:Min(0) val expectedAttendanceRevision: Long? = null,
 )
 
-fun AttendanceEntry.toCommand(): AttendanceEntryCommand = AttendanceEntryCommand(membershipId, attendanceStatus, expectedAttendanceRevision)
+fun AttendanceEntry.toCommand(): AttendanceEntryCommand =
+    AttendanceEntryCommand(
+        membershipId = membershipId ?: throw InvalidSessionScheduleException(),
+        attendanceStatus = attendanceStatus ?: throw InvalidSessionScheduleException(),
+        expectedAttendanceRevision = expectedAttendanceRevision ?: throw InvalidSessionScheduleException(),
+    )
 
+@Suppress("ThrowsCount")
 private fun bindExpectedAttendanceRows(
     commandEntries: List<AttendanceEntry>,
     expectedRows: List<ExpectedAttendanceRowBody>?,
@@ -41,18 +47,20 @@ private fun bindExpectedAttendanceRows(
         }
     val commandIds =
         commandEntries.map { entry ->
-            runCatching { java.util.UUID.fromString(entry.membershipId) }.getOrElse { throw InvalidSessionScheduleException() }
+            runCatching { java.util.UUID.fromString(entry.membershipId) }
+                .getOrElse { throw InvalidSessionScheduleException() }
         }
     if (commandIds.toSet() != expectedByMembership.keys || commandIds.size != expectedByMembership.size) {
         throw InvalidSessionScheduleException()
     }
     return commandEntries.map { entry ->
-        val membershipId = java.util.UUID.fromString(entry.membershipId)
+        val command = entry.toCommand()
+        val membershipId = java.util.UUID.fromString(command.membershipId)
         val expectedRevision = expectedByMembership.getValue(membershipId)
-        if (entry.expectedAttendanceRevision != expectedRevision) {
+        if (command.expectedAttendanceRevision != expectedRevision) {
             throw InvalidSessionScheduleException()
         }
-        AttendanceEntryCommand(entry.membershipId, entry.attendanceStatus, expectedRevision)
+        command.copy(expectedAttendanceRevision = expectedRevision)
     }
 }
 
@@ -63,6 +71,7 @@ class AttendanceController(
     private val envelopes: HostMutationEnvelopeReader,
 ) {
     @PostMapping
+    @Suppress("ThrowsCount")
     fun confirm(
         @PathVariable sessionId: String,
         @RequestParam(required = false) expectedParticipantSetRevision: Long?,

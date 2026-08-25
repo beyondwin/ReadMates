@@ -5,14 +5,16 @@ import org.springframework.boot.context.properties.ConfigurationProperties
 import org.springframework.core.env.Environment
 import java.time.Duration
 
+private const val DEFAULT_CURSOR_TTL_HOURS = 24L
+
 @ConfigurationProperties(prefix = "readmates.security.host-list-cursor")
 data class HostListCursorSigningProperties(
     val currentKey: String = "",
     val currentKeyVersion: Int = 1,
     val previousKey: String = "",
     val previousKeyVersion: Int = 0,
-    val ttl: Duration = Duration.ofHours(24),
-    val previousKeyRolloutBuffer: Duration = Duration.ofHours(24),
+    val ttl: Duration = Duration.ofHours(DEFAULT_CURSOR_TTL_HOURS),
+    val previousKeyRolloutBuffer: Duration = Duration.ofHours(DEFAULT_CURSOR_TTL_HOURS),
     val allowEmptySecret: Boolean = false,
 ) {
     fun validate(environment: Environment) {

@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package com.readmates.session.application.model
 
 import com.readmates.session.application.HostSessionListQuery
@@ -132,6 +134,7 @@ private data class SelectedListScope(
     val states: List<String>,
 )
 
+@Suppress("ThrowsCount")
 private fun HostSessionListQuery.selectedModeAndStates(): SelectedListScope {
     val provided =
         listOfNotNull(state?.takeIf { it.isNotBlank() }, mode?.takeIf { it.isNotBlank() }).size +
@@ -191,6 +194,7 @@ fun hostMeetingStateRank(
         HostMeetingListMode.RECORD -> if (state == "CLOSED") 0 else 1
     }
 
+@Suppress("CyclomaticComplexMethod")
 fun hostMeetingAttentionRank(
     mode: HostMeetingListMode,
     state: String,
@@ -204,22 +208,22 @@ fun hostMeetingAttentionRank(
         HostMeetingListMode.MEETING -> {
             val due = meetingDate == null || !meetingDate.isAfter(evaluatedOn)
             when {
-                state == "OPEN" && due && incompletePrep -> 0
-                state == "OPEN" && due -> 1
-                state == "OPEN" && incompletePrep -> 2
-                state == "OPEN" -> 3
-                due -> 4
-                else -> 5
+                state == "OPEN" && due && incompletePrep -> ATTENTION_FIRST
+                state == "OPEN" && due -> ATTENTION_SECOND
+                state == "OPEN" && incompletePrep -> ATTENTION_THIRD
+                state == "OPEN" -> ATTENTION_FOURTH
+                due -> ATTENTION_FIFTH
+                else -> ATTENTION_LAST
             }
         }
         HostMeetingListMode.RECORD ->
             when {
-                state == "PUBLISHED" && hasDraft -> 0
-                state == "PUBLISHED" && recordStatus != SessionRecordStatus.COMPLETE -> 1
-                state == "CLOSED" && hasDraft -> 2
-                state == "CLOSED" && recordStatus != SessionRecordStatus.COMPLETE -> 3
-                state == "PUBLISHED" -> 4
-                else -> 5
+                state == "PUBLISHED" && hasDraft -> ATTENTION_FIRST
+                state == "PUBLISHED" && recordStatus != SessionRecordStatus.COMPLETE -> ATTENTION_SECOND
+                state == "CLOSED" && hasDraft -> ATTENTION_THIRD
+                state == "CLOSED" && recordStatus != SessionRecordStatus.COMPLETE -> ATTENTION_FOURTH
+                state == "PUBLISHED" -> ATTENTION_FIFTH
+                else -> ATTENTION_LAST
             }
     }
 
@@ -230,6 +234,12 @@ class HostListCursorStaleException(
 ) : RuntimeException("Host list cursor is stale")
 
 private val ALL_HOST_LIST_STATES = listOf("DRAFT", "OPEN", "CLOSED", "PUBLISHED")
+private const val ATTENTION_FIRST = 0
+private const val ATTENTION_SECOND = 1
+private const val ATTENTION_THIRD = 2
+private const val ATTENTION_FOURTH = 3
+private const val ATTENTION_FIFTH = 4
+private const val ATTENTION_LAST = 5
 
 private fun HostMeetingListTuple.canonicalMap(): Map<String, Any?> =
     linkedMapOf(
@@ -301,6 +311,7 @@ private fun parseStringArray(json: String): List<String> {
     return splitTopLevel(body).map(::decodeJsonString)
 }
 
+@Suppress("CyclomaticComplexMethod")
 private fun splitTopLevel(body: String): List<String> {
     val parts = mutableListOf<String>()
     val current = StringBuilder()

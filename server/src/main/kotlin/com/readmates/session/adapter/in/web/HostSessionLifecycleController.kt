@@ -23,6 +23,7 @@ import tools.jackson.databind.JsonNode
 
 @RestController
 @RequestMapping("/api/host/sessions")
+@Suppress("TooManyFunctions")
 class HostSessionLifecycleController(
     private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
     private val envelopes: HostMutationEnvelopeReader,

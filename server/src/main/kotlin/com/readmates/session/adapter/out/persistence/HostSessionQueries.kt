@@ -1,3 +1,5 @@
+@file:Suppress("TooManyFunctions")
+
 package com.readmates.session.adapter.out.persistence
 
 import com.readmates.session.application.HostSessionFeedbackDocument

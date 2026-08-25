@@ -7,6 +7,7 @@ import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import com.readmates.auth.application.port.`in`.ResolveAuthenticatedPrincipalUseCase
 import com.readmates.auth.domain.MembershipRole
 import com.readmates.auth.domain.MembershipStatus
+import com.readmates.club.application.model.ResolvedClubContext
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
@@ -180,7 +181,7 @@ class SessionCookieAuthenticationFilter(
 
     private fun HttpServletRequest.hostAuthorityLossCode(
         source: AuthClubContextSource,
-        requestedClub: com.readmates.club.application.model.ResolvedClubContext?,
+        requestedClub: ResolvedClubContext?,
         priorHostAuthority: VerifiedHostAuthorityContext?,
         currentMember: AuthenticatedMemberSnapshot?,
     ): HostAuthorityLossCode? {

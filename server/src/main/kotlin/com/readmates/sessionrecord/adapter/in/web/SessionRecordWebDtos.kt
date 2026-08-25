@@ -138,6 +138,7 @@ data class ApplySessionRecordRequest(
     val expected: ApplySessionRecordExpectedBody? = null,
     val command: ApplySessionRecordCommandBody? = null,
 ) {
+    @Suppress("CyclomaticComplexMethod", "ThrowsCount")
     fun toCommand(sessionId: UUID): ApplySessionRecordCommand {
         if (previewId != null || notificationDecision != null) {
             throw SessionRecordException(
@@ -170,10 +171,16 @@ data class ApplySessionRecordRequest(
         }
         return ApplySessionRecordCommand(
             sessionId,
-            parseRecordUuid(applyRequestId ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "applyRequestId")),
-            expectedDraftRevision ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedDraftRevision"),
-            expectedLiveRevision ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedLiveRevision"),
-            expectedDraftHash ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedDraftHash"),
+            parseRecordUuid(
+                applyRequestId
+                    ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "applyRequestId"),
+            ),
+            expectedDraftRevision
+                ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedDraftRevision"),
+            expectedLiveRevision
+                ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedLiveRevision"),
+            expectedDraftHash
+                ?: throw SessionRecordException(SessionRecordError.INVALID_APPLY_CONTRACT, "expectedDraftHash"),
         )
     }
 }

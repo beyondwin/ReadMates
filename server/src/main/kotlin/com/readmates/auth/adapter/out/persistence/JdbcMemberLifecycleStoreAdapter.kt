@@ -249,13 +249,19 @@ class JdbcMemberLifecycleStoreAdapter(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    ): SessionParticipationChange = applyParticipationStatus(clubId, sessionId, membershipId, SessionParticipationStatus.ACTIVE)
+    ): SessionParticipationChange {
+        val status = SessionParticipationStatus.ACTIVE
+        return applyParticipationStatus(clubId, sessionId, membershipId, status)
+    }
 
     override fun markRemovedFromCurrentSession(
         clubId: UUID,
         sessionId: UUID,
         membershipId: UUID,
-    ): SessionParticipationChange = applyParticipationStatus(clubId, sessionId, membershipId, SessionParticipationStatus.REMOVED)
+    ): SessionParticipationChange {
+        val status = SessionParticipationStatus.REMOVED
+        return applyParticipationStatus(clubId, sessionId, membershipId, status)
+    }
 
     private fun applyParticipationStatus(
         clubId: UUID,

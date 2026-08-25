@@ -48,6 +48,7 @@ import java.util.UUID
 )
 @AutoConfigureMockMvc
 @Tag("integration")
+@Suppress("LargeClass")
 class PlatformAdminPublicTakedownIntegrationTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val authSessionService: AuthSessionService,
@@ -197,7 +198,11 @@ class PlatformAdminPublicTakedownIntegrationTest(
 
         val expiredPreview = JsonPath.read<String>(preview(OWNER_USER_ID), "$.previewId")
         jdbcTemplate.update(
-            "update admin_public_takedown_previews set expires_at = timestampadd(second, -1, utc_timestamp(6)) where id = ?",
+            """
+            update admin_public_takedown_previews
+            set expires_at = timestampadd(second, -1, utc_timestamp(6))
+            where id = ?
+            """.trimIndent(),
             expiredPreview,
         )
         confirmExpectingConflictOrBadRequest(expiredPreview, expectedStatus = 409)
@@ -245,6 +250,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `admin convergence view is bounded and retry appends a higher attempt without repeating origin deny`() {
         val receipt = createReceipt(OWNER_USER_ID, "operator-convergence-key")
         val receiptId = JsonPath.read<String>(receipt, "$.receiptId")
@@ -359,6 +365,7 @@ class PlatformAdminPublicTakedownIntegrationTest(
     }
 
     @Test
+    @Suppress("LongMethod")
     fun `preview bound v1 key reconciles after v2 rotation and retired key fails closed`() {
         val previewId = UUID.fromString(JsonPath.read<String>(preview(OWNER_USER_ID), "$.previewId"))
         assertThat(
@@ -429,7 +436,12 @@ class PlatformAdminPublicTakedownIntegrationTest(
         val rawReason = "private-body-sentinel provider-error-sentinel"
         confirm(
             OWNER_USER_ID,
-            """{"previewId":"$previewId","reasonCategory":"LEGAL","reason":"$rawReason","idempotencyKey":"redaction-key"}""",
+            """
+            {
+              "previewId":"$previewId","reasonCategory":"LEGAL",
+              "reason":"$rawReason","idempotencyKey":"redaction-key"
+            }
+            """.trimIndent(),
         )
 
         val stored =
@@ -482,7 +494,12 @@ class PlatformAdminPublicTakedownIntegrationTest(
         val previewId = JsonPath.read<String>(preview(actorId), "$.previewId")
         return confirm(
             actorId,
-            """{"previewId":"$previewId","reasonCategory":"PRIVACY","reason":"긴급 공개 회수","idempotencyKey":"$idempotencyKey"}""",
+            """
+            {
+              "previewId":"$previewId","reasonCategory":"PRIVACY",
+              "reason":"긴급 공개 회수","idempotencyKey":"$idempotencyKey"
+            }
+            """.trimIndent(),
         )
     }
 

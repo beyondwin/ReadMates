@@ -611,7 +611,11 @@ class HostSessionAttendanceConcurrencyDbTest(
 
     private fun countAudit(sessionId: String): Int =
         jdbcTemplate.queryForObject(
-            "select count(*) from host_session_change_audit where session_id = ? and action_type = 'ATTENDANCE_UPDATED'",
+            """
+            select count(*)
+            from host_session_change_audit
+            where session_id = ? and action_type = 'ATTENDANCE_UPDATED'
+            """.trimIndent(),
             Int::class.java,
             sessionId,
         ) ?: 0

@@ -36,6 +36,7 @@ class ReadmatesOAuthSuccessHandler(
     AuthenticationFailureHandler {
     private val appOrigin = readmatesAppOrigin(appBaseUrl)
 
+    @Suppress("LongMethod")
     override fun onAuthenticationSuccess(
         request: HttpServletRequest,
         response: HttpServletResponse,

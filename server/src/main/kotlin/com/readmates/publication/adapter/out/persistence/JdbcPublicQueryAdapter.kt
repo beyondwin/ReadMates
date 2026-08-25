@@ -159,6 +159,7 @@ class JdbcPublicQueryAdapter(
                   and public_session_publications.site_visibility = 'PUBLIC_RECORD'
                 """.trimIndent(),
                 { rs, _ ->
+                    val content = publicContent(jdbcTemplate, rs.uuid("club_id"), sessionId)
                     PublicSessionDetailResult(
                         sessionId = rs.uuid("id").toString(),
                         sessionNumber = rs.getInt("number"),
@@ -167,8 +168,8 @@ class JdbcPublicQueryAdapter(
                         bookImageUrl = rs.getString("book_image_url"),
                         date = rs.getObject("session_date", LocalDate::class.java).toString(),
                         summary = rs.getString("public_summary"),
-                        highlights = publicHighlights(jdbcTemplate, rs.uuid("club_id"), sessionId),
-                        oneLiners = publicOneLiners(jdbcTemplate, rs.uuid("club_id"), sessionId),
+                        highlights = content.highlights,
+                        oneLiners = content.oneLiners,
                     )
                 },
                 clubSlug,
@@ -293,16 +294,21 @@ class JdbcPublicQueryAdapter(
             clubId.dbString(),
         )
 
-    private fun publicHighlights(
+    @Suppress("LongMethod")
+    private fun publicContent(
         jdbcTemplate: JdbcTemplate,
         clubId: UUID,
         sessionId: UUID,
-    ): List<PublicHighlightResult> =
+    ): PublicSessionContent {
+        val highlights = mutableListOf<PublicHighlightResult>()
+        val oneLiners = mutableListOf<PublicOneLinerResult>()
         jdbcTemplate.query(
             """
             select
+              'HIGHLIGHT' as content_kind,
               highlights.text,
               highlights.sort_order,
+              highlights.created_at,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
               case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
@@ -319,33 +325,15 @@ class JdbcPublicQueryAdapter(
                 highlights.membership_id is null
                 or session_participants.participation_status = 'ACTIVE'
               )
-            order by highlights.sort_order, highlights.created_at
-            """.trimIndent(),
-            { rs, _ ->
-                PublicHighlightResult(
-                    text = rs.getString("text"),
-                    sortOrder = rs.getInt("sort_order"),
-                    authorName = rs.getString("author_name"),
-                    authorShortName = rs.getString("author_short_name"),
-                    avatarKey = rs.getString("avatar_key"),
-                )
-            },
-            clubId.dbString(),
-            sessionId.dbString(),
-        )
-
-    private fun publicOneLiners(
-        jdbcTemplate: JdbcTemplate,
-        clubId: UUID,
-        sessionId: UUID,
-    ): List<PublicOneLinerResult> =
-        jdbcTemplate.query(
-            """
+            union all
             select
+              'ONE_LINER' as content_kind,
+              one_line_reviews.text,
+              0 as sort_order,
+              one_line_reviews.created_at,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else users.name end as author_name,
               case when memberships.status = 'LEFT' then '탈퇴한 멤버' else coalesce(memberships.short_name, users.name) end as author_short_name,
-              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key,
-              one_line_reviews.text
+              case when memberships.status = 'LEFT' then null else memberships.avatar_key end as avatar_key
             from one_line_reviews
             join memberships on memberships.id = one_line_reviews.membership_id
               and memberships.club_id = one_line_reviews.club_id
@@ -357,17 +345,38 @@ class JdbcPublicQueryAdapter(
             where one_line_reviews.club_id = ?
               and one_line_reviews.session_id = ?
               and one_line_reviews.visibility = 'PUBLIC'
-            order by one_line_reviews.created_at, users.name
+            order by content_kind, sort_order, created_at, author_name
             """.trimIndent(),
             { rs, _ ->
-                PublicOneLinerResult(
-                    authorName = rs.getString("author_name"),
-                    authorShortName = rs.getString("author_short_name"),
-                    avatarKey = rs.getString("avatar_key"),
-                    text = rs.getString("text"),
-                )
+                if (rs.getString("content_kind") == "HIGHLIGHT") {
+                    highlights +=
+                        PublicHighlightResult(
+                            text = rs.getString("text"),
+                            sortOrder = rs.getInt("sort_order"),
+                            authorName = rs.getString("author_name"),
+                            authorShortName = rs.getString("author_short_name"),
+                            avatarKey = rs.getString("avatar_key"),
+                        )
+                } else {
+                    oneLiners +=
+                        PublicOneLinerResult(
+                            authorName = rs.getString("author_name"),
+                            authorShortName = rs.getString("author_short_name"),
+                            avatarKey = rs.getString("avatar_key"),
+                            text = rs.getString("text"),
+                        )
+                }
             },
             clubId.dbString(),
             sessionId.dbString(),
+            clubId.dbString(),
+            sessionId.dbString(),
         )
+        return PublicSessionContent(highlights, oneLiners)
+    }
 }
+
+private data class PublicSessionContent(
+    val highlights: List<PublicHighlightResult>,
+    val oneLiners: List<PublicOneLinerResult>,
+)

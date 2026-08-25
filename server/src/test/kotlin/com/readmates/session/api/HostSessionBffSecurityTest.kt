@@ -98,6 +98,7 @@ private const val CLEANUP_BFF_DELETE_SESSION_SQL = """
     executionPhase = Sql.ExecutionPhase.AFTER_TEST_METHOD,
 )
 @Tag("integration")
+@Suppress("LargeClass")
 class HostSessionBffSecurityTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,

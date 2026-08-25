@@ -11,6 +11,9 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
+private typealias PublicationEnvelope =
+    HostMutationEnvelope<HostSessionPublicationRequest, ExpectedPublicationRevisionBody>
+
 @Component
 class HostMutationEnvelopeReader(
     private val validator: Validator,
@@ -83,15 +86,25 @@ class HostMutationEnvelopeReader(
     }
 
     fun reverse(body: JsonNode): HostMutationEnvelope<HostLifecycleCommandBody, ExpectedSessionOnlyBody> =
-        read(body, ExpectedSessionOnlyBody::class.java, HostLifecycleCommandBody::class.java, setOf("sessionRevision")) {
+        read(
+            body,
+            ExpectedSessionOnlyBody::class.java,
+            HostLifecycleCommandBody::class.java,
+            setOf("sessionRevision"),
+        ) {
             ExpectedSessionOnlyBody(body.path("expectedSessionRevision").asLongOrNull()) to
                 convert(body, HostLifecycleCommandBody::class.java)
         }
 
+    @Suppress("ThrowsCount")
     fun attendance(body: JsonNode): HostMutationEnvelope<HostAttendanceCommandBody, ExpectedAttendanceRowsBody> {
         if (body.isArray) {
             val entries = mutableListOf<AttendanceEntry>()
             body.forEach { node -> entries += convert(node, AttendanceEntry::class.java) }
+            if (entries.isEmpty()) {
+                throw InvalidSessionScheduleException()
+            }
+            entries.forEach(::validate)
             return HostMutationEnvelope(
                 idempotencyKey = generatedKey(),
                 expected =
@@ -99,8 +112,11 @@ class HostMutationEnvelopeReader(
                         rows =
                             entries.map { entry ->
                                 ExpectedAttendanceRowBody(
-                                    membershipId = UUID.fromString(entry.membershipId),
-                                    attendanceRevision = entry.expectedAttendanceRevision,
+                                    membershipId =
+                                        runCatching { UUID.fromString(entry.membershipId) }
+                                            .getOrElse { throw InvalidSessionScheduleException() },
+                                    attendanceRevision =
+                                        entry.expectedAttendanceRevision ?: throw InvalidSessionScheduleException(),
                                 )
                             },
                     ),
@@ -133,7 +149,7 @@ class HostMutationEnvelopeReader(
         return envelope
     }
 
-    fun publication(body: JsonNode): HostMutationEnvelope<HostSessionPublicationRequest, ExpectedPublicationRevisionBody> {
+    fun publication(body: JsonNode): PublicationEnvelope {
         if (body.has("command")) {
             requireExactProperties(
                 body.get("command"),
@@ -164,6 +180,7 @@ class HostMutationEnvelopeReader(
                 convert(body, HostRestoreCommandBody::class.java)
         }
 
+    @Suppress("ThrowsCount")
     private fun <C : Any, E : Any> read(
         body: JsonNode,
         expectedType: Class<E>,

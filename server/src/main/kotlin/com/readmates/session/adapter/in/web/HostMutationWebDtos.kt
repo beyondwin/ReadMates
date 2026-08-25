@@ -9,6 +9,7 @@ import com.readmates.session.application.model.ExpectedCloseRevisions
 import com.readmates.session.application.model.ExpectedExposureRevision
 import com.readmates.session.application.model.ExpectedPublicationRevision
 import com.readmates.session.application.model.ExpectedSessionOnly
+import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
@@ -18,7 +19,7 @@ import java.util.UUID
 class HostCreateExpectedBody {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 }
@@ -28,11 +29,14 @@ data class ExpectedSessionOnlyBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 
-    fun toExpected(): ExpectedSessionOnly = ExpectedSessionOnly(sessionRevision ?: throw InvalidSessionScheduleException())
+    fun toExpected(): ExpectedSessionOnly {
+        val revision = sessionRevision ?: throw InvalidSessionScheduleException()
+        return ExpectedSessionOnly(revision)
+    }
 }
 
 data class ExpectedAttendanceRowBody(
@@ -41,7 +45,7 @@ data class ExpectedAttendanceRowBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 
@@ -58,7 +62,7 @@ data class ExpectedAttendanceRowsBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 }
@@ -70,7 +74,7 @@ data class ExpectedCloseRevisionsBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 
@@ -87,11 +91,14 @@ data class ExpectedExposureRevisionBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 
-    fun toExpected(): ExpectedExposureRevision = ExpectedExposureRevision(exposureRevision ?: throw InvalidSessionScheduleException())
+    fun toExpected(): ExpectedExposureRevision {
+        val revision = exposureRevision ?: throw InvalidSessionScheduleException()
+        return ExpectedExposureRevision(revision)
+    }
 }
 
 data class ExpectedPublicationRevisionBody(
@@ -100,7 +107,7 @@ data class ExpectedPublicationRevisionBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 
@@ -116,7 +123,7 @@ data class ExpectedPublishVectorBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 
@@ -138,7 +145,7 @@ data class ExpectedCorrectionPublishVectorBody(
 ) {
     @JsonAnySetter
     fun rejectUnknown(
-        name: String,
+        @Suppress("UNUSED_PARAMETER") name: String,
         @Suppress("UNUSED_PARAMETER") value: Any?,
     ): Unit = throw InvalidSessionScheduleException()
 
@@ -153,7 +160,7 @@ data class ExpectedCorrectionPublishVectorBody(
 }
 
 data class HostAttendanceCommandBody(
-    @field:NotEmpty val entries: List<AttendanceEntry>? = null,
+    @field:Valid @field:NotEmpty val entries: List<AttendanceEntry>? = null,
 )
 
 data class HostLifecycleCommandBody(
