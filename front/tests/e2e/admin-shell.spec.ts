@@ -111,7 +111,37 @@ async function routePlatformAdminHostWorkspace(page: Page) {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ items: [], nextCursor: null }),
+      body: JSON.stringify({
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      }),
+    });
+  });
+  await page.route("**/api/bff/api/host/sessions?**", async (route) => {
+    const url = new URL(route.request().url());
+    if (url.searchParams.get("mode") !== "meeting" && !url.searchParams.has("needsAttention")) {
+      return route.fallback();
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      }),
+    });
+  });
+  await page.route("**/api/bff/api/host/sessions/record-ledger**", async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      }),
     });
   });
   await page.route("**/api/bff/api/host/club-operations?clubSlug=reading-sai", async (route) => {
@@ -146,6 +176,22 @@ async function routePlatformAdminHostWorkspace(page: Page) {
       status: 200,
       contentType: "application/json",
       body: JSON.stringify({ pending: 0, failed: 0, dead: 0, sentLast24h: 0, latestFailures: [] }),
+    });
+  });
+  await page.route("**/api/bff/api/host/**", async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (
+      path === "/api/bff/api/host/sessions/current"
+      || path === "/api/bff/api/host/sessions"
+      || path === "/api/bff/api/host/sessions/record-ledger"
+      || path === "/api/bff/api/host/dashboard"
+      || path === "/api/bff/api/host/club-operations"
+      || path === "/api/bff/api/host/notifications/summary"
+    ) return route.fallback();
+    await route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ code: "NOT_AVAILABLE" }),
     });
   });
 }
@@ -190,8 +236,8 @@ test.describe("/admin shell", () => {
   });
 
   test("platform admin with host membership can open host workspace from the admin header", async ({ page }) => {
-    await loginWithDevShortcut(page, "플랫폼 관리자 · OWNER");
     await routePlatformAdminHostWorkspace(page);
+    await loginWithDevShortcut(page, "플랫폼 관리자 · OWNER");
 
     await page.goto("/admin");
     await expect(page).toHaveURL(/\/admin\/today$/);
@@ -203,6 +249,6 @@ test.describe("/admin shell", () => {
       /\/clubs\/reading-sai\/app\/host(\/sessions\/[^/]+)?$/,
     );
     expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-    await expect(page.getByRole("heading", { name: /지금 다루는 모임|아직 열린 모임이 없습니다/ })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "오늘" })).toBeVisible();
   });
 });

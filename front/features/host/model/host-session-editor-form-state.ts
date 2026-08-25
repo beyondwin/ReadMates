@@ -91,6 +91,11 @@ export type HostSessionEditorAction =
       status: AttendanceStatus;
     }
   | {
+      type: "SYNC_AUTHORITATIVE_ATTENDANCE";
+      statuses: Record<string, AttendanceStatus>;
+      preserveMembershipIds: ReadonlySet<string>;
+    }
+  | {
       type: "PUBLICATION_SAVED";
       publicSummary: string;
       visibility: SessionRecordVisibility;
@@ -194,6 +199,19 @@ export function hostSessionEditorReducer(
           ...state.attendanceStatuses,
           [action.membershipId]: action.status,
         },
+      };
+
+    case "SYNC_AUTHORITATIVE_ATTENDANCE":
+      return {
+        ...state,
+        attendanceStatuses: Object.fromEntries(
+          Object.entries(action.statuses).map(([membershipId, status]) => [
+            membershipId,
+            action.preserveMembershipIds.has(membershipId)
+              ? (state.attendanceStatuses[membershipId] ?? status)
+              : status,
+          ]),
+        ),
       };
 
     case "PUBLICATION_SAVED":

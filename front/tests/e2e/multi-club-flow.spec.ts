@@ -71,7 +71,9 @@ test("club switcher changes club context while preserving independent roles", as
   expect(readingSaiAuth.currentMembership.clubSlug).toBe("reading-sai");
   expect(readingSaiAuth.currentMembership.role).toBe("HOST");
 
-  await page.getByLabel("클럽 전환").selectOption("sample-book-club");
+  const appHeader = page.getByRole("banner");
+  await appHeader.getByLabel("현재 클럽 읽는사이").click();
+  await appHeader.getByRole("navigation", { name: "클럽 선택" }).getByRole("link", { name: "샘플 북클럽" }).click();
 
   await expect(page).toHaveURL(/\/clubs\/sample-book-club\/app\/archive$/);
   expect(new URL(page.url()).search).toBe("");
@@ -96,7 +98,8 @@ test("canonical workspace URLs survive direct entry, reload, resize, and role-sw
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
   await page.setViewportSize({ width: 1280, height: 900 });
 
-  await page.locator(".desktop-only .rm-workspace-switch").click();
+  await page.getByRole("banner").locator(".rm-workspace-selector__trigger").click();
+  await page.getByRole("banner").getByRole("link", { name: "멤버 공간" }).click();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app$/);
   await page.goBack();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
@@ -116,11 +119,13 @@ limit 1;
 `).trim().split("\n").at(-1)!;
 
   await page.goto(`/clubs/reading-sai/app/sessions/${sessionId}`);
-  await expect(page.locator(".desktop-only .rm-workspace-switch")).toHaveAttribute(
+  const workspaceSelector = page.getByRole("banner");
+  await workspaceSelector.locator(".rm-workspace-selector__trigger").click();
+  await expect(workspaceSelector.getByRole("link", { name: "호스트 공간" })).toHaveAttribute(
     "href",
     `/clubs/reading-sai/app/host/sessions/${sessionId}`,
   );
-  await page.locator(".desktop-only .rm-workspace-switch").click();
+  await workspaceSelector.getByRole("link", { name: "호스트 공간" }).click();
   await expect(page).toHaveURL(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
 });
 
@@ -138,11 +143,13 @@ limit 1;
   try {
     runMysql(`update sessions set state = 'OPEN', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
     await page.goto(`/clubs/reading-sai/app/host/sessions/${sessionId}`);
-    await expect(page.locator(".desktop-only .rm-workspace-switch")).toHaveAttribute(
+    const workspaceSelector = page.getByRole("banner");
+    await workspaceSelector.locator(".rm-workspace-selector__trigger").click();
+    await expect(workspaceSelector.getByRole("link", { name: "멤버 공간" })).toHaveAttribute(
       "href",
       `/clubs/reading-sai/app/sessions/${sessionId}`,
     );
-    await page.locator(".desktop-only .rm-workspace-switch").click();
+    await workspaceSelector.getByRole("link", { name: "멤버 공간" }).click();
     await expect(page).toHaveURL("/clubs/reading-sai/app/archive");
   } finally {
     runMysql(`update sessions set state = 'PUBLISHED', updated_at = utc_timestamp(6) where id = '${sessionId}';`);
@@ -177,7 +184,9 @@ limit 1;
 test("revoked host authority replaces the host route with the member-safe route", async ({ page }) => {
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto("/clubs/reading-sai/app");
-  await page.locator(".desktop-only .rm-workspace-switch").click();
+  const workspaceSelector = page.getByRole("banner");
+  await workspaceSelector.locator(".rm-workspace-selector__trigger").click();
+  await workspaceSelector.getByRole("link", { name: "호스트 공간" }).click();
   await expect(page).toHaveURL(/\/clubs\/reading-sai\/app\/host(?:\/sessions\/[^/]+)?$/);
 
   runMysql(`

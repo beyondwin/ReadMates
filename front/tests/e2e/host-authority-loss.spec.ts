@@ -282,7 +282,7 @@ async function triggerSecurityFailure(page: Page, clubSlug = CLUB_SLUG) {
 async function openRecordDraft(page: Page, sessionId: string, draft: string) {
   await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
-  await page.getByRole("listitem", { name: /^기록 / }).getByRole("button").click();
+  await page.getByRole("link", { name: "모임 기록" }).click();
   const summary = page.getByRole("textbox", { name: "공개 요약" });
   await expect(summary).toBeVisible();
   await summary.fill(draft);

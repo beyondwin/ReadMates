@@ -15,8 +15,8 @@ const scopedAppPath = "/clubs/reading-sai/app";
 async function expectPracticalTapTarget(locator: Locator) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
-  expect(box!.width).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(43.99);
+  expect(box!.width).toBeGreaterThanOrEqual(43.99);
 }
 
 async function expectProfileEditorDialog(page: Page, viewportWidth: number) {

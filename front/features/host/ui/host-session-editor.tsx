@@ -4,6 +4,7 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useReducer,
   useRef,
@@ -445,6 +446,26 @@ export default function HostSessionEditor({
     ),
   );
   const attendanceWriteStatesRef = useRef<Record<string, AttendanceWriteState>>({});
+  const authoritativeAttendanceSignature = (session?.attendees ?? [])
+    .map((attendee) => `${attendee.membershipId}:${attendee.attendanceRevision}:${attendee.attendanceStatus}`)
+    .join("|");
+
+  useLayoutEffect(() => {
+    const statuses = Object.fromEntries(
+      (session?.attendees ?? []).map((attendee) => [attendee.membershipId, attendee.attendanceStatus]),
+    );
+    const preserveMembershipIds = new Set(
+      Object.entries(attendanceWriteStatesRef.current)
+        .filter(([, writeState]) => writeState.inFlight)
+        .map(([membershipId]) => membershipId),
+    );
+    for (const [membershipId, status] of Object.entries(statuses)) {
+      if (!preserveMembershipIds.has(membershipId)) {
+        committedAttendanceStatusesRef.current[membershipId] = status;
+      }
+    }
+    dispatch({ type: "SYNC_AUTHORITATIVE_ATTENDANCE", statuses, preserveMembershipIds });
+  }, [authoritativeAttendanceSignature, session?.attendees, session?.sessionId]);
 
   // ---------------------------------------------------------------------------
   // Derived values
@@ -910,7 +931,10 @@ export default function HostSessionEditor({
       attendanceWriteStatesRef.current[membershipId] = writeState;
 
       if (writeState.inFlight) {
-        writeState.queuedStatus = writeState.inFlightStatus === attendanceStatus ? null : attendanceStatus;
+        attendanceWriteStatesRef.current[membershipId] = {
+          ...writeState,
+          queuedStatus: writeState.inFlightStatus === attendanceStatus ? null : attendanceStatus,
+        };
         return;
       }
 
@@ -920,16 +944,19 @@ export default function HostSessionEditor({
           inFlightStatus: null,
           queuedStatus: null,
         };
-        attendanceWriteStatesRef.current[membershipId] = currentWriteState;
-        currentWriteState.inFlight = true;
-        currentWriteState.inFlightStatus = status;
+        attendanceWriteStatesRef.current[membershipId] = {
+          ...currentWriteState,
+          inFlight: true,
+          inFlightStatus: status,
+        };
 
         let writeSucceeded = false;
 
         const rollbackToCommittedStatus = () => {
           const committedStatus = committedAttendanceStatusesRef.current[membershipId] ?? "UNKNOWN";
+          const latestWriteState = attendanceWriteStatesRef.current[membershipId];
 
-          if (currentWriteState.queuedStatus === null) {
+          if (latestWriteState?.queuedStatus === null) {
             dispatch({ type: "UPDATE_ATTENDANCE", membershipId, status: committedStatus });
           }
         };
@@ -940,19 +967,26 @@ export default function HostSessionEditor({
           writeSucceeded = true;
           committedAttendanceStatusesRef.current[membershipId] = status;
 
-          if (currentWriteState.queuedStatus === null || currentWriteState.queuedStatus === status) {
-            currentWriteState.queuedStatus = null;
+          const latestWriteState = attendanceWriteStatesRef.current[membershipId];
+          if (latestWriteState && (latestWriteState.queuedStatus === null || latestWriteState.queuedStatus === status)) {
+            attendanceWriteStatesRef.current[membershipId] = {
+              ...latestWriteState,
+              queuedStatus: null,
+            };
           }
         } catch {
-          if (currentWriteState.queuedStatus === null) {
+          if (attendanceWriteStatesRef.current[membershipId]?.queuedStatus === null) {
             rollbackToCommittedStatus();
             flash("출석 저장에 실패했습니다. 다시 선택해 주세요");
           }
         } finally {
-          const nextStatus = currentWriteState.queuedStatus;
-          currentWriteState.inFlight = false;
-          currentWriteState.inFlightStatus = null;
-          currentWriteState.queuedStatus = null;
+          const latestWriteState = attendanceWriteStatesRef.current[membershipId];
+          const nextStatus = latestWriteState?.queuedStatus ?? null;
+          attendanceWriteStatesRef.current[membershipId] = {
+            inFlight: false,
+            inFlightStatus: null,
+            queuedStatus: null,
+          };
 
           if (nextStatus !== null) {
             void sendAttendanceWrite(nextStatus);

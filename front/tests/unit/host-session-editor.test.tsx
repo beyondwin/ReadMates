@@ -841,6 +841,40 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
   });
 
+  it("replaces stale local attendance when a newer authoritative session detail arrives", async () => {
+    const attended = {
+      ...session,
+      attendees: session.attendees.map((attendee) => attendee.membershipId === "membership-suhan"
+        ? { ...attendee, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 }
+        : attendee),
+    };
+    const { rerender } = render(
+      <HostSessionEditorForTest
+        session={attended}
+        initialLocation={{ panel: "attendance", source: "manual" }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "true");
+
+    rerender(
+      <HostSessionEditorForTest
+        session={{
+          ...attended,
+          attendees: attended.attendees.map((attendee) => attendee.membershipId === "membership-suhan"
+            ? { ...attendee, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 2 }
+            : attendee),
+        }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "false");
+    });
+  });
+
   it.each(["OPEN", "CLOSED", "PUBLISHED"] as const)(
     "keeps the %s session feedback document in the shared record context",
     (state) => {

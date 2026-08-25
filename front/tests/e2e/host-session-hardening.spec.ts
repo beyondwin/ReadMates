@@ -977,10 +977,7 @@ test("legacy revision-zero applied summary publishes first revision as 1", async
   const applied = await applyResponse;
   expect(applied.status(), await applied.text()).toBe(200);
 
-  const notifyDialog = page.getByRole("dialog", { name: "알림 보내기" });
-  await expect(notifyDialog).toBeVisible();
-  await notifyDialog.getByRole("button", { name: "이번에는 보내지 않기" }).click();
-  await expect(notifyDialog).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
 
   const revisionOutput = runMysql(`
 select version, source

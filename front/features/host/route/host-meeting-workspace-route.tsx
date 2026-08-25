@@ -8,7 +8,11 @@ import { buildHostMeetingWorkspace, type HostMeetingLocation, type HostMeetingTa
 import { buildHostMeetingUrl, canonicalizeLegacyHostMeetingUrl, parseHostMeetingLocation } from "@/features/host/model/host-session-workspace-navigation";
 import type { ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
 import type { HostSessionHistoryPage, HostSessionRecordEditor, HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
-import { hostSessionDetailQuery, invalidateHostSessionRecordSurfaces } from "@/features/host/queries/host-session-queries";
+import {
+  hostSessionDetailQuery,
+  invalidateHostSessionRecordSurfaces,
+  isHostSessionNotFoundError,
+} from "@/features/host/queries/host-session-queries";
 import {
   hostPublicConvergenceQuery,
   useRetryHostPublicConvergenceMutation,
@@ -259,6 +263,19 @@ export function HostMeetingWorkspaceRoute({
   }
 
   if (!baseQuery.data) {
+    if (isHostSessionNotFoundError(baseQuery.error)) {
+      return (
+        <DeferredHostWorkspace>
+          <EditHostSessionRoute
+            returnTarget={returnStatePurged ? undefined : returnTarget}
+            LinkComponent={LinkComponent}
+            hostDashboardReturnTarget={hostDashboardReturnTarget}
+            readmatesReturnState={returnStatePurged ? undefined : readmatesReturnState}
+            onSessionRecordsChanged={onSessionRecordsChanged}
+          />
+        </DeferredHostWorkspace>
+      );
+    }
     return (
       <HostMeetingWorkspace
         identity={{
