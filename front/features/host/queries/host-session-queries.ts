@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   closeHostSession,
   correctionPublishHostSession,
@@ -71,7 +71,7 @@ import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
 
-export type HostMutationReconciliationState = "idle" | "checking";
+export type HostMutationReconciliationState = "idle" | "checking" | "pending";
 
 export class HostMutationPendingError extends Error {
   readonly code = "HOST_MUTATION_PENDING";
@@ -451,38 +451,115 @@ export function invalidateHostSessionRecordSurfaces(
   return invalidateSessionMutationSurfaces(client, sessionId, context);
 }
 
-export function useCreateHostSessionMutation(context: ExplicitReadmatesApiContext) {
+export function useCreateHostSessionMutation(
+  context: ExplicitReadmatesApiContext,
+  options: { retainUntilResolved?: boolean } = {},
+) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
+  const setReconciliationState = reconciliation.setReconciliationState;
+  const pendingCreateRef = useRef<HostMutationEnvelope<HostSessionRequest, Record<string, never>> | null>(null);
+  const [hasPendingCreate, setHasPendingCreate] = useState(false);
+
+  const markPendingCreate = useCallback((
+    envelope: HostMutationEnvelope<HostSessionRequest, Record<string, never>> | null,
+  ) => {
+    pendingCreateRef.current = envelope;
+    setHasPendingCreate(Boolean(envelope));
+    setReconciliationState(envelope ? "pending" : "idle");
+  }, [setReconciliationState]);
+
+  const acceptCommittedCreate = useCallback((result: HostMutationReconciliation) => {
+    if (!result.receipt) {
+      throw new Error("HOST_MUTATION_COMMITTED_RECEIPT_MISSING");
+    }
+    return committedDetailResponse(result.receipt.resourceId, context, 201);
+  }, [context]);
+
+  const invalidateCreateSurfaces = useCallback((response: Response) =>
+    invalidateOk(response, () => Promise.all([
+      invalidateHostSessionLists(client, context),
+      invalidateHostSessionDashboard(client, context),
+    ])), [client, context]);
+
   const mutation = useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "sessions", "create"),
-    mutationFn: (request: HostSessionRequest) => {
+    mutationFn: async (request: HostSessionRequest) => {
+      if (pendingCreateRef.current) throw new HostMutationPendingError();
       const explicitContext = requireHostMutationContext(context);
-      const envelope = { idempotencyKey: newHostMutationKey(), expected: {}, command: request };
-      return executeHostMutationWithReconciliation({
-        operation: "SESSION_CREATE",
-        resourceSlot: "create",
-        envelope,
-        context: explicitContext,
-        execute: (exactEnvelope) => createHostSession(exactEnvelope, explicitContext),
-        acceptCommitted: (result) => {
-          if (!result.receipt) {
-            throw new Error("HOST_MUTATION_COMMITTED_RECEIPT_MISSING");
-          }
-          return committedDetailResponse(result.receipt.resourceId, explicitContext, 201);
-        },
-        onStateChange: reconciliation.setReconciliationState,
-      });
+      const envelope: HostMutationEnvelope<HostSessionRequest, Record<string, never>> = {
+        idempotencyKey: newHostMutationKey(),
+        expected: {},
+        command: request,
+      };
+      markPendingCreate(envelope);
+      try {
+        const response = await executeHostMutationWithReconciliation({
+          operation: "SESSION_CREATE",
+          resourceSlot: "create",
+          envelope,
+          context: explicitContext,
+          execute: (exactEnvelope) => createHostSession(exactEnvelope, explicitContext),
+          acceptCommitted: acceptCommittedCreate,
+          onStateChange: setReconciliationState,
+        });
+        if (!options.retainUntilResolved) markPendingCreate(null);
+        return response;
+      } catch (error) {
+        markPendingCreate(envelope);
+        throw error instanceof HostMutationPendingError ? error : new HostMutationPendingError();
+      }
     },
-    onSuccess: (response) =>
-      invalidateOk(response, () =>
-        Promise.all([
-          invalidateHostSessionLists(client, context),
-          invalidateHostSessionDashboard(client, context),
-        ]),
-      ),
+    onSuccess: invalidateCreateSurfaces,
   });
-  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
+
+  const reconcilePendingCreate = useCallback(async (): Promise<Response> => {
+    const envelope = pendingCreateRef.current;
+    if (!envelope) throw new Error("HOST_CREATE_RECONCILIATION_NOT_PENDING");
+    setReconciliationState("checking");
+    try {
+      const result = await fetchHostMutationReconciliation(
+        "SESSION_CREATE",
+        "create",
+        envelope.idempotencyKey,
+        context,
+      );
+      let response: Response;
+      if (result.status === "COMMITTED") {
+        response = await acceptCommittedCreate(result);
+      } else if (result.status === "NOT_EXECUTED") {
+        try {
+          response = await createHostSession(envelope, context);
+        } catch (error) {
+          if (isReadmatesTransportError(error)) throw new HostMutationPendingError();
+          throw error;
+        }
+      } else {
+        throw new HostMutationPendingError();
+      }
+      await invalidateCreateSurfaces(response);
+      if (!options.retainUntilResolved) markPendingCreate(null);
+      return response;
+    } finally {
+      setReconciliationState(pendingCreateRef.current ? "pending" : "idle");
+    }
+  }, [acceptCommittedCreate, context, invalidateCreateSurfaces, markPendingCreate, options.retainUntilResolved, setReconciliationState]);
+
+  const resolvePendingCreate = useCallback(() => markPendingCreate(null), [markPendingCreate]);
+  const resetMutation = mutation.reset;
+  const reset = useCallback(() => {
+    resetMutation();
+    markPendingCreate(null);
+  }, [markPendingCreate, resetMutation]);
+
+  return {
+    ...mutation,
+    reset,
+    reconcilePendingCreate,
+    resolvePendingCreate,
+    hasPendingCreate,
+    reconciliationState: reconciliation.reconciliationState,
+  };
 }
 
 export function useUpdateHostSessionMutation(context: ExplicitReadmatesApiContext) {

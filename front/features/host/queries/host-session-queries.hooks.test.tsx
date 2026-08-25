@@ -505,6 +505,23 @@ describe("host session mutation hooks", () => {
     ]);
   });
 
+  it("allows default create consumers to start another request after an authoritative response", async () => {
+    vi.mocked(createHostSession)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sessionId: "session-8" }), { status: 201 }) as never)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sessionId: "session-9" }), { status: 201 }) as never);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCreateHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync(sessionRequest);
+      await result.current.mutateAsync({ ...sessionRequest, title: "No.9 모임" });
+    });
+
+    expect(createHostSession).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(createHostSession).mock.calls[0]?.[0].idempotencyKey)
+      .not.toBe(vi.mocked(createHostSession).mock.calls[1]?.[0].idempotencyKey);
+  });
+
   it("leaves every seeded cache unchanged when create returns a non-ok response", async () => {
     vi.mocked(createHostSession).mockResolvedValue(new Response("bad request", { status: 400 }) as never);
     const { client, Wrapper } = createWrapper();
@@ -518,6 +535,126 @@ describe("host session mutation hooks", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(cacheState(client)).toEqual(before);
+  });
+
+  it("keeps the exact create envelope while a delayed first commit is pending", async () => {
+    vi.mocked(createHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation)
+      .mockResolvedValueOnce({
+        status: "PENDING",
+        receipt: null,
+        current: null,
+        attendanceVersions: null,
+        attendanceSnapshotId: null,
+      })
+      .mockResolvedValueOnce({
+        status: "COMMITTED",
+        receipt: { resourceId: "session-8" } as never,
+        current: null,
+        attendanceVersions: [],
+        attendanceSnapshotId: null,
+      });
+    vi.mocked(fetchHostSessionDetail).mockResolvedValue(authoritativeDetail() as never);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCreateHostSessionMutation(context, { retainUntilResolved: true }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await expect(result.current.mutateAsync(sessionRequest)).rejects.toMatchObject({
+        code: "HOST_MUTATION_PENDING",
+      });
+    });
+    const firstEnvelope = vi.mocked(createHostSession).mock.calls[0]?.[0];
+    expect(result.current.hasPendingCreate).toBe(true);
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ ...sessionRequest, title: "새 key로 보내면 안 됨" }))
+        .rejects.toMatchObject({ code: "HOST_MUTATION_PENDING" });
+    });
+    expect(createHostSession).toHaveBeenCalledTimes(1);
+
+    let reconciled: Response | undefined;
+    await act(async () => {
+      reconciled = await result.current.reconcilePendingCreate();
+    });
+    expect(reconciled?.status).toBe(201);
+    expect(fetchHostMutationReconciliation).toHaveBeenNthCalledWith(
+      2,
+      "SESSION_CREATE",
+      "create",
+      firstEnvelope?.idempotencyKey,
+      context,
+    );
+    expect(createHostSession).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.resolvePendingCreate());
+    expect(result.current.hasPendingCreate).toBe(false);
+  });
+
+  it("keeps the create envelope when reconciliation is unknown", async () => {
+    vi.mocked(createHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockRejectedValueOnce(new Error("malformed reconciliation"));
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCreateHostSessionMutation(context, { retainUntilResolved: true }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await expect(result.current.mutateAsync(sessionRequest)).rejects.toMatchObject({
+        code: "HOST_MUTATION_PENDING",
+      });
+    });
+
+    expect(result.current.hasPendingCreate).toBe(true);
+    await act(async () => {
+      await expect(result.current.mutateAsync({ ...sessionRequest, title: "새 요청 금지" }))
+        .rejects.toMatchObject({ code: "HOST_MUTATION_PENDING" });
+    });
+    expect(createHostSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries NOT_EXECUTED once with the retained create envelope and key", async () => {
+    vi.mocked(createHostSession)
+      .mockRejectedValueOnce(new ReadmatesTransportError())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sessionId: "session-8" }), { status: 201 }) as never);
+    vi.mocked(fetchHostMutationReconciliation)
+      .mockResolvedValueOnce({
+        status: "PENDING",
+        receipt: null,
+        current: null,
+        attendanceVersions: null,
+        attendanceSnapshotId: null,
+      })
+      .mockResolvedValueOnce({
+        status: "NOT_EXECUTED",
+        receipt: null,
+        current: null,
+        attendanceVersions: [],
+        attendanceSnapshotId: null,
+      });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCreateHostSessionMutation(context, { retainUntilResolved: true }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await expect(result.current.mutateAsync(sessionRequest)).rejects.toMatchObject({
+        code: "HOST_MUTATION_PENDING",
+      });
+    });
+    const firstEnvelope = vi.mocked(createHostSession).mock.calls[0]?.[0];
+
+    let reconciled: Response | undefined;
+    await act(async () => {
+      reconciled = await result.current.reconcilePendingCreate();
+    });
+    expect(reconciled?.status).toBe(201);
+    expect(createHostSession).toHaveBeenNthCalledWith(2, firstEnvelope, context);
+    expect(createHostSession).toHaveBeenCalledTimes(2);
   });
 
   it("invalidates detail, lists, dashboard, and current session after update", async () => {

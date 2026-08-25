@@ -36,6 +36,7 @@ export {
   EditHostSessionRoute,
   NewHostSessionRoute,
 } from "@/features/host/route/host-session-editor-route";
+export { NewHostMeetingRoute } from "@/features/host/route/new-host-meeting-route";
 export {
   hostSessionEditorPreviewActions,
 } from "@/features/host/route/host-session-editor-data";
