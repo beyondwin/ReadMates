@@ -26,6 +26,15 @@ import {
   MEMBER_READ_SURFACE_CAPABILITIES,
   VIEWER_READ_SURFACE_CAPABILITIES,
 } from "@/shared/model/read-surface-capabilities";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
+import { resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
+
+function memberSessionDetailLoaderFactory(queryClient: QueryClient) {
+  return createMemberSessionDetailLoader(queryClient, (pathname) => resolveUnavailableDetailTarget({
+    pathname,
+    lastSafeTarget: readLastSafeWorkspaceTarget("member"),
+  }));
+}
 
 afterEach(() => {
   cleanup();

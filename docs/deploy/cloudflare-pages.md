@@ -33,7 +33,7 @@ Cloudflare 프로젝트 root가 `front`이므로 Pages Functions는 `front/funct
 
 Pages Functions는 browser가 보낸 `X-Readmates-Club-Slug`, `X-Readmates-Club-Host`를 그대로 신뢰하지 않습니다. `/clubs/<club-slug>` path fallback은 검증된 slug를 `clubSlug` query로 BFF에 전달하고, registered host alias는 request host를 Spring에 전달합니다.
 
-Mutating `/api/host/**` 요청은 browser bundle이 `X-Readmates-Client-Contract: v2`를 선언해야 합니다. Pages Functions는 정확한 값만 trusted upstream header로 재생성하고 누락/불일치는 upstream 호출 전에 `409 HOST_CLIENT_UPGRADE_REQUIRED`로 거절합니다. 값을 무조건 주입하면 열린 구버전 탭이 새 backend contract를 잘못 호출할 수 있으므로 금지합니다.
+Mutating `/api/host/**`는 global host-client generation을 사용합니다. R1에서 backend mode를 `SUPPORT_V2_V3`로 올리고 Pages Functions는 v2/v3만 allowlist/pass-through하며 browser는 v2를 유지합니다. R2a는 같은 support mode에서 safety/cache policy를 배포하고 이전 720초 browser cache window를 소진합니다. Attested R2a evidence 뒤 R2b가 v3 SPA+Functions candidate를 배포하고, named 24시간 동안 `v2 writes == 0`, `v3 writes > 0`, `missing/unknown == 0`을 확인한 뒤에만 R3가 backend를 `ENFORCE_V3`로 전환합니다. Pages Functions는 header를 생성하거나 downgrade하지 않으며 누락·unknown·stage-incompatible generation은 upstream mutation 전에 fail closed합니다.
 
 `front/public/_redirects`는 함수 pass-through 규칙을 SPA fallback보다 위에 둬야 합니다. Club path와 registered host alias deep link는 모두 SPA fallback으로 진입해야 합니다.
 
@@ -75,14 +75,14 @@ Preview 배포에는 운영 BFF secret을 넣지 않습니다. Preview에서 API
 1. GitHub `main`에 변경을 병합하고 필요한 검증을 끝냅니다.
 2. `vMAJOR.MINOR.PATCH` 형식의 release tag를 만들고 push해 server image를 build/scan/promote합니다.
 3. Server/API 변경이 있으면 OCI backend를 같은 image tag로 올리고 Flyway/health/BFF smoke를 확인합니다.
-4. Host-client rollout이면 protected `host-rollout-r2b` ref가 exact annotated tag commit을 가리키게 push하고, `.github/workflows/host-client-rollout-evidence.yml`의 package/evidence/final-checker gate를 실행합니다.
+4. Host-client rollout이면 protected `host-rollout-r2b` ref가 exact annotated tag commit을 가리키게 push하고, fresh explicit stage approval 뒤 `.github/workflows/host-client-rollout-evidence.yml`의 no-input `workflow_dispatch`로 package/evidence/final-checker gate를 실행합니다.
 5. Workflow가 deterministic Pages tar를 직접 SHA-256으로 검증하고 attestation과 final live checker를 통과시킵니다.
 6. Reusable `.github/workflows/deploy-front.yml`이 caller ref/SHA/stage/tag를 자체 derivation하고 같은 artifact ID와 digest를 다시 검증합니다. Tar의 absolute/`..` path, symlink, hardlink, device, FIFO, privileged mode를 거부한 뒤 `dist`와 `functions`를 Cloudflare Pages production으로 함께 배포합니다.
 7. [README.md](../../README.md)의 smoke check를 실행합니다.
 
 `main`, rollout branch, tag push만으로는 frontend production 배포가 실행되지 않습니다. `Deploy Front`에는 manual dispatch가 없으며 no-input protected host rollout orchestrator가 R2a runtime pair gate 또는 R2b final evidence checker를 통과한 뒤 exact job output으로만 호출합니다. Reusable caller는 stage/ref/tag/SHA input을 받지 않습니다. 직접 업로드를 사용했다면 배포한 commit을 기록하고 GitHub `main`과 release tag가 가리키는 commit을 다시 맞춥니다.
 
-Major host-write contract release에서는 backend promotion 직후부터 frontend 배포 완료까지 구 Pages BFF의 host mutation이 409로 동결되는 것이 정상입니다. 같은 tag의 SPA와 Functions가 함께 배포되면 새 browser + 새 BFF handshake에서 쓰기가 재개됩니다. Frontend만 이전 tag로 rollback하면 읽기와 멤버 기능은 유지되지만 host write는 계속 동결되며, 복구하려면 호환 frontend 재배포 또는 backend image rollback/forward-fix가 필요합니다.
+Host-write rollout은 backend promotion 직후 모든 write를 즉시 동결하지 않습니다. R1과 R2a의 `SUPPORT_V2_V3` window에서는 v2/v3가 모두 허용되고 browser는 R2b 전까지 v2를 유지합니다. R2b 뒤 Pages rollback은 v3-capable backend를 유지한 채 이전 검증 v3 Pages candidate로만 수행합니다. Pre-v3 backend로의 backend-only rollback은 금지하며 불가피하면 Pages/browser와 coordinated rollback하고 이미 열린 v3 tab은 incompatible pair에서 fail closed하게 둡니다. R3 rollback은 Pages v3를 유지한 채 backend mode만 `SUPPORT_V2_V3`로 되돌립니다. R1/R2a rollback은 각 stage 이전에 검증한 backend/Pages pair로 함께 복귀하며 immutable receipt/convergence ledger는 수정하거나 삭제하지 않습니다.
 
 이 절차는 Cloudflare Pages의 프론트엔드 배포 흐름입니다. Spring Boot release image는 별도 `Deploy Server Image` workflow가 GHCR에 scan/promote하지만, OCI compose stack promotion은 운영자가 `deploy/oci/05-deploy-compose-stack.sh`로 수행하는 별도 절차입니다.
 
@@ -118,7 +118,7 @@ READMATES_BFF_SECRET=<shared-bff-secret>
 READMATES_BFF_SECRETS=<new-secret>,<old-secret>
 READMATES_BFF_SECRET_REQUIRED=true
 # Server-side typed rollout mode. Set only through the approved R1/R2a/R2b/R3 runbook.
-READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=V2_ONLY
+READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=SUPPORT_V2_V3
 READMATES_IP_HASH_BASE_SECRET=<openssl rand -base64 32으로 생성>
 READMATES_AUTH_SESSION_COOKIE_SECURE=true
 ```

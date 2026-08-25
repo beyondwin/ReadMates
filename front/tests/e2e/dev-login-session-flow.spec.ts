@@ -59,7 +59,14 @@ async function fillNewMeetingBasics(
   await page.getByLabel("책 제목").fill(input.bookTitle);
   await page.getByLabel("저자").fill(input.author);
   await page.getByLabel("모임 날짜").fill(input.date);
-  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
+  const createdResponse = page.waitForResponse((response) => (
+    response.request().method() === "POST"
+    && new URL(response.url()).pathname === "/api/bff/api/host/sessions"
+    && response.ok()
+  ));
+  await page.getByRole("form", { name: "새 모임 정보" }).getByRole("button", { name: "모임 초안 저장" }).click();
+  const created = await (await createdResponse).json() as { sessionId: string };
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${created.sessionId}`);
   await expectCanonicalMeetingUrl(page);
 }
 
@@ -80,21 +87,33 @@ async function confirmLifecycle(page: Page, name: string, pathIncludes: string) 
   page.on("dialog", onDialog);
   try {
     const triggerName = name === "멤버에게 열기" ? "멤버와 준비 시작" : name;
-    const checkAttendance = page.getByRole("button", { name: "실제 출석 확인" }).locator("visible=true");
-    const finish = page.getByRole("button", { name: "모임 마치기" }).locator("visible=true");
+    const primaryActions = page.getByRole("region", { name: "지금 할 일" });
+    const checkAttendance = primaryActions.getByRole("button", { name: "실제 출석 확인" });
+    const finish = primaryActions.getByRole("button", { name: "모임 마치기" });
     if (name === "모임 마치기") {
       await expect(checkAttendance.or(finish)).toBeVisible({ timeout: 10_000 });
       if (await checkAttendance.count()) {
         await checkAttendance.click();
         await expect(page.getByRole("region", { name: "출석" })).toBeVisible();
-        for (const button of await page.getByRole("button", { name: /참석$/ }).all()) {
+        const attendButtons = page.getByRole("button", { name: /참석$/ });
+        await expect(attendButtons.first()).toBeVisible();
+        const attendCount = await attendButtons.count();
+        for (let index = 0; index < attendCount; index += 1) {
+          const button = attendButtons.nth(index);
           if ((await button.getAttribute("aria-pressed")) !== "true") {
+            const saved = page.waitForResponse((response) => (
+              response.request().method() === "POST"
+              && response.url().includes("/attendance")
+            ));
             await button.click();
+            const savedResponse = await saved;
+            expect(savedResponse.ok()).toBe(true);
+            await expect(button).toHaveAttribute("aria-pressed", "true");
           }
         }
       }
     }
-    const trigger = page.getByRole("button", { name: triggerName }).locator("visible=true");
+    const trigger = primaryActions.getByRole("button", { name: triggerName });
     await expect(trigger).toBeVisible({ timeout: 10_000 });
     await trigger.click();
     const dialog = page.getByRole("dialog", { name });
@@ -123,7 +142,7 @@ async function createOpenMeetingThroughUi(
   page: Page,
   input: { title: string; bookTitle: string; author: string; date: string },
 ) {
-  await page.goto("/app/host/sessions/new");
+  await page.goto(`${canonicalHostDashboardPath}/sessions/new`);
   await fillNewMeetingBasics(page, input);
   await openMeetingForMembers(page);
 }
@@ -142,7 +161,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await page.goto("/app/host");
   await expectCanonicalHostDashboard(page);
 
-  await page.goto("/app/host/sessions/new");
+  await page.goto(`${canonicalHostDashboardPath}/sessions/new`);
   await expect(page.getByLabel("모임 제목")).toBeVisible();
   await page.getByLabel("모임 제목").fill("E2E 예정 모임");
   await page.getByLabel("책 제목").fill("E2E 예정 책");
@@ -155,11 +174,12 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
       && !response.url().includes("/sessions/")
       && response.ok(),
   );
-  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
+  await page.getByRole("form", { name: "새 모임 정보" }).getByRole("button", { name: "모임 초안 저장" }).click();
   const created = await createResponse;
   expect(created.ok()).toBe(true);
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
-  const createdSessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
+  const createdSessionId = ((await created.json()) as { sessionId: string }).sessionId;
+  await page.goto(`/clubs/reading-sai/app/host/sessions/${createdSessionId}`);
+  await expect(page).toHaveURL(new RegExp(`/app/host/sessions/${createdSessionId}$`));
   await page.evaluate(async (sessionId) => {
     const response = await fetch(`/api/bff/api/host/sessions/${sessionId}/access-scope`, {
       method: "PATCH",
@@ -186,7 +206,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await confirmLifecycle(page, "모임 마치기", "/close");
   await page.goto(`/app/host/sessions/${createdSessionId}`);
   await expectCanonicalMeetingUrl(page);
-  await expect(page.getByRole("button", { name: "멤버와 준비 시작" }).locator("visible=true")).toBeVisible();
+  await expect(page.getByRole("region", { name: "지금 할 일" }).getByRole("button", { name: "멤버와 준비 시작" })).toBeVisible();
   await openMeetingForMembers(page);
 
   await page.goto("/app/session/current");
@@ -208,7 +228,7 @@ test("host creates member-visible upcoming session then starts it", async ({ pag
   await confirmLifecycle(page, "모임 마치기", "/close");
   await expect(page.locator(".m-toast")).toContainText("모임을 마쳤습니다");
   await expect(page.getByText("기록 정리 중")).toBeVisible();
-  await expect(page.getByRole("button", { name: "정리본 올리기" }).locator("visible=true")).toBeVisible();
+  await expect(page.getByRole("region", { name: "지금 할 일" }).getByRole("button", { name: "정리본 올리기" })).toBeVisible();
 });
 
 test("host creates session seven and member sees current session", async ({ page }) => {

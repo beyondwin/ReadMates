@@ -9,9 +9,10 @@ import HostMembers from "@/features/host/ui/host-members";
 import { createHostMembersActions, hostMembersLoaderFactory } from "@/features/host";
 import HostMembersPage from "@/src/pages/host-members";
 import type { HostMemberListItem } from "@/features/host/api/host-contracts";
-import type { HostMemberProfileErrorCode } from "@/features/host/model/host-view-types";
 import type { AuthMeResponse } from "@/shared/auth/auth-contracts";
 import { __resetHostClientContractCapabilityForTest } from "@/shared/api/host-client-contract";
+
+const hostContext = { clubSlug: "reading-sai" };
 
 function createTestQueryClient() {
   return new QueryClient({
@@ -137,7 +138,7 @@ const noopHostMembersActions = {
   refreshMembers: vi.fn(async () => ({ items: [], nextCursor: null })),
   submitLifecycle: vi.fn(async () => ({ member: members[0], currentSessionPolicyResult: "APPLIED" as const })),
   submitViewerAction: vi.fn(async () => members[0]),
-  submitProfile: vi.fn(async () => ({ ok: true as const, member: members[0] })),
+  submitProfile: vi.fn(async () => members[0]),
 } satisfies HostMembersActions;
 
 type HostMembersProps = Parameters<typeof HostMembers>[0];
@@ -184,16 +185,6 @@ function authResponse(auth: AuthMeResponse) {
   });
 }
 
-function hostClientCapabilityResponse() {
-  return new Response(JSON.stringify({
-    schemaVersion: 1,
-    supportedHostClientContracts: ["v3"],
-  }), {
-    status: 200,
-    headers: { "Cache-Control": "no-store", "Content-Type": "application/json" },
-  });
-}
-
 function deferred<T>() {
   let resolve: (value: T) => void = () => undefined;
   let reject: (reason?: unknown) => void = () => undefined;
@@ -220,30 +211,30 @@ function installRouterRequestShim() {
 
 function renderHostMembersPage(extraResponses: Array<Response | Promise<Response>> = [], initialMembers = members) {
   installRouterRequestShim();
-  const queuedResponses = [...extraResponses];
-  let authServed = false;
-  let initialMembersServed = false;
-  const fetchMock = vi.fn((input: RequestInfo | URL) => {
-    const url = input.toString();
-    if (url === "/api/bff/__internal/client-contract-status") {
-      return Promise.resolve(hostClientCapabilityResponse());
-    }
-    if (!authServed && url === "/api/bff/api/auth/me?clubSlug=reading-sai") {
-      authServed = true;
-      return Promise.resolve(authResponse(activeHostAuth));
-    }
-    if (!initialMembersServed && url === "/api/bff/api/host/members?limit=50&clubSlug=reading-sai") {
-      initialMembersServed = true;
-      return Promise.resolve(memberListResponse(initialMembers));
-    }
-    const response = queuedResponses.shift();
-    if (response) {
-      return Promise.resolve(response);
-    }
-    return Promise.reject(new Error(`Unexpected fetch: ${url}`));
-  });
+  const fetchMock = vi
+    .fn()
+    .mockResolvedValueOnce(authResponse(activeHostAuth))
+    .mockResolvedValueOnce(memberListResponse(initialMembers));
 
-  vi.stubGlobal("fetch", fetchMock);
+  for (const response of extraResponses) {
+    fetchMock.mockResolvedValueOnce(response);
+  }
+
+  vi.stubGlobal("fetch", vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+    if (input.toString() === "/api/bff/__internal/client-contract-status") {
+      return Promise.resolve(new Response(JSON.stringify({
+        schemaVersion: 1,
+        supportedHostClientContracts: ["v3"],
+      }), {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store",
+        },
+      }));
+    }
+    return fetchMock(input, init);
+  }));
   const queryClient = createTestQueryClient();
   const router = createMemoryRouter(
     [
@@ -263,11 +254,6 @@ function renderHostMembersPage(extraResponses: Array<Response | Promise<Response
     </QueryClientProvider>,
   );
   return fetchMock;
-}
-
-function hostMemberFetchCalls(fetchMock: ReturnType<typeof vi.fn>) {
-  return fetchMock.mock.calls.filter(([input]) =>
-    input.toString().startsWith("/api/bff/api/host/members"));
 }
 
 afterEach(() => {
@@ -459,15 +445,12 @@ describe("HostMembersPage", () => {
     ["DISPLAY_NAME_RESERVED", "시스템에서 쓰는 이름은 사용할 수 없습니다."],
   ])("shows the %s host profile validation error near the edit field", async (code, message) => {
     const user = userEvent.setup();
-    const actions = {
-      ...noopHostMembersActions,
-      submitProfile: vi.fn(async () => ({
-        ok: false as const,
+    renderHostMembersPage([
+      new Response(JSON.stringify({ code, message: "raw server detail" }), {
         status: 400,
-        code: code as HostMemberProfileErrorCode,
-      })),
-    } satisfies HostMembersActions;
-    render(<HostMembersForTest initialMembers={members} actions={actions} />);
+        headers: { "Content-Type": "application/json" },
+      }),
+    ]);
 
     const row = within((await screen.findByText("멤버1")).closest("article") as HTMLElement);
     await user.click(row.getByRole("button", { name: "이름 변경" }));
@@ -477,6 +460,7 @@ describe("HostMembersPage", () => {
     await user.click(dialog.getByRole("button", { name: "이름 저장" }));
 
     expect(await dialog.findByText(message)).toBeInTheDocument();
+    expect(dialog.queryByText("raw server detail")).not.toBeInTheDocument();
   });
 
   it.each([
@@ -485,15 +469,12 @@ describe("HostMembersPage", () => {
     [400, { code: "MEMBERSHIP_NOT_ALLOWED" }],
   ])("shows a not-editable message for host profile error %s %o", async (status, body) => {
     const user = userEvent.setup();
-    const actions = {
-      ...noopHostMembersActions,
-      submitProfile: vi.fn(async () => ({
-        ok: false as const,
+    renderHostMembersPage([
+      new Response(JSON.stringify(body), {
         status,
-        code: body.code as HostMemberProfileErrorCode,
-      })),
-    } satisfies HostMembersActions;
-    render(<HostMembersForTest initialMembers={members} actions={actions} />);
+        headers: { "Content-Type": "application/json" },
+      }),
+    ]);
 
     const row = within((await screen.findByText("멤버1")).closest("article") as HTMLElement);
     await user.click(row.getByRole("button", { name: "이름 변경" }));
@@ -517,8 +498,7 @@ describe("HostMembersPage", () => {
     await user.type(dialog.getByLabelText("이름"), "새이름");
     await user.dblClick(dialog.getByRole("button", { name: "이름 저장" }));
 
-    expect(hostMemberFetchCalls(fetchMock).filter(([input]) =>
-      input.toString().includes("/membership-active/profile"))).toHaveLength(1);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(dialog.getByRole("button", { name: "이름 저장" })).toBeDisabled();
     expect(dialog.getByRole("button", { name: "이름 저장" })).toHaveTextContent("저장 중");
 
@@ -677,7 +657,7 @@ describe("HostMembersPage", () => {
     vi.stubGlobal("fetch", fetchMock);
     const client = createTestQueryClient();
 
-    await createHostMembersActions(client, { clubSlug: "reading-sai" }).loadMembers({ limit: 50, cursor: "cursor-1" });
+    await createHostMembersActions(client, hostContext).loadMembers({ limit: 50, cursor: "cursor-1" });
 
     expect(fetchMock).toHaveBeenCalledWith(
       "/api/bff/api/host/members?limit=50&cursor=cursor-1&clubSlug=reading-sai",
@@ -744,10 +724,10 @@ describe("HostMembersPage", () => {
     expect(secondRow.getByRole("button", { name: "이름 변경" })).toBeDisabled();
     expect(secondRow.getByRole("button", { name: "이름 변경" })).toHaveAccessibleDescription("멤버 상태 업데이트를 처리하는 중입니다.");
     expect(secondRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(3);
-    expect(hostMemberFetchCalls(fetchMock)).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     await user.click(firstRow.getByRole("button", { name: "둘러보기 해제" }));
-    expect(hostMemberFetchCalls(fetchMock)).toHaveLength(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     firstApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
     secondApproval.resolve(new Response(JSON.stringify({ status: "ACTIVE" }), { status: 200, headers: { "Content-Type": "application/json" } }));
@@ -806,17 +786,15 @@ describe("HostMembersPage", () => {
 
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
     expect(screen.getByText("정식 멤버로 전환했습니다.")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
       "/api/bff/api/host/members/membership-pending/activate?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
-    );
-    expect(fetchMock).toHaveBeenCalledWith(
-      "/api/bff/__internal/client-contract-status",
-      expect.objectContaining({ method: "GET", cache: "no-store" }),
     );
 
     await user.click(screen.getByRole("tab", { name: "활성 멤버" }));
@@ -854,14 +832,14 @@ describe("HostMembersPage", () => {
         name: "정식 멤버로 전환",
       }),
     );
-    await waitFor(() => expect(hostMemberFetchCalls(fetchMock)).toHaveLength(3));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(4));
 
     await user.click(
       within(screen.getByText("두번째 둘러보기").closest("article") as HTMLElement).getByRole("button", {
         name: "정식 멤버로 전환",
       }),
     );
-    await waitFor(() => expect(hostMemberFetchCalls(fetchMock)).toHaveLength(5));
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(6));
 
     expect(screen.getByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
 
@@ -898,11 +876,13 @@ describe("HostMembersPage", () => {
 
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
     expect(screen.getByText("둘러보기 멤버를 해제했습니다.")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
       "/api/bff/api/host/members/membership-pending/deactivate-viewer?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -928,7 +908,8 @@ describe("HostMembersPage", () => {
     expect(await screen.findByText("둘러보기 멤버가 없습니다.")).toBeInTheDocument();
     expect(screen.getByText("처리는 완료됐지만 멤버 목록 새로고침에 실패했습니다. 새로고침해서 최신 상태를 확인해 주세요.")).toBeInTheDocument();
     expect(screen.queryByText("정식 멤버 전환에 실패했습니다.")).not.toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
       "/api/bff/api/host/members?limit=50&clubSlug=reading-sai",
       expect.objectContaining({ cache: "no-store" }),
     );
@@ -1064,11 +1045,13 @@ describe("HostMembersPage", () => {
     row = screen.getByText("새").closest("article");
     await user.click(within(row as HTMLElement).getByRole("button", { name: "이번 모임 추가" }));
 
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
       "/api/bff/api/host/members/membership-active/current-session/remove?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
-    expect(fetchMock).toHaveBeenCalledWith(
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
       "/api/bff/api/host/members/membership-not-session/current-session/add?clubSlug=reading-sai",
       expect.objectContaining({ method: "POST" }),
     );
@@ -1102,7 +1085,7 @@ describe("HostMembersPage", () => {
     expect(activeRow.getAllByText("멤버 상태 업데이트를 처리하는 중입니다.")).toHaveLength(4);
 
     await user.click(activeRow.getByRole("button", { name: "정지" }));
-    expect(hostMemberFetchCalls(fetchMock)).toHaveLength(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
 
     await act(async () => {
       removal.resolve(lifecycleResponse(removed));

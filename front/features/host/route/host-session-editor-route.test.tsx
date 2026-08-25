@@ -279,7 +279,7 @@ import {
   EditHostSessionRoute,
   NewHostSessionRoute,
 } from "./host-session-editor-route";
-import { hostSessionEditorLoaderFactory as createHostSessionEditorLoader } from "./host-session-editor-data";
+import { hostMeetingWorkspaceLoaderFactory as hostSessionEditorLoaderFactory } from "./host-meeting-workspace-data";
 import { hostNotificationKeys } from "@/features/host/queries/host-notification-queries";
 import { hostSessionRecordKeys } from "@/features/host/queries/host-session-record-queries";
 import { hostSessionKeys } from "@/features/host/queries/host-session-queries";
@@ -301,17 +301,6 @@ const snapshot = {
   oneLineReviews: [],
   feedbackDocument: { fileName: "", title: "", markdown: "" },
 };
-
-function hostSessionEditorLoaderFactory(client: QueryClient) {
-  return createHostSessionEditorLoader(client, (pathname) => {
-    const clubSlug = /^\/clubs\/([^/]+)\/app\/host(?:\/|$)/.exec(pathname)?.[1] ?? "";
-    const fallback = `/clubs/${clubSlug}/app/host`;
-    const lastSafeTarget = window.sessionStorage.getItem("readmates:last-safe-workspace-target:host");
-    return lastSafeTarget?.startsWith(`${fallback}/`) && lastSafeTarget !== pathname
-      ? lastSafeTarget
-      : fallback;
-  });
-}
 
 const recordEditor: HostSessionRecordEditor = {
   sessionId: "session-1",
@@ -355,6 +344,13 @@ function sessionDetail(overrides: Record<string, unknown> = {}) {
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
     ...overrides,
   };
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }
 
 function renderWorkflow(
@@ -1282,10 +1278,8 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("captures a pending undo from a basic save receipt and restores with the preview hash", async () => {
-    const saveSession = vi.fn(async () => ({
-      ok: true as const,
-      createdSessionId: null,
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
+    const saveSession = vi.fn(async () => jsonResponse({
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
     }));
     routeMocks.previewRestore.mockResolvedValue({
       sessionId: "session-1",
@@ -1350,10 +1344,8 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("clears mounted draft, receipt, and reconciliation state for the revoked club only", async () => {
-    const saveSession = vi.fn(async () => ({
-      ok: true as const,
-      createdSessionId: null,
-      changeReceipt: { changeId: "change-basic-sensitive", kind: "BASIC_INFO" as const, undoAvailable: true },
+    const saveSession = vi.fn(async () => jsonResponse({
+      changeReceipt: { changeId: "change-basic-sensitive", kind: "BASIC_INFO", undoAvailable: true },
     }));
     routeMocks.preview.mockResolvedValue({
       eventType: "SESSION_RECORD_UPDATED",
@@ -1387,10 +1379,8 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("clears the undo bar when restore completes without a new undoable receipt", async () => {
-    const saveSession = vi.fn(async () => ({
-      ok: true as const,
-      createdSessionId: null,
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
+    const saveSession = vi.fn(async () => jsonResponse({
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
     }));
     routeMocks.previewRestore.mockResolvedValue({
       sessionId: "session-1",
@@ -1592,10 +1582,8 @@ describe("EditHostSessionRecordWorkflow", () => {
         attendanceStatus: "ATTENDED",
       }],
     });
-    const saveSession = vi.fn(async () => ({
-      ok: true as const,
-      createdSessionId: null,
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
+    const saveSession = vi.fn(async () => jsonResponse({
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
     }));
     const updateAttendance = vi.fn(async () => ({
       sessionId: "session-1",
@@ -1649,7 +1637,7 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("does not create a receipt when a mutation fails", async () => {
-    const saveSession = vi.fn(async () => ({ ok: false as const }));
+    const saveSession = vi.fn(async () => jsonResponse({ message: "failed" }, 500));
     const updateAttendance = vi.fn(async () => {
       throw new Error("offline");
     });
@@ -1670,11 +1658,9 @@ describe("EditHostSessionRecordWorkflow", () => {
   });
 
   it("dismisses the undo bar without restoring", async () => {
-    const saveSession = vi.fn(async () => ({
-      ok: true as const,
-      createdSessionId: null,
-      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO" as const, undoAvailable: true },
-    }));
+    const saveSession = vi.fn(async () => jsonResponse(sessionDetail({
+      changeReceipt: { changeId: "change-basic-1", kind: "BASIC_INFO", undoAvailable: true },
+    })));
     renderWorkflow(recordEditor, vi.fn(), undefined, {
       session: sessionDetail(),
       actions: { saveSession },
@@ -1824,7 +1810,7 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     };
   }
 
-  it("prefetches the meeting-owned list with mode=meeting for an active editor", async () => {
+  it("keeps active editor loading to base detail without prefetching meeting lists", async () => {
     loaderApiMocks.fetchHostSessionDetail.mockResolvedValue(sessionDetail());
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
@@ -1833,11 +1819,7 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
       mode: "active",
     });
 
-    expect(loaderApiMocks.fetchHostSessionList).toHaveBeenCalledWith(
-      "meeting",
-      { clubSlug: "reading-sai" },
-      { limit: 50 },
-    );
+    expect(loaderApiMocks.fetchHostSessionList).not.toHaveBeenCalled();
     expect(loaderApiMocks.fetchHostSessions).not.toHaveBeenCalled();
   });
 
@@ -1871,7 +1853,7 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     try {
       await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
     } catch (response) {
-      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("Location")).toBe("/app/host/sessions");
       expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
     }
     expect(loaderApiMocks.fetchHostSessionTrash).not.toHaveBeenCalled();
@@ -1895,12 +1877,12 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     try {
       await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
     } catch (response) {
-      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("Location")).toBe("/app/host/sessions");
       expect((response as Response).headers.get("X-Remix-Replace")).toBe("true");
     }
   });
 
-  it("uses only a same-club safe host last-safe candidate when the detail is unavailable", async () => {
+  it("leaves last-safe target selection to app composition when detail is unavailable", async () => {
     window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", "/clubs/reading-sai/app/host/notifications");
     loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(403));
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -1908,20 +1890,20 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
     try {
       await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
     } catch (response) {
-      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host/notifications");
+      expect((response as Response).headers.get("Location")).toBe("/app/host/sessions");
     }
 
     window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", "/clubs/other-club/app/host/notifications");
     try {
       await hostSessionEditorLoaderFactory(client)(loaderArgs() as never);
     } catch (response) {
-      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("Location")).toBe("/app/host/sessions");
     } finally {
       window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");
     }
   });
 
-  it("does not replace an unavailable host detail with the same stored last-safe pathname", async () => {
+  it("does not read a same-path stored target inside the feature loader", async () => {
     const unavailablePath = "/clubs/reading-sai/app/host/sessions/session-1";
     window.sessionStorage.setItem("readmates:last-safe-workspace-target:host", unavailablePath);
     loaderApiMocks.fetchHostSessionDetail.mockRejectedValue(loaderApiError(403));
@@ -1932,7 +1914,7 @@ describe("hostSessionEditorLoaderFactory trash fallback", () => {
       throw new Error("Expected replacement redirect");
     } catch (response) {
       expect(response).toBeInstanceOf(Response);
-      expect((response as Response).headers.get("Location")).toBe("/clubs/reading-sai/app/host");
+      expect((response as Response).headers.get("Location")).toBe("/app/host/sessions");
       expect((response as Response).headers.get("Location")).not.toBe(unavailablePath);
     } finally {
       window.sessionStorage.removeItem("readmates:last-safe-workspace-target:host");

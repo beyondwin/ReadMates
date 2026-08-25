@@ -12,6 +12,7 @@ import com.readmates.publication.application.model.PublicProjectionGeneration
 import java.time.Instant
 import java.util.UUID
 
+@Suppress("TooManyFunctions")
 interface PublicConvergencePort {
     fun loadGenerationBySession(sessionId: UUID): PublicProjectionGeneration?
 
@@ -40,4 +41,17 @@ interface PublicConvergencePort {
         sessionId: UUID,
         mutationReceiptId: UUID,
     ): PublicConvergenceHostSnapshot?
+
+    fun loadLatestHostSnapshot(
+        clubId: UUID,
+        sessionId: UUID,
+    ): PublicConvergenceHostSnapshot?
+
+    fun requestHostRetry(
+        clubId: UUID,
+        sessionId: UUID,
+        convergenceId: UUID,
+        now: Instant,
+        maxAttempts: Int,
+    ): Boolean
 }

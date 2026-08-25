@@ -145,7 +145,9 @@ evidence protocol을 구현하므로 application transaction과 JDBC lock 순서
 
 Platform admin AI Ops는 `readmates.aigen.enabled=true`일 때 `/api/admin/ai-generation/summary`, `/api/admin/ai-generation/jobs`, `/api/admin/ai-generation/jobs/{jobId}`, `/api/admin/ai-generation/jobs/{jobId}/force-cancel`을 사용합니다. 요약과 job ledger는 provider/model/status/error/cost 중심의 안전한 projection만 반환하고, force-cancel은 platform admin actor, 이전/다음 상태, 결과, 안전한 error code를 Flyway V34 `ai_generation_admin_action_audit`에 기록합니다.
 
-Public cache, 멤버 알림 deep link, host 알림 운영 ledger는 club id 또는 club slug를 포함해 scope를 나눕니다. 공개 cache key는 club id 기준으로 분리하고, 알림 link는 `/clubs/:slug/app/**` canonical path를 사용해 로그인 후에도 원래 클럽 화면으로 복귀합니다.
+Public cache, 멤버 알림 deep link, host 알림 운영 ledger는 club id 또는 club slug를 포함해 scope를 나눕니다. 공개 cache key는 club id 기준으로 분리하고, 알림 link는 `/clubs/:slug/app/**` canonical path를 사용해 로그인 후에도 원래 클럽 화면으로 복귀합니다. Publication transaction은 origin projection과 cache generation, immutable mutation receipt, 최초 convergence work를 원자적으로 남기고 provider purge는 별도 append-only attempt ledger에서 수렴시킵니다. Scheduler는 `publication.adapter.in.scheduling`의 inbound adapter이며 `ProcessPublicConvergenceUseCase`만 호출합니다. 현재 authoritative public projection은 Spring의 `public, max-age=60, must-revalidate`와 BFF의 CDN `no-store` 경계를 사용하므로 새 navigation/read 목표는 60초입니다. 이미 렌더링·저장·offline인 copy는 원격 회수 대상이 아닙니다.
+
+긴급 public takedown은 `admin.takedown` workflow slice의 `EMERGENCY_PUBLIC_TAKEDOWN` capability가 있는 active OWNER/OPERATOR만 preview/confirm할 수 있습니다. SUPPORT, inactive actor, capabilityless actor, target/generation mismatch는 fail closed합니다. Confirm은 redacted immutable admin receipt와 최초 convergence work를 만들고, 재시도는 같은 `convergenceId`에 higher attempt만 추가하며 origin deny를 반복하지 않습니다. Confirm 활성화는 기존 `120 + 600 = 720`초 browser cache window를 실제로 소진한 R2a evidence가 있기 전까지 fail closed입니다.
 
 ## 서버 내부 구조
 
@@ -282,6 +284,7 @@ lazy 및 scheduled trigger는 CAS로 설치한 정확히 하나의 in-flight fut
 `GET /api/admin/health/snapshot`의 기존 `schema`, `generatedAt`, `cards`는 유지되고 `lastSuccessfulAt`(첫 성공 전 `null`), `refreshState`(`FRESH`/`REFRESHING`/`STALE`/`UNAVAILABLE`), `staleAgeSeconds`가 additive metadata로 제공됩니다. platform-admin authorization, database schema, migration, live AI-provider invocation과 email-send behavior는 변경하지 않습니다. frontend는 server-supplied state와 age를 표시하며 TanStack Query의 fetching 상태는 새로고침 버튼의 transport hint일 뿐 server freshness를 대체하지 않습니다.
 
 ### Mixed / Workflow-side
+- `publication` — 공개 projection query와 cache generation을 읽고, 별도 append-only convergence ledger의 lease/retry를 조정합니다. Provider HTTP와 JDBC detail은 outbound port/adapter 뒤에 두며 mutation receipt는 convergence 상태 갱신에 사용하지 않습니다.
 - `admin.operations` — 네 운영 source의 allowlist signal을 case/event/source-freshness ledger로 조정하고, 낙관적 version을 가진 lifecycle mutation과 exact-source resolve 검증을 수행합니다. Application layer는 source adapter, JDBC, Micrometer, Spring Web detail이 아니라 outbound port에 의존합니다.
 - `feedback` — 문서 업로드 mutation + 조회를 함께 보유합니다.
 - `sessionrecord` — `/app/host/sessions` 장부와 editor/history API가 기본 정보·출석의 복구 가능한 before/after snapshot, 공개 기록 공통 draft, immutable applied revision, restore-to-draft를 소유합니다. 적용 전 member/public live projection은 변경하지 않습니다. 세션 행의 활성 조회는 `active_sessions` projection을 사용합니다.
@@ -324,7 +327,7 @@ Spring은 `/api/**` 요청에서 `X-Readmates-Bff-Secret`을 검사할 수 있�
 
 Mutating method인 `POST`, `PUT`, `PATCH`, `DELETE`는 `Origin` 또는 `Referer`가 `READMATES_ALLOWED_ORIGINS` 또는 `READMATES_APP_BASE_URL`에서 파생된 허용 origin에 포함되어야 합니다.
 
-Production은 `READMATES_HOST_WRITE_CLIENT_CONTRACT_REQUIRED=true`로 mutating `/api/host/**`에 현재 client contract를 추가로 요구합니다. 새 browser bundle은 `X-Readmates-Client-Contract: v2`를 선언하고 Pages Functions는 정확한 선언만 새 upstream header로 재생성합니다. BFF가 값을 무조건 부여하지 않으므로 구 browser + 새 BFF, 새 browser + 구 BFF, 구 browser + 구 BFF는 모두 새 backend에서 409로 fail closed하고 새 browser + 새 BFF만 통과합니다. 이 header는 인증이나 권한을 대신하지 않으며 BFF secret, same-origin 검증, session, club-scoped HOST 권한을 모두 통과해야 합니다. 호스트 변경 복원(`POST /api/host/sessions/{sessionId}/changes/{changeId}/restore`)과 휴지통 복원(`POST /api/host/sessions/{sessionId}/restore`)도 같은 generic `/api/bff/**` proxy를 타며, BFF path allowlist나 Functions 전용 구현은 두지 않습니다.
+Mutating `/api/host/**`는 typed `READMATES_HOST_WRITE_CLIENT_CONTRACT_MODE=DISABLED|V2_ONLY|SUPPORT_V2_V3|ENFORCE_V3`와 `X-Readmates-Client-Contract` generation을 함께 검사합니다. 현재 repository 계약은 global v3 host write이며 BFF는 browser 선언을 allowlist/normalize해 전달하되 생성하거나 downgrade하지 않습니다. 활성화 순서는 R1 `SUPPORT_V2_V3` → R2a safety/cache policy와 이전 720초 browser window 소진 → R2b v3 browser → named 24-hour residue-zero observation → R3 `ENFORCE_V3`입니다. 각 stage는 서로 다른 immutable artifact와 fresh explicit live approval을 요구하며 repository-ready 상태만으로 실행하지 않습니다. Incompatible browser/BFF/backend pair는 write를 fail closed하고, 이 header는 BFF secret, same-origin 검증, session, club-scoped HOST 권한을 대신하지 않습니다. 호스트 변경 복원과 휴지통 복원도 같은 generic `/api/bff/**` proxy와 global generation contract를 따릅니다.
 
 클럽 context header도 BFF 신뢰 경계 안에 있습니다. Spring은 `X-Readmates-Club-Slug`와 `X-Readmates-Club-Host`를 browser input으로 취급하지 않고, BFF secret을 통과한 요청에서만 context resolve 입력으로 사용합니다. 허용 origin은 primary auth/app origin, `https://readmates.pages.dev`, 등록된 active club host를 명시적으로 포함해야 하며 wildcard suffix로 넓게 열지 않습니다.
 
@@ -355,21 +358,20 @@ AI Kafka exhaustion과 restart recovery는 application input port를 호출하�
 
 ## 공개 API 2계층 캐시
 
-공개 API 응답은 Spring과 Cloudflare Pages Functions BFF 두 계층에서 캐시합니다.
+공개 API의 browser freshness는 Spring이 소유하고 Cloudflare Pages Functions BFF/CDN은 authoritative projection을 저장하지 않습니다.
 
 **1계층: Spring `Cache-Control` 헤더**
 
-`/api/public/clubs/{slug}`, `/api/public/clubs/{slug}/sessions/{sessionId}` 등 `PublicController`의 GET endpoint는 `Cache-Control: public, max-age=60, must-revalidate`를 응답 헤더에 포함합니다. Club list/stats/detail과 PUBLISHED guest record reader는 publication의 exact current generation row, `origin_readable=true`, `emergency_denied=false`를 함께 요구하므로 takedown transaction 뒤 origin에서 summary, book metadata, record와 count를 반환하지 않습니다. CLOSED guest archive는 publication이 없는 legacy/never-published row를 계속 읽되, publication이 있으면 exact generation의 `emergency_denied=false`를 요구하고 generation 불일치는 숨깁니다. CDN 또는 브라우저는 새 header 기준 최대 60초 동안 fresh response를 사용할 수 있고, 기존 720초 header를 가진 browser 경계는 protected evidence gate로 별도 소진해야 합니다.
+`/api/public/clubs/{slug}`, `/api/public/clubs/{slug}/sessions/{sessionId}` 등 `PublicController`의 authoritative GET endpoint는 `Cache-Control: public, max-age=60, must-revalidate`와 generation-bound `ETag`를 반환합니다. Club list/stats/detail과 PUBLISHED guest record reader는 publication의 exact current generation row, `origin_readable=true`, `emergency_denied=false`를 함께 요구하므로 takedown transaction 뒤 origin에서 summary, book metadata, record와 count를 반환하지 않습니다. CLOSED guest archive는 publication이 없는 legacy/never-published row를 계속 읽되, publication이 있으면 exact generation의 `emergency_denied=false`를 요구하고 generation 불일치는 숨깁니다. Browser는 최대 60초 뒤 반드시 재검증하며 stale-while-revalidate로 이전 projection을 다시 제공하지 않습니다. 과거 720초 lifetime은 R2a에서 pre-enable browser entry가 모두 만료됐음을 증명하기 위한 historical activation context일 뿐 현재 response contract가 아닙니다.
 
 **2계층: BFF `caches.default` 저장**
 
-Cloudflare Pages Functions BFF(`front/functions/api/bff/[[path]].ts`)는 `/api/public/clubs/`, `/api/public/records/` 경로 prefix에 해당하는 GET 요청에 대해 `caches.default`를 사용합니다.
+Cloudflare Pages Functions BFF(`front/functions/api/bff/[[path]].ts`)의 public cache prefix allowlist는 현재 빈 배열입니다. 따라서 authoritative public projection GET은 `caches.default`를 조회하거나 채우지 않으며 upstream response에 `CDN-Cache-Control: no-store`와 `Cloudflare-CDN-Cache-Control: no-store`를 추가합니다.
 
-- 캐시 히트 시 upstream fetch 없이 즉시 반환합니다.
-- 캐시 미스 시 upstream을 fetch하고, 응답이 캐시 가능한 조건(`response.ok`, `Cache-Control: public` 또는 `max-age` 포함, `Set-Cookie` 없음, `Vary: Cookie/Authorization` 없음)을 만족하면 `context.waitUntil`로 비동기 저장합니다.
-- 캐시 키는 pathname과 search만 포함하고 cookie, authorization 같은 사용자 컨텍스트를 제거합니다.
-- 저장하는 응답은 `copyUpstreamHeaders`로 내부 `x-readmates-*` 헤더와 `set-cookie`를 제거한 sanitized 응답입니다.
-- 변이 메서드(`POST`, `PUT`, `PATCH`, `DELETE`)와 prefix에 해당하지 않는 경로는 캐시 계층을 거치지 않습니다.
+- 모든 authoritative projection GET은 upstream Spring을 조회하고 sanitized response를 반환합니다.
+- 빈 prefix allowlist 때문에 `caches.default.match/put` branch에 들어가지 않습니다.
+- CDN 전용 no-store header는 Spring의 browser-facing 60초 `Cache-Control`을 대체하지 않고 edge 저장만 금지합니다.
+- 변이 메서드와 guest/member/private 응답도 이 public cache 계층을 사용하지 않으며 각 endpoint의 stricter `no-store`/authorization 계약을 유지합니다.
 
 ## 멤버십과 역할 모델
 

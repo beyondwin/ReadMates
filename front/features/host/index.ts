@@ -36,11 +36,17 @@ export {
   EditHostSessionRoute,
   NewHostSessionRoute,
 } from "@/features/host/route/host-session-editor-route";
+export { NewHostMeetingRoute } from "@/features/host/route/new-host-meeting-route";
 export {
-  hostSessionEditorLoaderFactory,
   hostSessionEditorPreviewActions,
-  type HostSessionEditorRouteData,
 } from "@/features/host/route/host-session-editor-data";
+export {
+  HostMeetingWorkspaceRoute,
+} from "@/features/host/route/host-meeting-workspace-route";
+export {
+  hostMeetingWorkspaceLoaderFactory,
+  type HostMeetingWorkspaceRouteData,
+} from "@/features/host/route/host-meeting-workspace-data";
 export {
   HostMembersRoute,
 } from "@/features/host/route/host-members-route";

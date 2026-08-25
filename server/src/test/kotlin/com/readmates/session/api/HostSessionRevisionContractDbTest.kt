@@ -333,8 +333,12 @@ class HostSessionRevisionContractDbTest(
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
                 content =
-                    """[{"membershipId":"$membershipId","attendanceStatus":"$status",""" +
-                    """"expectedAttendanceRevision":0}]"""
+                    """
+                    [{
+                      "membershipId":"$membershipId","attendanceStatus":"$status",
+                      "expectedAttendanceRevision":0
+                    }]
+                    """.trimIndent()
             }.andExpect { status { isOk() } }
             .andReturn()
             .response

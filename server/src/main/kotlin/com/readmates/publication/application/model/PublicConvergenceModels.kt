@@ -112,6 +112,8 @@ class PublicConvergenceNotAuthorizedException : RuntimeException("PUBLIC_CONVERG
 
 class PublicConvergenceNotFoundException : RuntimeException("PUBLIC_CONVERGENCE_NOT_FOUND")
 
+class PublicConvergenceRetryUnavailableException : RuntimeException("PUBLIC_CONVERGENCE_RETRY_UNAVAILABLE")
+
 fun providerIdempotencyToken(
     convergenceId: UUID,
     attemptNo: Int,

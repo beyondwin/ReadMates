@@ -3,8 +3,8 @@ import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { MemoryRouter, Route, Routes } from "react-router";
 
-vi.mock("@/features/host/route/host-session-editor-route", () => ({
-  EditHostSessionRoute: () => <div>editor body</div>,
+vi.mock("@/features/host/route/host-meeting-workspace-route", () => ({
+  HostMeetingWorkspaceRoute: () => <div>meeting workspace body</div>,
 }));
 
 vi.mock("@/features/host/route/host-meeting-ledger-route", () => ({
@@ -33,7 +33,7 @@ vi.mock("@/src/app/router-link", () => ({
 import { MeetingRouteElement } from "./meeting-route-element";
 
 describe("MeetingRouteElement", () => {
-  it("renders the session editor without the operating ledger chrome", () => {
+  it("renders the route-first meeting workspace without the operating ledger chrome", () => {
     render(
       <MemoryRouter initialEntries={["/app/host/sessions/draft-1"]}>
         <Routes>
@@ -42,7 +42,7 @@ describe("MeetingRouteElement", () => {
       </MemoryRouter>,
     );
 
-    expect(screen.getByText("editor body")).toBeInTheDocument();
+    expect(screen.getByText("meeting workspace body")).toBeInTheDocument();
     expect(screen.queryByText("ledger chrome")).not.toBeInTheDocument();
   });
 });

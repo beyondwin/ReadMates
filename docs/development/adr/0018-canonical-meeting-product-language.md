@@ -1,6 +1,6 @@
 # ADR-0018: 사용자 핵심 객체를 `모임`과 `기록`으로 통일
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 제품·디자인·프런트엔드
 - 관련: `front/shared/ui/readmates-copy.ts:1`,

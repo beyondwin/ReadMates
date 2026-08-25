@@ -33,6 +33,7 @@ class SecurityConfig(
     private val sessionCookieAuthenticationFilter: SessionCookieAuthenticationFilter,
     private val rateLimitFilter: RateLimitFilter,
     private val memberAuthoritiesFilter: MemberAuthoritiesFilter,
+    private val hostAuthorityLossAccessDeniedHandler: HostAuthorityLossAccessDeniedHandler,
     private val platformAdminAuthoritiesFilter: PlatformAdminAuthoritiesFilter,
     private val oAuthFlowContextRepository: OAuthFlowContextRepository,
     private val googleOidcUserService: GoogleOidcUserService,
@@ -128,6 +129,11 @@ class SecurityConfig(
                     methodAndPath("POST", Regex("^/api/admin/domains/[^/]+/check$")),
                     methodAndPath("POST", Regex("^/api/admin/notifications/replay-preview$")),
                     methodAndPath("POST", Regex("^/api/admin/notifications/replay-confirm$")),
+                    methodAndPath("POST", Regex("^/api/admin/public-takedowns/(preview|confirm)$")),
+                    methodAndPath(
+                        "POST",
+                        Regex("^/api/admin/public-takedowns/[^/]+/convergence/retry$"),
+                    ),
                     methodAndPath(
                         "POST",
                         Regex(
@@ -230,6 +236,7 @@ class SecurityConfig(
                     .authenticated()
             }.exceptionHandling {
                 it.authenticationEntryPoint(HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED))
+                it.accessDeniedHandler(hostAuthorityLossAccessDeniedHandler)
             }.addFilterBefore(bffSecretFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterBefore(sessionCookieAuthenticationFilter, AnonymousAuthenticationFilter::class.java)
             .addFilterAfter(platformAdminAuthoritiesFilter, SessionCookieAuthenticationFilter::class.java)

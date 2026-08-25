@@ -5,6 +5,7 @@ import com.readmates.auth.application.InvitationDomainException
 import com.readmates.auth.application.port.`in`.AcceptGoogleInvitationUseCase
 import com.readmates.auth.application.port.`in`.LoginVerifiedGoogleUserUseCase
 import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
+import com.readmates.shared.security.CurrentMember
 import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.beans.factory.annotation.Value
@@ -28,12 +29,14 @@ class ReadmatesOAuthSuccessHandler(
     private val acceptGoogleInvitationUseCase: AcceptGoogleInvitationUseCase,
     private val manageAuthSessionUseCase: ManageAuthSessionUseCase,
     private val oauthReturnState: OAuthReturnState,
+    private val hostAuthorityContextCookie: HostAuthorityContextCookie,
     @param:Value("\${readmates.app-base-url:http://localhost:3000}")
     private val appBaseUrl: String,
 ) : AuthenticationSuccessHandler,
     AuthenticationFailureHandler {
     private val appOrigin = readmatesAppOrigin(appBaseUrl)
 
+    @Suppress("LongMethod")
     override fun onAuthenticationSuccess(
         request: HttpServletRequest,
         response: HttpServletResponse,
@@ -62,6 +65,7 @@ class ReadmatesOAuthSuccessHandler(
                         )
                     OAuthLoginRedirect(
                         userId = acceptedMember.userId,
+                        currentMember = acceptedMember,
                         returnTarget =
                             oauthReturnState.inviteReturnTargetFromState(
                                 signedState = signedReturnState,
@@ -80,6 +84,7 @@ class ReadmatesOAuthSuccessHandler(
                         )
                     OAuthLoginRedirect(
                         userId = loginResult.userId,
+                        currentMember = loginResult.currentMember,
                         returnTarget = oauthReturnState.validatedReturnTarget(signedReturnState),
                     )
                 }
@@ -91,6 +96,12 @@ class ReadmatesOAuthSuccessHandler(
                 )
 
             response.addHeader(HttpHeaders.SET_COOKIE, manageAuthSessionUseCase.sessionCookie(issuedSession.rawToken))
+            login.currentMember?.takeIf { it.isHost }?.let { host ->
+                response.addHeader(
+                    HttpHeaders.SET_COOKIE,
+                    hostAuthorityContextCookie.issue(issuedSession.sessionId, issuedSession.expiresAt, host.clubId),
+                )
+            }
             response.sendRedirect(oauthReturnState.redirectUrl(login.returnTarget))
         } catch (exception: RuntimeException) {
             redirectDomainLoginError(request, response, exception, signedReturnState)
@@ -234,6 +245,7 @@ class ReadmatesOAuthSuccessHandler(
 
 private data class OAuthLoginRedirect(
     val userId: java.util.UUID,
+    val currentMember: CurrentMember?,
     val returnTarget: String,
 )
 

@@ -10,7 +10,10 @@ class HostListEpochCoverageTest {
     @Test
     fun `every meeting and record sql sort filter source has a mutation owner`() {
         val querySql =
-            read("server/src/main/kotlin/com/readmates/session/adapter/out/persistence/HostSessionQueries.kt")
+            read(
+                "server/src/main/kotlin/com/readmates/session/adapter/out/persistence/" +
+                    "HostSessionQueries.kt",
+            )
         HostListEpochInventory.sources.forEach { source ->
             assertThat(querySql)
                 .`as`("SQL projection must name %s", source.sqlToken)

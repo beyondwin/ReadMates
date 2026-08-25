@@ -59,6 +59,7 @@ class AuthSessionService(
         warmCache(tokenHash, storedSession, now)
 
         return IssuedAuthSession(
+            sessionId = storedSession.id,
             rawToken = rawToken,
             storedTokenHash = tokenHash,
             userId = userId,

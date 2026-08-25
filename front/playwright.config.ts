@@ -1,10 +1,12 @@
 import { defineConfig, devices } from "@playwright/test";
 import { resolveE2eDatabaseName } from "./tests/e2e/readmates-e2e-config";
+import { protectedSecurityReporterEnabled } from "./tests/e2e/support/host-authority-cache-security-reporter";
 
 delete process.env.NO_COLOR;
 
 const port = Number(process.env.PLAYWRIGHT_PORT ?? 3100);
 const workers = Number(process.env.PLAYWRIGHT_WORKERS ?? 1);
+const hostWorkspaceSmokeOnly = process.env.READMATES_HOST_WORKSPACE_SMOKE_ONLY === "true";
 const baseURL = `http://localhost:${port}`;
 const loopbackBaseURL = `http://127.0.0.1:${port}`;
 const allowedOrigins = `${baseURL},${loopbackBaseURL}`;
@@ -37,12 +39,21 @@ export default defineConfig({
   workers,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 2 : 0,
-  reporter: "list",
+  reporter: protectedSecurityReporterEnabled()
+    ? [["list"], ["./tests/e2e/support/host-authority-cache-security-reporter.ts"]]
+    : "list",
   use: {
     baseURL,
     trace: "on-first-retry",
   },
-  webServer: [
+  webServer: hostWorkspaceSmokeOnly ? [
+    {
+      command: `pnpm exec vite --host 127.0.0.1 --port ${shellQuote(port)}`,
+      url: `${baseURL}/login`,
+      reuseExistingServer: false,
+      timeout: 120_000,
+    },
+  ] : [
     {
       command:
         `${envAssignment("MYSQL_PWD", dbPassword)} mysql --protocol=TCP -h ${shellQuote(dbHost)} -P ${shellQuote(dbPort)} ` +
@@ -81,6 +92,16 @@ export default defineConfig({
     {
       name: "chromium",
       use: { ...devices["Desktop Chrome"] },
+    },
+    {
+      name: "firefox-host",
+      testMatch: ["tests/e2e/host-meeting-workspace-browser-smoke.spec.ts"],
+      use: { ...devices["Desktop Firefox"], trace: "off" },
+    },
+    {
+      name: "webkit-mobile-host",
+      testMatch: ["tests/e2e/host-meeting-workspace-browser-smoke.spec.ts"],
+      use: { ...devices["iPhone 13"], trace: "off" },
     },
   ],
 });

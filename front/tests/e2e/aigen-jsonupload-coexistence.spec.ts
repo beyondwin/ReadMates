@@ -109,7 +109,7 @@ test("JSON-upload and AI-generate modes coexist and toggle via URL query params"
   await expect(page.getByLabel("정리한 파일을 여기에 놓으세요")).toHaveCount(0);
 
   // 2) The record workspace defaults to manual editing and owns one shared draft.
-  await page.getByRole("listitem", { name: /^기록 / }).getByRole("button").click();
+  await page.getByRole("link", { name: "모임 기록" }).click();
   await expect(page.locator("#workspace-panel-records")).toBeVisible();
   await expect(page).toHaveURL(/\?section=records$/);
   await expect(page.getByRole("tab", { name: "직접 작성" }))

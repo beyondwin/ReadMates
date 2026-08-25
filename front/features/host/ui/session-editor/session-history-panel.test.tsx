@@ -293,6 +293,100 @@ describe("SessionHistoryPanel", () => {
     expect(onReverseLifecycle).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps pagination available while freshness blocks only recovery actions", () => {
+    render(
+      <SessionHistoryPanel
+        items={[
+          historyItem(),
+          {
+            ...historyItem(),
+            id: "change-1",
+            type: "BASIC_INFO_UPDATED",
+            revisionId: null,
+            revisionVersion: null,
+            revisionSource: null,
+            recovery: { action: "RESTORE_CHANGE", availability: "AVAILABLE" },
+          },
+          {
+            ...historyItem(),
+            id: "history-opened",
+            type: "SESSION_OPENED",
+            revisionId: null,
+            revisionVersion: null,
+            revisionSource: null,
+            fromState: "DRAFT",
+            toState: "OPEN",
+            recovery: { action: "REVERSE_LIFECYCLE", availability: "AVAILABLE" },
+          },
+        ]}
+        expectedDraftRevision={4}
+        restoring={false}
+        recoveryActionsDisabled
+        nextCursor="cursor-2"
+        onLoadMore={vi.fn()}
+        onRestore={vi.fn()}
+        onRestoreCompleted={vi.fn()}
+        onRestoreChange={vi.fn()}
+        onReverseLifecycle={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "이 버전으로 초안 만들기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "이 변경 되돌리기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "이 상태 되돌리기" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "변경 기록 더 보기" })).toBeEnabled();
+  });
+
+  it("clears a pending restore dialog and its inline error on a sensitive reset", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <SessionHistoryPanel
+        key="history-reset-0"
+        items={[historyItem()]}
+        expectedDraftRevision={4}
+        restoring={false}
+        onRestore={vi.fn().mockRejectedValue(new Error("stale"))}
+        onRestoreCompleted={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "이 버전으로 초안 만들기" }));
+    await user.click(screen.getByRole("button", { name: "작업 초안 만들기" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("복원하지 못했습니다");
+
+    rerender(
+      <SessionHistoryPanel
+        key="history-reset-1"
+        items={[historyItem()]}
+        expectedDraftRevision={4}
+        restoring={false}
+        onRestore={vi.fn()}
+        onRestoreCompleted={vi.fn()}
+      />,
+    );
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps dialog cancellation available when freshness changes but blocks confirmation", async () => {
+    const user = userEvent.setup();
+    const props = {
+      items: [historyItem()],
+      expectedDraftRevision: 4,
+      restoring: false,
+      onRestore: vi.fn(),
+      onRestoreCompleted: vi.fn(),
+    };
+    const { rerender } = render(<SessionHistoryPanel {...props} />);
+
+    await user.click(screen.getByRole("button", { name: "이 버전으로 초안 만들기" }));
+    rerender(<SessionHistoryPanel {...props} recoveryActionsDisabled />);
+
+    expect(screen.getByRole("button", { name: "취소" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "작업 초안 만들기" })).toBeDisabled();
+  });
+
   it("renders a disabled explanation instead of a restore button when recovery is unavailable", () => {
     render(
       <SessionHistoryPanel

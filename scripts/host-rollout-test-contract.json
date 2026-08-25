@@ -71,7 +71,7 @@
           "id": "playwright-authority-cache-regressions",
           "argv": ["corepack", "pnpm", "--dir", "front", "exec", "playwright", "test", "tests/e2e/host-authority-loss.spec.ts", "tests/e2e/public-projection-cache-safety.spec.ts"],
           "timeoutSeconds": 2400,
-          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/host-authority-loss.spec.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts"],
+          "requiredPaths": ["front/playwright.config.ts", "front/tests/e2e/host-authority-loss.spec.ts", "front/tests/e2e/public-projection-cache-safety.spec.ts", "front/tests/e2e/support/host-authority-cache-security-reporter.ts"],
           "cases": ["host-authority-revoked", "membership-suspended", "cross-club-scope", "inflight-request-cancelled", "exact-club-state-purged", "other-club-state-preserved", "back-reload-new-tab-offline-no-resurrection", "revision-conflict-preserves-draft", "authorized-response-loss-preserves-draft", "origin-immediate-deny-rerun", "old-generation-not-reserved-rerun", "browser-general-120s-rerun", "browser-emergency-60s-rerun"]
         }
       ]

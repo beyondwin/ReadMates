@@ -371,6 +371,80 @@ internal class PublicConvergenceHostQueryRepository(
                 sessionId.dbString(),
                 clubId.dbString(),
             ).firstOrNull()
+
+    fun loadLatest(
+        clubId: UUID,
+        sessionId: UUID,
+    ): PublicConvergenceHostSnapshot? {
+        val mutationReceiptId =
+            jdbcTemplate
+                .query(
+                    """
+                    select receipt.mutation_receipt_id
+                    from (
+                      select mutation_receipt_id, session_id_snapshot, created_at
+                      from public_mutation_convergence_receipts
+                      union all
+                      select mutation_receipt_id, session_id_snapshot, created_at
+                      from public_mutation_convergence_links
+                    ) receipt
+                    join active_sessions sessions on sessions.id = receipt.session_id_snapshot
+                    where receipt.session_id_snapshot = ? and sessions.club_id = ?
+                    order by receipt.created_at desc, receipt.mutation_receipt_id desc
+                    limit 1
+                    """.trimIndent(),
+                    { resultSet, _ -> resultSet.uuid("mutation_receipt_id") },
+                    sessionId.dbString(),
+                    clubId.dbString(),
+                ).firstOrNull() ?: return null
+        return load(clubId, sessionId, mutationReceiptId)
+    }
+
+    fun requestRetry(
+        clubId: UUID,
+        sessionId: UUID,
+        convergenceId: UUID,
+        now: Instant,
+        maxAttempts: Int,
+    ): Boolean {
+        val retryable =
+            jdbcTemplate
+                .query(
+                    """
+                    select work.next_attempt_no, work.lease_owner, work.lease_expires_at, current.status
+                    from public_convergence_work work
+                    join (
+                      select convergence_id, session_id_snapshot from public_mutation_convergence_receipts
+                      union all
+                      select convergence_id, session_id_snapshot from public_mutation_convergence_links
+                    ) receipt on receipt.convergence_id = work.convergence_id
+                    join active_sessions sessions on sessions.id = receipt.session_id_snapshot
+                    left join public_convergence_current current on current.convergence_id = work.convergence_id
+                    where work.convergence_id = ? and receipt.session_id_snapshot = ? and sessions.club_id = ?
+                    for update
+                    """.trimIndent(),
+                    { resultSet, _ ->
+                        val leaseExpiresAt = resultSet.utcOffsetDateTimeOrNull("lease_expires_at")?.toInstant()
+                        resultSet.getString("status") == ConvergenceAttemptStatus.FAILED.name &&
+                            resultSet.getInt("next_attempt_no") <= maxAttempts &&
+                            (resultSet.getString("lease_owner") == null || leaseExpiresAt?.isAfter(now) != true)
+                    },
+                    convergenceId.dbString(),
+                    sessionId.dbString(),
+                    clubId.dbString(),
+                ).firstOrNull() ?: false
+        if (!retryable) return false
+        return jdbcTemplate.update(
+            """
+            update public_convergence_work
+            set available_at = ?, lease_owner = null, lease_expires_at = null,
+                updated_at = utc_timestamp(6)
+            where convergence_id = ?
+            """.trimIndent(),
+            now.atOffset(ZoneOffset.UTC).toUtcLocalDateTime(),
+            convergenceId.dbString(),
+        ) == 1
+    }
 }
 
 internal class PublicConvergenceReceiptRepository(

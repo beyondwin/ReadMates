@@ -180,6 +180,7 @@ class SessionScopedNotificationDeletionRaceDbTest(
         effect: () -> Unit,
         sessionId: UUID,
     ): RaceOutcome {
+        val expectedSessionRevision = expectedSessionRevision(sessionId)
         val ready = CountDownLatch(2)
         val start = CountDownLatch(1)
         val executor = Executors.newFixedThreadPool(2)
@@ -194,7 +195,7 @@ class SessionScopedNotificationDeletionRaceDbTest(
                 executor.submit<DeleteAttempt> {
                     ready.countDown()
                     check(start.await(10, TimeUnit.SECONDS))
-                    runDelete(sessionId)
+                    runDelete(sessionId, expectedSessionRevision)
                 }
             check(ready.await(10, TimeUnit.SECONDS))
             start.countDown()
@@ -228,17 +229,37 @@ class SessionScopedNotificationDeletionRaceDbTest(
             false
         }
 
-    private fun deleteCommand(sessionId: UUID) = HostSessionIdCommand(host, sessionId, ExpectedSessionRevision(0))
-
-    private fun runDelete(sessionId: UUID): DeleteAttempt =
+    private fun runDelete(
+        sessionId: UUID,
+        expectedSessionRevision: ExpectedSessionRevision,
+    ): DeleteAttempt =
         try {
-            deleteTemplate.execute { lifecycleService.delete(deleteCommand(sessionId)) }
+            deleteTemplate.execute { lifecycleService.delete(deleteCommand(sessionId, expectedSessionRevision)) }
             DeleteAttempt.DELETED
         } catch (_: HostSessionDeletionBlockedException) {
             DeleteAttempt.BLOCKED
         } catch (_: DataIntegrityViolationException) {
             DeleteAttempt.BLOCKED
         }
+
+    private fun deleteCommand(
+        sessionId: UUID,
+        expectedSessionRevision: ExpectedSessionRevision = expectedSessionRevision(sessionId),
+    ): HostSessionIdCommand =
+        HostSessionIdCommand(
+            host = host,
+            sessionId = sessionId,
+            expectedSessionRevision = expectedSessionRevision,
+        )
+
+    private fun expectedSessionRevision(sessionId: UUID): ExpectedSessionRevision =
+        ExpectedSessionRevision(
+            jdbcTemplate.queryForObject(
+                "select session_revision from sessions where id = ?",
+                Long::class.java,
+                sessionId.toString(),
+            ) ?: error("Missing session revision"),
+        )
 
     private fun enqueueSessionOutbox(
         sessionId: UUID,

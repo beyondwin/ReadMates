@@ -43,6 +43,8 @@ import com.readmates.auth.application.port.out.AllowedOriginPort
 import com.readmates.auth.application.port.out.RateLimitPort
 import com.readmates.auth.infrastructure.security.BffSecretFilter
 import com.readmates.auth.infrastructure.security.GoogleOidcUserService
+import com.readmates.auth.infrastructure.security.HostAuthorityContextCookie
+import com.readmates.auth.infrastructure.security.HostAuthorityLossAccessDeniedHandler
 import com.readmates.auth.infrastructure.security.MemberAuthoritiesFilter
 import com.readmates.auth.infrastructure.security.OAuthFlowContextRepository
 import com.readmates.auth.infrastructure.security.PlatformAdminAuthoritiesFilter
@@ -770,6 +772,7 @@ class PlatformAdminAuditSearchInvocations {
 @EnableAutoConfiguration(exclude = [DataSourceAutoConfiguration::class, FlywayAutoConfiguration::class])
 @Import(
     SecurityConfig::class,
+    HostAuthorityLossAccessDeniedHandler::class,
     CurrentMemberWebConfig::class,
     PlatformAdminAuditController::class,
     AdminAuditErrorHandler::class,
@@ -1028,7 +1031,12 @@ class PlatformAdminBffSecurityHarnessConfiguration {
         sessions: ManageAuthSessionUseCase,
         principals: ResolveAuthenticatedPrincipalUseCase,
         clubs: ResolveClubContextUseCase,
-    ) = SessionCookieAuthenticationFilter(sessions, principals, clubs)
+    ) = SessionCookieAuthenticationFilter(
+        sessions,
+        principals,
+        clubs,
+        HostAuthorityContextCookie("test-host-authority-context-secret"),
+    )
 
     @Bean
     fun platformAdminAuthoritiesFilter(currentMembers: ResolveCurrentMemberUseCase): PlatformAdminAuthoritiesFilter {

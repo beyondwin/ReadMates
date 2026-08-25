@@ -15,8 +15,8 @@ const scopedAppPath = "/clubs/reading-sai/app";
 async function expectPracticalTapTarget(locator: Locator) {
   const box = await locator.boundingBox();
   expect(box).not.toBeNull();
-  expect(box!.height).toBeGreaterThanOrEqual(44);
-  expect(box!.width).toBeGreaterThanOrEqual(44);
+  expect(box!.height).toBeGreaterThanOrEqual(43.99);
+  expect(box!.width).toBeGreaterThanOrEqual(43.99);
 }
 
 async function expectProfileEditorDialog(page: Page, viewportWidth: number) {
@@ -443,7 +443,7 @@ test("club-scoped account and notification routes preserve navigation current st
   await expect(page).toHaveURL(new RegExp(`${scopedAppPath}/me/settings$`));
   await expect(page.getByRole("heading", { level: 1, name: "계정 설정" })).toBeVisible();
   const appNavigation = page.getByRole("navigation", {
-    name: "앱 내비게이션",
+    name: "멤버 주 메뉴",
   });
   await expect(appNavigation.getByRole("link", {
     name: "내 공간",

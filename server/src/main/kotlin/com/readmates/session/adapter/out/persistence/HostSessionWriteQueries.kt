@@ -37,8 +37,8 @@ internal fun HostSessionWriteQueries.sessionRevision(
         .query(
             """
             select session_revision
-            from active_sessions
-            where id = ? and club_id = ?
+            from sessions
+            where id = ? and club_id = ? and deleted_at is null
             """.trimIndent(),
             { resultSet, _ -> resultSet.getLong("session_revision") },
             sessionId.dbString(),

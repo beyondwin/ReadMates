@@ -42,27 +42,27 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0015](0015-notification-outbox-dedupe-policy.md) | Notification Outbox dedupeKey 정책 | Accepted | 2026-05-12 | server |
 | [0016](0016-deploy-ledger-event-schema.md) | Deploy ledger NDJSON event schema + dual-format writer | Accepted | 2026-05-12 | ops |
 | [0017](0017-separate-web-and-notification-worker-processes.md) | Web과 notification worker process를 분리 운영 | Proposed | 2026-08-22 | server, ops |
-| [0018](0018-canonical-meeting-product-language.md) | 사용자 핵심 객체를 `모임`과 `기록`으로 통일 | Proposed | 2026-08-22 | product, front, content |
-| [0019](0019-url-authoritative-club-workspaces.md) | URL이 소유하는 club-scoped workspace identity | Proposed | 2026-08-22 | front, product |
+| [0018](0018-canonical-meeting-product-language.md) | 사용자 핵심 객체를 `모임`과 `기록`으로 통일 | Accepted | 2026-08-22 | product, front, content |
+| [0019](0019-url-authoritative-club-workspaces.md) | URL이 소유하는 club-scoped workspace identity | Accepted | 2026-08-22 | front, product |
 | [0020](0020-shared-brand-role-composition.md) | 하나의 브랜드 시스템과 역할별 composition grammar | Proposed | 2026-08-22 | design, front |
 | [0021](0021-response-and-attendance-as-separate-facts.md) | 참석 응답과 실제 출석을 별도 사실로 유지 | Accepted | 2026-08-22 | product, server, front |
 | [0022](0022-lifecycle-audience-and-public-placement.md) | 모임 lifecycle, app audience, 공개 사이트 배치를 독립 축으로 유지 | Accepted | 2026-08-22 | product, server, front |
-| [0023](0023-revision-guarded-host-mutations.md) | Domain revision으로 host mutation을 조건부 실행 | Proposed | 2026-08-22 | server, front |
-| [0024](0024-explicit-unknown-actual-attendance.md) | 실제 출석에 명시적 `UNKNOWN` correction 상태 제공 | Proposed | 2026-08-22 | product, server, front |
-| [0025](0025-session-participant-snapshot-owns-response-denominator.md) | 모임 참여자 snapshot이 응답 분모를 소유 | Proposed | 2026-08-22 | product, server |
+| [0023](0023-revision-guarded-host-mutations.md) | Domain revision으로 host mutation을 조건부 실행 | Accepted | 2026-08-22 | server, front |
+| [0024](0024-explicit-unknown-actual-attendance.md) | 실제 출석에 명시적 `UNKNOWN` correction 상태 제공 | Accepted | 2026-08-22 | product, server, front |
+| [0025](0025-session-participant-snapshot-owns-response-denominator.md) | 모임 참여자 snapshot이 응답 분모를 소유 | Accepted | 2026-08-22 | product, server |
 | [0026](0026-common-global-club-shell.md) | Member와 host가 공통 global club shell을 사용 | Proposed | 2026-08-22 | product, design, front |
 | [0027](0027-current-meeting-local-task-navigation.md) | 현재 모임 작업은 local task navigation으로 분리 | Proposed | 2026-08-22 | product, design, front |
-| [0028](0028-idempotent-host-mutation-receipts.md) | Host mutation을 idempotency receipt로 재조정 | Proposed | 2026-08-22 | server, front |
+| [0028](0028-idempotent-host-mutation-receipts.md) | Host mutation을 idempotency receipt로 재조정 | Accepted | 2026-08-22 | server, front |
 | [0029](0029-bff-secret-and-origin-validation.md) | Mutating API에 BFF secret과 Origin/Referer를 함께 검증 | Accepted | 2026-08-22 | server, security |
 | [0030](0030-role-and-sensitive-document-access.md) | 역할 권한과 민감 문서 접근 권한을 분리 | Accepted | 2026-08-22 | server, product, security |
 | [0031](0031-low-cardinality-metric-tags.md) | Notification 운영 metric tag를 low-cardinality 값으로 제한 | Accepted | 2026-08-22 | server, ops |
 | [0032](0032-weekly-client-ip-hash-salt.md) | Client IP hash salt를 ISO 주 단위로 회전 | Accepted | 2026-08-22 | server, security |
 | [0033](0033-application-service-transaction-boundaries.md) | Business orchestration owner가 transaction boundary를 소유 | Accepted | 2026-08-22 | server |
 | [0034](0034-global-host-client-contract-generation.md) | Client contract generation을 모든 host mutation에 적용 | Proposed | 2026-08-22 | server, BFF, front |
-| [0035](0035-purge-host-state-on-authority-loss.md) | Host authority 상실 시 client의 host-sensitive state를 폐기 | Proposed | 2026-08-22 | product, security, front |
+| [0035](0035-purge-host-state-on-authority-loss.md) | Host authority 상실 시 client의 host-sensitive state를 폐기 | Accepted | 2026-08-22 | product, security, front |
 | [0036](0036-public-projection-cache-convergence.md) | Public projection 원자성과 cache convergence를 분리 | Proposed | 2026-08-22 | server, BFF, ops, product |
 | [0037](0037-platform-admin-emergency-public-takedown.md) | 긴급 public takedown을 platform-admin 전용 command로 실행 | Proposed | 2026-08-22 | platform ops, security, server |
-| [0038](0038-server-owned-host-list-cursor-epochs.md) | Host 모임·기록 목록을 server-owned cursor epoch로 제공 | Proposed | 2026-08-22 | server, front, product |
+| [0038](0038-server-owned-host-list-cursor-epochs.md) | Host 모임·기록 목록을 server-owned cursor epoch로 제공 | Accepted | 2026-08-22 | server, front, product |
 | [0039](0039-platform-admin-task-centered-service-spine.md) | 플랫폼 어드민을 task-centered Service Spine으로 구성 | Accepted | 2026-08-22 | product, design, platform ops |
 | [0040](0040-domain-owned-admin-safe-command-protocol.md) | 플랫폼 어드민 mutation을 도메인 소유 safe-command protocol로 실행 | Accepted | 2026-08-22 | platform ops, security, server |
 | [0041](0041-domain-separated-platform-admin-invitation-delivery-token.md) | 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성 | Accepted | 2026-08-24 | platform ops, security, server |

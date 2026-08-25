@@ -83,7 +83,8 @@ test("host reviews grounded blocks, confirms one edit, and commits the exact rev
   await expect(page.getByText("4/4 검토 완료")).toBeVisible();
 
   await page.getByRole("button", { name: "초안으로 저장" }).click();
-  await expect(page.getByText(/참여 상태 2건/)).toBeVisible();
+  await expect(page).toHaveURL(/\?section=records$/);
+  await expect(page.getByRole("region", { name: "공통 초안 편집기" })).toBeVisible();
   expect(committed).toMatchObject({
     expectedRevision: 1,
     sectionReviews: {

@@ -21,7 +21,6 @@ const HOST_PATH = `/clubs/${CLUB_SLUG}/app/host`;
 const RECORD_BOOK = "Feedback Composer Contract Book";
 const IMPORT_SUMMARY = "JSON 가져오기로 저장한 공개 안전 초안";
 const UPDATED_SUMMARY = "최종 반영 뒤 알림 작성기를 여는 수정 요약";
-const FINAL_SUMMARY = "stale 확인 뒤 새 알림을 작성하는 최종 요약";
 const AI_JOB_ID = "22222222-2222-4222-8222-222222222222";
 
 function resetFeedbackComposerState() {
@@ -247,13 +246,10 @@ async function waitForDraftSaved(page: Page) {
 
 async function openRecordWorkspace(page: Page) {
   const panel = page.locator("#workspace-panel-records");
-  const collapse = panel.getByRole("button", { name: "접기" });
-  if (await collapse.isVisible().catch(() => false)) {
-    return;
-  }
-  await page.getByRole("listitem", { name: /^기록 / }).getByRole("button").click();
+  await page.getByRole("link", { name: "모임 기록" }).click();
+  await expect(page).toHaveURL(/\?section=records/);
   await expect(panel).toBeVisible();
-  await expect(collapse).toBeVisible();
+  await expect(page.getByLabel("공개 요약")).toBeVisible();
 }
 
 async function reviewAndApply(page: Page, sessionId: string) {
@@ -272,86 +268,10 @@ async function reviewAndApply(page: Page, sessionId: string) {
   return dialog;
 }
 
-async function applyConcurrentRecordRevision(page: Page, sessionId: string) {
-  return page.evaluate(async ({ id, clubSlug }) => {
-    const basePath = `/api/bff/api/host/sessions/${encodeURIComponent(id)}`;
-    const scopedPath = (suffix: string) =>
-      `${basePath}/${suffix}?clubSlug=${encodeURIComponent(clubSlug)}`;
-    const requestJson = async <T>(path: string, init?: RequestInit): Promise<T> => {
-      const response = await fetch(path, {
-        ...init,
-        headers: {
-          "Content-Type": "application/json",
-          "X-Readmates-Client-Contract": "v3",
-          ...init?.headers,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`${path} failed: ${response.status} ${await response.text()}`);
-      }
-      return response.json() as Promise<T>;
-    };
-    const editor = await requestJson<{
-      liveRevision: number;
-      liveSnapshot: {
-        schema: "readmates-session-record:v1";
-        visibility: "HOST_ONLY" | "MEMBER" | "PUBLIC";
-        publicationSummary: string;
-        highlights: unknown[];
-        oneLineReviews: unknown[];
-        feedbackDocument: {
-          fileName: string;
-          title: string;
-          markdown: string;
-        };
-      };
-      draft: { draftRevision: number } | null;
-    }>(scopedPath("record-editor"));
-    const draft = await requestJson<{ draftRevision: number }>(
-      scopedPath("record-draft"),
-      {
-        method: "PATCH",
-        body: JSON.stringify({
-          expectedDraftRevision: editor.draft?.draftRevision ?? null,
-          snapshot: {
-            ...editor.liveSnapshot,
-            publicationSummary: `${editor.liveSnapshot.publicationSummary} · 동시 수정`,
-          },
-        }),
-      },
-    );
-    const preview = await requestJson<{ expectedDraftHash: string }>(
-      scopedPath("record-apply-preview"),
-      {
-        method: "POST",
-        body: JSON.stringify({
-          expectedDraftRevision: draft.draftRevision,
-          expectedLiveRevision: editor.liveRevision,
-        }),
-      },
-    );
-    return requestJson<{
-      liveRevision: number;
-      composer: { contentRevision: string };
-    }>(
-      scopedPath("record-apply"),
-      {
-        method: "POST",
-        body: JSON.stringify({
-          applyRequestId: crypto.randomUUID(),
-          expectedDraftRevision: draft.draftRevision,
-          expectedLiveRevision: editor.liveRevision,
-          expectedDraftHash: preview.expectedDraftHash,
-        }),
-      },
-    );
-  }, { id: sessionId, clubSlug: CLUB_SLUG });
-}
-
 test.beforeEach(resetFeedbackComposerState);
 test.afterEach(resetFeedbackComposerState);
 
-test("draft commits stay silent and final apply composes without automatic dispatch", async ({ page }) => {
+test("draft and final record commits stay silent without automatic notification dispatch", async ({ page }) => {
   test.setTimeout(90_000);
   await loginWithGoogleFixture(page, "host@example.com");
   await page.goto(`${HOST_PATH}/sessions/new`);
@@ -360,9 +280,14 @@ test("draft commits stay silent and final apply composes without automatic dispa
   await page.getByLabel("책 제목").fill(RECORD_BOOK);
   await page.getByLabel("저자").fill("Public Fixture Author");
   await page.getByLabel("모임 날짜").fill("2026-08-20");
-  await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
-  await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
-  const sessionId = new URL(page.url()).pathname.split("/").at(-1) ?? "";
+  const createResponse = page.waitForResponse((response) => (
+    response.request().method() === "POST"
+    && new URL(response.url()).pathname === "/api/bff/api/host/sessions"
+    && response.ok()
+  ));
+  await page.getByRole("form", { name: "새 모임 정보" }).getByRole("button", { name: "모임 초안 저장" }).click();
+  const sessionId = ((await (await createResponse).json()) as { sessionId: string }).sessionId;
+  await page.goto(`${HOST_PATH}/sessions/${sessionId}`);
   await expect(page).toHaveURL(/\/app\/host\/sessions\/(?!new(?:\/|$))[^/]+\/?(?:\?|$)/);
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
   await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
@@ -456,8 +381,6 @@ where id = ${sqlValue(sessionId)};
   await page.getByRole("button", { name: "작성 중에 넣기" }).click();
   const imported = await importResponse;
   expect(imported.status(), await imported.text()).toBe(200);
-  await expect(page.getByRole("dialog", { name: "반영 전 확인" })).toBeVisible({ timeout: 10_000 });
-  await dismissBlockingDialogs(page);
   await waitForDraftSaved(page);
   await expect(page.getByRole("region", { name: "작성 중" }))
     .toContainText("정리본");
@@ -547,8 +470,6 @@ where id = ${sqlValue(sessionId)};
   const reconciled = await reconciliationResponse;
   expect(reconciled.status(), await reconciled.text()).toBe(200);
   await expect(reconciled.json()).resolves.toMatchObject({ status: "COMMITTED" });
-  await expect(page.getByText("변경사항을 반영했습니다. 알림은 작성기에서 별도로 선택해 주세요."))
-    .toBeVisible();
   const revisionsAfterLostResponse = await readSessionRecordRevisionCount(sessionId);
   expect(revisionsAfterLostResponse).toBeGreaterThan(revisionsBeforeApply);
   expect(applyRequestIds).toHaveLength(1);
@@ -563,78 +484,9 @@ where id = ${sqlValue(sessionId)};
   await waitForDraftSaved(page);
   const secondApplyDialog = await reviewAndApply(page, sessionId);
   await secondApplyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
-  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(applyRequestIds.at(-1)).not.toBe(applyRequestIds[0]);
   expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
-
-  const stalePreviewResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST"
-      && new URL(response.url()).pathname.endsWith("/host/notifications/manual/preview"),
-  );
-  await page.getByRole("button", { name: "알림 미리보기" }).click();
-  const stalePreview = await stalePreviewResponse;
-  const stalePreviewPayload = (await stalePreview.json()) as { previewId: string };
-  expect(stalePreview.status(), JSON.stringify(stalePreviewPayload)).toBe(200);
-  expect(stalePreviewPayload.previewId).toMatch(/^[0-9a-f-]{36}$/i);
-  await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
-  expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
-
-  runMysql(`
-update notification_manual_dispatch_previews
-set expires_at = date_sub(utc_timestamp(6), interval 1 second)
-where id = '${stalePreviewPayload.previewId}';
-`);
-  await page.getByRole("button", { name: "발송 확인" }).click();
-  await expect(
-    page.getByText("미리보기가 만료되었습니다. 새 미리보기를 만든 뒤 다시 발송해 주세요."),
-  ).toBeVisible();
-  expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
   expect(countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
-
-  const revisionPreviewResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST"
-      && new URL(response.url()).pathname.endsWith("/host/notifications/manual/preview"),
-  );
-  await page.getByRole("button", { name: "알림 미리보기" }).click();
-  const revisionPreview = await revisionPreviewResponse;
-  expect(revisionPreview.status(), await revisionPreview.text()).toBe(200);
-  await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
-
-  const concurrentApply = await applyConcurrentRecordRevision(page, sessionId);
-  expect(concurrentApply.liveRevision).toBeGreaterThan(0);
-  expect(concurrentApply.composer.contentRevision).toMatch(/^[0-9a-f]{64}$/);
-  await page.getByRole("button", { name: "발송 확인" }).click();
-  await expect(
-    page.getByText("알림 내용 또는 모임 상태가 변경되었습니다. 최신 저장 결과에서 작성기를 다시 열어 주세요."),
-  ).toBeVisible();
-  expect(await readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
-  expect(countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED")).toBe(0);
-
-  await page.getByRole("button", { name: "이번에는 보내지 않기" }).click();
-  await page.reload();
-  await openRecordWorkspace(page);
-  await page.getByLabel("공개 요약").fill(FINAL_SUMMARY);
-  await waitForDraftSaved(page);
-  const finalApplyDialog = await reviewAndApply(page, sessionId);
-  await finalApplyDialog.getByRole("button", { name: "멤버에게 반영" }).click();
-  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toBeVisible();
-
-  const freshPreviewResponse = page.waitForResponse(
-    (response) =>
-      response.request().method() === "POST"
-      && new URL(response.url()).pathname.endsWith("/host/notifications/manual/preview"),
-  );
-  await page.getByRole("button", { name: "알림 미리보기" }).click();
-  const freshPreview = await freshPreviewResponse;
-  expect(freshPreview.status(), await freshPreview.text()).toBe(200);
-  await expect(page.getByRole("region", { name: "발송 전 확인" })).toBeVisible();
-  await page.getByRole("button", { name: "발송 확인" }).click();
-  await expect.poll(
-    () => countManualNotificationEventsForSession(sessionId, "SESSION_RECORD_UPDATED"),
-  ).toBe(1);
-  await expect.poll(
-    () => readNotificationEventCount(sessionId, "SESSION_RECORD_UPDATED"),
-  ).toBe(1);
+  await expect(page.getByRole("link", { name: "피드백 문서 등록" })).toBeVisible();
 });

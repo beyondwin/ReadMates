@@ -67,6 +67,30 @@ export function parseHostMeetingLocation(search: string): HostMeetingLocation {
   return canonical;
 }
 
+export function canonicalizeLegacyHostMeetingUrl(currentUrl: string | URL): string | null {
+  const raw = currentUrl instanceof URL
+    ? `${currentUrl.pathname}${currentUrl.search}${currentUrl.hash}`
+    : currentUrl;
+  const queryStart = raw.indexOf("?");
+  const hashStart = raw.indexOf("#");
+  const search = queryStart === -1
+    ? ""
+    : raw.slice(queryStart, hashStart !== -1 && hashStart > queryStart ? hashStart : undefined);
+  const evidence = readOwnedQueryEvidence(search);
+  if (!evidence || evidence.task !== null || (evidence.records === null && evidence.aigen === null)) {
+    return null;
+  }
+  const canonical = canonicalLocationFromEvidence(evidence);
+  if (!canonical) return null;
+  const legacy = evidence.records === "json"
+    ? recordLocation("json")
+    : evidence.aigen === "1"
+      ? recordLocation("ai")
+      : null;
+  if (!legacy || !sameMeetingLocation(legacy, canonical)) return null;
+  return buildHostMeetingUrl(currentUrl, canonical);
+}
+
 function canonicalLocationFromEvidence(
   evidence: HostMeetingOwnedQueryEvidence,
 ): HostMeetingLocation | null {

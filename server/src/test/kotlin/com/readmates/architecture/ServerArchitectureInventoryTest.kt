@@ -71,6 +71,8 @@ class ServerArchitectureInventoryTest {
                 "purgeExpiredWork",
                 "countWorkBacklog",
                 "loadHostSnapshot",
+                "loadLatestHostSnapshot",
+                "requestHostRetry",
             )
         assertThat(
             PublicConvergencePort::class.java.methods

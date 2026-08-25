@@ -10,27 +10,27 @@ import com.readmates.session.application.model.HostSessionCommand
 import com.readmates.session.application.model.SessionVersionVector
 import com.readmates.session.domain.SessionAccessScope
 import com.readmates.shared.security.CurrentMember
+import com.readmates.shared.validation.CodePointSize
 import jakarta.validation.constraints.AssertTrue
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.Pattern
-import jakarta.validation.constraints.Size
 import java.net.URI
 import java.time.LocalDate
 import java.util.UUID
 
 data class HostSessionRequest(
-    @field:NotBlank val title: String,
-    @field:NotBlank val bookTitle: String,
-    @field:NotBlank val bookAuthor: String,
-    @field:Size(max = 500) val bookLink: String? = null,
-    @field:Size(max = 1000) val bookImageUrl: String? = null,
+    @field:NotBlank @field:CodePointSize(max = 255) val title: String,
+    @field:NotBlank @field:CodePointSize(max = 255) val bookTitle: String,
+    @field:NotBlank @field:CodePointSize(max = 255) val bookAuthor: String,
+    @field:CodePointSize(max = 500) val bookLink: String? = null,
+    @field:CodePointSize(max = 1000) val bookImageUrl: String? = null,
     @field:Pattern(regexp = "\\d{4}-\\d{2}-\\d{2}") val date: String,
     @field:Pattern(regexp = "\\d{2}:\\d{2}") val startTime: String? = null,
     @field:Pattern(regexp = "\\d{2}:\\d{2}") val endTime: String? = null,
     val questionDeadlineAt: String? = null,
-    @field:Size(max = 255) val locationLabel: String? = null,
-    @field:Size(max = 1000) val meetingUrl: String? = null,
-    @field:Size(max = 255) val meetingPasscode: String? = null,
+    @field:CodePointSize(max = 255) val locationLabel: String? = null,
+    @field:CodePointSize(max = 1000) val meetingUrl: String? = null,
+    @field:CodePointSize(max = 255) val meetingPasscode: String? = null,
     val accessScope: SessionAccessScope? = null,
     val expectedSessionRevision: Long? = null,
 ) {

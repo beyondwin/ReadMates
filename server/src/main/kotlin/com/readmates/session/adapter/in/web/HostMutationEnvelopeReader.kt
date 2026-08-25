@@ -11,7 +11,7 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 import java.util.UUID
 
-private typealias HostPublicationEnvelope =
+private typealias PublicationEnvelope =
     HostMutationEnvelope<HostSessionPublicationRequest, ExpectedPublicationRevisionBody>
 
 @Component
@@ -96,10 +96,15 @@ class HostMutationEnvelopeReader(
                 convert(body, HostLifecycleCommandBody::class.java)
         }
 
+    @Suppress("ThrowsCount")
     fun attendance(body: JsonNode): HostMutationEnvelope<HostAttendanceCommandBody, ExpectedAttendanceRowsBody> {
         if (body.isArray) {
             val entries = mutableListOf<AttendanceEntry>()
             body.forEach { node -> entries += convert(node, AttendanceEntry::class.java) }
+            if (entries.isEmpty()) {
+                throw InvalidSessionScheduleException()
+            }
+            entries.forEach(::validate)
             return HostMutationEnvelope(
                 idempotencyKey = generatedKey(),
                 expected =
@@ -110,7 +115,8 @@ class HostMutationEnvelopeReader(
                                     membershipId =
                                         runCatching { UUID.fromString(entry.membershipId) }
                                             .getOrElse { throw InvalidSessionScheduleException() },
-                                    attendanceRevision = entry.expectedAttendanceRevision,
+                                    attendanceRevision =
+                                        entry.expectedAttendanceRevision ?: throw InvalidSessionScheduleException(),
                                 )
                             },
                     ),
@@ -143,7 +149,7 @@ class HostMutationEnvelopeReader(
         return envelope
     }
 
-    fun publication(body: JsonNode): HostPublicationEnvelope {
+    fun publication(body: JsonNode): PublicationEnvelope {
         if (body.has("command")) {
             requireExactProperties(
                 body.get("command"),
@@ -174,6 +180,7 @@ class HostMutationEnvelopeReader(
                 convert(body, HostRestoreCommandBody::class.java)
         }
 
+    @Suppress("ThrowsCount")
     private fun <C : Any, E : Any> read(
         body: JsonNode,
         expectedType: Class<E>,
@@ -181,76 +188,39 @@ class HostMutationEnvelopeReader(
         expectedFields: Set<String>,
         legacy: () -> Pair<E, C>,
     ): HostMutationEnvelope<C, E> {
-        requireObject(body)
+        if (!body.isObject) {
+            throw InvalidSessionScheduleException()
+        }
         val names = body.propertyNames().asSequence().toSet()
         val envelopeFields = setOf("idempotencyKey", "expected", "command")
-        return if (names.any { name -> name in envelopeFields }) {
-            readCanonical(body, names, envelopeFields, expectedType, commandType, expectedFields)
-        } else {
-            readLegacy(commandType, legacy)
+        if (names.any { name -> name in envelopeFields }) {
+            if (names != envelopeFields) {
+                throw InvalidSessionScheduleException()
+            }
+            val key =
+                body.get("idempotencyKey")?.asString()?.takeIf { value -> value.isNotBlank() }
+                    ?: throw InvalidSessionScheduleException()
+            requireExactProperties(body.get("expected"), expectedFields)
+            val expected = convert(body.get("expected"), expectedType)
+            val command =
+                if (commandType == Unit::class.java) {
+                    @Suppress("UNCHECKED_CAST")
+                    Unit as C
+                } else {
+                    convert(body.get("command"), commandType)
+                }
+            validate(expected)
+            if (commandType != Unit::class.java) {
+                validate(command)
+            }
+            return HostMutationEnvelope(key, expected, command)
         }
-    }
-
-    private fun <C : Any, E : Any> readCanonical(
-        body: JsonNode,
-        names: Set<String>,
-        envelopeFields: Set<String>,
-        expectedType: Class<E>,
-        commandType: Class<C>,
-        expectedFields: Set<String>,
-    ): HostMutationEnvelope<C, E> {
-        requireExactEnvelopeProperties(names, envelopeFields)
-        val key = requireIdempotencyKey(body)
-        requireExactProperties(body.get("expected"), expectedFields)
-        val expected = convert(body.get("expected"), expectedType)
-        val command = canonicalCommand(body, commandType)
-        validate(expected)
-        if (commandType != Unit::class.java) {
-            validate(command)
-        }
-        return HostMutationEnvelope(key, expected, command)
-    }
-
-    private fun <C : Any, E : Any> readLegacy(
-        commandType: Class<C>,
-        legacy: () -> Pair<E, C>,
-    ): HostMutationEnvelope<C, E> {
         val (expected, command) = legacy()
         if (commandType != Unit::class.java) {
             validate(command)
         }
         return HostMutationEnvelope(generatedKey(), expected, command)
     }
-
-    private fun <C : Any> canonicalCommand(
-        body: JsonNode,
-        commandType: Class<C>,
-    ): C =
-        if (commandType == Unit::class.java) {
-            @Suppress("UNCHECKED_CAST")
-            Unit as C
-        } else {
-            convert(body.get("command"), commandType)
-        }
-
-    private fun requireObject(body: JsonNode) {
-        if (!body.isObject) {
-            throw InvalidSessionScheduleException()
-        }
-    }
-
-    private fun requireExactEnvelopeProperties(
-        names: Set<String>,
-        envelopeFields: Set<String>,
-    ) {
-        if (names != envelopeFields) {
-            throw InvalidSessionScheduleException()
-        }
-    }
-
-    private fun requireIdempotencyKey(body: JsonNode): String =
-        body.get("idempotencyKey")?.asString()?.takeIf { value -> value.isNotBlank() }
-            ?: throw InvalidSessionScheduleException()
 
     private fun <T> convert(
         node: JsonNode?,

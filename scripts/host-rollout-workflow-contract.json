@@ -2,7 +2,7 @@
   "schemaVersion": "readmates.host-rollout.workflow-contract.v1",
   "canonicalization": "supported-yaml-parsed-ast-json-order-v1",
   "workflows": {
-    ".github/workflows/ci.yml": "sha256:c899d85985b967f4d381312a0f4e7e7ae542dfaf629b910f9a9b626a3b165319",
+    ".github/workflows/ci.yml": "sha256:3f75e12b8de0d4dd785a1c2ee30f84e57b9709b902b6932cac02186f68c0bea5",
     ".github/workflows/deploy-front.yml": "sha256:a626cc3fe7e991cb693a19c8f1b7f4a38430f7a5ca4f1bee587be882f2bfa3af",
     ".github/workflows/deploy-server.yml": "sha256:5b69ae0cbcff10a7475c601a5020f464f9046e0fa7c1416955716442561cee29",
     ".github/workflows/host-client-rollout-evidence.yml": "sha256:8d6e0b6af15bd7ea0159d6282d1ab934f4a0433651808dbddf6e23184a9d639f",

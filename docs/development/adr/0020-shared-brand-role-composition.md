@@ -58,3 +58,7 @@ Host의 `Meeting Folio`, `Active Desk`, 기록 단계의 `Publication Desk`는 l
 
 - design system docs에 role composition examples와 anti-pattern을 추가한다.
 - 구현과 visual/browser evidence가 design guide에 반영되면 `Accepted`로 승격한다.
+
+## 미충족 증거
+
+- Automated responsive/semantic/cross-browser evidence는 있으나 VoiceOver/Safari와 NVDA/Chrome 수동 검증 및 protected accessibility attestation은 아직 `not measured`다.

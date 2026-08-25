@@ -32,9 +32,10 @@ internal fun HostSessionWriteQueries.lockParticipantSetRevision(
         .query(
             """
             select participant_set_revision
-            from active_sessions
+            from sessions
             where id = ?
               and club_id = ?
+              and deleted_at is null
             for update
             """.trimIndent(),
             { resultSet, _ -> resultSet.getLong("participant_set_revision") },
@@ -83,9 +84,10 @@ internal fun HostSessionWriteQueries.lockSession(
         .query(
             """
             select id, state
-            from active_sessions
+            from sessions
             where id = ?
               and club_id = ?
+              and deleted_at is null
             for update
             """.trimIndent(),
             { resultSet, _ ->
@@ -103,8 +105,9 @@ internal fun HostSessionWriteQueries.lockCurrentOpenSession(clubId: UUID): Locke
         .query(
             """
             select id, state
-            from active_sessions
+            from sessions
             where club_id = ?
+              and deleted_at is null
               and state = 'OPEN'
             order by number desc
             limit 1

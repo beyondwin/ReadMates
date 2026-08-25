@@ -322,6 +322,66 @@ jobs:
             front/playwright-report
           if-no-files-found: ignore
 
+  frontend-host-workspace-quality:
+    name: Host workspace browser and performance budgets
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: front
+    steps:
+      - name: Configure Git defaults
+        working-directory: .
+        run: git config --global init.defaultBranch main
+
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+
+      - name: Set up pnpm from packageManager
+        working-directory: .
+        run: |
+          if command -v corepack >/dev/null 2>&1; then
+            corepack_cmd=(corepack)
+          else
+            corepack_cmd=(npx --yes corepack@0.35.0)
+          fi
+          "${corepack_cmd[@]}" enable
+          "${corepack_cmd[@]}" prepare "$(node -p "require('./package.json').packageManager")" --activate
+          "${corepack_cmd[@]}" pnpm --version
+
+      - name: Restore pnpm cache
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Install dependencies
+        working-directory: .
+        run: pnpm install --frozen-lockfile
+
+      - name: Install focused Playwright browsers
+        run: pnpm exec playwright install --with-deps chromium firefox webkit
+
+      - name: Run focused host workspace browser smoke
+        run: pnpm test:e2e:host-workspace-browsers
+
+      - name: Run production host workspace performance budget
+        run: pnpm test:host-workspace-performance
+
+      - name: Upload public-safe host workspace performance summary
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: host-workspace-performance-summary
+          path: front/output/performance/host-meeting-workspace-summary.json
+          if-no-files-found: error
+          retention-days: 14
+
   design-system:
     name: Design system
     runs-on: ubuntu-latest

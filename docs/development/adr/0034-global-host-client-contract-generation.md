@@ -44,3 +44,8 @@ Browser preflight는 secret diagnostics와 분리된 `GET /api/bff/__internal/cl
 ## 후속 작업
 
 - Backend/BFF support, v3 frontend adoption, enforcement 순서와 metric이 일치하면 `Accepted`로 승격한다.
+
+## 미충족 증거
+
+- R1, R2a, R2b, R3 각각의 fresh live approval과 protected deployment/attestation이 없다.
+- 이전 720초 browser cache window 소진과 named 24-hour `v2 writes == 0`, `v3 writes > 0`, `missing/unknown == 0` 관찰이 `not measured`다.

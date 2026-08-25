@@ -5,6 +5,7 @@ import java.time.OffsetDateTime
 import java.util.UUID
 
 data class IssuedAuthSession(
+    val sessionId: String,
     val rawToken: String,
     val storedTokenHash: String,
     val userId: String,

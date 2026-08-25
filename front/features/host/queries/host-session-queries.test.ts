@@ -5,6 +5,7 @@ vi.mock("@/features/host/api/host-api", () => ({
   fetchHostSessions: vi.fn(),
   fetchHostSessionDetail: vi.fn(),
   fetchHostSessionDeletionPreview: vi.fn(),
+  fetchHostPublicConvergence: vi.fn(),
   fetchHostSessionScheduleDefaults: vi.fn(),
   fetchManualNotificationDispatches: vi.fn(),
   fetchHostSessionTrashList: vi.fn(),
@@ -18,6 +19,7 @@ import {
   fetchHostSessions,
   fetchHostSessionDetail,
   fetchHostSessionDeletionPreview,
+  fetchHostPublicConvergence,
   fetchHostSessionScheduleDefaults,
   fetchManualNotificationDispatches,
   fetchHostSessionTrashList,
@@ -26,6 +28,7 @@ import {
 } from "@/features/host/api/host-api";
 import {
   parseHostSessionDeletionResponse,
+  parseHostSessionTrashItem,
   parseHostSessionTrashPage,
 } from "@/features/host/api/host-contracts";
 import { ReadmatesApiError } from "@/shared/api/errors";
@@ -33,6 +36,7 @@ import { BUILTIN_SCHEDULE_DEFAULTS } from "@/features/host/model/host-schedule-d
 import {
   classifyScheduleDefaultsError,
   hostCurrentSessionQuery,
+  hostPublicConvergenceQuery,
   hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
   hostSessionKeys,
@@ -88,6 +92,24 @@ describe("host session query keys", () => {
       "sessions",
       "scheduleDefaults",
     ]);
+    expect(hostSessionKeys.convergence("session-7", { clubSlug: "reading-sai" })).toEqual([
+      "host",
+      "reading-sai",
+      "sessions",
+      "convergence",
+      "session-7",
+    ]);
+  });
+
+  it("polls only while convergence remains pending", async () => {
+    vi.mocked(fetchHostPublicConvergence).mockResolvedValue(null);
+    const query = hostPublicConvergenceQuery("session-7", { clubSlug: "reading-sai" });
+
+    await runQuery(query);
+    expect(fetchHostPublicConvergence).toHaveBeenCalledWith("session-7", { clubSlug: "reading-sai" });
+    expect(query.retry).toBe(false);
+    expect(query.refetchInterval?.({ state: { data: { status: "PENDING" } } } as never)).toBe(5_000);
+    expect(query.refetchInterval?.({ state: { data: { status: "FAILED" } } } as never)).toBe(false);
   });
 
   it("rejects an unscoped host query key at runtime", () => {
@@ -271,6 +293,18 @@ describe("host session query keys", () => {
       deleted: true,
       counts: emptyCounts(),
     })).toThrow();
+  });
+
+  it("accepts the authoritative trash detail response as a trash item", () => {
+    expect(parseHostSessionTrashItem({
+      ...trashItem(),
+      trashed: true,
+      counts: emptyCounts(),
+    })).toMatchObject({
+      sessionId: "session-7",
+      trashed: true,
+      counts: emptyCounts(),
+    });
   });
 
   it("parses trash list pages with cursor metadata", () => {

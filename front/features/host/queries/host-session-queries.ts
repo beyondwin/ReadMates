@@ -1,6 +1,6 @@
 import type { QueryClient } from "@tanstack/react-query";
 import { queryOptions, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   closeHostSession,
   correctionPublishHostSession,
@@ -9,6 +9,7 @@ import {
   deleteHostSession,
   fetchHostCurrentSession,
   fetchHostMutationReconciliation,
+  fetchHostPublicConvergence,
   fetchHostSessionClosingStatus,
   fetchHostSessionDeletionPreview,
   fetchHostSessionDetail,
@@ -22,6 +23,7 @@ import {
   openHostSession,
   publishHostSession,
   reopenHostSession,
+  retryHostPublicConvergence,
   returnHostSessionToDraft,
   saveHostSessionAttendance,
   saveHostSessionAccessScope,
@@ -51,6 +53,7 @@ import type {
   HostMutationEnvelope,
   HostMutationOperation,
   HostMutationReconciliation,
+  HostPublicConvergenceView,
 } from "@/features/host/api/host-contracts";
 import type { HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
@@ -68,10 +71,11 @@ import { isReadmatesApiError, isReadmatesTransportError } from "@/shared/api/err
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
 import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
+import { beginHostMeetingAttendanceCommit } from "@/shared/observability/host-meeting-performance";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
 
-export type HostMutationReconciliationState = "idle" | "checking";
+export type HostMutationReconciliationState = "idle" | "checking" | "pending";
 
 export class HostMutationPendingError extends Error {
   readonly code = "HOST_MUTATION_PENDING";
@@ -200,6 +204,8 @@ export const hostSessionKeys = {
     [...hostSessionKeys.manualDispatchesRoot(context), normalizeManualDispatchesRequest(request)] as const,
   scheduleDefaults: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "scheduleDefaults"] as const,
+  convergence: (sessionId: string, context: ExplicitReadmatesApiContext) =>
+    [...hostSessionKeys.scope(context), "convergence", sessionId] as const,
   trashRoot: (context: ExplicitReadmatesApiContext) =>
     [...hostSessionKeys.scope(context), "trash"] as const,
   trashList: (page: PageRequest | undefined, context: ExplicitReadmatesApiContext) =>
@@ -294,6 +300,15 @@ export function hostSessionDetailQuery(sessionId: string, context: ExplicitReadm
   return queryOptions<HostSessionDetailResponse>({
     queryKey: hostSessionKeys.detail(sessionId, context),
     queryFn: () => fetchHostSessionDetail(sessionId, context),
+  });
+}
+
+export function hostPublicConvergenceQuery(sessionId: string, context: ExplicitReadmatesApiContext) {
+  return queryOptions<HostPublicConvergenceView | null>({
+    queryKey: hostSessionKeys.convergence(sessionId, context),
+    queryFn: () => fetchHostPublicConvergence(sessionId, context),
+    retry: false,
+    refetchInterval: (query) => query.state.data?.status === "PENDING" ? 5_000 : false,
   });
 }
 
@@ -434,6 +449,7 @@ async function invalidateSessionMutationSurfaces(
     invalidateHostSessionLists(client, context),
     invalidateHostSessionDashboard(client, context),
     invalidateHostCurrentSession(client, context),
+    client.invalidateQueries({ queryKey: hostSessionKeys.convergence(sessionId, context), exact: true }),
     invalidateHostSessionRecordCaches(client, sessionId, context, {
       editor: true,
       history: true,
@@ -451,38 +467,128 @@ export function invalidateHostSessionRecordSurfaces(
   return invalidateSessionMutationSurfaces(client, sessionId, context);
 }
 
-export function useCreateHostSessionMutation(context: ExplicitReadmatesApiContext) {
+export function useRetryHostPublicConvergenceMutation(context: ExplicitReadmatesApiContext) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationKey: hostMutationKey(context.clubSlug, "public-convergence", "retry"),
+    mutationFn: ({ sessionId, convergenceId }: { sessionId: string; convergenceId: string }) =>
+      retryHostPublicConvergence(sessionId, convergenceId, context),
+    onSuccess: (_result, { sessionId }) => client.invalidateQueries({
+      queryKey: hostSessionKeys.convergence(sessionId, context),
+      exact: true,
+    }),
+  });
+}
+
+export function useCreateHostSessionMutation(
+  context: ExplicitReadmatesApiContext,
+  options: { retainUntilResolved?: boolean } = {},
+) {
   const client = useQueryClient();
   const reconciliation = useReconciliationState();
+  const setReconciliationState = reconciliation.setReconciliationState;
+  const pendingCreateRef = useRef<HostMutationEnvelope<HostSessionRequest, Record<string, never>> | null>(null);
+  const [hasPendingCreate, setHasPendingCreate] = useState(false);
+
+  const markPendingCreate = useCallback((
+    envelope: HostMutationEnvelope<HostSessionRequest, Record<string, never>> | null,
+  ) => {
+    pendingCreateRef.current = envelope;
+    setHasPendingCreate(Boolean(envelope));
+    setReconciliationState(envelope ? "pending" : "idle");
+  }, [setReconciliationState]);
+
+  const acceptCommittedCreate = useCallback((result: HostMutationReconciliation) => {
+    if (!result.receipt) {
+      throw new Error("HOST_MUTATION_COMMITTED_RECEIPT_MISSING");
+    }
+    return committedDetailResponse(result.receipt.resourceId, context, 201);
+  }, [context]);
+
+  const invalidateCreateSurfaces = useCallback((response: Response) =>
+    invalidateOk(response, () => Promise.all([
+      invalidateHostSessionLists(client, context),
+      invalidateHostSessionDashboard(client, context),
+    ])), [client, context]);
+
   const mutation = useMutation({
     mutationKey: hostMutationKey(context.clubSlug, "sessions", "create"),
-    mutationFn: (request: HostSessionRequest) => {
+    mutationFn: async (request: HostSessionRequest) => {
+      if (pendingCreateRef.current) throw new HostMutationPendingError();
       const explicitContext = requireHostMutationContext(context);
-      const envelope = { idempotencyKey: newHostMutationKey(), expected: {}, command: request };
-      return executeHostMutationWithReconciliation({
-        operation: "SESSION_CREATE",
-        resourceSlot: "create",
-        envelope,
-        context: explicitContext,
-        execute: (exactEnvelope) => createHostSession(exactEnvelope, explicitContext),
-        acceptCommitted: (result) => {
-          if (!result.receipt) {
-            throw new Error("HOST_MUTATION_COMMITTED_RECEIPT_MISSING");
-          }
-          return committedDetailResponse(result.receipt.resourceId, explicitContext, 201);
-        },
-        onStateChange: reconciliation.setReconciliationState,
-      });
+      const envelope: HostMutationEnvelope<HostSessionRequest, Record<string, never>> = {
+        idempotencyKey: newHostMutationKey(),
+        expected: {},
+        command: request,
+      };
+      markPendingCreate(envelope);
+      try {
+        const response = await executeHostMutationWithReconciliation({
+          operation: "SESSION_CREATE",
+          resourceSlot: "create",
+          envelope,
+          context: explicitContext,
+          execute: (exactEnvelope) => createHostSession(exactEnvelope, explicitContext),
+          acceptCommitted: acceptCommittedCreate,
+          onStateChange: setReconciliationState,
+        });
+        if (!options.retainUntilResolved) markPendingCreate(null);
+        return response;
+      } catch (error) {
+        markPendingCreate(envelope);
+        throw error instanceof HostMutationPendingError ? error : new HostMutationPendingError();
+      }
     },
-    onSuccess: (response) =>
-      invalidateOk(response, () =>
-        Promise.all([
-          invalidateHostSessionLists(client, context),
-          invalidateHostSessionDashboard(client, context),
-        ]),
-      ),
+    onSuccess: invalidateCreateSurfaces,
   });
-  return { ...mutation, reconciliationState: reconciliation.reconciliationState };
+
+  const reconcilePendingCreate = useCallback(async (): Promise<Response> => {
+    const envelope = pendingCreateRef.current;
+    if (!envelope) throw new Error("HOST_CREATE_RECONCILIATION_NOT_PENDING");
+    setReconciliationState("checking");
+    try {
+      const result = await fetchHostMutationReconciliation(
+        "SESSION_CREATE",
+        "create",
+        envelope.idempotencyKey,
+        context,
+      );
+      let response: Response;
+      if (result.status === "COMMITTED") {
+        response = await acceptCommittedCreate(result);
+      } else if (result.status === "NOT_EXECUTED") {
+        try {
+          response = await createHostSession(envelope, context);
+        } catch (error) {
+          if (isReadmatesTransportError(error)) throw new HostMutationPendingError();
+          throw error;
+        }
+      } else {
+        throw new HostMutationPendingError();
+      }
+      await invalidateCreateSurfaces(response);
+      if (!options.retainUntilResolved) markPendingCreate(null);
+      return response;
+    } finally {
+      setReconciliationState(pendingCreateRef.current ? "pending" : "idle");
+    }
+  }, [acceptCommittedCreate, context, invalidateCreateSurfaces, markPendingCreate, options.retainUntilResolved, setReconciliationState]);
+
+  const resolvePendingCreate = useCallback(() => markPendingCreate(null), [markPendingCreate]);
+  const resetMutation = mutation.reset;
+  const reset = useCallback(() => {
+    resetMutation();
+    markPendingCreate(null);
+  }, [markPendingCreate, resetMutation]);
+
+  return {
+    ...mutation,
+    reset,
+    reconcilePendingCreate,
+    resolvePendingCreate,
+    hasPendingCreate,
+    reconciliationState: reconciliation.reconciliationState,
+  };
 }
 
 export function useUpdateHostSessionMutation(context: ExplicitReadmatesApiContext) {
@@ -979,15 +1085,28 @@ export function useUpdateHostSessionAttendanceMutation(context: ExplicitReadmate
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (_result, variables) =>
-      Promise.all([
-        invalidateHostSessionDetail(client, variables.sessionId, context),
+    onSuccess: async (_result, variables) => {
+      if (variables.attendance.length === 1) {
+        const refreshed = await fetchHostSessionDetail(variables.sessionId, context);
+        const requested = variables.attendance[0];
+        const accepted = refreshed.attendees.find((row) => row.membershipId === requested.membershipId);
+        if (accepted && accepted.attendanceStatus === requested.attendanceStatus) {
+          beginHostMeetingAttendanceCommit({
+            ...requested,
+            attendanceRevision: accepted.attendanceRevision,
+          });
+        }
+        client.setQueryData(hostSessionKeys.detail(variables.sessionId, context), refreshed);
+      }
+      await Promise.all([
+        ...(variables.attendance.length === 1 ? [] : [invalidateHostSessionDetail(client, variables.sessionId, context)]),
         invalidateHostCurrentSession(client, context),
         invalidateHostSessionRecordCaches(client, variables.sessionId, context, {
           history: true,
           ledgers: true,
         }),
-      ]),
+      ]);
+    },
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }

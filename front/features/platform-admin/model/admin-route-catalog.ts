@@ -7,7 +7,7 @@ import {
 export type AdminRouteGroup = "today" | "clubs" | "services" | "review";
 export type AdminRouteStatus = "ready" | "coming_soon";
 export type AdminRouteSlice =
-  | "S1" | "S2" | "S3" | "S4" | "S5" | "S6" | "S7" | "S8" | "S9" | "S10";
+  | "S1" | "S2" | "S3" | "S4" | "S5" | "S6" | "S7" | "S8" | "S9" | "S10" | "C4";
 
 export const ADMIN_SHELL_LAYOUT_BREAKPOINT_PX = 768;
 export const ADMIN_SHELL_LAYOUT_MEDIA_QUERY = `(max-width: ${ADMIN_SHELL_LAYOUT_BREAKPOINT_PX}px)`;
@@ -96,6 +96,15 @@ export const ADMIN_ROUTES: ReadonlyArray<AdminRouteDescriptor> = [
     slice: "S1",
     status: "ready",
     requiredCapability: "VIEW_SUPPORT",
+  },
+  {
+    path: "public-takedown",
+    label: "긴급 공개 회수",
+    group: "operations",
+    groupLabel: "Operations",
+    slice: "C4",
+    status: "ready",
+    requiredCapability: "emergency_public_takedown",
   },
   {
     path: "audit",

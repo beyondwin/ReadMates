@@ -10,6 +10,7 @@ import {
   hostSessionRecordHistoryQuery,
 } from "@/features/host/queries/host-session-record-queries";
 import {
+  hostSessionClosingStatusQuery,
   hostSessionDetailQuery,
   hostSessionManualDispatchesQuery,
 } from "@/features/host/queries/host-session-queries";
@@ -17,11 +18,7 @@ import { hostSessionDetailContractFixture } from "./api-contract-fixtures";
 
 const routeUnitMocks = vi.hoisted(() => ({
   capturedProps: null as Record<string, unknown> | null,
-  fetchClosingStatus: vi.fn(),
-  fetchManualDispatches: vi.fn(),
   fetchRecordEditor: vi.fn(),
-  fetchRecordHistory: vi.fn(),
-  fetchSessionDetail: vi.fn(),
   useRealEditor: false,
 }));
 
@@ -32,9 +29,6 @@ vi.mock("@/features/host/api/host-api", async (importOriginal) => {
     closeHostSession: vi.fn(),
     commitHostSessionImport: vi.fn(),
     createHostSession: vi.fn(),
-    fetchHostSessionClosingStatus: routeUnitMocks.fetchClosingStatus,
-    fetchHostSessionDetail: routeUnitMocks.fetchSessionDetail,
-    fetchManualNotificationDispatches: routeUnitMocks.fetchManualDispatches,
     fetchHostSessionScheduleDefaults: vi.fn(),
     openHostSession: vi.fn(),
     publishHostSession: vi.fn(),
@@ -49,7 +43,6 @@ vi.mock("@/features/host/api/host-session-record-api", async (importOriginal) =>
   return {
     ...actual,
     fetchHostSessionRecordEditor: routeUnitMocks.fetchRecordEditor,
-    fetchHostSessionHistory: routeUnitMocks.fetchRecordHistory,
   };
 });
 
@@ -165,7 +158,7 @@ const recordEditorResponse = {
   validationSummary: { valid: true, issues: [] },
 };
 
-const versionedSessionDetail = {
+const authoritativeSessionDetail = {
   ...hostSessionDetailContractFixture,
   sessionId: "session-7",
   versions: {
@@ -177,18 +170,39 @@ const versionedSessionDetail = {
     publicationRevision: 1,
   },
   attendanceSnapshotId: "attendance-snapshot-4",
+  attendees: hostSessionDetailContractFixture.attendees.map((attendee, index) => ({
+    ...attendee,
+    attendanceRevision: index + 1,
+  })),
 };
 
 function createClient() {
   return new QueryClient({
-    defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    defaultOptions: {
+      queries: {
+        retry: false,
+        staleTime: Number.POSITIVE_INFINITY,
+        gcTime: Number.POSITIVE_INFINITY,
+      },
+      mutations: { retry: false },
+    },
   });
 }
 
 function seedEditRouteQueries(client: QueryClient, options?: { recordEditor?: boolean }) {
   client.setQueryData(
     hostSessionDetailQuery("session-7", { clubSlug: "reading-sai" }).queryKey,
-    versionedSessionDetail,
+    authoritativeSessionDetail,
+  );
+  client.setQueryData(
+    hostSessionClosingStatusQuery("session-7", { clubSlug: "reading-sai" }).queryKey,
+    {
+      session: {
+        sessionRevision: authoritativeSessionDetail.versions.sessionRevision,
+        participantSetRevision: authoritativeSessionDetail.versions.participantSetRevision,
+        attendanceSnapshotId: authoritativeSessionDetail.attendanceSnapshotId,
+      },
+    },
   );
   client.setQueryData(
     hostSessionManualDispatchesQuery(
@@ -227,17 +241,7 @@ describe("EditHostSessionRoute query actions", () => {
   beforeEach(() => {
     routeUnitMocks.capturedProps = null;
     routeUnitMocks.useRealEditor = false;
-    routeUnitMocks.fetchClosingStatus.mockReset().mockResolvedValue({
-      session: {
-        sessionRevision: 3,
-        participantSetRevision: 4,
-        attendanceSnapshotId: "attendance-snapshot-4",
-      },
-    });
-    routeUnitMocks.fetchManualDispatches.mockReset().mockResolvedValue({ items: [], nextCursor: null });
-    routeUnitMocks.fetchRecordEditor.mockReset().mockResolvedValue(recordEditorResponse);
-    routeUnitMocks.fetchRecordHistory.mockReset().mockResolvedValue({ items: [], nextCursor: null });
-    routeUnitMocks.fetchSessionDetail.mockReset().mockResolvedValue(versionedSessionDetail);
+    routeUnitMocks.fetchRecordEditor.mockReset();
     vi.mocked(commitHostSessionImport).mockReset();
     vi.mocked(commitHostSessionImport).mockResolvedValue({
       sessionId: "session-7",
@@ -255,7 +259,7 @@ describe("EditHostSessionRoute query actions", () => {
     ]) {
       vi.mocked(apiFn).mockReset();
       vi.mocked(apiFn).mockResolvedValue(
-        new Response(JSON.stringify(versionedSessionDetail), { status: 200 }) as never,
+        new Response(JSON.stringify(authoritativeSessionDetail), { status: 200 }) as never,
       );
     }
   });
@@ -271,9 +275,11 @@ describe("EditHostSessionRoute query actions", () => {
 
     await user.click(screen.getByRole("button", { name: "commit import" }));
 
-    expect(commitHostSessionImport).toHaveBeenCalledWith("session-7", expect.objectContaining({
-      format: "readmates-session-import:v1",
-    }), { clubSlug: "reading-sai" });
+    expect(commitHostSessionImport).toHaveBeenCalledWith(
+      "session-7",
+      expect.objectContaining({ format: "readmates-session-import:v1" }),
+      { clubSlug: "reading-sai" },
+    );
     expect(invalidateSpy).not.toHaveBeenCalledWith({
       queryKey: hostNotificationKeys.scope({ clubSlug: "reading-sai" }),
     });
@@ -299,15 +305,28 @@ describe("EditHostSessionRoute query actions", () => {
     renderEditRoute(client, onSessionRecordsChanged);
     await user.click(screen.getByRole("button", { name: label }));
 
-    const command = _name === "reopen" || _name === "unpublish" || _name === "return-to-draft"
-      ? { reasonCode: "ACCIDENTAL_TRANSITION" }
-      : {};
+    const expected = _name === "close"
+      ? {
+          sessionRevision: authoritativeSessionDetail.versions.sessionRevision,
+          participantSetRevision: authoritativeSessionDetail.versions.participantSetRevision,
+          attendanceSnapshotId: authoritativeSessionDetail.attendanceSnapshotId,
+        }
+      : _name === "publish"
+        ? {
+            sessionRevision: authoritativeSessionDetail.versions.sessionRevision,
+            liveRecordRevision: authoritativeSessionDetail.versions.liveRecordRevision,
+            exposureRevision: authoritativeSessionDetail.versions.exposureRevision,
+            publicationRevision: authoritativeSessionDetail.versions.publicationRevision,
+          }
+        : { sessionRevision: authoritativeSessionDetail.versions.sessionRevision };
     expect(apiFn).toHaveBeenCalledWith(
       "session-7",
       expect.objectContaining({
-        idempotencyKey: expect.stringMatching(/^host-/),
-        expected: expect.any(Object),
-        command,
+        idempotencyKey: expect.any(String),
+        expected,
+        command: _name === "reopen" || _name === "unpublish" || _name === "return-to-draft"
+          ? { reasonCode: "ACCIDENTAL_TRANSITION" }
+          : {},
       }),
       { clubSlug: "reading-sai" },
     );
@@ -337,8 +356,8 @@ describe("EditHostSessionRoute query actions", () => {
     expect(reopenHostSession).toHaveBeenCalledWith(
       "session-7",
       expect.objectContaining({
-        idempotencyKey: expect.stringMatching(/^host-/),
-        expected: { sessionRevision: 3 },
+        idempotencyKey: expect.any(String),
+        expected: { sessionRevision: authoritativeSessionDetail.versions.sessionRevision },
         command: { reasonCode: "ACCIDENTAL_TRANSITION" },
       }),
       { clubSlug: "reading-sai" },
@@ -515,16 +534,19 @@ describe("NewHostSessionRoute schedule defaults", () => {
     await user.click(screen.getAllByRole("button", { name: "모임 문서 저장" })[0]!);
 
     await waitFor(() => expect(createHostSession).toHaveBeenCalledTimes(1));
-    expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
-      idempotencyKey: expect.stringMatching(/^host-/),
-      expected: {},
-      command: expect.objectContaining({
-        meetingUrl: "",
-        meetingPasscode: "",
-        startTime: "19:30",
-        locationLabel: "온라인",
+    expect(createHostSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: expect.any(String),
+        expected: {},
+        command: expect.objectContaining({
+          meetingUrl: "",
+          meetingPasscode: "",
+          startTime: "19:30",
+          locationLabel: "온라인",
+        }),
       }),
-    }), { clubSlug: "reading-sai" });
+      { clubSlug: "reading-sai" },
+    );
   });
 
   it("submits adopted meeting secrets and keeps them clearable", async () => {
@@ -547,14 +569,14 @@ describe("NewHostSessionRoute schedule defaults", () => {
     await user.click(screen.getAllByRole("button", { name: "모임 문서 저장" })[0]!);
 
     await waitFor(() => expect(createHostSession).toHaveBeenCalledTimes(1));
-    expect(createHostSession).toHaveBeenCalledWith(expect.objectContaining({
-      idempotencyKey: expect.stringMatching(/^host-/),
-      expected: {},
-      command: expect.objectContaining({
-        meetingUrl: "",
-        meetingPasscode: "",
+    expect(createHostSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: expect.any(String),
+        expected: {},
+        command: expect.objectContaining({ meetingUrl: "", meetingPasscode: "" }),
       }),
-    }), { clubSlug: "reading-sai" });
+      { clubSlug: "reading-sai" },
+    );
   });
 
   it("retries a visible schedule-defaults failure without leaving the editor", async () => {

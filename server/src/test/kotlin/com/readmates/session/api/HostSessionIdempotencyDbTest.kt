@@ -42,8 +42,8 @@ class HostSessionIdempotencyDbTest(
             .findAndAddModules()
             .build()
 
-    @Suppress("LongMethod")
     @Test
+    @Suppress("LongMethod", "MaxLineLength")
     fun `envelope rejects missing extra and wrong-domain expected revisions`() {
         val created = createDraft("envelope-validate", "key-create-valid-01")
         val sessionId = created.first
@@ -94,8 +94,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-close-extra-01",
-                        """{"sessionRevision":0,"participantSetRevision":0,""" +
-                            """"attendanceSnapshotId":"att:","publicationRevision":0}""",
+                        """{"sessionRevision":0,"participantSetRevision":0,"attendanceSnapshotId":"att:","publicationRevision":0}""",
                         "{}",
                     )
             }.andExpect { status { isBadRequest() } }
@@ -106,10 +105,8 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-att-extra-01",
-                        """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID",""" +
-                            """"attendanceRevision":0}],"sessionRevision":0}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID",""" +
-                            """"attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
+                        """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}],"sessionRevision":0}""",
+                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
                     )
             }.andExpect { status { isBadRequest() } }
         mockMvc
@@ -237,8 +234,8 @@ class HostSessionIdempotencyDbTest(
         assertThat(countSessions("title = '다른 생성'")).isZero()
     }
 
-    @Suppress("LongMethod")
     @Test
+    @Suppress("LongMethod", "MaxLineLength")
     fun `duplicate basic save attendance and close keep one side effect`() {
         val created = createDraft("중복 저장", "key-basic-orig-0001")
         val sessionId = created.first
@@ -246,23 +243,13 @@ class HostSessionIdempotencyDbTest(
             .patch("/api/host/sessions/$sessionId") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    envelope(
-                        "key-basic-dup-0001",
-                        """{"sessionRevision":0}""",
-                        sessionCommand("한번만 저장"),
-                    )
+                content = envelope("key-basic-dup-0001", """{"sessionRevision":0}""", sessionCommand("한번만 저장"))
             }.andExpect { status { isOk() } }
         mockMvc
             .patch("/api/host/sessions/$sessionId") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    envelope(
-                        "key-basic-dup-0001",
-                        """{"sessionRevision":0}""",
-                        sessionCommand("한번만 저장"),
-                    )
+                content = envelope("key-basic-dup-0001", """{"sessionRevision":0}""", sessionCommand("한번만 저장"))
             }.andExpect { status { isOk() } }
         assertThat(sessionRevision(sessionId)).isEqualTo(1)
         assertThat(auditCount(sessionId, "BASIC_INFO_UPDATED")).isEqualTo(1)
@@ -279,8 +266,7 @@ class HostSessionIdempotencyDbTest(
                     envelope(
                         "key-att-dup-0001",
                         """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID",""" +
-                            """"attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
+                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
                     )
             }.andExpect { status { isOk() } }
         mockMvc
@@ -291,8 +277,7 @@ class HostSessionIdempotencyDbTest(
                     envelope(
                         "key-att-dup-0001",
                         """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID",""" +
-                            """"attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
+                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0}]}""",
                     )
             }.andExpect { status { isOk() } }
         assertThat(attendanceAuditCount(sessionId)).isEqualTo(1)
@@ -307,8 +292,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-close-dup-0001",
-                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,""" +
-                            """"attendanceSnapshotId":"$snapshot"}""",
+                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,"attendanceSnapshotId":"$snapshot"}""",
                         "{}",
                     )
             }.andExpect { status { isOk() } }
@@ -319,8 +303,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-close-dup-0001",
-                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,""" +
-                            """"attendanceSnapshotId":"$snapshot"}""",
+                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,"attendanceSnapshotId":"$snapshot"}""",
                         "{}",
                     )
             }.andExpect { status { isOk() } }
@@ -328,8 +311,8 @@ class HostSessionIdempotencyDbTest(
         assertThat(lifecycleCount(sessionId, "CLOSED")).isEqualTo(1)
     }
 
-    @Suppress("LongMethod")
     @Test
+    @Suppress("MaxLineLength")
     fun `envelope rejects reverse restore bulk attendance access publication and publish vector fields`() {
         val sessionId = createDraft("vector-validate", "key-create-vector-01").first
         mockMvc
@@ -357,8 +340,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-publish-extra-01",
-                        """{"sessionRevision":0,"liveRecordRevision":0,"exposureRevision":0,""" +
-                            """"publicationRevision":0,"participantSetRevision":0}""",
+                        """{"sessionRevision":0,"liveRecordRevision":0,"exposureRevision":0,"publicationRevision":0,"participantSetRevision":0}""",
                         "{}",
                     )
             }.andExpect { status { isBadRequest() } }
@@ -375,8 +357,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-corr-extra-01",
-                        """{"sessionRevision":0,"recordDraftRevision":1,"liveRecordRevision":1,""" +
-                            """"exposureRevision":0,"publicationRevision":0,"participantSetRevision":0}""",
+                        """{"sessionRevision":0,"recordDraftRevision":1,"liveRecordRevision":1,"exposureRevision":0,"publicationRevision":0,"participantSetRevision":0}""",
                         "{}",
                     )
             }.andExpect { status { isBadRequest() } }
@@ -387,16 +368,14 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-missing-set-01",
-                        """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},""" +
-                            """{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED",""" +
-                            """"expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID",""" +
-                            """"attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}]}""",
+                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
                     )
             }.andExpect { status { isBadRequest() } }
     }
 
     @Test
+    @Suppress("MaxLineLength")
     fun `attendance expected rows disagreeing with command entries are rejected`() {
         val sessionId = createDraft("출석 불일치", "key-att-mis-orig-01").first
         open(sessionId, 0, "key-att-mis-open-01")
@@ -408,15 +387,14 @@ class HostSessionIdempotencyDbTest(
                     envelope(
                         "key-att-mis-01",
                         """{"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID",""" +
-                            """"attendanceStatus":"ATTENDED","expectedAttendanceRevision":9}]}""",
+                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED","expectedAttendanceRevision":9}]}""",
                     )
             }.andExpect { status { isBadRequest() } }
         assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")
     }
 
-    @Suppress("LongMethod")
     @Test
+    @Suppress("LongMethod", "MaxLineLength")
     fun `history restore replay returns the audit change id and kind`() {
         val sessionId = createDraft("복원 원본", "key-hist-create-01").first
         val first =
@@ -484,8 +462,8 @@ class HostSessionIdempotencyDbTest(
         assertThat(replayed.get("changeId").asString()).isNotEqualTo(replayed.path("receiptId").asString())
     }
 
-    @Suppress("LongMethod")
     @Test
+    @Suppress("LongMethod")
     fun `access and publication envelope cas increments revisions`() {
         val sessionId = createDraft("노출 개정", "key-exp-create-01").first
         mockMvc
@@ -592,8 +570,8 @@ class HostSessionIdempotencyDbTest(
             }
     }
 
-    @Suppress("LongMethod")
     @Test
+    @Suppress("LongMethod")
     fun `reverse trash restore bulk attendance and publish replay once`() {
         val sessionId = createDraft("범위 재시도", "key-scope-create-01").first
         open(sessionId, 0, "key-scope-open-01")
@@ -605,12 +583,8 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-dup-01",
-                        """{"participantSetRevision":$setRevision,"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID",""" +
-                            """"attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID",""" +
-                            """"attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED",""" +
-                            """"expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID",""" +
-                            """"attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        expectedAttendanceRows(setRevision),
+                        attendanceEntries(),
                     )
             }.andExpect { status { isOk() } }
         mockMvc
@@ -620,12 +594,8 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         "key-bulk-dup-01",
-                        """{"participantSetRevision":$setRevision,"rows":[{"membershipId":"$HOST_MEMBERSHIP_ID",""" +
-                            """"attendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID",""" +
-                            """"attendanceRevision":0}]}""",
-                        """{"entries":[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED",""" +
-                            """"expectedAttendanceRevision":0},{"membershipId":"$MEMBER_MEMBERSHIP_ID",""" +
-                            """"attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]}""",
+                        expectedAttendanceRows(setRevision),
+                        attendanceEntries(),
                     )
             }.andExpect { status { isOk() } }
         assertThat(attendanceAuditCount(sessionId)).isEqualTo(1)
@@ -818,6 +788,31 @@ class HostSessionIdempotencyDbTest(
         command: String,
     ) = """{"idempotencyKey":"$key","expected":$expected,"command":$command}"""
 
+    private fun expectedAttendanceRows(setRevision: Long): String =
+        """
+        {
+          "participantSetRevision":$setRevision,
+          "rows":[
+            {"membershipId":"$HOST_MEMBERSHIP_ID","attendanceRevision":0},
+            {"membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceRevision":0}
+          ]
+        }
+        """.trimIndent()
+
+    private fun attendanceEntries(): String =
+        """
+        {"entries":[
+          {
+            "membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED",
+            "expectedAttendanceRevision":0
+          },
+          {
+            "membershipId":"$MEMBER_MEMBERSHIP_ID","attendanceStatus":"ABSENT",
+            "expectedAttendanceRevision":0
+          }
+        ]}
+        """.trimIndent()
+
     private fun sessionCommand(
         title: String,
         meetingUrl: String? = null,
@@ -840,6 +835,7 @@ class HostSessionIdempotencyDbTest(
             """.trimIndent()
     }
 
+    @Suppress("MaxLineLength")
     private fun close(
         sessionId: String,
         sessionRev: Long,
@@ -854,8 +850,7 @@ class HostSessionIdempotencyDbTest(
                 content =
                     envelope(
                         key,
-                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,""" +
-                            """"attendanceSnapshotId":"$snapshot"}""",
+                        """{"sessionRevision":$sessionRev,"participantSetRevision":$setRevision,"attendanceSnapshotId":"$snapshot"}""",
                         "{}",
                     )
             }.andExpect { status { isOk() } }

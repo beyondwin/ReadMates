@@ -10,6 +10,8 @@ import com.readmates.club.application.port.`in`.CheckSupportAccessGrantUseCase
 import com.readmates.club.application.port.`in`.ResolveClubContextUseCase
 import com.readmates.shared.security.CurrentMember
 import com.readmates.shared.security.CurrentUser
+import com.readmates.shared.security.HostAuthorityLossCode
+import com.readmates.shared.security.HostAuthorityLossContract
 import com.readmates.shared.security.emailOrNull
 import jakarta.servlet.FilterChain
 import jakarta.servlet.http.HttpServletRequest
@@ -56,13 +58,14 @@ class MemberAuthoritiesFilter(
         if (authentication != null && email != null) {
             val requestedClubContext = request.resolveAuthClubContext(resolveClubContextUseCase)
             val resolvedClubContext = requestedClubContext.context
-
             val member =
                 if (requestedClubContext.supplied && resolvedClubContext == null) {
                     null
                 } else {
                     resolveAuthenticatedPrincipalUseCase.resolveByEmail(email, resolvedClubContext)
                 }
+
+            val authorityLoss = request.hostAuthorityLossCode()
 
             val userId =
                 when (val principal = authentication.principal) {
@@ -115,7 +118,8 @@ class MemberAuthoritiesFilter(
             }
 
             // Map authority strings → SimpleGrantedAuthority at this infrastructure boundary
-            val grantedAuthorities = result.authorities.map { SimpleGrantedAuthority(it) }
+            val grantedAuthorities =
+                result.authorities.toGrantedAuthorities(authorityLoss)
 
             val mappedAuthentication =
                 UsernamePasswordAuthenticationToken(
@@ -144,4 +148,15 @@ class MemberAuthoritiesFilter(
             clubName = clubName,
             avatarKey = avatarKey,
         )
+
+    private fun HttpServletRequest.hostAuthorityLossCode(): HostAuthorityLossCode? =
+        getAttribute(HostAuthorityLossContract.REQUEST_ATTRIBUTE) as? HostAuthorityLossCode
+
+    private fun Set<String>.toGrantedAuthorities(authorityLoss: HostAuthorityLossCode?): List<SimpleGrantedAuthority> =
+        filterNot { authorityLoss != null && it == HOST_AUTHORITY }
+            .map(::SimpleGrantedAuthority)
+
+    private companion object {
+        const val HOST_AUTHORITY = "ROLE_HOST"
+    }
 }

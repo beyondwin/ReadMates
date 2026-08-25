@@ -9,6 +9,7 @@ import com.readmates.session.application.model.ExpectedCloseRevisions
 import com.readmates.session.application.model.ExpectedExposureRevision
 import com.readmates.session.application.model.ExpectedPublicationRevision
 import com.readmates.session.application.model.ExpectedSessionOnly
+import jakarta.validation.Valid
 import jakarta.validation.constraints.Min
 import jakarta.validation.constraints.NotBlank
 import jakarta.validation.constraints.NotEmpty
@@ -159,7 +160,7 @@ data class ExpectedCorrectionPublishVectorBody(
 }
 
 data class HostAttendanceCommandBody(
-    @field:NotEmpty val entries: List<AttendanceEntry>? = null,
+    @field:Valid @field:NotEmpty val entries: List<AttendanceEntry>? = null,
 )
 
 data class HostLifecycleCommandBody(

@@ -1914,12 +1914,7 @@ class HostSessionServicesTest {
             query: CanonicalHostSessionListQuery,
             evaluatedAt: Instant,
             cursor: HostMeetingListTuple?,
-        ) = HostMeetingListPageRead(
-            items = emptyList(),
-            last = null,
-            hasMore = false,
-            summary = HostSessionListSummary(0, 0, 0),
-        )
+        ) = HostMeetingListPageRead(emptyList(), null, false, HostSessionListSummary(0, 0, 0))
 
         override fun create(command: HostSessionCommand) =
             CreatedSessionResponse(
@@ -1989,7 +1984,9 @@ class HostSessionServicesTest {
 
         override fun update(command: UpdateHostSessionCommand) =
             com.readmates.session.application.port.out.HostSessionDraftUpdateResult(
-                hostSessionDetail(command.sessionId).also { calls += "update:${command.sessionId}:${command.session.title}" },
+                hostSessionDetail(command.sessionId).also {
+                    calls += "update:${command.sessionId}:${command.session.title}"
+                },
             )
 
         override fun lockVisibilitySnapshot(command: HostSessionIdCommand): HostSessionVisibilitySnapshot {

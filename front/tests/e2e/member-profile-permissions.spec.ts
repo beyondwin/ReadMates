@@ -321,14 +321,22 @@ test("active members edit their profile from member space and refresh the accoun
   let refreshedDisplayName: string | null = null;
   let authPayload: Record<string, unknown> | null = null;
 
-  await page.route("**/api/bff/api/auth/me", async (route) => {
+  await page.route("**/api/bff/api/auth/me**", async (route) => {
     if (!authPayload) {
       const upstream = await route.fetch();
       authPayload = await upstream.json() as Record<string, unknown>;
     }
 
+    const displayName = refreshedDisplayName ?? authPayload.displayName;
+    const currentMembership = authPayload.currentMembership as Record<string, unknown> | undefined;
     await route.fulfill({
-      json: { ...authPayload, displayName: refreshedDisplayName ?? authPayload.displayName },
+      json: {
+        ...authPayload,
+        displayName,
+        currentMembership: currentMembership
+          ? { ...currentMembership, displayName }
+          : currentMembership,
+      },
     });
   });
   await page.route("**/api/bff/api/me/profile**", async (route) => {
@@ -415,13 +423,9 @@ test("suspended members omit account navigation and profile editing from member 
   await expect(shelf.getByRole("link", {
     name: /계정 (관리|설정)/,
   })).toHaveCount(0);
-  await expect(shelf.locator(".rm-member-profile__avatar img")).toHaveAttribute(
-    "src",
-    /\/assets\/avatars\/book-club\/[a-z0-9-]+\.webp$/,
-  );
-  await expect(shelf.getByRole("list", {
-    name: "최근 독서 기록",
-  })).toBeVisible();
+  await expect(page.getByText("게스트 미리보기")).toBeVisible();
+  await expect(shelf.locator(".rm-member-profile__avatar img")).toHaveCount(0);
+  await expect(shelf.getByRole("list", { name: "최근 독서 기록" })).toHaveCount(0);
 
   const directUpdate = await replaceProfileDirect(page, "E2E Suspended Avatar", "cloud-green-book", "reading-sai");
   expect(directUpdate.status).toBe(200);
@@ -526,11 +530,11 @@ test("an empty reading shelf omits recent-session navigation", async ({ page }) 
   await expect(utilities.getByRole("link", {
     name: "알림 받은 알림과 수신 설정",
     exact: true,
-  })).toHaveAttribute("href", "/app/notifications");
+  })).toHaveAttribute("href", "/clubs/reading-sai/app/notifications");
   await expect(utilities.getByRole("link", {
     name: "계정 설정 프로필과 멤버십 정보",
     exact: true,
-  })).toHaveAttribute("href", "/app/me/settings");
+  })).toHaveAttribute("href", "/clubs/reading-sai/app/me/settings");
   await expect(page.getByRole("list", {
     name: "최근 독서 기록",
   })).toHaveCount(0);

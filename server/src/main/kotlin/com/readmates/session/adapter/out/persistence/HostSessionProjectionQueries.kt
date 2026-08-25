@@ -137,7 +137,7 @@ select sessions.session_revision,
        draft.draft_revision,
        coalesce(revision.live_revision, 0) as live_revision,
        coalesce(publication.publication_revision, 0) as publication_revision
-from active_sessions sessions
+from sessions
 left join session_record_drafts draft
   on draft.session_id = sessions.id and draft.club_id = sessions.club_id
 left join (
@@ -151,6 +151,7 @@ left join session_publication_versions publication
   on publication.session_id = sessions.id
 where sessions.id = ?
   and sessions.club_id = ?
+  and sessions.deleted_at is null
 """
 
 private const val REVISION_CONFLICT_SQL = """
@@ -161,7 +162,7 @@ select sessions.session_revision,
        draft.draft_revision,
        coalesce(revision.live_revision, 0) as live_revision,
        coalesce(publication.publication_revision, 0) as publication_revision
-from active_sessions sessions
+from sessions
 left join session_record_drafts draft
   on draft.session_id = sessions.id and draft.club_id = sessions.club_id
 left join (
@@ -175,4 +176,5 @@ left join session_publication_versions publication
   on publication.session_id = sessions.id
 where sessions.id = ?
   and sessions.club_id = ?
+  and sessions.deleted_at is null
 """

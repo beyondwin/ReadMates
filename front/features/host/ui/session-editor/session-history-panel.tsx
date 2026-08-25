@@ -16,6 +16,7 @@ export function SessionHistoryPanel({
   onRestoreCompleted,
   onRestoreChange,
   onReverseLifecycle,
+  recoveryActionsDisabled = false,
 }: {
   items: SessionHistoryPanelItem[];
   expectedDraftRevision: number | null;
@@ -30,6 +31,7 @@ export function SessionHistoryPanel({
   onRestoreCompleted: () => void;
   onRestoreChange?: (changeId: string) => void | Promise<void>;
   onReverseLifecycle?: () => void;
+  recoveryActionsDisabled?: boolean;
 }) {
   const [pending, setPending] = useState<SessionHistoryPanelItem | null>(null);
   const [restoreError, setRestoreError] = useState<string | null>(null);
@@ -110,7 +112,7 @@ export function SessionHistoryPanel({
                     <button
                       className="btn btn-quiet btn-sm"
                       type="button"
-                      disabled={restoring}
+                      disabled={restoring || recoveryActionsDisabled}
                       onClick={(event) => {
                         restoreTriggerRef.current = event.currentTarget;
                         setRestoreError(null);
@@ -123,7 +125,7 @@ export function SessionHistoryPanel({
                     <button
                       className="btn btn-quiet btn-sm"
                       type="button"
-                      disabled={restoring}
+                      disabled={restoring || recoveryActionsDisabled}
                       onClick={() => {
                         void onRestoreChange(item.id);
                       }}
@@ -134,7 +136,7 @@ export function SessionHistoryPanel({
                     <button
                       className="btn btn-quiet btn-sm"
                       type="button"
-                      disabled={restoring}
+                      disabled={restoring || recoveryActionsDisabled}
                       onClick={onReverseLifecycle}
                     >
                       {view.recovery.buttonLabel}
@@ -199,7 +201,7 @@ export function SessionHistoryPanel({
                 ref={confirmRef}
                 className="btn btn-primary"
                 type="button"
-                disabled={restoring}
+                disabled={restoring || recoveryActionsDisabled}
                 onClick={async () => {
                   setRestoreError(null);
                   try {

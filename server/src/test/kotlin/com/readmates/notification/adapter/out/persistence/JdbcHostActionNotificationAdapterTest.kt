@@ -134,9 +134,7 @@ class JdbcHostActionNotificationAdapterTest(
         insertRaceSession()
         val preview = racePreview()
         adapter.insertPreview(preview)
-        lifecycleService.delete(
-            HostSessionIdCommand(hostMember(), RACE_SESSION_ID, ExpectedSessionRevision(0)),
-        )
+        lifecycleService.delete(deleteCommand(RACE_SESSION_ID))
 
         assertThatThrownBy {
             adapter.completeDecision(
@@ -158,6 +156,7 @@ class JdbcHostActionNotificationAdapterTest(
         adapter.insertPreview(preview)
         val effectTemplate = TransactionTemplate(transactionManager)
         val deleteTemplate = TransactionTemplate(transactionManager)
+        val expectedSessionRevision = expectedSessionRevision(RACE_SESSION_ID)
         val ready = CountDownLatch(2)
         val start = CountDownLatch(1)
         val executor = Executors.newFixedThreadPool(2)
@@ -189,9 +188,7 @@ class JdbcHostActionNotificationAdapterTest(
                     check(start.await(10, TimeUnit.SECONDS))
                     try {
                         deleteTemplate.execute {
-                            lifecycleService.delete(
-                                HostSessionIdCommand(hostMember(), RACE_SESSION_ID, ExpectedSessionRevision(0)),
-                            )
+                            lifecycleService.delete(deleteCommand(RACE_SESSION_ID, expectedSessionRevision))
                         }
                         true
                     } catch (_: HostSessionDeletionBlockedException) {
@@ -226,6 +223,25 @@ class JdbcHostActionNotificationAdapterTest(
             CLUB_ID.toString(),
         )
     }
+
+    private fun deleteCommand(
+        sessionId: UUID,
+        expectedSessionRevision: ExpectedSessionRevision = expectedSessionRevision(sessionId),
+    ): HostSessionIdCommand =
+        HostSessionIdCommand(
+            host = hostMember(),
+            sessionId = sessionId,
+            expectedSessionRevision = expectedSessionRevision,
+        )
+
+    private fun expectedSessionRevision(sessionId: UUID): ExpectedSessionRevision =
+        ExpectedSessionRevision(
+            jdbcTemplate.queryForObject(
+                "select session_revision from sessions where id = ?",
+                Long::class.java,
+                sessionId.toString(),
+            ) ?: error("Missing session revision"),
+        )
 
     private fun racePreview() =
         HostActionNotificationPreviewRecord(

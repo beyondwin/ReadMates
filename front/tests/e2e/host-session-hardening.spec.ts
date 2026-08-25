@@ -38,6 +38,7 @@ async function closeWorkspaceSheets(page: Page) {
   for (const name of ["모임 정보", "변경 내역"] as const) {
     const trigger = page.getByRole("button", { name }).first();
     const sheet = page.getByRole("dialog", { name });
+    if (await trigger.count() === 0 && await sheet.count() === 0) continue;
     if ((await trigger.getAttribute("aria-expanded")) !== "true" && !(await sheet.isVisible())) {
       continue;
     }
@@ -55,7 +56,7 @@ async function closeWorkspaceSheets(page: Page) {
 async function expectFocusWorkspace(page: Page) {
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
-  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
 }
 
 async function openWorkspacePanel(
@@ -63,6 +64,11 @@ async function openWorkspacePanel(
   name: "기본 정보" | "출석" | "기록" | "변경 기록",
 ) {
   if (name === "기본 정보") {
+    if (/\/sessions\/new\/?$/.test(new URL(page.url()).pathname)) {
+      await expect(page.getByLabel("모임 제목")).toBeVisible();
+      return;
+    }
+    if (await page.getByLabel("모임 제목").isVisible().catch(() => false)) return;
     const trigger = page.getByRole("button", { name: "모임 정보" });
     if ((await trigger.getAttribute("aria-expanded")) !== "true") {
       await closeWorkspaceSheets(page);
@@ -72,17 +78,13 @@ async function openWorkspacePanel(
     return;
   }
   if (name === "변경 기록") {
-    const trigger = page.getByRole("button", { name: "변경 내역" }).first();
-    if ((await trigger.getAttribute("aria-expanded")) !== "true") {
-      await closeWorkspaceSheets(page);
-      await trigger.click();
-    }
-    await expect(page.getByRole("dialog", { name: "변경 내역" })).toBeVisible();
+    await page.getByRole("link", { name: "변경 내역" }).click();
+    await expect(page).toHaveURL(/section=history/);
+    await expect(page.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
     return;
   }
   await closeWorkspaceSheets(page);
-  const progressName = name === "출석" ? /출석/ : /^기록 /;
-  await page.getByRole("listitem", { name: progressName }).getByRole("button").click();
+  await page.getByRole("link", { name: name === "출석" ? /실제 출석/ : /모임 기록/ }).click();
   const panelId = name === "출석" ? "workspace-panel-attendance" : "workspace-panel-records";
   const panel = page.locator(`#${panelId}`);
   await expect(panel).toBeVisible();
@@ -538,7 +540,7 @@ where session_id = ${sqlString(sessionId)}
   await page.reload();
   await expectFocusWorkspace(page);
   await openWorkspacePanel(page, "변경 기록");
-  await expect(page.getByRole("dialog", { name: "변경 내역" })).toContainText(reasonLabel);
+  await expect(page.getByRole("main", { name: "현재 모임 작업" })).toContainText(reasonLabel);
 }
 
 async function confirmReverse(page: Page, name: string, reasonCode: string) {
@@ -719,6 +721,12 @@ test("previous online meeting secrets stay out of create until explicit adoption
   });
 
   await loginWithGoogleFixture(page, "host@example.com");
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "sendBeacon", {
+      configurable: true,
+      value: () => false,
+    });
+  });
   const creates = collectCreateBodies(page);
   const telemetry = collectTelemetryPayloads(page);
   await page.route(`**${FRONTEND_OBSERVABILITY_BROWSER_PATH}`, async (route) => {
@@ -742,17 +750,16 @@ test("previous online meeting secrets stay out of create until explicit adoption
     await page.getByLabel("책 제목").fill("명시적 채택 책");
     await page.getByLabel("저자").fill("테스트 저자");
     await page.getByLabel("모임 날짜").fill("2026-07-01");
-    await page.locator("form#host-session-editor").getByRole("button", { name: "모임 문서 저장" }).click();
+    await page.getByRole("form", { name: "새 모임 정보" }).getByRole("button", { name: "모임 초안 저장" }).click();
     await expect.poll(() => creates.bodies.length).toBe(1);
     expect(creates.bodies).not.toContainEqual(expect.objectContaining({ meetingPasscode: FIXTURE_PASSCODE }));
     expect(JSON.stringify(creates.bodies)).not.toContain(FIXTURE_PASSCODE);
-    await expect(page).toHaveURL(/\/app\/host\/sessions\/[0-9a-f-]{36}/i);
+    await expect(page.getByRole("button", { name: "멤버와 준비 시작" })).toBeVisible();
 
     await page.goto(`${HOST_PATH}/sessions/new`);
     await expect(page).toHaveURL(/\/sessions\/new/);
     await expect(page.getByLabel("모임 제목")).toBeVisible();
     await page.getByRole("button", { name: "이전 온라인 모임 정보 사용" }).click();
-    await page.getByRole("button", { name: "현재 모임에 적용" }).click();
     await expect(page.getByLabel("Passcode · 선택")).toHaveValue(FIXTURE_PASSCODE);
     await expect(page.getByLabel("미팅 URL")).toHaveValue(FIXTURE_MEETING_URL);
 
@@ -970,10 +977,7 @@ test("legacy revision-zero applied summary publishes first revision as 1", async
   const applied = await applyResponse;
   expect(applied.status(), await applied.text()).toBe(200);
 
-  const notifyDialog = page.getByRole("dialog", { name: "알림 보내기" });
-  await expect(notifyDialog).toBeVisible();
-  await notifyDialog.getByRole("button", { name: "이번에는 보내지 않기" }).click();
-  await expect(notifyDialog).toBeHidden();
+  await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
 
   const revisionOutput = runMysql(`
 select version, source
@@ -987,7 +991,7 @@ order by version;
   expect(revisionOutput).not.toContain("BASELINE");
 
   await openWorkspacePanel(page, "변경 기록");
-  await expect(page.getByRole("dialog", { name: "변경 내역" }).getByText("버전 1")).toBeVisible();
+  await expect(page.getByRole("main", { name: "현재 모임 작업" }).getByText("버전 1")).toBeVisible();
 });
 
 test("reverse request IDs correlate to lifecycle audit without secrets", async ({ page }) => {
@@ -1023,4 +1027,66 @@ where session_id = ${sqlString(sessionId)}
   expect(audit).not.toContain(FIXTURE_PASSCODE);
   expect(audit).not.toContain("member1@example.com");
   expect(readMembershipId("host@example.com")).toBe(HOST_MEMBERSHIP_ID);
+});
+
+test("recoverable conflict and committed response loss preserve form drafts and reconcile before retry", async ({ page }) => {
+  const conflictSessionId = insertSession({ bookTitle: "복구 가능한 리비전 충돌", state: "DRAFT" });
+  const responseLossSessionId = insertSession({ bookTitle: "복구 가능한 응답 유실", state: "DRAFT" });
+  const conflictDraft = "충돌 뒤에도 남아야 하는 모임 제목";
+  const responseLossDraft = "응답 유실 뒤 조정으로 확정할 모임 제목";
+  await loginWithGoogleFixture(page, "host@example.com");
+
+  await openHostSession(page, conflictSessionId);
+  await openWorkspacePanel(page, "기본 정보");
+  const conflictTitle = page.getByLabel("모임 제목");
+  await conflictTitle.fill(conflictDraft);
+  let conflictAttempts = 0;
+  const conflictPattern = `**/api/bff/api/host/sessions/${conflictSessionId}?clubSlug=${CLUB_SLUG}`;
+  await page.route(conflictPattern, async (route) => {
+    if (route.request().method() !== "PATCH") return route.continue();
+    conflictAttempts += 1;
+    await route.fulfill({
+      status: 409,
+      contentType: "application/json",
+      body: JSON.stringify({
+        code: "REVISION_CONFLICT",
+        message: "최신 모임 정보를 확인해 주세요.",
+        status: 409,
+      }),
+    });
+  });
+  await page.getByRole("button", { name: "기본 정보 저장" }).click();
+  await expect(page.locator("#host-session-basic-save-state")).toHaveAttribute("role", "alert");
+  await expect(conflictTitle).toHaveValue(conflictDraft);
+  expect(conflictAttempts).toBe(1);
+  await page.unroute(conflictPattern);
+
+  await openHostSession(page, responseLossSessionId);
+  await openWorkspacePanel(page, "기본 정보");
+  const responseLossTitle = page.getByLabel("모임 제목");
+  await responseLossTitle.fill(responseLossDraft);
+  const order: string[] = [];
+  let mutationAttempts = 0;
+  const responseLossPattern = `**/api/bff/api/host/sessions/${responseLossSessionId}?clubSlug=${CLUB_SLUG}`;
+  await page.route(responseLossPattern, async (route) => {
+    if (route.request().method() !== "PATCH") return route.continue();
+    mutationAttempts += 1;
+    order.push(`mutation-${mutationAttempts}`);
+    const committed = await route.fetch();
+    expect(committed.status(), await committed.text()).toBe(200);
+    await route.abort("failed");
+  });
+  await page.route("**/api/bff/api/host/mutations/SESSION_BASIC_SAVE/**", async (route) => {
+    order.push("reconcile");
+    await route.continue();
+  });
+  await page.getByRole("button", { name: "기본 정보 저장" }).click();
+  await expect(page.locator("#host-session-basic-save-state")).toHaveText("저장되었습니다.");
+  await expect(responseLossTitle).toHaveValue(responseLossDraft);
+  expect(order).toEqual(["mutation-1", "reconcile"]);
+  expect(mutationAttempts).toBe(1);
+  const storedTitle = runMysql(`
+select title from sessions where id = ${sqlString(responseLossSessionId)};
+`).trim().split("\n").at(-1);
+  expect(storedTitle).toBe(responseLossDraft);
 });

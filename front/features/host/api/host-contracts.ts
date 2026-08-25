@@ -99,6 +99,24 @@ export type HostMutationReconciliation = {
   attendanceSnapshotId: string | null;
 };
 
+export type HostPublicConvergenceView = {
+  convergenceId: string;
+  originResult: "APPLIED" | "READABLE" | "DENIED";
+  committedGeneration: number;
+  status: "QUEUED" | "PENDING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
+  lastAttemptAt: string | null;
+  retryable: boolean;
+};
+
+export const HostPublicConvergenceViewSchema = z.object({
+  convergenceId: z.string().uuid(),
+  originResult: z.enum(["APPLIED", "READABLE", "DENIED"]),
+  committedGeneration: z.number().int().nonnegative(),
+  status: z.enum(["QUEUED", "PENDING", "SUCCEEDED", "FAILED", "EXPIRED"]),
+  lastAttemptAt: z.string().datetime({ offset: true }).nullable(),
+  retryable: z.boolean(),
+}).strict();
+
 export type HostMutationOperation =
   | "SESSION_CREATE"
   | "SESSION_BASIC_SAVE"
@@ -1350,16 +1368,6 @@ export function parseHostSessionListPage(value: unknown, mode: HostListMode): Ho
   return page as HostSessionListPage;
 }
 
-export const HostSessionTrashItemSchema = z.object({
-  sessionId: z.string(),
-  sessionNumber: z.number(),
-  title: z.string(),
-  state: sessionStateSchema,
-  deletedAt: z.string(),
-  purgeAfter: z.string(),
-  sessionRevision: nonNegativeRevision,
-}).strict();
-
 const HostSessionDeletionCountsSchema = z.object({
   participants: z.number(),
   rsvpResponses: z.number(),
@@ -1372,6 +1380,18 @@ const HostSessionDeletionCountsSchema = z.object({
   feedbackReports: z.number(),
   feedbackDocuments: z.number(),
 });
+
+export const HostSessionTrashItemSchema = z.object({
+  sessionId: z.string(),
+  sessionNumber: z.number(),
+  title: z.string(),
+  state: sessionStateSchema,
+  deletedAt: z.string(),
+  purgeAfter: z.string(),
+  sessionRevision: nonNegativeRevision,
+  trashed: z.literal(true).optional(),
+  counts: HostSessionDeletionCountsSchema.optional(),
+}).strict();
 
 export const HostSessionDeletionResponseSchema = HostSessionTrashItemSchema.extend({
   trashed: z.literal(true),

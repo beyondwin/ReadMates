@@ -36,6 +36,7 @@ GH_TIMEOUT_SECONDS = 90
 DOWNLOAD_TIMEOUT_SECONDS = 30
 
 EXPECTED_COMMANDS = {
+    "accessibility": {"manual-screen-reader-evidence"},
     "cache-safety": {
         "seed-r2a-prechange-cache",
         "deploy-r2a-cache-policy",
@@ -52,6 +53,10 @@ EXPECTED_COMMANDS = {
 }
 
 EXPECTED_CASES = {
+    "accessibility": {
+        "voiceover-safari-host-workspace",
+        "nvda-chrome-host-workspace",
+    },
     "cache-safety": {
         "origin-immediate-deny",
         "bff-generation-deny",
@@ -97,10 +102,13 @@ EXPECTED_CASES = {
 }
 
 EXPECTED_PROVENANCE = {
+    "accessibility": {"D6"},
     "cache-safety": {"A7", "C1"},
     "compatibility": {"D3"},
     "security": {"B7", "C1", "D5"},
 }
+
+AUTOMATED_EVIDENCE_KINDS = {"cache-safety", "compatibility", "security"}
 
 FORBIDDEN_FIELD_PARTS = {
     "secret",
@@ -796,7 +804,8 @@ class EvidenceVerifierTests(unittest.TestCase):
     def setUp(self) -> None:
         self.schema = load_schema(DEFAULT_SCHEMA)
 
-    def test_schema_and_policy_accept_all_three_exact_kinds(self) -> None:
+    def test_schema_and_policy_accept_all_four_exact_kinds(self) -> None:
+        self.assertEqual(set(EXPECTED_COMMANDS), {"cache-safety", "compatibility", "security", "accessibility"})
         for kind in EXPECTED_COMMANDS:
             with self.subTest(kind=kind):
                 validate_manifest_policy(_sample_manifest(kind), self.schema, kind)
@@ -1112,7 +1121,7 @@ class EvidenceVerifierTests(unittest.TestCase):
             with self.assertRaises(EvidenceError):
                 verify_evidence(manifest_path, Path(directory) / "missing.intoto.jsonl", "cache-safety", gh_binary=Path("missing-gh"))
 
-    def test_wrong_repository_workflow_ref_sha_ref_and_accessibility_kind_fail_closed(self) -> None:
+    def test_wrong_repository_workflow_ref_sha_ref_and_unsupported_kind_fail_closed(self) -> None:
         cases: list[tuple[str, dict[str, Any], str]] = []
         wrong_workflow = _sample_manifest("cache-safety")
         wrong_workflow["producer"]["workflowRef"] = "other/readmates/.github/workflows/host-client-rollout-evidence.yml@refs/heads/main"
@@ -1127,7 +1136,7 @@ class EvidenceVerifierTests(unittest.TestCase):
             with self.subTest(name=name), self.assertRaises(EvidenceError):
                 validate_manifest_policy(manifest, self.schema, kind)
         with self.assertRaises(EvidenceError):
-            validate_manifest_policy(_sample_manifest("cache-safety"), self.schema, "accessibility")
+            validate_manifest_policy(_sample_manifest("cache-safety"), self.schema, "performance")
 
 
 def run_self_tests() -> int:

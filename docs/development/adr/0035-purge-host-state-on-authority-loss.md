@@ -1,6 +1,6 @@
 # ADR-0035: Host authority 상실 시 client의 host-sensitive state를 폐기
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 제품·보안·프런트엔드
 - 관련: ADR-0019, ADR-0030, `front/src/app/route-continuity.ts:80`

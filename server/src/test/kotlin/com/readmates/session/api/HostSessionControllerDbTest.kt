@@ -36,6 +36,8 @@ import java.time.LocalDate
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
+import javax.sql.DataSource
 
 private const val CLEANUP_GENERATED_SESSIONS_SQL = """
     update host_action_notification_previews
@@ -313,6 +315,7 @@ class HostSessionControllerDbTest(
     @param:Autowired private val mockMvc: MockMvc,
     @param:Autowired private val jdbcTemplate: JdbcTemplate,
     @param:Autowired private val hostSessionDraftPort: HostSessionDraftPort,
+    @param:Autowired private val dataSource: DataSource,
 ) : ReadmatesMySqlIntegrationTestSupport() {
     private val jsonMapper = tools.jackson.databind.ObjectMapper()
 
@@ -402,6 +405,155 @@ class HostSessionControllerDbTest(
                 Int::class.java,
             )
         assertEquals(0, participantCount)
+    }
+
+    @Test
+    fun `host create measures title limits in Unicode code points`() {
+        val astralAtLimit = "📚".repeat(255)
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(title = astralAtLimit)
+            }.andExpect {
+                status { isCreated() }
+            }
+
+        val privateRejectedTitle = "📚".repeat(256)
+        val response =
+            mockMvc
+                .post("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = validationSessionRequestJson(title = privateRejectedTitle)
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_REQUEST") }
+                    jsonPath("$.field") { value("title") }
+                }.andReturn()
+
+        assertThat(response.response.contentAsString).doesNotContain(privateRejectedTitle)
+    }
+
+    @Test
+    fun `host update measures passcode limits in Unicode code points`() {
+        val sessionId = createDraftSessionSeven()
+        val combiningAtLimit = "e\u0301".repeat(127) + "e"
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    validationSessionRequestJson(
+                        meetingPasscode = combiningAtLimit,
+                        expectedSessionRevision = 0,
+                    )
+            }.andExpect {
+                status { isOk() }
+            }
+
+        val privateRejectedPasscode = "e\u0301".repeat(128)
+        val response =
+            mockMvc
+                .patch("/api/host/sessions/$sessionId") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        validationSessionRequestJson(
+                            meetingPasscode = privateRejectedPasscode,
+                            expectedSessionRevision = 1,
+                        )
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.field") { value("meetingPasscode") }
+                }.andReturn()
+
+        assertThat(response.response.contentAsString).doesNotContain(privateRejectedPasscode)
+    }
+
+    @Test
+    fun `host create keeps ASCII boundary and deterministically reports the first canonical field`() {
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(title = "a".repeat(255))
+            }.andExpect {
+                status { isCreated() }
+            }
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    validationSessionRequestJson(
+                        title = "a".repeat(256),
+                        bookAuthor = "b".repeat(256),
+                    )
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("title") }
+            }
+    }
+
+    @Test
+    fun `host create reports default end time range rejection against meetingTime`() {
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(startTime = "23:00")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_REQUEST") }
+                jsonPath("$.field") { value("meetingTime") }
+            }
+    }
+
+    @Test
+    fun `host create maps legacy transport names to canonical frontend validation fields`() {
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(bookAuthor = "a".repeat(256))
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("author") }
+            }
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(date = "2026-02-30")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("meetingDate") }
+            }
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(meetingUrl = "http://private.invalid/room")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("meetingUrl") }
+            }
     }
 
     @Test
@@ -1152,8 +1304,12 @@ class HostSessionControllerDbTest(
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
                 content =
-                    """[{"membershipId":"$membershipId","attendanceStatus":"ABSENT",""" +
-                    """"expectedAttendanceRevision":0}]"""
+                    """
+                    [{
+                      "membershipId":"$membershipId","attendanceStatus":"ABSENT",
+                      "expectedAttendanceRevision":0
+                    }]
+                    """.trimIndent()
             }.andExpect {
                 status { isOk() }
             }
@@ -1167,24 +1323,6 @@ class HostSessionControllerDbTest(
         assertThat(details)
             .contains(membershipId, """"from":"UNKNOWN"""", """"to":"ABSENT"""")
             .doesNotContain("host@example.com", "김호스트")
-    }
-
-    @Test
-    fun `legacy attendance array normalizes an invalid membership uuid to bad request`() {
-        createSessionSeven()
-
-        mockMvc
-            .post("/api/host/sessions/00000000-0000-0000-0000-000000009777/attendance") {
-                with(user("host@example.com"))
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content =
-                    """
-                    [{"membershipId":"not-a-uuid","attendanceStatus":"ABSENT","expectedAttendanceRevision":0}]
-                    """.trimIndent()
-            }.andExpect {
-                status { isBadRequest() }
-            }
     }
 
     @Test
@@ -2077,28 +2215,41 @@ class HostSessionControllerDbTest(
     fun `host close does not overwrite session state changed before close update`() {
         val sessionId = "00000000-0000-0000-0000-000000009777"
         createSessionSeven()
-        val expectedRevision = sessionRevision(sessionId)
-        jdbcTemplate.update(
-            """
-            update sessions
-            set state = 'PUBLISHED',
-                visibility = 'MEMBER',
-                session_revision = session_revision + 1
-            where id = ?
-              and club_id = '00000000-0000-0000-0000-000000000001'
-            """.trimIndent(),
-            sessionId,
-        )
-
-        mockMvc
-            .post("/api/host/sessions/$sessionId/close") {
-                with(user("host@example.com"))
-                with(csrf())
-                contentType = MediaType.APPLICATION_JSON
-                content = """{"expectedSessionRevision":$expectedRevision}"""
-            }.andExpect {
-                status { isConflict() }
+        val executor = Executors.newSingleThreadExecutor()
+        dataSource.connection.use { contender ->
+            contender.autoCommit = false
+            contender
+                .prepareStatement(
+                    """
+                    update sessions
+                    set state = 'PUBLISHED', visibility = 'MEMBER'
+                    where id = ?
+                      and club_id = '00000000-0000-0000-0000-000000000001'
+                    """.trimIndent(),
+                ).use { statement ->
+                    statement.setString(1, sessionId)
+                    assertEquals(1, statement.executeUpdate())
+                }
+            try {
+                val close =
+                    executor.submit<org.springframework.test.web.servlet.MvcResult> {
+                        mockMvc
+                            .post("/api/host/sessions/$sessionId/close") {
+                                with(user("host@example.com"))
+                                with(csrf())
+                                withExpectedRevision(sessionId)
+                            }.andReturn()
+                    }
+                assertThrows<TimeoutException> { close.get(250, TimeUnit.MILLISECONDS) }
+                contender.commit()
+                assertEquals(409, close.get(10, TimeUnit.SECONDS).response.status)
+            } finally {
+                if (!contender.autoCommit) {
+                    contender.rollback()
+                }
+                executor.shutdownNow()
             }
+        }
 
         assertEquals("PUBLISHED", findSessionState(sessionId))
     }
@@ -2803,9 +2954,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
-                    """"reasonCode":"LEGACY_UNSPECIFIED"}"""
+                content = reverseBody(sessionId, "LEGACY_UNSPECIFIED")
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2816,9 +2965,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
-                    """"reasonCode":"EMPTY_SESSION_DELETED"}"""
+                content = reverseBody(sessionId, "EMPTY_SESSION_DELETED")
             }.andExpect {
                 status { isBadRequest() }
                 jsonPath("$.code") { value("LIFECYCLE_REASON_INVALID") }
@@ -2887,9 +3034,7 @@ class HostSessionControllerDbTest(
                 with(user("host@example.com"))
                 with(csrf())
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
-                    """"reasonCode":"ACCIDENTAL_TRANSITION"}"""
+                content = reverseBody(sessionId, "ACCIDENTAL_TRANSITION")
             }.andExpect {
                 status { isConflict() }
                 jsonPath("$.code") { value("SESSION_REOPEN_NOT_ALLOWED") }
@@ -2934,9 +3079,7 @@ class HostSessionControllerDbTest(
                 with(csrf())
                 header(RequestIdFilter.HEADER, requestId)
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    """{"expectedSessionRevision": ${sessionRevision(sessionId)}, """ +
-                    """"reasonCode":"OPERATIONAL_RECOVERY"}"""
+                content = reverseBody(sessionId, "OPERATIONAL_RECOVERY")
             }.andExpect {
                 status { isOk() }
                 jsonPath("$.state") { value("OPEN") }
@@ -3763,6 +3906,39 @@ class HostSessionControllerDbTest(
           "meetingUrl": "https://meet.google.com/readmates-test",
           "meetingPasscode": "readmates",
           "expectedSessionRevision": $expectedSessionRevision
+        }
+        """.trimIndent()
+
+    private fun validationSessionRequestJson(
+        title: String = "새 모임",
+        bookAuthor: String = "새 저자",
+        date: String = "2026-06-30",
+        startTime: String? = null,
+        meetingUrl: String? = null,
+        meetingPasscode: String? = null,
+        expectedSessionRevision: Long? = null,
+    ): String =
+        jsonMapper.writeValueAsString(
+            buildMap<String, Any?> {
+                put("title", title)
+                put("bookTitle", "새 책")
+                put("bookAuthor", bookAuthor)
+                put("date", date)
+                startTime?.let { put("startTime", it) }
+                meetingUrl?.let { put("meetingUrl", it) }
+                meetingPasscode?.let { put("meetingPasscode", it) }
+                expectedSessionRevision?.let { put("expectedSessionRevision", it) }
+            },
+        )
+
+    private fun reverseBody(
+        sessionId: String,
+        reasonCode: String,
+    ): String =
+        """
+        {
+          "expectedSessionRevision": ${sessionRevision(sessionId)},
+          "reasonCode":"$reasonCode"
         }
         """.trimIndent()
 

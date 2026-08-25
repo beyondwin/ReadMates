@@ -51,7 +51,8 @@ test("receipt-backed COMMIT_RETRY converges to COMMITTED without exposing conten
   await expect(page.getByRole("region", { name: "공통 초안 편집기" }))
     .toBeVisible({ timeout: 10_000 });
   expect(polls).toBeGreaterThanOrEqual(2);
-  await expect(page.getByText(/공개 합성|대본|근거 발언/)).toHaveCount(0);
+  await expect(page.getByText("공개 합성 근거 발언입니다.", { exact: true })).toHaveCount(0);
+  await expect(page.getByText("공개 합성 전체 발언입니다.", { exact: true })).toHaveCount(0);
   await expect(page.getByRole("dialog", { name: "알림 보내기" })).toHaveCount(0);
   expect(notificationMutations()).toEqual([]);
 });

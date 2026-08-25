@@ -910,7 +910,7 @@ Route-first ownership을 유지한다.
 - `pnpm --dir front test:e2e`
 - public artifact가 추가되면 public-release candidate checks
 
-구현 계획은 이 문서 검토가 끝난 뒤 별도로 작성한다. 실제 변경 surface와 migration 여부가 확정되면 focused test를 먼저 고르고 위 canonical gate로 확장한다.
+구현은 승인된 workspace redesign, server safety, host-client v3, public-projection convergence 계획으로 분리해 수행했다. 현재 완료 판단은 이 historical spec의 예정 문구가 아니라 active architecture, ADR registry, release-readiness review와 각 계획의 evidence ledger를 따른다.
 
 ## 28. 출시 차단 조건
 

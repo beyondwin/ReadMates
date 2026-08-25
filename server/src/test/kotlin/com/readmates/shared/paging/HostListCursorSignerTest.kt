@@ -86,10 +86,16 @@ class HostListCursorSignerTest {
         val unknownVersion = "99.${parts[1]}.${parts[2]}"
         val wrongKey = signWith("other-host-list-cursor-key", CURRENT_VERSION, PAYLOAD)
 
-        listOf("${parts[0]}.${parts[1]}.$mutatedMac", retired, unknownVersion, wrongKey, "not-a-cursor", "")
-            .forEach { raw ->
-                assertThrows<InvalidHostListCursorException> { signer.verify(raw) }
-            }
+        listOf(
+            "${parts[0]}.${parts[1]}.$mutatedMac",
+            retired,
+            unknownVersion,
+            wrongKey,
+            "not-a-cursor",
+            "",
+        ).forEach { raw ->
+            assertThrows<InvalidHostListCursorException> { signer.verify(raw) }
+        }
         assertNoSensitiveLogs()
     }
 

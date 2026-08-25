@@ -1,6 +1,6 @@
 # ADR-0028: Host mutation을 idempotency receipt로 재조정
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 서버·프런트엔드·제품
 - 관련: ADR-0015, ADR-0023, `server/src/main/kotlin/com/readmates/notification/application/port/out/ManualNotificationDispatchPort.kt:91`

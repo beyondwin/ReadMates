@@ -20,6 +20,7 @@ import com.readmates.publication.application.model.ClaimedPublicConvergenceWork 
 import com.readmates.publication.application.model.CompletePublicConvergenceAttemptCommand as CompleteAttemptCommand
 
 @Repository
+@Suppress("TooManyFunctions")
 class JdbcPublicConvergenceAdapter(
     private val jdbcTemplate: JdbcTemplate,
 ) : PublicConvergencePort {
@@ -138,6 +139,20 @@ class JdbcPublicConvergenceAdapter(
         sessionId: UUID,
         mutationReceiptId: UUID,
     ): PublicConvergenceHostSnapshot? = hostQuery.load(clubId, sessionId, mutationReceiptId)
+
+    override fun loadLatestHostSnapshot(
+        clubId: UUID,
+        sessionId: UUID,
+    ): PublicConvergenceHostSnapshot? = hostQuery.loadLatest(clubId, sessionId)
+
+    @Transactional
+    override fun requestHostRetry(
+        clubId: UUID,
+        sessionId: UUID,
+        convergenceId: UUID,
+        now: java.time.Instant,
+        maxAttempts: Int,
+    ): Boolean = hostQuery.requestRetry(clubId, sessionId, convergenceId, now, maxAttempts)
 }
 
 private fun java.sql.ResultSet.getLongOrNull(column: String): Long? {

@@ -105,8 +105,8 @@ const hostSessionEditorTestActions = {
   reopenSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   unpublishSession: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
   returnSessionToDraft: async () => ({ ok: true, session: hostSessionDetailContractFixture }),
-  saveSession: async (sessionId, request) => {
-    const response = await fetch(
+  saveSession: (sessionId, request) =>
+    fetch(
       sessionId === null
         ? "/api/bff/api/host/sessions"
         : `/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}`,
@@ -116,16 +116,10 @@ const hostSessionEditorTestActions = {
         body: JSON.stringify(request),
         cache: "no-store",
       },
-    );
-    if (!response.ok) {
-      return { ok: false };
-    }
-    const body = await response.json() as { sessionId?: unknown };
-    return {
-      ok: true,
-      createdSessionId: typeof body.sessionId === "string" ? body.sessionId : null,
-      changeReceipt: null,
-    };
+    ),
+  readCreatedSessionId: async (response) => {
+    const body = await response.json() as { sessionId: string };
+    return body.sessionId;
   },
   updateAttendance: async (sessionId, attendance) => {
     const response = await fetch(`/api/bff/api/host/sessions/${encodeURIComponent(sessionId)}/attendance`, {
@@ -383,6 +377,13 @@ afterEach(() => {
 });
 
 describe("HostSessionEditor", () => {
+  it("does not create a nested main landmark when embedded in Meeting Folio", () => {
+    render(<HostSessionEditorForTest session={openSession} embeddedInMeetingFolio />);
+
+    expect(screen.queryByRole("main")).not.toBeInTheDocument();
+    expect(document.querySelector(".rm-host-session-editor")).toBeInTheDocument();
+  });
+
   it("requires restore workflows to expose completion as a promise", () => {
     expect(restoreReturnsPromise).toBe(true);
   });
@@ -595,8 +596,8 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("list", { name: "진행 상황" })).toBeVisible();
   });
 
-  it("fails fast when a persisted session is rendered without its record workflow", () => {
-    expect(() => render(
+  it("renders base meeting work without requiring the unopened record workflow", () => {
+    render(
       <HostSessionEditor
         session={session}
         actions={hostSessionEditorTestActions}
@@ -605,7 +606,11 @@ describe("HostSessionEditor", () => {
           onChange: vi.fn(),
         }}
       />,
-    )).toThrow("recordWorkflow is required for persisted sessions");
+    );
+
+    expect(screen.getByText("No.1")).toBeVisible();
+    expect(screen.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+    expect(screen.queryByLabelText("기록 요약")).not.toBeInTheDocument();
   });
 
   it("shows the focus deck by default without a global save action or page tabs", () => {
@@ -666,11 +671,7 @@ describe("HostSessionEditor", () => {
 
   it("does not submit basic information when Enter is pressed in a record input", async () => {
     const user = userEvent.setup();
-    const saveSession = vi.fn(async () => ({
-      ok: true as const,
-      createdSessionId: null,
-      changeReceipt: null,
-    }));
+    const saveSession = vi.fn(async () => ({ ok: true }) as Response);
     const workflow = recordWorkflow("MEMBER");
     workflow.snapshot.oneLineReviews = [{
       membershipId: "membership-reviewer",
@@ -726,11 +727,7 @@ describe("HostSessionEditor", () => {
 
   it("keeps basic save feedback beside the section-local action", async () => {
     const user = userEvent.setup();
-    const saveSession = vi.fn(async () => ({
-      ok: true as const,
-      createdSessionId: null,
-      changeReceipt: null,
-    }));
+    const saveSession = vi.fn(async () => ({ ok: true }) as Response);
 
     render(
       <HostSessionEditorForTest
@@ -842,6 +839,40 @@ describe("HostSessionEditor", () => {
     expect(screen.queryByRole("button", { name: "수 리포트 업로드 준비중" })).not.toBeInTheDocument();
     expect(screen.queryByText("이멤버14")).not.toBeInTheDocument();
     expect(screen.queryByText("feedback-14-sample-member.html")).not.toBeInTheDocument();
+  });
+
+  it("replaces stale local attendance when a newer authoritative session detail arrives", async () => {
+    const attended = {
+      ...session,
+      attendees: session.attendees.map((attendee) => attendee.membershipId === "membership-suhan"
+        ? { ...attendee, attendanceStatus: "ATTENDED" as const, attendanceRevision: 1 }
+        : attendee),
+    };
+    const { rerender } = render(
+      <HostSessionEditorForTest
+        session={attended}
+        initialLocation={{ panel: "attendance", source: "manual" }}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "true");
+
+    rerender(
+      <HostSessionEditorForTest
+        session={{
+          ...attended,
+          attendees: attended.attendees.map((attendee) => attendee.membershipId === "membership-suhan"
+            ? { ...attendee, attendanceStatus: "UNKNOWN" as const, attendanceRevision: 2 }
+            : attendee),
+        }}
+        initialLocation={{ panel: "attendance", source: "manual" }}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "수 참석" })).toHaveAttribute("aria-pressed", "false");
+      expect(screen.getByRole("button", { name: "수 불참" })).toHaveAttribute("aria-pressed", "false");
+    });
   });
 
   it.each(["OPEN", "CLOSED", "PUBLISHED"] as const)(
@@ -1659,8 +1690,9 @@ describe("HostSessionEditor", () => {
     };
     render(<HostSessionEditorForTest session={upcomingOpen} />);
 
-    expect(screen.getByRole("heading", { name: "참석 응답" })).toBeVisible();
-    expect(screen.getAllByText(/참석 응답 참석/).length).toBeGreaterThan(0);
+    const ledger = screen.getByRole("region", { name: "참여자 기록" });
+    expect(within(ledger).getByRole("heading", { name: "참여자 기록" })).toBeVisible();
+    expect(within(ledger).getAllByText("참석", { selector: "dd" }).length).toBeGreaterThan(0);
     await user.click(screen.getAllByRole("button", { name: "멤버 응답 확인하기" })[0]!);
     expect(document.getElementById("workspace-member-responses")).toHaveFocus();
   });

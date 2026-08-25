@@ -16,6 +16,7 @@ export type AdminCapability =
   | "view_notifications"
   | "view_audit"
   | "view_analytics"
+  | "emergency_public_takedown"
   | "create_club"
   | "edit_club_metadata"
   | "toggle_club_visibility"
@@ -45,6 +46,7 @@ const OWNER_CAPS: ReadonlySet<AdminCapability> = new Set<AdminCapability>([
   "revoke_support_grant",
   "force_cancel_ai_job",
   "check_domain_provisioning",
+  "emergency_public_takedown",
 ]);
 
 const OPERATOR_CAPS: ReadonlySet<AdminCapability> = new Set<AdminCapability>([
@@ -54,6 +56,7 @@ const OPERATOR_CAPS: ReadonlySet<AdminCapability> = new Set<AdminCapability>([
   "toggle_club_visibility",
   "force_cancel_ai_job",
   "check_domain_provisioning",
+  "emergency_public_takedown",
 ]);
 
 const SUPPORT_CAPS: ReadonlySet<AdminCapability> = new Set<AdminCapability>(ALL_VIEWS);

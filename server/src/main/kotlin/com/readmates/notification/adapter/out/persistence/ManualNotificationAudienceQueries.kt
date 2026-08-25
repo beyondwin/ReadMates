@@ -10,6 +10,7 @@ import com.readmates.shared.db.uuid
 import org.springframework.jdbc.core.JdbcTemplate
 import java.util.UUID
 
+@Suppress("TooManyFunctions")
 internal class ManualNotificationAudienceQueries(
     private val jdbcTemplate: JdbcTemplate,
 ) {

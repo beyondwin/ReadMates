@@ -9,6 +9,9 @@ import com.readmates.auth.application.port.`in`.LogoutAuthSessionUseCase
 import com.readmates.auth.application.port.`in`.ManageAuthSessionUseCase
 import com.readmates.auth.application.service.InvitationTokenService
 import com.readmates.auth.domain.BookClubAvatarKey
+import com.readmates.auth.domain.MembershipRole
+import com.readmates.auth.domain.MembershipStatus
+import com.readmates.auth.infrastructure.security.HostAuthorityContextCookie
 import com.readmates.auth.infrastructure.security.OAuthFlowContextRepository
 import com.readmates.auth.infrastructure.security.OAuthGuestJoinSession
 import com.readmates.auth.infrastructure.security.OAuthInviteTokenSession
@@ -97,6 +100,7 @@ class GoogleOAuthLoginSessionTest(
                 RejectingGoogleInvitationUseCase(),
                 sessionIngress,
                 oauthReturnState,
+                HostAuthorityContextCookie("test-host-authority-context-secret"),
                 "https://readmates.pages.dev",
             )
         val request = CountingMockHttpServletRequest("GET", "/login/oauth2/code/google")
@@ -117,6 +121,35 @@ class GoogleOAuthLoginSessionTest(
         )
         assertEquals(1, request.sessionIdChangeCount)
         assertEquals("https://readmates.pages.dev/app", response.redirectedUrl)
+    }
+
+    @Test
+    fun `oauth handler binds authoritative host membership to the issued app session`() {
+        val sessionIngress = RecordingSessionIngress()
+        val handler =
+            ReadmatesOAuthSuccessHandler(
+                FixedHostGoogleLoginUseCase(),
+                RejectingGoogleInvitationUseCase(),
+                sessionIngress,
+                oauthReturnState,
+                HostAuthorityContextCookie("test-host-authority-context-secret"),
+                "https://readmates.pages.dev",
+            )
+        val request = CountingMockHttpServletRequest("GET", "/login/oauth2/code/google")
+        request.setSession(securitySession())
+        val response = MockHttpServletResponse()
+        val authentication =
+            TestingAuthenticationToken(
+                googleOidcUser("google-host-context-fixture", "host@example.com", "Host Fixture"),
+                "credentials",
+            )
+
+        handler.onAuthenticationSuccess(request, response, authentication)
+
+        val setCookies = response.getHeaders(HttpHeaders.SET_COOKIE)
+        assertEquals(2, setCookies.size)
+        assertTrue(setCookies.any { it.startsWith("readmates_session=") })
+        assertTrue(setCookies.any { it.startsWith("${HostAuthorityContextCookie.COOKIE_NAME}=") })
     }
 
     @Test
@@ -893,7 +926,7 @@ class GoogleOAuthLoginSessionTest(
                 Int::class.java,
                 "oauth.invited@example.com",
             )
-        assertEquals(0, participantCount, "invitation acceptance must not change an OPEN participant snapshot")
+        assertEquals(0, participantCount)
         assertEquals(listOf("reading-sai:ACTIVE"), membershipStates("oauth.invited@example.com"))
     }
 
@@ -1577,6 +1610,30 @@ private class FixedGoogleLoginUseCase : LoginVerifiedGoogleUserUseCase {
     ): GoogleLoginResult = GoogleLoginResult(UUID.fromString("00000000-0000-0000-0000-000000000101"), null)
 }
 
+private class FixedHostGoogleLoginUseCase : LoginVerifiedGoogleUserUseCase {
+    override fun loginVerifiedGoogleUserForSession(
+        googleSubjectId: String,
+        email: String,
+        displayName: String?,
+        profileImageUrl: String?,
+        targetClubSlug: String?,
+    ): GoogleLoginResult =
+        GoogleLoginResult(
+            UUID.fromString("00000000-0000-0000-0000-000000000101"),
+            CurrentMember(
+                userId = UUID.fromString("00000000-0000-0000-0000-000000000101"),
+                membershipId = UUID.fromString("00000000-0000-0000-0000-000000000201"),
+                clubId = UUID.fromString("00000000-0000-0000-0000-000000000001"),
+                clubSlug = "reading-sai",
+                email = "host@example.com",
+                displayName = "Host Fixture",
+                accountName = "host",
+                role = MembershipRole.HOST,
+                membershipStatus = MembershipStatus.ACTIVE,
+            ),
+        )
+}
+
 private class RejectingGoogleInvitationUseCase : AcceptGoogleInvitationUseCase {
     override fun acceptGoogleInvitation(
         rawToken: String,
@@ -1601,6 +1658,7 @@ private class RecordingSessionIngress : ManageAuthSessionUseCase {
     ): IssuedAuthSession {
         issueCount += 1
         return IssuedAuthSession(
+            sessionId = "00000000-0000-0000-0000-000000000901",
             rawToken = "issued-test-token",
             storedTokenHash = "stored-test-hash",
             userId = userId,

@@ -29,6 +29,17 @@ interface GetHostPublicConvergenceUseCase {
         sessionId: UUID,
         mutationReceiptId: UUID,
     ): PublicConvergenceView
+
+    fun getLatestConvergence(
+        actor: ClubActor,
+        sessionId: UUID,
+    ): PublicConvergenceView?
+
+    fun retryConvergence(
+        actor: ClubActor,
+        sessionId: UUID,
+        convergenceId: UUID,
+    ): PublicConvergenceView
 }
 
 interface ProcessPublicConvergenceUseCase {

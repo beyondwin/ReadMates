@@ -1,0 +1,206 @@
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  beginHostMeetingFilterCommit,
+  commitHostMeetingAttendanceRow,
+  commitHostMeetingFilterRaf,
+} from "@/shared/observability/host-meeting-performance";
+
+type Response = "GOING" | "NOT_GOING" | "UNSURE" | "NO_RESPONSE";
+export type MeetingAttendance = "ATTENDED" | "ABSENT" | "UNKNOWN";
+
+export type MeetingResponseLedgerRow = {
+  membershipId: string;
+  displayName: string;
+  secondaryLabel: string;
+  response: Response;
+  attendance: MeetingAttendance;
+  attendanceRevision: number;
+  questionCount: number | null;
+  recentResponseLabel: string | null;
+  writeState?: "idle" | "saving" | "saved" | "error" | "conflict";
+};
+
+const responseLabel: Record<Response, string> = {
+  GOING: "참석",
+  NOT_GOING: "불참",
+  UNSURE: "미정",
+  NO_RESPONSE: "미응답",
+};
+const attendanceLabel: Record<MeetingAttendance, string> = {
+  ATTENDED: "출석",
+  ABSENT: "불참",
+  UNKNOWN: "확인 전",
+};
+
+export function MeetingResponseLedger({
+  rows,
+  onAttendanceChange,
+  onBulkAttendanceChange,
+}: {
+  rows: ReadonlyArray<MeetingResponseLedgerRow>;
+  onAttendanceChange: (membershipId: string, attendance: MeetingAttendance) => void;
+  onBulkAttendanceChange: (membershipIds: ReadonlyArray<string>, attendance: MeetingAttendance) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Response | "ALL">("ALL");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkTarget, setBulkTarget] = useState<MeetingAttendance | null>(null);
+  const pendingFilterCommitRef = useRef(false);
+  const visible = useMemo(() => rows.filter((row) => {
+    const matchesQuery = `${row.displayName} ${row.secondaryLabel}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
+    return matchesQuery && (filter === "ALL" || row.response === filter);
+  }), [filter, query, rows]);
+  const totals = useMemo(() => Object.fromEntries(
+    (["GOING", "UNSURE", "NOT_GOING", "NO_RESPONSE"] as const).map((status) => [
+      status,
+      rows.filter((row) => row.response === status).length,
+    ]),
+  ) as Record<Response, number>, [rows]);
+
+  useLayoutEffect(() => {
+    commitHostMeetingAttendanceRow(rows);
+  }, [rows]);
+
+  useLayoutEffect(() => {
+    if (!pendingFilterCommitRef.current) return;
+    pendingFilterCommitRef.current = false;
+    const frame = requestAnimationFrame(() => commitHostMeetingFilterRaf());
+    return () => cancelAnimationFrame(frame);
+  }, [visible]);
+
+  const beginFilterCommit = () => {
+    pendingFilterCommitRef.current = true;
+    beginHostMeetingFilterCommit();
+  };
+
+  return (
+    <section className="rm-meeting-response-ledger" aria-labelledby="meeting-response-ledger-title">
+      <div className="rm-meeting-response-ledger__head">
+        <div>
+          <h2 id="meeting-response-ledger-title" className="h2 editorial">참여자 기록</h2>
+          <p role="status" aria-label="참석 응답 합계" className="small rm-meeting-response-ledger__totals">
+            참석 {totals.GOING} · 미정 {totals.UNSURE} · 불참 {totals.NOT_GOING} · 미응답 {totals.NO_RESPONSE}
+          </p>
+        </div>
+        <div className="rm-meeting-response-ledger__tools">
+          <label>
+            <span className="sr-only">참여자 검색</span>
+            <input type="search" aria-label="참여자 검색" value={query} onChange={(event) => {
+              beginFilterCommit();
+              setQuery(event.currentTarget.value);
+            }} placeholder="이름으로 찾기" />
+          </label>
+          <label>
+            <span className="sr-only">참석 응답 필터</span>
+            <select aria-label="참석 응답 필터" value={filter} onChange={(event) => {
+              beginFilterCommit();
+              setFilter(event.currentTarget.value as Response | "ALL");
+            }}>
+              <option value="ALL">모든 응답</option>
+              <option value="GOING">참석</option>
+              <option value="UNSURE">미정</option>
+              <option value="NOT_GOING">불참</option>
+              <option value="NO_RESPONSE">미응답</option>
+            </select>
+          </label>
+        </div>
+      </div>
+      {selected.size > 0 ? (
+        <div className="rm-meeting-response-ledger__bulk" role="group" aria-label="선택한 참여자 실제 출석 변경">
+          <span>{selected.size}명 선택</span>
+          {(["ATTENDED", "ABSENT", "UNKNOWN"] as const).map((status) => (
+            <button key={status} type="button" className="btn btn-quiet btn-sm" onClick={() => setBulkTarget(status)}>
+              {attendanceLabel[status]}으로 변경
+            </button>
+          ))}
+        </div>
+      ) : null}
+      {visible.length === 0 ? (
+        <p role="status" className="rm-meeting-panel-state">조건에 맞는 참여자가 없습니다.</p>
+      ) : (
+        <ul className="rm-meeting-response-ledger__rows">
+          {visible.map((row) => (
+            <li key={row.membershipId} aria-label={`${row.displayName} · ${row.secondaryLabel}`} className="rm-meeting-response-ledger__row">
+              <label className="rm-meeting-response-ledger__select">
+                <input
+                  type="checkbox"
+                  aria-label={`${row.displayName} 선택`}
+                  checked={selected.has(row.membershipId)}
+                  onChange={(event) => {
+                    const checked = event.currentTarget.checked;
+                    setSelected((current) => {
+                      const next = new Set(current);
+                      if (checked) next.add(row.membershipId);
+                      else next.delete(row.membershipId);
+                      return next;
+                    });
+                  }}
+                />
+              </label>
+              <div className="rm-meeting-response-ledger__person">
+                <strong>{row.displayName}</strong>
+                <span className="small muted">{row.secondaryLabel}</span>
+              </div>
+              <dl className="rm-meeting-response-ledger__facts">
+                <div><dt>참석 응답</dt><dd>{responseLabel[row.response]}</dd></div>
+                <div><dt>질문</dt><dd>{row.questionCount === null ? "확인 전" : `${row.questionCount}개`}</dd></div>
+                <div><dt>최근 응답</dt><dd>{row.recentResponseLabel ?? "기록 없음"}</dd></div>
+              </dl>
+              <label className="rm-meeting-response-ledger__attendance">
+                <span>실제 출석</span>
+                <select
+                  aria-label={`${row.displayName} 실제 출석`}
+                  value={row.attendance}
+                  disabled={row.writeState === "saving"}
+                  onChange={(event) => onAttendanceChange(row.membershipId, event.currentTarget.value as MeetingAttendance)}
+                >
+                  <option value="UNKNOWN">확인 전</option>
+                  <option value="ATTENDED">출석</option>
+                  <option value="ABSENT">불참</option>
+                </select>
+              </label>
+              {row.writeState === "saving" ? <span role="status" className="small">저장 중</span> : null}
+              {row.writeState === "saved" ? <span role="status" className="small">저장됨</span> : null}
+              {row.writeState === "error" ? <span role="alert" className="small">저장하지 못했습니다. 다시 선택해 주세요.</span> : null}
+              {row.writeState === "conflict" ? <span role="alert" className="small">최신 출석 상태와 충돌했습니다. 새로 확인해 주세요.</span> : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {bulkTarget ? (
+        <div className="rm-host-action-dialog-backdrop" role="presentation">
+          <section
+            className="rm-host-action-dialog-sheet stack"
+            style={{ width: "min(440px, 100%)" }}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="meeting-bulk-attendance-confirm-title"
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setBulkTarget(null);
+            }}
+          >
+            <h2 id="meeting-bulk-attendance-confirm-title" className="h2 editorial">일괄 실제 출석 변경 확인</h2>
+            <p style={{ margin: 0 }}>
+              선택한 {selected.size}명을 <strong>{attendanceLabel[bulkTarget]}</strong>으로 변경합니다.
+            </p>
+            <p className="small muted" style={{ margin: 0 }}>확인한 뒤에만 출석 상태를 저장합니다.</p>
+            <div className="row wrap" style={{ justifyContent: "flex-end" }}>
+              <button type="button" className="btn btn-quiet" autoFocus onClick={() => setBulkTarget(null)}>취소</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  onBulkAttendanceChange([...selected], bulkTarget);
+                  setBulkTarget(null);
+                  setSelected(new Set());
+                }}
+              >
+                {selected.size}명을 {attendanceLabel[bulkTarget]}으로 변경
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </section>
+  );
+}

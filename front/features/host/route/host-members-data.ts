@@ -7,17 +7,19 @@ import {
   submitHostViewerAction,
 } from "@/features/host/api/host-api";
 import type { HostMemberListItem, HostMemberListPage } from "@/features/host/api/host-contracts";
-import type { HostMembersActions } from "@/features/host/model/host-member-actions";
-import type {
-  HostMemberProfileErrorCode,
-  HostMemberProfileResponse,
-  MemberLifecycleResponse,
-} from "@/features/host/model/host-view-types";
+import {
+  HostMemberProfileActionError,
+  type HostMembersActions,
+} from "@/features/host/model/host-member-actions";
+import type { HostMemberProfileErrorCode } from "@/features/host/model/host-view-types";
 import { hostMemberListQuery, invalidateHostMembers } from "@/features/host/queries/host-members-queries";
 import { clubSlugFromLoaderArgs } from "@/shared/auth/member-app-loader";
 import { requireHostLoaderAuth } from "./host-loader-auth";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
-import { hostApiErrorFromResponse, readHostResponseJson } from "@/shared/api/host-authority-event";
+import {
+  completeHostResponseBody,
+  readHostResponseJson,
+} from "@/shared/api/host-authority-event";
 
 const HOST_MEMBERS_PAGE_LIMIT = 50;
 
@@ -63,31 +65,30 @@ export function createHostMembersActions(
     submitLifecycle: async (membershipId, path, body) => {
       const response = await submitHostMemberLifecycle(membershipId, path, body, context);
       if (!response.ok) {
-        throw await hostApiErrorFromResponse(response, {
-          clubSlug: context.clubSlug,
-          requestKind: "MEMBER_LIFECYCLE",
-        });
+        await completeHostResponseBody(response);
+        throw new Error("HOST_MEMBER_LIFECYCLE_ACTION_FAILED");
       }
-      const result = await readHostResponseJson<MemberLifecycleResponse>(response);
+      const result = await readHostResponseJson(response);
       await markMembersStale();
       return result;
     },
     submitProfile: async (membershipId, displayName) => {
       const response = await submitHostMemberProfile(membershipId, displayName, context);
       if (!response.ok) {
-        const error = await hostApiErrorFromResponse(response, {
-          clubSlug: context.clubSlug,
-          requestKind: "MEMBER_PROFILE",
-        });
-        return {
-          ok: false,
-          status: response.status,
-          code: error.code as HostMemberProfileErrorCode,
-        };
+        let code: HostMemberProfileErrorCode | null = null;
+        try {
+          const body = await readHostResponseJson<unknown>(response);
+          if (typeof body === "object" && body !== null && "code" in body && typeof body.code === "string") {
+            code = body.code as HostMemberProfileErrorCode;
+          }
+        } catch {
+          // The UI only needs the stable status fallback when an error body is unavailable.
+        }
+        throw new HostMemberProfileActionError(response.status, code);
       }
-      const member = await readHostResponseJson<HostMemberProfileResponse>(response);
+      const member = await readHostResponseJson(response);
       await markMembersStale();
-      return { ok: true, member };
+      return member;
     },
     submitViewerAction: (membershipId, action) => submitHostViewerAction(membershipId, action, context),
   };

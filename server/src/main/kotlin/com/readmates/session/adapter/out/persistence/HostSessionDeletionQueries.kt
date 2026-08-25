@@ -43,7 +43,7 @@ class HostSessionDeletionQueries(
         requireDeletableTarget(target)
         return HostSessionDeletionAssessment(
             target = target,
-            blockers = countDeletionBlockers(command.host.clubId, command.sessionId, lock),
+            blockers = countDeletionBlockers(command.host.clubId, command.sessionId),
             counts = countSessionDeletionRows(command.host.clubId, command.sessionId),
         )
     }
@@ -368,103 +368,78 @@ class HostSessionDeletionQueries(
         }
     }
 
+    @Suppress("LongMethod")
     private fun countDeletionBlockers(
         clubId: UUID,
         sessionId: UUID,
-        lock: Boolean,
     ) = hostSessionDeletionBlockers(
         revisionCount =
-            countBlockerRows(
-                "select count(*) from session_record_revisions where club_id = ? and session_id = ?",
+            countSessionRows(
+                "select count(*) from session_record_revisions where club_id = ? and session_id = ? for update",
                 clubId,
                 sessionId,
-                lock,
             ),
         decisionCount =
-            countBlockerRows(
-                "select count(*) from host_action_notification_decisions where club_id = ? and session_id = ?",
+            countSessionRows(
+                """
+                select count(*)
+                from host_action_notification_decisions
+                where club_id = ? and session_id = ?
+                for update
+                """.trimIndent(),
                 clubId,
                 sessionId,
-                lock,
             ),
         manualDispatchCount =
-            countBlockerRows(
-                "select count(*) from notification_manual_dispatches where club_id = ? and session_id = ?",
+            countSessionRows(
+                "select count(*) from notification_manual_dispatches where club_id = ? and session_id = ? for update",
                 clubId,
                 sessionId,
-                lock,
             ),
-        eventCount = countNotificationEventBlockers(clubId, sessionId, lock),
-        deliveryCount = countNotificationDeliveryBlockers(clubId, sessionId, lock),
-        memberNotificationCount = countMemberNotificationBlockers(clubId, sessionId, lock),
+        eventCount =
+            countSessionRows(
+                """
+                select count(*)
+                from notification_event_outbox
+                where club_id = ?
+                  and aggregate_type = 'SESSION'
+                  and aggregate_id = ?
+                for update
+                """.trimIndent(),
+                clubId,
+                sessionId,
+            ),
+        deliveryCount =
+            countSessionRows(
+                """
+                select count(*)
+                from notification_deliveries d
+                inner join notification_event_outbox e
+                  on e.id = d.event_id and e.club_id = d.club_id
+                where e.club_id = ?
+                  and e.aggregate_type = 'SESSION'
+                  and e.aggregate_id = ?
+                for update
+                """.trimIndent(),
+                clubId,
+                sessionId,
+            ),
+        memberNotificationCount =
+            countSessionRows(
+                """
+                select count(*)
+                from member_notifications m
+                inner join notification_event_outbox e
+                  on e.id = m.event_id and e.club_id = m.club_id
+                where e.club_id = ?
+                  and e.aggregate_type = 'SESSION'
+                  and e.aggregate_id = ?
+                for update
+                """.trimIndent(),
+                clubId,
+                sessionId,
+            ),
     )
-
-    private fun countNotificationEventBlockers(
-        clubId: UUID,
-        sessionId: UUID,
-        lock: Boolean,
-    ) = countBlockerRows(
-        """
-        select count(*)
-        from notification_event_outbox
-        where club_id = ?
-          and aggregate_type = 'SESSION'
-          and aggregate_id = ?
-        """.trimIndent(),
-        clubId,
-        sessionId,
-        lock,
-    )
-
-    private fun countNotificationDeliveryBlockers(
-        clubId: UUID,
-        sessionId: UUID,
-        lock: Boolean,
-    ) = countBlockerRows(
-        """
-        select count(*)
-        from notification_deliveries d
-        inner join notification_event_outbox e
-          on e.id = d.event_id and e.club_id = d.club_id
-        where e.club_id = ?
-          and e.aggregate_type = 'SESSION'
-          and e.aggregate_id = ?
-        """.trimIndent(),
-        clubId,
-        sessionId,
-        lock,
-    )
-
-    private fun countMemberNotificationBlockers(
-        clubId: UUID,
-        sessionId: UUID,
-        lock: Boolean,
-    ) = countBlockerRows(
-        """
-        select count(*)
-        from member_notifications m
-        inner join notification_event_outbox e
-          on e.id = m.event_id and e.club_id = m.club_id
-        where e.club_id = ?
-          and e.aggregate_type = 'SESSION'
-          and e.aggregate_id = ?
-        """.trimIndent(),
-        clubId,
-        sessionId,
-        lock,
-    )
-
-    private fun countBlockerRows(
-        sql: String,
-        clubId: UUID,
-        sessionId: UUID,
-        lock: Boolean,
-    ): Int = countSessionRows(blockerCountSql(sql, lock), clubId, sessionId)
-
-    private fun blockerCountSql(
-        sql: String,
-        lock: Boolean,
-    ): String = if (lock) "$sql for update" else sql
 
     private fun countSessionDeletionRows(
         clubId: UUID,

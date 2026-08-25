@@ -43,8 +43,6 @@ import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.RestControllerAdvice
 
-private typealias HostRevisionConflictEntity = ResponseEntity<HostSessionRevisionConflictResponse>
-
 @RestControllerAdvice
 @Suppress("TooManyFunctions")
 class SessionApplicationErrorHandler {
@@ -142,13 +140,21 @@ class SessionApplicationErrorHandler {
         InvalidMembershipIdException::class,
         InvalidSessionScheduleException::class,
         InvalidQuestionSetException::class,
-        ConstraintViolationException::class,
     )
     fun handleBadRequest(): ResponseEntity<ApiErrorResponse> =
         apiErrorResponse(
             status = HttpStatus.BAD_REQUEST,
             code = "INVALID_REQUEST",
             message = "모임 요청 값을 확인해 주세요.",
+        )
+
+    @ExceptionHandler(ConstraintViolationException::class)
+    fun handleConstraintViolation(ex: ConstraintViolationException): ResponseEntity<ApiErrorResponse> =
+        apiErrorResponse(
+            status = HttpStatus.BAD_REQUEST,
+            code = "INVALID_REQUEST",
+            message = "모임 요청 값을 확인해 주세요.",
+            field = ex.canonicalHostSessionField(),
         )
 
     @ExceptionHandler(InvalidHostSessionCursorException::class, InvalidHostListCursorException::class)
@@ -168,7 +174,7 @@ class SessionApplicationErrorHandler {
         )
 
     @ExceptionHandler(HostSessionRevisionConflictException::class)
-    fun handleRevisionConflict(ex: HostSessionRevisionConflictException): HostRevisionConflictEntity =
+    fun handleRevisionConflict(ex: HostSessionRevisionConflictException) =
         ResponseEntity.status(HttpStatus.CONFLICT).body(
             HostSessionRevisionConflictResponse(
                 message = "다른 호스트가 모임을 먼저 저장했습니다. 최신 내용을 확인한 뒤 다시 적용하세요.",
@@ -269,3 +275,48 @@ class SessionApplicationErrorHandler {
             message = "권한이 없습니다.",
         )
 }
+
+private val hostSessionFieldPriority =
+    listOf(
+        "title",
+        "bookTitle",
+        "author",
+        "meetingDate",
+        "meetingTime",
+        "locationLabel",
+        "meetingUrl",
+        "meetingPasscode",
+        "bookLink",
+        "bookImageUrl",
+        "questionDeadlineAt",
+    ).withIndex().associate { (index, field) -> field to index }
+
+private fun ConstraintViolationException.canonicalHostSessionField(): String? =
+    constraintViolations
+        .filter { violation -> violation.rootBeanClass == HostSessionRequest::class.java }
+        .mapNotNull { violation ->
+            violation.propertyPath
+                .lastOrNull()
+                ?.name
+                ?.toCanonicalHostSessionField()
+        }.distinct()
+        .minWithOrNull(
+            compareBy<String> { field -> hostSessionFieldPriority[field] ?: Int.MAX_VALUE }
+                .thenBy { field -> field },
+        )
+
+private fun String.toCanonicalHostSessionField(): String? =
+    when (this) {
+        "title" -> "title"
+        "bookTitle" -> "bookTitle"
+        "bookAuthor" -> "author"
+        "date", "validCalendarDate" -> "meetingDate"
+        "startTime", "endTime", "validTimeRange" -> "meetingTime"
+        "locationLabel" -> "locationLabel"
+        "meetingUrl", "allowedMeetingUrl" -> "meetingUrl"
+        "meetingPasscode" -> "meetingPasscode"
+        "bookLink", "allowedBookLink" -> "bookLink"
+        "bookImageUrl", "allowedBookImageUrl" -> "bookImageUrl"
+        "questionDeadlineAt", "validQuestionDeadline" -> "questionDeadlineAt"
+        else -> null
+    }

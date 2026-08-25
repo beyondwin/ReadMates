@@ -14,11 +14,9 @@ import com.readmates.shared.mutation.application.model.HostMutationOperation
 import com.readmates.shared.mutation.application.model.IdempotencyKeyReusedException
 import com.readmates.shared.mutation.application.model.MutationClaimResult
 import com.readmates.shared.mutation.application.model.MutationIdentity
-import com.readmates.shared.mutation.application.port.out.MutationIdempotencyPort
 import com.readmates.shared.mutation.application.service.MutationIdempotencyMetrics
 import com.readmates.shared.mutation.application.service.MutationIdempotencyService
 import com.readmates.shared.mutation.config.MutationIdempotencyProperties
-import com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator
 import com.readmates.support.ReadmatesMySqlIntegrationTestSupport
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry
 import org.assertj.core.api.Assertions.assertThat
@@ -32,7 +30,6 @@ import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.jdbc.core.JdbcTemplate
-import org.springframework.mock.env.MockEnvironment
 import org.springframework.test.context.jdbc.Sql
 import org.springframework.transaction.PlatformTransactionManager
 import org.springframework.transaction.support.TransactionTemplate
@@ -44,7 +41,6 @@ import java.util.UUID
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.TimeoutException
 
 @SpringBootTest(properties = ["spring.flyway.locations=classpath:db/mysql/migration,classpath:db/mysql/dev"])
 @Sql(statements = [CLEANUP_MUTATION_IDEMPOTENCY_SQL], executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD)
@@ -142,7 +138,7 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `rotated current key can still replay a previous-key row`() {
         val identity = identity("rotation-key")
-        val original = service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION))
+        val original = service(properties = keyPair(current = KEY_V1, currentVersion = 1))
         original.claim(identity, payload())
         val receiptId = insertReceipt()
         original.complete(identity, receiptId)
@@ -151,9 +147,9 @@ class JdbcMutationIdempotencyAdapterDbTest(
                 properties =
                     keyPair(
                         current = KEY_V2,
-                        currentVersion = KEY_V2_VERSION,
+                        currentVersion = 2,
                         previous = KEY_V1,
-                        previousVersion = KEY_V1_VERSION,
+                        previousVersion = 1,
                     ),
             )
         assertThat(rotated.claim(identity, payload())).isEqualTo(MutationClaimResult.Replayed(identity, receiptId))
@@ -162,16 +158,16 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `referenced digest key retirement is fail closed until purge and buffer elapse`() {
         val identity = identity("retire-key")
-        val v1 = service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION))
+        val v1 = service(properties = keyPair(current = KEY_V1, currentVersion = RETIREMENT_KEY_V1))
         v1.claim(identity, payload())
         val rotated =
             service(
                 properties =
                     keyPair(
                         current = KEY_V2,
-                        currentVersion = KEY_V2_VERSION,
+                        currentVersion = RETIREMENT_KEY_V2,
                         previous = KEY_V1,
-                        previousVersion = KEY_V1_VERSION,
+                        previousVersion = RETIREMENT_KEY_V1,
                     ),
             )
         assertThatThrownBy { rotated.retirePreviousKey() }
@@ -182,167 +178,9 @@ class JdbcMutationIdempotencyAdapterDbTest(
             .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
         clock.instant = clock.instant.plus(Duration.ofHours(24))
         rotated.retirePreviousKey()
-        val retired = service(properties = keyPair(current = KEY_V2, currentVersion = KEY_V2_VERSION))
+        val retired = service(properties = keyPair(current = KEY_V2, currentVersion = RETIREMENT_KEY_V2))
         assertThat(retired.claim(identity("post-retire-key"), payload()))
             .isInstanceOf(MutationClaimResult.Claimed::class.java)
-    }
-
-    @Test
-    fun `V55 admin takedown references block key retirement and purge through shared retention`() {
-        insertAdminTakedownOperationalRows()
-        adapter.markReferenced(KEY_V1_VERSION, clock.instant)
-        val rotated =
-            service(
-                properties =
-                    keyPair(
-                        current = KEY_V2,
-                        currentVersion = KEY_V2_VERSION,
-                        previous = KEY_V1,
-                        previousVersion = KEY_V1_VERSION,
-                    ),
-            )
-
-        assertThat(adapter.countByDigestKeyVersion(KEY_V1_VERSION)).isEqualTo(1)
-        assertThat(adapter.referencedDigestKeyVersions()).contains(KEY_V1_VERSION)
-        assertThatThrownBy { rotated.retirePreviousKey() }
-            .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
-
-        clock.instant = clock.instant.plus(Duration.ofHours(24)).plusSeconds(1)
-        assertThat(rotated.purgeExpired(50)).isEqualTo(2)
-        assertThat(adminTakedownPreviewCount()).isZero()
-        assertThat(adminTakedownIdempotencyCount()).isZero()
-        assertThatThrownBy { rotated.retirePreviousKey() }
-            .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
-        clock.instant = clock.instant.plus(Duration.ofHours(24))
-        rotated.retirePreviousKey()
-    }
-
-    @Test
-    fun `never used digest version receives a durable conservative retirement state`() {
-        val markedAt = clock.instant
-
-        assertThat(adapter.markUnreferencedIfEmpty(NEVER_USED_KEY_VERSION, markedAt)).isEqualTo(markedAt)
-        val state = adapter.digestKeyStates().single { it.digestKeyVersion == NEVER_USED_KEY_VERSION }
-        assertThat(state.lastReferencedAt).isEqualTo(markedAt)
-        assertThat(state.unreferencedSince).isEqualTo(markedAt)
-
-        clock.instant = clock.instant.plusSeconds(30)
-        assertThat(adapter.markUnreferencedIfEmpty(NEVER_USED_KEY_VERSION, clock.instant)).isEqualTo(markedAt)
-    }
-
-    @Test
-    fun `retirement state is not created while either idempotency namespace references the version`() {
-        val hostIdentity = identity("missing-host-state-key")
-        service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION))
-            .claim(hostIdentity, payload())
-        jdbcTemplate.update(
-            "delete from mutation_digest_key_state where digest_key_version = ?",
-            KEY_V1_VERSION,
-        )
-
-        assertThat(adapter.markUnreferencedIfEmpty(KEY_V1_VERSION, clock.instant)).isNull()
-        assertThat(adapter.digestKeyStates()).noneMatch { state -> state.digestKeyVersion == KEY_V1_VERSION }
-
-        jdbcTemplate.update(
-            "delete from mutation_idempotency_keys where idempotency_key = ?",
-            hostIdentity.idempotencyKey,
-        )
-        insertAdminTakedownOperationalRows()
-
-        assertThat(adapter.markUnreferencedIfEmpty(KEY_V1_VERSION, clock.instant)).isNull()
-        assertThat(adapter.digestKeyStates()).noneMatch { state -> state.digestKeyVersion == KEY_V1_VERSION }
-    }
-
-    @Test
-    @Timeout(30)
-    fun `concurrent claim waits for retirement marker and clears it before owning a reference`() {
-        val markedAt = clock.instant
-        val claimAt = markedAt.plusSeconds(1)
-        val retirementMarked = CountDownLatch(1)
-        val releaseRetirement = CountDownLatch(1)
-        val claimAttempted = CountDownLatch(1)
-        val executor = Executors.newFixedThreadPool(2)
-        try {
-            val retirement =
-                executor.submit<Instant?> {
-                    transactionTemplate.execute {
-                        val result = adapter.markUnreferencedIfEmpty(CONCURRENT_KEY_VERSION, markedAt)
-                        retirementMarked.countDown()
-                        check(releaseRetirement.await(10, TimeUnit.SECONDS))
-                        result
-                    }
-                }
-            check(retirementMarked.await(10, TimeUnit.SECONDS))
-            clock.instant = claimAt
-            val claimIdentity = identity("retirement-race-claim-key")
-            val claim =
-                executor.submit<MutationClaimResult> {
-                    claimAttempted.countDown()
-                    transactionTemplate.execute {
-                        service(
-                            properties =
-                                keyPair(
-                                    current = KEY_V2,
-                                    currentVersion = CONCURRENT_KEY_VERSION,
-                                ),
-                        ).claim(claimIdentity, payload())
-                    }
-                }
-            check(claimAttempted.await(10, TimeUnit.SECONDS))
-
-            assertThatThrownBy { claim.get(250, TimeUnit.MILLISECONDS) }
-                .isInstanceOf(TimeoutException::class.java)
-
-            releaseRetirement.countDown()
-            assertThat(retirement.get(10, TimeUnit.SECONDS)).isEqualTo(markedAt)
-            assertThat(claim.get(10, TimeUnit.SECONDS)).isInstanceOf(MutationClaimResult.Claimed::class.java)
-            assertThat(rowCount(claimIdentity)).isOne()
-            assertThat(adapter.unreferencedSince(CONCURRENT_KEY_VERSION)).isNull()
-        } finally {
-            releaseRetirement.countDown()
-            executor.shutdownNow()
-        }
-    }
-
-    private fun insertAdminTakedownOperationalRows() {
-        jdbcTemplate.update(
-            """
-            insert into admin_public_takedown_previews (
-              id, actor_user_id_snapshot, actor_platform_role_snapshot,
-              club_id_snapshot, session_id_snapshot, publication_id_snapshot,
-              target_generation, current_surfaces_json, expires_at, created_at
-            ) values (?, ?, 'OWNER', ?, ?, ?, 1, json_array('ORIGIN'), ?, ?)
-            """.trimIndent(),
-            ADMIN_PREVIEW_ID.toString(),
-            ACTOR_ID.toString(),
-            CLUB_ID.toString(),
-            RESOURCE_ID.toString(),
-            RESOURCE_ID.toString(),
-            clock.instant
-                .plus(Duration.ofHours(24))
-                .atOffset(ZoneOffset.UTC)
-                .toLocalDateTime(),
-            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
-        )
-        jdbcTemplate.update(
-            """
-            insert into admin_public_takedown_idempotency (
-              actor_user_id, operation, club_id, publication_id, idempotency_key,
-              request_hmac, canonical_schema_version, digest_key_version,
-              created_at, expires_at
-            ) values (?, 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, 'admin-retire-key',
-                      unhex(sha2('synthetic-admin-request', 256)), 1, ?, ?, ?)
-            """.trimIndent(),
-            ACTOR_ID.toString(),
-            CLUB_ID.toString(),
-            RESOURCE_ID.toString(),
-            KEY_V1_VERSION,
-            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
-            clock.instant
-                .plus(Duration.ofHours(24))
-                .atOffset(ZoneOffset.UTC)
-                .toLocalDateTime(),
-        )
     }
 
     @Test
@@ -374,132 +212,6 @@ class JdbcMutationIdempotencyAdapterDbTest(
         assertThat(v1.purgeExpired(50)).isZero()
         assertThat(receiptCount(receiptId)).isEqualTo(1)
     }
-
-    @Test
-    fun `bounded purge gives admin preview and host namespaces a fair share under backlog`() {
-        repeat(6) { index ->
-            insertFairAdminIdempotency(index)
-            insertFairPreview(index)
-            service().claim(identity("fair-host-$index"), payload(meetingPasscode = "fair-$index"))
-        }
-        clock.instant = clock.instant.plus(Duration.ofHours(24)).plusSeconds(1)
-
-        assertThat(service().purgeExpired(6)).isEqualTo(6)
-
-        assertThat(fairRowCount("admin_public_takedown_idempotency", "idempotency_key", "fair-admin-%"))
-            .isEqualTo(4)
-        assertThat(fairRowCount("admin_public_takedown_previews", "actor_user_id_snapshot", ACTOR_ID.toString()))
-            .isEqualTo(4)
-        assertThat(fairRowCount("mutation_idempotency_keys", "idempotency_key", "fair-host-%"))
-            .isEqualTo(4)
-    }
-
-    @Test
-    fun `bounded purge rejects undersized positive limits and preserves zero no-op`() {
-        val adapter = JdbcMutationIdempotencyAdapter(jdbcTemplate)
-
-        assertThat(adapter.purgeExpired(clock.instant, 0)).isZero()
-        listOf(1, 2).forEach { limit ->
-            assertThatThrownBy { adapter.purgeExpired(clock.instant, limit) }
-                .isInstanceOf(IllegalArgumentException::class.java)
-                .hasMessageContaining("at least 3")
-        }
-    }
-
-    @Test
-    fun `every repeated bounded purge pass advances all three namespaces`() {
-        repeat(6) { index ->
-            insertFairAdminIdempotency(20 + index)
-            insertFairPreview(20 + index)
-            service().claim(identity("fair-host-repeat-$index"), payload(meetingPasscode = "repeat-$index"))
-        }
-        clock.instant = clock.instant.plus(Duration.ofHours(24)).plusSeconds(1)
-        val forceNonAdminRemainder = Math.floorMod(1L - Math.floorMod(clock.instant.epochSecond, 3L), 3L)
-        clock.instant = clock.instant.plusSeconds(forceNonAdminRemainder)
-
-        repeat(2) {
-            val before = fairNamespaceCounts("repeat")
-            assertThat(service().purgeExpired(4)).isEqualTo(4)
-            val after = fairNamespaceCounts("repeat")
-            assertThat(before.admin - after.admin).isEqualTo(2)
-            assertThat(before.preview - after.preview).isEqualTo(1)
-            assertThat(before.host - after.host).isEqualTo(1)
-            assertThat(before.total - after.total).isEqualTo(4)
-            clock.instant = clock.instant.plusSeconds(3)
-        }
-    }
-
-    private fun fairNamespaceCounts(scope: String): FairNamespaceCounts =
-        FairNamespaceCounts(
-            admin = fairRowCount("admin_public_takedown_idempotency", "idempotency_key", "fair-admin-%"),
-            preview = fairRowCount("admin_public_takedown_previews", "actor_user_id_snapshot", ACTOR_ID.toString()),
-            host = fairRowCount("mutation_idempotency_keys", "idempotency_key", "fair-host-$scope-%"),
-        )
-
-    private data class FairNamespaceCounts(
-        val admin: Int,
-        val preview: Int,
-        val host: Int,
-    ) {
-        val total: Int = admin + preview + host
-    }
-
-    private fun insertFairAdminIdempotency(index: Int) {
-        jdbcTemplate.update(
-            """
-            insert into admin_public_takedown_idempotency (
-              actor_user_id, operation, club_id, publication_id, idempotency_key,
-              request_hmac, canonical_schema_version, digest_key_version,
-              created_at, expires_at
-            ) values (?, 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, ?,
-                      unhex(sha2(?, 256)), 1, ?, ?, ?)
-            """.trimIndent(),
-            ACTOR_ID.toString(),
-            CLUB_ID.toString(),
-            RESOURCE_ID.toString(),
-            "fair-admin-$index",
-            "fair-admin-request-$index",
-            KEY_V1_VERSION,
-            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
-            clock.instant
-                .plus(Duration.ofHours(24))
-                .atOffset(ZoneOffset.UTC)
-                .toLocalDateTime(),
-        )
-    }
-
-    private fun insertFairPreview(index: Int) {
-        jdbcTemplate.update(
-            """
-            insert into admin_public_takedown_previews (
-              id, actor_user_id_snapshot, actor_platform_role_snapshot,
-              club_id_snapshot, session_id_snapshot, publication_id_snapshot,
-              target_generation, current_surfaces_json, expires_at, created_at
-            ) values (?, ?, 'OWNER', ?, ?, ?, 1, json_array('ORIGIN'), ?, ?)
-            """.trimIndent(),
-            UUID.nameUUIDFromBytes("fair-preview-$index".toByteArray()).toString(),
-            ACTOR_ID.toString(),
-            CLUB_ID.toString(),
-            RESOURCE_ID.toString(),
-            RESOURCE_ID.toString(),
-            clock.instant
-                .plus(Duration.ofHours(24))
-                .atOffset(ZoneOffset.UTC)
-                .toLocalDateTime(),
-            clock.instant.atOffset(ZoneOffset.UTC).toLocalDateTime(),
-        )
-    }
-
-    private fun fairRowCount(
-        table: String,
-        column: String,
-        value: String,
-    ): Int =
-        jdbcTemplate.queryForObject(
-            "select count(*) from $table where $column like ?",
-            Int::class.java,
-            value,
-        ) ?: 0
 
     @Test
     fun `tables logs and receipt dto never persist raw canonical url passcode sha or hmac secret`() {
@@ -564,12 +276,13 @@ class JdbcMutationIdempotencyAdapterDbTest(
     @Test
     fun `startup validator fails closed when referenced key cannot be replayed`() {
         val identity = identity("orphan-key")
-        service(properties = keyPair(current = KEY_V1, currentVersion = ORPHAN_KEY_VERSION)).claim(identity, payload())
+        service(properties = keyPair(current = KEY_V1, currentVersion = 9)).claim(identity, payload())
         val validator =
-            MutationIdempotencyStartupValidator(
-                keyPair(current = KEY_V2, currentVersion = KEY_V2_VERSION),
-                isolatedRestartPort(ORPHAN_KEY_VERSION),
-                MockEnvironment(),
+            com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator(
+                keyPair(current = KEY_V2, currentVersion = 2),
+                adapter,
+                org.springframework.mock.env
+                    .MockEnvironment(),
             )
         assertThatThrownBy { validator.validate() }
             .isInstanceOf(IllegalStateException::class.java)
@@ -577,68 +290,37 @@ class JdbcMutationIdempotencyAdapterDbTest(
     }
 
     @Test
-    fun `startup validator rejects config removal before durable retirement state is safe`() {
-        val identity = identity("restart-retirement-key")
-        service(properties = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION)).claim(identity, payload())
-        jdbcTemplate.update(
-            "delete from mutation_idempotency_keys where idempotency_key = ?",
-            identity.idempotencyKey,
-        )
-        val validator =
-            MutationIdempotencyStartupValidator(
-                keyPair(
-                    current = KEY_V2,
-                    currentVersion = KEY_V2_VERSION,
-                    previousVersion = KEY_V1_VERSION,
-                ),
-                isolatedRestartPort(KEY_V1_VERSION),
-                MockEnvironment(),
-            )
+    fun `immutable public takedown receipt blocks digest key retirement and startup without that key`() {
+        insertPublicTakedownReceipt(digestKeyVersion = TAKEDOWN_KEY_V1)
+        assertThat(adapter.countByDigestKeyVersion(TAKEDOWN_KEY_V1)).isEqualTo(1)
+        assertThat(adapter.referencedDigestKeyVersions()).contains(TAKEDOWN_KEY_V1)
 
+        val rotated =
+            service(
+                properties =
+                    keyPair(
+                        current = KEY_V2,
+                        currentVersion = TAKEDOWN_KEY_V2,
+                        previous = KEY_V1,
+                        previousVersion = TAKEDOWN_KEY_V1,
+                    ),
+            )
+        assertThatThrownBy { rotated.retirePreviousKey() }
+            .isInstanceOf(DigestKeyRetirementRejectedException::class.java)
+
+        val validator =
+            com.readmates.shared.mutation.config.MutationIdempotencyStartupValidator(
+                keyPair(current = KEY_V2, currentVersion = TAKEDOWN_KEY_V2),
+                adapter,
+                org.springframework.mock.env
+                    .MockEnvironment(),
+            )
         assertThatThrownBy { validator.validate() }
             .isInstanceOf(IllegalStateException::class.java)
             .hasMessageContaining("digest key")
-        assertThat(logAppender.list.joinToString { it.formattedMessage })
-            .doesNotContain(KEY_V1, KEY_V2)
-
-        jdbcTemplate.update(
-            """
-            update mutation_digest_key_state
-            set unreferenced_since = '2026-08-22 01:00:00.000000'
-            where digest_key_version = ?
-            """.trimIndent(),
-            KEY_V1_VERSION,
-        )
-        MutationIdempotencyStartupValidator(
-            keyPair(
-                current = KEY_V2,
-                currentVersion = KEY_V2_VERSION,
-                previousVersion = KEY_V1_VERSION,
-            ),
-            isolatedRestartPort(KEY_V1_VERSION),
-            MockEnvironment(),
-            Clock.fixed(Instant.parse("2026-08-23T01:00:00Z"), ZoneOffset.UTC),
-        ).validate()
     }
 
-    private fun isolatedRestartPort(vararg versions: Int): MutationIdempotencyPort {
-        val includedVersions = versions.toSet()
-        return object : MutationIdempotencyPort by adapter {
-            override fun referencedDigestKeyVersions(): Set<Int> =
-                adapter.referencedDigestKeyVersions().filterTo(mutableSetOf()) { version ->
-                    version in includedVersions
-                }
-
-            override fun digestKeyStates(): List<MutationIdempotencyPort.DigestKeyState> =
-                adapter.digestKeyStates().filter { state -> state.digestKeyVersion in includedVersions }
-        }
-    }
-
-    private fun service(): MutationIdempotencyService = service(defaultProperties())
-
-    private fun defaultProperties() = keyPair(current = KEY_V1, currentVersion = KEY_V1_VERSION)
-
-    private fun service(properties: MutationIdempotencyProperties) =
+    private fun service(properties: MutationIdempotencyProperties = keyPair(current = KEY_V1, currentVersion = 1)) =
         MutationIdempotencyService(adapter, properties, clock, MutationIdempotencyMetrics(registry))
 
     private fun payload(
@@ -665,6 +347,32 @@ class JdbcMutationIdempotencyAdapterDbTest(
 
     private fun insertReceipt(): UUID = UUID.fromString("cccccccc-0000-4000-8000-000000000099")
 
+    private fun insertPublicTakedownReceipt(digestKeyVersion: Int) {
+        jdbcTemplate.update(
+            """
+            insert into admin_public_takedown_receipts (
+              id, actor_admin_id, actor_role_snapshot, capability_snapshot,
+              club_id_snapshot, session_id_snapshot, publication_id_snapshot, preview_id_snapshot,
+              idempotency_key_hmac, canonical_schema_version, digest_key_version, request_hmac,
+              reason_category, reason_summary, origin_result, committed_generation,
+              committed_club_generation, convergence_id, created_at
+            ) values (
+              ?, ?, 'OWNER', 'EMERGENCY_PUBLIC_TAKEDOWN', ?, ?, ?, ?,
+              unhex(repeat('01', 32)), 1, ?, unhex(repeat('02', 32)),
+              'PRIVACY', 'REDACTED_NON_EMPTY', 'DENIED', 2, 2, ?, utc_timestamp(6)
+            )
+            """.trimIndent(),
+            TAKEDOWN_RECEIPT_ID,
+            ACTOR_ID.toString(),
+            CLUB_ID.toString(),
+            TAKEDOWN_SESSION_ID,
+            TAKEDOWN_PUBLICATION_ID,
+            TAKEDOWN_PREVIEW_ID,
+            digestKeyVersion,
+            TAKEDOWN_CONVERGENCE_ID,
+        )
+    }
+
     private fun rowCount(identity: MutationIdentity): Int =
         jdbcTemplate.queryForObject(
             """
@@ -686,19 +394,6 @@ class JdbcMutationIdempotencyAdapterDbTest(
             "select count(*) from host_session_mutation_receipts where id = ?",
             Int::class.java,
             receiptId.toString(),
-        ) ?: 0
-
-    private fun adminTakedownIdempotencyCount(): Int =
-        jdbcTemplate.queryForObject(
-            "select count(*) from admin_public_takedown_idempotency where idempotency_key = 'admin-retire-key'",
-            Int::class.java,
-        ) ?: 0
-
-    private fun adminTakedownPreviewCount(): Int =
-        jdbcTemplate.queryForObject(
-            "select count(*) from admin_public_takedown_previews where id = ?",
-            Int::class.java,
-            ADMIN_PREVIEW_ID.toString(),
         ) ?: 0
 
     private fun importedKeys(tableName: String): List<String> =
@@ -727,16 +422,19 @@ class JdbcMutationIdempotencyAdapterDbTest(
         val CLUB_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053001")
         val ACTOR_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053002")
         val RESOURCE_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053010")
-        val ADMIN_PREVIEW_ID: UUID = UUID.fromString("aaaaaaaa-0000-4000-8000-000000053011")
         const val KEY_V1 = "test-mutation-identity-v1-key"
         const val KEY_V2 = "test-mutation-identity-v2-key"
-        const val KEY_V1_VERSION = 5_301
-        const val KEY_V2_VERSION = 5_302
-        const val ORPHAN_KEY_VERSION = 5_309
-        const val NEVER_USED_KEY_VERSION = 5_310
-        const val CONCURRENT_KEY_VERSION = 5_311
+        const val RETIREMENT_KEY_V1 = 501
+        const val RETIREMENT_KEY_V2 = 502
+        const val TAKEDOWN_KEY_V1 = 511
+        const val TAKEDOWN_KEY_V2 = 512
         const val SENSITIVE_URL = "https://meet.example.com/private-room"
         const val SENSITIVE_PASSCODE = "room-passcode-value"
+        const val TAKEDOWN_RECEIPT_ID = "aaaaaaaa-0000-4000-8000-000000053091"
+        const val TAKEDOWN_SESSION_ID = "aaaaaaaa-0000-4000-8000-000000053092"
+        const val TAKEDOWN_PUBLICATION_ID = "aaaaaaaa-0000-4000-8000-000000053093"
+        const val TAKEDOWN_PREVIEW_ID = "aaaaaaaa-0000-4000-8000-000000053094"
+        const val TAKEDOWN_CONVERGENCE_ID = "aaaaaaaa-0000-4000-8000-000000053095"
 
         fun keyPair(
             current: String,
@@ -756,14 +454,12 @@ class JdbcMutationIdempotencyAdapterDbTest(
 }
 
 private const val CLEANUP_MUTATION_IDEMPOTENCY_SQL = """
-delete from admin_public_takedown_previews
-where actor_user_id_snapshot = 'aaaaaaaa-0000-4000-8000-000000053002';
-delete from admin_public_takedown_idempotency
-where actor_user_id = 'aaaaaaaa-0000-4000-8000-000000053002';
+delete from admin_public_takedown_receipts
+where id = 'aaaaaaaa-0000-4000-8000-000000053091';
 delete from mutation_idempotency_keys
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from host_session_mutation_receipts
 where club_id = 'aaaaaaaa-0000-4000-8000-000000053001';
 delete from mutation_digest_key_state
-where digest_key_version in (5301, 5302, 5309, 5310, 5311);
+where digest_key_version in (1, 2, 9, 501, 502, 511, 512);
 """

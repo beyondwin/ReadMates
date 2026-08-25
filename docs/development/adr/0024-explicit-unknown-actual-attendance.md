@@ -1,6 +1,6 @@
 # ADR-0024: 실제 출석에 명시적 `UNKNOWN` correction 상태 제공
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-22
 - 작성자: 제품·서버·프런트엔드
 - 관련: ADR-0021, `server/src/main/kotlin/com/readmates/session/adapter/in/web/AttendanceController.kt:17`

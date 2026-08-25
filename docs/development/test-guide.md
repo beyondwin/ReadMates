@@ -108,6 +108,20 @@ Do not treat the first baseline as a CI gate. Use `summary.md` and `findings.jso
 
 ## Playwright E2E
 
+### Host meeting workspace focused browser and performance gates
+
+Install and run only the approved host workspace projects:
+
+```bash
+corepack pnpm --dir front exec playwright install --with-deps chromium firefox webkit
+corepack pnpm --dir front test:e2e:host-workspace-browsers
+corepack pnpm --dir front test:host-workspace-performance
+```
+
+The browser command runs only `chromium`, `firefox-host`, and `webkit-mobile-host` against public-safe synthetic route fixtures. The performance command serves the production build and produces exactly five cold 500-member runs. CI uploads only the bounded JSON summary; it does not upload screenshots, traces, HAR data, or fixture payloads from this job.
+
+Manual VoiceOver/Safari and NVDA/Chrome evidence is a separate protected artifact. The tracked template must remain value-free. Do not mark accessibility complete from automated semantics tests or from an unattested local note.
+
 ```bash
 pnpm --dir front test:e2e
 ```
@@ -479,6 +493,19 @@ pnpm --dir front test:ct
   --tests com.readmates.notification.application.model.NotificationEmailTemplatesTest \
   --tests com.readmates.notification.application.model.NotificationEmailTemplatePreviewTest
 ```
+
+## Host workspace와 rollout 증거
+
+Host workspace 변경은 변경 surface에 맞는 model/route/UI test와 focused browser spec을 먼저 실행합니다. Release closeout에서는 `scripts/check-host-client-rollout-contract.py`의 self-test와 structural mode가 active architecture, ADR status, R1/R2a/R2b/R3 ordering, 720-second cache gate, same-candidate evidence binding을 함께 확인합니다.
+
+```bash
+python3 scripts/check-agent-guidance.py --self-test
+python3 scripts/check-agent-guidance.py
+python3 -B scripts/check-host-client-rollout-contract.py --self-test
+python3 -B scripts/check-host-client-rollout-contract.py
+```
+
+이 normal mode는 repository와 artifact/runbook readiness만 증명합니다. R1/R2a/R2b/R3, 720초 old-browser window, 24시간 residue-zero, public cache 120/60초, VoiceOver/Safari와 NVDA/Chrome 결과는 protected runtime artifact가 없으면 `not measured`로 기록합니다. 같은 tag나 tracked Markdown의 수기 digest/timestamp는 live evidence를 대신하지 않습니다.
 
 ## 공개 릴리즈 후보 점검
 

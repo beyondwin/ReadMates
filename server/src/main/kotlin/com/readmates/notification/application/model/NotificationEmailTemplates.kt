@@ -14,6 +14,7 @@ data class NotificationRenderedCopy(
     val emailBodyHtml: String,
 )
 
+@Suppress("TooManyFunctions")
 object NotificationEmailTemplates {
     fun eventCopy(
         eventType: NotificationEventType,

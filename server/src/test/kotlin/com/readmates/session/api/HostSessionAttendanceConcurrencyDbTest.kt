@@ -442,26 +442,7 @@ class HostSessionAttendanceConcurrencyDbTest(
             .post("/api/host/sessions/$sessionId/attendance") {
                 withHost()
                 contentType = MediaType.APPLICATION_JSON
-                content =
-                    """
-                    {
-                      "idempotencyKey": "host-attendance-missing-revision",
-                      "expected": {
-                        "rows": [
-                          { "membershipId": "$HOST_MEMBERSHIP_ID" }
-                        ]
-                      },
-                      "command": {
-                        "entries": [
-                          {
-                            "membershipId": "$HOST_MEMBERSHIP_ID",
-                            "attendanceStatus": "ATTENDED",
-                            "expectedAttendanceRevision": 0
-                          }
-                        ]
-                      }
-                    }
-                    """.trimIndent()
+                content = """[{"membershipId":"$HOST_MEMBERSHIP_ID","attendanceStatus":"ATTENDED"}]"""
             }.andExpect { status { isBadRequest() } }
 
         assertThat(attendanceStatus(sessionId, HOST_MEMBERSHIP_ID)).isEqualTo("UNKNOWN")
@@ -630,8 +611,11 @@ class HostSessionAttendanceConcurrencyDbTest(
 
     private fun countAudit(sessionId: String): Int =
         jdbcTemplate.queryForObject(
-            "select count(*) from host_session_change_audit " +
-                "where session_id = ? and action_type = 'ATTENDANCE_UPDATED'",
+            """
+            select count(*)
+            from host_session_change_audit
+            where session_id = ? and action_type = 'ATTENDANCE_UPDATED'
+            """.trimIndent(),
             Int::class.java,
             sessionId,
         ) ?: 0

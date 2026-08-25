@@ -27,6 +27,7 @@ vi.mock("@/features/host/api/host-api", () => ({
   fetchHostSessionTrash: vi.fn(),
   fetchHostSessionTrashList: vi.fn(),
   fetchHostMutationReconciliation: vi.fn(),
+  retryHostPublicConvergence: vi.fn(),
   restoreHostSession: vi.fn(),
 }));
 
@@ -37,6 +38,7 @@ import {
   createHostSession,
   deleteHostSession,
   fetchHostMutationReconciliation,
+  retryHostPublicConvergence,
   fetchHostSessionDetail,
   fetchHostSessionClosingStatus,
   fetchHostSessionTrash,
@@ -63,6 +65,7 @@ import {
   usePublishHostSessionMutation,
   useReopenHostSessionMutation,
   useReturnHostSessionToDraftMutation,
+  useRetryHostPublicConvergenceMutation,
   useRestoreHostSessionMutation,
   useSaveHostSessionPublicationMutation,
   useSaveHostSessionAccessScopeMutation,
@@ -294,6 +297,7 @@ beforeEach(() => {
     sessionRevision: 4,
   });
   vi.mocked(fetchHostMutationReconciliation).mockReset();
+  vi.mocked(retryHostPublicConvergence).mockReset();
 });
 
 afterEach(() => {
@@ -301,6 +305,32 @@ afterEach(() => {
 });
 
 describe("host session mutation hooks", () => {
+  it("invalidates only the exact scoped convergence view after a bounded retry", async () => {
+    const response = {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED" as const,
+      committedGeneration: 7,
+      status: "PENDING" as const,
+      lastAttemptAt: "2026-08-26T04:30:00Z",
+      retryable: false,
+    };
+    vi.mocked(retryHostPublicConvergence).mockResolvedValue(response);
+    const { client, Wrapper } = createWrapper();
+    const exactKey = hostSessionKeys.convergence("session-7", context);
+    const otherKey = hostSessionKeys.convergence("session-7", { clubSlug: "other-club" });
+    client.setQueryData(exactKey, { ...response, status: "FAILED", retryable: true });
+    client.setQueryData(otherKey, { ...response, status: "FAILED", retryable: true });
+    const { result } = renderHook(() => useRetryHostPublicConvergenceMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({ sessionId: "session-7", convergenceId: response.convergenceId });
+    });
+
+    expect(retryHostPublicConvergence).toHaveBeenCalledWith("session-7", response.convergenceId, context);
+    expect(client.getQueryState(exactKey)?.isInvalidated).toBe(true);
+    expect(client.getQueryState(otherKey)?.isInvalidated).toBe(false);
+  });
+
   it("reconciles correction publication with its exact operation, resource, key, and envelope", async () => {
     vi.mocked(correctionPublishHostSession)
       .mockRejectedValueOnce(new ReadmatesTransportError())
@@ -505,6 +535,23 @@ describe("host session mutation hooks", () => {
     ]);
   });
 
+  it("allows default create consumers to start another request after an authoritative response", async () => {
+    vi.mocked(createHostSession)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sessionId: "session-8" }), { status: 201 }) as never)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sessionId: "session-9" }), { status: 201 }) as never);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(() => useCreateHostSessionMutation(context), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync(sessionRequest);
+      await result.current.mutateAsync({ ...sessionRequest, title: "No.9 모임" });
+    });
+
+    expect(createHostSession).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(createHostSession).mock.calls[0]?.[0].idempotencyKey)
+      .not.toBe(vi.mocked(createHostSession).mock.calls[1]?.[0].idempotencyKey);
+  });
+
   it("leaves every seeded cache unchanged when create returns a non-ok response", async () => {
     vi.mocked(createHostSession).mockResolvedValue(new Response("bad request", { status: 400 }) as never);
     const { client, Wrapper } = createWrapper();
@@ -518,6 +565,126 @@ describe("host session mutation hooks", () => {
 
     await waitFor(() => expect(result.current.isSuccess).toBe(true));
     expect(cacheState(client)).toEqual(before);
+  });
+
+  it("keeps the exact create envelope while a delayed first commit is pending", async () => {
+    vi.mocked(createHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation)
+      .mockResolvedValueOnce({
+        status: "PENDING",
+        receipt: null,
+        current: null,
+        attendanceVersions: null,
+        attendanceSnapshotId: null,
+      })
+      .mockResolvedValueOnce({
+        status: "COMMITTED",
+        receipt: { resourceId: "session-8" } as never,
+        current: null,
+        attendanceVersions: [],
+        attendanceSnapshotId: null,
+      });
+    vi.mocked(fetchHostSessionDetail).mockResolvedValue(authoritativeDetail() as never);
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCreateHostSessionMutation(context, { retainUntilResolved: true }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await expect(result.current.mutateAsync(sessionRequest)).rejects.toMatchObject({
+        code: "HOST_MUTATION_PENDING",
+      });
+    });
+    const firstEnvelope = vi.mocked(createHostSession).mock.calls[0]?.[0];
+    expect(result.current.hasPendingCreate).toBe(true);
+
+    await act(async () => {
+      await expect(result.current.mutateAsync({ ...sessionRequest, title: "새 key로 보내면 안 됨" }))
+        .rejects.toMatchObject({ code: "HOST_MUTATION_PENDING" });
+    });
+    expect(createHostSession).toHaveBeenCalledTimes(1);
+
+    let reconciled: Response | undefined;
+    await act(async () => {
+      reconciled = await result.current.reconcilePendingCreate();
+    });
+    expect(reconciled?.status).toBe(201);
+    expect(fetchHostMutationReconciliation).toHaveBeenNthCalledWith(
+      2,
+      "SESSION_CREATE",
+      "create",
+      firstEnvelope?.idempotencyKey,
+      context,
+    );
+    expect(createHostSession).toHaveBeenCalledTimes(1);
+
+    act(() => result.current.resolvePendingCreate());
+    expect(result.current.hasPendingCreate).toBe(false);
+  });
+
+  it("keeps the create envelope when reconciliation is unknown", async () => {
+    vi.mocked(createHostSession).mockRejectedValueOnce(new ReadmatesTransportError());
+    vi.mocked(fetchHostMutationReconciliation).mockRejectedValueOnce(new Error("malformed reconciliation"));
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCreateHostSessionMutation(context, { retainUntilResolved: true }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await expect(result.current.mutateAsync(sessionRequest)).rejects.toMatchObject({
+        code: "HOST_MUTATION_PENDING",
+      });
+    });
+
+    expect(result.current.hasPendingCreate).toBe(true);
+    await act(async () => {
+      await expect(result.current.mutateAsync({ ...sessionRequest, title: "새 요청 금지" }))
+        .rejects.toMatchObject({ code: "HOST_MUTATION_PENDING" });
+    });
+    expect(createHostSession).toHaveBeenCalledTimes(1);
+  });
+
+  it("retries NOT_EXECUTED once with the retained create envelope and key", async () => {
+    vi.mocked(createHostSession)
+      .mockRejectedValueOnce(new ReadmatesTransportError())
+      .mockResolvedValueOnce(new Response(JSON.stringify({ sessionId: "session-8" }), { status: 201 }) as never);
+    vi.mocked(fetchHostMutationReconciliation)
+      .mockResolvedValueOnce({
+        status: "PENDING",
+        receipt: null,
+        current: null,
+        attendanceVersions: null,
+        attendanceSnapshotId: null,
+      })
+      .mockResolvedValueOnce({
+        status: "NOT_EXECUTED",
+        receipt: null,
+        current: null,
+        attendanceVersions: [],
+        attendanceSnapshotId: null,
+      });
+    const { Wrapper } = createWrapper();
+    const { result } = renderHook(
+      () => useCreateHostSessionMutation(context, { retainUntilResolved: true }),
+      { wrapper: Wrapper },
+    );
+
+    await act(async () => {
+      await expect(result.current.mutateAsync(sessionRequest)).rejects.toMatchObject({
+        code: "HOST_MUTATION_PENDING",
+      });
+    });
+    const firstEnvelope = vi.mocked(createHostSession).mock.calls[0]?.[0];
+
+    let reconciled: Response | undefined;
+    await act(async () => {
+      reconciled = await result.current.reconcilePendingCreate();
+    });
+    expect(reconciled?.status).toBe(201);
+    expect(createHostSession).toHaveBeenNthCalledWith(2, firstEnvelope, context);
+    expect(createHostSession).toHaveBeenCalledTimes(2);
   });
 
   it("invalidates detail, lists, dashboard, and current session after update", async () => {
@@ -633,13 +800,33 @@ describe("host session mutation hooks", () => {
   });
 
   it.each([
-    ["open", useOpenHostSessionMutation, openHostSession, false],
-    ["close", useCloseHostSessionMutation, closeHostSession, true],
-    ["publish", usePublishHostSessionMutation, publishHostSession, true],
-  ] as const)("invalidates session surfaces after %s", async (_name, hook, apiFn, expectsManualDispatches) => {
+    ["open", useOpenHostSessionMutation, openHostSession, false, undefined],
+    ["close", useCloseHostSessionMutation, closeHostSession, true, undefined],
+    ["publish", usePublishHostSessionMutation, publishHostSession, true, null],
+    ["correction-publish", useCorrectionPublishHostSessionMutation, correctionPublishHostSession, true, {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED",
+      committedGeneration: 6,
+      status: "SUCCEEDED",
+      lastAttemptAt: "2026-08-26T04:20:00Z",
+      retryable: false,
+    }],
+  ] as const)("invalidates session surfaces after %s", async (
+    _name,
+    hook,
+    apiFn,
+    expectsManualDispatches,
+    staleConvergence,
+  ) => {
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
+    const convergenceKey = hostSessionKeys.convergence("session-7", context);
+    const otherConvergenceKey = hostSessionKeys.convergence("session-7", { clubSlug: "other-club" });
+    if (staleConvergence !== undefined) {
+      client.setQueryData(convergenceKey, staleConvergence);
+      client.setQueryData(otherConvergenceKey, staleConvergence);
+    }
     const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -675,17 +862,35 @@ describe("host session mutation hooks", () => {
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
+    if (staleConvergence !== undefined) {
+      expect(client.getQueryState(convergenceKey)?.isInvalidated).toBe(true);
+      expect(client.getQueryData(convergenceKey)).toEqual(staleConvergence);
+      expect(client.getQueryState(otherConvergenceKey)?.isInvalidated).toBe(false);
+    }
   });
 
   it.each([
-    ["reopen", useReopenHostSessionMutation, reopenHostSession],
-    ["unpublish", useUnpublishHostSessionMutation, unpublishHostSession],
-    ["return-to-draft", useReturnHostSessionToDraftMutation, returnHostSessionToDraft],
-  ] as const)("invalidates session surfaces after reverse %s", async (_name, hook, apiFn) => {
+    ["reopen", useReopenHostSessionMutation, reopenHostSession, {
+      convergenceId: "10000000-0000-4000-8000-000000000001",
+      originResult: "APPLIED",
+      committedGeneration: 6,
+      status: "FAILED",
+      lastAttemptAt: "2026-08-26T04:20:00Z",
+      retryable: true,
+    }],
+    ["unpublish", useUnpublishHostSessionMutation, unpublishHostSession, null],
+    ["return-to-draft", useReturnHostSessionToDraftMutation, returnHostSessionToDraft, undefined],
+  ] as const)("invalidates session surfaces after reverse %s", async (_name, hook, apiFn, staleConvergence) => {
     const request = { reasonCode: "ACCIDENTAL_TRANSITION" as const };
     vi.mocked(apiFn).mockResolvedValue(new Response("{}", { status: 200 }) as never);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
+    const convergenceKey = hostSessionKeys.convergence("session-7", context);
+    const otherConvergenceKey = hostSessionKeys.convergence("session-7", { clubSlug: "other-club" });
+    if (staleConvergence !== undefined) {
+      client.setQueryData(convergenceKey, staleConvergence);
+      client.setQueryData(otherConvergenceKey, staleConvergence);
+    }
     const { result } = renderHook(() => hook(context), { wrapper: Wrapper });
 
     await act(async () => {
@@ -713,6 +918,11 @@ describe("host session mutation hooks", () => {
       entries.otherClubDetail,
       entries.otherClubRecordLedger,
     ]);
+    if (staleConvergence !== undefined) {
+      expect(client.getQueryState(convergenceKey)?.isInvalidated).toBe(true);
+      expect(client.getQueryData(convergenceKey)).toEqual(staleConvergence);
+      expect(client.getQueryState(otherConvergenceKey)?.isInvalidated).toBe(false);
+    }
   });
 
   it("returns the visibility composer result and caches the updated session", async () => {
@@ -805,6 +1015,17 @@ describe("host session mutation hooks", () => {
       sessionId: "session-7",
       count: 1,
     } as never);
+    const refreshedDetail = {
+      ...authoritativeDetail(),
+      attendees: [{
+        ...authoritativeDetail().attendees[0],
+        attendanceStatus: "ATTENDED" as const,
+        attendanceRevision: 7,
+      }],
+    };
+    vi.mocked(fetchHostSessionDetail)
+      .mockResolvedValueOnce(authoritativeDetail())
+      .mockResolvedValueOnce(refreshedDetail);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
     const otherClubAttention = [
@@ -830,13 +1051,15 @@ describe("host session mutation hooks", () => {
         expectedAttendanceRevision: 6,
       }] },
     }), context);
+    expect(fetchHostSessionDetail).toHaveBeenCalledWith("session-7", context);
     expectInvalidated(client, [
-      entries.detail,
       entries.current,
       entries.recordHistory,
       entries.recordLedger,
       entries.recordAttention,
     ]);
+    expect(client.getQueryState(entries.detail[0])?.isInvalidated).toBe(false);
+    expect(client.getQueryData(entries.detail[0])).toEqual(refreshedDetail);
     expectFresh(client, [
       entries.closingStatus,
       entries.list,

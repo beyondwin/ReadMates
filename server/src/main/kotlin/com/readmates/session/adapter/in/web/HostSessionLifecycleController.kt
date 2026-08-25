@@ -3,7 +3,6 @@
 package com.readmates.session.adapter.`in`.web
 
 import com.readmates.session.application.model.ExpectedSessionRevision
-import com.readmates.session.application.model.HostMutationEnvelope
 import com.readmates.session.application.model.HostSessionIdCommand
 import com.readmates.session.application.model.HostSessionLifecycleReasonCode
 import com.readmates.session.application.model.HostSessionReverseCommand
@@ -56,7 +55,7 @@ class HostSessionLifecycleController(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.open(envelopes.sessionRevision(body).toSessionCommand(member, sessionId))
+    ) = hostSessionLifecycleUseCase.open(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
 
     @PostMapping("/{sessionId}/close")
     fun close(
@@ -96,30 +95,64 @@ class HostSessionLifecycleController(
             ),
         )
     } else {
-        hostSessionLifecycleUseCase.publish(envelopes.sessionRevision(body).toSessionCommand(member, sessionId))
+        hostSessionLifecycleUseCase.publish(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
     }
+
+    @PostMapping("/{sessionId}/correction-publish")
+    fun correctionPublish(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+        @RequestBody body: JsonNode,
+    ): Any {
+        val envelope = envelopes.correctionPublishVector(body)
+        val expected = envelope.expected.toExpected()
+        return hostSessionLifecycleUseCase.correctionPublish(
+            HostSessionIdCommand(
+                host = member,
+                sessionId = parseHostSessionId(sessionId),
+                expectedSessionRevision = ExpectedSessionRevision(expected.sessionRevision),
+                expectedCorrectionVector = expected,
+                idempotencyKey = envelope.idempotencyKey,
+            ),
+        )
+    }
+
+    @GetMapping("/{sessionId}/correction-publish-preview")
+    fun correctionPublishPreview(
+        member: CurrentMember,
+        @PathVariable sessionId: String,
+    ) = hostSessionLifecycleUseCase.correctionPublishPreview(
+        HostSessionIdCommand(member, parseHostSessionId(sessionId)),
+    )
 
     @PostMapping("/{sessionId}/reopen")
     fun reopen(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.reopen(envelopes.reverse(body).toReverseCommand(member, sessionId))
+    ) = hostSessionLifecycleUseCase.reopen(envelopes.reverseCommand(member, sessionId, body))
 
     @PostMapping("/{sessionId}/unpublish")
     fun unpublish(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.unpublish(envelopes.reverse(body).toReverseCommand(member, sessionId))
+    ) = hostSessionLifecycleUseCase.unpublish(envelopes.reverseCommand(member, sessionId, body))
 
     @PostMapping("/{sessionId}/return-to-draft")
     fun returnToDraft(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.returnToDraft(envelopes.reverse(body).toReverseCommand(member, sessionId))
+    ) = hostSessionLifecycleUseCase.returnToDraft(envelopes.reverseCommand(member, sessionId, body))
+}
 
+@RestController
+@RequestMapping("/api/host/sessions")
+class HostSessionDeletionController(
+    private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
+    private val envelopes: HostMutationEnvelopeReader,
+) {
     @GetMapping("/{sessionId}/deletion-preview")
     fun deletionPreview(
         member: CurrentMember,
@@ -131,74 +164,40 @@ class HostSessionLifecycleController(
         member: CurrentMember,
         @PathVariable sessionId: String,
         @RequestBody body: JsonNode,
-    ) = hostSessionLifecycleUseCase.delete(envelopes.sessionRevision(body).toSessionCommand(member, sessionId))
+    ) = hostSessionLifecycleUseCase.delete(sessionCommand(member, sessionId, envelopes.sessionRevision(body)))
 }
 
-private fun HostMutationEnvelope<Unit, ExpectedSessionOnlyBody>.toSessionCommand(
+private fun sessionCommand(
     member: CurrentMember,
     sessionId: String,
+    envelope: com.readmates.session.application.model.HostMutationEnvelope<Unit, ExpectedSessionOnlyBody>,
 ) = HostSessionIdCommand(
     host = member,
     sessionId = parseHostSessionId(sessionId),
-    expectedSessionRevision = ExpectedSessionRevision(expected.toExpected().sessionRevision),
-    idempotencyKey = idempotencyKey,
+    expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+    idempotencyKey = envelope.idempotencyKey,
 )
 
-private fun HostMutationEnvelope<HostLifecycleCommandBody, ExpectedSessionOnlyBody>.toReverseCommand(
+private fun HostMutationEnvelopeReader.reverseCommand(
     member: CurrentMember,
     sessionId: String,
-): HostSessionReverseCommand =
-    HostSessionReverseCommand(
+    body: JsonNode,
+): HostSessionReverseCommand {
+    val envelope = reverse(body)
+    val parsed =
+        envelope.command.reasonCode?.let { raw ->
+            runCatching { HostSessionLifecycleReasonCode.valueOf(raw) }
+                .getOrElse { throw InvalidHostSessionLifecycleReasonException() }
+                .takeIf(USER_SELECTABLE_LIFECYCLE_REASONS::contains)
+                ?: throw InvalidHostSessionLifecycleReasonException()
+        }
+    return HostSessionReverseCommand(
         host = member,
         sessionId = parseHostSessionId(sessionId),
-        reasonCode = command.reasonCode?.let(::parseReasonCode),
-        reasonNote = command.reasonNote,
-        expectedSessionRevision = ExpectedSessionRevision(expected.toExpected().sessionRevision),
-        idempotencyKey = idempotencyKey,
-    )
-
-private fun parseReasonCode(raw: String): HostSessionLifecycleReasonCode =
-    runCatching { HostSessionLifecycleReasonCode.valueOf(raw) }
-        .getOrElse { throw InvalidHostSessionLifecycleReasonException() }
-        .takeIf(USER_SELECTABLE_LIFECYCLE_REASONS::contains)
-        ?: throw InvalidHostSessionLifecycleReasonException()
-
-@RestController
-@RequestMapping("/api/host/sessions")
-class HostSessionCorrectionController(
-    private val hostSessionLifecycleUseCase: HostSessionLifecycleUseCase,
-    private val envelopes: HostMutationEnvelopeReader,
-) {
-    @PostMapping("/{sessionId}/correction-publish")
-    fun correctionPublish(
-        member: CurrentMember,
-        @PathVariable sessionId: String,
-        @RequestBody body: JsonNode,
-    ): Any =
-        hostSessionLifecycleUseCase.correctionPublish(
-            envelopes.correctionPublishVector(body).toCorrectionPublishCommand(member, sessionId),
-        )
-
-    @GetMapping("/{sessionId}/correction-publish-preview")
-    fun correctionPublishPreview(
-        member: CurrentMember,
-        @PathVariable sessionId: String,
-    ) = hostSessionLifecycleUseCase.correctionPublishPreview(
-        HostSessionIdCommand(member, parseHostSessionId(sessionId)),
-    )
-}
-
-private fun HostMutationEnvelope<Unit, ExpectedCorrectionPublishVectorBody>.toCorrectionPublishCommand(
-    member: CurrentMember,
-    sessionId: String,
-): HostSessionIdCommand {
-    val vector = expected.toExpected()
-    return HostSessionIdCommand(
-        host = member,
-        sessionId = parseHostSessionId(sessionId),
-        expectedSessionRevision = ExpectedSessionRevision(vector.sessionRevision),
-        expectedCorrectionVector = vector,
-        idempotencyKey = idempotencyKey,
+        reasonCode = parsed,
+        reasonNote = envelope.command.reasonNote,
+        expectedSessionRevision = ExpectedSessionRevision(envelope.expected.toExpected().sessionRevision),
+        idempotencyKey = envelope.idempotencyKey,
     )
 }
 

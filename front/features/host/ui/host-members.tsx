@@ -6,7 +6,10 @@ import type {
   HostMemberListItem,
   MemberLifecycleRequest,
 } from "@/features/host/model/host-view-types";
-import type { HostMembersActions } from "@/features/host/model/host-member-actions";
+import {
+  HostMemberProfileActionError,
+  type HostMembersActions,
+} from "@/features/host/model/host-member-actions";
 import { scopedAppLinkTarget } from "@/shared/routing/scoped-app-link-target";
 import { LifecyclePolicyDialog } from "./members/member-approval-actions";
 import { actionKey, disabledProfileReason, isMembershipPending } from "./members/member-action-rules";
@@ -266,18 +269,16 @@ export default function HostMembers({ initialMembers, actions, LinkComponent = D
     setMessage(null);
 
     try {
-      const result = await actions.submitProfile(member.membershipId, displayName);
-      if (!result.ok) {
-        throw new Error(hostProfileErrorMessage(result.status, result.code));
-      }
-
-      const updatedMember = result.member;
+      const updatedMember = await actions.submitProfile(member.membershipId, displayName);
       setMembers((current) =>
         current.map((item) => (item.membershipId === updatedMember.membershipId ? updatedMember : item)),
       );
       setMessage({ kind: "status", text: "이름을 저장했습니다." });
     } catch (error) {
-      throw new Error(profileFailureMessage(error), { cause: error });
+      const failure = error instanceof HostMemberProfileActionError
+        ? new Error(hostProfileErrorMessage(error.status, error.code), { cause: error })
+        : error;
+      throw new Error(profileFailureMessage(failure), { cause: error });
     } finally {
       setActionPending(key, false);
     }

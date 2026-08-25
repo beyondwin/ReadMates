@@ -176,6 +176,8 @@ gh run list --workflow "Host Client Rollout Evidence" --branch host-rollout-r2b 
 gh run watch <host-rollout-run-id> --exit-status
 ```
 
+Ref push는 protected candidate 위치만 갱신하며 live mutation을 시작하지 않습니다. Fresh explicit R2b live approval을 확인한 뒤 no-input `workflow_dispatch`를 실행합니다. Dispatch로 생성된 run의 environment-bound job은 그 다음 protected environment reviewer 승인을 통과해야 진행합니다.
+
 Protected workflow는 ref 보호, annotated tag/checkout commit, exact candidate SHA-256, R2a/R2b evidence와 final checker를 확인한 뒤 reusable `Deploy Front`가 검증한 tar에서 추출한 `dist`와 `functions`만 Cloudflare Pages production에 배포합니다. Server image, OCI promotion, evidence checker, frontend 중 하나가 실패하면 다음 단계로 진행하지 않습니다. 실패 원인은 GitHub Actions log와 artifact를 보고 수정한 뒤 새 patch tag로 다시 발행합니다. 이미 push된 tag를 force update하지 않습니다.
 
 ## GitHub Release 생성
@@ -295,6 +297,14 @@ identifier는 Git에 남기지 않습니다.
 알림/SMTP/Kafka가 바뀐 릴리즈는 호스트 알림 화면에서 preview/confirm, event ledger, pending/failed delivery 상태를 sanitized summary로 확인합니다. 실제 멤버 이메일, 알림 본문, club 운영 데이터는 release note에 쓰지 않습니다.
 
 서버/API/frontend contract가 함께 바뀐 platform-admin 릴리스는 먼저 익명 요청이 `/api/bff/api/admin/operations/cases`에서 인증 경계를 지키는지 확인합니다. 그 뒤 OWNER 또는 OPERATOR의 읽기 전용 세션으로 `/admin/today`의 queue/detail, source status와 canonical detail link가 렌더링되는지 확인하고 SUPPORT에는 lifecycle action이 노출되지 않는지 확인합니다. 실제 acknowledge·snooze·resolve mutation은 별도 운영 승인 없이 smoke로 실행하지 않으며, 실제 멤버 데이터나 운영 식별자는 기록하지 않습니다.
+
+## Public convergence와 emergency takedown
+
+일반 게시·수정·내리기는 origin commit과 immutable receipt를 먼저 확인하고, provider purge 결과는 같은 `convergenceId`의 append-only attempt로만 관찰합니다. Host/admin 화면의 `PENDING|SUCCEEDED|FAILED`는 provider-neutral bounded category와 timestamp만 보여 주며 raw provider error, private content, meeting URL/passcode, raw reason은 기록하지 않습니다. Retry는 같은 convergence ID에 higher attempt를 추가하고 origin mutation을 반복하지 않습니다.
+
+Emergency confirm은 R2a cache-safety manifest가 이전 `max-age=120 + stale-while-revalidate=600` 전체 720초 window 소진을 입증하기 전에는 production에서 fail closed해야 합니다. 활성화 뒤 목표는 새 navigation/read 기준 일반 120초, 긴급 60초이며 이미 렌더링·저장·offline인 copy는 원격 회수할 수 없습니다. OWNER/OPERATOR의 `EMERGENCY_PUBLIC_TAKEDOWN` capability, 대상 identity/generation, preview TTL, redacted reason category를 확인하고 SUPPORT/inactive/capabilityless actor는 거절합니다.
+
+Repository checker와 local browser evidence는 runbook/artifact readiness일 뿐 live provider, 720초 window, 120/60초 SLA 완료 증거가 아닙니다. 실제 사고에서도 새 origin deny command를 반복하지 말고 receipt reconciliation → existing convergence view → retry 순서로 처리합니다.
 
 ## Rollback 기준
 

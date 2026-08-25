@@ -52,6 +52,7 @@ import type {
   HostMutationEnvelope,
   HostMutationOperation,
   HostMutationReconciliation,
+  HostPublicConvergenceView,
   PublicationVersionVector,
   ManualNotificationConfirmRequest,
   ManualNotificationConfirmResponse,
@@ -85,6 +86,7 @@ import {
   HostSessionVisibilityUpdateResponseSchema,
   HostMutationReconciliationSchema,
   HostMutationIdempotencyKeySchema,
+  HostPublicConvergenceViewSchema,
   parseHostAttendanceResponse,
   parseHostSessionDetailResponse,
   parseHostSessionDeletionResponse,
@@ -364,6 +366,29 @@ export function fetchHostSessionScheduleDefaults(context: ExplicitHostApiContext
 
 export function fetchHostSessionDetail(sessionId: string, context: ExplicitHostApiContext) {
   return readmatesFetch<HostSessionDetailResponse>(`/api/host/sessions/${encodeURIComponent(sessionId)}`, undefined, context).then(parseHostSessionDetailResponse);
+}
+
+export function fetchHostPublicConvergence(
+  sessionId: string,
+  context: ExplicitHostApiContext,
+): Promise<HostPublicConvergenceView | null> {
+  return readmatesFetch<HostPublicConvergenceView | undefined>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/publication/convergence`,
+    undefined,
+    context,
+  ).then((value) => value === undefined ? null : HostPublicConvergenceViewSchema.parse(value));
+}
+
+export function retryHostPublicConvergence(
+  sessionId: string,
+  convergenceId: string,
+  context: ExplicitHostApiContext,
+): Promise<HostPublicConvergenceView> {
+  return readmatesFetch<HostPublicConvergenceView>(
+    `/api/host/sessions/${encodeURIComponent(sessionId)}/publication/convergence/${encodeURIComponent(convergenceId)}/retry`,
+    { method: "POST" },
+    context,
+  ).then((value) => HostPublicConvergenceViewSchema.parse(value));
 }
 
 export function fetchHostSessionTrashList(context: ExplicitHostApiContext, page?: PageRequest) {

@@ -37,8 +37,8 @@ class ActiveSessionProjectionArchitectureTest {
 
         assertTrue(
             violations.isEmpty(),
-            "Normal session SQL must read active_sessions; only deletion/reconciliation projection owners " +
-                "and the HostSessionWriteQueries max-number allocation query may use sessions:\n" +
+            "Normal session SQL must read active_sessions; only deletion, explicit trash projection, " +
+                "and max-number allocation queries may use sessions:\n" +
                 violations.joinToString("\n"),
         )
     }
@@ -77,14 +77,64 @@ class ActiveSessionProjectionArchitectureTest {
         val inMaxNumberWindow =
             MAX_NUMBER_ALLOCATION_COLLAPSED in window
         val inProjectionLockWindow = PUBLIC_PROJECTION_LOCK_COLLAPSED in window
-        val isRawSessionRead = SESSION_TABLE_SCAN.matches(match.value)
+        val inTrashProjectionQuery =
+            sourceFile.name == "HostSessionWriteQueries.kt" &&
+                match.range.first in namedConstantRange(source, "LOAD_PROJECTION_SQL", "VERSION_VECTOR_SQL")
+        val inVersionVectorQuery =
+            sourceFile.name == "HostSessionWriteQueries.kt" &&
+                match.range.first in namedConstantRange(source, "VERSION_VECTOR_SQL", null)
+        val inSplitProjectionQuery =
+            sourceFile.name == "HostSessionProjectionQueries.kt" &&
+                (
+                    match.range.first in namedConstantRange(source, "VERSION_VECTOR_SQL", "REVISION_CONFLICT_SQL") ||
+                        match.range.first in namedConstantRange(source, "REVISION_CONFLICT_SQL", null)
+                )
+        val inAllSessionsProjectionQuery =
+            sourceFile.name == "HostSessionWriteQueryHelpers.kt" &&
+                match.range.first in namedConstantRange(source, "HOST_ALL_PROJECTION_SQL", null)
+        val inOwnedWriteFunction =
+            RAW_SESSION_WRITE_FUNCTIONS[sourceFile.name]
+                .orEmpty()
+                .any { functionName -> match.range.first in namedFunctionRange(source, functionName) }
         return when {
             sourceFile.name == "HostSessionDeletionQueries.kt" -> true
-            sourceFile.name in DELETION_RECONCILIATION_QUERY_FILES -> isRawSessionRead
             sourceFile.name in PUBLIC_PROJECTION_LOCK_FILES -> inProjectionLockWindow
-            sourceFile.name != "HostSessionWriteQueries.kt" -> false
-            else -> inMaxNumberWindow
+            sourceFile.name == "HostSessionWriteQueries.kt" ->
+                inMaxNumberWindow || inTrashProjectionQuery || inVersionVectorQuery || inOwnedWriteFunction
+            sourceFile.name == "HostSessionProjectionQueries.kt" -> inSplitProjectionQuery
+            sourceFile.name == "HostSessionWriteQueryHelpers.kt" -> inAllSessionsProjectionQuery
+            else -> inOwnedWriteFunction
         }
+    }
+
+    private fun namedConstantRange(
+        source: String,
+        startName: String,
+        endName: String?,
+    ): IntRange {
+        val start = source.indexOf("private const val $startName")
+        val end = endName?.let { source.indexOf("private const val $it") }?.takeIf { it >= 0 } ?: source.length
+        return start..end
+    }
+
+    private fun namedFunctionRange(
+        source: String,
+        functionName: String,
+    ): IntRange {
+        val declarations =
+            Regex("""(?m)^[ \t]*(?:override\s+)?(?:private\s+)?(?:internal\s+)?fun\s+(?:\w+\.)?\w+\s*\(""")
+        val functionDeclaration =
+            Regex(
+                """(?m)^[ \t]*(?:override\s+)?(?:private\s+)?(?:internal\s+)?fun\s+(?:\w+\.)?$functionName\s*\(""",
+            )
+        val start =
+            functionDeclaration
+                .find(source)
+                ?.range
+                ?.first
+                ?: return IntRange.EMPTY
+        val end = declarations.find(source, start + 1)?.range?.first ?: source.length
+        return start until end
     }
 
     private fun isGuardedSessionUpdate(
@@ -143,11 +193,32 @@ class ActiveSessionProjectionArchitectureTest {
                 "JdbcAuthPublicProjectionMutationAdapter.kt",
                 "JdbcClubPublicProjectionMutationAdapter.kt",
             )
-        val DELETION_RECONCILIATION_QUERY_FILES =
-            setOf(
-                "JdbcPublicQueryAdapter.kt",
-                "HostPublicProjectionWriteOperations.kt",
-                "HostSessionWriteQueryHelpers.kt",
+        val RAW_SESSION_WRITE_FUNCTIONS =
+            mapOf(
+                "JdbcPublicTakedownAdapter.kt" to setOf("loadTarget", "lockSession"),
+                "JdbcMemberLifecycleStoreAdapter.kt" to
+                    setOf("lockOpenSessionForUpdate", "currentParticipantSetRevision"),
+                "SessionScopedNotificationGuard.kt" to setOf("lockExisting"),
+                "SessionRecordPublicProjectionWriteOperations.kt" to
+                    setOf("lockSession", "loadAffectedOrigin"),
+                "JdbcSessionParticipationWriteAdapter.kt" to setOf("lockOpenSession"),
+                "HostPublicProjectionWriteOperations.kt" to
+                    setOf("rotateAffectedContent", "lockSession", "loadOrigin"),
+                "JdbcHostSessionRecoveryAdapter.kt" to setOf("lockForRestore"),
+                "HostSessionWriteQueries.kt" to
+                    setOf(
+                        "lockParticipantSetRevision",
+                        "sessionRevision",
+                        "lockSession",
+                        "lockCurrentOpenSession",
+                        "revisionConflict",
+                    ),
+                "HostSessionWriteLockQueries.kt" to
+                    setOf(
+                        "lockParticipantSetRevision",
+                        "lockSession",
+                        "lockCurrentOpenSession",
+                    ),
             )
 
         fun collapseWhitespace(value: String): String = value.replace(Regex("""\s+"""), " ")

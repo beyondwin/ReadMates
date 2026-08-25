@@ -372,6 +372,7 @@ private fun jacksonImportsIn(serviceRoot: Path): List<String> =
     }
 
 @Tag("architecture")
+@Suppress("LargeClass")
 class ServerArchitectureBoundaryTest {
     @Test
     fun `notification decomposition boundaries remain focused`() = assertNotificationAndAiRedisBoundaries()
@@ -417,6 +418,7 @@ class ServerArchitectureBoundaryTest {
                     "admin.audit",
                     "admin.health",
                     "admin.analytics",
+                    "admin.takedown",
                     "aigen",
                     "browse",
                     "sessionclosing",
@@ -441,6 +443,7 @@ class ServerArchitectureBoundaryTest {
         assertTrue(inboundPackages.contains("com.readmates.session.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.shared.adminmutation.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.shared.mutation.adapter.in.scheduling.."))
+        assertTrue(inboundPackages.contains("com.readmates.publication.adapter.in.scheduling.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.adapter.in.security.."))
         assertTrue(inboundPackages.contains("com.readmates.auth.infrastructure.security.."))
     }
@@ -753,6 +756,19 @@ class ServerAdapterArchitectureBoundaryTest {
             .resideInAnyPackage(
                 "com.readmates.aigen.application.service..",
                 "com.readmates.aigen.adapter.out..",
+            ).check(importedClasses)
+    }
+
+    @Test
+    fun `publication scheduling adapter depends on application ports rather than concrete services`() {
+        noClasses()
+            .that()
+            .resideInAnyPackage("com.readmates.publication.adapter.in.scheduling..")
+            .should()
+            .dependOnClassesThat()
+            .resideInAnyPackage(
+                "com.readmates.publication.application.service..",
+                "com.readmates.publication.adapter.out..",
             ).check(importedClasses)
     }
 
