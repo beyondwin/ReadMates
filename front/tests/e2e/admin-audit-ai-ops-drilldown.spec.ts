@@ -41,6 +41,15 @@ async function routeShell(page: Page, role: PlatformAdminRole): Promise<void> {
       domainsRequiringAction: [],
     });
   });
+  await page.route("**/api/bff/api/admin/capabilities", async (route) => {
+    await json(route, 200, {
+      schemaVersion: 1,
+      role,
+      status: "ACTIVE",
+      capabilities: ["VIEW_AUDIT", "VIEW_AI_OPERATIONS"],
+      generatedAt: "2026-08-25T00:00:00Z",
+    });
+  });
   await page.route("**/api/bff/api/admin/clubs", async (route) => {
     await json(route, 200, { items: [] });
   });
@@ -138,9 +147,10 @@ test("owner drills from an AI_OPS audit row into the affected club's ai-ops jobs
 
   await expect(page).toHaveURL(/\/admin\/ai-ops\?clubId=club-1&jobId=job-1/);
   await expect(page.getByRole("heading", { name: "AI Ops", level: 1 })).toBeVisible();
-  await expect(page.getByText("Club One")).toBeVisible();
+  await expect(page.getByText("Club One", { exact: true })).toBeVisible();
   await expect(page.getByRole("button", { name: "전체 보기" })).toBeVisible();
 
+  await page.getByRole("dialog", { name: "AI 작업 상세" }).getByRole("button", { name: "닫기" }).click();
   await page.getByRole("button", { name: "전체 보기" }).click();
   await expect(page).not.toHaveURL(/clubId=/);
 

@@ -45,6 +45,15 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
       domainsRequiringAction: [],
     });
   });
+  await page.route("**/api/bff/api/admin/capabilities", async (route) => {
+    await json(route, 200, {
+      schemaVersion: 1,
+      role,
+      status: "ACTIVE",
+      capabilities: ["VIEW_NOTIFICATION_OPERATIONS", "REPLAY_NOTIFICATIONS"],
+      generatedAt: "2026-08-25T00:00:00Z",
+    });
+  });
   await page.route("**/api/bff/api/admin/clubs", async (route) => {
     await json(route, 200, { items: [] });
   });
@@ -114,9 +123,14 @@ async function routeNotifications(page: Page): Promise<void> {
   });
   await page.route("**/api/bff/api/admin/notifications/replay-confirm", async (route) => {
     await json(route, 200, {
+      receiptId: "00000000-0000-4000-8000-000000005901",
       replayedCount: 2,
       skippedCount: 0,
-      selectionHash: "a".repeat(64),
+      skippedReasonCounts: {},
+      originStatus: "SUCCEEDED",
+      effectStatus: "PENDING",
+      effectAvailability: "AVAILABLE",
+      convergenceId: "00000000-0000-4000-8000-000000005902",
     });
   });
 }
@@ -141,5 +155,5 @@ test("owner operates admin notification ledgers and replay", async ({ page }) =>
   await page.getByLabel("처리 사유").fill("provider recovered");
   await expect(page.getByRole("button", { name: "재처리 확정" })).toBeEnabled();
   await page.getByRole("button", { name: "재처리 확정" }).click();
-  await expect(page.getByText("2건 재처리를 기록했습니다.")).toBeVisible();
+  await expect(page.getByText("재처리 2건 · 건너뜀 0건")).toBeVisible();
 });

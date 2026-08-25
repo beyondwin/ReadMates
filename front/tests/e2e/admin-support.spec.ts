@@ -56,8 +56,12 @@ async function routeSupport(page: Page): Promise<void> {
       publicVisibility: "PUBLIC",
       domainCount: 0,
       domainActionRequiredCount: 0,
+      notificationFailureCount: 0,
+      aiFailureCount: 0,
       firstHostOnboardingState: "ASSIGNED",
+      adminRevision: 1,
     }],
+    nextCursor: null,
   }));
   await page.route("**/api/bff/api/admin/support/search**", async (route) => json(route, 200, [{
     subjectId: SUBJECT_ID,
@@ -146,7 +150,7 @@ test("owner searches support subject then creates and revokes grant", async ({ p
   await page.getByRole("button", { name: "발급 확정" }).click();
   await expect(page.getByText(/create-receipt-1/)).toBeVisible();
   await page.getByRole("button", { name: "권한 취소 검토" }).click();
-  await page.getByRole("button", { name: "취소 검토" }).click();
+  await page.getByRole("button", { name: "취소 검토", exact: true }).click();
   await page.getByRole("button", { name: "취소 확정" }).click();
 });
 

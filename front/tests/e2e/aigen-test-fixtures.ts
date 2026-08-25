@@ -125,7 +125,11 @@ export async function routeHostEditorShell(page: Page, clubSlug: string): Promis
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ items: [], nextCursor: null }),
+      body: JSON.stringify({
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      }),
     });
   });
 
@@ -291,6 +295,15 @@ export function hostSessionDetailResponse(sessionId: string): HostSessionDetailR
     visibility: "HOST_ONLY",
     publication: null,
     state: "OPEN",
+    versions: {
+      sessionRevision: 1,
+      exposureRevision: 0,
+      participantSetRevision: 0,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-e2e",
     attendees: [],
     feedbackDocument: {
       uploaded: false,

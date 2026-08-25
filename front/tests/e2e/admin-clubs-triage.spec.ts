@@ -455,7 +455,7 @@ test.describe("admin clubs registry", () => {
     const requests = harness.onboardingRequests.filter(
       (item) => (item.club as { slug: string }).slug === "response-loss-circle",
     );
-    expect(new Set(requests.map((item) => item.idempotencyKey))).toHaveSize(1);
+    expect(new Set(requests.map((item) => item.idempotencyKey)).size).toBe(1);
   });
 
   test("requires a fresh preview after an expired onboarding confirm", async ({
@@ -560,6 +560,7 @@ test.describe("admin clubs registry", () => {
     const cdp = await page.context().newCDPSession(page);
     await cdp.send("Emulation.setPageScaleFactor", { pageScaleFactor: 2 });
     await expect(page.getByRole("link", { name: "새 클럽" })).toBeVisible();
+    await cdp.send("Emulation.setPageScaleFactor", { pageScaleFactor: 1 });
     await cdp.detach();
 
     const onboardingTrigger = page.getByRole("link", { name: "새 클럽" });

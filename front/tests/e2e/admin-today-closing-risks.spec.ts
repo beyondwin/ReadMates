@@ -62,6 +62,13 @@ test("owner sees a safe closing-risk case and follows its host board link", asyn
     domains: [],
     domainsRequiringAction: [],
   }));
+  await page.route("**/api/bff/api/admin/capabilities**", (route) => json(route, 200, {
+    schemaVersion: 1,
+    role: "OWNER",
+    status: "ACTIVE",
+    capabilities: ["VIEW_TODAY"],
+    generatedAt: GENERATED_AT,
+  }));
   await page.route("**/api/bff/api/admin/clubs", (route) => json(route, 200, { items: [] }));
   await page.route("**/api/bff/api/admin/operations/cases**", (route) => {
     const pathname = new URL(route.request().url()).pathname;

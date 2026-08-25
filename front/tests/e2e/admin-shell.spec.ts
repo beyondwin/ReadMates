@@ -144,11 +144,15 @@ async function routePlatformAdminHostWorkspace(page: Page) {
       }),
     });
   });
-  await page.route("**/api/bff/api/host/sessions?limit=50&clubSlug=reading-sai", async (route) => {
+  await page.route("**/api/bff/api/host/sessions?**", async (route) => {
     await route.fulfill({
       status: 200,
       contentType: "application/json",
-      body: JSON.stringify({ items: [], nextCursor: null }),
+      body: JSON.stringify({
+        items: [],
+        nextCursor: null,
+        summary: { needsAttentionCount: 0, incompletePublishedCount: 0, draftCount: 0 },
+      }),
     });
   });
   await page.route("**/api/bff/api/host/club-operations?clubSlug=reading-sai", async (route) => {

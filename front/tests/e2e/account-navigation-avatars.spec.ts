@@ -204,7 +204,20 @@ function hostSessionDetailResponse() {
     visibility: "HOST_ONLY",
     publication: null,
     state: "OPEN",
-    attendees: sameSurnameMembers.map((member) => ({ ...member, participationStatus: "ACTIVE" })),
+    versions: {
+      sessionRevision: 1,
+      exposureRevision: 0,
+      participantSetRevision: 1,
+      recordDraftRevision: null,
+      liveRecordRevision: null,
+      publicationRevision: 0,
+    },
+    attendanceSnapshotId: "attendance-snapshot-avatar-roster",
+    attendees: sameSurnameMembers.map((member) => ({
+      ...member,
+      participationStatus: "ACTIVE",
+      attendanceRevision: 0,
+    })),
     feedbackDocument: { uploaded: false, fileName: null, uploadedAt: null },
   };
 }
@@ -684,7 +697,7 @@ test("scoped account navigation preserves local avatar identity across mobile an
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto(`${APP_BASE}/notifications`);
-  const mobileTabs = page.getByRole("navigation", { name: "앱 탭" });
+  const mobileTabs = page.getByRole("navigation", { name: "멤버 주 메뉴 모바일" });
   await expect(mobileTabs.getByRole("link", { name: "내 공간" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByRole("link", { name: "내 공간" }).first()).toHaveAttribute("href", `${APP_BASE}/me`);
   await page.screenshot({ path: testInfo.outputPath("390-notifications-parent.png"), fullPage: true });
@@ -719,15 +732,21 @@ test("scoped account navigation preserves local avatar identity across mobile an
   await expect(page).toHaveURL(`${APP_BASE}/me`);
 
   await page.setViewportSize({ width: 320, height: 700 });
-  await expect(page.getByRole("link", { name: "호스트 화면" })).toBeVisible();
+  const memberWorkspaceSelector = page.locator(".rm-club-shell-mobile-context .rm-workspace-selector");
+  await memberWorkspaceSelector.locator("summary").click();
+  const memberWorkspaceNavigation = memberWorkspaceSelector.getByRole("navigation", { name: "공간 선택" });
+  await expect(memberWorkspaceNavigation.getByRole("link", { name: "호스트 공간" })).toBeVisible();
   const narrowAccount = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
   await expect(narrowAccount).toBeVisible();
   await expectAvatarRoleSize(narrowAccount.locator(".rm-avatar-chip"), "navigation", 36);
   await page.screenshot({ path: testInfo.outputPath("320-member-header.png"), fullPage: true });
-  await page.getByRole("link", { name: "호스트 화면" }).click();
+  await memberWorkspaceNavigation.getByRole("link", { name: "호스트 공간" }).click();
   await expect.poll(() => new URL(page.url()).pathname, { timeout: 15_000 }).toMatch(/\/app\/host(\/sessions\/[^/]+)?$/);
   const hostHeader = page.getByRole("banner");
-  await expect(hostHeader.getByRole("link", { name: "멤버 화면으로" })).toBeVisible();
+  const hostWorkspaceSelector = page.locator(".rm-club-shell-mobile-context .rm-workspace-selector");
+  await hostWorkspaceSelector.locator("summary").click();
+  await expect(hostWorkspaceSelector.getByRole("navigation", { name: "공간 선택" }).getByRole("link", { name: "멤버 공간" })).toBeVisible();
+  await hostWorkspaceSelector.locator("summary").click();
   await expect(hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` })).toBeVisible();
   await hostHeader.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` }).click();
   await expect(page.getByRole("dialog", { name: MEMBER_NAME }).getByRole("button", { name: "로그아웃" })).toBeVisible();
@@ -738,7 +757,7 @@ test("scoped account navigation preserves local avatar identity across mobile an
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto(`${APP_BASE}/notifications`);
-  const desktopNavigation = page.getByRole("navigation", { name: "앱 내비게이션" });
+  const desktopNavigation = page.getByRole("navigation", { name: "멤버 주 메뉴" });
   await expect(desktopNavigation.getByRole("link", { name: "내 공간" })).toHaveAttribute("aria-current", "page");
   const desktopNotificationAccount = page.getByRole("button", { name: `${MEMBER_NAME} 계정 메뉴` });
   await expect(desktopNotificationAccount).toContainText(MEMBER_NAME);

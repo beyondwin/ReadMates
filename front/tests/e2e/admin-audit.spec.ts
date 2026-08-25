@@ -41,6 +41,15 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
       domainsRequiringAction: [],
     });
   });
+  await page.route("**/api/bff/api/admin/capabilities", async (route) => {
+    await json(route, 200, {
+      schemaVersion: 1,
+      role,
+      status: "ACTIVE",
+      capabilities: ["VIEW_AUDIT", "VIEW_SENSITIVE_AUDIT"],
+      generatedAt: "2026-08-25T00:00:00Z",
+    });
+  });
   await page.route("**/api/bff/api/admin/clubs", async (route) => {
     await json(route, 200, { items: [] });
   });
