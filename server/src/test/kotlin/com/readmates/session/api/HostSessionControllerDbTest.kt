@@ -409,6 +409,155 @@ class HostSessionControllerDbTest(
     }
 
     @Test
+    fun `host create measures title limits in Unicode code points`() {
+        val astralAtLimit = "📚".repeat(255)
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(title = astralAtLimit)
+            }.andExpect {
+                status { isCreated() }
+            }
+
+        val privateRejectedTitle = "📚".repeat(256)
+        val response =
+            mockMvc
+                .post("/api/host/sessions") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content = validationSessionRequestJson(title = privateRejectedTitle)
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.code") { value("INVALID_REQUEST") }
+                    jsonPath("$.field") { value("title") }
+                }.andReturn()
+
+        assertThat(response.response.contentAsString).doesNotContain(privateRejectedTitle)
+    }
+
+    @Test
+    fun `host update measures passcode limits in Unicode code points`() {
+        val sessionId = createDraftSessionSeven()
+        val combiningAtLimit = "e\u0301".repeat(127) + "e"
+
+        mockMvc
+            .patch("/api/host/sessions/$sessionId") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    validationSessionRequestJson(
+                        meetingPasscode = combiningAtLimit,
+                        expectedSessionRevision = 0,
+                    )
+            }.andExpect {
+                status { isOk() }
+            }
+
+        val privateRejectedPasscode = "e\u0301".repeat(128)
+        val response =
+            mockMvc
+                .patch("/api/host/sessions/$sessionId") {
+                    with(user("host@example.com"))
+                    with(csrf())
+                    contentType = MediaType.APPLICATION_JSON
+                    content =
+                        validationSessionRequestJson(
+                            meetingPasscode = privateRejectedPasscode,
+                            expectedSessionRevision = 1,
+                        )
+                }.andExpect {
+                    status { isBadRequest() }
+                    jsonPath("$.field") { value("meetingPasscode") }
+                }.andReturn()
+
+        assertThat(response.response.contentAsString).doesNotContain(privateRejectedPasscode)
+    }
+
+    @Test
+    fun `host create keeps ASCII boundary and deterministically reports the first canonical field`() {
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(title = "a".repeat(255))
+            }.andExpect {
+                status { isCreated() }
+            }
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content =
+                    validationSessionRequestJson(
+                        title = "a".repeat(256),
+                        bookAuthor = "b".repeat(256),
+                    )
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("title") }
+            }
+    }
+
+    @Test
+    fun `host create reports default end time range rejection against meetingTime`() {
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(startTime = "23:00")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.code") { value("INVALID_REQUEST") }
+                jsonPath("$.field") { value("meetingTime") }
+            }
+    }
+
+    @Test
+    fun `host create maps legacy transport names to canonical frontend validation fields`() {
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(bookAuthor = "a".repeat(256))
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("author") }
+            }
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(date = "2026-02-30")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("meetingDate") }
+            }
+
+        mockMvc
+            .post("/api/host/sessions") {
+                with(user("host@example.com"))
+                with(csrf())
+                contentType = MediaType.APPLICATION_JSON
+                content = validationSessionRequestJson(meetingUrl = "http://private.invalid/room")
+            }.andExpect {
+                status { isBadRequest() }
+                jsonPath("$.field") { value("meetingUrl") }
+            }
+    }
+
+    @Test
     fun `host creates draft with guest readable access scope in one post`() {
         val response =
             mockMvc
@@ -3731,6 +3880,28 @@ class HostSessionControllerDbTest(
           "expectedSessionRevision": $expectedSessionRevision
         }
         """.trimIndent()
+
+    private fun validationSessionRequestJson(
+        title: String = "새 모임",
+        bookAuthor: String = "새 저자",
+        date: String = "2026-06-30",
+        startTime: String? = null,
+        meetingUrl: String? = null,
+        meetingPasscode: String? = null,
+        expectedSessionRevision: Long? = null,
+    ): String =
+        jsonMapper.writeValueAsString(
+            buildMap<String, Any?> {
+                put("title", title)
+                put("bookTitle", "새 책")
+                put("bookAuthor", bookAuthor)
+                put("date", date)
+                startTime?.let { put("startTime", it) }
+                meetingUrl?.let { put("meetingUrl", it) }
+                meetingPasscode?.let { put("meetingPasscode", it) }
+                expectedSessionRevision?.let { put("expectedSessionRevision", it) }
+            },
+        )
 
     private fun sessionRevision(sessionId: String): Long =
         jdbcTemplate

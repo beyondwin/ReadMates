@@ -17,6 +17,8 @@ data class ApiErrorResponse(
     val status: Int,
     val traceId: String? = null,
     @field:JsonInclude(JsonInclude.Include.NON_NULL)
+    val field: String? = null,
+    @field:JsonInclude(JsonInclude.Include.NON_NULL)
     val openSessionId: String? = null,
     @field:JsonInclude(JsonInclude.Include.NON_EMPTY)
     val blockers: List<ApiErrorBlocker> = emptyList(),
@@ -26,6 +28,7 @@ fun apiErrorResponse(
     status: HttpStatus,
     code: String,
     message: String = status.defaultApiErrorMessage(),
+    field: String? = null,
     openSessionId: String? = null,
     blockers: List<ApiErrorBlocker> = emptyList(),
 ): ResponseEntity<ApiErrorResponse> =
@@ -37,6 +40,7 @@ fun apiErrorResponse(
                 message = message,
                 status = status.value(),
                 traceId = MDC.get(RequestIdFilter.MDC_KEY),
+                field = field,
                 openSessionId = openSessionId,
                 blockers = blockers,
             ),

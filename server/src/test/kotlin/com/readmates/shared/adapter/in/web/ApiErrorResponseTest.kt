@@ -5,8 +5,11 @@ import org.assertj.core.api.Assertions.assertThat
 import org.junit.jupiter.api.Test
 import org.springframework.http.HttpStatus
 import org.springframework.web.server.ResponseStatusException
+import tools.jackson.databind.json.JsonMapper
 
 class ApiErrorResponseTest {
+    private val jsonMapper = JsonMapper.builder().findAndAddModules().build()
+
     @Test
     fun `builds a public safe error response from status code and code`() {
         val response =
@@ -55,5 +58,20 @@ class ApiErrorResponseTest {
                 status = 410,
             ),
         )
+    }
+
+    @Test
+    fun `validation field is optional and omitted from existing error bodies`() {
+        val existing =
+            jsonMapper.readTree(
+                jsonMapper.writeValueAsString(ApiErrorResponse("CONFLICT", "conflict", 409)),
+            )
+        val validation =
+            jsonMapper.readTree(
+                jsonMapper.writeValueAsString(ApiErrorResponse("INVALID_REQUEST", "invalid", 400, field = "meetingTime")),
+            )
+
+        assertThat(existing.has("field")).isFalse()
+        assertThat(validation.get("field").asString()).isEqualTo("meetingTime")
     }
 }
