@@ -145,6 +145,7 @@ class PublicControllerDbTest(
     @Test
     @Sql(
         statements = [
+            RESTORE_PUBLIC_SESSION_ONE_SQL,
             MARK_MEMBER1_LEFT_SQL,
         ],
         executionPhase = Sql.ExecutionPhase.BEFORE_TEST_METHOD,
@@ -563,6 +564,24 @@ class PublicControllerDbTest(
             where users.email = 'member1@example.com'
               and memberships.club_id = '00000000-0000-0000-0000-000000000001';
         """
+
+        private const val RESTORE_PUBLIC_SESSION_ONE_SQL = """
+            update sessions
+            set state = 'PUBLISHED', access_scope = 'GUEST_READABLE', deleted_at = null
+            where id = '00000000-0000-0000-0000-000000000301'
+              and club_id = '00000000-0000-0000-0000-000000000001';
+            update public_session_publications
+            set site_visibility = 'PUBLIC_RECORD'
+            where session_id = '00000000-0000-0000-0000-000000000301'
+              and club_id = '00000000-0000-0000-0000-000000000001';
+            update public_projection_current
+            set origin_readable = true
+            where session_id = '00000000-0000-0000-0000-000000000301';
+            update public_club_projection_generations
+            set origin_readable = true
+            where club_id = '00000000-0000-0000-0000-000000000001';
+        """
+
         private const val RESET_MEMBER1_ACTIVE_SQL = """
             update memberships
             join users on users.id = memberships.user_id
