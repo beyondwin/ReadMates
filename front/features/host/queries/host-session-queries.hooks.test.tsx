@@ -1015,6 +1015,17 @@ describe("host session mutation hooks", () => {
       sessionId: "session-7",
       count: 1,
     } as never);
+    const refreshedDetail = {
+      ...authoritativeDetail(),
+      attendees: [{
+        ...authoritativeDetail().attendees[0],
+        attendanceStatus: "ATTENDED" as const,
+        attendanceRevision: 7,
+      }],
+    };
+    vi.mocked(fetchHostSessionDetail)
+      .mockResolvedValueOnce(authoritativeDetail())
+      .mockResolvedValueOnce(refreshedDetail);
     const { client, Wrapper } = createWrapper();
     const { entries } = seedSurfaces(client);
     const otherClubAttention = [
@@ -1040,13 +1051,15 @@ describe("host session mutation hooks", () => {
         expectedAttendanceRevision: 6,
       }] },
     }), context);
+    expect(fetchHostSessionDetail).toHaveBeenCalledWith("session-7", context);
     expectInvalidated(client, [
-      entries.detail,
       entries.current,
       entries.recordHistory,
       entries.recordLedger,
       entries.recordAttention,
     ]);
+    expect(client.getQueryState(entries.detail[0])?.isInvalidated).toBe(false);
+    expect(client.getQueryData(entries.detail[0])).toEqual(refreshedDetail);
     expectFresh(client, [
       entries.closingStatus,
       entries.list,

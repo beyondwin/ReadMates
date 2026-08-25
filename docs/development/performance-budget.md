@@ -17,6 +17,12 @@ Run the combined alias:
 corepack pnpm --dir front performance:budget
 ```
 
+Run the production-build host meeting workspace budget:
+
+```bash
+corepack pnpm --dir front test:host-workspace-performance
+```
+
 Run Lighthouse against production build output through Vite preview:
 
 ```bash
@@ -39,6 +45,23 @@ Preview Lighthouse output is written under:
 ```
 
 These files are local evidence only and should not be committed.
+
+The host meeting workspace harness writes one public-safe summary to
+`front/output/performance/host-meeting-workspace-summary.json`. It performs exactly five cold Chromium runs with 500 synthetic members and records every raw value plus the median. The summary contains no member names, identifiers, URLs, traces, HAR files, or private fixtures.
+
+## Host meeting workspace budgets
+
+The production-build harness fails closed when a mark is missing, a value is non-finite, the run count is not five, or the synthetic member count is not 500. Every raw run must satisfy:
+
+| Metric | Budget |
+| --- | ---: |
+| UTF-8 decoded meeting JSON | 500 KiB |
+| Route data ready to first usable control | 1,000 ms |
+| Search/filter input to first RAF after DOM commit | 100 ms |
+| Authoritative single-row save accepted to affected row commit | 100 ms |
+| Forced-GC heap increase when entering the ledger | 25 MiB |
+
+The harness uses a fresh browser context, disabled cache, fixed network conditions, fixed 4x CPU throttling, and forced garbage collection for each run. These synthetic results are regression budgets, not production RUM or device-lab claims.
 
 ## Budget Meaning
 

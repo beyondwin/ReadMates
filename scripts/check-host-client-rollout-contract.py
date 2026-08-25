@@ -762,7 +762,7 @@ def validate_structural_sources(sources: dict[str, str]) -> list[str]:
                     configured_cases[group].update(cases)
         if set(configured_commands) != set(EXPECTED_REPORTER_ARGV):
             errors.append("structured reporter exact command set is incomplete or unknown")
-        for group in verifier.EXPECTED_COMMANDS:
+        for group in verifier.AUTOMATED_EVIDENCE_KINDS:
             actual_ids = {
                 command_id
                 for command_id, command in configured_commands.items()

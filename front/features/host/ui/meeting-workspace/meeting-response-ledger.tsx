@@ -1,4 +1,9 @@
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  beginHostMeetingFilterCommit,
+  commitHostMeetingAttendanceRow,
+  commitHostMeetingFilterRaf,
+} from "@/shared/observability/host-meeting-performance";
 
 type Response = "GOING" | "NOT_GOING" | "UNSURE" | "NO_RESPONSE";
 export type MeetingAttendance = "ATTENDED" | "ABSENT" | "UNKNOWN";
@@ -9,6 +14,7 @@ export type MeetingResponseLedgerRow = {
   secondaryLabel: string;
   response: Response;
   attendance: MeetingAttendance;
+  attendanceRevision: number;
   questionCount: number | null;
   recentResponseLabel: string | null;
   writeState?: "idle" | "saving" | "saved" | "error" | "conflict";
@@ -39,6 +45,7 @@ export function MeetingResponseLedger({
   const [filter, setFilter] = useState<Response | "ALL">("ALL");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkTarget, setBulkTarget] = useState<MeetingAttendance | null>(null);
+  const pendingFilterCommitRef = useRef(false);
   const visible = useMemo(() => rows.filter((row) => {
     const matchesQuery = `${row.displayName} ${row.secondaryLabel}`.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
     return matchesQuery && (filter === "ALL" || row.response === filter);
@@ -49,6 +56,22 @@ export function MeetingResponseLedger({
       rows.filter((row) => row.response === status).length,
     ]),
   ) as Record<Response, number>, [rows]);
+
+  useLayoutEffect(() => {
+    commitHostMeetingAttendanceRow(rows);
+  }, [rows]);
+
+  useLayoutEffect(() => {
+    if (!pendingFilterCommitRef.current) return;
+    pendingFilterCommitRef.current = false;
+    const frame = requestAnimationFrame(() => commitHostMeetingFilterRaf());
+    return () => cancelAnimationFrame(frame);
+  }, [visible]);
+
+  const beginFilterCommit = () => {
+    pendingFilterCommitRef.current = true;
+    beginHostMeetingFilterCommit();
+  };
 
   return (
     <section className="rm-meeting-response-ledger" aria-labelledby="meeting-response-ledger-title">
@@ -62,11 +85,17 @@ export function MeetingResponseLedger({
         <div className="rm-meeting-response-ledger__tools">
           <label>
             <span className="sr-only">참여자 검색</span>
-            <input type="search" aria-label="참여자 검색" value={query} onChange={(event) => setQuery(event.currentTarget.value)} placeholder="이름으로 찾기" />
+            <input type="search" aria-label="참여자 검색" value={query} onChange={(event) => {
+              beginFilterCommit();
+              setQuery(event.currentTarget.value);
+            }} placeholder="이름으로 찾기" />
           </label>
           <label>
             <span className="sr-only">참석 응답 필터</span>
-            <select aria-label="참석 응답 필터" value={filter} onChange={(event) => setFilter(event.currentTarget.value as Response | "ALL") }>
+            <select aria-label="참석 응답 필터" value={filter} onChange={(event) => {
+              beginFilterCommit();
+              setFilter(event.currentTarget.value as Response | "ALL");
+            }}>
               <option value="ALL">모든 응답</option>
               <option value="GOING">참석</option>
               <option value="UNSURE">미정</option>

@@ -108,6 +108,20 @@ Do not treat the first baseline as a CI gate. Use `summary.md` and `findings.jso
 
 ## Playwright E2E
 
+### Host meeting workspace focused browser and performance gates
+
+Install and run only the approved host workspace projects:
+
+```bash
+corepack pnpm --dir front exec playwright install --with-deps chromium firefox webkit
+corepack pnpm --dir front test:e2e:host-workspace-browsers
+corepack pnpm --dir front test:host-workspace-performance
+```
+
+The browser command runs only `chromium`, `firefox-host`, and `webkit-mobile-host` against public-safe synthetic route fixtures. The performance command serves the production build and produces exactly five cold 500-member runs. CI uploads only the bounded JSON summary; it does not upload screenshots, traces, HAR data, or fixture payloads from this job.
+
+Manual VoiceOver/Safari and NVDA/Chrome evidence is a separate protected artifact. The tracked template must remain value-free. Do not mark accessibility complete from automated semantics tests or from an unattested local note.
+
 ```bash
 pnpm --dir front test:e2e
 ```

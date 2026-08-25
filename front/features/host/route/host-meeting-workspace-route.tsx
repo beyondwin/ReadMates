@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useEffect, useInsertionEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLoaderData, useLocation, useNavigate, useParams } from "react-router";
-import HostSessionEditor, { type HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
+import type { HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import { buildHostMeetingWorkspace, type HostMeetingLocation, type HostMeetingTask } from "@/features/host/model/host-session-workspace-model";
@@ -36,13 +36,29 @@ import {
   type MeetingPanelViewModel,
 } from "@/features/host/ui/meeting-workspace/host-meeting-workspace";
 import { MeetingNotificationWorkspace } from "@/features/host/ui/meeting-workspace/meeting-notification-workspace";
-import {
-  EditHostSessionRecordWorkflow,
-  EditHostSessionRoute,
-  type HostSessionRecordsChangedEvent,
-} from "./host-session-editor-route";
+import type { HostSessionRecordsChangedEvent } from "./host-session-editor-route";
 import { useHostMeetingWorkspaceActions } from "./host-meeting-workspace-actions";
 import type { HostMeetingWorkspaceRouteData } from "./host-meeting-workspace-data";
+import {
+  beginHostMeetingRouteCommit,
+} from "@/shared/observability/host-meeting-performance";
+import "./host-meeting-workspace.css";
+
+const EditHostSessionRoute = lazy(async () => {
+  const module = await import("./host-session-editor-route");
+  return { default: module.EditHostSessionRoute };
+});
+
+const HostSessionEditor = lazy(() => import("@/features/host/ui/host-session-editor"));
+
+const EditHostSessionRecordWorkflow = lazy(async () => {
+  const module = await import("./host-session-editor-route");
+  return { default: module.EditHostSessionRecordWorkflow };
+});
+
+function DeferredHostWorkspace({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<p role="status" className="rm-meeting-panel-state">모임 작업을 불러오는 중입니다.</p>}>{children}</Suspense>;
+}
 
 type HostMeetingWorkspaceRouteProps = {
   returnTarget?: ReadmatesReturnTarget;
@@ -195,6 +211,13 @@ export function HostMeetingWorkspaceRoute({
   const [lifecycleSubmitting, setLifecycleSubmitting] = useState(false);
   const [lifecycleError, setLifecycleError] = useState<string | null>(null);
   const lifecycleRestoreFocusRef = useRef<HTMLElement | null>(null);
+  const measuredRouteIdentityRef = useRef<string | null>(null);
+
+  useInsertionEffect(() => {
+    if (!baseQuery.data || measuredRouteIdentityRef.current === routeIdentity) return;
+    measuredRouteIdentityRef.current = routeIdentity;
+    beginHostMeetingRouteCommit(baseQuery.dataUpdatedAt);
+  }, [baseQuery.data, baseQuery.dataUpdatedAt, routeIdentity]);
 
   useEffect(() => {
     const unregisterHistory = registerHostSensitiveState({
@@ -223,13 +246,15 @@ export function HostMeetingWorkspaceRoute({
 
   if (loaderData.mode === "trash") {
     return (
-      <EditHostSessionRoute
-        returnTarget={returnStatePurged ? undefined : returnTarget}
-        LinkComponent={LinkComponent}
-        hostDashboardReturnTarget={hostDashboardReturnTarget}
-        readmatesReturnState={returnStatePurged ? undefined : readmatesReturnState}
-        onSessionRecordsChanged={onSessionRecordsChanged}
-      />
+      <DeferredHostWorkspace>
+        <EditHostSessionRoute
+          returnTarget={returnStatePurged ? undefined : returnTarget}
+          LinkComponent={LinkComponent}
+          hostDashboardReturnTarget={hostDashboardReturnTarget}
+          readmatesReturnState={returnStatePurged ? undefined : readmatesReturnState}
+          onSessionRecordsChanged={onSessionRecordsChanged}
+        />
+      </DeferredHostWorkspace>
     );
   }
 
@@ -392,9 +417,10 @@ export function HostMeetingWorkspaceRoute({
     meetingLocation.task,
     panelStates,
     (recordEditor, stale) => (
-      <EditHostSessionRecordWorkflow
-        embeddedInMeetingFolio
-        session={session}
+      <DeferredHostWorkspace>
+        <EditHostSessionRecordWorkflow
+          embeddedInMeetingFolio
+          session={session}
         recordEditor={recordEditor}
         historyPage={{ items: [], nextCursor: null }}
         loadHistoryPage={(cursor) => queryClient.fetchQuery(hostSessionRecordHistoryQuery(
@@ -413,8 +439,9 @@ export function HostMeetingWorkspaceRoute({
         readmatesReturnState={returnStatePurged ? undefined : readmatesReturnState}
         onSessionRecordsChanged={handleSessionRecordsChanged}
         navigation={navigation}
-        recordFreshness={stale ? { blocked: true, observedAt: stale.observedAt, onRetry: stale.retry } : undefined}
-      />
+          recordFreshness={stale ? { blocked: true, observedAt: stale.observedAt, onRetry: stale.retry } : undefined}
+        />
+      </DeferredHostWorkspace>
     ),
     (history, stale) => {
       const recoveryActionsDisabled = historyCleared
@@ -491,9 +518,10 @@ export function HostMeetingWorkspaceRoute({
   );
 
   const baseContent = (
-    <HostSessionEditor
-      embeddedInMeetingFolio
-      session={session}
+    <DeferredHostWorkspace>
+      <HostSessionEditor
+        embeddedInMeetingFolio
+        session={session}
       actions={actions}
       clubSlug={clubSlug}
       LinkComponent={LinkComponent}
@@ -502,8 +530,9 @@ export function HostMeetingWorkspaceRoute({
       readmatesReturnState={returnStatePurged ? undefined : readmatesReturnState}
       onSessionRecordsChanged={handleSessionRecordsChanged}
       navigation={navigation}
-      meetingTask={meetingLocation.task}
-    />
+        meetingTask={meetingLocation.task}
+      />
+    </DeferredHostWorkspace>
   );
   const resolvedPanel: MeetingPanelViewModel = baseTask
     ? { kind: "ready", task: meetingLocation.task, content: baseContent }

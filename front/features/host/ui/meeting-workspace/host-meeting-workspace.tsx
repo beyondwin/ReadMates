@@ -1,9 +1,10 @@
-import { useEffect, useRef, type ComponentType, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ComponentType, type ReactNode } from "react";
 import type { HostMeetingTask, HostMeetingTaskLink } from "@/features/host/model/host-session-workspace-model";
 import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import { MeetingJudgmentRail, type MeetingJudgmentModel, type MeetingPrimaryActionModel } from "./meeting-judgment-rail";
 import { MeetingLocalNavigation, type MeetingLinkProps } from "./meeting-local-navigation";
 import { MeetingMasthead, type MeetingIdentityModel } from "./meeting-masthead";
+import { commitHostMeetingFirstUsable } from "@/shared/observability/host-meeting-performance";
 
 export type MeetingPanelViewModel =
   | { kind: "loading"; task: HostMeetingTask }
@@ -87,6 +88,14 @@ export function HostMeetingWorkspace({
 }: HostMeetingWorkspaceProps) {
   const headingRef = useRef<HTMLHeadingElement>(null);
   const selectedTaskRef = useRef<HostMeetingTask | null>(null);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const firstEnabledTaskControl = workspaceRef.current?.querySelector<HTMLElement>(
+      ".rm-meeting-local-nav a[href]:not([aria-disabled='true']), .rm-meeting-local-nav button:not([disabled])",
+    );
+    if (firstEnabledTaskControl) commitHostMeetingFirstUsable();
+  }, [activeTask, tasks]);
 
   useEffect(() => {
     if (selectedTaskRef.current !== activeTask) return;
@@ -95,7 +104,7 @@ export function HostMeetingWorkspace({
   }, [activeTask]);
 
   return (
-    <div className={`rm-meeting-folio rm-meeting-folio--${activeTask}`}>
+    <div ref={workspaceRef} className={`rm-meeting-folio rm-meeting-folio--${activeTask}`}>
       <MeetingMasthead identity={identity} headingRef={headingRef} />
       <div className="rm-meeting-folio__mobile-action">
         <button type="button" className="btn btn-primary" disabled={primaryAction.disabled} onClick={onPrimaryAction}>

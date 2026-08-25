@@ -4,8 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { MeetingResponseLedger } from "./meeting-response-ledger";
 
 const rows = [
-  { membershipId: "a", displayName: "같은 이름", secondaryLabel: "A 독자", response: "GOING" as const, attendance: "UNKNOWN" as const, questionCount: 2, recentResponseLabel: "오늘" },
-  { membershipId: "b", displayName: "같은 이름", secondaryLabel: "B 독자", response: "NO_RESPONSE" as const, attendance: "ABSENT" as const, questionCount: 0, recentResponseLabel: null, writeState: "conflict" as const },
+  { membershipId: "a", displayName: "같은 이름", secondaryLabel: "A 독자", response: "GOING" as const, attendance: "UNKNOWN" as const, attendanceRevision: 1, questionCount: 2, recentResponseLabel: "오늘" },
+  { membershipId: "b", displayName: "같은 이름", secondaryLabel: "B 독자", response: "NO_RESPONSE" as const, attendance: "ABSENT" as const, attendanceRevision: 1, questionCount: 0, recentResponseLabel: null, writeState: "conflict" as const },
 ];
 
 describe("MeetingResponseLedger", () => {
@@ -31,6 +31,7 @@ describe("MeetingResponseLedger", () => {
       secondaryLabel: `참여자 ${index + 1}`,
       response: index % 2 === 0 ? "GOING" as const : "NO_RESPONSE" as const,
       attendance: "UNKNOWN" as const,
+      attendanceRevision: 1,
       questionCount: 0,
       recentResponseLabel: null,
     }));

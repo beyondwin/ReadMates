@@ -23,7 +23,7 @@
       "const": "host-client-rollout-evidence/v1"
     },
     "evidenceKind": {
-      "enum": ["cache-safety", "compatibility", "security"]
+      "enum": ["cache-safety", "compatibility", "security", "accessibility"]
     },
     "gitSha": {
       "$ref": "#/$defs/gitSha"
@@ -146,7 +146,7 @@
           "maximum": 100
         },
         "job": {
-          "enum": ["cache-safety", "compatibility", "security"]
+          "enum": ["cache-safety", "compatibility", "security", "accessibility"]
         },
         "startedAt": {
           "$ref": "#/$defs/timestamp"
@@ -182,7 +182,7 @@
         "required": ["id", "gitSha"],
         "properties": {
           "id": {
-            "enum": ["A7", "C1", "B7", "D3", "D5"]
+            "enum": ["A7", "C1", "B7", "D3", "D5", "D6"]
           },
           "gitSha": {
             "$ref": "#/$defs/gitSha"

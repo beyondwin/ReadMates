@@ -1,6 +1,11 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  HOST_MEETING_PERFORMANCE_METRICS,
+  beginHostMeetingRouteCommit,
+  resetHostMeetingPerformanceStateForTests,
+} from "@/shared/observability/host-meeting-performance";
 import { HostMeetingWorkspace, type HostMeetingWorkspaceProps } from "./host-meeting-workspace";
 
 const props: HostMeetingWorkspaceProps = {
@@ -38,6 +43,20 @@ const props: HostMeetingWorkspaceProps = {
 };
 
 describe("HostMeetingWorkspace", () => {
+  afterEach(() => resetHostMeetingPerformanceStateForTests());
+
+  it("commits first usable only after an enabled task control is laid out", () => {
+    beginHostMeetingRouteCommit();
+    const { unmount } = render(<HostMeetingWorkspace {...props} tasks={[]} />);
+    expect(performance.getEntriesByName(HOST_MEETING_PERFORMANCE_METRICS.routeDataToUsable)).toHaveLength(0);
+
+    unmount();
+    resetHostMeetingPerformanceStateForTests();
+    beginHostMeetingRouteCommit();
+    render(<HostMeetingWorkspace {...props} />);
+    expect(performance.getEntriesByName(HOST_MEETING_PERFORMANCE_METRICS.routeDataToUsable)).toHaveLength(1);
+  });
+
   it("renders one h1, the active work surface, and an independent judgment rail", () => {
     render(<HostMeetingWorkspace {...props} />);
 

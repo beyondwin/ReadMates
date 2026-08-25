@@ -1323,6 +1323,7 @@ export default function HostSessionEditor({
                           ? "UNSURE"
                           : attendee.rsvpStatus,
                       attendance: attendanceStatuses[attendee.membershipId] ?? attendee.attendanceStatus,
+                      attendanceRevision: attendee.attendanceRevision,
                       questionCount: null,
                       recentResponseLabel: null,
                     }))}

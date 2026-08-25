@@ -19,6 +19,7 @@ const rows = Array.from({ length: 500 }, (_, index) => ({
   secondaryLabel: `참여자 ${index + 1}`,
   response: index % 4 === 0 ? "NO_RESPONSE" as const : "GOING" as const,
   attendance: index % 3 === 0 ? "UNKNOWN" as const : "ATTENDED" as const,
+  attendanceRevision: 1,
   questionCount: index % 5,
   recentResponseLabel: index % 4 === 0 ? null : "오늘 20:15",
 }));

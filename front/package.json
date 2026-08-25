@@ -14,6 +14,8 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:host-workspace-browsers": "READMATES_HOST_WORKSPACE_SMOKE_ONLY=true playwright test tests/e2e/host-meeting-workspace-browser-smoke.spec.ts --project=chromium --project=firefox-host --project=webkit-mobile-host",
+    "test:host-workspace-performance": "pnpm build && playwright test --config=playwright-performance.config.ts",
     "test:ct": "pnpm test:ct:docker",
     "test:ct:docker": "tsx scripts/run-ct-docker.ts",
     "test:ct:update": "pnpm test:ct:update:docker",

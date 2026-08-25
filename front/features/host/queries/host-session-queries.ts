@@ -71,6 +71,7 @@ import { isReadmatesApiError, isReadmatesTransportError } from "@/shared/api/err
 import { hostNotificationManualOptionsRootKey } from "./host-notification-query-key-helpers";
 import { hostSessionRecordKeys } from "./host-session-record-query-keys";
 import { hostClubQueryPrefix, hostMutationKey } from "./host-state-purge";
+import { beginHostMeetingAttendanceCommit } from "@/shared/observability/host-meeting-performance";
 
 export const DEFAULT_HOST_SESSION_LIST_LIMIT = 50;
 
@@ -1083,15 +1084,28 @@ export function useUpdateHostSessionAttendanceMutation(context: ExplicitReadmate
         onStateChange: reconciliation.setReconciliationState,
       });
     },
-    onSuccess: (_result, variables) =>
-      Promise.all([
-        invalidateHostSessionDetail(client, variables.sessionId, context),
+    onSuccess: async (_result, variables) => {
+      if (variables.attendance.length === 1) {
+        const refreshed = await fetchHostSessionDetail(variables.sessionId, context);
+        const requested = variables.attendance[0];
+        const accepted = refreshed.attendees.find((row) => row.membershipId === requested.membershipId);
+        if (accepted && accepted.attendanceStatus === requested.attendanceStatus) {
+          beginHostMeetingAttendanceCommit({
+            ...requested,
+            attendanceRevision: accepted.attendanceRevision,
+          });
+        }
+        client.setQueryData(hostSessionKeys.detail(variables.sessionId, context), refreshed);
+      }
+      await Promise.all([
+        ...(variables.attendance.length === 1 ? [] : [invalidateHostSessionDetail(client, variables.sessionId, context)]),
         invalidateHostCurrentSession(client, context),
         invalidateHostSessionRecordCaches(client, variables.sessionId, context, {
           history: true,
           ledgers: true,
         }),
-      ]),
+      ]);
+    },
   });
   return { ...mutation, reconciliationState: reconciliation.reconciliationState };
 }
