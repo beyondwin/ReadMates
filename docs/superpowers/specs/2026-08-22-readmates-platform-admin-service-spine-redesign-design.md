@@ -8,7 +8,7 @@
 
 대상 표면: `front/`의 `/admin/**`, `front/functions` BFF, Spring platform-admin API와 관련 persistence·audit
 
-ADR impact: `new` — ADR-0039, ADR-0040. ADR-0020·ADR-0029·ADR-0030·ADR-0033·ADR-0037을 준수한다.
+ADR impact: new — ADR-0039, ADR-0040. ADR-0020·ADR-0029·ADR-0030·ADR-0033·ADR-0037을 준수한다.
 
 ## 1. 문서의 역할과 선행 설계 관계
 

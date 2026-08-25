@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`
 
-ADR impact: implements proposed ADR-0039; constraining reference — ADR-0035, ADR-0040
+ADR impact: update — ADR-0039; constraining reference — ADR-0035, ADR-0040
 
 ## Global Constraints
 

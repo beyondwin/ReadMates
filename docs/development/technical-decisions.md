@@ -41,10 +41,10 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0036](adr/0036-public-projection-cache-convergence.md) | Public projection 원자성과 cache convergence를 분리 | Proposed |
 | [ADR-0037](adr/0037-platform-admin-emergency-public-takedown.md) | 긴급 public takedown을 platform-admin 전용 command로 실행 | Proposed |
 | [ADR-0038](adr/0038-server-owned-host-list-cursor-epochs.md) | Host 모임·기록 목록을 server-owned cursor epoch로 제공 | Accepted |
-| [ADR-0039](adr/0039-platform-admin-task-centered-service-spine.md) | 플랫폼 어드민을 task-centered Service Spine으로 구성 | Proposed |
-| [ADR-0040](adr/0040-domain-owned-admin-safe-command-protocol.md) | 플랫폼 어드민 mutation을 도메인 소유 safe-command protocol로 실행 | Proposed |
-| [ADR-0041](adr/0041-domain-separated-platform-admin-invitation-delivery-token.md) | 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성 | Proposed |
-| [ADR-0042](adr/0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Proposed |
-| [ADR-0043](adr/0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Proposed |
+| [ADR-0039](adr/0039-platform-admin-task-centered-service-spine.md) | 플랫폼 어드민을 task-centered Service Spine으로 구성 | Accepted |
+| [ADR-0040](adr/0040-domain-owned-admin-safe-command-protocol.md) | 플랫폼 어드민 mutation을 도메인 소유 safe-command protocol로 실행 | Accepted |
+| [ADR-0041](adr/0041-domain-separated-platform-admin-invitation-delivery-token.md) | 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성 | Accepted |
+| [ADR-0042](adr/0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Accepted |
+| [ADR-0043](adr/0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Accepted |
 
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.

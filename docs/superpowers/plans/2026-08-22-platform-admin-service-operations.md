@@ -10,7 +10,7 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-22-readmates-platform-admin-service-spine-redesign-design.md`
 
-ADR impact: implements proposed ADR-0039 and ADR-0040 (including the V59 typed-receipt refinement); constraining reference — ADR-0028, ADR-0029, ADR-0031, ADR-0033
+ADR impact: update — ADR-0039, ADR-0040 (including the V59 typed-receipt refinement); constraining reference — ADR-0028, ADR-0029, ADR-0031, ADR-0033
 
 ## Global Constraints
 
