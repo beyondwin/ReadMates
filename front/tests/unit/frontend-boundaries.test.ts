@@ -724,6 +724,7 @@ describe("frontend architecture boundaries", () => {
   it("keeps host presentation components free of API-backed defaults", () => {
     const hostPresentationComponents = [
       "features/host/ui/host-session-editor.tsx",
+      "features/host/ui/meeting-workspace/host-meeting-workspace-route-frame.tsx",
       "features/host/ui/host-members.tsx",
       "features/host/ui/host-invitations.tsx",
     ];
@@ -746,6 +747,7 @@ describe("frontend architecture boundaries", () => {
   it("keeps host route TSX modules render-only for Fast Refresh", () => {
     const hostRouteComponents = [
       "features/host/route/host-dashboard-route.tsx",
+      "features/host/route/host-meeting-workspace-route.tsx",
       "features/host/route/host-session-editor-route.tsx",
       "features/host/route/host-members-route.tsx",
       "features/host/route/host-invitations-route.tsx",
@@ -762,5 +764,16 @@ describe("frontend architecture boundaries", () => {
         /export\s+const\s+\w*Actions\b/,
       );
     }
+  });
+
+  it("keeps the meeting base loader free of heavy panel query ownership", () => {
+    const source = fs.readFileSync(
+      path.join(projectRoot, "features/host/route/host-meeting-workspace-data.ts"),
+      "utf8",
+    );
+
+    expect(source).not.toMatch(
+      /hostSessionRecordEditorQuery|hostSessionRecordHistoryQuery|hostSessionManualDispatchesQuery/,
+    );
   });
 });

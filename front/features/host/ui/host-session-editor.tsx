@@ -29,6 +29,7 @@ import {
   compatibilityVisibilityForExposure,
 } from "@/features/host/model/session-exposure-model";
 import type {
+  HostMeetingTask,
   HostSessionDraftSource,
   HostSessionWorkspaceLocation,
   HostSessionWorkspacePanel,
@@ -171,6 +172,11 @@ type HostSessionRecordWorkflow = {
   onRestoreCompleted?: () => void;
   onRestoreChange?: (changeId: string) => void | Promise<void>;
   onReverseLifecycle?: () => void;
+  freshness?: {
+    blocked: boolean;
+    observedAt: string;
+    onRetry: () => void;
+  };
 };
 
 const emptyManagementMessage = "모임을 만든 뒤 참석과 피드백 문서를 관리할 수 있습니다.";
@@ -233,6 +239,7 @@ export default function HostSessionEditor({
   pendingUndo = null,
   undoConfirm = null,
   restoreNotice = null,
+  meetingTask,
 }: {
   session?: HostSessionDetailResponse | null;
   notificationDispatches?: ManualNotificationDispatchListItem[];
@@ -254,11 +261,9 @@ export default function HostSessionEditor({
   pendingUndo?: WorkspacePendingUndo | null;
   undoConfirm?: WorkspaceUndoConfirm | null;
   restoreNotice?: WorkspaceRestoreNotice | null;
+  meetingTask?: HostMeetingTask;
 }) {
   const resolvedScheduleDefaults = scheduleDefaultsLoadState?.defaults ?? scheduleDefaults ?? null;
-  if (session && !recordWorkflow) {
-    throw new Error("recordWorkflow is required for persisted sessions");
-  }
 
   // ---------------------------------------------------------------------------
   // Form state (reducer)
@@ -1263,7 +1268,7 @@ export default function HostSessionEditor({
         LinkComponent={LinkComponent}
         focusContent={
           <>
-            {displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT" && session ? (
+            {(meetingTask === "responses" || displayedWorkspaceView.primaryAction.kind === "REVIEW_MEMBER_INPUT") && session ? (
               <MemberResponseSummary attendees={session.attendees} />
             ) : null}
             {displaySession ? (
@@ -1388,7 +1393,7 @@ export default function HostSessionEditor({
         }
         recordsPanel={
           visitedPanels.has("records") || activePanel === "records" ? (
-            session ? (
+            session && recordWorkflow ? (
               <SessionRecordWorkspace
                 state={session.state}
                 accessScope={session.accessScope}
@@ -1407,7 +1412,10 @@ export default function HostSessionEditor({
                   rebasePending: recordWorkflow!.rebasePending,
                   rebaseError: recordWorkflow!.rebaseError,
                 }}
-                reviewPending={recordWorkflow!.confirmation.submitting}
+                reviewPending={recordWorkflow.confirmation.submitting}
+                freshnessBlocked={recordWorkflow.freshness?.blocked ?? false}
+                freshnessObservedAt={recordWorkflow.freshness?.observedAt ?? null}
+                onRetryFreshness={recordWorkflow.freshness?.onRetry}
                 feedbackDocument={{
                   ...feedbackDocumentForWorkspace,
                   previewState: feedbackPreviewState,
@@ -1427,7 +1435,7 @@ export default function HostSessionEditor({
                   onReloadDraft: recordWorkflow!.onReloadDraft,
                   onRebaseDraft: recordWorkflow!.onRebaseDraft,
                   onCopyInput: recordWorkflow!.onCopyInput,
-                  onReviewDraft: recordWorkflow!.confirmation.onReview,
+                  onReviewDraft: recordWorkflow.confirmation.onReview,
                   onAigenCommitted: handleAigenCommitted,
                   onImportFileSelected: previewSessionImport,
                   onImportCommit: commitSessionImport,

@@ -86,7 +86,6 @@ import {
   useRestoreHostSessionChangeMutation,
 } from "@/features/host/queries/host-session-recovery-queries";
 import {
-  hostSessionDeletionPreviewQuery,
   hostSessionDetailQuery,
   hostSessionKeys,
   hostSessionTrashDetailQuery,
@@ -98,25 +97,9 @@ import {
   invalidateHostSessionRecordSurfaces,
   hostSessionManualDispatchesQuery,
   resolveHostScheduleDefaultsLoadState,
-  useCloseHostSessionMutation,
-  useCommitHostSessionImportMutation,
-  useCreateHostSessionMutation,
-  useDeleteHostSessionMutation,
-  useOpenHostSessionMutation,
-  useRestoreHostSessionMutation,
-  usePublishHostSessionMutation,
-  useReopenHostSessionMutation,
-  useReturnHostSessionToDraftMutation,
-  useUnpublishHostSessionMutation,
-  useUpdateHostSessionAttendanceMutation,
-  useUpdateHostSessionMutation,
-  useSaveHostSessionAccessScopeMutation,
 } from "@/features/host/queries/host-session-queries";
-import {
-  hostSessionEditorPreviewActions,
-  type HostSessionEditorRouteData,
-} from "./host-session-editor-data";
-import { hostSessionLifecycleResultFromResponse } from "./host-session-lifecycle-result";
+import type { HostMeetingWorkspaceRouteData } from "./host-meeting-workspace-data";
+import { useHostMeetingWorkspaceActions } from "./host-meeting-workspace-actions";
 import {
   HostNotificationComposerController,
   type HostNotificationComposerRequest,
@@ -435,87 +418,6 @@ function HostSessionTrashTombstoneRoute({
   );
 }
 
-function useHostSessionEditorActions(
-  context: ExplicitReadmatesApiContext,
-  onSessionRecordsChanged?: (sessionId: string) => void | Promise<void>,
-): HostSessionEditorActions {
-  const queryClient = useQueryClient();
-  const { mutateAsync: createSession } = useCreateHostSessionMutation(context);
-  const { mutateAsync: updateSession } = useUpdateHostSessionMutation(context);
-  const { mutateAsync: deleteSession } = useDeleteHostSessionMutation(context);
-  const { mutateAsync: restoreSession } = useRestoreHostSessionMutation(context);
-  const { mutateAsync: openSession } = useOpenHostSessionMutation(context);
-  const { mutateAsync: closeSession } = useCloseHostSessionMutation(context);
-  const { mutateAsync: publishSession } = usePublishHostSessionMutation(context);
-  const { mutateAsync: reopenSession } = useReopenHostSessionMutation(context);
-  const { mutateAsync: unpublishSession } = useUnpublishHostSessionMutation(context);
-  const { mutateAsync: returnSessionToDraft } = useReturnHostSessionToDraftMutation(context);
-  const { mutateAsync: updateAttendance } = useUpdateHostSessionAttendanceMutation(context);
-  const { mutateAsync: commitImport } = useCommitHostSessionImportMutation(context);
-  const { mutateAsync: saveAccessScope } = useSaveHostSessionAccessScopeMutation(context);
-
-  const runLifecycle = useCallback(async (
-    mutate: () => Promise<Response>,
-    sessionId: string,
-  ) => {
-    const result = await hostSessionLifecycleResultFromResponse(await mutate(), {
-      clubSlug: context.clubSlug,
-      requestKind: "SESSION_LIFECYCLE",
-    });
-    if (result.ok) {
-      await onSessionRecordsChanged?.(sessionId);
-    }
-    return result;
-  }, [context.clubSlug, onSessionRecordsChanged]);
-
-  return useMemo<HostSessionEditorActions>(() => ({
-    loadDeletionPreview: (sessionId) =>
-      queryClient.fetchQuery(hostSessionDeletionPreviewQuery(sessionId, context)),
-    deleteSession: (sessionId) => deleteSession(sessionId),
-    restoreSession: (sessionId) => restoreSession(sessionId),
-    openSession: (sessionId) => runLifecycle(() => openSession(sessionId), sessionId),
-    closeSession: (sessionId) => runLifecycle(() => closeSession(sessionId), sessionId),
-    publishSession: (sessionId) => runLifecycle(() => publishSession(sessionId), sessionId),
-    reopenSession: (sessionId, request) =>
-      runLifecycle(() => reopenSession({ sessionId, request }), sessionId),
-    unpublishSession: (sessionId, request) =>
-      runLifecycle(() => unpublishSession({ sessionId, request }), sessionId),
-    returnSessionToDraft: (sessionId, request) =>
-      runLifecycle(() => returnSessionToDraft({ sessionId, request }), sessionId),
-    saveSession: (sessionId, request) =>
-      sessionId === null
-        ? createSession(request)
-        : updateSession({ sessionId, request }),
-    updateAttendance: (sessionId, attendance) =>
-      updateAttendance({ sessionId, attendance }),
-    previewSessionImport: hostSessionEditorPreviewActions(context).previewSessionImport,
-    commitSessionImport: async (sessionId, request) => {
-      const result = await commitImport({ sessionId, request });
-      await onSessionRecordsChanged?.(sessionId);
-      return result;
-    },
-    saveSessionAccessScope: (sessionId, request) => saveAccessScope({ sessionId, request }),
-  }), [
-    closeSession,
-    commitImport,
-    context,
-    createSession,
-    deleteSession,
-    restoreSession,
-    openSession,
-    publishSession,
-    queryClient,
-    onSessionRecordsChanged,
-    reopenSession,
-    returnSessionToDraft,
-    saveAccessScope,
-    runLifecycle,
-    unpublishSession,
-    updateAttendance,
-    updateSession,
-  ]);
-}
-
 export function NewHostSessionRoute({
   returnTarget,
   LinkComponent,
@@ -540,7 +442,7 @@ export function NewHostSessionRoute({
     },
     [clubSlug, context, onSessionRecordsChanged, queryClient],
   );
-  const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
+  const actions = useHostMeetingWorkspaceActions(context, handleSessionRecordsChanged);
   const scheduleDefaultsQuery = useQuery(hostSessionScheduleDefaultsQuery(context));
   useRecordHostScheduleDefaultsOutcome(scheduleDefaultsQuery);
   const scheduleDefaultsLoadState = resolveHostScheduleDefaultsLoadState(scheduleDefaultsQuery);
@@ -566,7 +468,7 @@ export function EditHostSessionRoute({
   readmatesReturnState,
   onSessionRecordsChanged,
 }: HostSessionEditorRouteProps) {
-  const loaderData = useLoaderData() as HostSessionEditorRouteData;
+  const loaderData = useLoaderData() as HostMeetingWorkspaceRouteData;
   const { clubSlug, sessionId: routeSessionId } = useParams<{ clubSlug: string; sessionId: string }>();
   const sessionId = routeSessionId ?? loaderData.sessionId;
   const context = useMemo(() => contextFromClubSlug(clubSlug), [clubSlug]);
@@ -585,7 +487,7 @@ export function EditHostSessionRoute({
     },
     [clubSlug, context, onSessionRecordsChanged, queryClient],
   );
-  const actions = useHostSessionEditorActions(context, handleSessionRecordsChanged);
+  const actions = useHostMeetingWorkspaceActions(context, handleSessionRecordsChanged);
   const [restored, setRestored] = useState(false);
   const [ownedTrash, setOwnedTrash] = useState<HostSessionTrashItem | null>(null);
   const [restoreAnnouncement, setRestoreAnnouncement] = useState<string | null>(null);
@@ -743,6 +645,7 @@ export function EditHostSessionRecordWorkflow({
     location: { panel: "focus", source: "manual" },
     onChange: () => undefined,
   },
+  recordFreshness,
 }: {
   session: HostSessionDetailResponse;
   recordEditor: HostSessionRecordEditor;
@@ -762,6 +665,11 @@ export function EditHostSessionRecordWorkflow({
   navigation?: {
     location: HostSessionWorkspaceLocation;
     onChange: (next: HostSessionWorkspaceLocation) => void;
+  };
+  recordFreshness?: {
+    blocked: boolean;
+    observedAt: string;
+    onRetry: () => void;
   };
 }) {
   const queryClient = useQueryClient();
@@ -1360,6 +1268,7 @@ export function EditHostSessionRecordWorkflow({
             navigation.onChange({ panel: "records", source: "manual" });
           },
           onRestoreChange: (changeId) => startChangeRestore(changeId),
+          freshness: recordFreshness,
         }}
       />
       <HostNotificationComposerController

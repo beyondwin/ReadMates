@@ -8,7 +8,8 @@ import { memoizeRouteModule } from "@/src/app/routes/route-module-loader";
 import { ClubHostAppRouteLayout } from "@/src/app/layouts/club-app-route-layout";
 import { NotFoundRoute, RouteErrorBoundary } from "@/src/app/route-error";
 import { RequireHost } from "@/src/app/route-guards";
-import { canonicalizeCompatibilityEntry } from "@/src/app/workspace-route-model";
+import { canonicalizeCompatibilityEntry, resolveUnavailableDetailTarget } from "@/src/app/workspace-route-model";
+import { readLastSafeWorkspaceTarget } from "@/src/app/workspace-route-continuity";
 import { ReadmatesRouteLoading } from "@/src/pages/readmates-page";
 import { HOST_ROUTE_PATHS } from "@/shared/routing/host-route-destinations";
 
@@ -187,11 +188,17 @@ function scopedHostAppRoutes(queryClient: QueryClient): RouteObject[] {
       errorElement: <HostRouteError />,
       fallback: <ReadmatesRouteLoading label="모임 장부를 불러오는 중" variant="host" />,
       load: async () => {
-        const [{ MeetingRouteElement: Component }, { hostSessionEditorLoaderFactory }] = await Promise.all([
+        const [{ MeetingRouteElement: Component }, { hostMeetingWorkspaceLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/meeting-route-element"),
-          import("@/features/host/route/host-session-editor-data"),
+          import("@/features/host/route/host-meeting-workspace-data"),
         ]);
-        return { Component, loader: hostSessionEditorLoaderFactory(queryClient) };
+        return {
+          Component,
+          loader: hostMeetingWorkspaceLoaderFactory(queryClient, (pathname) => resolveUnavailableDetailTarget({
+            pathname,
+            lastSafeTarget: readLastSafeWorkspaceTarget("host"),
+          })),
+        };
       },
     }),
     scopedHostRoute({
@@ -354,11 +361,17 @@ function hostAppRoutes(queryClient: QueryClient, scoped = false): RouteObject[] 
       errorElement: <HostRouteError />,
       hydrateFallbackElement: <ReadmatesRouteLoading label="모임 장부를 불러오는 중" variant="host" />,
       lazy: async () => {
-        const [{ MeetingRouteElement }, { hostSessionEditorLoaderFactory }] = await Promise.all([
+        const [{ MeetingRouteElement }, { hostMeetingWorkspaceLoaderFactory }] = await Promise.all([
           import("@/src/app/host-routes/meeting-route-element"),
-          import("@/features/host/route/host-session-editor-data"),
+          import("@/features/host/route/host-meeting-workspace-data"),
         ]);
-        return { Component: MeetingRouteElement, loader: hostSessionEditorLoaderFactory(queryClient) };
+        return {
+          Component: MeetingRouteElement,
+          loader: hostMeetingWorkspaceLoaderFactory(queryClient, (pathname) => resolveUnavailableDetailTarget({
+            pathname,
+            lastSafeTarget: readLastSafeWorkspaceTarget("host"),
+          })),
+        };
       },
     },
     {

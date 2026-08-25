@@ -585,8 +585,8 @@ describe("HostSessionEditor", () => {
     expect(screen.getByRole("list", { name: "진행 상황" })).toBeVisible();
   });
 
-  it("fails fast when a persisted session is rendered without its record workflow", () => {
-    expect(() => render(
+  it("renders base meeting work without requiring the unopened record workflow", () => {
+    render(
       <HostSessionEditor
         session={session}
         actions={hostSessionEditorTestActions}
@@ -595,7 +595,11 @@ describe("HostSessionEditor", () => {
           onChange: vi.fn(),
         }}
       />,
-    )).toThrow("recordWorkflow is required for persisted sessions");
+    );
+
+    expect(screen.getByText("No.1")).toBeVisible();
+    expect(screen.getByRole("region", { name: "지금 할 일" })).toBeVisible();
+    expect(screen.queryByLabelText("기록 요약")).not.toBeInTheDocument();
   });
 
   it("shows the focus deck by default without a global save action or page tabs", () => {

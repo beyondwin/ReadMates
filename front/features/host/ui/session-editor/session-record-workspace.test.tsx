@@ -293,6 +293,29 @@ describe("SessionRecordWorkspace", () => {
     expect(onReviewDraft).toHaveBeenCalledTimes(1);
   });
 
+  it("keeps draft editing available while stale cached data blocks only apply review", async () => {
+    const user = userEvent.setup();
+    const onRetryFreshness = vi.fn();
+
+    render(
+      <SessionRecordWorkspace
+        {...props({
+          freshnessBlocked: true,
+          freshnessObservedAt: "2026-08-25T09:30:00+09:00",
+          onRetryFreshness,
+        })}
+      />,
+    );
+
+    expect(screen.getByRole("textbox", { name: "공개 요약" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "반영 전 확인" })).toBeDisabled();
+    expect(screen.getByRole("region", { name: "반영 전 확인" }))
+      .toHaveTextContent("최신 기록을 확인한 뒤 반영할 수 있습니다");
+
+    await user.click(screen.getByRole("button", { name: "최신 기록 확인" }));
+    expect(onRetryFreshness).toHaveBeenCalledTimes(1);
+  });
+
   it("forwards rebase pending and error state to the common draft editor", () => {
     const onRebaseDraft = vi.fn();
     const pending = props({

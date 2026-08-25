@@ -1,5 +1,5 @@
 import { useLocation } from "react-router";
-import { EditHostSessionRoute } from "@/features/host/route/host-session-editor-route";
+import { HostMeetingWorkspaceRoute } from "@/features/host/route/host-meeting-workspace-route";
 import { useSessionRecordsChangedInvalidation } from "@/src/app/host-route-invalidation";
 import { hostDashboardReturnTarget, readmatesReturnState, readReadmatesReturnTarget } from "@/src/app/route-continuity";
 import { Link } from "@/src/app/router-link";
@@ -10,7 +10,7 @@ export function MeetingRouteElement() {
   const onSessionRecordsChanged = useSessionRecordsChangedInvalidation();
 
   return (
-    <EditHostSessionRoute
+    <HostMeetingWorkspaceRoute
       returnTarget={returnTarget}
       LinkComponent={Link}
       hostDashboardReturnTarget={hostDashboardReturnTarget}

@@ -52,6 +52,9 @@ export type SessionRecordWorkspaceProps = {
     rebaseError: string | null;
   };
   reviewPending: boolean;
+  freshnessBlocked?: boolean;
+  freshnessObservedAt?: string | null;
+  onRetryFreshness?: () => void;
   feedbackDocument: {
     uploaded: boolean;
     fileName: string | null;
@@ -131,12 +134,16 @@ function firstValidationAnchor(issues: string[]) {
 function nextActionPresentation(
   draft: SessionRecordWorkspaceProps["draft"],
   reviewPending: boolean,
+  freshnessBlocked: boolean,
 ) {
   if (!draft.source) {
     return { guidance: "초안을 먼저 만들어 주세요", reviewEnabled: false };
   }
   if (reviewPending) {
     return { guidance: "반영 전 확인 준비 중", reviewEnabled: false };
+  }
+  if (freshnessBlocked) {
+    return { guidance: "최신 기록을 확인한 뒤 반영할 수 있습니다", reviewEnabled: false };
   }
   if (draft.saveState === "saving") {
     return { guidance: "저장 중", reviewEnabled: false };
@@ -201,6 +208,9 @@ export function SessionRecordWorkspace({
   liveSnapshot,
   draft,
   reviewPending,
+  freshnessBlocked = false,
+  freshnessObservedAt = null,
+  onRetryFreshness,
   feedbackDocument,
   creation,
   actions,
@@ -212,7 +222,7 @@ export function SessionRecordWorkspace({
   const [visitedSources, setVisitedSources] = useState<Set<HostSessionDraftSource>>(
     () => new Set([source]),
   );
-  const nextAction = nextActionPresentation(draft, reviewPending);
+  const nextAction = nextActionPresentation(draft, reviewPending, freshnessBlocked);
   const exposure = resolvedSessionExposure({
     state,
     visibility: liveSnapshot.visibility,
@@ -489,7 +499,20 @@ export function SessionRecordWorkspace({
           padding: "12px 14px",
         }}
       >
-        <span className="small">{nextAction.guidance}</span>
+        <span className="small">
+          {freshnessBlocked && freshnessObservedAt
+            ? `${formatDateTimeLabel(freshnessObservedAt)} 기준 · ${nextAction.guidance}`
+            : nextAction.guidance}
+        </span>
+        {freshnessBlocked && onRetryFreshness ? (
+          <button
+            className="btn btn-quiet btn-sm"
+            type="button"
+            onClick={onRetryFreshness}
+          >
+            최신 기록 확인
+          </button>
+        ) : null}
         <button
           className="btn btn-primary btn-sm"
           type="button"
