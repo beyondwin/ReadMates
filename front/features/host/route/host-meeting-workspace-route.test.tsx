@@ -10,9 +10,17 @@ import {
   hostSessionDetailQuery,
 } from "@/features/host/queries/host-session-queries";
 import { hostSensitiveStorage } from "@/features/host/storage/host-sensitive-storage";
+import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
+import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 
 const routeMocks = vi.hoisted(() => ({
   panelStates: {} as Record<string, unknown>,
+  panelQueryInput: null as null | {
+    task: string;
+    sessionId: string;
+    context: unknown;
+    recordPrerequisite?: boolean;
+  },
   restoreRevision: vi.fn(),
   fetchRestorePreview: vi.fn(),
   restoreChange: vi.fn(),
@@ -21,11 +29,16 @@ const routeMocks = vi.hoisted(() => ({
   returnSessionToDraft: vi.fn(),
 }));
 const SESSION_ID = "11111111-1111-4111-8111-111111111111";
+const OBSERVED_AT = "2026-08-25T01:02:03.000Z";
 
 vi.mock("./host-loader-auth", () => ({ requireHostLoaderAuth: vi.fn() }));
 
-vi.mock("@/features/host/queries/host-meeting-panel-queries", () => ({
-  useHostMeetingPanelQueries: () => routeMocks.panelStates,
+vi.mock("@/features/host/queries/host-meeting-panel-queries", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@/features/host/queries/host-meeting-panel-queries")>(),
+  useHostMeetingPanelQueries: (input: typeof routeMocks.panelQueryInput) => {
+    routeMocks.panelQueryInput = input;
+    return routeMocks.panelStates;
+  },
 }));
 
 vi.mock("@/features/host/queries/host-session-record-queries", async (importOriginal) => ({
@@ -71,10 +84,17 @@ function loaderArgs(search = "") {
   };
 }
 
-function renderRoute(search: string, convergence?: {
-  status: "PENDING" | "SUCCEEDED" | "FAILED";
-  retryable: boolean;
-}) {
+function renderRoute(search: string, extras: {
+  convergence?: {
+    status: "PENDING" | "SUCCEEDED" | "FAILED";
+    retryable: boolean;
+  };
+  session?: {
+    state?: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED";
+    title?: string;
+  };
+} = {}) {
+  const { convergence, session } = extras;
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Number.POSITIVE_INFINITY } },
   });
@@ -82,10 +102,10 @@ function renderRoute(search: string, convergence?: {
     hostSessionDetailQuery(SESSION_ID, { clubSlug: "reading-sai" }).queryKey,
     {
       sessionId: SESSION_ID,
-      title: "모임",
+      title: session?.title ?? "모임",
       bookTitle: "책",
       date: "2026-08-25",
-      state: "OPEN",
+      state: session?.state ?? "OPEN",
       visibility: "HOST_ONLY",
       versions: {
         sessionRevision: 7,
@@ -129,11 +149,13 @@ function renderRoute(search: string, convergence?: {
 
 describe("host meeting workspace route", () => {
   beforeEach(() => {
+    routeMocks.panelQueryInput = null;
     routeMocks.panelStates = {
       record: { kind: "loading" },
       history: { kind: "loading" },
       historyAuthority: { kind: "loading" },
       notifications: { kind: "loading" },
+      recordReadiness: { status: "not-required" },
     };
     routeMocks.restoreRevision.mockReset().mockResolvedValue({ draftRevision: 5 });
     routeMocks.fetchRestorePreview.mockReset();
@@ -144,7 +166,7 @@ describe("host meeting workspace route", () => {
   });
 
   it("shows origin commit and pending public convergence as separate route-owned facts", async () => {
-    renderRoute("?task=overview", { status: "PENDING", retryable: false });
+    renderRoute("?task=overview", { convergence: { status: "PENDING", retryable: false } });
 
     expect(await screen.findByText("origin 반영 완료")).toBeInTheDocument();
     expect(screen.getByText("회수 진행 중")).toBeInTheDocument();
@@ -290,7 +312,177 @@ describe("host meeting workspace route", () => {
     unmount();
     await expect(hostSensitiveStorage.clearClub("reading-sai")).resolves.toBeUndefined();
   });
+
+  it("keeps CLOSED overview pending and disabled until record readiness is ready", async () => {
+    setRecordPanel("pending");
+    renderRoute("?task=overview", { session: { state: "CLOSED" } });
+
+    const pending = await screen.findAllByRole("button", { name: "다음 할 일 확인 중" });
+    expect(pending.length).toBeGreaterThan(0);
+    expect(pending.every((button) => button.hasAttribute("disabled"))).toBe(true);
+    expectNoRecordMutationActions();
+    expect(routeMocks.panelQueryInput?.recordPrerequisite).toBe(true);
+  });
+
+  it("keeps the meeting header and unrelated links when CLOSED record readiness is unavailable", async () => {
+    const retry = vi.fn();
+    setRecordPanel("unavailable", { retry });
+    renderRoute("?task=overview", { session: { state: "CLOSED", title: "마친 모임" } });
+
+    expect(await screen.findByRole("heading", { name: "마친 모임" })).toBeInTheDocument();
+    expect(screen.getByText("기록 정리 중")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "기본 정보 편집" })).toBeEnabled();
+    expect(screen.getByRole("link", { name: "참석 응답" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "실제 출석" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "알림" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "변경 내역" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "다음 할 일 확인 중" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
+    expectNoRecordMutationActions();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "모임 기록 다시 시도" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+    expect(routeMocks.reopenSession).not.toHaveBeenCalled();
+    expect(routeMocks.unpublishSession).not.toHaveBeenCalled();
+    expect(routeMocks.returnSessionToDraft).not.toHaveBeenCalled();
+  });
+
+  it("shows observed time and retry after a cached CLOSED record refetch fails", async () => {
+    const retry = vi.fn();
+    setRecordPanel("stale", {
+      retry,
+      facts: {
+        hasDraft: false,
+        draftLiveBaseStale: false,
+        validationIssueCount: 0,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      },
+    });
+    renderRoute("?task=overview", { session: { state: "CLOSED" } });
+
+    expect(await screen.findByText(new RegExp(formatDateTimeLabel(OBSERVED_AT)))).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "다음 할 일 확인 중" }).every((button) => button.hasAttribute("disabled"))).toBe(true);
+    expectNoRecordMutationActions();
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "최신 내용 확인" }));
+    expect(retry).toHaveBeenCalledTimes(1);
+  });
+
+  it("chooses the exact CLOSED action once record readiness is ready", async () => {
+    setRecordPanel("ready", {
+      facts: {
+        hasDraft: false,
+        draftLiveBaseStale: false,
+        validationIssueCount: 0,
+        hasAppliedRecord: false,
+        publicationReady: false,
+      },
+    });
+    renderRoute("?task=overview", { session: { state: "CLOSED" } });
+
+    const upload = await screen.findAllByRole("button", { name: "정리본 올리기" });
+    expect(upload.length).toBeGreaterThan(0);
+    expect(upload.every((button) => !button.hasAttribute("disabled"))).toBe(true);
+    expect(screen.queryByRole("button", { name: "다음 할 일 확인 중" })).not.toBeInTheDocument();
+  });
+
+  it("publishes a ready applied CLOSED record instead of uploading", async () => {
+    setRecordPanel("ready", {
+      facts: {
+        hasDraft: false,
+        draftLiveBaseStale: false,
+        validationIssueCount: 0,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      },
+    });
+    renderRoute("?task=overview", { session: { state: "CLOSED" } });
+
+    expect(await screen.findAllByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).not.toHaveLength(0);
+    expect(screen.queryByRole("button", { name: "정리본 올리기" })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["pending", "pending"],
+    ["ready without an applied record", "ready"],
+  ] as const)("never shows upload or publish on PUBLISHED overview when record readiness is %s", async (_name, status) => {
+    setRecordPanel(status);
+    renderRoute("?task=overview", { session: { state: "PUBLISHED" } });
+
+    expect(await screen.findAllByRole("button", { name: "공개 기록 보기" })).not.toHaveLength(0);
+    expectNoRecordMutationActions();
+    expect(routeMocks.panelQueryInput?.recordPrerequisite).toBe(true);
+  });
+
+  it("does not enable the record prerequisite on OPEN overview", async () => {
+    renderRoute("?task=overview");
+
+    expect(await screen.findByRole("button", { name: "기본 정보 편집" })).toBeEnabled();
+    expect(routeMocks.panelQueryInput?.recordPrerequisite).toBe(false);
+  });
 });
+
+function expectNoRecordMutationActions() {
+  expect(screen.queryByRole("button", { name: "정리본 올리기" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "게스트·멤버 노트에 기록 게시" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "반영 전 확인" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "기록에 반영" })).not.toBeInTheDocument();
+}
+
+function emptyRecordFacts() {
+  return {
+    hasDraft: false,
+    draftLiveBaseStale: false,
+    validationIssueCount: 0,
+    hasAppliedRecord: false,
+    publicationReady: false,
+  };
+}
+
+function setRecordPanel(
+  status: "pending" | "ready" | "stale" | "unavailable",
+  options: {
+    retry?: () => void;
+    facts?: {
+      hasDraft: boolean;
+      draftLiveBaseStale: boolean;
+      validationIssueCount: number;
+      hasAppliedRecord: boolean;
+      publicationReady: boolean;
+    };
+  } = {},
+) {
+  const facts = options.facts ?? emptyRecordFacts();
+  const retry = options.retry ?? vi.fn();
+  const recordReadiness: HostMeetingRecordReadiness = status === "pending"
+    ? { status: "pending" }
+    : status === "unavailable"
+      ? { status: "unavailable", observedAt: null, retryable: true }
+      : status === "stale"
+        ? { status: "stale", facts, observedAt: OBSERVED_AT, retryable: true }
+        : { status: "ready", facts, observedAt: OBSERVED_AT };
+  routeMocks.panelStates = {
+    record: status === "pending"
+      ? { kind: "loading" }
+      : status === "unavailable"
+        ? { kind: "unavailable", retry }
+        : status === "stale"
+          ? {
+            kind: "stale-cached",
+            data: { draft: null, draftLiveBaseStale: facts.draftLiveBaseStale, liveRevision: facts.hasAppliedRecord ? 1 : 0, validationSummary: { valid: facts.publicationReady, issues: [] } },
+            observedAt: OBSERVED_AT,
+            retry,
+          }
+          : {
+            kind: "ready",
+            data: { draft: facts.hasDraft ? {} : null, draftLiveBaseStale: facts.draftLiveBaseStale, liveRevision: facts.hasAppliedRecord ? 1 : 0, validationSummary: { valid: facts.publicationReady, issues: [] } },
+          },
+    history: { kind: "loading" },
+    historyAuthority: { kind: "loading" },
+    notifications: { kind: "loading" },
+    recordReadiness,
+  };
+}
 
 function historyPage(...input: unknown[]) {
   const nextCursor = typeof input.at(-1) === "string" ? input.pop() as string : null;

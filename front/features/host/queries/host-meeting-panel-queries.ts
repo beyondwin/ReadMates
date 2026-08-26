@@ -1,7 +1,11 @@
 import { useQuery, type QueryObserverResult } from "@tanstack/react-query";
-import type { HostSessionHistoryPage } from "@/features/host/api/host-session-record-contracts";
+import type { HostSessionHistoryPage, HostSessionRecordEditor } from "@/features/host/api/host-session-record-contracts";
 import type { ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import {
+  mapHostMeetingRecordFacts,
+  type HostMeetingRecordReadiness,
+} from "@/features/host/model/host-meeting-record-readiness";
 import type { HostMeetingTask } from "@/features/host/model/host-session-workspace-model";
 import type { PanelLoadState } from "@/features/host/model/host-meeting-panel-state";
 import {
@@ -50,18 +54,50 @@ export function panelLoadStateFromQuery<T>(
   return { kind: "loading" };
 }
 
+export function observeHostMeetingRecordReadiness(
+  query: PanelQuerySnapshot<HostSessionRecordEditor>,
+  required: boolean,
+): HostMeetingRecordReadiness {
+  if (!required) return { status: "not-required" };
+  const observedAt = query.dataUpdatedAt > 0
+    ? new Date(query.dataUpdatedAt).toISOString()
+    : null;
+  if (query.data !== undefined) {
+    const facts = mapHostMeetingRecordFacts(query.data);
+    if (query.isFetching || query.isError) {
+      return {
+        status: "stale",
+        facts,
+        observedAt: observedAt ?? new Date(query.dataUpdatedAt).toISOString(),
+        retryable: true,
+      };
+    }
+    return {
+      status: "ready",
+      facts,
+      observedAt: observedAt ?? new Date(query.dataUpdatedAt).toISOString(),
+    };
+  }
+  if (query.isError) {
+    return { status: "unavailable", observedAt, retryable: true };
+  }
+  return { status: "pending" };
+}
+
 export function useHostMeetingPanelQueries({
   task,
   sessionId,
   context,
+  recordPrerequisite,
 }: {
   task: HostMeetingTask;
   sessionId: string;
   context: ExplicitReadmatesApiContext;
+  recordPrerequisite: boolean;
 }) {
   const recordQuery = useQuery({
     ...hostSessionRecordEditorQuery(sessionId, context),
-    enabled: task === "records" || task === "history",
+    enabled: recordPrerequisite || task === "records" || task === "history",
   });
   const historyQuery = useQuery({
     ...hostSessionRecordHistoryQuery(sessionId, { limit: MEETING_PANEL_PAGE_LIMIT }, context),
@@ -86,5 +122,6 @@ export function useHostMeetingPanelQueries({
       notificationsQuery,
       (page: ManualNotificationDispatchListResponse) => page.items.length === 0,
     ),
+    recordReadiness: observeHostMeetingRecordReadiness(recordQuery, recordPrerequisite),
   };
 }

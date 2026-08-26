@@ -4,7 +4,9 @@ import { useLoaderData, useLocation, useNavigate, useParams } from "react-router
 import type { HostSessionEditorLinkComponent } from "@/features/host/ui/host-session-editor";
 import type { ReadmatesReturnState, ReadmatesReturnTarget } from "@/shared/routing/readmates-route-state";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import type { HostMeetingRecordReadiness } from "@/features/host/model/host-meeting-record-readiness";
 import { buildHostMeetingWorkspace, type HostMeetingLocation, type HostMeetingTask } from "@/features/host/model/host-session-workspace-model";
+import { formatDateTimeLabel } from "@/shared/ui/readmates-display";
 import { buildHostMeetingUrl, canonicalizeLegacyHostMeetingUrl, parseHostMeetingLocation } from "@/features/host/model/host-session-workspace-navigation";
 import type { ManualNotificationDispatchListResponse } from "@/features/host/api/host-contracts";
 import type { HostSessionHistoryPage, HostSessionRecordEditor, HostSessionReverseRequest } from "@/features/host/api/host-session-record-contracts";
@@ -121,6 +123,24 @@ function mapPanelState<T>(
   return state;
 }
 
+function recordReadinessForMeeting(
+  state: "DRAFT" | "OPEN" | "CLOSED" | "PUBLISHED",
+  readiness: HostMeetingRecordReadiness | undefined,
+): HostMeetingRecordReadiness {
+  if (readiness) return readiness;
+  return state === "CLOSED" || state === "PUBLISHED"
+    ? { status: "pending" }
+    : { status: "not-required" };
+}
+
+function recordObservationAnnouncements(readiness: HostMeetingRecordReadiness) {
+  if (readiness.status !== "stale") return [];
+  return [{
+    kind: "status" as const,
+    message: `${formatDateTimeLabel(readiness.observedAt)}에 확인한 내용을 표시합니다. 최신 확인이 필요한 행동은 잠시 사용할 수 없습니다.`,
+  }];
+}
+
 function panelForTask(
   task: HostMeetingTask,
   states: ReturnType<typeof useHostMeetingPanelQueries>,
@@ -214,10 +234,12 @@ export function HostMeetingWorkspaceRoute({
     enabled: loaderData.mode === "active",
   });
   const retryConvergence = useRetryHostPublicConvergenceMutation(context);
+  const recordPrerequisite = baseQuery.data?.state === "CLOSED" || baseQuery.data?.state === "PUBLISHED";
   const panelStates = useHostMeetingPanelQueries({
     task: meetingLocation.task,
     sessionId,
     context,
+    recordPrerequisite,
   });
   const restoreRevision = useRestoreHostSessionRevisionToDraftMutation(context);
   const restoreChange = useRestoreHostSessionChangeMutation(context);
@@ -320,11 +342,7 @@ export function HostMeetingWorkspaceRoute({
           today: todayIsoDate(),
           unansweredResponseCount: 0,
           unknownAttendanceCount: 0,
-          hasRecordDraft: false,
-          recordDraftStale: false,
-          recordValidationIssueCount: 0,
-          hasAppliedRecord: false,
-          publicationReady: false,
+          recordReadiness: { status: "not-required" },
         }).tasks}
         primaryAction={{ kind: "LOADING", label: "모임 확인 중", disabled: true }}
         panel={baseQuery.isError
@@ -355,6 +373,10 @@ export function HostMeetingWorkspaceRoute({
     : null;
   const activeAttendees = session.attendees.filter((item) => (item.participationStatus ?? "ACTIVE") === "ACTIVE");
   const unknownAttendanceCount = activeAttendees.filter((item) => item.attendanceStatus === "UNKNOWN").length;
+  const recordReadiness = recordReadinessForMeeting(session.state, panelStates.recordReadiness);
+  const recordRetry = panelStates.record.kind === "unavailable" || panelStates.record.kind === "stale-cached"
+    ? panelStates.record.retry
+    : undefined;
   const workspace = buildHostMeetingWorkspace({
     currentUrl,
     state: session.state,
@@ -362,11 +384,7 @@ export function HostMeetingWorkspaceRoute({
     today: todayIsoDate(),
     unansweredResponseCount: activeAttendees.filter((item) => item.rsvpStatus === "NO_RESPONSE").length,
     unknownAttendanceCount,
-    hasRecordDraft: Boolean(recordData?.draft),
-    recordDraftStale: Boolean(recordData?.draftLiveBaseStale),
-    recordValidationIssueCount: recordData?.validationSummary.issues.length ?? 0,
-    hasAppliedRecord: (recordData?.liveRevision ?? 0) > 0,
-    publicationReady: Boolean(recordData && recordData.liveRevision > 0 && !recordData.draftLiveBaseStale && recordData.validationSummary.valid),
+    recordReadiness,
   });
   const baseTask = meetingLocation.task === "overview" || meetingLocation.task === "responses" || meetingLocation.task === "attendance";
   const historyAuthority = panelStates.historyAuthority;
@@ -605,8 +623,9 @@ export function HostMeetingWorkspaceRoute({
   const primaryAction = {
     kind: workspace.primaryAction.kind,
     label: workspace.primaryAction.label,
-    disabled: baseQuery.isFetching || baseQuery.isError,
-    reason: baseQuery.isFetching ? "최신 모임 상태를 확인하고 있습니다." : null,
+    disabled: workspace.primaryAction.disabled || baseQuery.isFetching || baseQuery.isError,
+    reason: workspace.primaryAction.reason
+      ?? (baseQuery.isFetching ? "최신 모임 상태를 확인하고 있습니다." : null),
   };
 
   return (
@@ -641,8 +660,13 @@ export function HostMeetingWorkspaceRoute({
           { audience: "공개 기록", result: publicProjection },
         ],
         convergence: buildPublicConvergenceStatus(convergenceQuery.data),
+        secondaryActions: recordRetry ? (
+          <button type="button" className="btn btn-quiet btn-sm" onClick={recordRetry}>
+            {panelStates.record.kind === "stale-cached" ? "최신 내용 확인" : "모임 기록 다시 시도"}
+          </button>
+        ) : undefined,
       }}
-      announcements={[]}
+      announcements={recordObservationAnnouncements(recordReadiness)}
       onTaskLinkActivated={() => undefined}
       onPrimaryAction={() => {
         if (meetingLocation.task !== workspace.primaryAction.task) {
