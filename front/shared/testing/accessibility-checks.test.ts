@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { describe, expect, it } from "vitest";
-import { findUnnamedInteractiveElements } from "./accessibility-checks";
+import { findNestedLiveRegions, findUnnamedInteractiveElements } from "./accessibility-checks";
 
 function makeContainer(html: string): HTMLElement {
   const el = document.createElement("div");
@@ -63,5 +63,50 @@ describe("findUnnamedInteractiveElements", () => {
 
   it("returns an empty array when there are no interactive elements", () => {
     expect(findUnnamedInteractiveElements(makeContainer(`<p>본문</p>`))).toEqual([]);
+  });
+});
+
+describe("findNestedLiveRegions", () => {
+  it("returns inner live regions nested inside another live region", () => {
+    const container = makeContainer(`
+      <div aria-live="polite">
+        <div class="inner" aria-live="polite">updated</div>
+      </div>
+    `);
+    const nested = findNestedLiveRegions(container);
+    expect(nested).toHaveLength(1);
+    expect(nested[0]?.className).toBe("inner");
+  });
+
+  it("treats implicit alert, status, and log roles as live regions", () => {
+    const container = makeContainer(`
+      <div role="alert">
+        <div class="mid" role="status">
+          <div class="inner" role="log">loading</div>
+        </div>
+      </div>
+    `);
+    expect(findNestedLiveRegions(container).map((el) => el.className)).toEqual(["mid", "inner"]);
+  });
+
+  it("does not flag sibling live regions", () => {
+    const container = makeContainer(`
+      <div aria-live="polite">one</div>
+      <div role="status">two</div>
+    `);
+    expect(findNestedLiveRegions(container)).toEqual([]);
+  });
+
+  it("does not treat aria-live=off as a live region", () => {
+    const container = makeContainer(`
+      <div aria-live="polite">
+        <div class="off" aria-live="off" role="status">quiet</div>
+      </div>
+    `);
+    expect(findNestedLiveRegions(container)).toEqual([]);
+  });
+
+  it("returns an empty array when there are no live regions", () => {
+    expect(findNestedLiveRegions(makeContainer(`<p>본문</p>`))).toEqual([]);
   });
 });

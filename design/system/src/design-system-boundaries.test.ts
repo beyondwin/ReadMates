@@ -100,4 +100,30 @@ describe("design-system boundaries", () => {
 
     expect(violations, violations.join("\n")).toEqual([]);
   });
+
+  it("aliases stale semantic colors to warning without changing warning values", () => {
+    const tokens = fs.readFileSync(path.join(packageRoot, "src/styles/tokens.css"), "utf8");
+    const stylesheet = document.createElement("style");
+    stylesheet.textContent = tokens;
+    document.head.append(stylesheet);
+
+    try {
+      const root = getComputedStyle(document.documentElement);
+      expect(tokens).toMatch(/--warn:\s+oklch\(0\.52 0\.10 62\);/);
+      expect(tokens).toMatch(/--warn-soft:\s+oklch\(0\.95 0\.035 70\);/);
+      expect(tokens).toMatch(/--warning:\s*var\(--warn\);/);
+      expect(tokens).toMatch(/--warning-soft:\s*var\(--warn-soft\);/);
+      expect(tokens).toMatch(/--warning-line:\s*color-mix\(in oklch,\s*var\(--warn\),\s*transparent 70%\);/);
+      expect(root.getPropertyValue("--warning").trim()).toBe("var(--warn)");
+      expect(root.getPropertyValue("--warning-soft").trim()).toBe("var(--warn-soft)");
+      expect(root.getPropertyValue("--warning-line").trim()).toBe(
+        "color-mix(in oklch, var(--warn), transparent 70%)",
+      );
+      expect(root.getPropertyValue("--stale").trim()).toBe("var(--warning)");
+      expect(root.getPropertyValue("--stale-soft").trim()).toBe("var(--warning-soft)");
+      expect(root.getPropertyValue("--stale-line").trim()).toBe("var(--warning-line)");
+    } finally {
+      stylesheet.remove();
+    }
+  });
 });

@@ -44,6 +44,9 @@
   --warning: var(--warn);
   --warning-soft: var(--warn-soft);
   --warning-line: color-mix(in oklch, var(--warn), transparent 70%);
+  --stale: var(--warning);
+  --stale-soft: var(--warning-soft);
+  --stale-line: var(--warning-line);
   --locked: oklch(0.38 0.018 260);
   --locked-soft: color-mix(in oklch, var(--bg-sub) 84%, var(--ink-200));
   --locked-line: var(--line-strong);

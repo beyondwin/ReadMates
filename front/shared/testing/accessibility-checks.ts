@@ -1,4 +1,6 @@
 const INTERACTIVE_SELECTOR = "button, a[href], [role='button'], [role='link']";
+const LIVE_REGION_SELECTOR = "[aria-live], [role='alert'], [role='status'], [role='log']";
+const LIVE_ROLES = new Set(["alert", "status", "log"]);
 
 export function findUnnamedInteractiveElements(container: HTMLElement): HTMLElement[] {
   const elements = Array.from(
@@ -11,6 +13,33 @@ export function findUnnamedInteractiveElements(container: HTMLElement): HTMLElem
     const title = el.getAttribute("title")?.trim();
     return !text && !ariaLabel && !labelledBy && !title;
   });
+}
+
+export function findNestedLiveRegions(container: HTMLElement): HTMLElement[] {
+  const elements = Array.from(container.querySelectorAll<HTMLElement>(LIVE_REGION_SELECTOR));
+  return elements.filter((el) => {
+    if (!isLiveRegion(el)) {
+      return false;
+    }
+    for (let parent = el.parentElement; parent; parent = parent.parentElement) {
+      if (isLiveRegion(parent)) {
+        return true;
+      }
+    }
+    return false;
+  });
+}
+
+function isLiveRegion(el: HTMLElement): boolean {
+  const ariaLive = el.getAttribute("aria-live")?.trim().toLowerCase();
+  if (ariaLive === "off") {
+    return false;
+  }
+  if (ariaLive === "polite" || ariaLive === "assertive") {
+    return true;
+  }
+  const role = el.getAttribute("role")?.trim().toLowerCase();
+  return role !== undefined && LIVE_ROLES.has(role);
 }
 
 function getLabelledByText(el: HTMLElement): string {
