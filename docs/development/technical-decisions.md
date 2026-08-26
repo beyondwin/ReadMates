@@ -22,14 +22,14 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0017](adr/0017-separate-web-and-notification-worker-processes.md) | Web과 notification worker process를 분리 운영 | Proposed |
 | [ADR-0018](adr/0018-canonical-meeting-product-language.md) | 사용자 핵심 객체를 `모임`과 `기록`으로 통일 | Accepted |
 | [ADR-0019](adr/0019-url-authoritative-club-workspaces.md) | URL이 소유하는 club-scoped workspace identity | Accepted |
-| [ADR-0020](adr/0020-shared-brand-role-composition.md) | 하나의 브랜드 시스템과 역할별 composition grammar | Proposed |
+| [ADR-0020](adr/0020-shared-brand-role-composition.md) | 하나의 브랜드 시스템과 역할별 composition grammar | Superseded by ADR-0045 |
 | [ADR-0021](adr/0021-response-and-attendance-as-separate-facts.md) | 참석 응답과 실제 출석을 별도 사실로 유지 | Accepted |
 | [ADR-0022](adr/0022-lifecycle-audience-and-public-placement.md) | 모임 lifecycle, app audience, 공개 사이트 배치를 독립 축으로 유지 | Accepted |
 | [ADR-0023](adr/0023-revision-guarded-host-mutations.md) | Domain revision으로 host mutation을 조건부 실행 | Accepted |
 | [ADR-0024](adr/0024-explicit-unknown-actual-attendance.md) | 실제 출석에 명시적 `UNKNOWN` correction 상태 제공 | Accepted |
 | [ADR-0025](adr/0025-session-participant-snapshot-owns-response-denominator.md) | 모임 참여자 snapshot이 응답 분모를 소유 | Accepted |
 | [ADR-0026](adr/0026-common-global-club-shell.md) | Member와 host가 공통 global club shell을 사용 | Proposed |
-| [ADR-0027](adr/0027-current-meeting-local-task-navigation.md) | 현재 모임 작업은 local task navigation으로 분리 | Proposed |
+| [ADR-0027](adr/0027-current-meeting-local-task-navigation.md) | 현재 모임 작업은 local task navigation으로 분리 | Superseded by ADR-0044 |
 | [ADR-0028](adr/0028-idempotent-host-mutation-receipts.md) | Host mutation을 idempotency receipt로 재조정 | Accepted |
 | [ADR-0029](adr/0029-bff-secret-and-origin-validation.md) | Mutating API에 BFF secret과 Origin/Referer를 함께 검증 | Accepted |
 | [ADR-0030](adr/0030-role-and-sensitive-document-access.md) | 역할 권한과 민감 문서 접근 권한을 분리 | Accepted |
@@ -46,5 +46,7 @@ ReadMates의 durable product·technical·design·operational decision은 [ADR �
 | [ADR-0041](adr/0041-domain-separated-platform-admin-invitation-delivery-token.md) | 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성 | Accepted |
 | [ADR-0042](adr/0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Accepted |
 | [ADR-0043](adr/0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Accepted |
+| [ADR-0044](adr/0044-host-focus-deck-primary-action-composition.md) | 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성 | Proposed |
+| [ADR-0045](adr/0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Proposed |
 
 Active architecture는 [architecture.md](architecture.md), 검증 경로는 [test-guide.md](test-guide.md)와 각 ADR의 `검증` 절을 따른다. Server의 canonical PR gate는 `./scripts/server-ci-check.sh`다. 외부 서비스의 가격·한도·API 동작처럼 변할 수 있는 사실은 운영 판단 직전에 공식 source로 다시 확인한다.

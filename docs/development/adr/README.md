@@ -44,14 +44,14 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0017](0017-separate-web-and-notification-worker-processes.md) | Web과 notification worker process를 분리 운영 | Proposed | 2026-08-22 | server, ops |
 | [0018](0018-canonical-meeting-product-language.md) | 사용자 핵심 객체를 `모임`과 `기록`으로 통일 | Accepted | 2026-08-22 | product, front, content |
 | [0019](0019-url-authoritative-club-workspaces.md) | URL이 소유하는 club-scoped workspace identity | Accepted | 2026-08-22 | front, product |
-| [0020](0020-shared-brand-role-composition.md) | 하나의 브랜드 시스템과 역할별 composition grammar | Proposed | 2026-08-22 | design, front |
+| [0020](0020-shared-brand-role-composition.md) | 하나의 브랜드 시스템과 역할별 composition grammar | Superseded by ADR-0045 | 2026-08-22 | design, front |
 | [0021](0021-response-and-attendance-as-separate-facts.md) | 참석 응답과 실제 출석을 별도 사실로 유지 | Accepted | 2026-08-22 | product, server, front |
 | [0022](0022-lifecycle-audience-and-public-placement.md) | 모임 lifecycle, app audience, 공개 사이트 배치를 독립 축으로 유지 | Accepted | 2026-08-22 | product, server, front |
 | [0023](0023-revision-guarded-host-mutations.md) | Domain revision으로 host mutation을 조건부 실행 | Accepted | 2026-08-22 | server, front |
 | [0024](0024-explicit-unknown-actual-attendance.md) | 실제 출석에 명시적 `UNKNOWN` correction 상태 제공 | Accepted | 2026-08-22 | product, server, front |
 | [0025](0025-session-participant-snapshot-owns-response-denominator.md) | 모임 참여자 snapshot이 응답 분모를 소유 | Accepted | 2026-08-22 | product, server |
 | [0026](0026-common-global-club-shell.md) | Member와 host가 공통 global club shell을 사용 | Proposed | 2026-08-22 | product, design, front |
-| [0027](0027-current-meeting-local-task-navigation.md) | 현재 모임 작업은 local task navigation으로 분리 | Proposed | 2026-08-22 | product, design, front |
+| [0027](0027-current-meeting-local-task-navigation.md) | 현재 모임 작업은 local task navigation으로 분리 | Superseded by ADR-0044 | 2026-08-22 | product, design, front |
 | [0028](0028-idempotent-host-mutation-receipts.md) | Host mutation을 idempotency receipt로 재조정 | Accepted | 2026-08-22 | server, front |
 | [0029](0029-bff-secret-and-origin-validation.md) | Mutating API에 BFF secret과 Origin/Referer를 함께 검증 | Accepted | 2026-08-22 | server, security |
 | [0030](0030-role-and-sensitive-document-access.md) | 역할 권한과 민감 문서 접근 권한을 분리 | Accepted | 2026-08-22 | server, product, security |
@@ -68,6 +68,8 @@ Routine refactor, component-local layout, reversible implementation detail은 AD
 | [0041](0041-domain-separated-platform-admin-invitation-delivery-token.md) | 플랫폼 어드민 초대 전달 토큰을 도메인 분리 HMAC으로 재생성 | Accepted | 2026-08-24 | platform ops, security, server |
 | [0042](0042-purpose-separated-platform-admin-audit-cursors.md) | 플랫폼 어드민 audit cursor를 V57 digest key로 서명 | Accepted | 2026-08-24 | platform ops, security, server |
 | [0043](0043-minimize-platform-admin-support-reason-evidence.md) | 플랫폼 어드민 support access 사유 evidence를 최소화 | Accepted | 2026-08-24 | platform ops, security, server, front |
+| [0044](0044-host-focus-deck-primary-action-composition.md) | 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성 | Proposed | 2026-08-26 | product, design, front |
+| [0045](0045-host-admin-focus-deck-editorial-ledger-composition.md) | 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정 | Proposed | 2026-08-26 | product, design, platform ops, front |
 
 ## 상태 범례
 

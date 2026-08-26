@@ -1,6 +1,6 @@
 # ADR-0020: 하나의 브랜드 시스템과 역할별 composition grammar
 
-- 상태: Proposed
+- 상태: Superseded by ADR-0045
 - 결정일: 2026-08-22
 - 작성자: 제품·디자인
 - 관련: `docs/agents/design.md:5`,

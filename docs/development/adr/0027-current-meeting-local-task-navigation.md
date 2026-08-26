@@ -1,6 +1,6 @@
 # ADR-0027: 현재 모임 작업은 local task navigation으로 분리
 
-- 상태: Proposed
+- 상태: Superseded by ADR-0044
 - 결정일: 2026-08-22
 - 작성자: 제품·디자인·프런트엔드
 - 관련: ADR-0003, ADR-0026, `docs/development/architecture.md:389`
