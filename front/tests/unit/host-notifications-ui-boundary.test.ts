@@ -79,4 +79,17 @@ describe("host notifications UI boundary", () => {
     expect(workbench).toContain('from "./host-notification-composer"');
     expect(workbench).not.toContain("manual-notification-member-picker");
   });
+
+  it("imports host editorial ledger CSS from the notifications route, not UI", () => {
+    const route = readFileSync(
+      resolve(repoRoot, "features/host/route/host-notifications-route.tsx"),
+      "utf8",
+    );
+    const page = readFileSync(
+      resolve(repoRoot, "features/host/ui/host-notifications-page.tsx"),
+      "utf8",
+    );
+    expect(route).toContain("host-editorial-ledger.css");
+    expect(page).not.toContain("host-editorial-ledger.css");
+  });
 });

@@ -517,6 +517,7 @@ describe("HostMembersPage", () => {
     const headerEyebrow = document.querySelector(".page-header-compact .eyebrow");
     const contentContainer = document.querySelector("main > section.container") as HTMLElement | null;
     expect(page).not.toBeNull();
+    expect(page).toHaveClass("rm-host-editorial-ledger");
     expect(headerEyebrow?.tagName).toBe("DIV");
     expect(contentContainer).not.toBeNull();
     expect(contentContainer).toHaveClass("rm-host-members-page__body");
@@ -524,6 +525,10 @@ describe("HostMembersPage", () => {
     expect(contentContainer?.style.paddingBottom).toBe("");
     expect(contentContainer?.style.paddingLeft).toBe("");
     expect(contentContainer?.style.paddingRight).toBe("");
+    expect(screen.getByRole("heading", { level: 1, name: "멤버 관리" })).toHaveClass(
+      "rm-host-editorial-ledger__heading",
+    );
+    expect(page?.querySelector(".page-header-compact")?.querySelectorAll("[style]")).toHaveLength(0);
   });
 
   it("labels viewer members as browsing members instead of approval pending", async () => {

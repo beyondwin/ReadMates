@@ -35,6 +35,7 @@ import {
 } from "@/shared/query/cursor-pagination";
 import type { HostNotificationsRouteData } from "./host-notifications-data";
 import { combineManualOptions } from "./host-notifications-route-model";
+import "@/features/host/ui/host-editorial-ledger.css";
 
 const HOST_NOTIFICATION_LEDGER_PAGE_LIMIT = 50;
 const MANUAL_DISPATCH_PAGE_LIMIT = 20;
@@ -159,7 +160,8 @@ export function HostNotificationsRoute() {
   };
 
   return (
-    <HostNotificationsPage
+    <div className="rm-host-editorial-ledger">
+      <HostNotificationsPage
       clubSlug={context.clubSlug}
       summary={summaryQuery.data ?? { pending: 0, failed: 0, dead: 0, sentLast24h: 0, latestFailures: [] }}
       events={events.items}
@@ -228,6 +230,7 @@ export function HostNotificationsRoute() {
         setPolicyError(null);
         await policyQuery.refetch();
       }}
-    />
+      />
+    </div>
   );
 }

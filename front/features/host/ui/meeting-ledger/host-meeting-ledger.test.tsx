@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { MemoryRouter } from "react-router";
@@ -7,6 +7,7 @@ import { HostMeetingLedger } from "./host-meeting-ledger";
 import type { MeetingListItem } from "@/features/host/model/host-meeting-ledger-model";
 import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
 import type { UpcomingBookListItem } from "@/features/host/model/upcoming-book-list-model";
+import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 
 function attentionItem(overrides: Partial<HostSessionLedgerItem> = {}): HostSessionLedgerItem {
   return {
@@ -35,11 +36,18 @@ function attentionItem(overrides: Partial<HostSessionLedgerItem> = {}): HostSess
 function TestLink({
   to,
   children,
+  className,
+  ...props
 }: {
   to: string | { pathname?: string };
   children: ReactNode;
+  className?: string;
 }) {
-  return <a href={typeof to === "string" ? to : ""}>{children}</a>;
+  return (
+    <a href={typeof to === "string" ? to : ""} className={className} {...props}>
+      {children}
+    </a>
+  );
 }
 
 function renderLedger(items: MeetingListItem[]) {
@@ -325,5 +333,57 @@ describe("HostMeetingLedger", () => {
     expect(screen.queryByText("확인 필요한 모임 기록이 없습니다.")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(onRetryAttention).toHaveBeenCalled();
+  });
+
+  it("aligns home overview to one heading, next-meeting identity, and one primary action", () => {
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          overviewOnly
+          items={[{ sessionId: "open-1", state: "OPEN", date: "2026-04-15" }]}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    const root = document.querySelector(".rm-host-editorial-ledger") as HTMLElement | null;
+    expect(root).not.toBeNull();
+    expect(within(root!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(within(root!).getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
+    expect(root!.querySelector("[role='tablist']")).toBeNull();
+    expect(root!.querySelectorAll("[style]")).toHaveLength(0);
+    expect(findNestedLiveRegions(root!)).toEqual([]);
+    expect(root!.querySelector(".rm-host-editorial-ledger__identity")).toHaveTextContent("2026.04.15");
+    expect(root!.querySelector(".rm-host-editorial-ledger__identity")).toHaveTextContent("진행 중");
+    expect(within(root!).getAllByRole("link", { name: "지금 다루는 모임 열기" })).toHaveLength(1);
+    expect(within(root!).getByRole("link", { name: "지금 다루는 모임 열기" })).toHaveClass(
+      "rm-host-editorial-ledger__action",
+    );
+  });
+
+  it("uses editorial empty and error state grammar on home", async () => {
+    const onRetryAttention = vi.fn();
+    render(
+      <MemoryRouter>
+        <HostMeetingLedger
+          overviewOnly
+          items={[]}
+          attentionError
+          onRetryAttention={onRetryAttention}
+          LinkComponent={TestLink}
+        />
+      </MemoryRouter>,
+    );
+
+    const root = document.querySelector(".rm-host-editorial-ledger") as HTMLElement;
+    expect(root.querySelectorAll(".rm-host-editorial-ledger__state")).not.toHaveLength(0);
+    expect(root.querySelector(".rm-host-editorial-ledger__state")).toHaveTextContent(
+      "아직 열린 모임이 없습니다",
+    );
+    expect(screen.getByRole("link", { name: "첫 모임 만들기" })).toHaveClass(
+      "rm-host-editorial-ledger__action",
+    );
+    expect(screen.getByRole("alert")).toHaveClass("rm-host-editorial-ledger__state");
+    expect(root.querySelectorAll("[style]")).toHaveLength(0);
   });
 });

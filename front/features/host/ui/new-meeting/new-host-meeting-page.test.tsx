@@ -1,6 +1,9 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
+import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 import { emptyNewMeetingDraft, type NewMeetingDraft } from "../../model/new-host-meeting-model";
 import { NewHostMeetingPage } from "./new-host-meeting-page";
 
@@ -150,5 +153,37 @@ describe("NewHostMeetingPage", () => {
     expect(screen.getByLabelText("책 제목")).toHaveValue("입력은 그대로");
     expect(screen.getByLabelText("책 제목")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByText("책 제목을 확인해 주세요.")).toBeVisible();
+  });
+
+  it("imports editorial ledger styles from the new-meeting route entry", () => {
+    const routeSource = readFileSync(path.resolve("features/host/route/new-host-meeting-route.tsx"), "utf8");
+    expect(routeSource).toContain("host-editorial-ledger.css");
+  });
+
+  it("keeps one editable form flow without auto-submit, forced AI, or inline styles", () => {
+    const onSubmit = vi.fn();
+    renderPage({
+      onSubmit,
+      suggestionStatus: "ready",
+      suggestionMessage: "최근 모임의 운영 정보를 바탕으로 제안합니다.",
+    });
+
+    const root = document.querySelector(".rm-host-editorial-ledger") as HTMLElement | null;
+    expect(root).not.toBeNull();
+    expect(within(root!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(within(root!).getByRole("heading", { level: 1, name: "새 모임 만들기" })).toBeInTheDocument();
+    expect(root!.querySelector("[role='tablist']")).toBeNull();
+    expect(readFileSync(path.resolve("features/host/ui/new-meeting/new-host-meeting-page.tsx"), "utf8")).not.toMatch(/style=\{\{/);
+    expect(within(root!).getByRole("heading", { level: 1 }).getAttribute("style")).toBeNull();
+    expect(within(root!).getByRole("form", { name: "새 모임 정보" }).getAttribute("style")).toBeNull();
+    expect(findNestedLiveRegions(root!)).toEqual([]);
+    expect(onSubmit).not.toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /AI|자동 생성|자동 제출/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("form", { name: "새 모임 정보" })).toHaveClass("rm-host-editorial-ledger__form");
+    expect(screen.getAllByRole("button", { name: "모임 초안 저장" })).toHaveLength(1);
+    expect(screen.getByRole("button", { name: "모임 초안 저장" })).toHaveClass(
+      "rm-host-editorial-ledger__action",
+    );
+    expect(screen.getByRole("status")).toHaveClass("rm-host-editorial-ledger__state");
   });
 });

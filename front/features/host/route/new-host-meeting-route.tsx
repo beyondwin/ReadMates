@@ -26,6 +26,7 @@ import { registerHostSensitiveState } from "../storage/host-sensitive-storage";
 import { NewHostMeetingPage, type SavedNewMeeting } from "../ui/new-meeting/new-host-meeting-page";
 import { hostApiErrorFromResponse, readHostResponseJson } from "@/shared/api/host-authority-event";
 import { recordHostScheduleDefaults } from "@/shared/observability/frontend-observability";
+import "@/features/host/ui/host-editorial-ledger.css";
 
 export type NewHostMeetingRouteProps = {
   onSessionRecordsChanged?: (event: { sessionId: string; clubSlug: string }) => void | Promise<void>;

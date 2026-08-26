@@ -1,8 +1,11 @@
-import { render, screen } from "@testing-library/react";
+import { existsSync, readFileSync } from "node:fs";
+import path from "node:path";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router";
 import type { HostSessionLedgerItem } from "@/features/host/model/host-session-ledger-model";
+import { findNestedLiveRegions } from "@/shared/testing/accessibility-checks";
 
 const routeMocks = vi.hoisted(() => ({
   hostSessions: { items: [] as Array<Record<string, unknown>>, nextCursor: null as string | null },
@@ -182,5 +185,81 @@ describe("HostDashboardRoute", () => {
     expect(screen.queryByText("확인 필요한 모임 기록이 없습니다.")).not.toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "다시 시도" }));
     expect(routeMocks.refetchAttention).toHaveBeenCalled();
+  });
+
+  it("imports the scoped editorial ledger stylesheet from the host route entry", () => {
+    const routeSource = readFileSync(path.resolve("features/host/route/host-dashboard-route.tsx"), "utf8");
+    const cssPath = path.resolve("features/host/ui/host-editorial-ledger.css");
+
+    expect(routeSource).toContain("host-editorial-ledger.css");
+    expect(existsSync(cssPath)).toBe(true);
+    const css = readFileSync(cssPath, "utf8");
+    expect(css).toMatch(/\.rm-host-editorial-ledger__action[\s\S]*min-height:\s*44px/);
+    expect(css).toContain("var(--paper");
+    expect(css).toContain("var(--ink");
+    expect(css).toContain("var(--accent");
+    expect(css).toContain("var(--warning");
+    expect(css).toContain("var(--stale");
+    expect(css).toContain("prefers-reduced-motion");
+    expect(css).not.toMatch(/backdrop-filter|box-shadow:\s*0 0 \d+px|linear-gradient/);
+  });
+
+  it("keeps empty home on one heading, one create action, and editorial state grammar", () => {
+    renderRoute();
+
+    const root = document.querySelector(".rm-host-editorial-ledger") as HTMLElement | null;
+    expect(root).not.toBeNull();
+    expect(within(root!).getAllByRole("heading", { level: 1 })).toHaveLength(1);
+    expect(within(root!).getByRole("heading", { level: 1, name: "오늘" })).toBeInTheDocument();
+    expect(root!.querySelector("[role='tablist']")).toBeNull();
+    expect(root!.querySelectorAll("[style]")).toHaveLength(0);
+    expect(findNestedLiveRegions(root!)).toEqual([]);
+
+    const create = within(root!).getByRole("link", { name: "첫 모임 만들기" });
+    expect(create).toHaveClass("rm-host-editorial-ledger__action");
+    expect(within(root!).getAllByRole("link", { name: "첫 모임 만들기" })).toHaveLength(1);
+    expect(root!.querySelector(".rm-host-editorial-ledger__state")).toHaveTextContent(
+      "아직 열린 모임이 없습니다",
+    );
+  });
+
+  it("shows next-meeting identity and one primary action before attention evidence", () => {
+    routeMocks.hostSessions = {
+      items: [{ sessionId: "open-1", state: "OPEN", date: "2026-04-15" }],
+      nextCursor: null,
+    };
+    routeMocks.recordAttention = {
+      items: [attentionItem({ bookTitle: "공개된 책", state: "PUBLISHED" })],
+      nextCursor: null,
+      summary: {
+        needsAttentionCount: 1,
+        incompletePublishedCount: 1,
+        draftCount: 0,
+      },
+    };
+    renderRoute();
+
+    const root = document.querySelector(".rm-host-editorial-ledger") as HTMLElement;
+    const identity = root.querySelector(".rm-host-editorial-ledger__identity");
+    const attention = within(root).getByRole("region", { name: "확인 필요" });
+    expect(identity).toHaveTextContent("2026.04.15");
+    expect(identity).toHaveTextContent("진행 중");
+    expect(within(root).getAllByRole("link", { name: "지금 다루는 모임 열기" })).toHaveLength(1);
+    expect(within(root).getByRole("link", { name: "지금 다루는 모임 열기" })).toHaveClass(
+      "rm-host-editorial-ledger__action",
+    );
+    expect(identity!.compareDocumentPosition(attention) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(root.querySelector("[role='tablist']")).toBeNull();
+    expect(root.querySelectorAll("[style]")).toHaveLength(0);
+  });
+
+  it("marks a retryable attention failure as editorial state grammar", () => {
+    routeMocks.attentionError = true;
+    renderRoute();
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveClass("rm-host-editorial-ledger__state");
+    expect(alert).toHaveTextContent("확인 필요 목록을 불러오지 못했습니다.");
+    expect(screen.getByRole("button", { name: "다시 시도" }).closest(".rm-host-editorial-ledger")).not.toBeNull();
   });
 });

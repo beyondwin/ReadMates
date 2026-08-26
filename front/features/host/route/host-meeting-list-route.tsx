@@ -21,6 +21,7 @@ import {
 } from "./host-meeting-list-data";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import type { ExplicitReadmatesApiContext } from "@/shared/api/client";
+import "@/features/host/ui/host-editorial-ledger.css";
 
 export function HostMeetingListRoute({
   LinkComponent,

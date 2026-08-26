@@ -12,6 +12,7 @@ import {
 } from "@/features/host/ui/meeting-ledger/host-meeting-ledger";
 import { HOST_HOME_ATTENTION_LIMIT, type HostDashboardRouteData } from "./host-dashboard-data";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
+import "@/features/host/ui/host-editorial-ledger.css";
 
 export function HostDashboardRoute({
   LinkComponent,

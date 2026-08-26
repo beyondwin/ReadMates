@@ -67,10 +67,10 @@ function ScheduleSuggestionNote({
 }) {
   const role = status === "error" ? "alert" : "status";
   return (
-    <div className="surface-quiet stack" style={{ padding: 14 }} role={role}>
-      <p className="small" style={{ margin: 0 }}>{message}</p>
+    <div className="surface-quiet stack rm-host-editorial-ledger__panel rm-host-editorial-ledger__state" role={role}>
+      <p className="small">{message}</p>
       {reason ? (
-        <p className="tiny" style={{ margin: 0, color: "var(--text-2)" }}>
+        <p className="tiny rm-host-editorial-ledger__lede">
           {reason}{sourceMeetingCount > 0 ? ` · 최근 ${sourceMeetingCount}개 모임 기준` : ""}
         </p>
       ) : null}
@@ -112,7 +112,7 @@ export function NewHostMeetingPage({
   };
 
   return (
-    <main className="rm-host-session-workspace rm-new-meeting-page">
+    <main className="rm-host-session-workspace rm-new-meeting-page rm-host-editorial-ledger">
       <div className="rm-host-session-workspace__frame">
         <header className="rm-host-session-workspace__header">
           <h1 className="h1 editorial rm-host-session-workspace__title">새 모임 만들기</h1>
@@ -149,7 +149,7 @@ export function NewHostMeetingPage({
               <NewMeetingSectionIndex />
             </aside>
             <form
-              className="rm-new-meeting-page__form stack"
+              className="rm-new-meeting-page__form stack rm-host-editorial-ledger__form"
               aria-label="새 모임 정보"
               onSubmit={handleSubmit}
             >
@@ -184,7 +184,7 @@ export function NewHostMeetingPage({
                   onMeetingUrlChange={(value) => onFieldChange("meetingUrl", value)}
                   onMeetingPasscodeChange={(value) => onFieldChange("meetingPasscode", value)}
               />
-              <section id="new-meeting-audience" className="surface-quiet stack" style={{ padding: 18 }}>
+              <section id="new-meeting-audience" className="surface-quiet stack rm-host-editorial-ledger__panel">
                 <h2 className="h3 editorial">멤버에게 보이기</h2>
                 <p className="small">첫 저장은 언제나 호스트 전용 초안입니다.</p>
                 {sensitiveSuggestionAvailable ? (
@@ -206,9 +206,8 @@ export function NewHostMeetingPage({
                     id="new-meeting-form-error-summary"
                     role="alert"
                     aria-label="모임 저장 오류"
-                    className="surface-quiet small field-error"
+                    className="surface-quiet small field-error rm-host-editorial-ledger__state"
                     tabIndex={-1}
-                    style={{ padding: 14 }}
                   >
                     {formError}
                   </div>
@@ -225,7 +224,7 @@ export function NewHostMeetingPage({
                 ) : null}
                 <button
                   type={createPending ? "button" : "submit"}
-                  className="btn btn-primary"
+                  className="btn btn-primary rm-host-editorial-ledger__action"
                   disabled={status === "saving" || status === "checking"}
                   onClick={createPending && status === "pending" ? onCheckPendingCreate : undefined}
                 >
@@ -247,7 +246,7 @@ export function NewHostMeetingPage({
                 sourceMeetingCount={sourceMeetingCount}
                 onRetry={onRetrySuggestions}
               />
-              <section className="surface-quiet stack" style={{ padding: 18 }}>
+              <section className="surface-quiet stack rm-host-editorial-ledger__panel">
                 <h2 className="h3 editorial">저장 결과</h2>
                 <p className="small">DRAFT · HOST_ONLY · HIDDEN</p>
                 <p className="tiny">저장 후에는 한 번 더 확인해야 멤버와 준비가 시작됩니다.</p>

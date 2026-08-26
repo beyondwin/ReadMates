@@ -5,6 +5,7 @@ import type { HostMemberListPage } from "@/features/host/api/host-contracts";
 import { requireHostClubContext } from "@/features/host/model/host-authority-loss";
 import HostMembers, { type HostMembersLinkComponent } from "@/features/host/ui/host-members";
 import { createHostMembersActions } from "./host-members-data";
+import "@/features/host/ui/host-editorial-ledger.css";
 
 export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMembersLinkComponent }) {
   const members = useLoaderData() as HostMemberListPage;
@@ -17,14 +18,14 @@ export function HostMembersRoute({ LinkComponent }: { LinkComponent?: HostMember
   );
 
   return (
-    <main className="rm-host-members-page">
+    <main className="rm-host-members-page rm-host-editorial-ledger">
       <section className="page-header-compact">
-        <div className="container">
-          <div className="eyebrow">운영 · 멤버 관리</div>
-          <h1 className="h1 editorial" style={{ margin: "6px 0 4px" }}>
+        <div className="container rm-host-editorial-ledger__context">
+          <div className="eyebrow rm-host-editorial-ledger__eyebrow">운영 · 멤버 관리</div>
+          <h1 className="h1 editorial rm-host-editorial-ledger__heading">
             멤버 관리
           </h1>
-          <p className="small" style={{ color: "var(--text-2)", margin: 0 }}>
+          <p className="small rm-host-editorial-ledger__lede">
             멤버 상태와 이번 모임 참여 여부를 함께 확인합니다.
           </p>
         </div>
