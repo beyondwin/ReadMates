@@ -1,5 +1,4 @@
-import type { PlatformAdminRole } from "./platform-admin-domain-types";
-import { canDo } from "./platform-admin-permissions";
+import { canAdmin, type PlatformAdminCapabilities } from "./platform-admin-capabilities";
 import type {
   ConvergenceView,
   TakedownPreview,
@@ -20,8 +19,10 @@ export type AdminTakedownState =
   | { kind: "origin-denied"; receipt: TakedownReceipt; convergence: ConvergenceView }
   | { kind: "convergence-failed"; receipt: TakedownReceipt; convergence: ConvergenceView };
 
-export function canOperatePublicTakedown(role: PlatformAdminRole): boolean {
-  return canDo(role, "emergency_public_takedown");
+export function canOperatePublicTakedown(
+  capabilities: PlatformAdminCapabilities | null | undefined,
+): boolean {
+  return capabilities != null && canAdmin(capabilities, "EMERGENCY_PUBLIC_TAKEDOWN");
 }
 
 export function normalizeTakedownReason(reason: string): string {

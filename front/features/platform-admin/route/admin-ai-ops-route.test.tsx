@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import type { PlatformAdminAiOpsJob } from "@/features/platform-admin/api/platform-admin-contracts";
 import {
   platformAdminAiOpsJobQuery,
@@ -10,6 +11,7 @@ import {
   platformAdminAiOpsSummaryQuery,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 import {
+  installPlatformAdminAuthorityLossHandler,
   platformAdminCapabilitiesQuery,
   purgePlatformAdminState,
   platformAdminSummaryQuery,
@@ -94,6 +96,7 @@ function renderRoute(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } },
   });
+  installPlatformAdminAuthorityLossHandler(queryClient);
   if (options.seedAdminContext !== false) {
     queryClient.setQueryData(platformAdminSummaryQuery().queryKey, {
       platformRole: "OWNER",
@@ -314,5 +317,72 @@ describe("AdminAiOpsRoute", () => {
       vi.mocked(confirmForceCancelPlatformAdminAiJob).mock.calls[1],
     );
     expect(await screen.findByRole("status", { name: "AI 명령 영수증" })).toHaveTextContent("receipt-1");
+    expect(await screen.findByRole("region", { name: "명령 기록" })).toHaveTextContent("receipt-1");
+    expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
+  });
+
+  it("does not call preview when MANAGE_AI_OPERATIONS is absent even if the handler is invoked", async () => {
+    renderRoute("/admin/ai-ops", { canManage: false, pages: [[runningJob]] });
+    expect(screen.queryByRole("button", { name: "강제 취소 검토" })).not.toBeInTheDocument();
+    expect(previewForceCancelPlatformAdminAiJob).not.toHaveBeenCalled();
+    expect(confirmForceCancelPlatformAdminAiJob).not.toHaveBeenCalled();
+  });
+
+  it("purges preview and receipt after a confirm 403 without automatic retry", async () => {
+    const preview = {
+      previewId: "preview-1",
+      jobId: "job-1",
+      action: "FORCE_CANCEL" as const,
+      jobStatus: "RUNNING",
+      jobRevision: 7,
+      effectType: "AI_JOB_CANCEL",
+      impactCodes: ["CANCEL_JOB"],
+      expiresAt: "2026-08-25T01:00:00Z",
+      fingerprintPrefix: "00112233",
+    };
+    vi.mocked(previewForceCancelPlatformAdminAiJob).mockResolvedValue(preview);
+    vi.mocked(confirmForceCancelPlatformAdminAiJob).mockRejectedValue(await forbiddenAiError());
+    const { queryClient } = renderRoute("/admin/ai-ops", { pages: [[runningJob]] });
+
+    await userEvent.click(screen.getByRole("button", { name: "강제 취소 검토" }));
+    await userEvent.click(await screen.findByRole("button", { name: "강제 취소 확인" }));
+
+    await waitFor(() => {
+      expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
+      expect(queryClient.getQueryData(platformAdminCapabilitiesQuery().queryKey)).toBeUndefined();
+    });
+    expect(screen.queryByRole("dialog", { name: "강제 취소 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
+
+    act(() => {
+      queryClient.setQueryData(platformAdminSummaryQuery().queryKey, {
+        platformRole: "OWNER",
+        activeClubCount: 0,
+        domainActionRequiredCount: 0,
+        domainsRequiringAction: [],
+      });
+      queryClient.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+        schemaVersion: 1,
+        role: "OWNER",
+        status: "ACTIVE",
+        capabilities: ["VIEW_AI_OPERATIONS", "MANAGE_AI_OPERATIONS"],
+        generatedAt: "2026-08-25T00:00:00Z",
+      });
+    });
+    expect(screen.queryByRole("dialog", { name: "강제 취소 확인" })).not.toBeInTheDocument();
+    expect(confirmForceCancelPlatformAdminAiJob).toHaveBeenCalledTimes(1);
   });
 });
+
+async function forbiddenAiError() {
+  return apiErrorFromResponse(
+    new Response(
+      JSON.stringify({
+        code: "PERMISSION_DENIED",
+        message: "이 작업을 수행할 권한이 없습니다.",
+        status: 403,
+      }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+}

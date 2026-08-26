@@ -490,3 +490,135 @@
     scroll-behavior: auto !important;
   }
 }
+
+.admin-ai-ops,
+.admin-ai-ops .admin-page-context,
+.admin-ai-ops .admin-evidence-ledger,
+.admin-ai-ops .admin-safe-action-dock,
+.admin-ai-ops .admin-receipt-timeline {
+  min-width: 0;
+}
+
+.admin-ai-ops {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.admin-ai-ops .admin-safe-action-dock .btn,
+.admin-ai-ops .admin-safe-action-dock button,
+.admin-ai-ops .platform-admin-ai-ops__job-actions .btn,
+.admin-ai-ops .platform-admin-ai-ops__job-actions button,
+.admin-ai-ops .platform-admin-ai-ops__load-more,
+.admin-ai-ops .admin-evidence-ledger__controls .btn,
+.admin-ai-ops .admin-evidence-ledger__controls button {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-ai-ops .platform-admin-ai-ops__job-title,
+.admin-ai-ops .platform-admin-ai-ops__error,
+.admin-ai-ops .admin-page-context__freshness,
+.admin-ai-ops .admin-page-context__authority,
+.admin-ai-ops .admin-safe-action-dock__reason {
+  overflow-wrap: anywhere;
+}
+
+.admin-ai-ops :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-ai-ops,
+  .admin-ai-ops .platform-admin-ai-ops__metrics,
+  .admin-ai-ops .platform-admin-ai-ops__job,
+  .admin-ai-ops .admin-safe-action-dock {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-ai-ops .admin-safe-action-dock .btn,
+  .admin-ai-ops .admin-safe-action-dock button,
+  .admin-ai-ops .platform-admin-ai-ops__job-actions .btn,
+  .admin-ai-ops .platform-admin-ai-ops__load-more,
+  .admin-ai-ops .admin-evidence-ledger__controls .btn,
+  .admin-ai-ops .admin-evidence-ledger__controls button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-ai-ops,
+  .admin-ai-ops *,
+  .admin-ai-ops *::before,
+  .admin-ai-ops *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.admin-public-takedown,
+.admin-public-takedown .admin-page-context,
+.admin-public-takedown .admin-safe-action-dock,
+.admin-public-takedown .admin-receipt-timeline {
+  min-width: 0;
+}
+
+.admin-public-takedown {
+  display: grid;
+  gap: var(--space-md);
+}
+
+.admin-public-takedown .admin-safe-action-dock .btn,
+.admin-public-takedown .admin-safe-action-dock button,
+.admin-public-takedown .btn,
+.admin-public-takedown button,
+.admin-public-takedown .input,
+.admin-public-takedown textarea,
+.admin-public-takedown select {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-public-takedown .admin-page-context__authority,
+.admin-public-takedown .admin-safe-action-dock__reason,
+.admin-public-takedown code {
+  overflow-wrap: anywhere;
+}
+
+.admin-public-takedown :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-public-takedown,
+  .admin-public-takedown .admin-safe-action-dock,
+  .admin-public-takedown .platform-admin-support-grants__fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-public-takedown .admin-safe-action-dock .btn,
+  .admin-public-takedown .admin-safe-action-dock button,
+  .admin-public-takedown .btn,
+  .admin-public-takedown button {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-public-takedown,
+  .admin-public-takedown *,
+  .admin-public-takedown *::before,
+  .admin-public-takedown *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

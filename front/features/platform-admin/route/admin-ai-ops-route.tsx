@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "react-router";
 import type { PlatformAdminAiOpsAction } from "@/features/platform-admin/api/platform-admin-contracts";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
@@ -20,6 +20,8 @@ import {
   usePreviewPlatformAdminAiJobCommandMutation,
 } from "@/features/platform-admin/queries/platform-admin-ai-ops-queries";
 import {
+  installPlatformAdminAuthorityLossHandler,
+  isPlatformAdminAuthorityLossError,
   platformAdminCapabilitiesQuery,
   platformAdminSummaryQuery,
   subscribePlatformAdminAuthorityLoss,
@@ -27,12 +29,13 @@ import {
 import {
   PlatformAdminAiOps,
   type PlatformAdminAiOpsCommandState,
+  type PlatformAdminAiOpsJobView,
+  type PlatformAdminAiOpsSummaryView,
 } from "@/features/platform-admin/ui/platform-admin-ai-ops";
 
 export function AdminAiOpsRoute() {
+  const queryClient = useQueryClient();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [commandState, setCommandState] = useState<PlatformAdminAiOpsCommandState | null>(null);
-  const [commandError, setCommandError] = useState<string | null>(null);
   const filter = useMemo(() => aiOpsFilterFromSearchParams(searchParams), [searchParams]);
   const window = useMemo(() => aiOpsWindowFromSearchParams(searchParams), [searchParams]);
   const adminSummaryQuery = useQuery(platformAdminSummaryQuery());
@@ -40,18 +43,13 @@ export function AdminAiOpsRoute() {
   const summaryQuery = useQuery(platformAdminAiOpsSummaryQuery(window));
   const jobsQuery = useInfiniteQuery(platformAdminAiOpsJobsInfiniteQuery(aiOpsFilterToQuery(filter)));
   const jobQuery = useQuery(platformAdminAiOpsJobQuery(filter.jobId ?? ""));
-  const previewCommand = usePreviewPlatformAdminAiJobCommandMutation();
-  const confirmCommandMutation = useConfirmPlatformAdminAiJobCommandMutation();
   const jobs = useMemo(() => mergeAiOpsJobPages(jobsQuery.data?.pages ?? []), [jobsQuery.data?.pages]);
+  const canManageActions =
+    capabilitiesQuery.data != null && canAdmin(capabilitiesQuery.data, "MANAGE_AI_OPERATIONS");
 
-  useEffect(
-    () =>
-      subscribePlatformAdminAuthorityLoss(() => {
-        setCommandState(null);
-        setCommandError(null);
-      }),
-    [],
-  );
+  useEffect(() => {
+    installPlatformAdminAuthorityLossHandler(queryClient);
+  }, [queryClient]);
 
   const summaryError = summaryQuery.error ? classifyAiOpsError(summaryQuery.error) : null;
   const jobsError = jobsQuery.error ? classifyAiOpsError(jobsQuery.error) : null;
@@ -64,65 +62,6 @@ export function AdminAiOpsRoute() {
       params.set("window", nextWindow);
     }
     setSearchParams(params);
-  }
-
-  async function requestPreview(jobId: string, action: PlatformAdminAiOpsAction) {
-    const job = jobs.find((item) => item.jobId === jobId) ?? (filter.jobId === jobId ? jobQuery.data : null);
-    if (!job) {
-      setCommandError("작업의 최신 상태를 찾지 못했습니다. 목록을 새로고침해 주세요.");
-      return;
-    }
-    setCommandError(null);
-    try {
-      const preview = await previewCommand.mutateAsync({ jobId, action });
-      setCommandState({
-        phase: "REVIEW",
-        job,
-        action,
-        preview,
-        idempotencyKey: preview.previewId,
-      });
-    } catch (error) {
-      const classified = classifyAiOpsError(error);
-      setCommandError(
-        classified.kind === "CONFLICT"
-          ? "작업 상태가 변경되었습니다. 최신 목록에서 다시 검토해 주세요."
-          : classified.message,
-      );
-    }
-  }
-
-  async function confirmCommand() {
-    const current = commandState;
-    if (!current || current.phase === "CONFIRMING") {
-      return;
-    }
-    const request = {
-      previewId: current.preview.previewId,
-      idempotencyKey: current.idempotencyKey,
-      expectedJobRevision: current.preview.jobRevision,
-      confirmed: true as const,
-    };
-    setCommandState({ ...current, phase: "CONFIRMING" });
-    try {
-      const receipt = await confirmCommandMutation.mutateAsync({
-        jobId: current.job.jobId,
-        action: current.action,
-        request,
-      });
-      setCommandState({ ...current, phase: "RECEIPT", receipt });
-    } catch (error) {
-      const classified = classifyAiOpsError(error);
-      setCommandState({
-        ...current,
-        phase: "UNKNOWN",
-        code: classified.code ?? "NETWORK_UNKNOWN",
-        message:
-          classified.kind === "CONFLICT"
-            ? "작업 상태가 변경되었습니다. 최신 상태로 다시 검토해 주세요."
-            : "명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 확인해 주세요.",
-      });
-    }
   }
 
   if (disabled) {
@@ -148,27 +87,164 @@ export function AdminAiOpsRoute() {
     );
   }
 
-  const readError = summaryError ?? jobsError;
-  const routeError =
-    commandError ??
-    (jobError && filter.jobId
+  const readError = summaryError && !jobsError ? summaryError : null;
+  const queryError =
+    jobError && filter.jobId
       ? "선택한 AI 작업 상세를 불러오지 못했습니다."
-      : jobsError
-        ? "AI 작업 목록을 불러오지 못했습니다."
-        : readError
-          ? "일부 AI 운영 데이터를 불러오지 못했습니다."
-          : null);
+      : readError
+        ? "일부 AI 운영 데이터를 불러오지 못했습니다."
+        : null;
+
+  return (
+    <AiOpsCommandSession
+      key={canManageActions ? "manage-allowed" : "manage-denied"}
+      canManageActions={canManageActions}
+      role={adminSummaryQuery.data.platformRole}
+      summary={summaryQuery.data ?? null}
+      jobs={jobs}
+      loading={summaryQuery.isLoading || jobsQuery.isLoading}
+      queryError={queryError}
+      jobsUnavailable={Boolean(jobsError)}
+      filter={filter}
+      window={window}
+      selectedJob={filter.jobId ? (jobQuery.data ?? null) : null}
+      hasNextPage={jobsQuery.hasNextPage}
+      fetchingNextPage={jobsQuery.isFetchingNextPage}
+      onUpdateSearch={updateSearch}
+      onLoadMore={() => void jobsQuery.fetchNextPage()}
+      jobDetail={filter.jobId === jobQuery.data?.jobId ? jobQuery.data : null}
+    />
+  );
+}
+
+function AiOpsCommandSession({
+  canManageActions,
+  role,
+  summary,
+  jobs,
+  loading,
+  queryError,
+  jobsUnavailable,
+  filter,
+  window,
+  selectedJob,
+  hasNextPage,
+  fetchingNextPage,
+  onUpdateSearch,
+  onLoadMore,
+  jobDetail,
+}: {
+  canManageActions: boolean;
+  role: "OWNER" | "OPERATOR" | "SUPPORT";
+  summary: PlatformAdminAiOpsSummaryView | null;
+  jobs: PlatformAdminAiOpsJobView[];
+  loading: boolean;
+  queryError: string | null;
+  jobsUnavailable: boolean;
+  filter: ReturnType<typeof aiOpsFilterFromSearchParams>;
+  window: ReturnType<typeof aiOpsWindowFromSearchParams>;
+  selectedJob: PlatformAdminAiOpsJobView | null;
+  hasNextPage: boolean;
+  fetchingNextPage: boolean;
+  onUpdateSearch: (nextFilter: ReturnType<typeof aiOpsFilterFromSearchParams>, nextWindow?: ReturnType<typeof aiOpsWindowFromSearchParams>) => void;
+  onLoadMore: () => void;
+  jobDetail: PlatformAdminAiOpsJobView | null;
+}) {
+  const [commandState, setCommandState] = useState<PlatformAdminAiOpsCommandState | null>(null);
+  const [commandError, setCommandError] = useState<string | null>(null);
+  const previewCommand = usePreviewPlatformAdminAiJobCommandMutation();
+  const confirmCommandMutation = useConfirmPlatformAdminAiJobCommandMutation();
+
+  useEffect(
+    () =>
+      subscribePlatformAdminAuthorityLoss(() => {
+        setCommandState(null);
+        setCommandError(null);
+      }),
+    [],
+  );
+
+  async function requestPreview(jobId: string, action: PlatformAdminAiOpsAction) {
+    if (!canManageActions) return;
+    const job = jobs.find((item) => item.jobId === jobId) ?? (filter.jobId === jobId ? jobDetail : null);
+    if (!job) {
+      setCommandError("작업의 최신 상태를 찾지 못했습니다. 목록을 새로고침해 주세요.");
+      return;
+    }
+    setCommandError(null);
+    try {
+      const preview = await previewCommand.mutateAsync({ jobId, action });
+      setCommandState({
+        phase: "REVIEW",
+        job,
+        action,
+        preview,
+        idempotencyKey: preview.previewId,
+      });
+    } catch (error) {
+      if (isPlatformAdminAuthorityLossError(error)) {
+        setCommandState(null);
+        setCommandError(null);
+        return;
+      }
+      const classified = classifyAiOpsError(error);
+      setCommandError(
+        classified.kind === "CONFLICT"
+          ? "작업 상태가 변경되었습니다. 최신 목록에서 다시 검토해 주세요."
+          : classified.message,
+      );
+    }
+  }
+
+  async function confirmCommand() {
+    const current = commandState;
+    if (!canManageActions || !current || current.phase === "CONFIRMING") {
+      return;
+    }
+    const request = {
+      previewId: current.preview.previewId,
+      idempotencyKey: current.idempotencyKey,
+      expectedJobRevision: current.preview.jobRevision,
+      confirmed: true as const,
+    };
+    setCommandState({ ...current, phase: "CONFIRMING" });
+    try {
+      const receipt = await confirmCommandMutation.mutateAsync({
+        jobId: current.job.jobId,
+        action: current.action,
+        request,
+      });
+      setCommandState({ ...current, phase: "RECEIPT", receipt });
+    } catch (error) {
+      if (isPlatformAdminAuthorityLossError(error)) {
+        setCommandState(null);
+        setCommandError(null);
+        return;
+      }
+      const classified = classifyAiOpsError(error);
+      setCommandState({
+        ...current,
+        phase: "UNKNOWN",
+        code: classified.code ?? "NETWORK_UNKNOWN",
+        message:
+          classified.kind === "CONFLICT"
+            ? "작업 상태가 변경되었습니다. 최신 상태로 다시 검토해 주세요."
+            : "명령 응답을 확인하지 못했습니다. 같은 명령으로 다시 확인해 주세요.",
+      });
+    }
+  }
+
   return (
     <section className="admin-ai-ops" aria-labelledby="admin-ai-ops-title">
       <h1 id="admin-ai-ops-title" className="h1 editorial">AI Ops</h1>
       <PlatformAdminAiOps
-        role={adminSummaryQuery.data.platformRole}
-        canManageActions={canAdmin(capabilitiesQuery.data, "MANAGE_AI_OPERATIONS")}
-        summary={summaryQuery.data ?? null}
+        role={role}
+        canManageActions={canManageActions}
+        summary={summary}
         jobs={jobs}
-        loading={summaryQuery.isLoading || jobsQuery.isLoading}
-        error={routeError}
-        jobsUnavailable={Boolean(jobsError)}
+        loading={loading}
+        error={commandError ?? queryError}
+        jobsUnavailable={jobsUnavailable}
         commandState={commandState}
         onRequestPreview={(jobId, action) => void requestPreview(jobId, action)}
         onConfirmCommand={() => void confirmCommand()}
@@ -181,16 +257,16 @@ export function AdminAiOpsRoute() {
         }}
         onDismissCommand={() => setCommandState(null)}
         activeFilter={filter}
-        onSelectFailureCode={(code) => updateSearch({ ...filter, errorCode: code, jobId: null })}
-        onClearFilter={() => updateSearch(EMPTY_AI_OPS_FILTER)}
+        onSelectFailureCode={(code) => onUpdateSearch({ ...filter, errorCode: code, jobId: null })}
+        onClearFilter={() => onUpdateSearch(EMPTY_AI_OPS_FILTER)}
         window={window}
-        onSelectWindow={(next) => updateSearch(filter, next)}
-        selectedJob={filter.jobId ? (jobQuery.data ?? null) : null}
-        onSelectJob={(jobId) => updateSearch({ ...filter, jobId })}
-        onCloseJob={() => updateSearch({ ...filter, jobId: null })}
-        hasNextPage={jobsQuery.hasNextPage}
-        fetchingNextPage={jobsQuery.isFetchingNextPage}
-        onLoadMore={() => void jobsQuery.fetchNextPage()}
+        onSelectWindow={(next) => onUpdateSearch(filter, next)}
+        selectedJob={selectedJob}
+        onSelectJob={(jobId) => onUpdateSearch({ ...filter, jobId })}
+        onCloseJob={() => onUpdateSearch({ ...filter, jobId: null })}
+        hasNextPage={hasNextPage}
+        fetchingNextPage={fetchingNextPage}
+        onLoadMore={onLoadMore}
       />
     </section>
   );

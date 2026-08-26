@@ -31,7 +31,11 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Promise<void> {
+async function routePlatformAdminShell(
+  page: Page,
+  role: PlatformAdminRole,
+  capabilities?: string[],
+): Promise<void> {
   await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, platformAdminAuth(role));
@@ -52,7 +56,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
       schemaVersion: 1,
       role,
       status: "ACTIVE",
-      capabilities: [
+      capabilities: capabilities ?? [
         "VIEW_TODAY",
         "VIEW_AI_OPERATIONS",
         ...(role === "SUPPORT" ? [] : ["MANAGE_AI_OPERATIONS"]),
@@ -61,7 +65,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
     });
   });
 
-  await page.route("**/api/bff/api/admin/clubs", async (route) => {
+  await page.route("**/api/bff/api/admin/clubs**", async (route) => {
     await json(route, 200, { items: [] });
   });
 
@@ -170,6 +174,16 @@ test("platform owner sees retry-commit affordance on a committing job", async ({
   await expect(page.getByText("Stuck Volume")).toBeVisible();
   await expect(page.getByText("revision 2 · cleanup pending")).toBeVisible();
   await expect(page.getByRole("button", { name: "커밋 복구 검토" })).toBeVisible();
+});
+
+test("platform owner without MANAGE_AI_OPERATIONS cannot force cancel", async ({ page }) => {
+  await routePlatformAdminShell(page, "OWNER", ["VIEW_TODAY", "VIEW_AI_OPERATIONS"]);
+
+  await page.goto("/admin/ai-ops");
+
+  await expect(page.getByRole("heading", { name: "AI 운영" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "강제 취소 검토" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "커밋 복구 검토" })).toHaveCount(0);
 });
 
 test("platform support cannot retry-commit", async ({ page }) => {

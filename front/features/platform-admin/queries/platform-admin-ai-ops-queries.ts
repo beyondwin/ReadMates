@@ -73,6 +73,7 @@ type AiOpsPreviewVariables = { jobId: string; action: PlatformAdminAiOpsAction }
 export function usePreviewPlatformAdminAiJobCommandMutation() {
   return useMutation({
     mutationKey: [...platformAdminAiOpsKeys.all, "preview"],
+    retry: 0,
     mutationFn: ({ jobId, action }: AiOpsPreviewVariables) =>
       action === "FORCE_CANCEL"
         ? previewForceCancelPlatformAdminAiJob(jobId)
@@ -86,6 +87,7 @@ export function useConfirmPlatformAdminAiJobCommandMutation() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationKey: [...platformAdminAiOpsKeys.all, "confirm"],
+    retry: 0,
     mutationFn: ({ jobId, action, request }: AiOpsConfirmVariables) =>
       action === "FORCE_CANCEL"
         ? confirmForceCancelPlatformAdminAiJob(jobId, request)

@@ -1,11 +1,25 @@
 import { describe, expect, it } from "vitest";
 import type { TakedownReceipt } from "../api/platform-admin-takedown-contracts";
+import type { PlatformAdminCapabilities } from "./platform-admin-capabilities";
 import {
   canOperatePublicTakedown,
   initialConvergenceFromReceipt,
   normalizeTakedownReason,
   remoteCopyLimitationLabel,
 } from "./platform-admin-takedown-model";
+
+function caps(
+  role: PlatformAdminCapabilities["role"],
+  capabilities: PlatformAdminCapabilities["capabilities"],
+): PlatformAdminCapabilities {
+  return {
+    schemaVersion: 1,
+    role,
+    status: "ACTIVE",
+    capabilities,
+    generatedAt: "2026-08-26T04:00:00Z",
+  };
+}
 
 const receipt: TakedownReceipt = {
   schema: "admin.public_takedown.receipt.v1",
@@ -23,10 +37,12 @@ const receipt: TakedownReceipt = {
 };
 
 describe("platform-admin takedown model", () => {
-  it("allows only owner/operator capability and denies support", () => {
-    expect(canOperatePublicTakedown("OWNER")).toBe(true);
-    expect(canOperatePublicTakedown("OPERATOR")).toBe(true);
-    expect(canOperatePublicTakedown("SUPPORT")).toBe(false);
+  it("allows only the exact EMERGENCY_PUBLIC_TAKEDOWN capability", () => {
+    expect(canOperatePublicTakedown(caps("OWNER", ["EMERGENCY_PUBLIC_TAKEDOWN"]))).toBe(true);
+    expect(canOperatePublicTakedown(caps("OPERATOR", ["EMERGENCY_PUBLIC_TAKEDOWN"]))).toBe(true);
+    expect(canOperatePublicTakedown(caps("OWNER", ["VIEW_TODAY", "VIEW_CLUBS"]))).toBe(false);
+    expect(canOperatePublicTakedown(caps("SUPPORT", ["VIEW_TODAY"]))).toBe(false);
+    expect(canOperatePublicTakedown(null)).toBe(false);
   });
 
   it("requires a nonblank reason and trims the committed value", () => {

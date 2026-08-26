@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
@@ -7,6 +9,11 @@ import {
   type PlatformAdminAiOpsJobView,
   type PlatformAdminAiOpsSummaryView,
 } from "@/features/platform-admin/ui/platform-admin-ai-ops";
+
+const LEDGER_CSS = readFileSync(
+  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
+  "utf8",
+);
 
 const summary: PlatformAdminAiOpsSummaryView = {
   activeJobCount: 2,
@@ -363,5 +370,76 @@ describe("PlatformAdminAiOps", () => {
       />,
     );
     expect(screen.getByText("데이터 부족")).toBeInTheDocument();
+  });
+
+  it("composes page context and an evidence ledger without inventing L3 convergence", () => {
+    render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        onRequestPreview={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "AI 운영" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "AI 작업" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
+    expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
+  });
+
+  it("renders an L2 receipt timeline only after an actual command receipt", () => {
+    const { rerender } = render(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        commandState={reviewState}
+      />,
+    );
+
+    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L2");
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
+
+    rerender(
+      <PlatformAdminAiOps
+        role="OWNER"
+        canManageActions
+        summary={summary}
+        jobs={[runningJob]}
+        commandState={{
+          ...reviewState,
+          phase: "RECEIPT",
+          receipt: {
+            receiptId: "receipt-1",
+            previewId: "preview-1",
+            jobId: "job-1",
+            action: "FORCE_CANCEL",
+            beforeJobStatus: "RUNNING",
+            beforeJobRevision: 7,
+            afterJobStatus: "RUNNING",
+            afterJobRevision: 7,
+            originStatus: "ACCEPTED",
+            effectStatus: "PENDING",
+            safeErrorCode: "AI_EFFECT_UNAVAILABLE",
+          },
+        }}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "명령 기록" })).toHaveTextContent("receipt-1");
+    expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
+  });
+
+  it("locks 44px targets and reduced motion in the scoped AI Ops stylesheet", () => {
+    expect(LEDGER_CSS).toMatch(/\.admin-ai-ops[\s\S]*min-height:\s*44px/);
+    expect(LEDGER_CSS).toContain(".admin-ai-ops");
+    expect(LEDGER_CSS).toContain(":focus-visible");
+    expect(LEDGER_CSS).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-ai-ops[\s\S]*animation-duration:\s*0\.01ms/,
+    );
+    expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
   });
 });

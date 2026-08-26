@@ -4,7 +4,11 @@ import type {
   PlatformAdminAiOpsCommandPreviewResponse,
   PlatformAdminAiOpsCommandReceiptResponse,
 } from "@/features/platform-admin/model/platform-admin-domain-types";
+import { AdminSafeActionDock, type AdminSafeActionState } from "@/features/platform-admin/ui/admin-action-dock";
+import { AdminEvidenceLedger } from "@/features/platform-admin/ui/admin-evidence-ledger";
 import { AdminModalDialog } from "@/features/platform-admin/ui/admin-modal-dialog";
+import { AdminPageContext } from "@/features/platform-admin/ui/admin-page-context";
+import { AdminReceiptTimeline } from "@/features/platform-admin/ui/admin-receipt-timeline";
 
 export type PlatformAdminAiOpsRole = "OWNER" | "OPERATOR" | "SUPPORT";
 
@@ -126,18 +130,23 @@ export function PlatformAdminAiOps({
     onRequestPreview?.(jobId, action);
   }
 
-  return (
-    <section className="platform-admin-ai-ops" aria-labelledby="platform-admin-ai-ops-title">
-      <div className="platform-admin-ai-ops__header">
-        <div>
-          <p className="eyebrow">AI Ops</p>
-          <h2 id="platform-admin-ai-ops-title" className="h3 editorial">
-            AI 운영
-          </h2>
-        </div>
-        {loading ? <span className="platform-admin-domain-status">동기화 중</span> : null}
-      </div>
+  const jobsLedgerState = jobsUnavailable ? "unavailable" : jobs.length > 0 ? "ready" : "empty";
+  const jobsLedgerTitle = jobs.length > 0
+    ? undefined
+    : jobsUnavailable
+      ? "AI 작업 목록을 불러오지 못했습니다."
+      : filterActive
+        ? "이 필터에 해당하는 AI job이 없습니다."
+        : "표시할 AI job이 없습니다.";
 
+  return (
+    <section className="platform-admin-ai-ops admin-ai-ops">
+      <AdminPageContext
+        eyebrow="S5 Operations"
+        heading="AI 운영"
+        freshness={loading ? "동기화 중" : undefined}
+        authority={canAct ? "명령 가능" : "변경 권한 없음"}
+      >
       {error ? (
         <p className="platform-admin-ai-ops__error" role="alert">
           {error}
@@ -203,92 +212,93 @@ export function PlatformAdminAiOps({
         </div>
       ) : null}
 
-      <div className="platform-admin-ai-ops__jobs">
+      <AdminEvidenceLedger
+        label="AI 작업"
+        count={jobs.length > 0 ? jobs.length : undefined}
+        state={jobsLedgerState}
+        title={jobsLedgerTitle}
+        controls={
+          hasNextPage ? (
+            <button
+              type="button"
+              className="btn btn-secondary platform-admin-ai-ops__load-more"
+              disabled={fetchingNextPage}
+              onClick={() => onLoadMore?.()}
+            >
+              {fetchingNextPage ? "불러오는 중" : "이전 작업 더 보기"}
+            </button>
+          ) : null
+        }
+      >
         {jobs.length > 0 ? (
-          jobs.map((job) => (
-            <article key={job.jobId} className="platform-admin-ai-ops__job">
-              <div className="platform-admin-ai-ops__job-main">
-                <div className="platform-admin-ai-ops__badges">
-                  <span className="platform-admin-domain-status">{job.status}</span>
-                  {job.stage ? <span className="platform-admin-domain-status">{job.stage}</span> : null}
-                  {job.staleCandidate ? <span className="platform-admin-domain-status">STALE</span> : null}
-                </div>
-                <p className="platform-admin-ai-ops__job-title">
-                  {job.club.name ?? job.club.slug ?? job.club.clubId} ·{" "}
-                  {job.session.bookTitle ?? job.session.sessionId}
-                </p>
-                <p className="tiny muted">
-                  {job.provider} / {job.model} · ${job.costEstimateUsd} · {formatTimestamp(job.lastUpdatedAt)}
-                </p>
-                {job.revision != null ? (
+          <div className="platform-admin-ai-ops__jobs">
+            {jobs.map((job) => (
+              <article key={job.jobId} className="platform-admin-ai-ops__job">
+                <div className="platform-admin-ai-ops__job-main">
+                  <div className="platform-admin-ai-ops__badges">
+                    <span className="platform-admin-domain-status">{job.status}</span>
+                    {job.stage ? <span className="platform-admin-domain-status">{job.stage}</span> : null}
+                    {job.staleCandidate ? <span className="platform-admin-domain-status">STALE</span> : null}
+                  </div>
+                  <p className="platform-admin-ai-ops__job-title">
+                    {job.club.name ?? job.club.slug ?? job.club.clubId} ·{" "}
+                    {job.session.bookTitle ?? job.session.sessionId}
+                  </p>
                   <p className="tiny muted">
-                    revision {job.revision} · {job.cleanupPending ? "cleanup pending" : "cleanup complete"}
+                    {job.provider} / {job.model} · ${job.costEstimateUsd} · {formatTimestamp(job.lastUpdatedAt)}
                   </p>
-                ) : null}
-                {job.errorCode ? (
-                  <p className="platform-admin-ai-ops__job-error">
-                    {job.errorCode}: {job.safeErrorMessage ?? "safe error"}
-                  </p>
-                ) : null}
-              </div>
-              {canAct ? (
-                <div className="platform-admin-ai-ops__job-actions">
-                  {job.availableActions.includes("FORCE_CANCEL") ? (
-                    <button
-                      type="button"
-                      className="btn btn-quiet btn-sm"
-                      onClick={(event) => requestPreview(event, job.jobId, "FORCE_CANCEL")}
-                    >
-                      강제 취소 검토
-                    </button>
+                  {job.revision != null ? (
+                    <p className="tiny muted">
+                      revision {job.revision} · {job.cleanupPending ? "cleanup pending" : "cleanup complete"}
+                    </p>
                   ) : null}
-                  {job.availableActions.includes("RETRY_COMMIT") ? (
-                    <button
-                      type="button"
-                      className="btn btn-quiet btn-sm"
-                      onClick={(event) => requestPreview(event, job.jobId, "RETRY_COMMIT")}
-                    >
-                      커밋 복구 검토
-                    </button>
+                  {job.errorCode ? (
+                    <p className="platform-admin-ai-ops__job-error">
+                      {job.errorCode}: {job.safeErrorMessage ?? "safe error"}
+                    </p>
                   ) : null}
                 </div>
-              ) : null}
-              <button
-                type="button"
-                className="btn btn-quiet btn-sm"
-                onClick={(event) => {
-                  detailTriggerRef.current = event.currentTarget;
-                  onSelectJob?.(job.jobId);
-                }}
-              >
-                상세 보기
-              </button>
-            </article>
-          ))
-        ) : (
-          <p className="muted platform-admin-domain-empty">
-            {jobsUnavailable
-              ? "AI 작업 목록을 확인할 수 없습니다."
-              : filterActive
-                ? "이 필터에 해당하는 AI job이 없습니다."
-                : "표시할 AI job이 없습니다."}
-          </p>
-        )}
-      </div>
+                {canAct ? (
+                  <div className="platform-admin-ai-ops__job-actions">
+                    {job.availableActions.includes("FORCE_CANCEL") ? (
+                      <button
+                        type="button"
+                        className="btn btn-quiet btn-sm"
+                        onClick={(event) => requestPreview(event, job.jobId, "FORCE_CANCEL")}
+                      >
+                        강제 취소 검토
+                      </button>
+                    ) : null}
+                    {job.availableActions.includes("RETRY_COMMIT") ? (
+                      <button
+                        type="button"
+                        className="btn btn-quiet btn-sm"
+                        onClick={(event) => requestPreview(event, job.jobId, "RETRY_COMMIT")}
+                      >
+                        커밋 복구 검토
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                <button
+                  type="button"
+                  className="btn btn-quiet btn-sm"
+                  onClick={(event) => {
+                    detailTriggerRef.current = event.currentTarget;
+                    onSelectJob?.(job.jobId);
+                  }}
+                >
+                  상세 보기
+                </button>
+              </article>
+            ))}
+          </div>
+        ) : null}
+      </AdminEvidenceLedger>
       {!canAct && jobs.some((job) => job.availableActions.length > 0) ? (
         <p className="tiny muted platform-admin-ai-ops__permission-note">
           현재 권한으로는 AI 작업을 변경할 수 없습니다.
         </p>
-      ) : null}
-      {hasNextPage ? (
-        <button
-          type="button"
-          className="btn btn-secondary platform-admin-ai-ops__load-more"
-          disabled={fetchingNextPage}
-          onClick={() => onLoadMore?.()}
-        >
-          {fetchingNextPage ? "불러오는 중" : "이전 작업 더 보기"}
-        </button>
       ) : null}
 
       {commandState && canAct ? (
@@ -305,6 +315,7 @@ export function PlatformAdminAiOps({
       {selectedJob ? (
         <AiJobDetailDialog job={selectedJob} triggerRef={detailTriggerRef} onDismiss={onCloseJob} />
       ) : null}
+      </AdminPageContext>
     </section>
   );
 }
@@ -351,14 +362,37 @@ function AiCommandDialog({
       ) : null}
 
       {state.phase === "RECEIPT" && state.receipt ? (
-        <div className="platform-admin-ai-command-dialog__receipt" role="status" aria-label="AI 명령 영수증">
-          <p className="small"><strong>영수증</strong> {state.receipt.receiptId}</p>
-          <p className="small">원본 {state.receipt.originStatus} · 후속 효과 {state.receipt.effectStatus}</p>
-          {state.receipt.safeErrorCode ? <p className="small">안전 코드 {state.receipt.safeErrorCode}</p> : null}
-          <p className="tiny muted">
-            revision {state.receipt.beforeJobRevision} → {state.receipt.afterJobRevision}
-          </p>
-        </div>
+        <>
+          <div className="platform-admin-ai-command-dialog__receipt" role="status" aria-label="AI 명령 영수증">
+            <p className="small"><strong>영수증</strong> {state.receipt.receiptId}</p>
+            <p className="small">원본 {state.receipt.originStatus} · 후속 효과 {state.receipt.effectStatus}</p>
+            {state.receipt.safeErrorCode ? <p className="small">안전 코드 {state.receipt.safeErrorCode}</p> : null}
+            <p className="tiny muted">
+              revision {state.receipt.beforeJobRevision} → {state.receipt.afterJobRevision}
+            </p>
+          </div>
+          <AdminReceiptTimeline
+            level="L2"
+            receiptId={`영수증 ${state.receipt.receiptId}`}
+            entries={[
+              {
+                key: "origin",
+                label: `원본 ${state.receipt.originStatus}`,
+                state: "succeeded",
+              },
+              {
+                key: "effect",
+                label: `후속 효과 ${state.receipt.effectStatus}${state.receipt.safeErrorCode ? ` · ${state.receipt.safeErrorCode}` : ""}`,
+                state:
+                  state.receipt.effectStatus === "SUCCEEDED"
+                    ? "succeeded"
+                    : state.receipt.effectStatus === "FAILED"
+                      ? "failed"
+                      : "pending",
+              },
+            ]}
+          />
+        </>
       ) : (
         <div className="platform-admin-ai-command-dialog__impact">
           <p className="small"><strong>{state.preview.jobStatus} · revision {state.preview.jobRevision}</strong></p>
@@ -372,38 +406,96 @@ function AiCommandDialog({
       )}
 
       <div className="admin-modal-dialog__actions">
-        {state.phase === "UNKNOWN" ? (
-          <>
-            <button type="button" className="btn btn-secondary" onClick={() => onRestart?.()}>
-              최신 상태로 다시 검토
-            </button>
-            <button type="button" className="btn btn-primary" onClick={() => onRetrySame?.()}>
-              같은 명령으로 다시 확인
-            </button>
-          </>
-        ) : state.phase === "RECEIPT" ? (
-          <>
-            {state.receipt?.effectStatus === "PENDING" || state.receipt?.effectStatus === "FAILED" ? (
-              <button type="button" className="btn btn-secondary" onClick={() => onRetrySame?.()}>
-                같은 명령으로 상태 다시 확인
-              </button>
-            ) : null}
-            <button type="button" className="btn btn-primary" onClick={() => onDismiss?.()}>
-              닫기
-            </button>
-          </>
-        ) : (
-          <>
-            <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => onDismiss?.()}>
-              취소
-            </button>
-            <button type="button" className="btn btn-primary" disabled={busy} onClick={() => onConfirm?.()}>
-              {state.phase === "CONFIRMING" ? "확인 중" : `${label} 확인`}
-            </button>
-          </>
-        )}
+        <AdminSafeActionDock
+          level="L2"
+          authority="allowed"
+          state={aiCommandDockState(state, busy)}
+          primary={aiCommandPrimary({ state, label, busy, onConfirm, onRetrySame, onDismiss })}
+          secondary={aiCommandSecondary({ state, busy, onRestart, onRetrySame, onDismiss })}
+        />
       </div>
     </AdminModalDialog>
+  );
+}
+
+function aiCommandDockState(
+  _state: PlatformAdminAiOpsCommandState,
+  busy: boolean,
+): AdminSafeActionState {
+  if (busy) return "pending";
+  return "ready";
+}
+
+function aiCommandPrimary({
+  state,
+  label,
+  busy,
+  onConfirm,
+  onRetrySame,
+  onDismiss,
+}: {
+  state: PlatformAdminAiOpsCommandState;
+  label: string;
+  busy: boolean;
+  onConfirm?: () => void;
+  onRetrySame?: () => void;
+  onDismiss?: () => void;
+}) {
+  if (state.phase === "UNKNOWN") {
+    return (
+      <button type="button" className="btn btn-primary" onClick={() => onRetrySame?.()}>
+        같은 명령으로 다시 확인
+      </button>
+    );
+  }
+  if (state.phase === "RECEIPT") {
+    return (
+      <button type="button" className="btn btn-primary" onClick={() => onDismiss?.()}>
+        닫기
+      </button>
+    );
+  }
+  return (
+    <button type="button" className="btn btn-primary" disabled={busy} onClick={() => onConfirm?.()}>
+      {state.phase === "CONFIRMING" ? "확인 중" : `${label} 확인`}
+    </button>
+  );
+}
+
+function aiCommandSecondary({
+  state,
+  busy,
+  onRestart,
+  onRetrySame,
+  onDismiss,
+}: {
+  state: PlatformAdminAiOpsCommandState;
+  busy: boolean;
+  onRestart?: () => void;
+  onRetrySame?: () => void;
+  onDismiss?: () => void;
+}) {
+  if (state.phase === "UNKNOWN") {
+    return (
+      <button type="button" className="btn btn-secondary" onClick={() => onRestart?.()}>
+        최신 상태로 다시 검토
+      </button>
+    );
+  }
+  if (state.phase === "RECEIPT") {
+    if (state.receipt?.effectStatus === "PENDING" || state.receipt?.effectStatus === "FAILED") {
+      return (
+        <button type="button" className="btn btn-secondary" onClick={() => onRetrySame?.()}>
+          같은 명령으로 상태 다시 확인
+        </button>
+      );
+    }
+    return null;
+  }
+  return (
+    <button type="button" className="btn btn-secondary" disabled={busy} onClick={() => onDismiss?.()}>
+      취소
+    </button>
   );
 }
 

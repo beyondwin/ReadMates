@@ -12,7 +12,11 @@ async function json(route: Route, status: number, body: unknown) {
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function routeAdminShell(page: Page, role: "OWNER" | "SUPPORT") {
+async function routeAdminShell(
+  page: Page,
+  role: "OWNER" | "SUPPORT",
+  capabilities?: string[],
+) {
   await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", (route) => json(route, 200, {
     authenticated: true,
@@ -41,12 +45,12 @@ async function routeAdminShell(page: Page, role: "OWNER" | "SUPPORT") {
     schemaVersion: 1,
     role,
     status: "ACTIVE",
-    capabilities: role === "OWNER"
+    capabilities: capabilities ?? (role === "OWNER"
       ? ["VIEW_TODAY", "VIEW_CLUBS", "EMERGENCY_PUBLIC_TAKEDOWN"]
-      : ["VIEW_TODAY", "VIEW_CLUBS"],
+      : ["VIEW_TODAY", "VIEW_CLUBS"]),
     generatedAt: "2026-08-26T04:00:00Z",
   }));
-  await page.route("**/api/bff/api/admin/clubs", (route) => json(route, 200, { items: [] }));
+  await page.route("**/api/bff/api/admin/clubs**", (route) => json(route, 200, { items: [] }));
 }
 
 test("owner confirms one exact target, response loss reconciles, and reload preserves the immutable receipt", async ({ page }) => {
@@ -109,6 +113,20 @@ test("owner confirms one exact target, response loss reconciles, and reload pres
   await page.reload();
   await expect(page.getByRole("region", { name: "변경 불가 회수 영수증" })).toContainText(RECEIPT_ID);
   expect(confirmCalls).toBe(2);
+});
+
+test("OWNER without EMERGENCY_PUBLIC_TAKEDOWN cannot submit a takedown", async ({ page }) => {
+  await routeAdminShell(page, "OWNER", ["VIEW_TODAY", "VIEW_CLUBS"]);
+  let mutationCalls = 0;
+  await page.route("**/api/bff/api/admin/public-takedowns/**", async (route) => {
+    mutationCalls += 1;
+    await json(route, 403, { code: "PERMISSION_DENIED", message: "denied", status: 403 });
+  });
+
+  await page.goto("/admin/public-takedown");
+  await expect(page.getByText("긴급 회수 권한이 없습니다.")).toBeVisible();
+  await expect(page.getByLabel("클럽 ID")).toHaveCount(0);
+  expect(mutationCalls).toBe(0);
 });
 
 test("SUPPORT is capability denied and cannot submit a takedown", async ({ page }) => {

@@ -2,7 +2,11 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook } from "@testing-library/react";
 import type { PropsWithChildren } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ReadmatesTransportError } from "@/shared/api/errors";
+import { apiErrorFromResponse, ReadmatesTransportError } from "@/shared/api/errors";
+import {
+  installPlatformAdminAuthorityLossHandler,
+  platformAdminCapabilitiesQuery,
+} from "@/features/platform-admin/queries/platform-admin-queries";
 
 vi.mock("@/features/platform-admin/api/platform-admin-takedown-api", () => ({
   confirmAdminPublicTakedown: vi.fn(),
@@ -14,12 +18,14 @@ vi.mock("@/features/platform-admin/api/platform-admin-takedown-api", () => ({
 import {
   confirmAdminPublicTakedown,
   fetchAdminTakedownConvergence,
+  previewAdminPublicTakedown,
   retryAdminTakedownConvergence,
 } from "@/features/platform-admin/api/platform-admin-takedown-api";
 import {
   adminTakedownConvergenceQuery,
   adminTakedownKeys,
   useConfirmAdminPublicTakedownMutation,
+  usePreviewAdminPublicTakedownMutation,
   useRetryAdminTakedownConvergenceMutation,
 } from "./platform-admin-takedown-queries";
 
@@ -50,12 +56,36 @@ const failed = {
 };
 
 function wrapper() {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false }, mutations: { retry: 3 } },
+  });
+  installPlatformAdminAuthorityLossHandler(client);
   function Wrapper({ children }: PropsWithChildren) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
   }
   return { client, Wrapper };
 }
+
+async function forbiddenError() {
+  return apiErrorFromResponse(
+    new Response(
+      JSON.stringify({
+        code: "PERMISSION_DENIED",
+        message: "이 작업을 수행할 권한이 없습니다.",
+        status: 403,
+      }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    ),
+  );
+}
+
+const TAKEDOWN_CAPS = {
+  schemaVersion: 1 as const,
+  role: "OWNER" as const,
+  status: "ACTIVE" as const,
+  capabilities: ["EMERGENCY_PUBLIC_TAKEDOWN"] as const,
+  generatedAt: "2026-08-26T04:00:00Z",
+};
 
 beforeEach(() => vi.clearAllMocks());
 
@@ -81,6 +111,53 @@ describe("platform-admin takedown queries", () => {
     expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(2);
     expect(confirmAdminPublicTakedown).toHaveBeenNthCalledWith(1, request);
     expect(confirmAdminPublicTakedown).toHaveBeenNthCalledWith(2, request);
+  });
+
+  it("uses adminTakedownKeys.all as mutation keys and does not retry a 403", async () => {
+    vi.mocked(previewAdminPublicTakedown).mockRejectedValue(await forbiddenError());
+    const { client, Wrapper } = wrapper();
+    client.setQueryData(platformAdminCapabilitiesQuery().queryKey, TAKEDOWN_CAPS);
+    client.setQueryData(adminTakedownKeys.convergence(receipt.receiptId), failed);
+    const { result } = renderHook(() => usePreviewAdminPublicTakedownMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current.mutateAsync({
+        clubId: receipt.clubId,
+        sessionId: receipt.sessionId,
+        publicationId: receipt.publicationId,
+      }).catch(() => undefined);
+    });
+
+    const previewMutation = client.getMutationCache().find({ mutationKey: adminTakedownKeys.all });
+    expect(previewMutation?.options.mutationKey).toEqual(adminTakedownKeys.all);
+    expect(previewMutation?.options.retry).toBe(0);
+    expect(previewAdminPublicTakedown).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(platformAdminCapabilitiesQuery().queryKey)).toBeUndefined();
+    expect(client.getQueryData(adminTakedownKeys.convergence(receipt.receiptId))).toBeUndefined();
+  });
+
+  it("does not retry a failed confirm 403 and keeps the same mutation key", async () => {
+    vi.mocked(confirmAdminPublicTakedown).mockRejectedValue(await forbiddenError());
+    const { client, Wrapper } = wrapper();
+    client.setQueryData(platformAdminCapabilitiesQuery().queryKey, TAKEDOWN_CAPS);
+    const { result } = renderHook(() => useConfirmAdminPublicTakedownMutation(), { wrapper: Wrapper });
+
+    await act(async () => {
+      await result.current
+        .mutateAsync({
+          previewId: "40000000-0000-4000-8000-000000000004",
+          reasonCategory: "PRIVACY",
+          reason: "confirmed",
+          idempotencyKey: "admin-fixed-key",
+        })
+        .catch(() => undefined);
+    });
+
+    const confirmMutation = client.getMutationCache().find({ mutationKey: adminTakedownKeys.all });
+    expect(confirmMutation?.options.mutationKey).toEqual(adminTakedownKeys.all);
+    expect(confirmMutation?.options.retry).toBe(0);
+    expect(confirmAdminPublicTakedown).toHaveBeenCalledTimes(1);
+    expect(client.getQueryData(platformAdminCapabilitiesQuery().queryKey)).toBeUndefined();
   });
 
   it("retries convergence under the same receipt and appends a provider attempt", async () => {

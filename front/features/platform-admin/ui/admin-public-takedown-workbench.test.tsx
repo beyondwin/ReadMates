@@ -1,7 +1,14 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 import type { AdminTakedownState } from "../model/platform-admin-takedown-model";
 import { AdminPublicTakedownWorkbench } from "./admin-public-takedown-workbench";
+
+const LEDGER_CSS = readFileSync(
+  path.resolve("features/platform-admin/ui/admin-editorial-ledger.css"),
+  "utf8",
+);
 
 const preview = {
   schema: "admin.public_takedown.preview.v1" as const,
@@ -32,7 +39,7 @@ const receipt = {
 
 function renderWorkbench(state: AdminTakedownState, overrides = {}) {
   const props = {
-    role: "OWNER" as const,
+    canOperate: true,
     state,
     pending: false,
     error: null,
@@ -45,10 +52,11 @@ function renderWorkbench(state: AdminTakedownState, overrides = {}) {
 }
 
 describe("AdminPublicTakedownWorkbench", () => {
-  it("denies SUPPORT without rendering the emergency mutation form", () => {
-    renderWorkbench({ kind: "idle" }, { role: "SUPPORT" });
+  it("denies a capability-less actor without rendering the emergency mutation form", () => {
+    renderWorkbench({ kind: "idle" }, { canOperate: false });
     expect(screen.getByText("긴급 회수 권한이 없습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "대상 확인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
   });
 
   it("shows exact target, current surfaces, generation, limitation, and one primary confirm", () => {
@@ -97,5 +105,53 @@ describe("AdminPublicTakedownWorkbench", () => {
     expect(screen.getAllByText("원본 접근 차단 완료")).toHaveLength(2);
     expect(screen.getByRole("button", { name: "전파 다시 시도" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "긴급 회수 확인" })).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "명령 기록" })).toHaveTextContent(receipt.receiptId);
+    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L3");
+  });
+
+  it("renders an L3 receipt timeline with convergence only after an actual receipt", () => {
+    const { rerender } = renderWorkbench({ kind: "preview", preview });
+
+    expect(document.querySelector(".admin-safe-action-dock")).toHaveAttribute("data-level", "L3");
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
+    expect(screen.queryByText("공개 반영 추적")).not.toBeInTheDocument();
+
+    rerender(
+      <AdminPublicTakedownWorkbench
+        canOperate
+        state={{
+          kind: "origin-denied",
+          receipt,
+          convergence: {
+            schema: "admin.public_takedown.convergence.v1",
+            convergenceId: receipt.convergenceId,
+            originResult: "DENIED",
+            committedGeneration: 18,
+            status: "PENDING",
+            lastAttemptAt: "2026-08-26T04:01:01Z",
+            retryable: false,
+            attempts: [{ attemptNo: 1, status: "PENDING", observedAt: "2026-08-26T04:01:01Z", resultCategory: null }],
+          },
+        }}
+        pending={false}
+        error={null}
+        onPreview={vi.fn()}
+        onConfirm={vi.fn()}
+        onRetryConvergence={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("region", { name: "명령 기록" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "전파 수렴 타임라인" })).toHaveTextContent("시도 1");
+  });
+
+  it("locks 44px targets and reduced motion in the scoped takedown stylesheet", () => {
+    expect(LEDGER_CSS).toMatch(/\.admin-public-takedown[\s\S]*min-height:\s*44px/);
+    expect(LEDGER_CSS).toContain(".admin-public-takedown");
+    expect(LEDGER_CSS).toContain(":focus-visible");
+    expect(LEDGER_CSS).toMatch(
+      /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.admin-public-takedown[\s\S]*animation-duration:\s*0\.01ms/,
+    );
+    expect(LEDGER_CSS).not.toMatch(/backdrop-filter|linear-gradient/);
   });
 });

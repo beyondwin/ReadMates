@@ -30,12 +30,18 @@ export function adminTakedownConvergenceQuery(receiptId: string | null) {
 }
 
 export function usePreviewAdminPublicTakedownMutation() {
-  return useMutation({ mutationFn: (request: TakedownPreviewRequest) => previewAdminPublicTakedown(request) });
+  return useMutation({
+    mutationKey: adminTakedownKeys.all,
+    retry: 0,
+    mutationFn: (request: TakedownPreviewRequest) => previewAdminPublicTakedown(request),
+  });
 }
 
 export function useConfirmAdminPublicTakedownMutation() {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: adminTakedownKeys.all,
+    retry: 0,
     mutationFn: async (request: ConfirmTakedownRequest) => {
       try {
         return await confirmAdminPublicTakedown(request);
@@ -54,6 +60,8 @@ export function useConfirmAdminPublicTakedownMutation() {
 export function useRetryAdminTakedownConvergenceMutation() {
   const client = useQueryClient();
   return useMutation({
+    mutationKey: adminTakedownKeys.all,
+    retry: 0,
     mutationFn: (receiptId: string) => retryAdminTakedownConvergence(receiptId),
     onSuccess: (convergence: ConvergenceView, receiptId) => {
       client.setQueryData(adminTakedownKeys.convergence(receiptId), convergence);

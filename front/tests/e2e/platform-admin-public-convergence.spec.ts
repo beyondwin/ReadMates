@@ -33,7 +33,7 @@ async function routeOwnerShell(page: Page) {
     capabilities: ["VIEW_TODAY", "VIEW_CLUBS", "EMERGENCY_PUBLIC_TAKEDOWN"],
     generatedAt: "2026-08-26T04:00:00Z",
   }));
-  await page.route("**/api/bff/api/admin/clubs", (route) => json(route, 200, { items: [] }));
+  await page.route("**/api/bff/api/admin/clubs**", (route) => json(route, 200, { items: [] }));
 }
 
 test("provider retry appends a higher attempt under one convergence without repeating origin takedown", async ({ page }) => {
