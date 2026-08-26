@@ -1,5 +1,5 @@
 import { readFileSync } from "node:fs";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { AdminActionDock, AdminSafeActionDock } from "./admin-action-dock";
@@ -87,5 +87,50 @@ describe("AdminSafeActionDock", () => {
 
     await user.click(screen.getByRole("button", { name: "확인 처리" }));
     expect(onPrimary).toHaveBeenCalledOnce();
+  });
+
+  it("does not activate a wrapped button or link primary when locked", () => {
+    const onButton = vi.fn();
+    const onLink = vi.fn();
+    const { rerender } = render(
+      <AdminSafeActionDock
+        level="L1"
+        authority="denied"
+        state="ready"
+        reason="지금은 실행할 수 없습니다"
+        primary={
+          <div>
+            <button type="button" onClick={onButton}>
+              확인 처리
+            </button>
+          </div>
+        }
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "확인 처리" }));
+    expect(onButton).not.toHaveBeenCalled();
+
+    rerender(
+      <AdminSafeActionDock
+        level="L1"
+        authority="denied"
+        state="stale"
+        reason="지금은 실행할 수 없습니다"
+        primary={
+          <span>
+            <a href="/admin/clubs" onClick={onLink}>
+              클럽으로
+            </a>
+          </span>
+        }
+      />,
+    );
+
+    const link = screen.getByRole("link", { name: "클럽으로" });
+    fireEvent.click(link);
+    expect(onLink).not.toHaveBeenCalled();
+    expect(link).not.toHaveAttribute("href");
+    expect(link).toHaveAttribute("aria-disabled", "true");
   });
 });

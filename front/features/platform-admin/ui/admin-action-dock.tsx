@@ -1,4 +1,12 @@
-import { cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  type KeyboardEvent,
+  type ReactElement,
+  type ReactNode,
+  type SyntheticEvent,
+} from "react";
 
 export type AdminCommandLevel = "L1" | "L2" | "L3";
 export type AdminSafeActionState =
@@ -84,11 +92,56 @@ function lockPrimary(primary: ReactNode): ReactNode {
   if (primary == null || primary === false) {
     return null;
   }
-  if (isValidElement(primary)) {
-    return cloneElement(primary as ReactElement<{ disabled?: boolean; onClick?: unknown }>, {
-      disabled: true,
-      onClick: undefined,
-    });
+  return (
+    <div
+      className="admin-safe-action-dock__locked"
+      onClickCapture={preventActivation}
+      onPointerDownCapture={preventActivation}
+      onKeyDownCapture={preventKeyActivation}
+    >
+      {disableInteractiveTree(primary)}
+    </div>
+  );
+}
+
+function preventActivation(event: SyntheticEvent) {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function preventKeyActivation(event: KeyboardEvent<HTMLDivElement>) {
+  if (event.key === "Enter" || event.key === " " || event.key === "Spacebar") {
+    preventActivation(event);
   }
-  return primary;
+}
+
+function disableInteractiveTree(node: ReactNode): ReactNode {
+  return Children.map(node, (child) => {
+    if (!isValidElement(child)) {
+      return child;
+    }
+    const element = child as ReactElement<{
+      children?: ReactNode;
+      href?: string;
+      disabled?: boolean;
+      onClick?: unknown;
+      tabIndex?: number;
+    }>;
+    const lockedProps: Record<string, unknown> = {};
+    if (element.type === "button" || element.type === "input" || element.type === "select" || element.type === "textarea") {
+      lockedProps.disabled = true;
+      lockedProps.onClick = undefined;
+    }
+    if (element.type === "a") {
+      lockedProps.href = undefined;
+      lockedProps.role = "link";
+      lockedProps["aria-disabled"] = true;
+      lockedProps.tabIndex = -1;
+      lockedProps.onClick = undefined;
+    }
+    if (element.props.children === undefined) {
+      return cloneElement(element, lockedProps);
+    }
+    return cloneElement(element, lockedProps, disableInteractiveTree(element.props.children));
+  });
 }

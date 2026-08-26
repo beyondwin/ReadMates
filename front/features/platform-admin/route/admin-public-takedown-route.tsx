@@ -17,7 +17,8 @@ import {
 import { AdminPublicTakedownWorkbench } from "../ui/admin-public-takedown-workbench";
 
 export function AdminPublicTakedownRoute() {
-  const role = useQuery(platformAdminSummaryQuery()).data!.platformRole;
+  const summaryQuery = useQuery(platformAdminSummaryQuery());
+  const role = summaryQuery.data?.platformRole;
   const preview = usePreviewAdminPublicTakedownMutation();
   const confirm = useConfirmAdminPublicTakedownMutation();
   const retry = useRetryAdminTakedownConvergenceMutation();
@@ -74,15 +75,29 @@ export function AdminPublicTakedownRoute() {
           <p className="body muted">정확한 공개 대상의 원본 접근을 즉시 차단하고 별도 전파 수렴을 추적합니다.</p>
         </div>
       </header>
-      <AdminPublicTakedownWorkbench
-        role={role}
-        state={visibleState}
-        pending={preview.isPending || confirm.isPending || retry.isPending}
-        error={error}
-        onPreview={(target) => { void handlePreview(target); }}
-        onConfirm={(input) => { void handleConfirm(input); }}
-        onRetryConvergence={() => { void handleRetry(); }}
-      />
+      {role ? (
+        <AdminPublicTakedownWorkbench
+          role={role}
+          state={visibleState}
+          pending={preview.isPending || confirm.isPending || retry.isPending}
+          error={error}
+          onPreview={(target) => { void handlePreview(target); }}
+          onConfirm={(input) => { void handleConfirm(input); }}
+          onRetryConvergence={() => { void handleRetry(); }}
+        />
+      ) : summaryQuery.isPending ? (
+        <p role="status">불러오는 중</p>
+      ) : (
+        <AdminPublicTakedownWorkbench
+          role="SUPPORT"
+          state={visibleState}
+          pending={false}
+          error={error}
+          onPreview={() => undefined}
+          onConfirm={() => undefined}
+          onRetryConvergence={() => undefined}
+        />
+      )}
     </section>
   );
 }

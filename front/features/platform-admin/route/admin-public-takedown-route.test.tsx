@@ -11,6 +11,12 @@ vi.mock("@/features/platform-admin/api/platform-admin-takedown-api", () => ({
   retryAdminTakedownConvergence: vi.fn(),
 }));
 
+vi.mock("@/features/platform-admin/api/platform-admin-api", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/features/platform-admin/api/platform-admin-api")>()),
+  fetchPlatformAdminSummary: vi.fn(),
+}));
+
+import { fetchPlatformAdminSummary } from "@/features/platform-admin/api/platform-admin-api";
 import { previewAdminPublicTakedown } from "@/features/platform-admin/api/platform-admin-takedown-api";
 import { AdminPublicTakedownRoute } from "./admin-public-takedown-route";
 
@@ -68,5 +74,44 @@ describe("AdminPublicTakedownRoute", () => {
     renderRoute("SUPPORT");
     expect(screen.getByText("긴급 회수 권한이 없습니다.")).toBeInTheDocument();
     expect(screen.queryByLabelText("클럽 ID")).not.toBeInTheDocument();
+  });
+
+  it("does not throw or expose the mutation form before summary has loaded", () => {
+    vi.mocked(fetchPlatformAdminSummary).mockImplementation(() => new Promise(() => undefined));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    expect(() =>
+      render(
+        <QueryClientProvider client={client}>
+          <MemoryRouter initialEntries={["/admin/public-takedown"]}>
+            <AdminPublicTakedownRoute />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      ),
+    ).not.toThrow();
+    expect(screen.getByRole("heading", { name: "긴급 공개 회수" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("클럽 ID")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "대상 확인" })).not.toBeInTheDocument();
+  });
+
+  it("fails closed when the summary projection cannot be loaded", async () => {
+    vi.mocked(fetchPlatformAdminSummary).mockRejectedValue(new Error("summary unavailable"));
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false }, mutations: { retry: false } },
+    });
+
+    render(
+      <QueryClientProvider client={client}>
+        <MemoryRouter initialEntries={["/admin/public-takedown"]}>
+          <AdminPublicTakedownRoute />
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+
+    expect(await screen.findByText("긴급 회수 권한이 없습니다.")).toBeInTheDocument();
+    expect(screen.queryByLabelText("클럽 ID")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "대상 확인" })).not.toBeInTheDocument();
   });
 });
