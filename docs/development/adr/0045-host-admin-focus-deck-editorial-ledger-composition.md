@@ -1,6 +1,6 @@
 # ADR-0045: 호스트·플랫폼 관리자 composition을 Focus Deck·Editorial Operations Ledger로 고정
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-26
 - 작성자: 제품·디자인·플랫폼 운영·프런트엔드
 - 관련: ADR-0003, ADR-0020, ADR-0039, ADR-0040, ADR-0043, ADR-0044,
@@ -81,4 +81,4 @@ capability projection은 유지한다. Today case lifecycle action은 서버가 
 
 - 오래된 관리자 branch의 pure model/test intent를 current main에 재작성한다.
 - 분석 export와 notification replay를 exact capability projection으로 교정한다.
-- 코드·tests·`front/DESIGN.md`·active architecture가 일치한 뒤 `Accepted`로 승격한다.
+- 코드·tests·`front/DESIGN.md`·active architecture가 일치하여 `Accepted`로 승격한다.

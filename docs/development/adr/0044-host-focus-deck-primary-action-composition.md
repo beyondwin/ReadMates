@@ -1,6 +1,6 @@
 # ADR-0044: 호스트 현재 모임을 Focus Deck 단일 주 행동으로 구성
 
-- 상태: Proposed
+- 상태: Accepted
 - 결정일: 2026-08-26
 - 작성자: 제품·디자인·프런트엔드
 - 관련: ADR-0003, ADR-0020, ADR-0022, ADR-0023, ADR-0027, ADR-0028, ADR-0035,
@@ -67,4 +67,4 @@ prerequisite로 읽은 뒤에만 결정하며 pending/stale/unavailable을 `fals
 ## 후속 작업
 
 - 구현 계획에서 route/model/UI/CSS/test file ownership을 vertical slice로 나눈다.
-- 코드·tests·`front/DESIGN.md`·active architecture가 일치한 뒤 `Accepted`로 승격한다.
+- 코드·tests·`front/DESIGN.md`·active architecture가 일치하여 `Accepted`로 승격한다.

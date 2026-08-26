@@ -8,6 +8,7 @@ ReadMates는 Git tag와 GitHub Releases를 함께 사용합니다. 이 파일은
 
 ### Highlights
 
+- **호스트·관리자 시각 권위:** 호스트 현재 모임은 Focus Deck(한 개의 `지금 할 일`과 진행 사실)을 page-level 권위로 사용하고, `/admin/**`는 Editorial Operations Ledger로 route 문법을 맞춥니다. 분석 CSV export와 알림 replay는 exact capability projection만 따르며 Today lifecycle은 서버 `allowedActions`를 역할 이름으로 재계산하지 않습니다. 서버 API·schema·auth 계약은 바꾸지 않았습니다.
 - **플랫폼 어드민 서비스 스파인:** 관리 화면을 오늘·클럽·서비스·검토 네 영역으로 정리하고, 서버가 발급한 capability allowlist로 탐색을 제한합니다. `/admin/today`는 공통 페이지 문법(loading/empty/partial/unavailable/forbidden)과 접근 가능한 작업 dock·확인 dialog를 기준 운영 화면으로 사용합니다. 401/403이면 platform-admin 상태를 폐기합니다.
 - **플랫폼 어드민 서비스·검토 작업대:** 알림 replay와 AI recovery는 V59 typed receipt·attempt evidence로 중복 실행과 provider 결과 과장을 막고, support grant는 V60 preview/confirm과 allowlist reason evidence로 전환합니다. `/admin/audit`는 source-aware signed cursor와 body-only sensitive search를 사용하고, `/admin/analytics`는 서버가 계산한 KPI 정의·delta·availability와 capability-gated no-store CSV export를 제공합니다.
 - **플랫폼 관리자 safe command 기반:** V57의 HMAC-only claim·key-version alias와 도메인 소유 transaction protocol로 위험한 관리자 명령의 중복 실행을 막습니다. 완료 claim만 bounded purge하고 immutable domain receipt는 보존하며, digest key rotation·retirement와 DB-backed startup 검증은 불완전한 설정에서 fail closed합니다.
