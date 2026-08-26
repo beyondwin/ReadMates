@@ -1,12 +1,31 @@
 import { describe, expect, it } from "vitest";
+import type { HostMeetingRecordFacts, HostMeetingRecordReadiness } from "./host-meeting-record-readiness";
 import {
   buildHostMeetingWorkspace,
   buildHostSessionWorkspace,
+  type HostMeetingPrimaryAction,
   type HostMeetingWorkspaceInput,
   type HostSessionWorkspaceInput,
 } from "./host-session-workspace-model";
 
 const SESSION_ID = "11111111-1111-1111-1111-111111111111";
+const OBSERVED_AT = "2026-08-21T03:00:00.000Z";
+const RECORD_MUTATION_KINDS = ["UPLOAD_RECORD", "FIX_RECORD", "REVIEW_RECORD", "PUBLISH_RECORD"] as const;
+
+function readyReadiness(overrides: Partial<HostMeetingRecordFacts> = {}): HostMeetingRecordReadiness {
+  return {
+    status: "ready",
+    observedAt: OBSERVED_AT,
+    facts: {
+      hasDraft: false,
+      draftLiveBaseStale: false,
+      validationIssueCount: 0,
+      hasAppliedRecord: false,
+      publicationReady: false,
+      ...overrides,
+    },
+  };
+}
 
 const baseInput = {
   currentUrl: `https://readmates.test/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost#meeting`,
@@ -14,21 +33,24 @@ const baseInput = {
   today: "2026-08-20",
   unansweredResponseCount: 0,
   unknownAttendanceCount: 0,
-  hasRecordDraft: false,
-  recordDraftStale: false,
-  recordValidationIssueCount: 0,
-  hasAppliedRecord: false,
-  publicationReady: false,
+  recordReadiness: readyReadiness(),
 } satisfies Omit<HostMeetingWorkspaceInput, "state">;
 
+const confirmingClosedAction = {
+  kind: "CONFIRM_NEXT_ACTION",
+  label: "다음 할 일 확인 중",
+  task: "records",
+  disabled: true,
+} as const;
+
 describe("buildHostMeetingWorkspace", () => {
-  it("builds the six unordered semantic task links without progress fields", () => {
+  it("builds the six unordered semantic related task links without progress fields", () => {
     const view = buildHostMeetingWorkspace({
       ...baseInput,
       state: "OPEN",
     });
 
-    expect(view.tasks).toEqual([
+    expect(view.relatedTasks).toEqual([
       {
         task: "overview",
         label: "개요",
@@ -60,23 +82,22 @@ describe("buildHostMeetingWorkspace", () => {
         href: `/clubs/alpha/app/host/sessions/${SESSION_ID}?returnTo=%2Fclubs%2Falpha%2Fapp%2Fhost&section=history#meeting`,
       },
     ]);
+    expect(view.tasks).toEqual(view.relatedTasks);
     expect(Object.keys(view)).not.toEqual(
       expect.arrayContaining(["progress", "ordinal", "position", "step", "completed"]),
     );
-    for (const task of view.tasks) {
+    for (const task of view.relatedTasks) {
       expect(Object.keys(task)).not.toEqual(
         expect.arrayContaining(["progress", "ordinal", "position", "step", "completed", "state"]),
       );
     }
   });
 
-  it("uses only stored counts and states for task badges", () => {
+  it("uses only stored counts and ready record facts for task badges", () => {
     const storedAttention = {
       unansweredResponseCount: 5,
       unknownAttendanceCount: 2,
-      hasRecordDraft: true,
-      recordDraftStale: false,
-      recordValidationIssueCount: 0,
+      recordReadiness: readyReadiness({ hasDraft: true }),
     };
     const beforeMeeting = buildHostMeetingWorkspace({
       ...baseInput,
@@ -93,7 +114,7 @@ describe("buildHostMeetingWorkspace", () => {
       today: "2026-08-20",
     });
 
-    const badges = (view: typeof beforeMeeting) => view.tasks.map(({ task, badge }) => [task, badge]);
+    const badges = (view: typeof beforeMeeting) => view.relatedTasks.map(({ task, badge }) => [task, badge]);
     expect(badges(beforeMeeting)).toEqual([
       ["overview", undefined],
       ["responses", "미응답 5"],
@@ -107,55 +128,54 @@ describe("buildHostMeetingWorkspace", () => {
     const recordNeedsReview = buildHostMeetingWorkspace({
       ...baseInput,
       state: "CLOSED",
-      hasRecordDraft: true,
-      recordDraftStale: true,
+      recordReadiness: readyReadiness({ hasDraft: true, draftLiveBaseStale: true }),
     });
-    expect(recordNeedsReview.tasks.find(({ task }) => task === "records")?.badge).toBe("확인 필요");
+    expect(recordNeedsReview.relatedTasks.find(({ task }) => task === "records")?.badge).toBe("확인 필요");
   });
 
   it.each([
     [
       "DRAFT",
-      {},
+      { recordReadiness: { status: "not-required" } },
       "모임 작성 중",
-      { kind: "OPEN_SESSION", label: "멤버와 준비 시작", task: "overview" },
+      { kind: "OPEN_SESSION", label: "멤버와 준비 시작", task: "overview", disabled: false },
     ],
     [
       "OPEN",
       { meetingDate: "2026-08-21", today: "2026-08-20", unknownAttendanceCount: 2 },
       "멤버와 준비 중",
-      { kind: "REVIEW_MEMBER_INPUT", label: "멤버 응답 확인하기", task: "responses" },
+      { kind: "REVIEW_MEMBER_INPUT", label: "멤버 응답 확인하기", task: "responses", disabled: false },
     ],
     [
       "OPEN",
       { meetingDate: "2026-08-21", today: "2026-08-21", unknownAttendanceCount: 2 },
       "멤버와 준비 중",
-      { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", task: "attendance" },
+      { kind: "CHECK_ATTENDANCE", label: "실제 출석 확인", task: "attendance", disabled: false },
     ],
     [
       "OPEN",
       { meetingDate: "2026-08-21", today: "2026-08-22", unknownAttendanceCount: 0 },
       "멤버와 준비 중",
-      { kind: "FINISH_SESSION", label: "모임 마치기", task: "overview" },
+      { kind: "FINISH_SESSION", label: "모임 마치기", task: "overview", disabled: false },
     ],
     [
       "CLOSED",
       {},
       "기록 정리 중",
-      { kind: "UPLOAD_RECORD", label: "정리본 올리기", task: "records" },
+      { kind: "UPLOAD_RECORD", label: "정리본 올리기", task: "records", disabled: false },
     ],
     [
       "PUBLISHED",
-      { hasAppliedRecord: true, publicationReady: true },
-      "게스트·멤버 노트 게시 완료",
-      { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", task: "overview" },
+      { recordReadiness: readyReadiness({ hasAppliedRecord: true, publicationReady: true }) },
+      "공개 완료",
+      { kind: "VIEW_PUBLIC_RECORD", label: "공개 기록 보기", task: "overview", disabled: false },
     ],
   ] satisfies Array<[
     HostMeetingWorkspaceInput["state"],
     Partial<HostMeetingWorkspaceInput>,
     string,
-    { kind: string; label: string; task: string },
-  ]>) (
+    HostMeetingPrimaryAction,
+  ]>)(
     "keeps %s as the authoritative lifecycle while recommending its primary action",
     (state, overrides, statusLabel, primaryAction) => {
       const view = buildHostMeetingWorkspace({
@@ -187,33 +207,34 @@ describe("buildHostMeetingWorkspace", () => {
         kind: "REVIEW_MEMBER_INPUT",
         label: "멤버 응답 확인하기",
         task: "responses",
+        disabled: false,
       },
     });
   });
 
   it.each([
     [
-      { hasRecordDraft: true, recordDraftStale: true },
-      { kind: "FIX_RECORD", label: "반영 전 확인", task: "records" },
+      readyReadiness({ hasDraft: true, draftLiveBaseStale: true }),
+      { kind: "FIX_RECORD", label: "반영 전 확인", task: "records", disabled: false },
     ],
     [
-      { hasRecordDraft: true, recordValidationIssueCount: 2 },
-      { kind: "FIX_RECORD", label: "반영 전 확인", task: "records" },
+      readyReadiness({ hasDraft: true, validationIssueCount: 2 }),
+      { kind: "FIX_RECORD", label: "반영 전 확인", task: "records", disabled: false },
     ],
     [
-      { hasRecordDraft: true },
-      { kind: "REVIEW_RECORD", label: "기록에 반영", task: "records" },
+      readyReadiness({ hasDraft: true }),
+      { kind: "REVIEW_RECORD", label: "기록에 반영", task: "records", disabled: false },
     ],
     [
-      { hasRecordDraft: false, hasAppliedRecord: true, publicationReady: true },
-      { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", task: "records" },
+      readyReadiness({ hasAppliedRecord: true, publicationReady: true }),
+      { kind: "PUBLISH_RECORD", label: "게스트·멤버 노트에 기록 게시", task: "records", disabled: false },
     ],
-  ] satisfies Array<[Partial<HostMeetingWorkspaceInput>, { kind: string; label: string; task: string }]>) (
+  ] satisfies Array<[HostMeetingRecordReadiness, HostMeetingPrimaryAction]>)(
     "recommends the stored CLOSED record action without deriving lifecycle",
-    (overrides, primaryAction) => {
+    (recordReadiness, primaryAction) => {
       const view = buildHostMeetingWorkspace({
         ...baseInput,
-        ...overrides,
+        recordReadiness,
         state: "CLOSED",
       });
 
@@ -221,6 +242,160 @@ describe("buildHostMeetingWorkspace", () => {
       expect(view.primaryAction).toEqual(primaryAction);
     },
   );
+
+  it.each([
+    ["pending", { status: "pending" } satisfies HostMeetingRecordReadiness, undefined],
+    ["stale", {
+      status: "stale",
+      facts: readyReadiness().facts,
+      observedAt: OBSERVED_AT,
+      retryable: true,
+    } satisfies HostMeetingRecordReadiness, "마지막 확인 시각이 오래되었습니다. 다시 시도하세요."],
+    ["unavailable", {
+      status: "unavailable",
+      observedAt: OBSERVED_AT,
+      retryable: true,
+    } satisfies HostMeetingRecordReadiness, "모임 기록을 확인하지 못했습니다. 다시 시도하세요."],
+    ["unavailable without observation", {
+      status: "unavailable",
+      observedAt: null,
+      retryable: true,
+    } satisfies HostMeetingRecordReadiness, "모임 기록을 확인하지 못했습니다. 다시 시도하세요."],
+  ])("fail-closes CLOSED %s without a record mutation", (_name, recordReadiness, reason) => {
+    const view = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "CLOSED",
+      recordReadiness,
+    });
+
+    expect(view.lifecycle).toBe("CLOSED");
+    expect(view.statusLabel).toBe("기록 정리 중");
+    expect(view.primaryAction).toEqual({
+      ...confirmingClosedAction,
+      ...(reason ? { reason } : {}),
+    });
+    expect(RECORD_MUTATION_KINDS).not.toContain(view.primaryAction.kind);
+    expect(view.publicationReady).toBeNull();
+  });
+
+  it.each([
+    ["pending", { status: "pending" } satisfies HostMeetingRecordReadiness],
+    ["stale", {
+      status: "stale",
+      facts: readyReadiness({ hasDraft: false, hasAppliedRecord: false, publicationReady: false }).facts,
+      observedAt: OBSERVED_AT,
+      retryable: true,
+    } satisfies HostMeetingRecordReadiness],
+    ["unavailable", {
+      status: "unavailable",
+      observedAt: null,
+      retryable: true,
+    } satisfies HostMeetingRecordReadiness],
+    ["ready without applied record", readyReadiness()],
+  ])("keeps PUBLISHED %s view-public oriented instead of upload or publish", (_name, recordReadiness) => {
+    const view = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "PUBLISHED",
+      recordReadiness,
+    });
+
+    expect(view.statusLabel).toBe("공개 완료");
+    expect(view.primaryAction).toEqual({
+      kind: "VIEW_PUBLIC_RECORD",
+      label: "공개 기록 보기",
+      task: "overview",
+      disabled: false,
+    });
+    expect(RECORD_MUTATION_KINDS).not.toContain(view.primaryAction.kind);
+    expect(view.primaryAction.kind).not.toMatch(/UPLOAD|PUBLISH|FIX_RECORD|REVIEW_RECORD/);
+  });
+
+  it("exposes 3-5 actual fact sentences instead of a progress stepper", () => {
+    const view = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "OPEN",
+      unansweredResponseCount: 2,
+      unknownAttendanceCount: 1,
+      recordReadiness: { status: "not-required" },
+    });
+
+    expect(view.facts.length).toBeGreaterThanOrEqual(3);
+    expect(view.facts.length).toBeLessThanOrEqual(5);
+    const ids = view.facts.map((fact) => fact.id);
+    expect(ids).toEqual([...new Set(ids)]);
+    expect(ids).toContain("responses");
+    expect(ids).toContain("attendance");
+    expect(ids.indexOf("responses")).not.toBe(ids.indexOf("attendance"));
+
+    for (const fact of view.facts) {
+      expect(fact.label.endsWith("다.")).toBe(true);
+      expect(fact.label).not.toMatch(/%|퍼센트|완료율/);
+      expect(fact).not.toHaveProperty("ordinal");
+      expect(fact).not.toHaveProperty("index");
+      expect(fact).not.toHaveProperty("position");
+      expect(fact).not.toHaveProperty("step");
+      expect(fact).not.toHaveProperty("progress");
+      expect(fact).not.toHaveProperty("state");
+      expect(JSON.stringify(fact)).not.toMatch(/"done"|"current"|"next"/);
+    }
+    expect(view).not.toHaveProperty("progress");
+  });
+
+  it("keeps response, attendance, and publication facts on separate rows", () => {
+    const view = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "CLOSED",
+      unansweredResponseCount: 1,
+      unknownAttendanceCount: 2,
+      recordReadiness: readyReadiness({
+        hasDraft: true,
+        hasAppliedRecord: true,
+        publicationReady: true,
+      }),
+    });
+
+    expect(view.facts).toEqual(expect.arrayContaining([
+      expect.objectContaining({
+        id: "responses",
+        label: "참석 응답이 없는 멤버가 1명입니다.",
+        relatedTask: "responses",
+      }),
+      expect.objectContaining({
+        id: "attendance",
+        label: "실제 출석이 확인되지 않은 멤버가 2명입니다.",
+        relatedTask: "attendance",
+      }),
+      expect.objectContaining({
+        id: "record",
+        relatedTask: "records",
+      }),
+      expect.objectContaining({
+        id: "publication",
+        label: "게스트·멤버 노트에 게시할 수 있습니다.",
+        relatedTask: "records",
+      }),
+    ]));
+    expect(view.facts.find((fact) => fact.id === "identity")?.label).not.toMatch(/게스트·멤버 노트|게시할 수/);
+    expect(view.publicationReady).toBe(true);
+  });
+
+  it("does not treat unknown record readiness as publicationReady false", () => {
+    const pending = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "CLOSED",
+      recordReadiness: { status: "pending" },
+    });
+    const unavailable = buildHostMeetingWorkspace({
+      ...baseInput,
+      state: "CLOSED",
+      recordReadiness: { status: "unavailable", observedAt: null, retryable: true },
+    });
+
+    expect(pending.publicationReady).toBeNull();
+    expect(unavailable.publicationReady).toBeNull();
+    expect(pending.facts.some((fact) => fact.id === "publication")).toBe(false);
+    expect(unavailable.facts.some((fact) => fact.id === "publication")).toBe(false);
+  });
 });
 
 const compatibilityBaseInput = {
@@ -326,7 +501,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       { hasRecordDraft: true },
       { kind: "REVIEW_RECORD", label: "기록에 반영", panel: "records" },
     ],
-  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, { kind: string; label: string; panel: string }]>) (
+  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, { kind: string; label: string; panel: string }]>)(
     "keeps the exact CLOSED %s CTA and records location",
     (_name, overrides, primaryAction) => {
       expect(buildHostSessionWorkspace({
@@ -344,7 +519,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
     ["consumed draft", { hasRecordDraft: false, hasAppliedRecord: true, publicationReady: true }, true],
     ["ready draft", { hasRecordDraft: true, hasAppliedRecord: true, publicationReady: true }, true],
     ["applied but blocked", { hasRecordDraft: true, hasAppliedRecord: true, publicationReady: false }, false],
-  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, boolean]>) (
+  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, boolean]>)(
     "keeps PUBLISH_RECORD for %s and preserves publication readiness",
     (_name, overrides, publicationReady) => {
       expect(buildHostSessionWorkspace({
@@ -429,7 +604,7 @@ describe("HostSessionWorkspace view compatibility until B8", () => {
       { state: "PUBLISHED", hasAppliedRecord: true },
       ["done", "done", "done", "done", "done"],
     ],
-  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, string[]]>) (
+  ] satisfies Array<[string, Partial<HostSessionWorkspaceInput>, string[]]>)(
     "keeps the exact compatibility progress positions for %s",
     (_name, overrides, expectedStates) => {
       const state = overrides.state ?? "DRAFT";
