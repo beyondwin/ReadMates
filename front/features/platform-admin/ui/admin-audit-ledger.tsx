@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, type KeyboardEvent } from "react";
 import { Link } from "react-router";
 import {
   buildAdminAuditOperationSummary,
@@ -32,6 +32,10 @@ export type AdminAuditLedgerProps = {
     onSubmit: () => void;
     onClear: () => void;
   };
+  selectedId: string | null;
+  detailOpen: boolean;
+  onSelect: (item: AdminAuditLedgerItem) => void;
+  onCloseDetail: () => void;
   onFilterChange: (filters: AdminAuditFilters) => void;
   onLoadMore: () => void;
   onRetryLoadMore: () => void;
@@ -50,23 +54,31 @@ export function AdminAuditLedger({
   nextPageError,
   loadingMore,
   sensitiveSearch,
+  selectedId,
+  detailOpen,
+  onSelect,
+  onCloseDetail,
   onFilterChange,
   onLoadMore,
   onRetryLoadMore,
 }: AdminAuditLedgerProps) {
   const rowsRef = useRef<HTMLDivElement>(null);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const selected = page?.items.find((item) => item.id === selectedId) ?? page?.items[0] ?? null;
+  const wasDetailOpen = useRef(detailOpen);
+  const selected = page?.items.find((item) => item.id === selectedId)
+    ?? (selectedId ? null : page?.items[0] ?? null);
+
+  useEffect(() => {
+    if (wasDetailOpen.current && !detailOpen && selectedId) {
+      const row = [...(rowsRef.current?.querySelectorAll<HTMLButtonElement>("[data-audit-row]") ?? [])]
+        .find((button) => button.dataset.auditRow === selectedId);
+      row?.focus();
+    }
+    wasDetailOpen.current = detailOpen;
+  }, [detailOpen, selectedId]);
   const hasFilters = sensitiveSearch.active || Object.entries(filters).some(([key, value]) => {
     if (key === "range") return value !== "7d";
     return Boolean(value);
   });
-
-  function select(item: AdminAuditLedgerItem) {
-    setSelectedId(item.id);
-    setDetailOpen(true);
-  }
 
   function handleRowKeyDown(event: KeyboardEvent<HTMLButtonElement>, item: AdminAuditLedgerItem) {
     if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
@@ -81,8 +93,7 @@ export function AdminAuditLedger({
     const next = buttons[nextIndex];
     const nextItem = page?.items.find((candidate) => candidate.id === next?.dataset.auditRow);
     next?.focus();
-    if (nextItem) select(nextItem);
-    else select(item);
+    onSelect(nextItem ?? item);
   }
 
   return (
@@ -148,7 +159,7 @@ export function AdminAuditLedger({
               data-audit-row={item.id}
               aria-pressed={selected?.id === item.id}
               className="admin-audit__row"
-              onClick={() => select(item)}
+              onClick={() => onSelect(item)}
               onKeyDown={(event) => handleRowKeyDown(event, item)}
             >
               <span className="admin-audit__row-time">{formatTimestamp(item.occurredAt)}</span>
@@ -171,7 +182,7 @@ export function AdminAuditLedger({
             </button>
           ) : null}
         </div>
-        <AuditDetail item={selected} onBack={() => { setDetailOpen(false); rowsRef.current?.focus(); }} />
+        <AuditDetail item={selected} onBack={onCloseDetail} />
       </div>
     </section>
   );

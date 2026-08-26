@@ -622,3 +622,85 @@
     scroll-behavior: auto !important;
   }
 }
+
+.admin-support-workbench,
+.admin-support-workbench .admin-receipt-timeline,
+.admin-audit,
+.admin-audit .admin-page-context,
+.admin-analytics,
+.admin-analytics .admin-state-panel {
+  min-width: 0;
+}
+
+.admin-support-workbench .btn,
+.admin-support-workbench button,
+.admin-support-workbench .input,
+.admin-support-workbench textarea,
+.admin-support-workbench select,
+.admin-audit .btn,
+.admin-audit button,
+.admin-audit input,
+.admin-audit select,
+.admin-analytics .admin-analytics__export,
+.admin-analytics .admin-analytics__window {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.admin-support-workbench .admin-support-workbench__notice,
+.admin-support-workbench .small,
+.admin-audit .admin-audit__row-main,
+.admin-analytics .admin-analytics__export-denied,
+.admin-analytics .admin-state-panel__description {
+  overflow-wrap: anywhere;
+}
+
+.admin-support-workbench :focus-visible,
+.admin-audit :focus-visible,
+.admin-analytics :focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px var(--focus-ring-soft);
+}
+
+@media (max-width: 768px) {
+  .admin-support-workbench,
+  .admin-support-workbench .admin-support-workbench__filters,
+  .admin-support-workbench .admin-support-workbench__command-actions,
+  .admin-audit,
+  .admin-audit .admin-audit__filters,
+  .admin-analytics,
+  .admin-analytics .admin-analytics__actions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-support-workbench .btn,
+  .admin-support-workbench button,
+  .admin-audit .btn,
+  .admin-audit button,
+  .admin-analytics .admin-analytics__export,
+  .admin-analytics .admin-analytics__window {
+    width: 100%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-support-workbench,
+  .admin-support-workbench *,
+  .admin-support-workbench *::before,
+  .admin-support-workbench *::after,
+  .admin-audit,
+  .admin-audit *,
+  .admin-audit *::before,
+  .admin-audit *::after,
+  .admin-analytics,
+  .admin-analytics *,
+  .admin-analytics *::before,
+  .admin-analytics *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

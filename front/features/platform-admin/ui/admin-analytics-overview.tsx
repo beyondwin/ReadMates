@@ -12,6 +12,7 @@ import {
   type AdminAnalyticsOverview,
   type AnalyticsWindow,
 } from "@/features/platform-admin/model/platform-admin-analytics-model";
+import { AdminStatePanel } from "./admin-state-panel";
 
 export type AdminAnalyticsOverviewViewProps = {
   overview: AdminAnalyticsOverview | null;
@@ -20,6 +21,8 @@ export type AdminAnalyticsOverviewViewProps = {
   error: string | null;
   onWindowChange: (window: AnalyticsWindow) => void;
   exportStatus: "idle" | "pending" | "success" | "error";
+  canView?: boolean;
+  canExport?: boolean;
   onExport: () => void;
 };
 
@@ -32,6 +35,8 @@ export function AdminAnalyticsOverviewView({
   error,
   onWindowChange,
   exportStatus,
+  canView = true,
+  canExport = true,
   onExport,
 }: AdminAnalyticsOverviewViewProps) {
   function handleWindowKeyDown(event: KeyboardEvent<HTMLButtonElement>, value: AnalyticsWindow) {
@@ -70,18 +75,29 @@ export function AdminAnalyticsOverviewView({
 
       {error ? <p className="admin-analytics__error" role="alert">{error}</p> : null}
       {loading && !overview ? <p className="admin-analytics__loading">분석 데이터를 불러오는 중…</p> : null}
+      {!canView ? (
+        <AdminStatePanel
+          state="forbidden"
+          title="권한이 없습니다"
+          description="현재 권한으로는 분석을 볼 수 없습니다."
+        />
+      ) : null}
 
-      {overview ? (
+      {canView && overview ? (
         <>
           <div className="admin-analytics__actions">
-            <button
-              type="button"
-              className="admin-analytics__export"
-              disabled={exportStatus === "pending"}
-              onClick={onExport}
-            >
-              {exportStatus === "pending" ? "CSV 내려받는 중" : "CSV 내려받기"}
-            </button>
+            {canExport ? (
+              <button
+                type="button"
+                className="admin-analytics__export"
+                disabled={exportStatus === "pending"}
+                onClick={onExport}
+              >
+                {exportStatus === "pending" ? "CSV 내려받는 중" : "CSV 내려받기"}
+              </button>
+            ) : (
+              <p className="admin-analytics__export-denied">현재 권한으로는 CSV를 내려받을 수 없습니다.</p>
+            )}
             {exportStatus === "success" ? <p className="admin-analytics__export-status" role="status">CSV 파일을 내려받았습니다.</p> : null}
             {exportStatus === "error" ? <p className="admin-analytics__export-error" role="alert">CSV 파일을 만들지 못했습니다. 다시 시도해 주세요.</p> : null}
           </div>

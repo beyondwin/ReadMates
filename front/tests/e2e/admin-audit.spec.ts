@@ -132,6 +132,9 @@ test("owner reviews admin audit ledger without raw private fields", async ({ pag
   await expect(page.getByLabel("감사 이벤트 목록").getByText("알림 재처리가 확정되었습니다.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "알림 재처리가 확정되었습니다." })).toBeVisible();
   await expect(page.getByLabel("감사 이벤트 목록").getByText("support grant가 생성되었습니다.")).toBeVisible();
+  await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
+  await expect(page).toHaveURL(/event=platform_audit_events%3Aevent-2|event=platform_audit_events:event-2/);
+  await expect(page).toHaveURL(/mode=detail/);
   await expect(page.getByText("member1@example.com")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
 });
@@ -183,7 +186,11 @@ test("owner captures audit operation summary visual evidence on desktop and mobi
   await page.goto("/admin/audit");
   await expect(page.getByRole("heading", { name: "감사" })).toBeVisible();
   await page.getByRole("button", { name: /support grant가 생성되었습니다/ }).click();
+  await expect(page).toHaveURL(/mode=detail/);
   await expect(page.getByText("확인 필요")).toBeVisible();
+  await page.getByRole("button", { name: "목록으로" }).click();
+  await expect(page).not.toHaveURL(/mode=detail/);
+  await expect(page.getByRole("button", { name: /support grant가 생성되었습니다/ })).toBeFocused();
   await expectNoAuditPrivateSentinels(page);
   const mobileScreenshot = await page.screenshot({
     path: testInfo.outputPath("admin-audit-mobile.png"),

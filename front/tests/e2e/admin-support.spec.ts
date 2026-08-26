@@ -145,10 +145,11 @@ test("owner searches support subject then creates and revokes grant", async ({ p
   await expect(page.getByText("admin-support@example.com")).toHaveCount(0);
 
   await page.getByRole("button", { name: /지원관리자/ }).click();
-  await page.getByRole("textbox", { name: "내부 메모 (선택)" }).fill("ticket");
+  await page.getByRole("textbox", { name: "검토 시에만 확인하는 사유 메모 (저장되지 않음)" }).fill("ticket");
   await page.getByRole("button", { name: "발급 검토" }).click();
   await page.getByRole("button", { name: "발급 확정" }).click();
-  await expect(page.getByText(/create-receipt-1/)).toBeVisible();
+  await expect(page.getByRole("region", { name: "명령 기록" })).toContainText("create-receipt-1");
+  await expect(page.getByText("내부 메모")).toHaveCount(0);
   await page.getByRole("button", { name: "권한 취소 검토" }).click();
   await page.getByRole("button", { name: "취소 검토", exact: true }).click();
   await page.getByRole("button", { name: "취소 확정" }).click();

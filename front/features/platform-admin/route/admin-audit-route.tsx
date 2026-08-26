@@ -6,7 +6,12 @@ import {
   adminAuditSearchFromFilters,
   mergeAdminAuditLedgerPages,
   type AdminAuditFilters,
+  type AdminAuditLedgerItem,
 } from "@/features/platform-admin/model/platform-admin-audit-model";
+import {
+  adminAuditDetailOpenFromSearchParams,
+  adminAuditEventFromSearchParams,
+} from "./admin-audit-data";
 import { canAdmin } from "@/features/platform-admin/model/platform-admin-capabilities";
 import {
   platformAdminAuditKeys,
@@ -27,6 +32,8 @@ export function AdminAuditRoute() {
   const [searchParams, setSearchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const filters = useMemo(() => adminAuditFiltersFromSearchParams(searchParams), [searchParams]);
+  const selectedId = useMemo(() => adminAuditEventFromSearchParams(searchParams), [searchParams]);
+  const detailOpen = useMemo(() => adminAuditDetailOpenFromSearchParams(searchParams), [searchParams]);
   const capabilities = useQuery(platformAdminCapabilitiesQuery()).data ?? null;
   const canViewSensitive = capabilities !== null && canAdmin(capabilities, "VIEW_SENSITIVE_AUDIT");
   const previousCanViewSensitive = useRef(canViewSensitive);
@@ -71,6 +78,19 @@ export function AdminAuditRoute() {
     setSearchParams(adminAuditSearchFromFilters(next), { replace: true });
   }
 
+  function selectEvent(item: AdminAuditLedgerItem) {
+    const next = adminAuditSearchFromFilters(filters);
+    next.set("event", item.id);
+    next.set("mode", "detail");
+    setSearchParams(next);
+  }
+
+  function closeDetail() {
+    const next = adminAuditSearchFromFilters(filters);
+    if (selectedId) next.set("event", selectedId);
+    setSearchParams(next, { replace: true });
+  }
+
   function submitSensitiveSearch() {
     const normalized = searchValue.trim();
     if (!canViewSensitive || !normalized) return;
@@ -105,6 +125,10 @@ export function AdminAuditRoute() {
         onSubmit: submitSensitiveSearch,
         onClear: clearSensitiveState,
       }}
+      selectedId={selectedId}
+      detailOpen={detailOpen}
+      onSelect={selectEvent}
+      onCloseDetail={closeDetail}
       onFilterChange={changeFilters}
       onLoadMore={() => void activeQuery.fetchNextPage()}
       onRetryLoadMore={() => void activeQuery.fetchNextPage()}

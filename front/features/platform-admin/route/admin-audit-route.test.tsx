@@ -91,6 +91,8 @@ describe("AdminAuditRoute", () => {
     await screen.findByRole("button", { name: /다음 이벤트/ });
     expect(screen.getAllByRole("button", { name: /경계 이벤트/ })).toHaveLength(1);
     expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("경계 이벤트");
+    expect(screen.getByLabelText("location")).toHaveTextContent("event=boundary");
+    expect(screen.getByLabelText("location")).toHaveTextContent("mode=detail");
     expect(fetchAdminAuditLedger).toHaveBeenLastCalledWith(
       {
         range: "7d",
@@ -144,6 +146,38 @@ describe("AdminAuditRoute", () => {
     const sensitiveCache = queryClient.getQueriesData({ queryKey: [...platformAdminAuditKeys.all, "sensitive"] });
     expect(JSON.stringify(sensitiveCache)).not.toContain("private@example.com");
     expect(sensitiveCache.every(([key]) => (key as readonly unknown[]).at(-1) === 0)).toBe(true);
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("private@example.com");
+  });
+
+  it("opens detail from a share-safe event URL and restores row focus when detail closes", async () => {
+    const user = userEvent.setup();
+    renderRoute("/admin/audit?sourceSlice=S6&event=event-1&mode=detail");
+
+    expect(await screen.findByRole("button", { name: /첫 이벤트/ })).toHaveAttribute("aria-pressed", "true");
+    const detail = screen.getByRole("region", { name: "감사 이벤트 상세" });
+    expect(detail).toHaveTextContent("첫 이벤트");
+    expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "true");
+
+    await user.click(screen.getByRole("button", { name: "목록으로" }));
+
+    expect(screen.getByLabelText("location")).toHaveTextContent("event=event-1");
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("mode=detail");
+    expect(screen.getByRole("button", { name: /첫 이벤트/ })).toHaveFocus();
+    expect(document.querySelector(".admin-audit__body")).toHaveAttribute("data-detail-open", "false");
+  });
+
+  it("does not put a sensitive target into the event URL or query key after a row is selected", async () => {
+    const user = userEvent.setup();
+    const { queryClient } = renderRoute();
+    await user.type(await screen.findByRole("searchbox", { name: "민감 대상 검색" }), "private.member@example.com");
+    await user.click(screen.getByRole("button", { name: "대상 검색" }));
+    await user.click(await screen.findByRole("button", { name: /검색 결과/ }));
+
+    expect(screen.getByLabelText("location")).toHaveTextContent("event=private-hit");
+    expect(screen.getByLabelText("location")).not.toHaveTextContent("private.member@example.com");
+    expect(JSON.stringify(queryClient.getQueryCache().getAll().map((query) => query.queryKey))).not.toContain(
+      "private.member@example.com",
+    );
   });
 
   it("retains prior rows and offers a focused retry when load more fails", async () => {

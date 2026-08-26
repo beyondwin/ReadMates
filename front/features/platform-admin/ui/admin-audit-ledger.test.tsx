@@ -65,6 +65,10 @@ describe("AdminAuditLedger", () => {
         nextPageError={false}
         loadingMore={false}
         sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
         onFilterChange={vi.fn()}
         onLoadMore={vi.fn()}
         onRetryLoadMore={vi.fn()}
@@ -93,6 +97,10 @@ describe("AdminAuditLedger", () => {
         nextPageError={false}
         loadingMore={false}
         sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
         onFilterChange={vi.fn()}
         onLoadMore={vi.fn()}
         onRetryLoadMore={vi.fn()}
@@ -134,6 +142,10 @@ describe("AdminAuditLedger", () => {
           nextPageError={false}
           loadingMore={false}
           sensitiveSearch={defaultSearch}
+          selectedId={null}
+          detailOpen={false}
+          onSelect={vi.fn()}
+          onCloseDetail={vi.fn()}
           onFilterChange={vi.fn()}
           onLoadMore={vi.fn()}
           onRetryLoadMore={vi.fn()}
@@ -170,6 +182,10 @@ describe("AdminAuditLedger", () => {
         nextPageError={false}
         loadingMore={false}
         sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
         onFilterChange={vi.fn()}
         onLoadMore={vi.fn()}
         onRetryLoadMore={vi.fn()}
@@ -203,7 +219,7 @@ describe("AdminAuditLedger", () => {
             }],
           }}
           filters={{ range: "7d" }} loading={false} error={null} nextPageError={false} loadingMore={false}
-          sensitiveSearch={defaultSearch} onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()}
+          sensitiveSearch={defaultSearch} selectedId={null} detailOpen={false} onSelect={vi.fn()} onCloseDetail={vi.fn()} onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()}
         />
       </MemoryRouter>,
     );
@@ -220,24 +236,45 @@ describe("AdminAuditLedger", () => {
 
   it("supports arrow-key row navigation and a mobile return to the list", async () => {
     const user = userEvent.setup();
-    render(
+    const onSelect = vi.fn();
+    const onCloseDetail = vi.fn();
+    const { rerender } = render(
       <AdminAuditLedger page={page} filters={{ range: "7d" }} loading={false} error={null}
         nextPageError={false} loadingMore={false} sensitiveSearch={defaultSearch}
+        selectedId={page.items[0].id} detailOpen={true} onSelect={onSelect} onCloseDetail={onCloseDetail}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
     const first = screen.getByRole("button", { name: /알림 재처리가 확정되었습니다/ });
     first.focus();
     await user.keyboard("{ArrowDown}");
+    expect(onSelect).toHaveBeenCalledWith(page.items[1]);
+    rerender(
+      <AdminAuditLedger page={page} filters={{ range: "7d" }} loading={false} error={null}
+        nextPageError={false} loadingMore={false} sensitiveSearch={defaultSearch}
+        selectedId={page.items[1].id} detailOpen={true} onSelect={onSelect} onCloseDetail={onCloseDetail}
+        onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
+    );
     expect(screen.getByRole("button", { name: /support grant가 생성되었습니다/ })).toHaveFocus();
     expect(screen.getByRole("region", { name: "감사 이벤트 상세" })).toHaveTextContent("support grant가 생성되었습니다");
     await user.click(screen.getByRole("button", { name: "목록으로" }));
-    expect(screen.getByLabelText("감사 이벤트 목록")).toHaveFocus();
+    expect(onCloseDetail).toHaveBeenCalledOnce();
+    rerender(
+      <AdminAuditLedger page={page} filters={{ range: "7d" }} loading={false} error={null}
+        nextPageError={false} loadingMore={false} sensitiveSearch={defaultSearch}
+        selectedId={page.items[1].id} detailOpen={false} onSelect={onSelect} onCloseDetail={onCloseDetail}
+        onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
+    );
+    expect(screen.getByRole("button", { name: /support grant가 생성되었습니다/ })).toHaveFocus();
   });
 
   it("exposes every share-safe filter without exposing cursor controls", () => {
     render(
       <AdminAuditLedger page={page} filters={{ range: "7d" }} loading={false} error={null}
         nextPageError={false} loadingMore={false} sensitiveSearch={defaultSearch}
+        selectedId={null}
+        detailOpen={false}
+        onSelect={vi.fn()}
+        onCloseDetail={vi.fn()}
         onFilterChange={vi.fn()} onLoadMore={vi.fn()} onRetryLoadMore={vi.fn()} />,
     );
     expect(screen.getByLabelText("시작 시각")).toBeInTheDocument();

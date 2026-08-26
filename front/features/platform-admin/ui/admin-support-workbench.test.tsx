@@ -98,7 +98,27 @@ describe("AdminSupportWorkbench", () => {
     } })} />);
     const receipt = screen.getByLabelText("명령 영수증");
     expect(receipt).toHaveTextContent("receipt-1");
-    expect(receipt).toHaveTextContent("메모 있음");
+    expect(receipt).toHaveTextContent("검토 시 사유 메모 사용");
     expect(receipt).not.toHaveTextContent("raw private note");
+    expect(screen.queryByText(/내부 메모/)).not.toBeInTheDocument();
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toHaveTextContent("receipt-1");
+    expect(timeline.querySelector(".admin-receipt-timeline__convergence")).toBeNull();
+  });
+
+  it("keeps the optional reason note as review-time-only copy", () => {
+    render(<AdminSupportWorkbench {...props({
+      search: { ...props().search, selected: {
+        subjectId: "subject-1", displayName: "지원 대상", maskedEmail: "s***@example.com", kind: "USER", platformAdminRole: null, platformAdminStatus: null, clubMembershipSummary: [], grantEligible: true, grantBlockedReason: null,
+      } },
+    })} />);
+    expect(screen.getByLabelText("검토 시에만 확인하는 사유 메모 (저장되지 않음)")).toBeInTheDocument();
+    expect(screen.queryByLabelText("내부 메모 (선택)")).not.toBeInTheDocument();
+    expect(screen.queryByText(/오래 보관/)).not.toBeInTheDocument();
+  });
+
+  it("does not render an L2 timeline before an actual grant or revoke receipt", () => {
+    render(<AdminSupportWorkbench {...props()} />);
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
   });
 });

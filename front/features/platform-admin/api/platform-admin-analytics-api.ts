@@ -1,4 +1,5 @@
 import { readmatesFetch, readmatesFetchResponse } from "@/shared/api/client";
+import { apiErrorFromResponse } from "@/shared/api/errors";
 import { parseAdminAnalyticsOverview } from "@/features/platform-admin/api/platform-admin-analytics-contracts";
 import {
   analyticsSearchFromWindow,
@@ -26,7 +27,7 @@ export async function fetchAdminAnalyticsExport(window: AnalyticsWindow): Promis
     { clubSlug: undefined },
   );
   if (!response.ok) {
-    throw new Error(`Analytics export failed (${response.status})`);
+    throw await apiErrorFromResponse(response);
   }
   return {
     blob: await response.blob(),

@@ -69,6 +69,46 @@ describe("AdminAnalyticsOverviewView", () => {
     expect(screen.getByRole("button", { name: "CSV 내려받기" })).toBeEnabled();
   });
 
+  it("hides export when the export capability is absent and does not invoke the handler", () => {
+    const onExport = vi.fn();
+    render(
+      <AdminAnalyticsOverviewView
+        overview={overview}
+        window="30d"
+        loading={false}
+        error={null}
+        onWindowChange={vi.fn()}
+        exportStatus="idle"
+        canExport={false}
+        onExport={onExport}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "CSV 내려받기" })).not.toBeInTheDocument();
+    expect(screen.getByText("현재 권한으로는 CSV를 내려받을 수 없습니다.")).toBeInTheDocument();
+    expect(onExport).not.toHaveBeenCalled();
+  });
+
+  it("shows a forbidden overview state without KPI evidence", () => {
+    render(
+      <AdminAnalyticsOverviewView
+        overview={null}
+        window="30d"
+        loading={false}
+        error={null}
+        onWindowChange={vi.fn()}
+        exportStatus="idle"
+        canView={false}
+        canExport={false}
+        onExport={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/권한이 없습니다|분석 권한이 없습니다/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "CSV 내려받기" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("핵심 지표")).not.toBeInTheDocument();
+  });
+
   it("renders an honest empty trend state when KPI series are unavailable", () => {
     render(
       <AdminAnalyticsOverviewView

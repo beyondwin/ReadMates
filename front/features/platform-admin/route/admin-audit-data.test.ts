@@ -41,4 +41,25 @@ describe("adminAuditLoaderFactory", () => {
       expect((error as Response).headers.get("X-Remix-Replace")).toBe("true");
     }
   });
+
+  it("accepts a share-safe event id and detail mode without prefetching the sensitive target", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    await expect(adminAuditLoaderFactory(client)({
+      request: new Request("https://readmates.example/admin/audit?sourceSlice=S6&event=platform_audit_events:event-1&mode=detail"),
+    } as never)).resolves.toBeNull();
+    expect(fetchAdminAuditLedger).toHaveBeenCalledWith({ range: "7d", sourceSlice: "S6" }, undefined);
+  });
+
+  it("replace-redirects an unsafe event, bogus mode, and sensitive target while keeping share-safe filters", async () => {
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    try {
+      await adminAuditLoaderFactory(client)({
+        request: new Request("https://readmates.example/admin/audit?sourceSlice=S4&event=private.member@example.com&mode=edit&q=secret"),
+      } as never);
+      throw new Error("expected replace redirect");
+    } catch (error) {
+      expect((error as Response).headers.get("Location")).toBe("/admin/audit?range=7d&sourceSlice=S4");
+      expect((error as Response).headers.get("X-Remix-Replace")).toBe("true");
+    }
+  });
 });

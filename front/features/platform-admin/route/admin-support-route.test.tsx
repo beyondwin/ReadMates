@@ -190,23 +190,28 @@ describe("AdminSupportRoute", () => {
     fireEvent.click(screen.getByRole("button", { name: "검색" }));
     fireEvent.click(await screen.findByRole("button", { name: /지원 대상/ }));
     fireEvent.change(screen.getByLabelText("선택 사유"), { target: { value: "MEMBER_ASSISTANCE" } });
-    fireEvent.change(screen.getByLabelText("내부 메모 (선택)"), { target: { value: "raw private note" } });
+    fireEvent.change(screen.getByLabelText("검토 시에만 확인하는 사유 메모 (저장되지 않음)"), { target: { value: "raw private note" } });
     fireEvent.click(screen.getByRole("button", { name: "발급 검토" }));
     expect(await screen.findByText(/GRANT_SUPPORT_ACCESS/)).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "명령 기록" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "발급 확정" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("같은 요청");
     await act(() => router.navigate("/admin/other"));
     expect(router.state.location.pathname).toBe("/admin/support");
     fireEvent.click(screen.getByRole("button", { name: "발급 확정" }));
 
-    expect(await screen.findByText(/receipt-1/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "명령 기록" })).toHaveTextContent("receipt-1");
     const calls = vi.mocked(confirmAdminSupportGrant).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.[0].idempotencyKey).toBe(calls[1]?.[0].idempotencyKey);
     const receipt = screen.getByLabelText("명령 영수증");
     expect(within(receipt).getByText(/MEMBER_ASSISTANCE/)).toBeInTheDocument();
-    expect(within(receipt).getByText(/메모 있음/)).toBeInTheDocument();
+    expect(within(receipt).getByText(/검토 시 사유 메모 사용/)).toBeInTheDocument();
     expect(screen.queryByText("raw private note")).not.toBeInTheDocument();
+    expect(screen.queryByText(/내부 메모/)).not.toBeInTheDocument();
+    const timeline = screen.getByRole("region", { name: "명령 기록" });
+    expect(timeline).toHaveTextContent("receipt-1");
+    expect(timeline.querySelector(".admin-receipt-timeline__convergence")).toBeNull();
   });
 
   it("deduplicates cursor boundaries and clears private command state on authority loss", async () => {
@@ -264,16 +269,50 @@ describe("AdminSupportRoute", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("같은 요청");
     fireEvent.click(screen.getByRole("button", { name: "취소 확정" }));
 
-    expect(await screen.findByText(/revoke-receipt-1/)).toBeInTheDocument();
+    expect(await screen.findByRole("region", { name: "명령 기록" })).toHaveTextContent("revoke-receipt-1");
     const calls = vi.mocked(confirmAdminSupportGrantRevoke).mock.calls;
     expect(calls).toHaveLength(2);
     expect(calls[0]?.[1].idempotencyKey).toBe(calls[1]?.[1].idempotencyKey);
+    expect(screen.getByRole("region", { name: "명령 기록" })).toHaveTextContent("revoke-receipt-1");
   });
 
   it("fails closed when the authoritative capability is absent", async () => {
     renderRoute({ canManage: false });
     expect(screen.getByText("현재 권한으로는 지원 접근 권한을 변경할 수 없습니다.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "권한 취소 검토" })).not.toBeInTheDocument();
+  });
+
+  it("does not give SUPPORT a mutation from the role name without MANAGE_SUPPORT_ACCESS", async () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false, staleTime: Infinity }, mutations: { retry: false } },
+    });
+    client.setQueryData(platformAdminCapabilitiesQuery().queryKey, {
+      schemaVersion: 1,
+      role: "SUPPORT",
+      status: "ACTIVE",
+      capabilities: ["VIEW_SUPPORT"],
+      generatedAt: "2026-08-25T00:00:00Z",
+    });
+    client.setQueryData(platformAdminClubsQuery().queryKey, {
+      items: [{ clubId: "club-1", name: "읽는사이" }],
+    });
+    client.setQueryData(platformAdminSupportLedgerInfiniteQuery({ clubId: "club-1" }).queryKey, {
+      pages: [{ items: [grant], nextCursor: null }],
+      pageParams: [undefined],
+    });
+    render(
+      <QueryClientProvider client={client}>
+        <RouterProvider router={createMemoryRouter([
+          { path: "/admin/support", element: <AdminSupportRoute /> },
+        ], { initialEntries: ["/admin/support?clubId=club-1"] })} />
+      </QueryClientProvider>,
+    );
+
+    expect(screen.queryByRole("button", { name: "권한 취소 검토" })).not.toBeInTheDocument();
+    expect(previewAdminSupportGrant).not.toHaveBeenCalled();
+    expect(confirmAdminSupportGrant).not.toHaveBeenCalled();
+    expect(previewAdminSupportGrantRevoke).not.toHaveBeenCalled();
+    expect(confirmAdminSupportGrantRevoke).not.toHaveBeenCalled();
   });
 
   it("clears an existing preview when the current capability is removed", async () => {

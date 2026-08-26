@@ -27,7 +27,11 @@ async function json(route: Route, status: number, body: unknown): Promise<void> 
   await route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
 }
 
-async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Promise<void> {
+async function routePlatformAdminShell(
+  page: Page,
+  role: PlatformAdminRole,
+  capabilities: string[] = ["VIEW_ANALYTICS", "EXPORT_ANALYTICS"],
+): Promise<void> {
   await routeEmptyAdminOperations(page);
   await page.route("**/api/bff/api/auth/me**", async (route) => {
     await json(route, 200, platformAdminAuth(role));
@@ -46,7 +50,7 @@ async function routePlatformAdminShell(page: Page, role: PlatformAdminRole): Pro
       schemaVersion: 1,
       role,
       status: "ACTIVE",
-      capabilities: ["VIEW_ANALYTICS", "EXPORT_ANALYTICS"],
+      capabilities,
       generatedAt: "2026-08-25T00:00:00Z",
     });
   });
@@ -117,6 +121,25 @@ async function expectNoPrivateSentinels(page: Page): Promise<void> {
   await expect(page.getByText("ADMIN_ROUTE")).toHaveCount(0);
   await expect(page.getByText("{\"")).toHaveCount(0);
 }
+
+test("owner without EXPORT_ANALYTICS cannot start a CSV download", async ({ page }) => {
+  let exportRequests = 0;
+  await routePlatformAdminShell(page, "OWNER", ["VIEW_ANALYTICS"]);
+  await routeAnalytics(page);
+  await page.route("**/api/bff/api/admin/analytics/export.csv**", async (route) => {
+    exportRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: "text/csv; charset=utf-8",
+      body: "record_type,window\r\nmetadata,30d\r\n",
+    });
+  });
+
+  await page.goto("/admin/analytics");
+  await expect(page.getByRole("heading", { name: "분석" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "CSV 내려받기" })).toHaveCount(0);
+  expect(exportRequests).toBe(0);
+});
 
 test("owner reviews admin analytics overview and switches window", async ({ page }) => {
   await routePlatformAdminShell(page, "OWNER");

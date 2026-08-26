@@ -6,6 +6,7 @@ import type {
   SupportGrantReasonCategory,
   SupportGrantStatus,
 } from "@/features/platform-admin/model/platform-admin-support-model";
+import { AdminReceiptTimeline } from "./admin-receipt-timeline";
 
 export type AdminSupportWorkbenchClub = { clubId: string; name: string };
 
@@ -113,7 +114,12 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
       </header>
 
       {!props.canManage ? <p className="admin-support-workbench__notice">현재 권한으로는 지원 접근 권한을 변경할 수 없습니다.</p> : null}
-      {props.latestReceipt ? <ReceiptSummary receipt={props.latestReceipt} /> : null}
+      {props.latestReceipt ? (
+        <>
+          <ReceiptSummary receipt={props.latestReceipt} />
+          <SupportReceiptTimeline receipt={props.latestReceipt} />
+        </>
+      ) : null}
 
       <section className="admin-support-workbench__panel" aria-labelledby="support-search-title">
         <h2 id="support-search-title" className="h3 editorial">지원 대상 검색</h2>
@@ -145,7 +151,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
           </div>
           <CommandFields
             categoryLabel="선택 사유"
-            noteLabel="내부 메모 (선택)"
+            noteLabel="검토 시에만 확인하는 사유 메모 (저장되지 않음)"
             reasonCategory={props.create.reasonCategory}
             note={props.create.note}
             expiresAt={props.create.expiresAt}
@@ -175,7 +181,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
           <div className="admin-support-workbench__ledger">
             {props.ledger.items.map((item) => (
               <article key={item.grantId} className="admin-support-workbench__ledger-row">
-                <div><p><strong>{item.clubName}</strong> · {item.granteeDisplayName}</p><p className="small muted">{item.granteeMaskedEmail} · {item.status} · {item.reasonCategory} · {item.notePresent ? "메모 있음" : "메모 없음"}</p></div>
+                <div><p><strong>{item.clubName}</strong> · {item.granteeDisplayName}</p><p className="small muted">{item.granteeMaskedEmail} · {item.status} · {item.reasonCategory} · {notePresenceLabel(item.notePresent)}</p></div>
                 {props.canManage && item.status === "ACTIVE" ? <button type="button" className="btn btn-ghost btn-sm" disabled={effectLocked} onClick={() => props.revoke.onStart(item)}>권한 취소 검토</button> : null}
               </article>
             ))}
@@ -187,7 +193,7 @@ export function AdminSupportWorkbench(props: AdminSupportWorkbenchProps) {
       {props.revoke.target ? (
         <section className="admin-support-workbench__panel" aria-labelledby="support-revoke-title">
           <div className="admin-support-workbench__section-heading"><div><h2 id="support-revoke-title" className="h3 editorial">지원 접근 권한 취소</h2><p className="small muted">{props.revoke.target.clubName} · {props.revoke.target.granteeDisplayName}</p></div><button type="button" className="btn btn-ghost btn-sm" disabled={props.revoke.confirmPending || props.revoke.outcomeUnknown} onClick={props.revoke.onCancel}>닫기</button></div>
-          <CommandFields categoryLabel="취소 사유" noteLabel="취소 메모 (선택)" reasonCategory={props.revoke.reasonCategory} note={props.revoke.note} locked={props.revoke.preview !== null || props.revoke.confirmPending || props.revoke.receipt !== null} onReasonCategoryChange={props.revoke.onReasonCategoryChange} onNoteChange={props.revoke.onNoteChange} />
+          <CommandFields categoryLabel="취소 사유" noteLabel="검토 시에만 확인하는 사유 메모 (저장되지 않음)" reasonCategory={props.revoke.reasonCategory} note={props.revoke.note} locked={props.revoke.preview !== null || props.revoke.confirmPending || props.revoke.receipt !== null} onReasonCategoryChange={props.revoke.onReasonCategoryChange} onNoteChange={props.revoke.onNoteChange} />
           {props.revoke.preview ? <PreviewSummary preview={props.revoke.preview} /> : null}
           {props.revoke.receipt ? <ReceiptSummary receipt={props.revoke.receipt} /> : null}
           {props.revoke.recovery ? <p className="danger" role="alert">{props.revoke.recovery}</p> : null}
@@ -217,9 +223,31 @@ function CommandFields(props: {
 }
 
 function PreviewSummary({ preview }: { preview: AdminSupportGrantPreview }) {
-  return <section className="admin-support-workbench__review" aria-label="변경 검토"><p><strong>{preview.commandType === "CREATE" ? "발급" : "취소"} 영향</strong></p><ul>{preview.impactCodes.map((code) => <li key={code}>{code}</li>)}</ul><p className="small muted">사유 {preview.reasonCategory} · {preview.notePresent ? "메모 있음" : "메모 없음"} · 검토 만료 {preview.expiresAt}</p></section>;
+  return <section className="admin-support-workbench__review" aria-label="변경 검토"><p><strong>{preview.commandType === "CREATE" ? "발급" : "취소"} 영향</strong></p><ul>{preview.impactCodes.map((code) => <li key={code}>{code}</li>)}</ul><p className="small muted">사유 {preview.reasonCategory} · {notePresenceLabel(preview.notePresent)} · 검토 만료 {preview.expiresAt}</p></section>;
 }
 
 function ReceiptSummary({ receipt }: { receipt: AdminSupportGrantReceipt }) {
-  return <section className="admin-support-workbench__receipt" aria-label="명령 영수증"><p><strong>처리 완료</strong> · {receipt.outcome}</p><p className="small muted">영수증 {receipt.receiptId} · {receipt.beforeStatus} → {receipt.afterStatus}</p><p className="small muted">{receipt.reasonCategory} · {receipt.notePresent ? "메모 있음" : "메모 없음"}</p></section>;
+  return <section className="admin-support-workbench__receipt" aria-label="명령 영수증"><p><strong>처리 완료</strong> · {receipt.outcome}</p><p className="small muted">영수증 {receipt.receiptId} · {receipt.beforeStatus} → {receipt.afterStatus}</p><p className="small muted">{receipt.reasonCategory} · {notePresenceLabel(receipt.notePresent)}</p></section>;
+}
+
+function SupportReceiptTimeline({ receipt }: { receipt: AdminSupportGrantReceipt }) {
+  return (
+    <AdminReceiptTimeline
+      level="L2"
+      receiptId={`영수증 ${receipt.receiptId}`}
+      entries={[
+        {
+          key: "command",
+          label: `${receipt.commandType === "CREATE" ? "발급" : "취소"} ${receipt.outcome}`,
+          state: receipt.outcome === "SUCCEEDED" ? "succeeded" : "failed",
+          occurredAt: receipt.createdAt,
+          detail: `${receipt.beforeStatus} → ${receipt.afterStatus} · ${receipt.reasonCategory} · ${notePresenceLabel(receipt.notePresent)}`,
+        },
+      ]}
+    />
+  );
+}
+
+function notePresenceLabel(notePresent: boolean) {
+  return notePresent ? "검토 시 사유 메모 사용" : "검토 시 사유 메모 없음";
 }
