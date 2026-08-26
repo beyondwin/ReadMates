@@ -31,28 +31,30 @@ async function loginHost(page: Page) {
 }
 
 async function closeWorkspaceSheets(page: Page) {
-  const backdrop = page.locator(".rm-host-session-workspace__sheet-backdrop");
-  if (await backdrop.isVisible().catch(() => false)) {
-    await page.locator(".rm-host-session-workspace__sheet").focus();
+  await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+  const openBackdrop = page.locator(".rm-host-session-workspace__sheet-backdrop").filter({ visible: true });
+  const section = new URL(page.url()).searchParams.get("section");
+  if (section) {
+    await expect(openBackdrop.first()).toBeVisible();
+  }
+  if (await openBackdrop.count() === 0) return;
+  const sheet = page.getByRole("dialog").filter({ visible: true }).first();
+  const collapse = sheet.getByRole("button", { name: "접기" });
+  if (await collapse.isVisible().catch(() => false)) {
+    await collapse.click();
+  } else {
+    await sheet.focus();
     await page.keyboard.press("Escape");
-    await expect(backdrop).toBeHidden();
   }
-  for (const name of ["모임 정보", "변경 내역"] as const) {
-    const trigger = page.getByRole("button", { name }).first();
-    const sheet = page.getByRole("dialog", { name });
-    if (await trigger.count() === 0 && await sheet.count() === 0) continue;
-    if ((await trigger.getAttribute("aria-expanded")) !== "true" && !(await sheet.isVisible())) {
-      continue;
-    }
-    const collapse = sheet.getByRole("button", { name: "접기" });
-    if (await collapse.isVisible().catch(() => false)) {
-      await collapse.click();
-    } else if (await sheet.isVisible()) {
-      await sheet.focus();
-      await page.keyboard.press("Escape");
-    }
-    await expect(sheet).toBeHidden();
-  }
+  await expect(openBackdrop).toHaveCount(0);
+}
+
+async function expectFocusDeckOverview(page: Page) {
+  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
+  await expect(page.getByRole("navigation", { name: "현재 모임 작업" })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "모임 작업 목차" })).toHaveCount(0);
+  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toHaveCount(0);
+  await expect(page.getByRole("region", { name: "지금 할 일" })).toBeVisible();
 }
 
 async function openRecordEditor(page: Page) {
@@ -60,8 +62,7 @@ async function openRecordEditor(page: Page) {
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
-  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
+  await expectFocusDeckOverview(page);
 }
 
 async function openEditorSection(
@@ -83,29 +84,28 @@ async function openEditorSection(
     return;
   }
   if (name === "변경 기록") {
-    await page.getByRole("link", { name: "변경 내역" }).click();
+    await closeWorkspaceSheets(page);
+    const trigger = page.getByRole("button", { name: "변경 내역" }).first();
+    if ((await trigger.getAttribute("aria-expanded")) !== "true") {
+      await trigger.click();
+    }
     await expect(page).toHaveURL(/section=history/);
+    await expect(page.getByRole("dialog", { name: "변경 내역" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "버전과 작업 기록" })).toBeVisible();
     return;
   }
   await closeWorkspaceSheets(page);
   if (name === "개요") {
-    await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
+    await expectFocusDeckOverview(page);
     return;
   }
-  const taskLink = page.getByRole("link", { name: name === "출석" ? /실제 출석/ : /모임 기록/ });
-  if (await taskLink.count() === 0) {
-    const taskMenu = page.getByRole("button", { name: "모임 작업 목차" });
-    await expect(taskLink.or(taskMenu).first()).toBeVisible();
-    if (await taskMenu.isVisible().catch(() => false)) {
-      await taskMenu.click();
-    }
-    await expect(taskLink).toBeVisible();
-  }
+  const relatedWork = page.getByRole("navigation", { name: "관련 작업" });
+  const taskLink = relatedWork.getByRole("link", { name: name === "출석" ? /실제 출석/ : /모임 기록/ });
+  await expect(taskLink).toBeVisible();
   await taskLink.click();
-  const panelId = name === "출석" ? "workspace-panel-attendance" : "workspace-panel-records";
-  const panel = page.locator(`#${panelId}`);
+  const panel = page.getByRole("dialog", { name: name === "출석" ? "출석" : "모임 기록" });
   await expect(panel).toBeVisible();
+  await expect(panel).toHaveAttribute("aria-modal", "true");
   await expect(panel.getByRole("button", { name: "접기" })).toBeVisible();
 }
 
@@ -147,7 +147,7 @@ async function reviewAndApply(page: Page) {
       response.url().includes(`/host/sessions/${recordSessionId}/record-apply-preview`) &&
       response.ok(),
   );
-  await page.getByRole("button", { name: "반영 전 확인" }).filter({ visible: true }).first().click();
+  await page.locator("#workspace-panel-records").getByRole("button", { name: "반영 전 확인" }).click();
   expect((await previewResponse).ok()).toBe(true);
   const dialog = page.getByRole("dialog", { name: "반영 전 확인" });
   await expect(dialog).toBeVisible();
@@ -297,8 +297,7 @@ where id = '${recordSessionId}';
   await page.goto(`${HOST_PATH}/sessions/${recordSessionId}`);
   await expect(page).toHaveURL(new RegExp(`/sessions/${recordSessionId}/?$`));
   expect(new URL(page.url()).pathname).not.toMatch(/\/edit\/?$/);
-  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
-  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
+  await expectFocusDeckOverview(page);
   const overviewScreenshot = await page.screenshot({
     path: testInfo.outputPath("overview-1280x900.png"),
     fullPage: true,
@@ -545,9 +544,9 @@ where id = '${recordSessionId}';
   await loginHost(page);
   await page.goto(`${HOST_PATH}/sessions/${recordSessionId}`);
   await expect(page.getByRole("heading", { name: "Revision Workflow Session Updated" })).toBeVisible();
-  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
-  await expect(page.getByRole("tab", { name: "개요" })).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
+  await expectFocusDeckOverview(page);
+  await expect(page.getByRole("tab", { name: "개요" })).toHaveCount(0);
   await expect(page.getByRole("button", { name: "모임 정보" })).toBeVisible();
   await expect(page.getByRole("button", { name: "변경 내역" }).first()).toBeVisible();
   const overviewPanel = page.locator(".rm-host-session-workspace__focus");
@@ -615,7 +614,7 @@ where id = '${recordSessionId}';
   });
   expect(overviewScreenshot.byteLength).toBeGreaterThan(10_000);
   await openEditorSection(page, "기록");
-  await page.getByRole("button", { name: "반영 전 확인" }).filter({ visible: true }).first().click();
+  await page.locator("#workspace-panel-records").getByRole("button", { name: "반영 전 확인" }).click();
   await expect(dialog).toBeVisible();
   const wideMobileBox = await sheet.boundingBox();
   expect(wideMobileBox).not.toBeNull();
@@ -632,9 +631,8 @@ where id = '${recordSessionId}';
 
   await page.setViewportSize({ width: 1280, height: 900 });
   await openRecordEditor(page);
-  await expect(page.getByRole("tablist", { name: "호스트 편집 섹션" })).toHaveCount(0);
   await expect(page.locator(".rm-host-session-workspace")).toBeVisible();
-  await expect(page.getByRole("complementary", { name: /지금 확인할 일|반영 전 확인/ })).toBeVisible();
+  await expectFocusDeckOverview(page);
   const desktopScreenshot = await page.screenshot({
     path: testInfo.outputPath("host-editor-overview-1280x900.png"),
     fullPage: true,
