@@ -19,22 +19,6 @@
   "publication": null,
   "state": "PUBLISHED",
   "versions": {
-    "sessionRevision": 3,
-    "exposureRevision": 2,
-    "participantSetRevision": 4,
-    "recordDraftRevision": null,
-    "liveRecordRevision": 1,
-    "publicationRevision": 1
-  },
-  "attendanceSnapshotId": "att:membership-host:6",
-  "attendees": [],
-  "feedbackDocument": {
-    "uploaded": false,
-    "fileName": null,
-    "uploadedAt": null
-  },
-  "changeReceipt": null,
-  "versions": {
     "sessionRevision": 0,
     "exposureRevision": 0,
     "participantSetRevision": 0,
@@ -42,5 +26,12 @@
     "liveRecordRevision": null,
     "publicationRevision": 0
   },
-  "attendanceSnapshotId": "att:"
+  "attendanceSnapshotId": "att:",
+  "attendees": [],
+  "feedbackDocument": {
+    "uploaded": false,
+    "fileName": null,
+    "uploadedAt": null
+  },
+  "changeReceipt": null
 }
